@@ -153,8 +153,8 @@ export function validateModernHeaders(
   }
 
   // Mcp-Name is required only for the name/uri-addressed methods. Of those,
-  // this server implements tools/call alone.
-  if (method === "tools/call") {
+  // this server implements tools/call and prompts/get.
+  if (method === "tools/call" || method === "prompts/get") {
     const bodyName = (params as { name?: unknown } | undefined)?.name;
     const nameHeader = header("Mcp-Name");
     if (!nameHeader) return "missing Mcp-Name header";

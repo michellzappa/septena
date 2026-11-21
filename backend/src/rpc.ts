@@ -50,6 +50,19 @@ export type Tool = {
   annotations: ToolAnnotations;
 };
 
+export interface PromptArgument {
+  name: string;
+  description: string;
+  required: boolean;
+}
+
+export interface Prompt {
+  name: string;
+  title: string;
+  description: string;
+  arguments?: PromptArgument[];
+}
+
 /// Parse the JSON-RPC body and run the per-request protocol checks: reply 202
 /// to notifications, pick the era, and for modern requests validate the
 /// header/body agreement and the declared version. Returns a finished
@@ -115,8 +128,9 @@ export async function readRpcRequest(
 export function answerProtocolMethod(
   req: JsonRpcRequest,
   era: Era,
-  opts: { instructions: string; initializeInstructions?: string },
+  opts: { instructions: string; initializeInstructions?: string; hasPrompts?: boolean },
 ): Response | null {
+  const capabilities = opts.hasPrompts ? { tools: {}, prompts: {} } : { tools: {} };
   switch (req.method) {
     case "server/discover":
       // MUST be implemented by every modern server. Pure identity — no
@@ -126,7 +140,7 @@ export function answerProtocolMethod(
         req.id,
         {
           supportedVersions: SUPPORTED_VERSIONS,
-          capabilities: { tools: {} },
+          capabilities,
           instructions: opts.instructions,
           ttlMs: DISCOVER_TTL_MS,
           cacheScope: "public",
@@ -141,7 +155,7 @@ export function answerProtocolMethod(
       const requested = (req.params as { protocolVersion?: unknown } | undefined)?.protocolVersion;
       const result: Record<string, unknown> = {
         protocolVersion: negotiateLegacyVersion(requested),
-        capabilities: { tools: {} },
+        capabilities,
         serverInfo: SERVER_INFO,
       };
       if (opts.initializeInstructions !== undefined) result.instructions = opts.initializeInstructions;

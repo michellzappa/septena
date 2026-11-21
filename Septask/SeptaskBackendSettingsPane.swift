@@ -16,32 +16,49 @@ import UIKit
 /// the backend does not hold (its reconcile diffs each row against what the
 /// backend last confirmed), so a re-upload action would add nothing.
 struct SeptaskBackendSettingsPane: View {
+  private enum CopiedTarget: Equatable { case url, setupPrompt, starterPrompt }
+
   private var sync: TaskSyncEngine { .shared }
-  /// Claude connector pairing.
+  /// MCP connector pairing.
   @State private var pairCode = ""
   @State private var pairing = false
   @State private var pairResult: (text: String, failed: Bool)?
-  @State private var copiedURL = false
+  @State private var copied: CopiedTarget?
   private static let connectorURL = "https://api.septena.app/mcp"
+  private static let setupPrompt = "Set up Septena for me using https://septena.app/agents.md"
+  private static let starterPrompt =
+    "Set up my Septena areas, projects, and tasks by following https://api.septena.app/onboard.md"
 
   var body: some View {
     Form {
       SeptaskSyncAccountSection()
-      claudeSection
+      connectorSection
       if !sync.issues.isEmpty { issuesSection }
     }
     .formStyle(.grouped)
     .navigationTitle("Task backend")
   }
 
-  private var claudeSection: some View {
+  private var connectorSection: some View {
     Section {
+      LabeledContent("Setup prompt") {
+        Button(copied == .setupPrompt ? "Copied" : "Copy") {
+          copyText(Self.setupPrompt, target: .setupPrompt)
+        }
+      }
+      LabeledContent("First prompt") {
+        Button(copied == .starterPrompt ? "Copied" : "Copy") {
+          copyText(Self.starterPrompt, target: .starterPrompt)
+        }
+      }
       LabeledContent("Connector URL") {
         HStack {
           Text(Self.connectorURL)
             .font(.callout.monospaced())
             .textSelection(.enabled)
-          Button(copiedURL ? "Copied" : "Copy", action: copyURL)
+          Button(copied == .url ? "Copied" : "Copy") {
+            copyText(Self.connectorURL, target: .url)
+          }
         }
       }
       HStack {
@@ -63,9 +80,9 @@ struct SeptaskBackendSettingsPane: View {
           .foregroundStyle(pairResult.failed ? .red : .secondary)
       }
     } header: {
-      Text("Connect Claude")
+      Text("Connect your AI")
     } footer: {
-      Text("Add this URL to Claude as a custom connector. When Claude shows a code, enter it here. Claude can then read and change your tasks. Only enter a code from a browser window you opened yourself.")
+      Text("Paste the setup prompt into your AI assistant, or add the connector URL manually. When your browser shows a code, enter it here. Once connected, paste the first prompt to populate your areas, projects, and tasks. Only enter a code from a browser window you opened yourself.")
     }
   }
 
@@ -88,14 +105,14 @@ struct SeptaskBackendSettingsPane: View {
     }
   }
 
-  private func copyURL() {
+  private func copyText(_ text: String, target: CopiedTarget) {
     #if os(macOS)
     NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(Self.connectorURL, forType: .string)
+    NSPasteboard.general.setString(text, forType: .string)
     #else
-    UIPasteboard.general.string = Self.connectorURL
+    UIPasteboard.general.string = text
     #endif
-    copiedURL = true
+    copied = target
   }
 
   private func approvePairing() {

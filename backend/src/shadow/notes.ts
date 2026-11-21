@@ -287,7 +287,12 @@ export async function runNotesTool(ctx: NotesContext, name: NotesToolName, args:
       if (args.emoji) fields.emoji = args.emoji;
       const r = await pushOne(store, actor, { op: "upsert", entity: "area", id, fields }, undefined, why);
       if (r?.status !== "applied") throw new Error(`Area not created: ${refusalText(r)}`);
-      return { id, title: args.title, noteRev: args.notes ? 1 : 0 };
+      return {
+        id,
+        title: args.title,
+        ...(args.emoji ? { emoji: args.emoji } : {}),
+        noteRev: args.notes ? 1 : 0,
+      };
     }
 
     case "tasks_project_create": {
