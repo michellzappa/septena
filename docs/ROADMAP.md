@@ -111,7 +111,7 @@ accepts the result with no device awake in between.
 
 ### M3 — The factory ships code, Web client & Source adapters (`Later`)
 
-GitHub milestone: `"M3 The factory ships code"`.
+GitHub milestone: `"M3 Factory ships code"`.
 
 - F2 work profiles, approval cards, `errand`, kill switch
 - F3 `code` workflow on linked repos, run log (needs L0–L1)
