@@ -37,7 +37,6 @@ protocol AreasBackend: AnyObject {
   func rename(id: String, to title: String) async throws
   func setContext(id: String, context: String?) async throws
   func setEmoji(id: String, emoji: String?) async throws
-  func setAttachment(id: String, attachment: AreaAttachment?) async throws
   func delete(id: String) async throws
   /// Renumber areas to match `orderedIDs` (synced sidebar order). See
   /// `docs/DRAG_AND_DROP.md` §5 gap #2.
@@ -85,9 +84,6 @@ final class AreasMutator: AreasBackend {
   }
   func setEmoji(id: String, emoji: String?) async throws {
     try await requireBackend().setEmoji(id: id, emoji: emoji)
-  }
-  func setAttachment(id: String, attachment: AreaAttachment?) async throws {
-    try await requireBackend().setAttachment(id: id, attachment: attachment)
   }
   /// Delete an area and everything filed in it: each of its projects is
   /// deleted the way `ProjectsMutator.delete` deletes one (its tasks go to
@@ -185,7 +181,6 @@ final class AreasMutator: AreasBackend {
     let title: String
     let context: String?
     let emoji: String?
-    let attachmentJSON: String?
     let position: Int
     let cloudKitSystemFields: Data?
   }
@@ -194,7 +189,7 @@ final class AreasMutator: AreasBackend {
     let descriptor = FetchDescriptor<AreaEntity>(predicate: #Predicate { $0.id == id })
     guard let e = try? context.fetch(descriptor).first else { return nil }
     return DeletedArea(id: e.id, title: e.title, context: e.context, emoji: e.emoji,
-                       attachmentJSON: e.attachmentJSON, position: e.position,
+                       position: e.position,
                        cloudKitSystemFields: e.cloudKitSystemFields)
   }
 
@@ -299,7 +294,7 @@ final class CloudKitAreasBackend: AreasBackend {
     // and keeps the old change tag; otherwise the row is new to CloudKit.
     let keepSystemFields = sameID && engine.cancelPendingContainerDeletion(.area, id: s.id)
     let entity = AreaEntity(id: id, title: s.title, context: s.context, emoji: s.emoji,
-                            attachmentJSON: s.attachmentJSON, position: s.position,
+                            position: s.position,
                             cloudKitSystemFields: keepSystemFields ? s.cloudKitSystemFields : nil)
     context.insert(entity)
     DeletedContainerLedger.forget(.area, id)
@@ -323,12 +318,6 @@ final class CloudKitAreasBackend: AreasBackend {
     guard let entity = fetch(id: id) else { return }
     entity.emoji = (emoji?.isEmpty == true) ? nil : emoji
     commitAndPush(entity, op: "setEmoji")
-  }
-
-  func setAttachment(id: String, attachment: AreaAttachment?) async throws {
-    guard let entity = fetch(id: id) else { return }
-    entity.attachmentJSON = attachment?.normalized?.encodedString()
-    commitAndPush(entity, op: "setAttachment")
   }
 
   func delete(id: String) async throws {

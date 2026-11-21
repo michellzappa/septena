@@ -2,13 +2,13 @@
 
 **Status:** proposal (2026-11-21). Defaults in §6 stand unless mz overrules.
 **Decisions:** [ADR 0002](adr/0002-own-backend-replaces-icloud.md), [ADR 0007](adr/0007-septena-is-the-task-app.md), [ADR 0010](adr/0010-free-server-tier-with-limits.md), [ADR 0015](adr/0015-shared-registries-for-cross-platform-clients.md).
-**Builds on:** `docs/SYNC_SUBSCRIPTION_SPEC.md`, `SeptenaCore/TaskAttachments.swift`, `SeptenaCore/AreaAttachment.swift`, `Septena/Shell/Tasks/TaskAttachmentsPanel.swift`, `Septask/SeptaskKitRowViews.swift`, `Septask/SeptaskKitComposer.swift`, `Septask/SeptaskKitInspector.swift`.
+**Builds on:** `docs/SYNC_SUBSCRIPTION_SPEC.md`, `SeptenaCore/TaskAttachments.swift`, `Septena/Shell/Tasks/TaskAttachmentsPanel.swift`, `Septask/SeptaskKitRowViews.swift`, `Septask/SeptaskKitComposer.swift`, `Septask/SeptaskKitInspector.swift`.
 **Tracking issue:** [#131](https://github.com/michellzappa/septena/issues/131).
 **Owner of decisions:** mz. Defaults chosen by the author are marked *(default)*.
 
 ## 1. Goal
 
-Close the macOS parity gap for task, area, and project attachments — Septena's clearest day-one advantage over Things 3 — while honoring the Free vs. Paid attachment sync boundary from ADR 0010 and `docs/SYNC_SUBSCRIPTION_SPEC.md` (local-only on the device that added them on Free; 10 GB R2 sync across devices on Paid).
+Close the macOS parity gap for task file attachments — Septena's clearest day-one advantage over Things 3 — while honoring the Free vs. Paid attachment sync boundary from ADR 0010 and `docs/SYNC_SUBSCRIPTION_SPEC.md` (local-only on the device that added them on Free; 10 GB R2 sync across devices on Paid).
 
 **UX / IA ideal (progressive disclosure):** Tasks without attachments show zero paperclip/icon clutter. Rows with attachments show a quiet paperclip + count indicator; adding files works via drag-and-drop onto a task/composer/inspector, paste (`⌘V` with file/image on clipboard), or the Attach button.
 
@@ -29,15 +29,13 @@ Per `docs/SYNC_SUBSCRIPTION_SPEC.md` §3.2 and `docs/adr/0010-free-server-tier-w
 2. **Composer & Inspector (`SeptaskKitComposer.swift`, `SeptaskKitInspector.swift`):**
    - Attach button (`NSOpenPanel`), paste image/file from `NSPasteboard`, drag-and-drop file(s) directly onto a task row, open composer, or inspector.
    - Compact thumbnail / file-chip strip with **Quick Look** (`QLPreviewPanel` via click / Space on focused chip), Reveal/Save Copy, and Delete (recorded on `TaskUndo` so `⌘Z` restores the attachment metadata + file before purge!).
-3. **Area & Project attachments (`AreaAttachment`):**
-   - Surface the same compact attachment chip + add/remove control in Mac area/project headers or inspector, matching iOS.
 
 ## 4. Phases
 
 | Phase | Scope | Depends on |
 |---|---|---|
 | **AT0 — Plan-table attachment sync gate & cross-device placeholder** | Wire client-side check against server limits (`attachmentsSyncEnabled` / `attachmentsQuotaBytes`), keep local-only attachments working signed-out and on Free, and render the calm `"N files on <device>"` placeholder when remote bytes are not synced. | `#44` (backend entitlement row) |
-| **AT1 — Mac task-row, composer, inspector & Quick Look parity** | Add trailing paperclip indicator on `SeptaskKitRowViews`, drag-and-drop / paste / file-picker attach + Quick Look + undoable delete in `SeptaskKitComposer` and `SeptaskKitInspector`, plus area/project attachment parity. | None (can ship UI ahead of AT0 gate enforcement) |
+| **AT1 — Mac task-row, composer, inspector & Quick Look parity** | Add trailing paperclip indicator on `SeptaskKitRowViews`, drag-and-drop / paste / file-picker attach + Quick Look + undoable delete in `SeptaskKitComposer` and `SeptaskKitInspector`. | None (can ship UI ahead of AT0 gate enforcement) |
 
 ## 5. Verification
 

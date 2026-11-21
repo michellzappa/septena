@@ -43,7 +43,9 @@ const zNotesProposal = z.object({
   why: z.string().max(500).nullable(),
 }).strict();
 
-// `AreaAttachment` — opaque here; the app owns its shape. Size-capped only.
+// Retired (2026-11-21): legacy area/project context-feed pointer
+// (repo/calendar/feed). Kept on the wire so older clients' pushes still
+// validate; new clients never read or write it.
 const zAttachmentPointer = z.record(z.unknown()).refine(
   (v) => JSON.stringify(v).length <= ENTITY_LIMITS.attachmentPointerMax,
   "attachment pointer too large",
@@ -164,6 +166,7 @@ export const ENTITIES = {
       noteRev: { kind: "int", zod: z.never() },
       notesProposal: json(zNotesProposal),
       emoji: text(16),
+      // Retired (2026-11-21): kept so older clients' pushes still validate.
       attachment: json(zAttachmentPointer),
       position: int(),
     },
@@ -185,6 +188,7 @@ export const ENTITIES = {
       noteRev: { kind: "int", zod: z.never() },
       notesProposal: json(zNotesProposal),
       githubRepo: text(200),
+      // Retired (2026-11-21): kept so older clients' pushes still validate.
       attachment: json(zAttachmentPointer),
       position: int(),
     },

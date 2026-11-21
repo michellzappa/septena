@@ -56,8 +56,7 @@ v1 non-goals are still open:
 
 Areas, projects and headings are fully manageable from the shell. What's left:
 
-- **[P3] Project detail / notes**, and area attachment (repo / calendar / feed
-  context feed).
+- **[P3] Project detail / notes.**
 
 ## 4. Views and routes
 

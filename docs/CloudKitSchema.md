@@ -63,7 +63,7 @@ promoted to Prod unless the Console already shows them):
 | 10 | **New field** `reservedString1` (carries an area's optional user emoji — first actual write of this reserved slot) | `Area` | `reservedString1` | String |
 | 11 | **New record type** `Quote` (whole type, 4 fields — user-added + Readwise-imported daily-message lines for the optional dashboard footer) | `Quote` | all | — |
 | 12 | **New record types** for the generalized **Intake** section (replaces retired caffeine/cannabis types — consumables purge 2026-06-12) | `IntakeKind`, `IntakeItem`, `IntakeEvent` | all | — |
-| 13 | **New field** `reservedString1` on `Project` + `reservedString2` on `Area` — carry the JSON-encoded `AreaAttachment` (the one read-only context feed: repo/calendar/feed pointer). First write of these reserved slots. | `Project`, `Area` | `reservedString1` / `reservedString2` | String |
+| 13 | ~~**New field** `reservedString1` on `Project` + `reservedString2` on `Area`~~ — **RETIRED (2026-11-21)**: formerly carried the JSON-encoded area/project context feed (`AreaAttachment`); feature removed, slots no longer written. | `Project`, `Area` | `reservedString1` / `reservedString2` | String |
 | 14 | **New fields** `kind` + `heading` — project section dividers ("headings"). `kind == "heading"` marks a divider row (a `Task` record); `heading` is the FK from a member task to its divider. Both conditional-write. See `TaskKind`. | `Task` | `kind` / `heading` | String |
 | 15 | **New field** `reservedInt1` — synced sidebar sort order (`position`) for areas & projects; renumbered 1…N on Move Up/Down, conditional-write (0 = unset). First write of this reserved int slot. See `docs/DRAG_AND_DROP.md` §5 gap #2. | `Area`, `Project` | `reservedInt1` | Int(64) |
 | 16 | **New record type** `TaskAttachment` — one owned file per record, with metadata and a CloudKit asset. | `TaskAttachment` | all | — |
@@ -97,7 +97,6 @@ view regardless.
 - [ ] `MedicationDefinition` and `MedicationDoseEvent` record types exist with all fields
 - [ ] `IntakeKind`, `IntakeItem`, `IntakeEvent` record types exist with all fields (Intake section)
 - [ ] `SupplementDefinition.bucket : String` present
-- [ ] `Project.reservedString1 : String` + `Area.reservedString2 : String` present (JSON `AreaAttachment` — the one read-only context feed)
 - [ ] No type was promoted with a **different** field type than this manifest (additive
       mistakes can't be undone — if types diverge, the field is permanently wrong in Prod)
 
@@ -213,7 +212,7 @@ These six are the task backend, written by `SeptenaCore/CloudKit/*Record.swift`.
 | `title` | String | `String` | No | |
 | `context` | String | `String?` | Yes | |
 | `reservedString1` | String | `String?` (`emoji`) | Yes | user-assigned glyph; replaces the area dot in UI |
-| `reservedString2` | String | `String?` (`attachmentJSON`) | Yes | JSON-encoded `AreaAttachment` (one read-only context feed) |
+| `reservedString2` | — | retired | — | formerly JSON `AreaAttachment` (retired 2026-11-21; no longer written) |
 | `reservedInt1` | Int(64) | `Int` (`position`) | conditional | synced sidebar sort order; 0 = unset |
 | `reservedDate1` | — | reserved | — | |
 
@@ -228,8 +227,8 @@ These six are the task backend, written by `SeptenaCore/CloudKit/*Record.swift`.
 | `notes` | Bytes (ENCRYPTED_STRING) | `String?` | read-only | legacy; decode fallback only |
 | `notesText` | String | `String?` (`notes`) | Yes | plaintext replacement |
 | `context` | String | `String?` | Yes | |
-| `githubRepo` | String | `String?` | Yes | legacy repo pointer; mirrored from a `.git` `AreaAttachment`, else nil |
-| `reservedString1` | String | `String?` (`attachmentJSON`) | Yes | JSON-encoded `AreaAttachment` (one read-only context feed) |
+| `githubRepo` | String | `String?` | Yes | optional `owner/repo` pointer |
+| `reservedString1` | — | retired | — | formerly JSON `AreaAttachment` (retired 2026-11-21; no longer written) |
 | `reservedInt1` | Int(64) | `Int` (`position`) | conditional | synced sidebar sort order; 0 = unset |
 | `reservedString2`, `reservedDate1` | — | reserved | — | |
 
