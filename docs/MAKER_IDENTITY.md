@@ -25,22 +25,78 @@ the block and update each, same change. Treat this like a hotspot file.
 ## 1. The facts — never exceed these
 
 Every maker claim must trace to a row here. Numbers are a **snapshot** (git as of
-2026-06-21); they're for storytelling, not a live readout — restamp when you cite
-fresh ones, don't pretend they're current if they're old.
+2026-11-21, `michellzappa/septena`); they're for storytelling, not a live
+readout. Restamp when you cite fresh ones.
+
+**Scope (decided by mz, 2026-11-21):** Septena is the task app (ADR 0007). The
+maker story is the **todo story only**. The life OS (Septena Life, ADR 0017) may
+get at most one line ("the same code once ran a bigger app"), and it is not part
+of the arc. The June 2026 life-OS story below is superseded.
 
 | Claim you may make | The data behind it |
 |---|---|
-| Built by one person | Across every repo, every commit is mine. Native: 1,039 mine + 50 from a commit-cron I wrote. Webapp pilot: 242. No other human contributor. |
-| Piloted as a webapp, then rebuilt native | A Next.js + FastAPI webapp pilot ran Apr 19 → May 24, 230 commits. Its final commit exports data to bootstrap the iOS CloudKit build — the pilot fed the rebuild. The shipping app is the native version. |
-| Rooted in a years-long practice | Setlist and Septena are the *app form* of something I'd done by hand for years — structured training, nutrition, and symptom logging. (Septena's own DB only reaches back to 2024; the multi-year depth lives in the practice / prior exports — claim the *practice*, not in-app data, unless a start date is sourced.) |
-| Built fast, with AI | ~1,080 commits in the native app + 230 in the pilot (~1,310 app commits; ~1,410 incl. gateway + site), all inside ~11 weeks (Apr 4 → Jun 21 2026) — only possible paired with AI |
-| Evenings and weekends | Holds in **both** repos. Native: peaks 8–11pm (9pm = 131), Sat (199) + Sun (207) biggest. Pilot: single biggest day is Sunday (65). |
-| **Not** a night owl | **Zero** commits between 1am and 6am — in *either* repo. None. |
-| Built in the open | Public repo (`github.com/michellzappa/septena`), MIT-licensed — every line that touches your data is readable |
-| Private by design | Local-first, CloudKit private DB, no third-party analytics, no investors, no growth team |
-| The numbers are trustworthy | The public repo has a single root + linear history; going open source rewrote hashes (a secrets + history scrub) but **preserved author dates**, so its counts/dates are real. It's the public continuation of an earlier private repo — the same codebase, renamed — so don't double-count: those early commits already live inside the public repo's history. |
+| Built by one person | 1,912 commits in the repo: 1,862 by mz, 50 by a commit-cron agent mz wrote. No other human contributor. |
+| Built with AI | 1,133 commits carry `Co-Authored-By: Claude`. Gemini sessions also work in the repo (AGENTS.md is written for Claude, Gemini, Antigravity and Codex). Often 3–5 sessions run in parallel. |
+| Agent-native from day one | First commit 2026-04-04: "Engage", a Things-style task app (commit: "Things 3 clone — sidebar, inline entry, multi-select, agents"). 2026-04-05 added `agentNote`, `confidence` and `needsHumanReview` to every task. |
+| The task engine is the same code | The tasks / areas / projects engine from that first build is the task app today. The repo was renamed, not restarted. |
+| Septena is the task app | ADR 0007 (2026-11-19): the task app takes the name Septena. ADR 0017 (2026-11-21): the life OS moved to its own private repo as Septena Life. |
+| Agents work tasks, the human holds the stop | Ships (2026-11-19/20, ADR 0008): assign a task to Claude, the agent claims it with a lease, asks in the app with choice buttons, and mz can stop one task or pause all agents. The server enforces the stop; no agent can clear it. |
+| Unattended runner | **Planned**, not shipped (ADR 0005, issue #5): a runner on the Mac mini works tasks while devices sleep. Say "next" or "planned". |
+| The repo teaches its agents | `AGENTS.md` holds the rules, the traps earlier sessions fell into, and what an agent may not do alone. Most "Known traps" entries record an agent mistake. |
+| Built in the open | Public repo (`github.com/michellzappa/septena`), MIT: apps and server (`backend/`). |
+| Self-hosting | **Planned** (ADR 0011, #119): the server on your own Cloudflare account, unsupported by design. |
+| Private by design | One private store per user at `api.septena.app` (ADR 0002). No ads, no investors. The iCloud-only claim is **gone**; never use it. |
+| Weekends | Saturday is the biggest commit day (401), then Sunday (329) and Friday (328). |
+| The numbers are trustworthy | Going open source rewrote hashes (a secrets + history scrub) but preserved author dates, so counts and dates are real. The history from before the rename lives inside this repo; don't double-count. |
 
-### The build, in three phases (full internal record — public story is cropped to phases 2–3; see origin note + Block G)
+### Block G — the origin line (canonical, 2026-11-21)
+
+> The first commit was a task app. On 4 April 2026 I started a Things-style list,
+> and on day two every task got three odd fields: a note from the agent, how sure
+> it was, and whether a human needed to look. I wanted a list my AI could work,
+> and I wanted to see what it had done.
+
+### Block H — the thesis line (canonical, 2026-11-21)
+
+> I think of working with AI as being a centaur. The machine adds reach, and the
+> sense and the direction stay mine. My task list is where I decide what matters
+> this week. It should be the one place where I decide and the agents ask.
+
+Source: mz's essay "Field Notes from a Centaur" (michellzappa.com, Dec 2025),
+and ADR 0008 (the human holds the stop). The stop is the concrete proof of the
+thesis: lead with it, not with "AI".
+
+### Block I — the name (canonical)
+
+> **Septena** — Latin for a *group of seven*. Seven because the week is the unit a
+> life actually turns on, and the app is built around it (the seven-disc
+> mark); the word itself has seven letters. (Marketing owns the tagline
+> side — see `marketing.md` §4 "the week.")
+
+### Banned claims (untrue or off-voice)
+
+- ❌ "late nights", "3am", "midnight", "all-nighters", "burning the candle" — hustle tropes, off-voice. This is the one the user called out by name.
+- ❌ "never at night" / "zero commits after 1am" — **no longer true** (2026-11-21: 9 commits between 1am and 4am, 39 in the midnight hour; some may be travel time zones). Make no claim about hours.
+- ❌ "your data lives only in your iCloud" — untrue since ADR 0002.
+- ❌ the life-OS arc (logging habit, webapp pilot, "everything I track") as Septena's story — it is Septena Life's (decided 2026-11-21).
+- ❌ "agents work while you sleep" as shipped — the runner is planned (#5).
+- ❌ "fueled by coffee/caffeine" as a grind trope (the caffeine data is real, but it's "two cups, never past three" — a *restraint* story, not a hustle one; see the journal post of that name)
+- ❌ "team", "we", "our engineers" — it's one person; "I" or "Septena"
+- ❌ hype: "revolutionary", "game-changing", "the only app you'll ever need"
+- ❌ fake scarcity / fake urgency / countdown timers
+- ❌ guilt or manipulation around patronage — it gates nothing (see block C)
+
+---
+
+### Superseded record: the June 2026 life-OS story
+
+Kept as the internal record. **Do not use it in public copy.** It told the life
+OS arc (logging habit → webapp pilot → native app) and cropped out the early
+task app. mz reversed that on 2026-11-21: the early task app is now the story.
+Its numbers are a 2026-06-21 snapshot. Its "Block G" and "Block H" are replaced
+by the blocks above.
+
+#### The build, in three phases (full internal record — public story is cropped to phases 2–3; see origin note + Block G)
 
 The early builds carried throwaway codenames (irrelevant); the name **Septena**
 only landed ~May 13, a few weeks in. By *form*, not codename:
@@ -71,7 +127,7 @@ the earlier task-app burst and the other-projects band from the public version
 --until=2026-06-22 --date=short --pretty=%ad | sort | uniq -c` per repo). Use for
 site `/about` + the book lede.
 
-### Why an app — the form evolution & the thesis
+#### Why an app — the form evolution & the thesis
 
 The honest sequence of *forms* the idea passed through (the real "false starts" —
 context for the book + internal record, **not** the headline graph):
@@ -117,7 +173,7 @@ private). [[project_local_mcp_server]] is one proof the data is agent-readable.
 > device history), not in-app. Safe phrasing: "for years I'd been logging…". Only
 > claim "since 20XX" once pinned to a real source.
 
-### Block G — the origin line (canonical, for site /about, book lede, press)
+#### Old Block G (superseded)
 
 > For years I'd been logging my own training, nutrition, and symptoms by hand.
 > The first time that practice became an app, it was a scrappy webapp I tested on
@@ -127,31 +183,13 @@ private). [[project_local_mcp_server]] is one proof the data is agent-readable.
 For Phase 2, weave Block G into Block B (the long maker's note) — the website is
 where the arc gets told in full.
 
-### Block H — the thesis line (canonical, for site /about + book + talks)
+#### Old Block H (superseded)
 
 > The data was always structured and repetitive, so an app fits it better than
 > notes or an agent rig ever did. And once AI made converting between formats
 > trivial, building my own stopped being expensive — I vibe-coded each version in
 > days. It's still "file over app": an app for the ergonomics, but the data stays
 > mine — portable, exportable, and readable by my own AI.
-
-### Block I — the name (canonical)
-
-> **Septena** — Latin for a *group of seven*. Seven because the week is the unit a
-> life actually turns on, and the app is built around it (seven sections, the
-> seven-disc mark); the word itself has seven letters. (Marketing owns the tagline
-> side — see `marketing.md` §4 "the week.")
-
-### Banned claims (untrue or off-voice)
-
-- ❌ "late nights", "3am", "midnight", "all-nighters", "burning the candle" — **the data says he sleeps.** This is the one the user called out by name.
-- ❌ "fueled by coffee/caffeine" as a grind trope (the caffeine data is real, but it's "two cups, never past three" — a *restraint* story, not a hustle one; see the journal post of that name)
-- ❌ "team", "we", "our engineers" — it's one person; "I" or "Septena"
-- ❌ hype: "revolutionary", "game-changing", "the only app you'll ever need"
-- ❌ fake scarcity / fake urgency / countdown timers
-- ❌ guilt or manipulation around patronage — it gates nothing (see block C)
-
----
 
 ## 2. The voice
 
@@ -184,15 +222,56 @@ Canonical wording. Reuse verbatim where it fits; adapt length, not meaning.
 > on me; if something's thoughtful, it's probably the part I use every day too.
 > — mz
 
-### Block B — Maker's note (long, for the website /about and /ownership)
+### Block B — Maker's note (long, for the website /about) — rewritten 2026-11-21
 
-> I built Septena in about eleven weeks of evenings and weekends — a thousand-odd
-> commits, one person, with AI doing the parts of the typing I'd otherwise still
-> be doing. I'm not a night owl about it; the work happens after dinner and on
-> Saturdays, and the repo is public so you can check. I made it because I wanted
-> one private place for everything I track, and nothing on the market was mine
-> enough. It still is — local-first, open, no investors to answer to but you.
-> — Michell Zappa
+Todo story only. Humanizer pass done 2026-11-21. Facts trace to §1.
+
+> **Why Septena**
+>
+> The first commit was a task app. On 4 April 2026 I started a Things-style list,
+> and on day two every task got three odd fields: a note from the agent, how sure
+> it was, and whether a human needed to look. I wanted a list my AI could work,
+> and I wanted to see what it had done.
+>
+> For a while the same code also ran a much bigger app, one for tracking the rest
+> of my life. That one is Septena Life now, and it's a different story. Septena is
+> the list, the thing I started with.
+>
+> **How it's made**
+>
+> I build it with AI. Mostly Claude, sometimes Gemini, often several sessions at
+> once. Of the 1,912 commits in the repo, 1,133 name Claude as co-author. The repo
+> has an AGENTS.md that gives every agent the rules, the traps that earlier
+> sessions fell into, and the things it may not do alone. Much of that file exists
+> because an agent got something wrong first.
+>
+> So agents build Septena, and I use Septena to hand work to agents. I write a
+> task and assign it to Claude. The agent claims it, works on it, and asks me in
+> the app when it's stuck, with a couple of buttons to tap. When I say stop, it
+> stops. The stop lives on the server, not in a prompt, and no agent can lift it.
+> Next, a runner on my Mac mini will pick up tasks while I sleep.
+>
+> That stop is why I built the app. I think of working with AI as being a
+> centaur. The machine adds reach, and the sense and the direction stay mine. My
+> task list is where I decide what matters this week. It should be the one place
+> where I decide and the agents ask.
+>
+> **Why it's open**
+>
+> Code is cheap now, so trust is what an app has to earn. If an agent can write to
+> your tasks, you should be able to read the rules it runs under. If one person
+> makes an app, you should be able to keep it running without him. In this case,
+> without me. The apps and the server are open source under MIT. Running the
+> server on your own Cloudflare account is planned.
+>
+> No team, no investors. One person, a few agents, and a list that waits for my
+> say.
+>
+> Michell
+
+The previous Block B (June 2026: "eleven weeks of evenings and weekends", "not
+a night owl", "everything I track", "local-first") is retired. Its claims are
+stale or now banned (§1).
 
 ### Block C — Patronage / the AI-bill joke (Support / Septena+)
 
@@ -239,11 +318,11 @@ Where the identity appears, which block, which repo/file, current state.
 | Patronage / Septena+ | cloud · `SettingsPanes.swift` (`SeptenaPlus.reasons` → "Pays the AI bill") | C | **done** (iOS+Mac green 2026-06-21) |
 | Support intro line | cloud · `SupportSettingsPane.swift` (ticket footer + email fallback) | F | **done** (iOS+Mac green 2026-06-21) |
 | Changelog voice | cloud · `Septena/Resources/changelog.json` | E | ongoing, tighten |
-| Website /about | site · `app/about/page.tsx` | B + D | review vs. this doc |
+| Website /about | site · `app/about/page.tsx` | B + D | **stale**: Block B rewritten 2026-11-21 (todo story); page not updated yet |
 | Website /ownership | site · `app/ownership/page.tsx` | B + D | review vs. this doc |
 | Website /support | site · `app/support/page.tsx` | C + F | reframe |
 | Website /supporters | site · `app/supporters/page.tsx` | C | review |
-| Journal | site · `content/journal/*.md` | E + §2 | **live, on-voice — keep cadence**. Build story shipped 2026-06-21: `from-a-logging-habit-to-an-app` (the data → pilot → native arc, file-over-app thesis). |
+| Journal | site · `content/journal/*.md` | E + §2 | **live, on-voice — keep cadence**. Build story shipped 2026-06-21: `from-a-logging-habit-to-an-app` (the data → pilot → native arc, file-over-app thesis). That post now tells Septena Life's story, not Septena's (2026-11-21). |
 | Journal data-viz system | site · `content/journal/build-data.json` + `lib/journal-figures.ts` + `components/journal/figures.tsx` | — | **done** (site build green 2026-06-21). Reusable: a post embeds a chart with a `[figure:KEY]` line; add datasets to `build-data.json`. Server-SVG, no client JS. Use this, **not** one-off charts. |
 | Marketing source of truth | site · `docs/marketing.md` | all | add pointer to this doc |
 | Book proposition | see §6 | B + §2 | proposal only |
