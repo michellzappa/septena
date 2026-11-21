@@ -24,7 +24,6 @@
     "place.area": { "sfSymbol": "folder", "material": "folder", "lucide": "folder" },
     "place.project": { "sfSymbol": "number", "material": "tag", "lucide": "hash" },
     "place.section": { "sfSymbol": "text.alignleft", "material": "subject", "lucide": "heading" },
-
     "action.edit_details": { "sfSymbol": "info.circle", "material": "info", "lucide": "info" },
     "action.rename": { "sfSymbol": "pencil", "material": "edit", "lucide": "pencil" },
     "action.copy": { "sfSymbol": "doc.on.doc", "material": "content_copy", "lucide": "copy" },
@@ -57,7 +56,6 @@
     "action.tag": { "sfSymbol": "tag", "material": "label", "lucide": "tag" },
     "action.reminder": { "sfSymbol": "bell", "material": "notifications", "lucide": "bell" },
     "action.star": { "sfSymbol": "star", "material": "star", "lucide": "star" },
-
     "settings.account": { "sfSymbol": "person.crop.circle", "material": "account_circle", "lucide": "user-circle" },
     "settings.general": { "sfSymbol": "slider.horizontal.3", "material": "tune", "lucide": "sliders-horizontal" },
     "settings.tasks": { "sfSymbol": "checklist", "material": "checklist", "lucide": "list-todo" },
@@ -78,15 +76,17 @@
     "settings.backend": { "sfSymbol": "arrow.up.doc", "material": "cloud_sync", "lucide": "cloud" },
     "settings.animations": { "sfSymbol": "party.popper", "material": "celebration", "lucide": "party-popper" },
     "settings.feedback": { "sfSymbol": "paperplane", "material": "send", "lucide": "send" },
-
     "notice.sign_in": { "sfSymbol": "person.crop.circle.badge.exclamationmark", "material": "account_circle", "lucide": "user-x" },
     "notice.rolled_in": { "sfSymbol": "arrow.down.circle", "material": "arrow_circle_down", "lucide": "arrow-down-circle" },
     "notice.get_started": { "sfSymbol": "sparkles", "material": "auto_awesome", "lucide": "sparkles" },
     "notice.fade_intro": { "sfSymbol": "circle.lefthalf.filled", "material": "contrast", "lucide": "contrast" },
-
     "convo.needs_you": { "sfSymbol": "circle.fill", "material": "circle", "lucide": "circle" },
     "convo.working": { "sfSymbol": "circle.fill", "material": "circle", "lucide": "circle" },
     "convo.done": { "sfSymbol": "checkmark.circle.fill", "material": "check_circle", "lucide": "check-circle-2" },
-    "convo.wont_do": { "sfSymbol": "minus.circle", "material": "do_not_disturb_on", "lucide": "minus-circle" }
+    "convo.wont_do": { "sfSymbol": "minus.circle", "material": "do_not_disturb_on", "lucide": "minus-circle" },
+    "notice.weekly_sweep": { "sfSymbol": "circle.dashed", "material": "blur_circular", "lucide": "circle-dashed" },
+    "action.text_size": { "sfSymbol": "textformat.size", "material": "format_size", "lucide": "a-large-small" },
+    "action.window": { "sfSymbol": "macwindow", "material": "web_asset", "lucide": "app-window" },
+    "action.sidebar_counts": { "sfSymbol": "number", "material": "numbers", "lucide": "hash" }
   }
 }

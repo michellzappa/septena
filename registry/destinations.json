@@ -1,12 +1,25 @@
 {
   "version": 1,
   "description": "Canonical smart lists, navigation destinations, aliases, shortcuts, behavior flags, and empty states (ADR 0015).",
-  "viewAliases": {
-    "someday": "anytime",
-    "unscheduled": "anytime",
-    "triage": "inbox"
-  },
+  "viewAliases": { "someday": "anytime", "unscheduled": "anytime", "triage": "inbox" },
   "destinations": [
+    {
+      "id": "inbox",
+      "navigationKey": "triage",
+      "serverView": "triage",
+      "title": "Inbox",
+      "icon": "list.inbox",
+      "visibility": "todayBand",
+      "countRule": "triage",
+      "supportsManualOrder": false,
+      "supportsGroupByList": false,
+      "showsCalendarAgenda": false,
+      "showsInboxBand": false,
+      "supportsInlineCreate": true,
+      "dropBehavior": "clearPlace",
+      "featureId": "lists.inbox",
+      "emptyState": { "title": "Inbox is empty", "detail": "New tasks wait here until you schedule or file them." }
+    },
     {
       "id": "today",
       "navigationKey": "today",
@@ -42,7 +55,7 @@
       "supportsInlineCreate": false,
       "dropBehavior": "none",
       "featureId": "lists.review",
-      "emptyState": { "title": "Nothing to review", "detail": "Tasks an agent proposes as done appear here until you accept them." }
+      "emptyState": { "title": "Nothing to review", "detail": "Tasks Claude finishes appear here so you can check and accept them." }
     },
     {
       "id": "upcoming",
@@ -171,7 +184,14 @@
       "supportsInlineCreate": false,
       "dropBehavior": "delete",
       "featureId": "lists.recently-deleted",
-      "emptyState": { "title": "Recently Deleted is empty", "detail": "Deleted tasks stay here for 30 days before they are removed." }
+      "emptyState": { "title": "No Recently Deleted Tasks", "detail": "Deleted tasks appear here for 30 days before being permanently removed." }
     }
-  ]
+  ],
+  "genericEmptyState": {
+    "title": "Nothing here yet",
+    "detail": "Type above to add your first task.",
+    "pointerDetail": "Click + or double-click below to add a task.",
+    "touchDetail": "Tap + to add a task.",
+    "syncingTitle": "Syncing…"
+  }
 }

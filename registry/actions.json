@@ -64,6 +64,24 @@
       "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "lists.today"
     },
+    "task.toggleStar": {
+      "title": "Toggle Star",
+      "addTitle": "Star",
+      "removeTitle": "Remove Star",
+      "icon": "action.star",
+      "role": "default",
+      "shortcut": { "key": "s", "modifiers": ["primary", "alt"] },
+      "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
+      "featureId": "lists.starred"
+    },
+    "task.addChecklistItem": {
+      "title": "Add Checklist Item",
+      "icon": "action.checklist",
+      "role": "default",
+      "shortcut": { "key": "c", "modifiers": ["primary", "shift"] },
+      "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted"] },
+      "featureId": "task.checklists"
+    },
     "task.when": {
       "title": "When…",
       "icon": "action.when",
@@ -80,16 +98,21 @@
       "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "task.when-deadline"
     },
+    "task.reminder": {
+      "title": "Reminder…",
+      "addTitle": "Add Reminder…",
+      "icon": "action.reminder",
+      "role": "default",
+      "shortcut": { "key": "r", "modifiers": ["primary", "alt"] },
+      "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted"] },
+      "featureId": "task.alerts"
+    },
     "task.move": {
       "title": "Move…",
       "pluralTitle": "Move Tasks",
       "icon": "action.move",
       "role": "default",
-      "shortcut": {
-        "key": "m",
-        "modifiers": ["primary", "shift"],
-        "alternates": [{ "key": "m", "modifiers": ["primary"] }]
-      },
+      "shortcut": { "key": "m", "modifiers": ["primary", "shift"], "alternates": [{ "key": "m", "modifiers": ["primary"] }] },
       "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "places.projects"
     },
@@ -155,36 +178,176 @@
       "availability": { "selection": "any", "onlyDestinations": ["recentlyDeleted"] },
       "featureId": "lists.recently-deleted"
     },
-
-    "area.newProject": { "title": "New Project in Area", "icon": "action.add", "role": "default", "availability": { "selection": "single" }, "featureId": "places.projects" },
+    "area.newProject": {
+      "title": "New Project in Area",
+      "icon": "action.add",
+      "role": "default",
+      "availability": { "selection": "single" },
+      "featureId": "places.projects"
+    },
     "area.rename": { "title": "Rename", "icon": "action.rename", "role": "default", "availability": { "selection": "single" }, "featureId": "places.areas" },
     "area.delete": { "title": "Delete Area", "icon": "action.delete", "role": "destructive", "availability": { "selection": "single" }, "featureId": "places.areas" },
-
     "project.rename": { "title": "Rename", "icon": "action.rename", "role": "default", "availability": { "selection": "single" }, "featureId": "places.projects" },
-    "project.moveUp": { "title": "Move Up", "icon": "action.move_up", "role": "default", "availability": { "selection": "single", "platforms": ["ios", "ipados", "android"] }, "featureId": "places.projects" },
-    "project.moveDown": { "title": "Move Down", "icon": "action.move_down", "role": "default", "availability": { "selection": "single", "platforms": ["ios", "ipados", "android"] }, "featureId": "places.projects" },
+    "project.moveUp": {
+      "title": "Move Up",
+      "icon": "action.move_up",
+      "role": "default",
+      "availability": { "selection": "single", "platforms": ["ios", "ipados", "android"] },
+      "featureId": "places.projects"
+    },
+    "project.moveDown": {
+      "title": "Move Down",
+      "icon": "action.move_down",
+      "role": "default",
+      "availability": { "selection": "single", "platforms": ["ios", "ipados", "android"] },
+      "featureId": "places.projects"
+    },
     "project.markDone": { "title": "Mark Done", "icon": "action.complete", "role": "default", "availability": { "selection": "single" }, "featureId": "places.projects" },
-    "project.cancel": { "title": "Cancel Project", "icon": "action.cancel", "role": "default", "availability": { "selection": "single" }, "featureId": "places.projects" },
-    "project.delete": { "title": "Delete Project", "icon": "action.delete", "role": "destructive", "availability": { "selection": "single" }, "featureId": "places.projects" },
-
+    "project.cancel": {
+      "title": "Cancel Project",
+      "icon": "action.cancel",
+      "role": "default",
+      "availability": { "selection": "single" },
+      "featureId": "places.projects"
+    },
+    "project.delete": {
+      "title": "Delete Project",
+      "icon": "action.delete",
+      "role": "destructive",
+      "availability": { "selection": "single" },
+      "featureId": "places.projects"
+    },
     "sidebar.newArea": { "title": "New Area", "icon": "action.add", "role": "default", "availability": { "selection": "none" }, "featureId": "places.areas" },
     "sidebar.newProject": { "title": "New Project", "icon": "action.add", "role": "default", "availability": { "selection": "none" }, "featureId": "places.projects" },
-
     "section.new": { "title": "New Section", "icon": "action.add", "role": "default", "availability": { "selection": "none" }, "featureId": "places.sections" },
-    "section.rename": { "title": "Rename", "icon": "action.rename", "role": "default", "shortcut": { "key": "r", "modifiers": ["primary"] }, "availability": { "selection": "single" }, "featureId": "places.sections" },
-    "section.delete": { "title": "Delete Section", "icon": "action.delete", "role": "destructive", "availability": { "selection": "single" }, "featureId": "places.sections" },
-
+    "section.rename": {
+      "title": "Rename",
+      "icon": "action.rename",
+      "role": "default",
+      "shortcut": { "key": "r", "modifiers": ["primary"] },
+      "availability": { "selection": "single" },
+      "featureId": "places.sections"
+    },
+    "section.delete": {
+      "title": "Delete Section",
+      "icon": "action.delete",
+      "role": "destructive",
+      "availability": { "selection": "single" },
+      "featureId": "places.sections"
+    },
     "notice.openStep": { "title": "Open", "icon": "action.edit_details", "role": "default", "availability": { "selection": "single" }, "featureId": "lists.today" },
-    "notice.toggleStep": { "title": "Mark as Done", "activeTitle": "Mark as Not Done", "icon": "action.complete", "role": "default", "shortcut": { "key": "k", "modifiers": ["primary"] }, "availability": { "selection": "any" }, "featureId": "lists.today" },
+    "notice.toggleStep": {
+      "title": "Mark as Done",
+      "activeTitle": "Mark as Not Done",
+      "icon": "action.complete",
+      "role": "default",
+      "shortcut": { "key": "k", "modifiers": ["primary"] },
+      "availability": { "selection": "any" },
+      "featureId": "lists.today"
+    },
     "notice.hideGetStarted": { "title": "Hide Get Started", "icon": "action.cancel", "role": "default", "availability": { "selection": "none" }, "featureId": "lists.today" },
-
-    "app.newTask": { "title": "New To-Do", "icon": "action.add", "role": "default", "shortcut": { "key": "n", "modifiers": ["primary"] }, "availability": { "selection": "none" }, "featureId": "lists.today" },
-    "app.quickAdd": { "title": "Quick Add…", "icon": "action.add", "role": "default", "shortcut": { "key": "i", "modifiers": ["primary"] }, "availability": { "selection": "none", "platforms": ["ios", "ipados", "web", "android"] }, "featureId": "capture.quick-add" },
-    "app.quickEntry": { "title": "Quick Entry", "icon": "action.add", "role": "default", "shortcut": { "key": "space", "modifiers": ["ctrl", "alt"], "globalCapture": true }, "availability": { "selection": "none", "platforms": ["macos", "windows"] }, "featureId": "capture.quick-entry" },
-    "app.quickFind": { "title": "Quick Find…", "icon": "action.search", "role": "default", "shortcut": { "key": "f", "modifiers": ["primary", "shift"] }, "availability": { "selection": "none" }, "featureId": "find.quick-find" },
-    "app.toggleSidebar": { "title": "Show / Hide Sidebar", "icon": "action.sidebar", "role": "default", "shortcut": { "key": "s", "modifiers": ["ctrl", "primary"], "excludePlatforms": ["ios", "ipados"] }, "availability": { "selection": "none" }, "featureId": "mac.keyboard" },
-    "app.settings": { "title": "Settings…", "icon": "settings.tasks", "role": "default", "shortcut": { "key": ",", "modifiers": ["primary"] }, "availability": { "selection": "none" }, "featureId": "settings.display" },
-    "app.keyboardShortcuts": { "title": "Keyboard Shortcuts", "icon": "settings.about", "role": "default", "shortcut": { "key": "/", "modifiers": ["primary", "shift"] }, "availability": { "selection": "none" }, "featureId": "mac.keyboard" }
+    "app.newTask": {
+      "title": "New To-Do",
+      "icon": "action.add",
+      "role": "default",
+      "shortcut": { "key": "n", "modifiers": ["primary"] },
+      "availability": { "selection": "none" },
+      "featureId": "lists.today"
+    },
+    "app.quickAdd": {
+      "title": "Quick Add…",
+      "icon": "action.add",
+      "role": "default",
+      "shortcut": { "key": "i", "modifiers": ["primary"] },
+      "availability": { "selection": "none", "platforms": ["ios", "ipados", "web", "android"] },
+      "featureId": "capture.quick-add"
+    },
+    "app.quickEntry": {
+      "title": "Quick Entry",
+      "icon": "action.add",
+      "role": "default",
+      "shortcut": { "key": "space", "modifiers": ["ctrl", "alt"], "globalCapture": true },
+      "availability": { "selection": "none", "platforms": ["macos", "windows"] },
+      "featureId": "capture.quick-entry"
+    },
+    "app.quickFind": {
+      "title": "Quick Find…",
+      "icon": "action.search",
+      "role": "default",
+      "shortcut": { "key": "f", "modifiers": ["primary", "shift"] },
+      "availability": { "selection": "none" },
+      "featureId": "find.quick-find"
+    },
+    "app.toggleSidebar": {
+      "title": "Show / Hide Sidebar",
+      "icon": "action.sidebar",
+      "role": "default",
+      "shortcut": { "key": "s", "modifiers": ["ctrl", "primary"], "excludePlatforms": ["ios", "ipados"] },
+      "availability": { "selection": "none" },
+      "featureId": "mac.keyboard"
+    },
+    "app.settings": {
+      "title": "Settings…",
+      "icon": "settings.tasks",
+      "role": "default",
+      "shortcut": { "key": ",", "modifiers": ["primary"] },
+      "availability": { "selection": "none" },
+      "featureId": "settings.display"
+    },
+    "app.keyboardShortcuts": {
+      "title": "Keyboard Shortcuts",
+      "icon": "settings.about",
+      "role": "default",
+      "shortcut": { "key": "/", "modifiers": ["primary", "shift"] },
+      "availability": { "selection": "none" },
+      "featureId": "mac.keyboard"
+    },
+    "app.toggleSidebarCounts": {
+      "title": "Show Sidebar Counts",
+      "activeTitle": "Hide Sidebar Counts",
+      "icon": "action.sidebar_counts",
+      "role": "default",
+      "availability": { "selection": "none", "platforms": ["macos", "ipados", "web", "windows"] },
+      "featureId": "settings.display"
+    },
+    "app.textSizeIncrease": {
+      "title": "Increase Text Size",
+      "icon": "action.text_size",
+      "role": "default",
+      "shortcut": { "key": "+", "modifiers": ["primary"] },
+      "availability": { "selection": "none" },
+      "featureId": "settings.display"
+    },
+    "app.textSizeDecrease": {
+      "title": "Decrease Text Size",
+      "icon": "action.text_size",
+      "role": "default",
+      "shortcut": { "key": "-", "modifiers": ["primary"] },
+      "availability": { "selection": "none" },
+      "featureId": "settings.display"
+    },
+    "app.textSizeReset": {
+      "title": "Reset Text Size",
+      "icon": "action.text_size",
+      "role": "default",
+      "shortcut": { "key": "0", "modifiers": ["primary"] },
+      "availability": { "selection": "none" },
+      "featureId": "settings.display"
+    },
+    "app.septenaWindow": {
+      "title": "Septena Window",
+      "icon": "action.window",
+      "role": "default",
+      "availability": { "selection": "none", "platforms": ["macos"] },
+      "featureId": "mac.keyboard"
+    },
+    "app.classicWindow": {
+      "title": "Classic Window",
+      "icon": "action.window",
+      "role": "default",
+      "availability": { "selection": "none", "platforms": ["macos"] },
+      "featureId": "mac.keyboard"
+    }
   },
   "contextMenus": {
     "task.row": [
@@ -205,6 +368,7 @@
         ]
       },
       { "kind": "action", "id": "task.toggleToday" },
+      { "kind": "action", "id": "task.toggleStar" },
       {
         "kind": "submenu",
         "id": "schedule",
@@ -213,6 +377,7 @@
         "items": [
           { "kind": "action", "id": "task.when" },
           { "kind": "action", "id": "task.deadline" },
+          { "kind": "action", "id": "task.reminder" },
           { "kind": "divider" },
           { "kind": "action", "id": "task.clearSchedule" }
         ]
@@ -222,21 +387,13 @@
         "id": "move",
         "title": "Move",
         "icon": "action.move",
-        "items": [
-          { "kind": "slot", "slot": "moveDestinations" },
-          { "kind": "divider" },
-          { "kind": "action", "id": "task.move" }
-        ]
+        "items": [{ "kind": "slot", "slot": "moveDestinations" }, { "kind": "divider" }, { "kind": "action", "id": "task.move" }]
       },
       { "kind": "action", "id": "task.repeat" },
       { "kind": "action", "id": "task.pauseResumeRepeat" },
       { "kind": "action", "id": "task.createNextCopy" }
     ],
-    "task.recentlyDeleted": [
-      { "kind": "action", "id": "task.restore" },
-      { "kind": "divider" },
-      { "kind": "action", "id": "task.deletePermanently" }
-    ],
+    "task.recentlyDeleted": [{ "kind": "action", "id": "task.restore" }, { "kind": "divider" }, { "kind": "action", "id": "task.deletePermanently" }],
     "sidebar.area": [
       { "kind": "action", "id": "area.newProject" },
       { "kind": "divider" },
@@ -248,25 +405,22 @@
       { "kind": "action", "id": "project.moveUp" },
       { "kind": "action", "id": "project.moveDown" },
       { "kind": "divider" },
-      { "kind": "submenu", "id": "moveToArea", "title": "Move to Area", "icon": "action.move", "items": [{ "kind": "slot", "slot": "moveToAreaDestinations" }] },
+      {
+        "kind": "submenu",
+        "id": "moveToArea",
+        "title": "Move to Area",
+        "icon": "action.move",
+        "items": [{ "kind": "slot", "slot": "moveToAreaDestinations" }]
+      },
       { "kind": "divider" },
       { "kind": "action", "id": "project.markDone" },
       { "kind": "action", "id": "project.cancel" },
       { "kind": "divider" },
       { "kind": "action", "id": "project.delete" }
     ],
-    "sidebar.empty": [
-      { "kind": "action", "id": "sidebar.newArea" },
-      { "kind": "action", "id": "sidebar.newProject" }
-    ],
-    "project.heading": [
-      { "kind": "action", "id": "section.rename" },
-      { "kind": "divider" },
-      { "kind": "action", "id": "section.delete" }
-    ],
-    "project.blankSpace": [
-      { "kind": "action", "id": "section.new" }
-    ],
+    "sidebar.empty": [{ "kind": "action", "id": "sidebar.newArea" }, { "kind": "action", "id": "sidebar.newProject" }],
+    "project.heading": [{ "kind": "action", "id": "section.rename" }, { "kind": "divider" }, { "kind": "action", "id": "section.delete" }],
+    "project.blankSpace": [{ "kind": "action", "id": "section.new" }],
     "notice.getStartedStep": [
       { "kind": "action", "id": "notice.openStep" },
       { "kind": "action", "id": "notice.toggleStep" },
@@ -274,11 +428,93 @@
       { "kind": "action", "id": "notice.hideGetStarted" }
     ]
   },
-  "swipeActions": {
-    "featureId": "edit.swipe-actions",
-    "leading": ["task.toggleToday", "task.when"],
-    "trailing": ["task.move", "task.delete"]
-  },
+  "menuBar": [
+    { "id": "app", "title": "Septena", "system": "app", "items": [{ "kind": "action", "id": "app.settings" }] },
+    {
+      "id": "file",
+      "title": "File",
+      "system": "file",
+      "items": [{ "kind": "action", "id": "app.newTask" }, { "kind": "action", "id": "app.quickAdd" }]
+    },
+    {
+      "id": "view",
+      "title": "View",
+      "system": "view",
+      "items": [
+        { "kind": "action", "id": "app.toggleSidebar" },
+        { "kind": "action", "id": "task.toggleInfo" },
+        { "kind": "action", "id": "app.toggleSidebarCounts" },
+        { "kind": "divider" },
+        {
+          "kind": "submenu",
+          "id": "textSize",
+          "title": "Text Size",
+          "icon": "action.text_size",
+          "items": [
+            { "kind": "slot", "slot": "textSizeSteps" },
+            { "kind": "divider" },
+            { "kind": "action", "id": "app.textSizeIncrease" },
+            { "kind": "action", "id": "app.textSizeDecrease" },
+            { "kind": "action", "id": "app.textSizeReset" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "go",
+      "title": "Go",
+      "items": [
+        { "kind": "destination", "id": "today" },
+        { "kind": "destination", "id": "review" },
+        { "kind": "destination", "id": "upcoming" },
+        { "kind": "destination", "id": "repeating" },
+        { "kind": "destination", "id": "anytime" },
+        { "kind": "destination", "id": "logbook" },
+        { "kind": "divider" },
+        { "kind": "action", "id": "app.quickFind" },
+        { "kind": "divider" },
+        { "kind": "action", "id": "app.septenaWindow" },
+        { "kind": "action", "id": "app.classicWindow" },
+        { "kind": "action", "id": "app.quickEntry" }
+      ]
+    },
+    {
+      "id": "task",
+      "title": "Task",
+      "items": [
+        { "kind": "action", "id": "sidebar.newProject" },
+        { "kind": "action", "id": "sidebar.newArea" },
+        { "kind": "divider" },
+        { "kind": "action", "id": "task.editDetails", "titleField": "desktopTitle" },
+        { "kind": "action", "id": "task.duplicate" },
+        { "kind": "divider" },
+        {
+          "kind": "submenu",
+          "id": "complete",
+          "title": "Complete",
+          "icon": "action.complete",
+          "items": [
+            { "kind": "action", "id": "task.toggleComplete" },
+            { "kind": "action", "id": "task.cancel" },
+            { "kind": "divider" },
+            { "kind": "action", "id": "task.delete" }
+          ]
+        },
+        { "kind": "action", "id": "task.toggleToday" },
+        { "kind": "action", "id": "task.toggleStar" },
+        { "kind": "action", "id": "task.addChecklistItem" },
+        { "kind": "action", "id": "task.when" },
+        { "kind": "action", "id": "task.deadline" },
+        { "kind": "action", "id": "task.reminder" },
+        { "kind": "action", "id": "task.move" },
+        { "kind": "action", "id": "task.clearSchedule" },
+        { "kind": "action", "id": "task.repeat" },
+        { "kind": "action", "id": "task.createNextCopy" }
+      ]
+    },
+    { "id": "help", "title": "Help", "system": "help", "items": [{ "kind": "action", "id": "app.keyboardShortcuts" }] }
+  ],
+  "swipeActions": { "featureId": "edit.swipe-actions", "leading": ["task.toggleToday", "task.when"], "trailing": ["task.move", "task.delete"] },
   "shortcutsSheet": [
     {
       "id": "general",
@@ -296,8 +532,11 @@
         "task.toggleComplete",
         "task.cancel",
         "task.toggleToday",
+        "task.toggleStar",
+        "task.addChecklistItem",
         "task.when",
         "task.deadline",
+        "task.reminder",
         "task.move",
         "task.moveSuggested",
         "task.clearSchedule",

@@ -11,10 +11,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import * as L10N from "./registry-l10n.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, "..");
 const CHECK = process.argv.includes("--check");
+// `--seed-l10n <lang>`: one-time import of <lang> translations for registry
+// keys out of `Septena/Localizable.xcstrings` into `registry/l10n/<lang>.json`.
+const SEED_LANG = (() => {
+  const i = process.argv.indexOf("--seed-l10n");
+  return i === -1 ? null : process.argv[i + 1];
+})();
 
 const readJSON = (rel) => {
   const full = path.join(REPO, rel);
@@ -289,10 +296,19 @@ function validateDestinations(dests, icons, caps) {
   for (const d of dests.destinations) {
     assert(!seenIds.has(d.id), `destinations.json: duplicate id "${d.id}"`);
     seenIds.add(d.id);
-    assert(d.sidebarOrder > lastOrder, `destinations.json: sidebarOrder must strictly increase at "${d.id}"`);
-    lastOrder = d.sidebarOrder;
+    // A band (Inbox on Today) has no sidebar row, so no sidebarOrder.
+    if (d.visibility === "todayBand") {
+      assert(d.sidebarOrder === undefined, `destinations.json: ${d.id} is a todayBand and cannot have a sidebarOrder`);
+    } else {
+      assert(d.sidebarOrder > lastOrder, `destinations.json: sidebarOrder must strictly increase at "${d.id}"`);
+      lastOrder = d.sidebarOrder;
+    }
+    assert(typeof d.emptyState?.title === "string" && typeof d.emptyState?.detail === "string", `destinations.json: ${d.id} needs emptyState.title and .detail`);
     assert(d.icon in icons.icons, `destinations.json: ${d.id} unknown icon "${d.icon}"`);
     assert(d.featureId in caps.capabilities, `destinations.json: ${d.id} unknown featureId "${d.featureId}"`);
+  }
+  for (const f of ["title", "detail", "pointerDetail", "touchDetail", "syncingTitle"]) {
+    assert(typeof dests.genericEmptyState?.[f] === "string", `destinations.json: genericEmptyState.${f} missing`);
   }
   return seenIds;
 }
@@ -329,6 +345,11 @@ function validateActions(actions, icons, caps, destIds) {
     for (const item of items) {
       if (item.kind === "action") {
         assert(item.id in actions.actions, `actions.json: menu ${menuName} references unknown action "${item.id}"`);
+        if (item.titleField !== undefined) {
+          assert(typeof actions.actions[item.id][item.titleField] === "string", `actions.json: menu ${menuName} item ${item.id} titleField "${item.titleField}" is not a title of that action`);
+        }
+      } else if (item.kind === "destination") {
+        assert(destIds.has(item.id), `actions.json: menu ${menuName} references unknown destination "${item.id}"`);
       } else if (item.kind === "submenu") {
         assert(item.icon in icons.icons, `actions.json: submenu ${menuName}.${item.id} unknown icon "${item.icon}"`);
         checkMenuItems(`${menuName}.${item.id}`, item.items);
@@ -340,6 +361,18 @@ function validateActions(actions, icons, caps, destIds) {
     }
   };
   for (const [name, items] of Object.entries(actions.contextMenus)) checkMenuItems(name, items);
+  // The menu bar (ADR 0015): one composition, each shell maps `system` menus
+  // onto its own (App, File, View, Help) and adds the rest as new menus.
+  const validSystemMenus = new Set(["app", "file", "edit", "view", "window", "help"]);
+  assert(Array.isArray(actions.menuBar) && actions.menuBar.length > 0, "actions.json: menuBar missing");
+  const menuIds = new Set();
+  for (const m of actions.menuBar) {
+    assert(!menuIds.has(m.id), `actions.json: duplicate menuBar menu "${m.id}"`);
+    menuIds.add(m.id);
+    assert(typeof m.title === "string" && m.title.length > 0, `actions.json: menuBar.${m.id} missing title`);
+    if (m.system !== undefined) assert(validSystemMenus.has(m.system), `actions.json: menuBar.${m.id} unknown system menu "${m.system}"`);
+    checkMenuItems(`menuBar.${m.id}`, m.items);
+  }
 
   assert(actions.swipeActions.featureId in caps.capabilities, "actions.json: swipeActions unknown featureId");
   for (const id of [...actions.swipeActions.leading, ...actions.swipeActions.trailing]) {
@@ -430,6 +463,10 @@ function validateConformance() {
 }
 
 const swiftStr = (s) => JSON.stringify(s);
+// Localized registry copy (ADR 0020). Set once the strings are collected.
+let BY_KEY = null;
+const L = (s, obj, field) => L10N.swiftLookup(BY_KEY, s, obj?.l10nKeys?.[field] ?? s);
+const LOpt = (s, obj, field) => (s === undefined || s === null ? "nil" : L(s, obj, field));
 const swiftOptStr = (s) => (s === undefined || s === null ? "nil" : JSON.stringify(s));
 const camelId = (s) => s.replace(/[._-]+([a-zA-Z0-9])/g, (_, c) => c.toUpperCase());
 
@@ -452,6 +489,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("");
   lines.push("import Foundation");
   lines.push("");
+  lines.push(L10N.SWIFT_RUNTIME);
 
   // 1. Entities & Limits
   lines.push("/// Wire schema size and count limits shared with the backend (`registry/entities.json`).");
@@ -560,12 +598,12 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`  static let accentPalette: [String] = [${tokens.accentPalette.map(swiftStr).join(", ")}]`);
   lines.push("  static let fruitAccents: [RegistryFruitAccent] = [");
   for (const a of tokens.fruitAccents ?? []) {
-    lines.push(`    RegistryFruitAccent(id: ${swiftStr(a.id)}, name: ${swiftStr(a.name)}, origin: ${swiftStr(a.origin)}, lightHex: ${swiftStr(a.light)}, darkHex: ${swiftStr(a.dark)}, checkLightHex: ${swiftStr(a.checkLight)}, checkDarkHex: ${swiftStr(a.checkDark)}, multicolor: ${Boolean(a.multicolor)}),`);
+    lines.push(`    RegistryFruitAccent(id: ${swiftStr(a.id)}, name: ${L(a.name, a, "name")}, origin: ${swiftStr(a.origin)}, lightHex: ${swiftStr(a.light)}, darkHex: ${swiftStr(a.dark)}, checkLightHex: ${swiftStr(a.checkLight)}, checkDarkHex: ${swiftStr(a.checkDark)}, multicolor: ${Boolean(a.multicolor)}),`);
   }
   lines.push("  ]");
   lines.push("  static let textures: [RegistryTextureOption] = [");
   for (const t of tokens.textures ?? []) {
-    lines.push(`    RegistryTextureOption(id: ${swiftStr(t.id)}, name: ${swiftStr(t.name)}, tag: ${swiftStr(t.tag)}),`);
+    lines.push(`    RegistryTextureOption(id: ${swiftStr(t.id)}, name: ${L(t.name, t, "name")}, tag: ${L(t.tag, t, "tag")}),`);
   }
   lines.push("  ]");
   lines.push("  static let textScaleFactors: [Int: Double] = [");
@@ -584,7 +622,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   const emitItem = (item) => {
     const iconId = item.icon ?? null;
     const sf = iconId ? icons.icons[iconId].sfSymbol : null;
-    return `RegistrySettingsItem(kind: ${swiftStr(item.kind)}, key: ${optStr(item.key)}, page: ${optStr(item.page)}, surface: ${optStr(item.surface)}, label: ${optStr(item.label)}, detail: ${optStr(item.detail)}, iconId: ${optStr(iconId)}, sfSymbol: ${optStr(sf)}, statusKey: ${optStr(item.statusKey)}, desktopInline: ${Boolean(item.desktopInline)}, visibility: ${swiftStr(item.visibility ?? "always")}, platforms: ${optArr(item.platforms)})`;
+    return `RegistrySettingsItem(kind: ${swiftStr(item.kind)}, key: ${optStr(item.key)}, page: ${optStr(item.page)}, surface: ${optStr(item.surface)}, label: ${LOpt(item.label, item, "label")}, detail: ${LOpt(item.detail, item, "detail")}, iconId: ${optStr(iconId)}, sfSymbol: ${optStr(sf)}, statusKey: ${optStr(item.statusKey)}, desktopInline: ${Boolean(item.desktopInline)}, visibility: ${swiftStr(item.visibility ?? "always")}, platforms: ${optArr(item.platforms)})`;
   };
 
   lines.push("/// Desktop Settings sidebar tab descriptor (`registry/settings.json`).");
@@ -690,20 +728,20 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static let optionsByKey: [String: [RegistrySettingsOption]] = [");
   for (const [k, def] of Object.entries(settings.keys)) {
     if (!def.options) continue;
-    const opts = def.options.map((o) => `RegistrySettingsOption(value: ${swiftStr(o.value)}, title: ${swiftStr(o.title)})`).join(", ");
+    const opts = def.options.map((o) => `RegistrySettingsOption(value: ${swiftStr(o.value)}, title: ${L(o.title, o, "title")})`).join(", ");
     lines.push(`    ${swiftStr(k)}: [${opts}],`);
   }
   lines.push("  ]");
   lines.push("");
   lines.push("  static let desktopTabs: [RegistrySettingsTab] = [");
   for (const tab of settings.desktopTabs) {
-    lines.push(`    RegistrySettingsTab(id: ${swiftStr(tab.id)}, title: ${swiftStr(tab.title)}, iconId: ${swiftStr(tab.icon)}, sfSymbol: ${swiftStr(icons.icons[tab.icon].sfSymbol)}, group: ${swiftStr(tab.group)}, paletteSlot: ${optInt(tab.paletteSlot)}, featureId: ${swiftStr(tab.featureId)}),`);
+    lines.push(`    RegistrySettingsTab(id: ${swiftStr(tab.id)}, title: ${L(tab.title, tab, "title")}, iconId: ${swiftStr(tab.icon)}, sfSymbol: ${swiftStr(icons.icons[tab.icon].sfSymbol)}, group: ${swiftStr(tab.group)}, paletteSlot: ${optInt(tab.paletteSlot)}, featureId: ${swiftStr(tab.featureId)}),`);
   }
   lines.push("  ]");
   lines.push("");
   lines.push("  static let rootGroups: [RegistrySettingsGroup] = [");
   for (const grp of settings.rootGroups) {
-    lines.push(`    RegistrySettingsGroup(id: ${swiftStr(grp.id)}, header: ${optStr(grp.header)}, mobilePresentation: ${swiftStr(grp.mobilePresentation)}, desktopTab: ${optStr(grp.desktopTab)}, items: [`);
+    lines.push(`    RegistrySettingsGroup(id: ${swiftStr(grp.id)}, header: ${LOpt(grp.header, grp, "header")}, mobilePresentation: ${swiftStr(grp.mobilePresentation)}, desktopTab: ${optStr(grp.desktopTab)}, items: [`);
     for (const item of grp.items) {
       lines.push(`      ${emitItem(item)},`);
     }
@@ -713,9 +751,9 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("");
   lines.push("  static let pages: [RegistrySettingsPage] = [");
   for (const page of settings.pages) {
-    lines.push(`    RegistrySettingsPage(id: ${swiftStr(page.id)}, title: ${swiftStr(page.title)}, iconId: ${swiftStr(page.icon)}, sfSymbol: ${swiftStr(icons.icons[page.icon].sfSymbol)}, depth: ${page.depth}, platforms: ${optArr(page.platforms)}, featureId: ${swiftStr(page.featureId)}, sections: [`);
+    lines.push(`    RegistrySettingsPage(id: ${swiftStr(page.id)}, title: ${L(page.title, page, "title")}, iconId: ${swiftStr(page.icon)}, sfSymbol: ${swiftStr(icons.icons[page.icon].sfSymbol)}, depth: ${page.depth}, platforms: ${optArr(page.platforms)}, featureId: ${swiftStr(page.featureId)}, sections: [`);
     for (const sec of page.sections) {
-      lines.push(`      RegistrySettingsSection(id: ${swiftStr(sec.id)}, header: ${optStr(sec.header)}, platforms: ${optArr(sec.platforms)}, items: [`);
+      lines.push(`      RegistrySettingsSection(id: ${swiftStr(sec.id)}, header: ${LOpt(sec.header, sec, "header")}, platforms: ${optArr(sec.platforms)}, items: [`);
       for (const item of sec.items) {
         lines.push(`        ${emitItem(item)},`);
       }
@@ -756,12 +794,18 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const d of dests.destinations) {
     const capsList = d.shortcut ? `[${appleKeycaps(d.shortcut).map(swiftStr).join(", ")}]` : "nil";
     lines.push(
-      `    RegistryDestination(id: ${swiftStr(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${swiftStr(d.title)}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, visibility: ${swiftStr(d.visibility)}, shortcutKeycaps: ${capsList}, emptyTitle: ${swiftStr(d.emptyState.title)}, emptyDetail: ${swiftStr(d.emptyState.detail)}),`
+      `    RegistryDestination(id: ${swiftStr(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, visibility: ${swiftStr(d.visibility)}, shortcutKeycaps: ${capsList}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}),`
     );
   }
   lines.push("  ]");
   lines.push("");
   lines.push("  static let byNavigationKey: [String: RegistryDestination] = Dictionary(uniqueKeysWithValues: all.map { ($0.navigationKey, $0) })");
+  lines.push("");
+  lines.push("  /// Empty state for a list with no copy of its own (`genericEmptyState`).");
+  lines.push("  enum GenericEmpty {");
+  const ge = dests.genericEmptyState;
+  for (const f of ["title", "detail", "pointerDetail", "touchDetail", "syncingTitle"]) lines.push(`    static let ${f}: String = ${L(ge[f], ge, f)}`);
+  lines.push("  }");
   lines.push("}");
   lines.push("");
 
@@ -774,16 +818,92 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let excludePlatforms: [String]");
   lines.push("}");
   lines.push("");
+  lines.push("/// A platform-neutral shortcut (`primary` is ⌘ on Apple, Ctrl elsewhere).");
+  lines.push("struct RegistryShortcut: Sendable, Hashable {");
+  lines.push("  let key: String");
+  lines.push("  let modifiers: [String]");
+  lines.push("  let keycaps: [String]");
+  lines.push("  let excludePlatforms: [String]");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// One item in a context menu or menu-bar menu (`registry/actions.json`).");
+  lines.push("/// `kind` is `action`, `destination`, `submenu`, `divider` or `slot` (the shell fills a slot).");
+  lines.push("struct RegistryMenuItem: Sendable, Hashable, Identifiable {");
+  lines.push("  let kind: String");
+  lines.push("  let id: String");
+  lines.push("  let title: String?");
+  lines.push("  let sfSymbol: String?");
+  lines.push("  let items: [RegistryMenuItem]");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// One menu-bar menu. `system` names the platform menu it merges into (app, file, view, help).");
+  lines.push("struct RegistryMenu: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let title: String");
+  lines.push("  let system: String?");
+  lines.push("  let items: [RegistryMenuItem]");
+  lines.push("}");
+  lines.push("");
+  const destById = new Map(dests.destinations.map((d) => [d.id, d]));
+  const menuItem = (item, idx) => {
+    if (item.kind === "action") {
+      const a = actions.actions[item.id];
+      const field = item.titleField ?? "title";
+      return `RegistryMenuItem(kind: "action", id: ${swiftStr(item.id)}, title: ${L(a[field], a, field)}, sfSymbol: ${swiftStr(icons.icons[a.icon].sfSymbol)}, items: [])`;
+    }
+    if (item.kind === "destination") {
+      const d = destById.get(item.id);
+      return `RegistryMenuItem(kind: "destination", id: ${swiftStr(item.id)}, title: ${L(d.title, d, "title")}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, items: [])`;
+    }
+    if (item.kind === "submenu") {
+      return `RegistryMenuItem(kind: "submenu", id: ${swiftStr(item.id)}, title: ${L(item.title, item, "title")}, sfSymbol: ${swiftStr(icons.icons[item.icon].sfSymbol)}, items: [${item.items.map(menuItem).join(", ")}])`;
+    }
+    if (item.kind === "slot") return `RegistryMenuItem(kind: "slot", id: ${swiftStr(item.slot)}, title: nil, sfSymbol: nil, items: [])`;
+    return `RegistryMenuItem(kind: "divider", id: ${swiftStr(`divider.${idx}`)}, title: nil, sfSymbol: nil, items: [])`;
+  };
   lines.push("enum RegistryActions {");
   lines.push("  static let titles: [String: String] = [");
   for (const [id, a] of Object.entries(actions.actions)) {
-    lines.push(`    ${swiftStr(id)}: ${swiftStr(a.title)},`);
+    lines.push(`    ${swiftStr(id)}: ${L(a.title, a, "title")},`);
   }
   lines.push("  ]");
   lines.push("");
   lines.push("  static let sfSymbols: [String: String] = [");
   for (const [id, a] of Object.entries(actions.actions)) {
     lines.push(`    ${swiftStr(id)}: ${swiftStr(icons.icons[a.icon].sfSymbol)},`);
+  }
+  lines.push("  ]");
+  lines.push("");
+  const altFields = ["desktopTitle", "activeTitle", "pluralTitle", "addTitle", "removeTitle"];
+  lines.push("  /// Other titles of an action: `desktopTitle`, `activeTitle` (state on), `pluralTitle`, `addTitle`, `removeTitle`.");
+  lines.push("  static let alternateTitles: [String: [String: String]] = [");
+  for (const [id, a] of Object.entries(actions.actions)) {
+    const pairs = altFields.filter((f) => typeof a[f] === "string").map((f) => `${swiftStr(f)}: ${L(a[f], a, f)}`);
+    if (pairs.length) lines.push(`    ${swiftStr(id)}: [${pairs.join(", ")}],`);
+  }
+  lines.push("  ]");
+  lines.push("");
+  lines.push("  static let shortcuts: [String: RegistryShortcut] = [");
+  for (const [id, a] of Object.entries(actions.actions)) {
+    if (!a.shortcut) continue;
+    const sc = a.shortcut;
+    lines.push(`    ${swiftStr(id)}: RegistryShortcut(key: ${swiftStr(sc.key)}, modifiers: [${sc.modifiers.map(swiftStr).join(", ")}], keycaps: [${appleKeycaps(sc).map(swiftStr).join(", ")}], excludePlatforms: [${(sc.excludePlatforms ?? []).map(swiftStr).join(", ")}]),`);
+  }
+  lines.push("  ]");
+  lines.push("");
+  lines.push("  static let contextMenus: [String: [RegistryMenuItem]] = [");
+  for (const [name, items] of Object.entries(actions.contextMenus)) {
+    lines.push(`    ${swiftStr(name)}: [`);
+    items.forEach((it, i) => lines.push(`      ${menuItem(it, i)},`));
+    lines.push("    ],");
+  }
+  lines.push("  ]");
+  lines.push("");
+  lines.push("  static let menuBar: [RegistryMenu] = [");
+  for (const m of actions.menuBar) {
+    lines.push(`    RegistryMenu(id: ${swiftStr(m.id)}, title: ${L(m.title, m, "title")}, system: ${swiftOptStr(m.system)}, items: [`);
+    m.items.forEach((it, i) => lines.push(`      ${menuItem(it, i)},`));
+    lines.push("    ]),");
   }
   lines.push("  ]");
   lines.push("");
@@ -794,10 +914,10 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
       if (!a.shortcut) continue;
       const excl = (a.shortcut.excludePlatforms ?? []).map(swiftStr).join(", ");
       const primaryCaps = appleKeycaps(a.shortcut).map(swiftStr).join(", ");
-      lines.push(`    RegistryShortcutEntry(id: ${swiftStr(actionId)}, label: ${swiftStr(a.title)}, keycaps: [${primaryCaps}], excludePlatforms: [${excl}]),`);
+      lines.push(`    RegistryShortcutEntry(id: ${swiftStr(actionId)}, label: ${L(a.title, a, "title")}, keycaps: [${primaryCaps}], excludePlatforms: [${excl}]),`);
       for (const [idx, alt] of (a.shortcut.alternates ?? []).entries()) {
         const altCaps = appleKeycaps(alt).map(swiftStr).join(", ");
-        lines.push(`    RegistryShortcutEntry(id: ${swiftStr(`${actionId}.alt${idx}`)}, label: ${swiftStr(a.title)}, keycaps: [${altCaps}], excludePlatforms: [${excl}]),`);
+        lines.push(`    RegistryShortcutEntry(id: ${swiftStr(`${actionId}.alt${idx}`)}, label: ${L(a.title, a, "title")}, keycaps: [${altCaps}], excludePlatforms: [${excl}]),`);
       }
     }
     lines.push("  ]");
@@ -805,30 +925,168 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
-  // 8. Surfaces (Notices, Prompts, Task Attributes)
-  lines.push("/// Destructive and fork confirmation copy (`registry/surfaces.json`).");
+  // 8. Surfaces (Notices, Prompts, Toasts, Task Attributes)
+  // Templates (`{name}` placeholders, plural forms) become functions; the
+  // shell passes the values and gets localized text back (ADR 0020).
+  const tmplFn = (name, key) => {
+    const t = L10N.swiftTemplate(BY_KEY, key);
+    return `  static func ${name}(${t.params}) -> String { ${t.body} }`;
+  };
+  const tmplKey = (v, obj, field) => obj?.l10nKeys?.[field] ?? (typeof v === "string" ? v : v.other);
+  const isTmpl = (v) => typeof v !== "string" || L10N.placeholdersOf(v).length > 0;
+  /** Swift expression for a field that may be a template, with Swift locals named like its placeholders. */
+  const expr = (v, obj, field) => (isTmpl(v) ? L10N.swiftTemplate(BY_KEY, tmplKey(v, obj, field)).body : L(v, obj, field));
+
+  lines.push("/// One notice in a task list (`registry/surfaces.json` `notices`). A notice whose");
+  lines.push("/// title has a count gets a title function in `RegistryNotices` instead of `title`.");
+  lines.push("struct RegistryNotice: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let kind: String");
+  lines.push("  let priority: Int");
+  lines.push("  let iconId: String");
+  lines.push("  let sfSymbol: String");
+  lines.push("  let dismissScope: String");
+  lines.push("  let dismissible: Bool");
+  lines.push("  let explainerSlot: Bool");
+  lines.push("  let featureId: String");
+  lines.push("  let title: String?");
+  lines.push("  let detail: String?");
+  lines.push("  /// Platform key (`ios`, `ipados`, `macos`, …) → detail that replaces `detail` there.");
+  lines.push("  let platformDetails: [String: String]");
+  lines.push("  let primaryTitle: String?");
+  lines.push("  let steps: [RegistryNoticeStep]");
+  lines.push("  func detail(for platform: String) -> String? { platformDetails[platform] ?? detail }");
+  lines.push("}");
+  lines.push("");
+  lines.push("struct RegistryNoticeStep: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let title: String");
+  lines.push("  let detail: String");
+  lines.push("  let platformDetails: [String: String]");
+  lines.push("  func detail(for platform: String) -> String { platformDetails[platform] ?? detail }");
+  lines.push("}");
+  lines.push("");
+  const platformMap = (obj) => {
+    const pairs = [];
+    for (const pd of obj.platformDetails ?? []) for (const pl of pd.platforms) pairs.push(`${swiftStr(pl)}: ${L(pd.detail, pd, "detail")}`);
+    return pairs.length ? `[${pairs.join(", ")}]` : "[:]";
+  };
+  lines.push("enum RegistryNotices {");
+  lines.push(`  static let maxConcurrentExplainers: Int = ${surfaces.notices.maxConcurrentExplainers}`);
+  lines.push("  static let all: [RegistryNotice] = [");
+  for (const n of surfaces.notices.items) {
+    const title = n.title === undefined || isTmpl(n.title) ? "nil" : L(n.title, n, "title");
+    const steps = (n.steps ?? []).map((st) => `RegistryNoticeStep(id: ${swiftStr(st.id)}, title: ${L(st.title, st, "title")}, detail: ${L(st.detail, st, "detail")}, platformDetails: ${platformMap(st)})`).join(", ");
+    lines.push(`    RegistryNotice(id: ${swiftStr(n.id)}, kind: ${swiftStr(n.kind)}, priority: ${n.priority}, iconId: ${swiftStr(n.icon)}, sfSymbol: ${swiftStr(icons.icons[n.icon].sfSymbol)}, dismissScope: ${swiftStr(n.dismissScope)}, dismissible: ${Boolean(n.dismissible)}, explainerSlot: ${Boolean(n.explainerSlot)}, featureId: ${swiftStr(n.featureId)}, title: ${title}, detail: ${LOpt(n.detail, n, "detail")}, platformDetails: ${platformMap(n)}, primaryTitle: ${LOpt(n.primaryTitle, n, "primaryTitle")}, steps: [${steps}]),`);
+  }
+  lines.push("  ]");
+  lines.push("  static let byId: [String: RegistryNotice] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })");
+  for (const n of surfaces.notices.items) {
+    if (n.title !== undefined && isTmpl(n.title)) lines.push(tmplFn(`${n.id}Title`, tmplKey(n.title, n, "title")));
+  }
+  lines.push("}");
+  lines.push("");
+
+  lines.push("/// Destructive and fork confirmation copy (`registry/surfaces.json` `prompts`).");
   lines.push("struct RegistryPromptCopy: Sendable, Hashable {");
   lines.push("  let id: String");
   lines.push("  let title: String");
   lines.push("  let message: String");
   lines.push("  let confirmTitle: String?");
+  lines.push("  /// Fork prompts only: the choices, in order.");
+  lines.push("  let options: [RegistryPromptOption]");
   lines.push("}");
   lines.push("");
-  lines.push("enum RegistrySurfaces {");
-  lines.push(`  static let maxConcurrentExplainers: Int = ${surfaces.notices.maxConcurrentExplainers}`);
-  lines.push(`  static let toastDurationSeconds: Double = ${surfaces.toasts.durationSeconds}`);
-  lines.push(`  static let taskAttributeOrder: [String] = [${surfaces.taskAttributes.map((a) => swiftStr(a.id)).join(", ")}]`);
-  lines.push("  static let prompts: [String: RegistryPromptCopy] = [");
-  for (const p of surfaces.prompts.items) {
-    lines.push(`    ${swiftStr(p.id)}: RegistryPromptCopy(id: ${swiftStr(p.id)}, title: ${swiftStr(p.title)}, message: ${swiftStr(p.message)}, confirmTitle: ${swiftOptStr(p.confirmTitle)}),`);
+  lines.push("struct RegistryPromptOption: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let title: String");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// A prompt that asks for a name (`registry/surfaces.json` `prompts.text`).");
+  lines.push("struct RegistryTextPrompt: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let title: String");
+  lines.push("  let placeholder: String");
+  lines.push("  let confirmTitle: String");
+  lines.push("}");
+  lines.push("");
+  const pr = surfaces.prompts;
+  const promptCopy = (p, title, message) => {
+    const opts = (p.options ?? []).map((o) => `RegistryPromptOption(id: ${swiftStr(o.id)}, title: ${L(o.title, o, "title")})`).join(", ");
+    return `RegistryPromptCopy(id: ${swiftStr(p.id)}, title: ${title}, message: ${message}, confirmTitle: ${LOpt(p.confirmTitle, p, "confirmTitle")}, options: [${opts}])`;
+  };
+  lines.push("enum RegistryPrompts {");
+  lines.push(`  static let cancelTitle: String = ${L(pr.cancelTitle, pr, "cancelTitle")}`);
+  lines.push(`  static let errorTitle: String = ${L(pr.error.title, pr.error, "title")}`);
+  lines.push(`  static let errorConfirmTitle: String = ${L(pr.error.confirmTitle, pr.error, "confirmTitle")}`);
+  lines.push("  /// Prompts with fixed copy. Prompts with counts or names are functions below.");
+  lines.push("  static let fixed: [String: RegistryPromptCopy] = [");
+  for (const p of pr.items) {
+    if (p.variants || isTmpl(p.title) || isTmpl(p.message)) continue;
+    lines.push(`    ${swiftStr(p.id)}: ${promptCopy(p, L(p.title, p, "title"), L(p.message, p, "message"))},`);
   }
+  lines.push("  ]");
+  lines.push("  static let text: [String: RegistryTextPrompt] = [");
+  for (const t of pr.text) {
+    lines.push(`    ${swiftStr(t.id)}: RegistryTextPrompt(id: ${swiftStr(t.id)}, title: ${L(t.title, t, "title")}, placeholder: ${L(t.placeholder, t, "placeholder")}, confirmTitle: ${L(t.confirmTitle, t, "confirmTitle")}),`);
+  }
+  lines.push("  ]");
+  for (const cp of pr.countPhrases) lines.push(tmplFn(`${camelId(cp.id)}Phrase`, tmplKey(cp.label, cp, "label")));
+  for (const p of pr.items) {
+    if (p.variants) {
+      // The first variant whose `when` counts match wins; the last has no `when`.
+      const counts = p.counts ?? [];
+      const params = ["name: String", ...counts.map((c) => `${c}: Int`)].join(", ");
+      lines.push(`  static func ${p.id}(${params}) -> RegistryPromptCopy {`);
+      lines.push(`    let name = name.isEmpty ? ${L(p.untitledName, p, "untitledName")} : name`);
+      const used = new Set(p.variants.flatMap((v) => [...L10N.placeholdersOf(v.title), ...L10N.placeholdersOf(v.message)]));
+      for (const c of counts) {
+        const singular = c.replace(/s$/, "");
+        if (used.has(`${singular}Phrase`)) lines.push(`    let ${singular}Phrase = ${camelId(c)}Phrase(count: ${c})`);
+      }
+      for (const v of p.variants) {
+        const cond = Object.entries(v.when ?? {}).map(([c, n]) => `${c} == ${n}`).join(" && ");
+        const ret = `return ${promptCopy(p, expr(v.title, v, "title"), expr(v.message, v, "message"))}`;
+        lines.push(cond ? `    if ${cond} { ${ret} }` : `    ${ret}`);
+      }
+      lines.push("  }");
+    } else if (isTmpl(p.title) || isTmpl(p.message)) {
+      const names = [...new Set([...L10N.placeholdersOf(typeof p.title === "string" ? p.title : p.title.other), ...L10N.placeholdersOf(p.message), ...(typeof p.title === "string" ? [] : ["count"])])];
+      const params = names.map((n) => `${n}: ${L10N.INT_PLACEHOLDERS.has(n) ? "Int" : "String"}`).join(", ");
+      lines.push(`  static func ${p.id}(${params}) -> RegistryPromptCopy {`);
+      lines.push(`    ${promptCopy(p, expr(p.title, p, "title"), expr(p.message, p, "message"))}`);
+      lines.push("  }");
+    }
+  }
+  lines.push("}");
+  lines.push("");
+
+  lines.push("/// Snackbar copy (`registry/surfaces.json` `toasts`).");
+  lines.push("enum RegistryToasts {");
+  lines.push(`  static let durationSeconds: Double = ${surfaces.toasts.durationSeconds}`);
+  for (const [id, t] of Object.entries(surfaces.toasts.templates)) {
+    const tmpl = L10N.swiftTemplate(BY_KEY, tmplKey(t.format, t, "format"));
+    if (t.emptyTitleFormat !== undefined) {
+      const ph = L10N.placeholdersOf(t.format)[0];
+      lines.push(`  static func ${id}(${tmpl.params}) -> String { ${ph}.isEmpty ? ${L(t.emptyTitleFormat, t, "emptyTitleFormat")} : ${tmpl.body} }`);
+    } else {
+      lines.push(`  static func ${id}(${tmpl.params}) -> String { ${tmpl.body} }`);
+    }
+  }
+  lines.push("}");
+  lines.push("");
+
+  lines.push("enum RegistrySurfaces {");
+  lines.push(`  static let taskAttributeOrder: [String] = [${surfaces.taskAttributes.map((a) => swiftStr(a.id)).join(", ")}]`);
+  lines.push("  static let taskAttributeLabels: [String: String] = [");
+  for (const a of surfaces.taskAttributes) lines.push(`    ${swiftStr(a.id)}: ${L(a.label, a, "label")},`);
   lines.push("  ]");
   lines.push("}");
   lines.push("");
 
   // 8b. First run (surfaces.json `firstRun`)
   const fr = surfaces.firstRun;
-  const frButton = (b) => (b === undefined ? "nil" : `RegistryFirstRunButton(title: ${swiftStr(b.title)}, action: ${swiftStr(b.action)})`);
+  const frButton = (b) => (b === undefined ? "nil" : `RegistryFirstRunButton(title: ${L(b.title, b, "title")}, action: ${swiftStr(b.action)})`);
   lines.push("/// One button in the first run. `action` is one of a closed set the client implements.");
   lines.push("struct RegistryFirstRunButton: Sendable, Hashable {");
   lines.push("  let title: String");
@@ -877,14 +1135,14 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`  static let featureId: String = ${swiftStr(fr.featureId)}`);
   lines.push(`  /// The synced setting that records a finished first run, so a second device skips it.`);
   lines.push(`  static let completionSetting: String = ${swiftStr(fr.completionSetting)}`);
-  lines.push(`  static let setupPrompt: String = ${swiftStr(fr.prompts.setup)}`);
-  lines.push(`  static let firstPrompt: String = ${swiftStr(fr.prompts.first)}`);
+  lines.push(`  static let setupPrompt: String = ${L(fr.prompts.setup, fr.prompts, "setup")}`);
+  lines.push(`  static let firstPrompt: String = ${L(fr.prompts.first, fr.prompts, "first")}`);
   lines.push("  static let steps: [RegistryFirstRunStep] = [");
   for (const st of fr.steps) {
-    const points = (st.points ?? []).map((pt) => `RegistryFirstRunPoint(icon: ${swiftStr(pt.icon)}, title: ${swiftStr(pt.title)}, detail: ${swiftStr(pt.detail)})`).join(", ");
-    const choices = (st.choices ?? []).map((ch) => `RegistryFirstRunChoice(id: ${swiftStr(ch.id)}, icon: ${swiftStr(ch.icon)}, title: ${swiftStr(ch.title)}, detail: ${swiftStr(ch.detail)}, action: ${swiftStr(ch.action)}, platforms: [${(ch.platforms ?? []).map(swiftStr).join(", ")}])`).join(", ");
-    const instructions = (st.instructions ?? []).map(swiftStr).join(", ");
-    lines.push(`    RegistryFirstRunStep(id: ${swiftStr(st.id)}, kind: ${swiftStr(st.kind)}, icon: ${swiftStr(st.icon)}, title: ${swiftStr(st.title)}, body: ${swiftStr(st.body ?? "")}, footnote: ${swiftOptStr(st.footnote)}, returningTitle: ${swiftOptStr(st.returningTitle)}, returningBody: ${swiftOptStr(st.returningBody)}, skipWhen: ${swiftOptStr(st.skipWhen)}, requires: ${swiftOptStr(st.requires)}, completesGetStartedStep: ${swiftOptStr(st.completesGetStartedStep)}, points: [${points}], choices: [${choices}], instructions: [${instructions}], primary: ${frButton(st.primary)}, secondary: ${frButton(st.secondary)}, tertiary: ${frButton(st.tertiary)}, afterDone: ${frButton(st.afterDone)}),`);
+    const points = (st.points ?? []).map((pt) => `RegistryFirstRunPoint(icon: ${swiftStr(pt.icon)}, title: ${L(pt.title, pt, "title")}, detail: ${L(pt.detail, pt, "detail")})`).join(", ");
+    const choices = (st.choices ?? []).map((ch) => `RegistryFirstRunChoice(id: ${swiftStr(ch.id)}, icon: ${swiftStr(ch.icon)}, title: ${L(ch.title, ch, "title")}, detail: ${L(ch.detail, ch, "detail")}, action: ${swiftStr(ch.action)}, platforms: [${(ch.platforms ?? []).map(swiftStr).join(", ")}])`).join(", ");
+    const instructions = (st.instructions ?? []).map((s) => L(s)).join(", ");
+    lines.push(`    RegistryFirstRunStep(id: ${swiftStr(st.id)}, kind: ${swiftStr(st.kind)}, icon: ${swiftStr(st.icon)}, title: ${L(st.title, st, "title")}, body: ${st.body === undefined ? '""' : L(st.body, st, "body")}, footnote: ${LOpt(st.footnote, st, "footnote")}, returningTitle: ${LOpt(st.returningTitle, st, "returningTitle")}, returningBody: ${LOpt(st.returningBody, st, "returningBody")}, skipWhen: ${swiftOptStr(st.skipWhen)}, requires: ${swiftOptStr(st.requires)}, completesGetStartedStep: ${swiftOptStr(st.completesGetStartedStep)}, points: [${points}], choices: [${choices}], instructions: [${instructions}], primary: ${frButton(st.primary)}, secondary: ${frButton(st.secondary)}, tertiary: ${frButton(st.tertiary)}, afterDone: ${frButton(st.afterDone)}),`);
   }
   lines.push("  ]");
   lines.push("}");
@@ -948,12 +1206,16 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const SETTINGS_REGISTRY = ${JSON.stringify({ version: settings.version, keys: settings.keys, desktopTabs: settings.desktopTabs, rootGroups: settings.rootGroups, pages: settings.pages })} as const;`);
   lines.push(`export const VIEW_ALIASES = ${JSON.stringify(dests.viewAliases)} as const;`);
   lines.push(`export const DESTINATIONS = ${JSON.stringify(dests.destinations)} as const;`);
+  lines.push(`export const GENERIC_EMPTY_STATE = ${JSON.stringify(dests.genericEmptyState)} as const;`);
   lines.push(`export const ICONS = ${JSON.stringify(icons.icons)} as const;`);
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
-  lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, swipeActions: actions.swipeActions, shortcutsSheet: actions.shortcutsSheet })} as const;`);
+  lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, swipeActions: actions.swipeActions, shortcutsSheet: actions.shortcutsSheet })} as const;`);
   lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
+  lines.push("");
+  lines.push("// Localized registry copy (ADR 0020). Keys are the English text.");
+  lines.push(L10N.tsTables(BY_KEY, TRANSLATIONS));
   lines.push("");
   return lines.join("\n");
 }
@@ -995,11 +1257,39 @@ validateSurfaces(surfaces, icons, caps);
 validateFirstRun(surfaces, icons, caps, settings);
 validateConformance();
 
+BY_KEY = L10N.collectStrings({ settings, destinations: dests, actions, surfaces, tokens }, assert);
+
+const CATALOG_PATH = "Septena/Localizable.xcstrings";
+const catalog = readJSON(CATALOG_PATH);
+if (SEED_LANG) {
+  const rel = `registry/l10n/${SEED_LANG}.json`;
+  const full = path.join(REPO, rel);
+  const existing = fs.existsSync(full) ? JSON.parse(fs.readFileSync(full, "utf8")) : {};
+  const seeded = { ...L10N.seedFromCatalog(catalog, BY_KEY, SEED_LANG), ...existing };
+  const sorted = Object.fromEntries(Object.keys(seeded).sort().map((k) => [k, seeded[k]]));
+  fs.mkdirSync(path.dirname(full), { recursive: true });
+  fs.writeFileSync(full, JSON.stringify(sorted, null, 2) + "\n", "utf8");
+  console.log(`seeded ${rel}: ${Object.keys(sorted).length} translations`);
+}
+const TRANSLATIONS = L10N.readTranslations(REPO);
+const l10nReport = L10N.checkTranslations(BY_KEY, TRANSLATIONS, assert);
+
 const bundle = { entities, rules, icons, tokens, caps, settings, dests, actions, surfaces };
 const outputs = [
   ["SeptenaCore/Generated/RegistryConstants.swift", generateSwift(bundle)],
   ["backend/src/generated/registries.ts", generateTS(bundle)],
+  ["registry/l10n/en.json", L10N.englishFile(BY_KEY)],
 ];
+// The catalog is shared with Xcode, which rewrites extraction state and
+// comments on build. `--check` compares only what the registry owns.
+if (CHECK) {
+  const drift = L10N.catalogDrift(catalog, BY_KEY, TRANSLATIONS);
+  if (drift.length) {
+    throw new Error(`${CATALOG_PATH} is missing registry copy for ${drift.length} key(s), e.g. ${JSON.stringify(drift[0])} (run: node scripts/gen-registries.mjs)`);
+  }
+} else {
+  outputs.push([CATALOG_PATH, L10N.serializeCatalog(L10N.mergeCatalog(catalog, BY_KEY, TRANSLATIONS))]);
+}
 
 let changed = 0;
 for (const [rel, content] of outputs) {
@@ -1007,6 +1297,11 @@ for (const [rel, content] of outputs) {
     console.log(`wrote ${rel}`);
     changed++;
   }
+}
+
+for (const [lang, rep] of Object.entries(l10nReport)) {
+  console.log(`l10n ${lang}: ${rep.total - rep.missing}/${rep.total} registry strings translated (${rep.missing} missing, advisory)`);
+  if (rep.orphans.length) console.log(`l10n ${lang}: ${rep.orphans.length} keys no registry string uses: ${rep.orphans.slice(0, 5).map((k) => JSON.stringify(k)).join(", ")}${rep.orphans.length > 5 ? ", …" : ""}`);
 }
 
 if (CHECK) {

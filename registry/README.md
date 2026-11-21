@@ -18,6 +18,8 @@ iOS, iPadOS, macOS, Backend/MCP, Web, Android, and Windows. See
 | `registry/icons.json` | Semantic icon ID → SF Symbol / Material / Lucide map | R4 (`#145`) |
 | `registry/tokens.json` | Semantic design tokens, selection washes, 16-color palette, 5-step text scale | R4 (`#145`) |
 | `registry/capabilities.json` | Capability parity ledger keyed by Feature ID (ADR 0013) | R4 (`#145`) |
+| `registry/l10n/en.json` | Generated: every user-facing registry string, its placeholders and source paths | L1 (`#214`) |
+| `registry/l10n/<lang>.json` | Translations of registry copy, keyed by the English text | L1 (`#214`) |
 
 ## Workflow
 
@@ -38,3 +40,28 @@ Generated outputs (checked in, never hand-edited):
 
 - `SeptenaCore/Generated/RegistryConstants.swift`
 - `backend/src/generated/registries.ts`
+- `registry/l10n/en.json`
+- the registry entries in `Septena/Localizable.xcstrings` (their comment
+  starts "Generated from registry")
+
+## Localized copy (ADR 0020)
+
+- English stays inline in the registry files. The key of a string is its
+  English text, so the catalog's existing translations apply. When one
+  English text needs two translations, add `"l10nKeys": { "<field>": "<key>" }`
+  to the object that holds it.
+- Placeholders are named: `{count}`, `{name}`, `{date}`. `{count}` is an
+  integer (`%lld` on Apple); every other name is text (`%@`).
+- A plural string is an object: `{ "one": "1 task", "other": "{count} tasks" }`.
+- Translate in `registry/l10n/<lang>.json` (key → text, or plural forms), then
+  run the generator. It writes the translations into the Xcode catalog and the
+  TS tables (`REGISTRY_L10N`, `registryText()`). Never edit registry entries in
+  Xcode: the next generation overwrites them.
+- `--check` fails on empty English, a placeholder mismatch, or two keys that
+  collapse to one catalog key. It reports missing translations without failing.
+- Swift reads localized copy through the generated values (`RegistryL10n`);
+  templates are functions (`RegistryNotices.rolledInTitle(count:)`,
+  `RegistryToasts.movedBulk(count:destination:)`, `RegistryPrompts.deleteArea(…)`).
+- `node scripts/gen-registries.mjs --seed-l10n <lang>` copies catalog
+  translations for registry keys into `registry/l10n/<lang>.json` (existing
+  entries win).

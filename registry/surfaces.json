@@ -13,7 +13,13 @@
         "dismissible": true,
         "title": "Not signed in",
         "primaryTitle": "Sign in…",
-        "featureId": "sync.backend"
+        "featureId": "sync.backend",
+        "detail": "Your changes stay on this device until you sign in.",
+        "platformDetails": [
+          { "platforms": ["macos"], "detail": "Your changes stay on this Mac until you sign in." },
+          { "platforms": ["ipados"], "detail": "Your changes stay on this iPad until you sign in." },
+          { "platforms": ["ios"], "detail": "Your changes stay on this iPhone until you sign in." }
+        ]
       },
       {
         "id": "rolledIn",
@@ -22,7 +28,8 @@
         "icon": "notice.rolled_in",
         "dismissScope": "accountDay",
         "dismissible": true,
-        "featureId": "lists.today"
+        "featureId": "lists.today",
+        "title": { "one": "1 task rolled into Today", "other": "{count} tasks rolled into Today" }
       },
       {
         "id": "getStarted",
@@ -35,15 +42,31 @@
         "title": "Get started with Septena",
         "featureId": "lists.today",
         "steps": [
-          { "id": "connectAI", "title": "Connect your AI", "detail": "Let Claude work on tasks with you" },
-          { "id": "importTasks", "title": "Bring in your tasks", "detail": "Import from Things or Reminders" },
-          { "id": "addTask", "title": "Add your first task", "detail": "It lands in your Inbox until you schedule or file it" }
+          { "id": "connectAI", "title": "Connect your AI", "detail": "Connect an assistant to your tasks" },
+          { "id": "importTasks", "title": "Bring in your tasks", "detail": "Import from another app" },
+          {
+            "id": "addTask",
+            "title": "Add your first task",
+            "detail": "It lands in your Inbox until you schedule or file it",
+            "platformDetails": [{ "platforms": ["macos"], "detail": "Or press ⌃⌥Space anywhere on your Mac" }]
+          }
         ]
+      },
+      {
+        "id": "weeklySweep",
+        "kind": "info",
+        "priority": 3,
+        "icon": "notice.weekly_sweep",
+        "dismissScope": "accountWeek",
+        "dismissible": true,
+        "title": { "one": "1 task faded this week", "other": "{count} tasks faded this week" },
+        "primaryTitle": "Review",
+        "featureId": "fade.sweep"
       },
       {
         "id": "fadeIntro",
         "kind": "info",
-        "priority": 3,
+        "priority": 4,
         "explainerSlot": true,
         "icon": "notice.fade_intro",
         "dismissScope": "device",
@@ -55,16 +78,14 @@
     ]
   },
   "prompts": {
-    "safetyContract": {
-      "cancelIsDefaultButton": true,
-      "confirmCarriesDestructiveRole": true
-    },
+    "safetyContract": { "cancelIsDefaultButton": true, "confirmCarriesDestructiveRole": true },
+    "cancelTitle": "Cancel",
     "items": [
       {
         "id": "deletePermanently",
         "kind": "destructive",
-        "title": "Delete Permanently?",
-        "message": "This cannot be undone.",
+        "title": { "one": "Delete this task permanently?", "other": "Delete {count} tasks permanently?" },
+        "message": "You can't undo this.",
         "confirmTitle": "Delete Permanently",
         "featureId": "lists.recently-deleted"
       },
@@ -79,17 +100,42 @@
       {
         "id": "deleteArea",
         "kind": "destructive",
-        "title": "Delete this area?",
-        "message": "Its projects stay, detached from the area.",
-        "confirmTitle": "Delete Area",
+        "confirmTitle": "Delete",
+        "untitledName": "Area",
+        "counts": ["projects", "tasks"],
+        "variants": [
+          { "id": "empty", "when": { "projects": 0, "tasks": 0 }, "title": "Delete “{name}”?", "message": "You can undo this." },
+          {
+            "id": "tasksOnly",
+            "when": { "projects": 0 },
+            "title": "Delete “{name}” and its {taskPhrase}?",
+            "message": "The tasks move to Recently Deleted. You can undo this."
+          },
+          {
+            "id": "projectsOnly",
+            "when": { "tasks": 0 },
+            "title": "Delete “{name}” and its {projectPhrase}?",
+            "message": "You can undo this.",
+            "l10nKeys": { "title": "Delete “{name}” and its {projectPhrase}? (projects only)" }
+          },
+          {
+            "id": "projectsAndTasks",
+            "title": "Delete “{name}”, its {projectPhrase} and {taskPhrase}?",
+            "message": "The tasks move to Recently Deleted. You can undo this."
+          }
+        ],
         "featureId": "places.areas"
       },
       {
         "id": "deleteProject",
         "kind": "destructive",
-        "title": "Delete this project?",
-        "message": "Its tasks move to Recently Deleted.",
-        "confirmTitle": "Delete Project",
+        "confirmTitle": "Delete",
+        "untitledName": "Project",
+        "counts": ["tasks"],
+        "variants": [
+          { "id": "empty", "when": { "tasks": 0 }, "title": "Delete “{name}”?", "message": "You can undo this." },
+          { "id": "withTasks", "title": "Delete “{name}” and its {taskPhrase}?", "message": "The tasks move to Recently Deleted. You can undo this." }
+        ],
         "featureId": "places.projects"
       },
       {
@@ -105,13 +151,23 @@
         "kind": "fork",
         "title": "Reschedule repeating task?",
         "message": "Move only this task, or update the repeating schedule to the new date?",
-        "options": [
-          { "id": "exception", "title": "Only This Task" },
-          { "id": "updateRule", "title": "Update Schedule" }
-        ],
+        "options": [{ "id": "exception", "title": "Only This Task" }, { "id": "updateRule", "title": "Update Schedule" }],
         "featureId": "task.repeat"
       }
-    ]
+    ],
+    "countPhrases": [
+      { "id": "tasks", "label": { "one": "1 task", "other": "{count} tasks" } },
+      { "id": "projects", "label": { "one": "1 project", "other": "{count} projects" } }
+    ],
+    "text": [
+      { "id": "newSection", "title": "New Section", "placeholder": "Section name", "confirmTitle": "Add", "featureId": "places.sections" },
+      { "id": "renameSection", "title": "Rename Section", "placeholder": "Section name", "confirmTitle": "Rename", "featureId": "places.sections" },
+      { "id": "newArea", "title": "New Area", "placeholder": "Area name", "confirmTitle": "Create", "featureId": "places.areas" },
+      { "id": "renameArea", "title": "Rename Area", "placeholder": "Area name", "confirmTitle": "Rename", "featureId": "places.areas" },
+      { "id": "newProject", "title": "New Project", "placeholder": "Project name", "confirmTitle": "Create", "featureId": "places.projects" },
+      { "id": "renameProject", "title": "Rename Project", "placeholder": "Project name", "confirmTitle": "Rename", "featureId": "places.projects" }
+    ],
+    "error": { "title": "Error", "confirmTitle": "OK" }
   },
   "toasts": {
     "durationSeconds": 7,
@@ -119,7 +175,8 @@
       "deferred": { "format": "Deferred to {date}", "undoable": false },
       "moved": { "format": "Moved to {destination}", "undoable": true },
       "deletedSingle": { "format": "\"{title}\" deleted", "emptyTitleFormat": "Task deleted", "undoable": true },
-      "deletedBulk": { "format": "{count} tasks deleted", "singularFormat": "Task deleted", "undoable": true }
+      "deletedBulk": { "format": { "one": "Task deleted", "other": "{count} tasks deleted" }, "undoable": true },
+      "movedBulk": { "format": { "one": "Moved to {destination}", "other": "Moved {count} tasks to {destination}" }, "undoable": true }
     }
   },
   "firstRun": {
@@ -131,18 +188,26 @@
     },
     "steps": [
       {
-        "id": "welcome", "kind": "intro", "icon": "onboarding.welcome",
+        "id": "welcome",
+        "kind": "intro",
+        "icon": "onboarding.welcome",
         "title": "Welcome to Septena",
         "body": "A task list you share with your AI.",
         "points": [
           { "icon": "onboarding.devices", "title": "On every device", "detail": "Your tasks stay in step on iPhone, iPad and Mac." },
-          { "icon": "onboarding.agent", "title": "Work with Claude", "detail": "Claude can take a task, ask you a question, and hand back the result." },
+          {
+            "icon": "onboarding.agent",
+            "title": "Work with Claude",
+            "detail": "Claude can take a task, ask you a question, and hand back the result."
+          },
           { "icon": "onboarding.notes", "title": "Notes keep the context", "detail": "Each project has notes, so you and Claude know what it's for." }
         ],
         "primary": { "title": "Continue", "action": "next" }
       },
       {
-        "id": "account", "kind": "account", "icon": "onboarding.account",
+        "id": "account",
+        "kind": "account",
+        "icon": "onboarding.account",
         "title": "Sign in to sync",
         "body": "Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.",
         "footnote": "If you skip this, your tasks stay on this device until you sign in.",
@@ -151,18 +216,43 @@
         "secondary": { "title": "Not now", "action": "next" }
       },
       {
-        "id": "moveIn", "kind": "choices", "icon": "onboarding.move_in",
+        "id": "moveIn",
+        "kind": "choices",
+        "icon": "onboarding.move_in",
         "title": "Bring your tasks",
         "body": "Start from the list you already have, or start empty.",
         "completesGetStartedStep": "importTasks",
         "choices": [
-          { "id": "things", "icon": "onboarding.things", "title": "From Things", "detail": "Copies your areas, projects and tasks. Nothing in Things changes.", "action": "importThings", "platforms": ["ios", "ipados", "macos"] },
-          { "id": "reminders", "icon": "settings.reminders", "title": "From Reminders", "detail": "Pick a Reminders list. Its items wait in your Inbox until you bring them in.", "action": "importReminders", "platforms": ["ios", "ipados", "macos"] },
-          { "id": "fresh", "icon": "onboarding.fresh", "title": "Start empty", "detail": "Add tasks as they come up.", "action": "next", "platforms": ["ios", "ipados", "macos", "web", "android", "windows"] }
+          {
+            "id": "things",
+            "icon": "onboarding.things",
+            "title": "From Things",
+            "detail": "Copies your areas, projects and tasks. Nothing in Things changes.",
+            "action": "importThings",
+            "platforms": ["ios", "ipados", "macos"]
+          },
+          {
+            "id": "reminders",
+            "icon": "settings.reminders",
+            "title": "From Reminders",
+            "detail": "Pick a Reminders list. Its items wait in your Inbox until you bring them in.",
+            "action": "importReminders",
+            "platforms": ["ios", "ipados", "macos"]
+          },
+          {
+            "id": "fresh",
+            "icon": "onboarding.fresh",
+            "title": "Start empty",
+            "detail": "Add tasks as they come up.",
+            "action": "next",
+            "platforms": ["ios", "ipados", "macos", "web", "android", "windows"]
+          }
         ]
       },
       {
-        "id": "connectClaude", "kind": "connectAgent", "icon": "settings.claude",
+        "id": "connectClaude",
+        "kind": "connectAgent",
+        "icon": "settings.claude",
         "title": "Connect Claude",
         "body": "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.",
         "requires": "signedIn",
@@ -178,7 +268,9 @@
         "afterDone": { "title": "Continue", "action": "next" }
       },
       {
-        "id": "done", "kind": "finish", "icon": "onboarding.done",
+        "id": "done",
+        "kind": "finish",
+        "icon": "onboarding.done",
         "title": "You're all set",
         "body": "Today shows what to do now. Anything you skipped stays on the Get started list.",
         "returningTitle": "Welcome back",
@@ -188,13 +280,62 @@
     ]
   },
   "taskAttributes": [
-    { "id": "today", "label": "Today", "icon": "action.today_add", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "lists.today" },
-    { "id": "when", "label": "When", "icon": "action.when", "commitContract": "pickCommits", "surfaceTier": "popover", "featureId": "task.when-deadline" },
-    { "id": "deadline", "label": "Deadline", "icon": "action.deadline", "commitContract": "pickCommits", "surfaceTier": "popover", "featureId": "task.when-deadline" },
-    { "id": "list", "label": "List", "icon": "action.move", "commitContract": "pickCommits", "surfaceTier": "popover", "featureId": "places.projects" },
-    { "id": "repeat", "label": "Repeat", "icon": "action.repeat", "commitContract": "closeCommits", "surfaceTier": "popover", "featureId": "task.repeat" },
+    {
+      "id": "today",
+      "label": "Today",
+      "icon": "action.today_add",
+      "commitContract": "pickCommits",
+      "surfaceTier": "inline",
+      "featureId": "lists.today"
+    },
+    {
+      "id": "when",
+      "label": "When",
+      "icon": "action.when",
+      "commitContract": "pickCommits",
+      "surfaceTier": "popover",
+      "featureId": "task.when-deadline"
+    },
+    {
+      "id": "deadline",
+      "label": "Deadline",
+      "icon": "action.deadline",
+      "commitContract": "pickCommits",
+      "surfaceTier": "popover",
+      "featureId": "task.when-deadline"
+    },
+    {
+      "id": "list",
+      "label": "List",
+      "icon": "action.move",
+      "commitContract": "pickCommits",
+      "surfaceTier": "popover",
+      "featureId": "places.projects"
+    },
+    {
+      "id": "repeat",
+      "label": "Repeat",
+      "icon": "action.repeat",
+      "commitContract": "closeCommits",
+      "surfaceTier": "popover",
+      "featureId": "task.repeat"
+    },
     { "id": "notes", "label": "Notes", "icon": "action.notes", "commitContract": "closeCommits", "surfaceTier": "inline", "featureId": "task.notes" },
-    { "id": "discuss", "label": "Discuss", "icon": "action.discuss", "commitContract": "closeCommits", "surfaceTier": "inline", "featureId": "ai.discuss" },
-    { "id": "attachments", "label": "Attachments", "icon": "action.attachment", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "task.attachments" }
+    {
+      "id": "discuss",
+      "label": "Discuss",
+      "icon": "action.discuss",
+      "commitContract": "closeCommits",
+      "surfaceTier": "inline",
+      "featureId": "ai.discuss"
+    },
+    {
+      "id": "attachments",
+      "label": "Attachments",
+      "icon": "action.attachment",
+      "commitContract": "pickCommits",
+      "surfaceTier": "inline",
+      "featureId": "task.attachments"
+    }
   ]
 }

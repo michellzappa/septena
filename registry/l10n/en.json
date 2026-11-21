@@ -1,0 +1,1885 @@
+{
+  "\"{title}\" deleted": {
+    "text": "\"{title}\" deleted",
+    "placeholders": [
+      "title"
+    ],
+    "paths": [
+      "surfaces.toasts.templates.deletedSingle.format"
+    ]
+  },
+  "A task list you share with your AI.": {
+    "text": "A task list you share with your AI.",
+    "paths": [
+      "surfaces.firstRun.steps.welcome.body"
+    ]
+  },
+  "AI & Agents": {
+    "text": "AI & Agents",
+    "paths": [
+      "settings.desktopTabs.ai_agents.title",
+      "settings.rootGroups.ai_agents_root.header"
+    ]
+  },
+  "AI Mode": {
+    "text": "AI Mode",
+    "paths": [
+      "settings.pages.ai_preferences.sections.reach.items.0.label"
+    ]
+  },
+  "AI Preferences": {
+    "text": "AI Preferences",
+    "paths": [
+      "settings.rootGroups.ai_agents_root.items.2.label",
+      "settings.pages.ai_preferences.title"
+    ]
+  },
+  "AI diagnostics": {
+    "text": "AI diagnostics",
+    "paths": [
+      "settings.pages.advanced.sections.beta_ai.header"
+    ]
+  },
+  "About": {
+    "text": "About",
+    "paths": [
+      "settings.desktopTabs.about.title",
+      "settings.rootGroups.meta_root.items.1.label",
+      "settings.pages.about.title"
+    ]
+  },
+  "Accent": {
+    "text": "Accent",
+    "paths": [
+      "settings.rootGroups.appearance_root.items.0.label"
+    ]
+  },
+  "Account": {
+    "text": "Account",
+    "paths": [
+      "settings.desktopTabs.account.title",
+      "settings.rootGroups.account_root.items.0.label",
+      "settings.pages.account.title"
+    ]
+  },
+  "Add": {
+    "text": "Add",
+    "paths": [
+      "surfaces.prompts.text.newSection.confirmTitle"
+    ]
+  },
+  "Add Checklist Item": {
+    "text": "Add Checklist Item",
+    "paths": [
+      "actions.actions.task.addChecklistItem.title"
+    ]
+  },
+  "Add Reminder…": {
+    "text": "Add Reminder…",
+    "paths": [
+      "actions.actions.task.reminder.addTitle"
+    ]
+  },
+  "Add a task or move one here when you want to work on it today.": {
+    "text": "Add a task or move one here when you want to work on it today.",
+    "paths": [
+      "destinations.destinations.today.emptyState.detail"
+    ]
+  },
+  "Add tasks as they come up.": {
+    "text": "Add tasks as they come up.",
+    "paths": [
+      "surfaces.firstRun.steps.moveIn.choices.fresh.detail"
+    ]
+  },
+  "Add your first task": {
+    "text": "Add your first task",
+    "paths": [
+      "surfaces.notices.items.getStarted.steps.addTask.title"
+    ]
+  },
+  "Advanced": {
+    "text": "Advanced",
+    "paths": [
+      "settings.pages.about.sections.advanced_link.items.0.label",
+      "settings.pages.advanced.title"
+    ]
+  },
+  "Agent tools": {
+    "text": "Agent tools",
+    "paths": [
+      "settings.pages.advanced.sections.agent_tools.header"
+    ]
+  },
+  "Anonymous usage data": {
+    "text": "Anonymous usage data",
+    "paths": [
+      "settings.pages.privacy.sections.telemetry.header"
+    ]
+  },
+  "Anytime": {
+    "text": "Anytime",
+    "paths": [
+      "destinations.destinations.anytime.title"
+    ]
+  },
+  "Appearance": {
+    "text": "Appearance",
+    "paths": [
+      "settings.rootGroups.appearance_root.header"
+    ]
+  },
+  "Area": {
+    "text": "Area",
+    "paths": [
+      "surfaces.prompts.items.deleteArea.untitledName"
+    ]
+  },
+  "Area name": {
+    "text": "Area name",
+    "paths": [
+      "surfaces.prompts.text.newArea.placeholder",
+      "surfaces.prompts.text.renameArea.placeholder"
+    ]
+  },
+  "Attachments": {
+    "text": "Attachments",
+    "paths": [
+      "surfaces.taskAttributes.attachments.label"
+    ]
+  },
+  "Automatic": {
+    "text": "Automatic",
+    "paths": [
+      "settings.keys.aiMode.options.1.title"
+    ]
+  },
+  "Açaí": {
+    "text": "Açaí",
+    "paths": [
+      "tokens.fruitAccents.acai.name"
+    ]
+  },
+  "Balanced": {
+    "text": "Balanced",
+    "paths": [
+      "settings.keys.pccReasoning.options.1.title"
+    ]
+  },
+  "Baseline": {
+    "text": "Baseline",
+    "paths": [
+      "tokens.textures.none.tag"
+    ]
+  },
+  "Bring in your tasks": {
+    "text": "Bring in your tasks",
+    "paths": [
+      "surfaces.notices.items.getStarted.steps.importTasks.title"
+    ]
+  },
+  "Bring your tasks": {
+    "text": "Bring your tasks",
+    "paths": [
+      "surfaces.firstRun.steps.moveIn.title"
+    ]
+  },
+  "Calendar": {
+    "text": "Calendar",
+    "paths": [
+      "settings.rootGroups.connections_data_root.items.0.label",
+      "settings.pages.calendar.title"
+    ]
+  },
+  "Cancel": {
+    "text": "Cancel",
+    "paths": [
+      "surfaces.prompts.cancelTitle"
+    ]
+  },
+  "Cancel Project": {
+    "text": "Cancel Project",
+    "paths": [
+      "actions.actions.project.cancel.title"
+    ]
+  },
+  "Cancel Task": {
+    "text": "Cancel Task",
+    "paths": [
+      "actions.actions.task.cancel.title"
+    ]
+  },
+  "Cancel Tasks": {
+    "text": "Cancel Tasks",
+    "paths": [
+      "actions.actions.task.cancel.pluralTitle"
+    ]
+  },
+  "Carambola": {
+    "text": "Carambola",
+    "paths": [
+      "tokens.fruitAccents.carambola.name"
+    ]
+  },
+  "Caustic Glass": {
+    "text": "Caustic Glass",
+    "paths": [
+      "tokens.textures.causticGlass.name"
+    ]
+  },
+  "Classic Window": {
+    "text": "Classic Window",
+    "paths": [
+      "actions.actions.app.classicWindow.title"
+    ]
+  },
+  "Claude can take a task, ask you a question, and hand back the result.": {
+    "text": "Claude can take a task, ask you a question, and hand back the result.",
+    "paths": [
+      "surfaces.firstRun.steps.welcome.points.1.detail"
+    ]
+  },
+  "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.": {
+    "text": "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.",
+    "paths": [
+      "surfaces.firstRun.steps.connectClaude.body"
+    ]
+  },
+  "Clear Schedule": {
+    "text": "Clear Schedule",
+    "paths": [
+      "actions.actions.task.clearSchedule.title"
+    ]
+  },
+  "Click + or double-click below to add a task.": {
+    "text": "Click + or double-click below to add a task.",
+    "paths": [
+      "destinations.genericEmptyState.pointerDetail"
+    ]
+  },
+  "Colorful": {
+    "text": "Colorful",
+    "paths": [
+      "tokens.fruitAccents.colorful.name"
+    ]
+  },
+  "Complete": {
+    "text": "Complete",
+    "paths": [
+      "actions.contextMenus.task.row.complete.title",
+      "actions.menuBar.task.items.complete.title"
+    ]
+  },
+  "Completed and let-go tasks are archived here.": {
+    "text": "Completed and let-go tasks are archived here.",
+    "paths": [
+      "destinations.destinations.logbook.emptyState.detail"
+    ]
+  },
+  "Completion animations": {
+    "text": "Completion animations",
+    "paths": [
+      "settings.rootGroups.appearance_root.items.3.label"
+    ]
+  },
+  "Connect Claude": {
+    "text": "Connect Claude",
+    "paths": [
+      "settings.rootGroups.ai_agents_root.items.0.label",
+      "settings.pages.claude_pairing.title",
+      "settings.pages.claude_pairing.sections.connector.header",
+      "surfaces.firstRun.steps.connectClaude.title"
+    ]
+  },
+  "Connect an assistant to your tasks": {
+    "text": "Connect an assistant to your tasks",
+    "paths": [
+      "surfaces.notices.items.getStarted.steps.connectAI.detail"
+    ]
+  },
+  "Connect your AI": {
+    "text": "Connect your AI",
+    "paths": [
+      "surfaces.notices.items.getStarted.steps.connectAI.title"
+    ]
+  },
+  "Connections & Data": {
+    "text": "Connections & Data",
+    "paths": [
+      "settings.desktopTabs.connections_data.title",
+      "settings.rootGroups.connections_data_root.header"
+    ]
+  },
+  "Continue": {
+    "text": "Continue",
+    "paths": [
+      "surfaces.firstRun.steps.welcome.primary.title",
+      "surfaces.firstRun.steps.connectClaude.afterDone.title"
+    ]
+  },
+  "Copies your areas, projects and tasks. Nothing in Things changes.": {
+    "text": "Copies your areas, projects and tasks. Nothing in Things changes.",
+    "paths": [
+      "surfaces.firstRun.steps.moveIn.choices.things.detail"
+    ]
+  },
+  "Copy": {
+    "text": "Copy",
+    "paths": [
+      "actions.actions.task.copy.title"
+    ]
+  },
+  "Copy first prompt": {
+    "text": "Copy first prompt",
+    "paths": [
+      "surfaces.firstRun.steps.connectClaude.tertiary.title"
+    ]
+  },
+  "Copy setup prompt": {
+    "text": "Copy setup prompt",
+    "paths": [
+      "surfaces.firstRun.steps.connectClaude.primary.title"
+    ]
+  },
+  "Copy the setup prompt and paste it into Claude.": {
+    "text": "Copy the setup prompt and paste it into Claude.",
+    "paths": [
+      "surfaces.firstRun.steps.connectClaude.instructions.0"
+    ]
+  },
+  "Create": {
+    "text": "Create",
+    "paths": [
+      "surfaces.prompts.text.newArea.confirmTitle",
+      "surfaces.prompts.text.newProject.confirmTitle"
+    ]
+  },
+  "Create Next Copy": {
+    "text": "Create Next Copy",
+    "paths": [
+      "actions.actions.task.createNextCopy.title"
+    ]
+  },
+  "Data tools": {
+    "text": "Data tools",
+    "paths": [
+      "settings.pages.advanced.sections.data_tools.header"
+    ]
+  },
+  "Deadline": {
+    "text": "Deadline",
+    "paths": [
+      "surfaces.taskAttributes.deadline.label"
+    ]
+  },
+  "Deadline…": {
+    "text": "Deadline…",
+    "paths": [
+      "actions.actions.task.deadline.title"
+    ]
+  },
+  "Decrease Text Size": {
+    "text": "Decrease Text Size",
+    "paths": [
+      "actions.actions.app.textSizeDecrease.title"
+    ]
+  },
+  "Deferred to {date}": {
+    "text": "Deferred to {date}",
+    "placeholders": [
+      "date"
+    ],
+    "paths": [
+      "surfaces.toasts.templates.deferred.format"
+    ]
+  },
+  "Delete": {
+    "text": "Delete",
+    "paths": [
+      "actions.actions.task.delete.title",
+      "surfaces.prompts.items.deleteArea.confirmTitle",
+      "surfaces.prompts.items.deleteProject.confirmTitle"
+    ]
+  },
+  "Delete Account": {
+    "text": "Delete Account",
+    "paths": [
+      "surfaces.prompts.items.deleteAccount.confirmTitle"
+    ]
+  },
+  "Delete Account?": {
+    "text": "Delete Account?",
+    "paths": [
+      "surfaces.prompts.items.deleteAccount.title"
+    ]
+  },
+  "Delete Area": {
+    "text": "Delete Area",
+    "paths": [
+      "actions.actions.area.delete.title"
+    ]
+  },
+  "Delete Permanently": {
+    "text": "Delete Permanently",
+    "paths": [
+      "actions.actions.task.deletePermanently.title",
+      "surfaces.prompts.items.deletePermanently.confirmTitle"
+    ]
+  },
+  "Delete Project": {
+    "text": "Delete Project",
+    "paths": [
+      "actions.actions.project.delete.title"
+    ]
+  },
+  "Delete Section": {
+    "text": "Delete Section",
+    "paths": [
+      "actions.actions.section.delete.title",
+      "surfaces.prompts.items.deleteSection.confirmTitle"
+    ]
+  },
+  "Delete Tasks": {
+    "text": "Delete Tasks",
+    "paths": [
+      "actions.actions.task.delete.pluralTitle"
+    ]
+  },
+  "Delete this section?": {
+    "text": "Delete this section?",
+    "paths": [
+      "surfaces.prompts.items.deleteSection.title"
+    ]
+  },
+  "Delete {count} tasks permanently?": {
+    "forms": {
+      "one": "Delete this task permanently?",
+      "other": "Delete {count} tasks permanently?"
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.prompts.items.deletePermanently.title"
+    ]
+  },
+  "Delete “{name}” and its {projectPhrase}? (projects only)": {
+    "text": "Delete “{name}” and its {projectPhrase}?",
+    "placeholders": [
+      "name",
+      "projectPhrase"
+    ],
+    "paths": [
+      "surfaces.prompts.items.deleteArea.variants.projectsOnly.title"
+    ]
+  },
+  "Delete “{name}” and its {taskPhrase}?": {
+    "text": "Delete “{name}” and its {taskPhrase}?",
+    "placeholders": [
+      "name",
+      "taskPhrase"
+    ],
+    "paths": [
+      "surfaces.prompts.items.deleteArea.variants.tasksOnly.title",
+      "surfaces.prompts.items.deleteProject.variants.withTasks.title"
+    ]
+  },
+  "Delete “{name}”, its {projectPhrase} and {taskPhrase}?": {
+    "text": "Delete “{name}”, its {projectPhrase} and {taskPhrase}?",
+    "placeholders": [
+      "name",
+      "projectPhrase",
+      "taskPhrase"
+    ],
+    "paths": [
+      "surfaces.prompts.items.deleteArea.variants.projectsAndTasks.title"
+    ]
+  },
+  "Delete “{name}”?": {
+    "text": "Delete “{name}”?",
+    "placeholders": [
+      "name"
+    ],
+    "paths": [
+      "surfaces.prompts.items.deleteArea.variants.empty.title",
+      "surfaces.prompts.items.deleteProject.variants.empty.title"
+    ]
+  },
+  "Deleted tasks appear here for 30 days before being permanently removed.": {
+    "text": "Deleted tasks appear here for 30 days before being permanently removed.",
+    "paths": [
+      "destinations.destinations.recentlyDeleted.emptyState.detail"
+    ]
+  },
+  "Diagnostics": {
+    "text": "Diagnostics",
+    "paths": [
+      "settings.pages.advanced.sections.diagnostics.header"
+    ]
+  },
+  "Discuss": {
+    "text": "Discuss",
+    "paths": [
+      "surfaces.taskAttributes.discuss.label"
+    ]
+  },
+  "Duplicate": {
+    "text": "Duplicate",
+    "paths": [
+      "actions.actions.task.duplicate.title"
+    ]
+  },
+  "Duplicate Tasks": {
+    "text": "Duplicate Tasks",
+    "paths": [
+      "actions.actions.task.duplicate.pluralTitle"
+    ]
+  },
+  "Each project has notes, so you and Claude know what it's for.": {
+    "text": "Each project has notes, so you and Claude know what it's for.",
+    "paths": [
+      "surfaces.firstRun.steps.welcome.points.2.detail"
+    ]
+  },
+  "Edit Details…": {
+    "text": "Edit Details…",
+    "paths": [
+      "actions.actions.task.editDetails.title"
+    ]
+  },
+  "Elevation": {
+    "text": "Elevation",
+    "paths": [
+      "tokens.textures.ridges.tag"
+    ]
+  },
+  "Error": {
+    "text": "Error",
+    "paths": [
+      "surfaces.prompts.error.title"
+    ]
+  },
+  "Fade inactive tasks": {
+    "text": "Fade inactive tasks",
+    "paths": [
+      "settings.rootGroups.lists_root.items.2.label"
+    ]
+  },
+  "Faded": {
+    "text": "Faded",
+    "paths": [
+      "destinations.destinations.faded.title"
+    ]
+  },
+  "Field Matrix": {
+    "text": "Field Matrix",
+    "paths": [
+      "tokens.textures.fieldMatrix.name"
+    ]
+  },
+  "File": {
+    "text": "File",
+    "paths": [
+      "actions.menuBar.file.title"
+    ]
+  },
+  "From Reminders": {
+    "text": "From Reminders",
+    "paths": [
+      "surfaces.firstRun.steps.moveIn.choices.reminders.title"
+    ]
+  },
+  "From Things": {
+    "text": "From Things",
+    "paths": [
+      "surfaces.firstRun.steps.moveIn.choices.things.title"
+    ]
+  },
+  "General": {
+    "text": "General",
+    "paths": [
+      "settings.desktopTabs.general.title",
+      "actions.shortcutsSheet.general.title"
+    ]
+  },
+  "Get started with Septena": {
+    "text": "Get started with Septena",
+    "paths": [
+      "surfaces.notices.items.getStarted.title"
+    ]
+  },
+  "Give any task a Repeat rule and it will show up here.": {
+    "text": "Give any task a Repeat rule and it will show up here.",
+    "paths": [
+      "destinations.destinations.repeating.emptyState.detail"
+    ]
+  },
+  "Go": {
+    "text": "Go",
+    "paths": [
+      "actions.menuBar.go.title"
+    ]
+  },
+  "Group Today by list": {
+    "text": "Group Today by list",
+    "paths": [
+      "settings.rootGroups.lists_root.items.0.label"
+    ]
+  },
+  "Height Map": {
+    "text": "Height Map",
+    "paths": [
+      "tokens.textures.topography.tag"
+    ]
+  },
+  "Help": {
+    "text": "Help",
+    "paths": [
+      "actions.menuBar.help.title"
+    ]
+  },
+  "Hide Get Started": {
+    "text": "Hide Get Started",
+    "paths": [
+      "actions.actions.notice.hideGetStarted.title"
+    ]
+  },
+  "Hide Info": {
+    "text": "Hide Info",
+    "paths": [
+      "actions.actions.task.toggleInfo.activeTitle"
+    ]
+  },
+  "Hide Sidebar Counts": {
+    "text": "Hide Sidebar Counts",
+    "paths": [
+      "actions.actions.app.toggleSidebarCounts.activeTitle"
+    ]
+  },
+  "How AI helps with your tasks": {
+    "text": "How AI helps with your tasks",
+    "paths": [
+      "settings.pages.ai_preferences.sections.explainer.items.0.label"
+    ]
+  },
+  "If you skip this, your tasks stay on this device until you sign in.": {
+    "text": "If you skip this, your tasks stay on this device until you sign in.",
+    "paths": [
+      "surfaces.firstRun.steps.account.footnote"
+    ]
+  },
+  "Import & Export": {
+    "text": "Import & Export",
+    "paths": [
+      "settings.rootGroups.connections_data_root.items.2.label",
+      "settings.pages.import_export.title"
+    ]
+  },
+  "Import from Things": {
+    "text": "Import from Things",
+    "paths": [
+      "settings.pages.import_export.sections.move_in.items.0.label"
+    ]
+  },
+  "Import from another app": {
+    "text": "Import from another app",
+    "paths": [
+      "surfaces.notices.items.getStarted.steps.importTasks.detail"
+    ]
+  },
+  "Inactive tasks start to fade": {
+    "text": "Inactive tasks start to fade",
+    "paths": [
+      "surfaces.notices.items.fadeIntro.title"
+    ]
+  },
+  "Inbox": {
+    "text": "Inbox",
+    "paths": [
+      "destinations.destinations.inbox.title"
+    ]
+  },
+  "Inbox is empty": {
+    "text": "Inbox is empty",
+    "paths": [
+      "destinations.destinations.inbox.emptyState.title"
+    ]
+  },
+  "Increase Text Size": {
+    "text": "Increase Text Size",
+    "paths": [
+      "actions.actions.app.textSizeIncrease.title"
+    ]
+  },
+  "Industrial": {
+    "text": "Industrial",
+    "paths": [
+      "tokens.textures.fieldMatrix.tag"
+    ]
+  },
+  "It lands in your Inbox until you schedule or file it": {
+    "text": "It lands in your Inbox until you schedule or file it",
+    "paths": [
+      "surfaces.notices.items.getStarted.steps.addTask.detail"
+    ]
+  },
+  "Its tasks stay in the project.": {
+    "text": "Its tasks stay in the project.",
+    "paths": [
+      "surfaces.prompts.items.deleteSection.message"
+    ]
+  },
+  "Jabuticaba": {
+    "text": "Jabuticaba",
+    "paths": [
+      "tokens.fruitAccents.jabuticaba.name"
+    ]
+  },
+  "Keyboard Shortcuts": {
+    "text": "Keyboard Shortcuts",
+    "paths": [
+      "actions.actions.app.keyboardShortcuts.title"
+    ]
+  },
+  "Large": {
+    "text": "Large",
+    "paths": [
+      "tokens.textScale.steps.large.label"
+    ]
+  },
+  "Largest": {
+    "text": "Largest",
+    "paths": [
+      "tokens.textScale.steps.xLarge.label"
+    ]
+  },
+  "Later": {
+    "text": "Later",
+    "paths": [
+      "surfaces.firstRun.steps.connectClaude.secondary.title"
+    ]
+  },
+  "Learn where you usually file similar tasks.": {
+    "text": "Learn where you usually file similar tasks.",
+    "paths": [
+      "settings.rootGroups.lists_root.items.4.detail"
+    ]
+  },
+  "Light": {
+    "text": "Light",
+    "paths": [
+      "settings.keys.pccReasoning.options.0.title"
+    ]
+  },
+  "List": {
+    "text": "List",
+    "paths": [
+      "surfaces.taskAttributes.list.label"
+    ]
+  },
+  "Lists": {
+    "text": "Lists",
+    "paths": [
+      "settings.rootGroups.lists_root.header"
+    ]
+  },
+  "Logbook": {
+    "text": "Logbook",
+    "paths": [
+      "destinations.destinations.logbook.title"
+    ]
+  },
+  "Logbook is empty": {
+    "text": "Logbook is empty",
+    "paths": [
+      "destinations.destinations.logbook.emptyState.title"
+    ]
+  },
+  "MCP Skills": {
+    "text": "MCP Skills",
+    "paths": [
+      "settings.pages.advanced.sections.agent_tools.items.0.label"
+    ]
+  },
+  "Mark Done": {
+    "text": "Mark Done",
+    "paths": [
+      "actions.actions.project.markDone.title"
+    ]
+  },
+  "Mark as Complete": {
+    "text": "Mark as Complete",
+    "paths": [
+      "actions.actions.task.toggleComplete.title"
+    ]
+  },
+  "Mark as Done": {
+    "text": "Mark as Done",
+    "paths": [
+      "actions.actions.notice.toggleStep.title"
+    ]
+  },
+  "Mark as Not Done": {
+    "text": "Mark as Not Done",
+    "paths": [
+      "actions.actions.notice.toggleStep.activeTitle"
+    ]
+  },
+  "Medium": {
+    "text": "Medium",
+    "paths": [
+      "tokens.textScale.steps.normal.label"
+    ]
+  },
+  "Move": {
+    "text": "Move",
+    "paths": [
+      "actions.contextMenus.task.row.move.title"
+    ]
+  },
+  "Move Down": {
+    "text": "Move Down",
+    "paths": [
+      "actions.actions.project.moveDown.title"
+    ]
+  },
+  "Move Tasks": {
+    "text": "Move Tasks",
+    "paths": [
+      "actions.actions.task.move.pluralTitle"
+    ]
+  },
+  "Move Up": {
+    "text": "Move Up",
+    "paths": [
+      "actions.actions.project.moveUp.title"
+    ]
+  },
+  "Move from another app": {
+    "text": "Move from another app",
+    "paths": [
+      "settings.pages.import_export.sections.move_in.header"
+    ]
+  },
+  "Move only this task, or update the repeating schedule to the new date?": {
+    "text": "Move only this task, or update the repeating schedule to the new date?",
+    "paths": [
+      "surfaces.prompts.items.rescheduleFixedRepeat.message"
+    ]
+  },
+  "Move to Area": {
+    "text": "Move to Area",
+    "paths": [
+      "actions.contextMenus.sidebar.project.moveToArea.title"
+    ]
+  },
+  "Move to Suggested List": {
+    "text": "Move to Suggested List",
+    "paths": [
+      "actions.actions.task.moveSuggested.title"
+    ]
+  },
+  "Move to Today": {
+    "text": "Move to Today",
+    "paths": [
+      "actions.actions.task.toggleToday.addTitle"
+    ]
+  },
+  "Moved to {destination}": {
+    "text": "Moved to {destination}",
+    "placeholders": [
+      "destination"
+    ],
+    "paths": [
+      "surfaces.toasts.templates.moved.format"
+    ]
+  },
+  "Moved {count} tasks to {destination}": {
+    "forms": {
+      "one": "Moved to {destination}",
+      "other": "Moved {count} tasks to {destination}"
+    },
+    "placeholders": [
+      "count",
+      "destination"
+    ],
+    "paths": [
+      "surfaces.toasts.templates.movedBulk.format"
+    ]
+  },
+  "Move…": {
+    "text": "Move…",
+    "paths": [
+      "actions.actions.task.move.title"
+    ]
+  },
+  "New Area": {
+    "text": "New Area",
+    "paths": [
+      "actions.actions.sidebar.newArea.title",
+      "surfaces.prompts.text.newArea.title"
+    ]
+  },
+  "New Project": {
+    "text": "New Project",
+    "paths": [
+      "actions.actions.sidebar.newProject.title",
+      "surfaces.prompts.text.newProject.title"
+    ]
+  },
+  "New Project in Area": {
+    "text": "New Project in Area",
+    "paths": [
+      "actions.actions.area.newProject.title"
+    ]
+  },
+  "New Section": {
+    "text": "New Section",
+    "paths": [
+      "actions.actions.section.new.title",
+      "surfaces.prompts.text.newSection.title"
+    ]
+  },
+  "New To-Do": {
+    "text": "New To-Do",
+    "paths": [
+      "actions.actions.app.newTask.title"
+    ]
+  },
+  "New tasks wait here until you schedule or file them.": {
+    "text": "New tasks wait here until you schedule or file them.",
+    "paths": [
+      "destinations.destinations.inbox.emptyState.detail"
+    ]
+  },
+  "No Faded Tasks": {
+    "text": "No Faded Tasks",
+    "paths": [
+      "destinations.destinations.faded.emptyState.title"
+    ]
+  },
+  "No Recently Deleted Tasks": {
+    "text": "No Recently Deleted Tasks",
+    "paths": [
+      "destinations.destinations.recentlyDeleted.emptyState.title"
+    ]
+  },
+  "No Starred Tasks": {
+    "text": "No Starred Tasks",
+    "paths": [
+      "destinations.destinations.starred.emptyState.title"
+    ]
+  },
+  "No agent can claim or work on a task while paused.": {
+    "text": "No agent can claim or work on a task while paused.",
+    "paths": [
+      "settings.rootGroups.ai_agents_root.items.1.detail"
+    ]
+  },
+  "No repeating tasks": {
+    "text": "No repeating tasks",
+    "paths": [
+      "destinations.destinations.repeating.emptyState.title"
+    ]
+  },
+  "Not now": {
+    "text": "Not now",
+    "paths": [
+      "surfaces.firstRun.steps.account.secondary.title"
+    ]
+  },
+  "Not signed in": {
+    "text": "Not signed in",
+    "paths": [
+      "surfaces.notices.items.signIn.title"
+    ]
+  },
+  "Notes": {
+    "text": "Notes",
+    "paths": [
+      "surfaces.taskAttributes.notes.label"
+    ]
+  },
+  "Notes keep the context": {
+    "text": "Notes keep the context",
+    "paths": [
+      "surfaces.firstRun.steps.welcome.points.2.title"
+    ]
+  },
+  "Nothing here yet": {
+    "text": "Nothing here yet",
+    "paths": [
+      "destinations.genericEmptyState.title"
+    ]
+  },
+  "Nothing in Anytime": {
+    "text": "Nothing in Anytime",
+    "paths": [
+      "destinations.destinations.anytime.emptyState.title"
+    ]
+  },
+  "Nothing on Today": {
+    "text": "Nothing on Today",
+    "paths": [
+      "destinations.destinations.today.emptyState.title"
+    ]
+  },
+  "Nothing to review": {
+    "text": "Nothing to review",
+    "paths": [
+      "destinations.destinations.review.emptyState.title"
+    ]
+  },
+  "Nothing upcoming": {
+    "text": "Nothing upcoming",
+    "paths": [
+      "destinations.destinations.upcoming.emptyState.title"
+    ]
+  },
+  "OK": {
+    "text": "OK",
+    "paths": [
+      "surfaces.prompts.error.confirmTitle"
+    ]
+  },
+  "On every device": {
+    "text": "On every device",
+    "paths": [
+      "surfaces.firstRun.steps.welcome.points.0.title"
+    ]
+  },
+  "On-device intelligence": {
+    "text": "On-device intelligence",
+    "paths": [
+      "settings.pages.ai_preferences.sections.on_device.header"
+    ]
+  },
+  "On-device only": {
+    "text": "On-device only",
+    "paths": [
+      "settings.keys.aiMode.options.0.title"
+    ]
+  },
+  "One": {
+    "text": "One",
+    "paths": [
+      "settings.keys.tasksTitleLines.options.0.title"
+    ]
+  },
+  "Only This Task": {
+    "text": "Only This Task",
+    "paths": [
+      "surfaces.prompts.items.rescheduleFixedRepeat.options.exception.title"
+    ]
+  },
+  "Open": {
+    "text": "Open",
+    "paths": [
+      "actions.actions.notice.openStep.title"
+    ]
+  },
+  "Open Today": {
+    "text": "Open Today",
+    "paths": [
+      "surfaces.firstRun.steps.done.primary.title"
+    ]
+  },
+  "Open tasks without a date live here.": {
+    "text": "Open tasks without a date live here.",
+    "paths": [
+      "destinations.destinations.anytime.emptyState.detail"
+    ]
+  },
+  "Optical": {
+    "text": "Optical",
+    "paths": [
+      "tokens.textures.causticGlass.tag"
+    ]
+  },
+  "Or press ⌃⌥Space anywhere on your Mac": {
+    "text": "Or press ⌃⌥Space anywhere on your Mac",
+    "paths": [
+      "surfaces.notices.items.getStarted.steps.addTask.platformDetails.0.detail"
+    ]
+  },
+  "Overdue app icon badge": {
+    "text": "Overdue app icon badge",
+    "paths": [
+      "settings.rootGroups.lists_root.items.5.label"
+    ]
+  },
+  "Paste JSON Backup…": {
+    "text": "Paste JSON Backup…",
+    "paths": [
+      "settings.pages.advanced.sections.data_tools.items.0.label"
+    ]
+  },
+  "Paste the first prompt. Claude sets up your areas and projects with you.": {
+    "text": "Paste the first prompt. Claude sets up your areas and projects with you.",
+    "paths": [
+      "surfaces.firstRun.steps.connectClaude.instructions.2"
+    ]
+  },
+  "Pause Repeat": {
+    "text": "Pause Repeat",
+    "paths": [
+      "actions.actions.task.pauseResumeRepeat.title"
+    ]
+  },
+  "Pause all agents": {
+    "text": "Pause all agents",
+    "paths": [
+      "settings.rootGroups.ai_agents_root.items.1.label"
+    ]
+  },
+  "Persimmon": {
+    "text": "Persimmon",
+    "paths": [
+      "tokens.fruitAccents.persimmon.name"
+    ]
+  },
+  "Pick a Reminders list. Its items wait in your Inbox until you bring them in.": {
+    "text": "Pick a Reminders list. Its items wait in your Inbox until you bring them in.",
+    "paths": [
+      "surfaces.firstRun.steps.moveIn.choices.reminders.detail"
+    ]
+  },
+  "Pitaya": {
+    "text": "Pitaya",
+    "paths": [
+      "tokens.fruitAccents.pitaya.name"
+    ]
+  },
+  "Print / Ink": {
+    "text": "Print / Ink",
+    "paths": [
+      "tokens.textures.stippleDrift.tag"
+    ]
+  },
+  "Privacy": {
+    "text": "Privacy",
+    "paths": [
+      "settings.desktopTabs.privacy.title",
+      "settings.rootGroups.meta_root.items.0.label",
+      "settings.pages.privacy.title"
+    ]
+  },
+  "Private Cloud Compute reasoning": {
+    "text": "Private Cloud Compute reasoning",
+    "paths": [
+      "settings.pages.advanced.sections.beta_ai.items.2.label"
+    ]
+  },
+  "Project": {
+    "text": "Project",
+    "paths": [
+      "surfaces.prompts.items.deleteProject.untitledName"
+    ]
+  },
+  "Project name": {
+    "text": "Project name",
+    "paths": [
+      "surfaces.prompts.text.newProject.placeholder",
+      "surfaces.prompts.text.renameProject.placeholder"
+    ]
+  },
+  "Pure Canvas": {
+    "text": "Pure Canvas",
+    "paths": [
+      "tokens.textures.none.name"
+    ]
+  },
+  "Quick Add…": {
+    "text": "Quick Add…",
+    "paths": [
+      "actions.actions.app.quickAdd.title"
+    ]
+  },
+  "Quick Entry": {
+    "text": "Quick Entry",
+    "paths": [
+      "actions.actions.app.quickEntry.title"
+    ]
+  },
+  "Quick Find…": {
+    "text": "Quick Find…",
+    "paths": [
+      "actions.actions.app.quickFind.title"
+    ]
+  },
+  "Recently Deleted": {
+    "text": "Recently Deleted",
+    "paths": [
+      "destinations.destinations.recentlyDeleted.title"
+    ]
+  },
+  "Reminders": {
+    "text": "Reminders",
+    "paths": [
+      "settings.rootGroups.connections_data_root.items.1.label",
+      "settings.pages.reminders.title"
+    ]
+  },
+  "Reminder…": {
+    "text": "Reminder…",
+    "paths": [
+      "actions.actions.task.reminder.title"
+    ]
+  },
+  "Remove Star": {
+    "text": "Remove Star",
+    "paths": [
+      "actions.actions.task.toggleStar.removeTitle"
+    ]
+  },
+  "Remove from Today": {
+    "text": "Remove from Today",
+    "paths": [
+      "actions.actions.task.toggleToday.removeTitle"
+    ]
+  },
+  "Rename": {
+    "text": "Rename",
+    "paths": [
+      "actions.actions.task.editDetails.desktopTitle",
+      "actions.actions.area.rename.title",
+      "actions.actions.project.rename.title",
+      "actions.actions.section.rename.title",
+      "surfaces.prompts.text.renameSection.confirmTitle",
+      "surfaces.prompts.text.renameArea.confirmTitle",
+      "surfaces.prompts.text.renameProject.confirmTitle"
+    ]
+  },
+  "Rename Area": {
+    "text": "Rename Area",
+    "paths": [
+      "surfaces.prompts.text.renameArea.title"
+    ]
+  },
+  "Rename Project": {
+    "text": "Rename Project",
+    "paths": [
+      "surfaces.prompts.text.renameProject.title"
+    ]
+  },
+  "Rename Section": {
+    "text": "Rename Section",
+    "paths": [
+      "surfaces.prompts.text.renameSection.title"
+    ]
+  },
+  "Repeat": {
+    "text": "Repeat",
+    "paths": [
+      "surfaces.taskAttributes.repeat.label"
+    ]
+  },
+  "Repeating": {
+    "text": "Repeating",
+    "paths": [
+      "destinations.destinations.repeating.title"
+    ]
+  },
+  "Repeat…": {
+    "text": "Repeat…",
+    "paths": [
+      "actions.actions.task.repeat.title"
+    ]
+  },
+  "Reschedule repeating task?": {
+    "text": "Reschedule repeating task?",
+    "paths": [
+      "surfaces.prompts.items.rescheduleFixedRepeat.title"
+    ]
+  },
+  "Reset Text Size": {
+    "text": "Reset Text Size",
+    "paths": [
+      "actions.actions.app.textSizeReset.title"
+    ]
+  },
+  "Restore": {
+    "text": "Restore",
+    "paths": [
+      "actions.actions.task.restore.title"
+    ]
+  },
+  "Resume Repeat": {
+    "text": "Resume Repeat",
+    "paths": [
+      "actions.actions.task.pauseResumeRepeat.activeTitle"
+    ]
+  },
+  "Review": {
+    "text": "Review",
+    "paths": [
+      "destinations.destinations.review.title",
+      "surfaces.notices.items.weeklySweep.primaryTitle"
+    ]
+  },
+  "Ridge Lines": {
+    "text": "Ridge Lines",
+    "paths": [
+      "tokens.textures.ridges.name"
+    ]
+  },
+  "Schedule": {
+    "text": "Schedule",
+    "paths": [
+      "actions.contextMenus.task.row.schedule.title"
+    ]
+  },
+  "Section name": {
+    "text": "Section name",
+    "paths": [
+      "surfaces.prompts.text.newSection.placeholder",
+      "surfaces.prompts.text.renameSection.placeholder"
+    ]
+  },
+  "Septena": {
+    "text": "Septena",
+    "paths": [
+      "actions.menuBar.app.title"
+    ]
+  },
+  "Septena Life": {
+    "text": "Septena Life",
+    "paths": [
+      "settings.pages.about.sections.companion.header"
+    ]
+  },
+  "Septena Window": {
+    "text": "Septena Window",
+    "paths": [
+      "actions.actions.app.septenaWindow.title"
+    ]
+  },
+  "Set up Septena for me using https://septena.app/agents.md": {
+    "text": "Set up Septena for me using https://septena.app/agents.md",
+    "paths": [
+      "surfaces.firstRun.prompts.setup"
+    ]
+  },
+  "Set up my Septena areas, projects, and tasks by following https://api.septena.app/onboard.md": {
+    "text": "Set up my Septena areas, projects, and tasks by following https://api.septena.app/onboard.md",
+    "paths": [
+      "surfaces.firstRun.prompts.first"
+    ]
+  },
+  "Settings…": {
+    "text": "Settings…",
+    "paths": [
+      "actions.actions.app.settings.title"
+    ]
+  },
+  "Show / Hide Sidebar": {
+    "text": "Show / Hide Sidebar",
+    "paths": [
+      "actions.actions.app.toggleSidebar.title"
+    ]
+  },
+  "Show Info": {
+    "text": "Show Info",
+    "paths": [
+      "actions.actions.task.toggleInfo.title"
+    ]
+  },
+  "Show Sidebar Counts": {
+    "text": "Show Sidebar Counts",
+    "paths": [
+      "actions.actions.app.toggleSidebarCounts.title"
+    ]
+  },
+  "Show Welcome Again": {
+    "text": "Show Welcome Again",
+    "paths": [
+      "settings.pages.about.sections.actions.items.2.label"
+    ]
+  },
+  "Show completed tasks": {
+    "text": "Show completed tasks",
+    "paths": [
+      "settings.rootGroups.lists_root.items.1.label"
+    ]
+  },
+  "Show faded tasks": {
+    "text": "Show faded tasks",
+    "paths": [
+      "settings.rootGroups.lists_root.items.3.label"
+    ]
+  },
+  "Show faded tasks in projects and areas.": {
+    "text": "Show faded tasks in projects and areas.",
+    "paths": [
+      "settings.rootGroups.lists_root.items.3.detail"
+    ]
+  },
+  "Show model labels": {
+    "text": "Show model labels",
+    "paths": [
+      "settings.pages.advanced.sections.beta_ai.items.0.label"
+    ]
+  },
+  "Show which model answered next to each AI reply.": {
+    "text": "Show which model answered next to each AI reply.",
+    "paths": [
+      "settings.pages.advanced.sections.beta_ai.items.0.detail"
+    ]
+  },
+  "Sign in to sync": {
+    "text": "Sign in to sync",
+    "paths": [
+      "surfaces.firstRun.steps.account.title"
+    ]
+  },
+  "Sign in with Apple": {
+    "text": "Sign in with Apple",
+    "paths": [
+      "surfaces.firstRun.steps.account.primary.title"
+    ]
+  },
+  "Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.": {
+    "text": "Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.",
+    "paths": [
+      "surfaces.firstRun.steps.account.body"
+    ]
+  },
+  "Sign in…": {
+    "text": "Sign in…",
+    "paths": [
+      "surfaces.notices.items.signIn.primaryTitle"
+    ]
+  },
+  "Small": {
+    "text": "Small",
+    "paths": [
+      "tokens.textScale.steps.small.label"
+    ]
+  },
+  "Smallest": {
+    "text": "Smallest",
+    "paths": [
+      "tokens.textScale.steps.xSmall.label"
+    ]
+  },
+  "Star": {
+    "text": "Star",
+    "paths": [
+      "actions.actions.task.toggleStar.addTitle"
+    ]
+  },
+  "Star important tasks to keep them one tap away.": {
+    "text": "Star important tasks to keep them one tap away.",
+    "paths": [
+      "destinations.destinations.starred.emptyState.detail"
+    ]
+  },
+  "Starred": {
+    "text": "Starred",
+    "paths": [
+      "destinations.destinations.starred.title"
+    ]
+  },
+  "Start empty": {
+    "text": "Start empty",
+    "paths": [
+      "surfaces.firstRun.steps.moveIn.choices.fresh.title"
+    ]
+  },
+  "Start from the list you already have, or start empty.": {
+    "text": "Start from the list you already have, or start empty.",
+    "paths": [
+      "surfaces.firstRun.steps.moveIn.body"
+    ]
+  },
+  "Stipple Drift": {
+    "text": "Stipple Drift",
+    "paths": [
+      "tokens.textures.stippleDrift.name"
+    ]
+  },
+  "Suggest where to file": {
+    "text": "Suggest where to file",
+    "paths": [
+      "settings.rootGroups.lists_root.items.4.label"
+    ]
+  },
+  "Sync & storage diagnostics": {
+    "text": "Sync & storage diagnostics",
+    "paths": [
+      "settings.pages.advanced.sections.diagnostics.items.0.label"
+    ]
+  },
+  "Syncing…": {
+    "text": "Syncing…",
+    "paths": [
+      "destinations.genericEmptyState.syncingTitle"
+    ]
+  },
+  "Tactile": {
+    "text": "Tactile",
+    "paths": [
+      "tokens.textures.washiPaper.tag"
+    ]
+  },
+  "Tamarillo": {
+    "text": "Tamarillo",
+    "paths": [
+      "tokens.fruitAccents.tamarillo.name"
+    ]
+  },
+  "Tap + to add a task.": {
+    "text": "Tap + to add a task.",
+    "paths": [
+      "destinations.genericEmptyState.touchDetail"
+    ]
+  },
+  "Task": {
+    "text": "Task",
+    "paths": [
+      "actions.menuBar.task.title"
+    ]
+  },
+  "Task deleted": {
+    "text": "Task deleted",
+    "paths": [
+      "surfaces.toasts.templates.deletedSingle.emptyTitleFormat"
+    ]
+  },
+  "Task list": {
+    "text": "Task list",
+    "paths": [
+      "actions.shortcutsSheet.taskList.title"
+    ]
+  },
+  "Tasks Claude finishes appear here so you can check and accept them.": {
+    "text": "Tasks Claude finishes appear here so you can check and accept them.",
+    "paths": [
+      "destinations.destinations.review.emptyState.detail"
+    ]
+  },
+  "Tasks with a future When or Deadline date appear here.": {
+    "text": "Tasks with a future When or Deadline date appear here.",
+    "paths": [
+      "destinations.destinations.upcoming.emptyState.detail"
+    ]
+  },
+  "Tasks without activity for 14 days fade out and move to Faded.": {
+    "text": "Tasks without activity for 14 days fade out and move to Faded.",
+    "paths": [
+      "settings.rootGroups.lists_root.items.2.detail"
+    ]
+  },
+  "Text Size": {
+    "text": "Text Size",
+    "paths": [
+      "settings.rootGroups.appearance_root.items.1.label",
+      "actions.menuBar.view.items.textSize.title"
+    ]
+  },
+  "The tasks move to Recently Deleted. You can undo this.": {
+    "text": "The tasks move to Recently Deleted. You can undo this.",
+    "paths": [
+      "surfaces.prompts.items.deleteArea.variants.tasksOnly.message",
+      "surfaces.prompts.items.deleteArea.variants.projectsAndTasks.message",
+      "surfaces.prompts.items.deleteProject.variants.withTasks.message"
+    ]
+  },
+  "This account is already set up. Your tasks are syncing to this device.": {
+    "text": "This account is already set up. Your tasks are syncing to this device.",
+    "paths": [
+      "surfaces.firstRun.steps.done.returningBody"
+    ]
+  },
+  "Thorough": {
+    "text": "Thorough",
+    "paths": [
+      "settings.keys.pccReasoning.options.2.title"
+    ]
+  },
+  "Three": {
+    "text": "Three",
+    "paths": [
+      "settings.keys.tasksTitleLines.options.2.title"
+    ]
+  },
+  "Title lines": {
+    "text": "Title lines",
+    "paths": [
+      "settings.rootGroups.appearance_root.items.2.label"
+    ]
+  },
+  "Today": {
+    "text": "Today",
+    "paths": [
+      "destinations.destinations.today.title",
+      "surfaces.taskAttributes.today.label"
+    ]
+  },
+  "Today shows what to do now. Anything you skipped stays on the Get started list.": {
+    "text": "Today shows what to do now. Anything you skipped stays on the Get started list.",
+    "paths": [
+      "surfaces.firstRun.steps.done.body"
+    ]
+  },
+  "Toggle Star": {
+    "text": "Toggle Star",
+    "paths": [
+      "actions.actions.task.toggleStar.title"
+    ]
+  },
+  "Toggle Today": {
+    "text": "Toggle Today",
+    "paths": [
+      "actions.actions.task.toggleToday.title"
+    ]
+  },
+  "Topography": {
+    "text": "Topography",
+    "paths": [
+      "tokens.textures.topography.name"
+    ]
+  },
+  "Two": {
+    "text": "Two",
+    "paths": [
+      "settings.keys.tasksTitleLines.options.1.title"
+    ]
+  },
+  "Type above to add your first task.": {
+    "text": "Type above to add your first task.",
+    "paths": [
+      "destinations.genericEmptyState.detail"
+    ]
+  },
+  "Undated tasks fade after 14 days without activity and move to Faded. Open or edit a task to bring it back. You can turn this off in Settings.": {
+    "text": "Undated tasks fade after 14 days without activity and move to Faded. Open or edit a task to bring it back. You can turn this off in Settings.",
+    "paths": [
+      "surfaces.notices.items.fadeIntro.detail"
+    ]
+  },
+  "Undated tasks without activity for 14 days appear here until you keep them or let them go.": {
+    "text": "Undated tasks without activity for 14 days appear here until you keep them or let them go.",
+    "paths": [
+      "destinations.destinations.faded.emptyState.detail"
+    ]
+  },
+  "Upcoming": {
+    "text": "Upcoming",
+    "paths": [
+      "destinations.destinations.upcoming.title"
+    ]
+  },
+  "Update Schedule": {
+    "text": "Update Schedule",
+    "paths": [
+      "surfaces.prompts.items.rescheduleFixedRepeat.options.updateRule.title"
+    ]
+  },
+  "Usage data": {
+    "text": "Usage data",
+    "paths": [
+      "settings.pages.privacy.sections.telemetry.items.0.label"
+    ]
+  },
+  "Use Private Cloud Compute": {
+    "text": "Use Private Cloud Compute",
+    "paths": [
+      "settings.pages.advanced.sections.beta_ai.items.1.label"
+    ]
+  },
+  "Use my Claude": {
+    "text": "Use my Claude",
+    "paths": [
+      "settings.keys.aiMode.options.2.title"
+    ]
+  },
+  "View": {
+    "text": "View",
+    "paths": [
+      "actions.menuBar.view.title"
+    ]
+  },
+  "Washi Paper": {
+    "text": "Washi Paper",
+    "paths": [
+      "tokens.textures.washiPaper.name"
+    ]
+  },
+  "Welcome back": {
+    "text": "Welcome back",
+    "paths": [
+      "surfaces.firstRun.steps.done.returningTitle"
+    ]
+  },
+  "Welcome to Septena": {
+    "text": "Welcome to Septena",
+    "paths": [
+      "surfaces.firstRun.steps.welcome.title"
+    ]
+  },
+  "When": {
+    "text": "When",
+    "paths": [
+      "surfaces.taskAttributes.when.label"
+    ]
+  },
+  "When Claude shows a code, enter it below.": {
+    "text": "When Claude shows a code, enter it below.",
+    "paths": [
+      "surfaces.firstRun.steps.connectClaude.instructions.1"
+    ]
+  },
+  "When off, tasks appear in one list with their project or area underneath.": {
+    "text": "When off, tasks appear in one list with their project or area underneath.",
+    "paths": [
+      "settings.rootGroups.lists_root.items.0.detail"
+    ]
+  },
+  "When…": {
+    "text": "When…",
+    "paths": [
+      "actions.actions.task.when.title"
+    ]
+  },
+  "Where AI runs": {
+    "text": "Where AI runs",
+    "paths": [
+      "settings.pages.ai_preferences.sections.reach.header"
+    ]
+  },
+  "Work with Claude": {
+    "text": "Work with Claude",
+    "paths": [
+      "surfaces.firstRun.steps.welcome.points.1.title"
+    ]
+  },
+  "You can undo this.": {
+    "text": "You can undo this.",
+    "paths": [
+      "surfaces.prompts.items.deleteArea.variants.empty.message",
+      "surfaces.prompts.items.deleteArea.variants.projectsOnly.message",
+      "surfaces.prompts.items.deleteProject.variants.empty.message"
+    ]
+  },
+  "You can't undo this.": {
+    "text": "You can't undo this.",
+    "paths": [
+      "surfaces.prompts.items.deletePermanently.message"
+    ]
+  },
+  "You're all set": {
+    "text": "You're all set",
+    "paths": [
+      "surfaces.firstRun.steps.done.title"
+    ]
+  },
+  "Your changes stay on this Mac until you sign in.": {
+    "text": "Your changes stay on this Mac until you sign in.",
+    "paths": [
+      "surfaces.notices.items.signIn.platformDetails.0.detail"
+    ]
+  },
+  "Your changes stay on this device until you sign in.": {
+    "text": "Your changes stay on this device until you sign in.",
+    "paths": [
+      "surfaces.notices.items.signIn.detail"
+    ]
+  },
+  "Your changes stay on this iPad until you sign in.": {
+    "text": "Your changes stay on this iPad until you sign in.",
+    "paths": [
+      "surfaces.notices.items.signIn.platformDetails.1.detail"
+    ]
+  },
+  "Your changes stay on this iPhone until you sign in.": {
+    "text": "Your changes stay on this iPhone until you sign in.",
+    "paths": [
+      "surfaces.notices.items.signIn.platformDetails.2.detail"
+    ]
+  },
+  "Your data": {
+    "text": "Your data",
+    "paths": [
+      "settings.pages.privacy.sections.data_locality.header"
+    ]
+  },
+  "Your tasks stay in step on iPhone, iPad and Mac.": {
+    "text": "Your tasks stay in step on iPhone, iPad and Mac.",
+    "paths": [
+      "surfaces.firstRun.steps.welcome.points.0.detail"
+    ]
+  },
+  "Your tasks, areas, projects, and conversations are erased from the server and this device.": {
+    "text": "Your tasks, areas, projects, and conversations are erased from the server and this device.",
+    "paths": [
+      "surfaces.prompts.items.deleteAccount.message"
+    ]
+  },
+  "Yuzu": {
+    "text": "Yuzu",
+    "paths": [
+      "tokens.fruitAccents.yuzu.name"
+    ]
+  },
+  "{count} projects": {
+    "forms": {
+      "one": "1 project",
+      "other": "{count} projects"
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.prompts.countPhrases.projects.label"
+    ]
+  },
+  "{count} tasks": {
+    "forms": {
+      "one": "1 task",
+      "other": "{count} tasks"
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.prompts.countPhrases.tasks.label"
+    ]
+  },
+  "{count} tasks deleted": {
+    "forms": {
+      "one": "Task deleted",
+      "other": "{count} tasks deleted"
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.toasts.templates.deletedBulk.format"
+    ]
+  },
+  "{count} tasks faded this week": {
+    "forms": {
+      "one": "1 task faded this week",
+      "other": "{count} tasks faded this week"
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.notices.items.weeklySweep.title"
+    ]
+  },
+  "{count} tasks rolled into Today": {
+    "forms": {
+      "one": "1 task rolled into Today",
+      "other": "{count} tasks rolled into Today"
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.notices.items.rolledIn.title"
+    ]
+  }
+}
