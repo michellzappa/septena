@@ -1,6 +1,6 @@
 # 0013. Build the Windows app on the Android client's Kotlin code
 
-- Status: proposed
+- Status: accepted (2026-11-21)
 - Date: 2026-11-21
 - Deciders: mz
 
@@ -47,7 +47,7 @@
 
 ## Decision
 
-*(default, chosen for mz; mz can overrule)*
+Accepted by mz on 2026-11-21 with all defaults below.
 
 Septena for Windows is a native Compose for Desktop app that shares the
 Kotlin code of the Android client: the sync client, the local store, the

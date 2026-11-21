@@ -176,7 +176,7 @@ documented self-host server URL option.
 GitHub milestone: `"M5 Breadth"`.
 
 - #136 Windows client, Compose for Desktop on the Android Kotlin code
-  ([ADR 0013](adr/0013-native-windows-app-on-the-android-code.md), proposed):
+  ([ADR 0013](adr/0013-native-windows-app-on-the-android-code.md)):
   W0 shared Kotlin core → W1 Cloud PC spike → W2 first release scope →
   W3 signed installer and Store → W4 parity ledger. Starts after the #20 spike.
 - L3 notes / deadline sync, "Send to…" · L4 moves across lists
