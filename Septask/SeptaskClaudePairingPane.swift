@@ -5,21 +5,14 @@ import AppKit
 import UIKit
 #endif
 
-/// Settings ▸ About ▸ Advanced ▸ Task backend, on Mac and iOS. Septask is
-/// backend-only (docs/SEPTASK_BACKEND.md §9, phase 4): there is no iCloud
-/// switch and no copy or move-back action any more. This pane shows the
-/// sign-in and sync state (the same section as Settings ▸ Account), what
-/// the backend refused, and pairs a Claude connector.
-///
-/// Why no "Copy tasks to backend": it read the CloudKit mirror and needed a
-/// running CloudKit engine. The sync engine already sends every local row
-/// the backend does not hold (its reconcile diffs each row against what the
-/// backend last confirmed), so a re-upload action would add nothing.
-struct SeptaskBackendSettingsPane: View {
+/// Connect Claude pairing sections, driven by `registry/settings.json`
+/// (`claude_pairing`, docs/SETTINGS_UX_SPEC.md). Rendered inline at the top of
+/// macOS Settings ▸ AI & Agents (`desktopInline: true`), and as a 1-tap pushed
+/// page on iOS (`SeptaskClaudePairingPane`).
+struct SeptaskClaudePairingSections: View {
   private enum CopiedTarget: Equatable { case url, setupPrompt, starterPrompt }
 
   private var sync: TaskSyncEngine { .shared }
-  /// MCP connector pairing.
   @State private var pairCode = ""
   @State private var pairing = false
   @State private var pairResult: (text: String, failed: Bool)?
@@ -30,16 +23,17 @@ struct SeptaskBackendSettingsPane: View {
     "Set up my Septena areas, projects, and tasks by following https://api.septena.app/onboard.md"
 
   var body: some View {
-    Form {
-      SeptaskSyncAccountSection()
-      connectorSection
-      if !sync.issues.isEmpty { issuesSection }
+    if !sync.signedIn {
+      Section {
+        Text("Sign in with Apple so Claude can connect to your tasks through your private Septena account.")
+          .font(.callout)
+          .foregroundStyle(.secondary)
+        SeptaskSignInButton()
+      } header: {
+        Text("Sign in to connect Claude")
+      }
     }
-    .formStyle(.grouped)
-    .navigationTitle("Task backend")
-  }
 
-  private var connectorSection: some View {
     Section {
       LabeledContent("Setup prompt") {
         Button(copied == .setupPrompt ? "Copied" : "Copy") {
@@ -65,6 +59,7 @@ struct SeptaskBackendSettingsPane: View {
         TextField("Code from the browser page", text: $pairCode)
           .font(.body.monospaced())
           .onSubmit(approvePairing)
+          .disabled(!sync.signedIn)
         Button("Approve", action: approvePairing)
           .disabled(!sync.signedIn || pairing
                     || pairCode.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -80,28 +75,9 @@ struct SeptaskBackendSettingsPane: View {
           .foregroundStyle(pairResult.failed ? .red : .secondary)
       }
     } header: {
-      Text("Connect your AI")
+      Text("Connect Claude")
     } footer: {
-      Text("Paste the setup prompt into your AI assistant, or add the connector URL manually. When your browser shows a code, enter it here. Once connected, paste the first prompt to populate your areas, projects, and tasks. Only enter a code from a browser window you opened yourself.")
-    }
-  }
-
-  private var issuesSection: some View {
-    Section {
-      ForEach(sync.issues.suffix(20).reversed(), id: \.key) { issue in
-        VStack(alignment: .leading, spacing: 2) {
-          Text("\(issue.entity.rawValue) \(issue.id)")
-            .font(.caption.monospaced())
-          Text(issue.reason)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-      }
-      Button("Clear") { sync.clearIssues() }
-    } header: {
-      Text("Not synced")
-    } footer: {
-      Text("Changes the backend refused, newest first. The backend kept its own version of each.")
+      Text("Paste the setup prompt into Claude, or add the connector URL to Claude as a custom connector. When your browser shows a code, enter it here. Once connected, paste the first prompt to set up your areas, projects and tasks. Only enter a code from a browser window you opened yourself.")
     }
   }
 
@@ -137,5 +113,18 @@ struct SeptaskBackendSettingsPane: View {
         pairResult = ((error as? LocalizedError)?.errorDescription ?? error.localizedDescription, true)
       }
     }
+  }
+}
+
+struct SeptaskClaudePairingPane: View {
+  var body: some View {
+    Form {
+      SeptaskClaudePairingSections()
+    }
+    .formStyle(.grouped)
+    .navigationTitle("Connect Claude")
+    #if os(iOS)
+    .navigationBarTitleDisplayMode(.inline)
+    #endif
   }
 }

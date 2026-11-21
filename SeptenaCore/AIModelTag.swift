@@ -53,12 +53,12 @@ enum AIModelTag: String, Sendable, Equatable {
   // MARK: Beta visibility toggle
 
   /// User default key for the "show model labels" beta toggle.
-  static let visibilityKey = "septena.ai.showModelTags"
+  static let visibilityKey = RegistrySettings.StorageKey.showModelLabels
 
   /// Whether model tags are shown anywhere in the UI. Defaults ON during the
-  /// iOS-27 beta ("always indicate, for now"); the toggle lives in Settings ▸
-  /// Claude & AI so it can be turned off without a build.
+  /// beta; the toggle lives in Settings ▸ About ▸ Advanced so it can be turned
+  /// off without a build.
   static var isVisible: Bool {
-    UserDefaults.standard.object(forKey: visibilityKey) as? Bool ?? true
+    UserDefaults.standard.object(forKey: visibilityKey) as? Bool ?? RegistrySettings.Defaults.showModelLabels
   }
 }

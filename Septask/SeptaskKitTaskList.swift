@@ -1272,9 +1272,10 @@ final class SeptaskKitTaskListController: NSViewController {
     case .addTask:
       SeptaskKitQuickEntry.show()
     case .connectAI, .importTasks:
-      let dest: SeptaskSettingsView.Destination =
-        (id == .connectAI && TaskSyncEngine.shared.signedIn) ? .taskBackend : .connectionsAI
-      SeptaskSettingsLink.request(dest)
+      let pageID = id == .connectAI
+        ? RegistrySettings.PageID.claudePairing
+        : RegistrySettings.PageID.importExport
+      SeptaskSettingsLink.request(pageID)
       SeptaskKitSettingsWindow.show()
     }
   }
