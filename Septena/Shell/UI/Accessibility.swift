@@ -271,10 +271,35 @@ struct SeptenaToast: Identifiable {
   var undo: (() -> Void)?
 }
 
+/// Tracks whether any `SeptenaToastCapsule` is currently presenting a toast so
+/// floating root overlays (like iPhone's `MagicPlusOrb`) step aside cleanly
+/// instead of covering the toast's Undo button.
+@MainActor
+@Observable
+final class SeptenaToastActivity {
+  static let shared = SeptenaToastActivity()
+  private var activeStoreIDs: Set<ObjectIdentifier> = []
+
+  var hasActiveToast: Bool { !activeStoreIDs.isEmpty }
+
+  func setActive(_ active: Bool, for store: SeptenaToastStore) {
+    let key = ObjectIdentifier(store)
+    if active {
+      activeStoreIDs.insert(key)
+    } else {
+      activeStoreIDs.remove(key)
+    }
+  }
+}
+
 @MainActor
 @Observable
 final class SeptenaToastStore {
-  var current: SeptenaToast?
+  var current: SeptenaToast? {
+    didSet {
+      SeptenaToastActivity.shared.setActive(current != nil, for: self)
+    }
+  }
 
   func show(_ message: String, undo: (() -> Void)? = nil, duration: Double = 7) {
     current = SeptenaToast(message: message, duration: duration, undo: undo)
@@ -336,6 +361,9 @@ struct SeptenaToastCapsule: View {
       try? await Task.sleep(for: .seconds(seconds))
       guard !Task.isCancelled else { return }
       store.dismiss()
+    }
+    .onDisappear {
+      SeptenaToastActivity.shared.setActive(false, for: store)
     }
   }
 

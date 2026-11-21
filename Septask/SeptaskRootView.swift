@@ -304,6 +304,7 @@ struct SeptaskRootView: View {
       }
       .tabBarMinimizeBehavior(.onScrollDown)
 
+      let hideMagicPlus = nav.isTaskMultiSelectActive || SeptenaToastActivity.shared.hasActiveToast
       MagicPlusOrb(
         drag: magicPlusDrag,
         isViewingProject: isViewingProject,
@@ -321,9 +322,9 @@ struct SeptaskRootView: View {
       .padding(.trailing, 16)
       .padding(.bottom, 92)
       .ignoresSafeArea(.all, edges: .bottom)
-      .opacity(nav.isTaskMultiSelectActive ? 0 : 1)
-      .allowsHitTesting(!nav.isTaskMultiSelectActive)
-      .a11yAnimation(.snappy(duration: 0.2), value: nav.isTaskMultiSelectActive)
+      .opacity(hideMagicPlus ? 0 : 1)
+      .allowsHitTesting(!hideMagicPlus)
+      .a11yAnimation(.snappy(duration: 0.2), value: hideMagicPlus)
 
       MagicPlusFloatingOverlay(drag: magicPlusDrag)
     }
