@@ -19,7 +19,7 @@ const RETIRED_HOST = "mcp.septena.app";
 app.use("*", async (c, next) => {
   if (new URL(c.req.url).host !== RETIRED_HOST) return next();
   return c.text(
-    "mcp.septena.app was retired on 2026-11-20. Septena tasks are at https://api.septena.app/mcp (pair it from Septask).",
+    "mcp.septena.app was retired on 2026-11-20. Septena tasks are at https://api.septena.app/mcp (pair it from Septena).",
     410,
   );
 });

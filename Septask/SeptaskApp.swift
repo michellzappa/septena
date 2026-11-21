@@ -39,7 +39,7 @@ struct SeptaskApp: App {
   }
 
   var body: some Scene {
-    WindowGroup(id: "main") {
+    WindowGroup("Septena", id: "main") {
       SeptaskMainWindow(
         localStore: localStore,
         services: services,

@@ -1,11 +1,11 @@
 ---
 name: septena-tasks
-description: Use the Septena tasks MCP at api.septena.app to read and write the user's tasks, areas, projects and task conversations. Triggers when the user asks about their tasks, today's plan, their inbox, or any Septask data.
+description: Use the Septena tasks MCP at api.septena.app to read and write the user's tasks, areas, projects and task conversations. Triggers when the user asks about their tasks, today's plan, their inbox, or any Septena data.
 ---
 
 # Septena tasks MCP
 
-The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, projects and task conversations, the same data the Septask app shows. The user pairs it from the Septask app. Changes reach the app within seconds.
+The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, projects and task conversations, the same data the Septena app shows. The user pairs it from the Septena app. Changes reach the app within seconds.
 
 ## Conventions
 
@@ -133,7 +133,7 @@ tasks_list(view: "anytime")
 
 ## Errors to expect
 
-- 401 → the pairing expired or was revoked; the user re-pairs from Septask.
+- 401 → the pairing expired or was revoked; the user re-pairs from Septena.
 - A write tool that says the connection can only read → the pairing predates write access; the user removes and re-adds the connector.
 - `stale` on a notes write → the notes changed since you read them; the reply's `current` has the new text and noteRev.
 - `brief_is_users` → you tried to change the user's brief; log under `## Log` or propose instead.

@@ -28,6 +28,7 @@ enum SeptaskKitFirstRunWindow {
     let root = SeptaskKitFirstRunRoot { dismiss() }
     let host = NSHostingController(rootView: root)
     let window = NSWindow(contentViewController: host)
+    window.title = String(localized: "Septena", comment: "First-run window title")
     window.styleMask = [.titled, .fullSizeContentView]
     window.titlebarAppearsTransparent = true
     window.titleVisibility = .hidden

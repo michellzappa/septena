@@ -53,7 +53,7 @@ import { PROMPTS, getPrompt } from "./prompts.js";
 const INSTRUCTIONS =
   "Septena tasks. These tools read the signed-in user's tasks, areas, projects and " +
   "task conversations in the Septena task backend, and create, change and complete " +
-  "tasks and their conversations. It is the same data the user's Septask app shows, " +
+  "tasks and their conversations. It is the same data the user's Septena app shows, " +
   "and changes reach the app within seconds.\n\n" +
   "Working a task as an agent: find work with tasks_pending_reasoning (or tasks_agent_events with a cursor), " +
   "tasks_claim it with your agent name before you write, renew the claim while you work, write each step as a " +
@@ -80,7 +80,7 @@ const SUBSCRIPTION_MESSAGE =
 const RECONNECT_MESSAGE =
   "This Septena connection can only read tasks: it was set up before Claude could change them. " +
   "To let Claude change tasks, remove the Septena connector in Claude's settings, add " +
-  "https://api.septena.app/mcp again, and enter the new pairing code in Septask.";
+  "https://api.septena.app/mcp again, and enter the new pairing code in Septena.";
 
 // Arguments are validated before anything reaches the Durable Object. Unknown
 // keys are ignored, as on the live connector.

@@ -270,7 +270,7 @@ function requireApplied(r: OpResult | undefined, id: string): void {
     throw new Error(`Task not found: ${id}`);
   }
   if (r?.status === "rejected" && r.reason === "stopped") {
-    throw new Error(`Task ${id} was not changed: the user stopped agent work on it. Only the user can resume it in Septask.`);
+    throw new Error(`Task ${id} was not changed: the user stopped agent work on it. Only the user can resume it in Septena.`);
   }
   if (r?.status === "rejected" && r.reason === "human_accepts") {
     throw new Error(`Task ${id} was not completed (human_accepts): ${r.rule ?? AGENT_WRITE_RULES.human_accepts}`);

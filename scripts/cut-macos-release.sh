@@ -17,6 +17,6 @@ if [[ "$DRY" -eq 1 ]]; then
   echo "would create and push $TAG"
   exit 0
 fi
-git tag -a "$TAG" -m "Septask $VERSION"
+git tag -a "$TAG" -m "Septena $VERSION"
 git push origin "$TAG"
 echo "Pushed $TAG; GitHub Actions will publish the signed macOS release."

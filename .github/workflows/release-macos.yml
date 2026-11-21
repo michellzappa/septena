@@ -1,4 +1,4 @@
-name: Septask macOS Release
+name: Septena macOS Release
 
 on:
   push:
@@ -107,7 +107,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: |
-            dist/Septask-macOS.zip
+            dist/Septena-macOS.zip
             dist/version.txt
 
       - name: Locate Sparkle appcast tool
@@ -127,7 +127,7 @@ jobs:
         run: |
           [[ -n "$SPARKLE_PRIVATE_ED_KEY" ]] || { echo "SPARKLE_PRIVATE_ED_KEY is required" >&2; exit 1; }
           ./scripts/generate-update-site.sh \
-            dist/Septask-macOS.zip \
+            dist/Septena-macOS.zip \
             "${{ steps.version.outputs.version }}" \
             "v${{ steps.version.outputs.version }}" \
             "$RUNNER_TEMP/septask-updates"

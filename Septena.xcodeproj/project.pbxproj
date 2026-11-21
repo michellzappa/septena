@@ -2190,6 +2190,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SeptaskWatch/Info.plist;
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.tasks.watchkitapp;
+				PRODUCT_NAME = Septena;
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG SEPTASK";
@@ -2206,6 +2207,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SeptaskWatch/Info.plist;
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.tasks.watchkitapp;
+				PRODUCT_NAME = Septena;
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = SEPTASK;
@@ -2247,6 +2249,7 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.tasks;
+				PRODUCT_NAME = Septena;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = SEPTASK;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -2352,7 +2355,7 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.tasks;
-				PRODUCT_NAME = Septask;
+				PRODUCT_NAME = Septena;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG SEPTASK";
 			};
@@ -2390,7 +2393,7 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.tasks;
-				PRODUCT_NAME = Septask;
+				PRODUCT_NAME = Septena;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = SEPTASK;
 			};
@@ -2463,6 +2466,7 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.tasks;
+				PRODUCT_NAME = Septena;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG SEPTASK";
 				TARGETED_DEVICE_FAMILY = "1,2";

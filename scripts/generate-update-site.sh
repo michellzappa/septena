@@ -28,7 +28,7 @@ fi
 
 rm -rf "$OUTPUT"
 mkdir -p "$OUTPUT"
-cp "$ARCHIVE" "$OUTPUT/Septask-macOS.zip"
+cp "$ARCHIVE" "$OUTPUT/Septena-macOS.zip"
 DOWNLOAD_PREFIX="https://github.com/$REPO/releases/download/$TAG"
 printf '%s' "$SPARKLE_PRIVATE_ED_KEY" | "$TOOL" "$OUTPUT" \
   --download-url-prefix "$DOWNLOAD_PREFIX" \
@@ -43,13 +43,13 @@ cat > "$OUTPUT/index.html" <<EOF
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Septask updates</title>
+<title>Septena updates</title>
 <style>body{font:16px -apple-system,BlinkMacSystemFont,sans-serif;max-width:42rem;margin:5rem auto;padding:0 1.5rem;color:#222}a{color:#6d4aff}</style>
-<h1>Septask updates</h1>
+<h1>Septena updates</h1>
 <p>Current release: <strong>$VERSION</strong>.</p>
 <p><a href="https://github.com/$REPO/releases/tag/$TAG">Release notes and downloads on GitHub</a></p>
-<p>This page publishes the signed update feed used by Septask for macOS.</p>
+<p>This page publishes the signed update feed used by Septena for macOS.</p>
 </html>
 EOF
 
-echo "Generated $OUTPUT/appcast.xml for Septask $VERSION ($TAG)"
+echo "Generated $OUTPUT/appcast.xml for Septena $VERSION ($TAG)"
