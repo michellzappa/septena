@@ -144,19 +144,8 @@ enum SettingsMirror {
       return ((try? context.fetchCount(d)) ?? 0) > 0
     }
     return any(TaskEntity.self)
-      || any(HabitDefinitionEntity.self)
-      || any(SupplementDefinitionEntity.self)
-      || any(GoalEntity.self)
-      || any(NutritionEntryEntity.self)
-      || any(ExerciseEntryEntity.self)
-      || any(ChoreDefinitionEntity.self)
-      || any(GutEventEntity.self)
-      || any(MoodEventEntity.self)
-      || any(SymptomEventEntity.self)
-      || any(MedicationDoseEventEntity.self)
-      || any(IntakeEventEntity.self)
-      || any(GroceryItemEntity.self)
-      || any(ActivityDayEntity.self)
+      || any(ProjectEntity.self)
+      || any(AreaEntity.self)
   }
 
   /// Backfill every manifest key that has no local row yet. `freshAccount` is
