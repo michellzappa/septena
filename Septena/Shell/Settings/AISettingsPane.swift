@@ -5,8 +5,7 @@ import UIKit
 
 // The unified "Claude & AI" pane: the one place the user answers "what can AI
 // (and Claude) do with my data?" Combines the global reach dial (`AIMode`) and
-// on-device status board with the connections that carry data to a model — the
-// hosted Claude gateway and the macOS local MCP server — plus the MCP skill
+// on-device status board with the cloud MCP connection plus the MCP skill
 // briefs. The macOS developer provider-override moved to About ▸ Advanced.
 //
 // Apple Intelligence is a capability the app can only observe, never request,
@@ -91,7 +90,7 @@ struct ClaudeAISettingsPane<Extra: View>: View {
     }
   }
 
-  // MARK: - Connections (Claude gateway + local MCP)
+  // MARK: - Connections (cloud MCP)
 
   private var connectionsSection: some View {
     Section {
@@ -119,36 +118,13 @@ struct ClaudeAISettingsPane<Extra: View>: View {
         }
       }
       #endif
-
-      // Septask compiles no SettingsView destination graph — link the pane
-      // directly (macOS only; the pane type itself is macOS-gated, and the
-      // iOS discoverability row needs the full app's destination handling).
-      #if SEPTASK
-      #if os(macOS)
-      NavigationLink {
-        LocalMCPSettingsPane()
-      } label: {
-        Label("MCP Server", systemImage: "server.rack")
-      }
-      #endif
-      #else
-      NavigationLink(value: SettingsView.SettingsDestination.localMcp) {
-        Label("MCP Server", systemImage: "server.rack")
-      }
-      #endif
     } header: {
       Text("Connections")
     } footer: {
       #if SEPTASK
-      #if os(macOS)
-      Text("Claude reads your tasks through the task backend. Choose Claude above to pair it. The MCP Server lets Claude Code on this Mac connect directly.")
-      #else
       Text("Claude reads your tasks through the task backend. Choose Claude above to pair it.")
-      #endif
-      #elseif os(macOS)
-      Text("Claude reads and writes your data through the hosted gateway at mcp.septena.app. The MCP Server lets Claude Code on this Mac connect directly, with no gateway hop.")
       #else
-      Text("Claude reads and writes your data through the hosted gateway at mcp.septena.app. MCP Server is shown here for discoverability, but hosting it requires the Mac app.")
+      Text("Claude reads and writes your data through the hosted gateway at mcp.septena.app.")
       #endif
     }
   }

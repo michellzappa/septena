@@ -194,10 +194,6 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationC
   /// session-type id. Drained by the app's `.task` once NavigationState is alive.
   static var pendingTrainingStart: String?
 
-  /// Set true only by "Quit Completely" before calling `terminate`, so the
-  /// soft-quit interception below knows to let the process actually die.
-  static var reallyQuit = false
-
   func application(_ application: NSApplication,
                    didReceiveRemoteNotification userInfo: [String: Any]) {
     Task { @MainActor in
@@ -244,22 +240,8 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationC
     }
   }
 
-  /// When soft-quit is on (MCP server enabled *and* "keep serving" opted in),
-  /// closing the last window keeps the app alive so it keeps serving (the Dock
-  /// icon and menu bar stay; reopen brings the window back). Otherwise the
-  /// classic behavior holds (last window closed → quit).
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-    !MacAppLifecycle.softQuitEnabled
-  }
-
-  /// Intercept ⌘Q / menu Quit: only when soft-quit is on and this isn't an
-  /// explicit "Quit Completely" do we hide the app instead of terminating so
-  /// the loopback server stays up. By default ⌘Q quits.
-  func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-    if Self.reallyQuit { return .terminateNow }
-    guard MacAppLifecycle.softQuitEnabled else { return .terminateNow }
-    MacAppLifecycle.enterBackground()
-    return .terminateCancel
+    true
   }
 
   /// Dock-icon click / `open -a` while hidden: bring the app and window back.
@@ -269,40 +251,13 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationC
   }
 }
 
-/// Soft-quit transitions for the Mac app. Gated on the local MCP server being
-/// enabled *and* the user opting into "keep serving after quit" — that's the
-/// only reason to keep the process alive after the user quits. The Dock icon
-/// and menu bar always stay; this just hides/shows the app window, ⌘H-style, so
-/// the server keeps serving in the background.
 @MainActor
 enum MacAppLifecycle {
-  static var serverEnabled: Bool {
-    UserDefaults.standard.bool(forKey: MCPDefaultsKey.enabled)
-  }
-
-  /// True only when the server is on *and* "keep serving after quit" is opted
-  /// in. This is what gates the soft-quit — ⌘Q quits normally otherwise.
-  static var softQuitEnabled: Bool {
-    serverEnabled && UserDefaults.standard.bool(forKey: MCPDefaultsKey.keepAlive)
-  }
-
-  /// Soft-quit: hide the app. Windows aren't released, so `activate()` brings
-  /// the exact same window straight back. Dock icon + menu bar persist.
-  static func enterBackground() {
-    NSApp.hide(nil)
-  }
-
-  /// "Fake open": unhide and bring the main window to the front.
+  /// Unhide and bring the main window to the front.
   static func activate() {
     NSApp.unhide(nil)
     NSApp.activate(ignoringOtherApps: true)
     NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
-  }
-
-  /// Actually quit, bypassing the soft-quit interception.
-  static func quitCompletely() {
-    MacAppDelegate.reallyQuit = true
-    NSApp.terminate(nil)
   }
 }
 #endif

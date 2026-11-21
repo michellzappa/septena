@@ -248,14 +248,14 @@ struct SettingsView: View {
     case advanced        // dev + diagnostics, reached from About
     // Sub-panes reached from the hubs above.
     case general         // time of day, app icon, quick actions, animations
-    case claudeAI        // unified AI reach + Claude gateway + local MCP + skills
+    case claudeAI        // unified AI reach + Claude gateway + skills
     case connections     // Apple + service integrations (was Integrations)
     case data            // import / export (was Import & Export)
     case reports         // practitioner reports — scoped shareable section bundles
     case layout, correlations, timeOfDay
     case nextFeed        // Next list: suggestions, carry-over, per-section visibility
     case quickActions, appIcon, textSize
-    case skills, localMcp, motionGallery, dataTools
+    case skills, motionGallery, dataTools
     case connectedApp(ConnectedAppDestination)
     case support
     case communityProfile   // public username / display name / bio (community Worker)
@@ -476,7 +476,6 @@ struct SettingsView: View {
     case .connectedApp(let app): return app.title
     case .motionGallery: return "Motion Gallery"
     case .milestonePreview: return "Milestones (preview)"
-    case .localMcp:     return "MCP Server"
     case .section(let key):
       return SectionManifest.displayLabel(
         key: key,
@@ -522,7 +521,6 @@ struct SettingsView: View {
     case .connectedApp(let app): return app.systemImage
     case .motionGallery: return "wand.and.rays"
     case .milestonePreview: return "flag.checkered"
-    case .localMcp:     return "server.rack"
     case .section:      return "circle.fill"
     }
   }
@@ -575,14 +573,6 @@ struct SettingsView: View {
     case .advanced:          AdvancedSettingsPane()
     case .motionGallery:     MotionGalleryPane()
     case .milestonePreview:  MilestonePreviewPane()
-    #if os(macOS)
-    #else
-    #endif
-    #if os(macOS)
-    case .localMcp:          LocalMCPSettingsPane()
-    #else
-    case .localMcp:          MCPServerUnavailablePane()
-    #endif
     case .section(let key):  SectionDetailPane(sectionKey: key)
     }
   }
