@@ -766,10 +766,12 @@ struct TaskRow: View {
 }
 
 /// Quiet read-only status pill (`☀ Today`, `◌ Faded`) on the trailing edge of
-/// an off-Today / project task row. Same visual family as `TaskIssueChip`.
+/// an off-Today / project task row. Uses OS 26/27 frosted Liquid Glass capsule
+/// material (falling back to solid `mutedSurface` under Reduce Transparency).
 private struct TaskStatusPill: View {
   let symbol: String
   let title: String
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
   var body: some View {
     HStack(spacing: 3) {
@@ -779,9 +781,9 @@ private struct TaskStatusPill: View {
         .font(.septenaMetaSmall)
     }
     .foregroundStyle(Theme.inkSecondary)
-    .padding(.horizontal, 6)
-    .padding(.vertical, 2)
-    .background(Theme.mutedSurface, in: Capsule())
+    .padding(.horizontal, 7)
+    .padding(.vertical, 2.5)
+    .modifier(RowGlassPillSurface(reduceTransparency: reduceTransparency))
     .accessibilityLabel(title)
   }
 }
@@ -791,6 +793,7 @@ private struct TaskStatusPill: View {
 /// always open the task/conversation (where the clickable link lives).
 private struct TaskIssueChip: View {
   let issue: ConvoIssueLink
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
   var body: some View {
     HStack(spacing: 3) {
@@ -800,10 +803,34 @@ private struct TaskIssueChip: View {
         .font(.septenaMetaSmall)
     }
     .foregroundStyle(Theme.inkSecondary)
-    .padding(.horizontal, 6)
-    .padding(.vertical, 2)
-    .background(Theme.mutedSurface, in: Capsule())
+    .padding(.horizontal, 7)
+    .padding(.vertical, 2.5)
+    .modifier(RowGlassPillSurface(reduceTransparency: reduceTransparency))
     .accessibilityLabel(issue.fullLabel)
+  }
+}
+
+/// Shared OS 26/27 frosted glass capsule fill for neutral row pills/badges.
+private struct RowGlassPillSurface: ViewModifier {
+  let reduceTransparency: Bool
+
+  func body(content: Content) -> some View {
+    if reduceTransparency {
+      content.background(Theme.mutedSurface, in: Capsule())
+    } else {
+      #if os(iOS)
+      content
+        .background(.ultraThinMaterial, in: Capsule())
+        .glassEffect(.regular, in: .capsule)
+      #else
+      content
+        .background(.thinMaterial, in: Capsule())
+        .overlay(
+          Capsule()
+            .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
+        )
+      #endif
+    }
   }
 }
 

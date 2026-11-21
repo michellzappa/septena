@@ -555,7 +555,7 @@ final class SeptaskKitTaskListController: NSViewController {
       headerWashView.topAnchor.constraint(equalTo: container.topAnchor),
       headerWashView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
       headerWashView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-      headerWashView.heightAnchor.constraint(equalToConstant: 256),
+      headerWashView.heightAnchor.constraint(equalToConstant: 394),
       scrollView.topAnchor.constraint(equalTo: container.topAnchor),
       scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
       scrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
@@ -664,28 +664,35 @@ final class SeptaskKitTaskListController: NSViewController {
     })
   }
 
-  /// Repaint the Header Wash, card surfaces, selection washes, and custom fruit
-  /// checkboxes live when the user updates Appearance settings.
+  /// Repaint the Header Wash, frosted glass cards/notices, selection washes,
+  /// and custom fruit checkboxes live when Appearance settings change.
   private func refreshAppearance() {
     view.needsDisplay = true
     headerWashView.reloadConfig()
     tableView.enumerateAvailableRowViews { rowView, _ in
-      rowView.needsDisplay = true
+      if let cardRow = rowView as? KitCardRowView {
+        cardRow.refreshAppearance()
+      } else {
+        rowView.needsDisplay = true
+      }
       for col in 0..<rowView.numberOfColumns {
         if let cell = rowView.view(atColumn: col) as? NSView {
-          Self.refreshCheckboxes(in: cell)
+          Self.refreshAppearanceSubviews(in: cell)
         }
       }
     }
   }
 
-  private static func refreshCheckboxes(in view: NSView) {
+  private static func refreshAppearanceSubviews(in view: NSView) {
     if let checkbox = view as? KitCheckboxView {
       checkbox.refreshAppearance()
       return
     }
+    if let noticeFill = view as? KitNoticeFill {
+      noticeFill.refreshAppearance()
+    }
     for sub in view.subviews {
-      refreshCheckboxes(in: sub)
+      refreshAppearanceSubviews(in: sub)
     }
   }
 

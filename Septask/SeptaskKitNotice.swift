@@ -228,15 +228,58 @@ final class KitNoticeCell: NSTableCellView {
   @objc private func fireDismiss() { onDismiss?() }
 }
 
-/// The notice's rounded fill. Drawn in `draw(_:)` so the dynamic colors
-/// resolve against the current appearance (light / dark) on every pass.
+/// The notice's rounded fill. Uses macOS 26+ frosted `NSGlassEffectView` when a
+/// Header Wash texture is active (falling back to solid `cardSurface` when no
+/// texture is set or Reduce Transparency is enabled).
 @MainActor
-private final class KitNoticeFill: NSView {
-  var kind: KitNoticeKind = .info { didSet { needsDisplay = true } }
+final class KitNoticeFill: NSView {
+  var kind: KitNoticeKind = .info { didSet { syncGlass(); needsDisplay = true } }
+  private let glassView: NSGlassEffectView = {
+    let v = NSGlassEffectView()
+    v.style = .regular
+    v.cornerRadius = KitCardRowView.corner
+    v.translatesAutoresizingMaskIntoConstraints = false
+    return v
+  }()
 
   override var isFlipped: Bool { true }
 
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    addSubview(glassView)
+    NSLayoutConstraint.activate([
+      glassView.leadingAnchor.constraint(equalTo: leadingAnchor),
+      glassView.trailingAnchor.constraint(equalTo: trailingAnchor),
+      glassView.topAnchor.constraint(equalTo: topAnchor),
+      glassView.bottomAnchor.constraint(equalTo: bottomAnchor),
+    ])
+    syncGlass()
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitNoticeFill is code-only") }
+
+  func refreshAppearance() {
+    syncGlass()
+    needsDisplay = true
+  }
+
+  private var usesGlass: Bool {
+    AppearancePreferences.shared.hasActiveTexture
+      && !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+  }
+
+  private func syncGlass() {
+    let active = usesGlass
+    glassView.isHidden = !active
+    if active {
+      glassView.tintColor = kind == .warning
+        ? SeptaskKitTheme.noticeWarning.withAlphaComponent(0.14)
+        : nil
+    }
+  }
+
   override func draw(_ dirtyRect: NSRect) {
+    guard !usesGlass else { return }
     let path = NSBezierPath(roundedRect: bounds,
                             xRadius: KitCardRowView.corner, yRadius: KitCardRowView.corner)
     SeptaskKitTheme.cardSurface.setFill()

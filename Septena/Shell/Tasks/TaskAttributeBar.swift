@@ -291,6 +291,7 @@ private struct AttributePill: View {
   /// open editor. See `TaskAttributeBar.neutral`.
   var neutral: Bool = false
   let action: () -> Void
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
   private static let diameter: CGFloat = 34
 
@@ -325,7 +326,11 @@ private struct AttributePill: View {
       .contentShape(Circle())
     }
     .buttonStyle(.plain)
-    .background(Circle().fill(circleFill))
+    .modifier(AttributePillGlassBackground(
+      circleFill: circleFill,
+      tint: (isSet || isActive) ? (neutral ? Theme.inkPrimary.opacity(isActive ? 0.20 : 0.12) : accent.opacity(isActive ? 0.36 : 0.22)) : nil,
+      reduceTransparency: reduceTransparency
+    ))
     .overlay {
       Circle()
         .strokeBorder(ringColor, lineWidth: 2)
@@ -334,6 +339,31 @@ private struct AttributePill: View {
     }
     .accessibilityLabel(accessibleSummary)
     .help(accessibleSummary)
+  }
+}
+
+private struct AttributePillGlassBackground: ViewModifier {
+  let circleFill: Color
+  let tint: Color?
+  let reduceTransparency: Bool
+
+  func body(content: Content) -> some View {
+    if reduceTransparency {
+      content.background(Circle().fill(circleFill))
+    } else {
+      #if os(iOS)
+      if let tint {
+        content.glassEffect(.regular.tint(tint).interactive(), in: .circle)
+      } else {
+        content.glassEffect(.regular.interactive(), in: .circle)
+      }
+      #else
+      content
+        .background(.thinMaterial, in: Circle())
+        .background(Circle().fill(tint ?? .clear))
+        .overlay(Circle().strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5))
+      #endif
+    }
   }
 }
 // MARK: - Inline "When" editor

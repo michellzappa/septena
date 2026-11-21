@@ -162,14 +162,24 @@ private struct TaskCardChrome: ViewModifier {
       .background(alignment: .bottom) {
         ZStack(alignment: .bottom) {
           if useLiquidGlass {
-            shape.fill(.ultraThinMaterial)
-            shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.56 : 0.66))
+            #if os(iOS)
+            if position == .solo {
+              shape.fill(.thinMaterial)
+                .glassEffect(.regular, in: shape)
+            } else {
+              shape.fill(.thinMaterial)
+              shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.28 : 0.36))
+            }
+            #else
+            shape.fill(.thinMaterial)
+            shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.30 : 0.40))
+            #endif
             if isSelected {
               shape.fill(Theme.listSelectionFill)
             }
             if (position == .top || position == .solo) && !isSelected {
               VStack(spacing: 0) {
-                Color.white.opacity(colorScheme == .dark ? 0.14 : 0.72)
+                Color.white.opacity(colorScheme == .dark ? 0.16 : 0.78)
                   .frame(height: 0.75)
                 Spacer(minLength: 0)
               }

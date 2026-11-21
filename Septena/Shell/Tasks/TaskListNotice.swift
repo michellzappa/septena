@@ -31,6 +31,19 @@ struct TaskListNotice<Actions: View>: View {
   /// slice, with no gap under it, and the rows draw the rest.
   var headsCard: Bool = false
   @ViewBuilder var actions: Actions
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+  @Environment(\.colorScheme) private var colorScheme
+  #if SEPTASK
+  private let appearance = AppearancePreferences.shared
+  #endif
+
+  private var useLiquidGlass: Bool {
+    #if SEPTASK
+    return appearance.hasActiveTexture && !reduceTransparency
+    #else
+    return false
+    #endif
+  }
 
   var body: some View {
     header
@@ -98,11 +111,41 @@ struct TaskListNotice<Actions: View>: View {
     .accessibilityLabel(Text("Dismiss"))
   }
 
+  @ViewBuilder
   private var fill: some View {
     let shape = (headsCard ? TaskCardPosition.top : .solo).cardShape
-    return shape
-      .fill(Theme.cardSurface)
-      .overlay(shape.fill(kind == .warning ? Theme.noticeWarning.opacity(0.12) : Color.clear))
+    if useLiquidGlass {
+      #if os(iOS)
+      if !headsCard {
+        shape
+          .fill(.thinMaterial)
+          .glassEffect(
+            kind == .warning ? .regular.tint(Theme.noticeWarning.opacity(0.16)) : .regular,
+            in: shape
+          )
+      } else {
+        ZStack {
+          shape.fill(.thinMaterial)
+          shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.28 : 0.36))
+          if kind == .warning {
+            shape.fill(Theme.noticeWarning.opacity(0.12))
+          }
+        }
+      }
+      #else
+      ZStack {
+        shape.fill(.thinMaterial)
+        shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.30 : 0.40))
+        if kind == .warning {
+          shape.fill(Theme.noticeWarning.opacity(0.12))
+        }
+      }
+      #endif
+    } else {
+      shape
+        .fill(Theme.cardSurface)
+        .overlay(shape.fill(kind == .warning ? Theme.noticeWarning.opacity(0.12) : Color.clear))
+    }
   }
 
   private var tint: Color {

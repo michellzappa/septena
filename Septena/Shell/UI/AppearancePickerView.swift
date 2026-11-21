@@ -185,16 +185,10 @@ private struct AccentTileButton: View {
       VStack(alignment: .leading, spacing: 6) {
         HStack(spacing: 6) {
           swatchBadge
-          VStack(alignment: .leading, spacing: 1) {
-            Text(fruit.name)
-              .font(.caption.weight(.semibold))
-              .foregroundStyle(.primary)
-              .lineLimit(1)
-            Text(fruit.origin)
-              .font(.caption2)
-              .foregroundStyle(.secondary)
-              .lineLimit(1)
-          }
+          Text(fruit.name)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.primary)
+            .lineLimit(1)
           Spacer(minLength: 0)
         }
         // Mini-row accent preview: wash + done check + title bar
@@ -240,7 +234,7 @@ private struct AccentTileButton: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .accessibilityLabel("\(fruit.name), \(fruit.origin)")
+    .accessibilityLabel(fruit.name)
     .accessibilityAddTraits(isCurrent ? .isSelected : [])
   }
 

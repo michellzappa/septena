@@ -820,6 +820,7 @@ final class KitComposerTextView: NSTextView {
 @MainActor
 final class KitPillButton: NSButton {
   var onPress: ((NSView) -> Void)?
+  private let glass = KitPassthroughGlassView()
 
   var isOn: Bool {
     get { state == .on }
@@ -856,8 +857,16 @@ final class KitPillButton: NSButton {
     focusRingType = .exterior
     translatesAutoresizingMaskIntoConstraints = false
     wantsLayer = true
-    layer?.masksToBounds = true
-    layer?.cornerCurve = .continuous
+    layer?.masksToBounds = false
+    glass.style = .regular
+    glass.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(glass, positioned: .below, relativeTo: nil)
+    NSLayoutConstraint.activate([
+      glass.leadingAnchor.constraint(equalTo: leadingAnchor),
+      glass.trailingAnchor.constraint(equalTo: trailingAnchor),
+      glass.topAnchor.constraint(equalTo: topAnchor),
+      glass.bottomAnchor.constraint(equalTo: bottomAnchor),
+    ])
     target = self
     action = #selector(pressed)
     heightAnchor.constraint(equalToConstant: KitComposerCell.pillRowHeight).isActive = true
@@ -904,9 +913,18 @@ final class KitPillButton: NSButton {
 
   private func applyCapsule() {
     guard let layer else { return }
-    layer.cornerRadius = bounds.height / 2
+    let radius = bounds.height / 2
+    layer.cornerRadius = radius
     layer.cornerCurve = .continuous
-    layer.backgroundColor = (isOn ? SeptaskKitTheme.pillOnFill : SeptaskKitTheme.chipFill).cgColor
+    let reduce = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+    glass.isHidden = reduce
+    if reduce {
+      layer.backgroundColor = (isOn ? SeptaskKitTheme.pillOnFill : SeptaskKitTheme.chipFill).cgColor
+    } else {
+      glass.cornerRadius = radius
+      glass.tintColor = isOn ? SeptaskKitTheme.pillOnFill : nil
+      layer.backgroundColor = NSColor.clear.cgColor
+    }
   }
 
   @objc private func pressed() { onPress?(self) }

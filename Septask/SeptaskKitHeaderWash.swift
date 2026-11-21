@@ -38,7 +38,7 @@ final class KitHeaderWashView: NSView {
     }
   }
 
-  var fadeHeight: CGFloat = 235
+  var fadeHeight: CGFloat = 370
 
   private var driftTimer: Timer?
   private var motionAnchor = Date()

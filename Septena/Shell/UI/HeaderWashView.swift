@@ -10,7 +10,7 @@ import SwiftUI
 /// (`YYYY-MM-DD`); projects can optionally pass `projectID`.
 struct HeaderWashView: View {
   var projectID: String? = nil
-  var fadeHeight: CGFloat = 245
+  var fadeHeight: CGFloat = 380
 
   private let appearance = AppearancePreferences.shared
   @Environment(DayClock.self) private var dayClock

@@ -221,10 +221,10 @@ enum HeaderWashEngine {
       let colorSpace = CGColorSpaceCreateDeviceRGB()
       let colors: [CGColor] = [
         CGColor(colorSpace: colorSpace, components: [0, 0, 0, 1.0])!,
-        CGColor(colorSpace: colorSpace, components: [0, 0, 0, 0.55])!,
+        CGColor(colorSpace: colorSpace, components: [0, 0, 0, 0.58])!,
         CGColor(colorSpace: colorSpace, components: [0, 0, 0, 0.0])!,
       ]
-      let locations: [CGFloat] = [0.0, 0.62, 1.0]
+      let locations: [CGFloat] = [0.0, 0.56, 1.0]
       if let grad = CGGradient(colorsSpace: colorSpace, colors: colors as CFArray, locations: locations) {
         ctx.setBlendMode(.destinationIn)
         ctx.drawLinearGradient(
