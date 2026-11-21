@@ -48,6 +48,8 @@ enum RegistryEntityEnums {
   static let telemetryLevel: [String] = ["none", "minimal", "balanced", "full"]
   static let appearanceMode: [String] = ["system", "light", "dark"]
   static let accentColor: [String] = ["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "acai", "pitaya", "jabuticaba"]
+  static let appIconFinish: [String] = ["obsidian", "ceramic", "framed", "stealth"]
+  static let appIconColor: [String] = ["auto", "persimmon", "haskap", "tamarillo", "yuzu", "carambola", "acai", "pitaya", "mono"]
   static let canvasTexture: [String] = ["none", "topography", "fieldMatrix", "stippleDrift", "causticGlass", "ridges", "washiPaper"]
   static let textureMotion: [String] = ["still", "slowDrift"]
   static let entityNames: [String] = ["task", "area", "project", "attachment", "convo", "setting"]
@@ -313,6 +315,8 @@ enum RegistrySettings {
     static let textureMotion = "septena.appearance.textureMotion"
     static let appearanceMode = "septena.appearance.mode"
     static let syncTheme = "septena.appearance.syncTheme"
+    static let appIconFinish = "septena.appearance.appIconFinish"
+    static let appIconColor = "septena.appearance.appIconColor"
     static let todayShowCompleted = "septena.today.showCompleted"
     static let todayGroupByList = "septena.today.groupByList"
     static let tasksShowAging = "septena.tasks.showAging"
@@ -342,6 +346,8 @@ enum RegistrySettings {
     static let textureMotion: String = "still"
     static let appearanceMode: String = "system"
     static let syncTheme: Bool = true
+    static let appIconFinish: String = "obsidian"
+    static let appIconColor: String = "auto"
     static let todayShowCompleted: Bool = true
     static let todayGroupByList: Bool = true
     static let tasksShowAging: Bool = true

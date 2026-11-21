@@ -133,6 +133,26 @@
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
       "featureId": "settings.display"
     },
+    "appIconFinish": {
+      "scope": "device",
+      "storageKey": "septena.appearance.appIconFinish",
+      "type": "enum",
+      "enum": "appIconFinish",
+      "default": "obsidian",
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos"],
+      "featureId": "settings.display"
+    },
+    "appIconColor": {
+      "scope": "device",
+      "storageKey": "septena.appearance.appIconColor",
+      "type": "enum",
+      "enum": "appIconColor",
+      "default": "auto",
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos"],
+      "featureId": "settings.display"
+    },
     "todayShowCompleted": {
       "scope": "device",
       "storageKey": "septena.today.showCompleted",

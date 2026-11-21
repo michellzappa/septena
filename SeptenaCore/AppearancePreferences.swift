@@ -135,16 +135,13 @@ final class AppearancePreferences {
     }
   }
 
-  /// `nil` means "Default" (follows `accentColorID`). Non-nil overrides the
-  /// Home Screen icon color independently of the in-app accent.
+  /// `nil` means "Default" (`"auto"` — follows `accentColorID`). Non-nil
+  /// overrides the App Icon color independently of the in-app accent.
   var appIconColorOverride: AppIconColor? {
     didSet {
       guard oldValue != appIconColorOverride else { return }
-      if let appIconColorOverride {
-        UserDefaults.standard.set(appIconColorOverride.rawValue, forKey: AppIconCatalog.colorStorageKey)
-      } else {
-        UserDefaults.standard.removeObject(forKey: AppIconCatalog.colorStorageKey)
-      }
+      let stored = appIconColorOverride?.rawValue ?? AppIconCatalog.autoColorValue
+      UserDefaults.standard.set(stored, forKey: AppIconCatalog.colorStorageKey)
       applyAppIconIfNeeded()
       notifyChanged()
     }
@@ -185,6 +182,9 @@ final class AppearancePreferences {
 
   @ObservationIgnored private var isAdoptingSynced = false
   @ObservationIgnored private var syncObserver: NSObjectProtocol?
+  #if os(macOS)
+  @ObservationIgnored private var macThemeObserver: NSObjectProtocol?
+  #endif
 
   private init() {
     let ud = UserDefaults.standard
@@ -204,10 +204,12 @@ final class AppearancePreferences {
       ? accentRaw
       : RegistrySettings.Defaults.accentColor
 
-    let iconFinishRaw = ud.string(forKey: AppIconCatalog.finishStorageKey) ?? AppIconFinish.obsidian.rawValue
+    let iconFinishRaw = ud.string(forKey: AppIconCatalog.finishStorageKey)
+      ?? RegistrySettings.Defaults.appIconFinish
     self.appIconFinish = AppIconFinish(rawValue: iconFinishRaw) ?? .obsidian
 
-    if let iconColorRaw = ud.string(forKey: AppIconCatalog.colorStorageKey) {
+    if let iconColorRaw = ud.string(forKey: AppIconCatalog.colorStorageKey),
+       iconColorRaw != AppIconCatalog.autoColorValue {
       self.appIconColorOverride = AppIconColor(rawValue: iconColorRaw)
     } else {
       self.appIconColorOverride = nil
@@ -233,6 +235,19 @@ final class AppearancePreferences {
     ) { [weak self] _ in
       MainActor.assumeIsolated {
         self?.adoptSynced(SeptaskSyncedSettings.current())
+      }
+    }
+    #endif
+
+    #if os(macOS)
+    macThemeObserver = DistributedNotificationCenter.default().addObserver(
+      forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated {
+        guard let self, self.appearanceMode == .system else { return }
+        self.applyAppIconIfNeeded()
       }
     }
     #endif
@@ -280,6 +295,21 @@ final class AppearancePreferences {
   func applyAppIconIfNeeded() {
     #if os(iOS)
     AppIconCatalog.applyAlternateIcon(named: resolvedAlternateIconName)
+    #elseif os(macOS)
+    let isDarkOS: Bool
+    switch appearanceMode {
+    case .light:
+      isDarkOS = false
+    case .dark:
+      isDarkOS = true
+    case .system:
+      isDarkOS = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+    }
+    AppIconCatalog.applyMacIcon(
+      finish: resolvedAppIconFinish,
+      color: resolvedAppIconColor,
+      isDarkOS: isDarkOS
+    )
     #endif
   }
 
@@ -370,6 +400,7 @@ final class AppearancePreferences {
     case .light:  NSApp?.appearance = NSAppearance(named: .aqua)
     case .dark:   NSApp?.appearance = NSAppearance(named: .darkAqua)
     }
+    applyAppIconIfNeeded()
   }
   #else
   func applyPlatformAppearance() {}

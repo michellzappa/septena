@@ -98,12 +98,10 @@ struct AppearancePickerView: View {
         }
       }
 
-      #if os(iOS)
       Divider()
 
-      // 3. App Icon (Style + Color, 31 prebaked Light/Dark assets)
+      // 3. App Icon (Style + Color, iOS + macOS parity)
       AppIconPickerSection()
-      #endif
 
       Divider()
 
