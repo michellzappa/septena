@@ -27,7 +27,7 @@ export const GENERATED_COMMENT_PREFIX = "Generated from registry";
 const FIELDS = {
   settings: new Set(["title", "header", "label", "detail", "footer"]),
   destinations: new Set(["title", "detail", "pointerDetail", "touchDetail", "syncingTitle"]),
-  actions: new Set(["title", "desktopTitle", "activeTitle", "pluralTitle", "addTitle", "removeTitle"]),
+  actions: new Set(["title", "desktopTitle", "activeTitle", "pluralTitle", "addTitle", "removeTitle", "shortTitle"]),
   surfaces: new Set([
     "title", "primaryTitle", "detail", "message", "confirmTitle", "cancelTitle", "format",
     "emptyTitleFormat", "singularFormat", "body", "footnote", "returningTitle", "returningBody",

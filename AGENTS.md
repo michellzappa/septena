@@ -321,7 +321,10 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   menu shortcuts** for every keyboard action on the selected row (rename = `⌘R`,
   complete = `⌘K`, move = `⌘M` / `⌘⇧M`); double-click / right-click for mouse.
   Do NOT bind unmodified Space/Return. The shared shortcut map is
-  `TaskRowShortcuts` in `Septena/Shell/Tasks/TaskCommands.swift` — bare `⌘M`
+  the registry (`registry/actions.json`, `RegistryActions.shortcuts`): every
+  context menu, swipe and menu-bar item on both shells renders from it through
+  `RegistryMenuResolver` (`Septena/Shell/UI/RegistryMenu.swift`); a shell only
+  binds action IDs to handlers. Bare `⌘M`
   is intentionally reclaimed by the focused task list; bare `⌘.` remains the
   system Cancel equivalent and carries a `⇧` here.
   **Two sanctioned exceptions on the task surfaces** (both deliberate,

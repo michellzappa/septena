@@ -687,18 +687,23 @@ struct TaskListView: View {
     return withSnackbar
       .background {
         if rowCommandShortcutsEnabled {
-          // Rendered from the shared `TaskRowCommands` registry so this list
-          // can't drift from the macOS menu. The titles are real (they used to
-          // be `""`), which is what the hold-⌘ HUD labels each row with.
-          ForEach(TaskRowCommands.all) { command in
-            let action = iPadRowCommandActions[keyPath: command.handler]
-            Button(command.title) { action?() }
-              .keyboardShortcut(command.shortcut)
-              .disabled(action == nil)
-            ForEach(Array(command.alternateShortcuts.enumerated()), id: \.offset) { _, shortcut in
-              Button(command.title) { action?() }
-                .keyboardShortcut(shortcut)
+          // Rendered from the registry (`RegistryActions`, the row commands
+          // `TaskActions` serves) so this list can't drift from the macOS
+          // menu. The titles are real, which is what the hold-⌘ HUD labels
+          // each row with.
+          let actions = iPadRowCommandActions
+          ForEach(TaskActions.rowCommandIds, id: \.self) { id in
+            let action = actions.handler(for: id)
+            let title = RegistryActions.title(id)
+            if let shortcut = RegistryActions.shortcut(for: id) {
+              Button(title) { action?() }
+                .keyboardShortcut(shortcut.keyboardShortcut)
                 .disabled(action == nil)
+              ForEach(Array(shortcut.alternates.enumerated()), id: \.offset) { _, alternate in
+                Button(title) { action?() }
+                  .keyboardShortcut(alternate.keyboardShortcut)
+                  .disabled(action == nil)
+              }
             }
           }
           .opacity(0)
@@ -2658,17 +2663,20 @@ struct TaskListView: View {
 
   @ViewBuilder
   private func headingContextMenu(_ heading: SeptenaTask) -> some View {
-    Button {
-      headingDraftTitle = heading.title
-      headingRenameTarget = heading
-    } label: { Label("Rename Section", systemImage: "pencil") }
-    Button {
-      startCreateUnderHeading(heading)
-    } label: { Label("New Task in Section", systemImage: "plus") }
-    Divider()
-    Button(role: .destructive) {
-      headingDeleteTarget = heading
-    } label: { Label("Delete Section", systemImage: "trash") }
+    // Registry `project.heading`, the same menu the AppKit shell renders.
+    RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
+      RegistryActions.menu("project.heading")) { id in
+        switch id {
+        case "section.rename":
+          return .init {
+            headingDraftTitle = heading.title
+            headingRenameTarget = heading
+          }
+        case "section.newTask": return .init { startCreateUnderHeading(heading) }
+        case "section.delete": return .init { headingDeleteTarget = heading }
+        default: return nil
+        }
+      })
   }
 
   /// Quiet Things-style "+ Add Section" affordance at the foot of a project.
@@ -3852,47 +3860,48 @@ struct TaskListView: View {
   @ViewBuilder
   private func rowActionsMenu(target: ActionTarget) -> some View {
     if filter == .recentlyDeleted {
-      // Recently Deleted: only Restore and Delete Permanently — no scheduling,
-      // no move, no normal task lifecycle actions apply to trashed rows.
-      Button {
-        for id in target.ids {
-          mutator.restore(id: id)
-          removeLocally(id: id)
-        }
-        Task { await load() }
-      } label: {
-        Label("Restore", systemImage: "arrow.uturn.backward")
-      }
-      Divider()
-      Button(role: .destructive) {
-        Haptics.warning()
-        for id in target.ids {
-          removeLocally(id: id)
-          mutator.purge(id: id)
-        }
-      } label: {
-        Label("Delete Permanently", systemImage: "trash")
-      }
+      // Recently Deleted (registry `task.recentlyDeleted`): only Restore and
+      // Delete Permanently — no scheduling, no move, no normal task lifecycle
+      // actions apply to trashed rows.
+      RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
+        RegistryActions.menu("task.recentlyDeleted")) { id in
+          switch id {
+          case "task.restore":
+            return .init {
+              for id in target.ids {
+                mutator.restore(id: id)
+                removeLocally(id: id)
+              }
+              Task { await load() }
+            }
+          case "task.deletePermanently":
+            return .init {
+              Haptics.warning()
+              for id in target.ids {
+                removeLocally(id: id)
+                mutator.purge(id: id)
+              }
+            }
+          default: return nil
+          }
+        })
     } else if filter == .faded || (!target.tasks.isEmpty && target.tasks.allSatisfy(\.isFaded)) {
-      // Faded pile (`docs/TASK_FADE_SPEC.md` §4): Keep restores to the task's
-      // original list with undo; Let Go cancels with dropReason = "faded".
-      Button {
-        keepFadedTasks(target.ids)
-      } label: {
-        Label("Keep", systemImage: "arrow.uturn.backward")
-      }
-      Button {
-        dropFadedTasks(target.ids)
-      } label: {
-        Label("Let Go", systemImage: "wind")
-      }
-      Divider()
-      Button(role: .destructive) {
-        Haptics.warning()
-        for id in target.ids { applyDelete(id) }
-      } label: {
-        Label("Delete", systemImage: "trash")
-      }
+      // Faded pile (registry `task.faded`, `docs/TASK_FADE_SPEC.md` §4): Keep
+      // restores to the task's original list with undo; Let Go cancels with
+      // dropReason = "faded".
+      RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
+        RegistryActions.menu("task.faded")) { id in
+          switch id {
+          case "task.keepFaded": return .init { keepFadedTasks(target.ids) }
+          case "task.letGoFaded": return .init { dropFadedTasks(target.ids) }
+          case "task.delete":
+            return .init(variant: target.count > 1 ? .plural : .base) {
+              Haptics.warning()
+              for id in target.ids { applyDelete(id) }
+            }
+          default: return nil
+          }
+        })
     } else {
       TaskListRowContextMenu(
         target: target,
@@ -3921,6 +3930,11 @@ struct TaskListView: View {
           }
           Task { await load() }
         },
+        onToggleComplete: { ids in
+          for id in ids {
+            if let task = currentTask(id: id) { toggle(task) }
+          }
+        },
         onOpenWhen: { target in
           whenSheet = WhenSheet(taskIds: target.ids, kind: .scheduled)
         },
@@ -3946,6 +3960,8 @@ struct TaskListView: View {
         },
         moveAreas: areas,
         moveTopProjects: projects.filter { $0.area == nil && $0.status == .active },
+        sections: sectionMoveTargets,
+        onMoveToSection: { heading in fileIntoHeading(target.ids, heading: heading) },
         onOpenRepeat: { task in
           repeatTargetId = task.id
           showingRepeatSheet = true
@@ -3973,10 +3989,7 @@ struct TaskListView: View {
 
   @ViewBuilder
   private func taskContextMenu(for task: SeptenaTask) -> some View {
-    Group {
-      rowActionsMenu(target: actionTarget(for: task))
-      sectionMoveMenu(for: task)
-    }
+    rowActionsMenu(target: actionTarget(for: task))
   }
 
   /// Leading iOS swipe actions (and VoiceOver accessibility actions) for a task
@@ -3985,12 +3998,7 @@ struct TaskListView: View {
   private func swipeLeadingActions(for task: SeptenaTask) -> [TaskRowSwipeAction] {
     if filter == .recentlyDeleted {
       return [
-        TaskRowSwipeAction(
-          id: "restore",
-          title: String(localized: "Restore", comment: "Swipe action restore deleted task"),
-          systemImage: "arrow.uturn.backward",
-          tint: .green
-        ) {
+        .registry("task.restore", tint: TaskRowSwipeAction.tint(for: "task.restore")) {
           Haptics.tick()
           mutator.restore(id: task.id)
           removeLocally(id: task.id)
@@ -4000,61 +4008,51 @@ struct TaskListView: View {
     }
     if filter == .faded || task.isFaded {
       return [
-        TaskRowSwipeAction(
-          id: "keep",
-          title: String(localized: "Keep", comment: "Swipe action keep faded task"),
-          systemImage: "arrow.uturn.backward",
-          tint: .blue
-        ) {
+        .registry("task.keepFaded", tint: TaskRowSwipeAction.tint(for: "task.keepFaded")) {
           keepFadedTasks([task.id])
         }
       ]
     }
-    var actions: [TaskRowSwipeAction] = []
     let isProposal = task.source == TaskSource.mcp && task.acknowledgedAt == nil
-    if isProposal {
-      actions.append(TaskRowSwipeAction(
-        id: "accept",
-        title: String(localized: "Accept", comment: "Swipe action accept agent proposal"),
-        systemImage: "checkmark",
-        tint: .green
-      ) {
-        Haptics.tick()
-        promoteToToday([task.id])
-        mutator.acknowledge(id: task.id)
-        Task { await load() }
-      })
-    } else if task.isOnToday {
-      actions.append(TaskRowSwipeAction(
-        id: "remove-today",
-        title: String(localized: "Remove from Today", comment: "Swipe action remove from Today"),
-        systemImage: "sun.min",
-        tint: .gray
-      ) {
-        applyRemoveFromToday([task.id])
-      })
-    } else {
-      actions.append(TaskRowSwipeAction(
-        id: "today",
-        title: String(localized: "Today", comment: "Swipe action pin to Today"),
-        systemImage: "sun.max.fill",
-        tint: .orange
-      ) {
-        Haptics.tick()
-        promoteToToday([task.id])
-        mutator.acknowledge(id: task.id)
-        Task { await load() }
-      })
+    // The registry's `swipeActions` slots; an agent proposal swaps the Today
+    // slot for Accept.
+    return TaskRowSwipeAction.leading { id in
+      switch id {
+      case "task.toggleToday":
+        if isProposal {
+          return TaskRowSwipeAction(
+            id: "accept",
+            title: String(localized: "Accept", comment: "Swipe action accept agent proposal"),
+            systemImage: "checkmark",
+            tint: .green
+          ) {
+            Haptics.tick()
+            promoteToToday([task.id])
+            mutator.acknowledge(id: task.id)
+            Task { await load() }
+          }
+        }
+        if task.isOnToday {
+          return .registry(id, variant: .remove,
+                           systemImage: RegistryIcons.sfSymbol(for: "action.today_remove"),
+                           tint: .gray) {
+            applyRemoveFromToday([task.id])
+          }
+        }
+        return .registry(id, tint: TaskRowSwipeAction.tint(for: id)) {
+          Haptics.tick()
+          promoteToToday([task.id])
+          mutator.acknowledge(id: task.id)
+          Task { await load() }
+        }
+      case "task.when":
+        return .registry(id, tint: TaskRowSwipeAction.tint(for: id)) {
+          whenSheet = WhenSheet(taskIds: [task.id], kind: .scheduled)
+        }
+      default:
+        return nil
+      }
     }
-    actions.append(TaskRowSwipeAction(
-      id: "schedule",
-      title: String(localized: "Schedule", comment: "Swipe action schedule task"),
-      systemImage: "calendar",
-      tint: .indigo
-    ) {
-      whenSheet = WhenSheet(taskIds: [task.id], kind: .scheduled)
-    })
-    return actions
   }
 
   /// Trailing iOS swipe actions (and VoiceOver accessibility actions) for a
@@ -4063,86 +4061,58 @@ struct TaskListView: View {
   private func swipeTrailingActions(for task: SeptenaTask) -> [TaskRowSwipeAction] {
     if filter == .recentlyDeleted {
       return [
-        TaskRowSwipeAction(
-          id: "purge",
-          title: String(localized: "Delete Permanently", comment: "Swipe action permanent delete"),
-          systemImage: "trash",
-          tint: .red,
-          role: .destructive
-        ) {
+        .registry("task.deletePermanently", tint: TaskRowSwipeAction.tint(for: "task.deletePermanently")) {
           permanentDeleteConfirmTask = task
         }
       ]
     }
     if filter == .faded || task.isFaded {
       return [
-        TaskRowSwipeAction(
-          id: "delete",
-          title: String(localized: "Delete", comment: "Swipe action delete task"),
-          systemImage: "trash",
-          tint: .red,
-          role: .destructive
-        ) {
+        .registry("task.delete", tint: TaskRowSwipeAction.tint(for: "task.delete")) {
           Haptics.warning()
           applyDelete(task.id)
         },
-        TaskRowSwipeAction(
-          id: "let-go",
-          title: String(localized: "Let Go", comment: "Swipe action let go faded task"),
-          systemImage: "wind",
-          tint: .orange
-        ) {
+        .registry("task.letGoFaded", tint: TaskRowSwipeAction.tint(for: "task.letGoFaded")) {
           dropFadedTasks([task.id])
         }
       ]
     }
     let isProposal = task.source == TaskSource.mcp && task.acknowledgedAt == nil
-    return [
-      TaskRowSwipeAction(
-        id: "delete",
-        title: isProposal
-          ? String(localized: "Dismiss", comment: "Swipe action dismiss agent proposal")
-          : String(localized: "Delete", comment: "Swipe action delete task"),
-        systemImage: "trash",
-        tint: .red,
-        role: .destructive
-      ) {
-        Haptics.warning()
-        applyDelete(task.id)
-      },
-      TaskRowSwipeAction(
-        id: "move",
-        title: String(localized: "Move", comment: "Swipe action move task"),
-        systemImage: "folder",
-        tint: .blue
-      ) {
-        moveTargetIds = [task.id]
-        showingMoveSheet = true
-      }
-    ]
-  }
-
-  /// "Move to Section ▸" — the reliable, standard-macOS way to file a task into
-  /// a project heading (drag-to-section also works, but pointer drag in a custom
-  /// scroll list is finicky on macOS). Shown only on a project page that has
-  /// headings; acts on the whole selection. Lands the task(s) at the foot of the
-  /// chosen section so the result is predictable.
-  @ViewBuilder
-  private func sectionMoveMenu(for task: SeptenaTask) -> some View {
-    let headings = projectHeadingList
-    if case .project = filter, !headings.isEmpty {
-      let ids = actionTarget(for: task).ids
-      Divider()
-      Menu {
-        Button("No Section") { fileIntoHeading(ids, heading: nil) }
-        Divider()
-        ForEach(headings) { h in
-          Button(h.title) { fileIntoHeading(ids, heading: h.id) }
+    return TaskRowSwipeAction.trailing { id in
+      switch id {
+      case "task.delete":
+        let delete = {
+          Haptics.warning()
+          applyDelete(task.id)
         }
-      } label: {
-        Label("Move to Section", systemImage: "text.append")
+        if isProposal {
+          return TaskRowSwipeAction(
+            id: id,
+            title: String(localized: "Dismiss", comment: "Swipe action dismiss agent proposal"),
+            systemImage: RegistryActions.sfSymbols[id] ?? "trash",
+            tint: .red,
+            role: .destructive,
+            perform: delete)
+        }
+        return .registry(id, tint: TaskRowSwipeAction.tint(for: id), perform: delete)
+      case "task.move":
+        return .registry(id, tint: TaskRowSwipeAction.tint(for: id)) {
+          moveTargetIds = [task.id]
+          showingMoveSheet = true
+        }
+      default:
+        return nil
       }
     }
+  }
+
+  /// The headings Move to Section ▸ offers — the reliable, standard-macOS way
+  /// to file a task into a project heading (drag-to-section also works, but
+  /// pointer drag in a custom scroll list is finicky on macOS). Project pages
+  /// only; the registry drops the empty submenu elsewhere.
+  private var sectionMoveTargets: [SeptenaTask] {
+    if case .project = filter { return projectHeadingList }
+    return []
   }
 
   /// File `ids` under `heading` (nil = the un-headed block) at the foot of that

@@ -650,6 +650,12 @@
       "actions.actions.task.toggleInfo.activeTitle"
     ]
   },
+  "Hide Sidebar": {
+    "text": "Hide Sidebar",
+    "paths": [
+      "actions.actions.app.toggleSidebar.removeTitle"
+    ]
+  },
   "Hide Sidebar Counts": {
     "text": "Hide Sidebar Counts",
     "paths": [
@@ -735,6 +741,12 @@
       "tokens.fruitAccents.jabuticaba.name"
     ]
   },
+  "Keep": {
+    "text": "Keep",
+    "paths": [
+      "actions.actions.task.keepFaded.title"
+    ]
+  },
   "Keyboard Shortcuts": {
     "text": "Keyboard Shortcuts",
     "paths": [
@@ -763,6 +775,12 @@
     "text": "Learn where you usually file similar tasks.",
     "paths": [
       "settings.rootGroups.lists_root.items.4.detail"
+    ]
+  },
+  "Let Go": {
+    "text": "Let Go",
+    "paths": [
+      "actions.actions.task.letGoFaded.title"
     ]
   },
   "Light": {
@@ -834,12 +852,14 @@
   "Move": {
     "text": "Move",
     "paths": [
+      "actions.actions.task.move.shortTitle",
       "actions.contextMenus.task.row.move.title"
     ]
   },
   "Move Down": {
     "text": "Move Down",
     "paths": [
+      "actions.actions.area.moveDown.title",
       "actions.actions.project.moveDown.title"
     ]
   },
@@ -852,6 +872,7 @@
   "Move Up": {
     "text": "Move Up",
     "paths": [
+      "actions.actions.area.moveUp.title",
       "actions.actions.project.moveUp.title"
     ]
   },
@@ -871,6 +892,12 @@
     "text": "Move to Area",
     "paths": [
       "actions.contextMenus.sidebar.project.moveToArea.title"
+    ]
+  },
+  "Move to Section": {
+    "text": "Move to Section",
+    "paths": [
+      "actions.contextMenus.task.row.moveToSection.title"
     ]
   },
   "Move to Suggested List": {
@@ -938,6 +965,12 @@
     "paths": [
       "actions.actions.section.new.title",
       "surfaces.prompts.text.newSection.title"
+    ]
+  },
+  "New Task in Section": {
+    "text": "New Task in Section",
+    "paths": [
+      "actions.actions.section.newTask.title"
     ]
   },
   "New To-Do": {
@@ -1325,6 +1358,7 @@
   "Schedule": {
     "text": "Schedule",
     "paths": [
+      "actions.actions.task.when.shortTitle",
       "actions.contextMenus.task.row.schedule.title"
     ]
   },
@@ -1381,6 +1415,12 @@
     "text": "Show Info",
     "paths": [
       "actions.actions.task.toggleInfo.title"
+    ]
+  },
+  "Show Sidebar": {
+    "text": "Show Sidebar",
+    "paths": [
+      "actions.actions.app.toggleSidebar.addTitle"
     ]
   },
   "Show Sidebar Counts": {
@@ -1527,6 +1567,12 @@
       "tokens.textures.washiPaper.tag"
     ]
   },
+  "Tags…": {
+    "text": "Tags…",
+    "paths": [
+      "actions.actions.task.tags.title"
+    ]
+  },
   "Tamarillo": {
     "text": "Tamarillo",
     "paths": [
@@ -1612,6 +1658,7 @@
     "text": "Today",
     "paths": [
       "destinations.destinations.today.title",
+      "actions.actions.task.toggleToday.shortTitle",
       "surfaces.taskAttributes.today.label"
     ]
   },

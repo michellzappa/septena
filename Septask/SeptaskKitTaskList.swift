@@ -36,7 +36,7 @@ enum KitDrag {
 // loose projects (`orderedFromGroupedOpen` in TaskListView is the reference).
 // Flat Today sorts by due urgency instead, per the same setting's contract.
 //
-// Keyboard map — same bindings as `TaskRowShortcuts` (TaskCommands.swift),
+// Keyboard map — same bindings as the registry shortcuts (`RegistryActions`, registry/actions.json),
 // so the two shells never teach conflicting muscle memory:
 //   ↑/↓, ⇧-arrows, type-select, Home/End — native NSTableView
 //   ⌘K — toggle complete          ⌘T — toggle Today
@@ -258,26 +258,10 @@ final class SeptaskKitTaskListController: NSViewController {
   /// until the whole batch lands; otherwise an intermediate diff can remove a
   /// row before the rest of the batch has been written.
   private var isApplyingMove = false
-  /// Held so its submenu can be refreshed from the live structure on open.
-  private let moveMenuItem = NSMenuItem()
-  /// Placement items — titles / visibility refresh on every open from the
-  /// current selection (see `refreshPlacementMenuItems`).
-  private let todayMenuItem = NSMenuItem()
-  private let starMenuItem = NSMenuItem()
   private var checklistCounts: [String: (done: Int, total: Int)] = [:]
   private var attachmentCounts: [String: Int] = [:]
   private var tagsByID: [String: TaskTag] = [:]
   private var activeTagFilterIDs: Set<String> = []
-  /// Titled in `refreshPlacementMenuItems` — Show / Hide, so the row menu says
-  /// what ⌥⌘I will actually do next.
-  private let infoMenuItem = NSMenuItem()
-  private let clearScheduleMenuItem = NSMenuItem()
-  private let pauseRepeatMenuItem = NSMenuItem()
-  /// The filing pick offered as the first item of the context menu's Move
-  /// submenu ("Suggested: <List>"), read back by `tag` when chosen. Rebuilt
-  /// on every menu open, with the Move submenu, because the answer depends on
-  /// the selected row.
-  private var menuSuggestions: [SuggestionEngine.Suggestion] = []
 
   /// The inspector follows the selection; the window owns the wiring.
   var onSelectionChange: ((SeptenaTask?) -> Void)?
@@ -501,9 +485,8 @@ final class SeptaskKitTaskListController: NSViewController {
     // menu" highlight UNDERNEATH our custom fill — a second, uncontrollable
     // selection language on top of `KitCardRowView`'s. Popping the menu up
     // manually from `rightMouseDown` bypasses that machinery entirely.
-    let contextMenu = buildContextMenu()
-    let recentlyDeletedMenu = buildRecentlyDeletedMenu()
-    let fadedMenu = buildFadedMenu()
+    // Every row menu is rendered from the registry (`registry/actions.json`)
+    // fresh on each click, from the current selection.
     tableView.onRightClick = { [weak self, weak tableView] event in
       guard let self, let tableView else { return }
       let point = tableView.convert(event.locationInWindow, from: nil)
@@ -535,11 +518,11 @@ final class SeptaskKitTaskListController: NSViewController {
       if let task = self.rows[row].task, task.isHeading {
         menu = self.buildHeadingContextMenu()
       } else if self.filter == .recentlyDeleted {
-        menu = recentlyDeletedMenu
+        menu = self.buildRecentlyDeletedMenu()
       } else if self.filter == .faded || (self.rows[row].task?.isFaded == true) {
-        menu = fadedMenu
+        menu = self.buildFadedMenu()
       } else {
-        menu = contextMenu
+        menu = self.buildContextMenu()
       }
       menu.popUp(positioning: nil, at: point, in: tableView)
     }
@@ -2935,7 +2918,7 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   /// ⌘⇧. — drop both the schedule and the Today pin, leaving the task in
-  /// Anytime. Matches `TaskRowShortcuts.clearSchedule`.
+  /// Anytime. Matches the registry shortcut of `task.clearSchedule`.
   func clearScheduleSelection() {
     let before = actionableSelection.map(scheduleSnapshot)
     for task in actionableSelection {
@@ -3957,128 +3940,199 @@ final class SeptaskKitTaskListController: NSViewController {
     }
   }
 
-  // MARK: - Context menu (same commands + equivalents as the Task menu)
+  // MARK: - Context menus (registry `task.row`, `task.recentlyDeleted`, `task.faded`)
 
-  /// Same commands, same order, same bindings as the menu bar's Task menu and
-  /// as `TaskRowCommands` in the SwiftUI shell — one vocabulary everywhere.
-  /// Terminal outcomes (complete / cancel / delete) share one submenu so the
-  /// three stay next to each other instead of Delete living alone at the bottom.
+  /// The row menu, rendered from the registry menu `task.row` — the same
+  /// tree the SwiftUI shell's `TaskListRowContextMenu` renders, so items,
+  /// order, titles and key equivalents match in both shells. Built fresh on
+  /// every click, so titles and visibility follow the current selection.
   private func buildContextMenu() -> NSMenu {
-    let menu = NSMenu()
-    menu.delegate = self
-    menu.addItem(item(String(localized: "Rename", comment: "SeptaskKit: context menu"),
-                      #selector(menuRename), "r", [.command]))
-    infoMenuItem.action = #selector(menuInspector)
-    infoMenuItem.target = self
-    infoMenuItem.keyEquivalent = "i"
-    infoMenuItem.keyEquivalentModifierMask = [.command, .option]
-    menu.addItem(infoMenuItem)
-    // No Copy item: ⌘C and Edit ▸ Copy copy the selection's titles. The row
-    // menu keeps to actions on the task itself (same as the SwiftUI menu).
-    menu.addItem(item(String(localized: "Duplicate", comment: "SeptaskKit: context menu"),
-                      #selector(menuDuplicate), "d", [.command]))
-    menu.addItem(.separator())
-
-    let completeItem = NSMenuItem(
-      title: String(localized: "Complete", comment: "SeptaskKit: context menu"),
-      action: nil, keyEquivalent: "")
-    let completeMenu = NSMenu()
-    completeMenu.addItem(item(String(localized: "Mark as Complete", comment: "SeptaskKit: context menu"),
-                              #selector(menuToggleComplete), "k", [.command]))
-    completeMenu.addItem(item(String(localized: "Cancel Task", comment: "SeptaskKit: context menu"),
-                              #selector(menuCancel), "", []))
-    completeMenu.addItem(.separator())
-    completeMenu.addItem(item(String(localized: "Delete", comment: "SeptaskKit: context menu"),
-                              #selector(menuDelete), "\u{8}", [.command]))
-    completeItem.submenu = completeMenu
-    menu.addItem(completeItem)
-
-    // Titles and visibility are set in `menuNeedsUpdate` — "Toggle Today" is
-    // never shown as a bare toggle; on the Today list the item is hidden
-    // entirely (Clear Schedule is the exit).
-    todayMenuItem.action = #selector(menuToggleToday)
-    todayMenuItem.target = self
-    todayMenuItem.keyEquivalent = "t"
-    todayMenuItem.keyEquivalentModifierMask = [.command]
-    menu.addItem(todayMenuItem)
-
-    starMenuItem.action = #selector(menuToggleStar)
-    starMenuItem.target = self
-    starMenuItem.keyEquivalent = "s"
-    starMenuItem.keyEquivalentModifierMask = [.command, .option]
-    menu.addItem(starMenuItem)
-
-    menu.addItem(item(String(localized: "Tags…", comment: "SeptaskKit: context menu"),
-                      #selector(menuTags), "t", [.command, .shift]))
-
-    // When and Deadline share one submenu, as in the SwiftUI menu. They open
-    // separate popovers (one date each), so a submenu is the native way to
-    // offer both from one entry. The key equivalents stay on the items.
-    let scheduleItem = NSMenuItem(
-      title: String(localized: "Schedule", comment: "SeptaskKit: context menu"),
-      action: nil, keyEquivalent: "")
-    scheduleItem.image = NSImage(systemSymbolName: "calendar", accessibilityDescription: nil)
-    let scheduleMenu = NSMenu()
-    scheduleMenu.addItem(item(String(localized: "When…", comment: "SeptaskKit: context menu"),
-                              #selector(menuWhen), "s", [.command]))
-    scheduleMenu.addItem(item(String(localized: "Deadline…", comment: "SeptaskKit: context menu"),
-                              #selector(menuDeadline), "d", [.command, .shift]))
-    scheduleMenu.addItem(item(String(localized: "Reminder…", comment: "SeptaskKit: context menu"),
-                              #selector(menuReminder), "r", [.command, .option]))
-    scheduleItem.submenu = scheduleMenu
-    menu.addItem(scheduleItem)
-
-    clearScheduleMenuItem.title = String(localized: "Clear Schedule",
-                                         comment: "SeptaskKit: context menu")
-    clearScheduleMenuItem.action = #selector(menuClearSchedule)
-    clearScheduleMenuItem.target = self
-    clearScheduleMenuItem.keyEquivalent = "."
-    clearScheduleMenuItem.keyEquivalentModifierMask = [.command, .shift]
-    menu.addItem(clearScheduleMenuItem)
-
-    // Move remains a bounded destination submenu. Repeat is a full editor,
-    // however, so it opens a panel rather than forcing the rule through a
-    // preset submenu.
-    moveMenuItem.title = String(localized: "Move to", comment: "SeptaskKit: context menu")
-    moveMenuItem.keyEquivalent = "m"
-    moveMenuItem.keyEquivalentModifierMask = [.command, .shift]
-    menu.addItem(moveMenuItem)
-
-    menu.addItem(item(String(localized: "Repeat…", comment: "SeptaskKit: context menu"),
-                      #selector(menuRepeat), "", []))
-    pauseRepeatMenuItem.action = #selector(menuPauseResumeRepeat)
-    pauseRepeatMenuItem.target = self
-    pauseRepeatMenuItem.title = String(localized: "Pause Repeat", comment: "SeptaskKit: recurrence")
-    menu.addItem(pauseRepeatMenuItem)
-    menu.addItem(item(String(localized: "Create Next Copy", comment: "SeptaskKit: recurrence"),
-                      #selector(menuCreateNextCopy), "", []))
-    return menu
+    let selection = actionableSelection
+    let single = selection.count == 1 ? selection.first : nil
+    let plural: RegistryTitleVariant = selection.count > 1 ? .plural : .base
+    return KitRegistryMenu.build(RegistryActions.menu("task.row"), bind: { [weak self] id in
+      guard let self else { return nil }
+      switch id {
+      case "task.editDetails": return .init { self.beginEditSelectedRow() }
+      case "task.toggleInfo":
+        let visible = UserDefaults.standard.bool(forKey: SettingsKey.septaskInspectorVisible)
+        return .init(variant: visible ? .active : .base) { self.onToggleInspector?() }
+      case "task.duplicate": return .init(variant: plural) { self.duplicateSelection() }
+      case "task.toggleComplete": return .init { self.toggleCompleteSelection() }
+      case "task.cancel": return .init(variant: plural) { self.cancelSelection() }
+      case "task.delete": return .init(variant: plural) { self.deleteSelection() }
+      case "task.toggleToday":
+        // On Today every row is already "on Today", so a Today action just
+        // competes with Clear Schedule. Hide it; ⌘T still works via the key
+        // binding on the table.
+        guard self.filter != .today, !selection.isEmpty else { return nil }
+        let remove = selection.allSatisfy(\.isOnToday)
+        return .init(variant: remove ? .remove : .add) { self.toggleTodaySelection() }
+      case "task.toggleStar":
+        guard !selection.isEmpty else { return nil }
+        let allStarred = selection.allSatisfy(\.starred)
+        return .init(variant: allStarred ? .remove : .add) { self.toggleStarSelection() }
+      case "task.tags": return .init { self.presentTagPopover() }
+      case "task.when": return .init { self.presentDatePopover(kind: .when) }
+      case "task.deadline": return .init { self.presentDatePopover(kind: .deadline) }
+      case "task.reminder":
+        guard single != nil else { return nil }
+        return .init { self.presentReminderPopover() }
+      case "task.clearSchedule":
+        guard selection.contains(where: { $0.isOnToday || $0.scheduled != nil || $0.deadline != nil })
+        else { return nil }
+        return .init { self.clearScheduleSelection() }
+      case "task.move": return .init { self.presentMoveMenu() }
+      case "task.repeat":
+        guard single != nil else { return nil }
+        return .init { self.presentRecurrencePanel() }
+      case "task.pauseResumeRepeat":
+        guard !selection.isEmpty, selection.allSatisfy({ $0.recurrence != nil }) else { return nil }
+        let paused = selection.allSatisfy(\.recurrencePaused)
+        return .init(variant: paused ? .active : .base) { self.setRecurrencePaused(!paused) }
+      case "task.createNextCopy":
+        guard let single, single.recurrence != nil else { return nil }
+        return .init { self.createNextCopySelection() }
+      default:
+        return nil
+      }
+    }, slot: { [weak self] id in
+      guard let self else { return [] }
+      switch id {
+      case "moveDestinations": return self.moveDestinationNodes(selection: selection)
+      case "sectionDestinations": return self.sectionDestinationNodes(selection: selection)
+      default: return []
+      }
+    })
   }
 
-  /// The trash's own vocabulary — nothing else on the normal menu (rename,
-  /// complete, dates…) means anything for an already-deleted row.
+  /// The trash's own vocabulary (registry `task.recentlyDeleted`) — nothing
+  /// else on the normal menu means anything for an already-deleted row.
   private func buildRecentlyDeletedMenu() -> NSMenu {
-    let menu = NSMenu()
-    menu.addItem(item(String(localized: "Restore", comment: "SeptaskKit: context menu"),
-                      #selector(menuRestore), "", []))
-    menu.addItem(.separator())
-    menu.addItem(item(String(localized: "Delete Permanently", comment: "SeptaskKit: context menu"),
-                      #selector(menuDelete), "\u{8}", [.command]))
-    return menu
+    KitRegistryMenu.build(RegistryActions.menu("task.recentlyDeleted")) { [weak self] id in
+      guard let self else { return nil }
+      switch id {
+      case "task.restore": return .init { self.restoreTasks(self.actionableSelection.map(\.id)) }
+      case "task.deletePermanently": return .init { self.deleteSelection() }
+      default: return nil
+      }
+    }
   }
 
-  @objc private func menuRestore() { restoreTasks(actionableSelection.map(\.id)) }
-
+  /// The Faded pile's menu (registry `task.faded`).
   private func buildFadedMenu() -> NSMenu {
-    let menu = NSMenu()
-    menu.addItem(item(String(localized: "Keep", comment: "SeptaskKit: faded context menu"),
-                      #selector(menuKeepFaded), "", []))
-    menu.addItem(item(String(localized: "Let Go", comment: "SeptaskKit: faded context menu"),
-                      #selector(menuDropFaded), "", []))
-    menu.addItem(.separator())
-    menu.addItem(item(String(localized: "Delete", comment: "SeptaskKit: context menu"),
-                      #selector(menuDelete), "\u{8}", [.command]))
-    return menu
+    let plural: RegistryTitleVariant = actionableSelection.count > 1 ? .plural : .base
+    return KitRegistryMenu.build(RegistryActions.menu("task.faded")) { [weak self] id in
+      guard let self else { return nil }
+      switch id {
+      case "task.keepFaded": return .init { self.menuKeepFaded() }
+      case "task.letGoFaded": return .init { self.menuDropFaded() }
+      case "task.delete": return .init(variant: plural) { self.deleteSelection() }
+      default: return nil
+      }
+    }
+  }
+
+  /// The Move submenu's destinations — the same set the SwiftUI menu shows:
+  /// the filing suggestion first, then Inbox (unless every row is already in
+  /// it), every area and every top-level project.
+  private func moveDestinationNodes(selection: [SeptenaTask]) -> [RegistryMenuNode] {
+    let snapshot = StructureCache.snapshot(in: context)
+    var nodes: [RegistryMenuNode] = []
+    if let suggested = suggestedMoveNode(selection: selection, projects: snapshot.projects) {
+      nodes.append(suggested)
+      nodes.append(.divider(id: "suggested.divider"))
+    }
+    if !selection.allSatisfy(\.isInTriageBand) {
+      nodes.append(RegistryMenuEntry.slot(
+        id: "inbox", title: String(localized: "Inbox", comment: "SeptaskKit: move destination"),
+        sfSymbol: RegistryIcons.sfSymbol(for: "list.inbox")) { [weak self] in
+          self?.move(to: .none)
+        })
+    }
+    let topLevel = snapshot.projects.filter { $0.area == nil && $0.status == .active }
+    if !snapshot.areas.isEmpty || !topLevel.isEmpty {
+      nodes.append(.divider(id: "destinations.divider"))
+      for area in snapshot.areas {
+        let title = (area.emoji?.isEmpty == false) ? "\(area.emoji ?? "")  \(area.title)" : area.title
+        nodes.append(RegistryMenuEntry.slot(id: "area.\(area.id)", title: title) { [weak self] in
+          self?.move(to: .area(area.id))
+        })
+      }
+      for project in topLevel {
+        nodes.append(RegistryMenuEntry.slot(
+          id: "project.\(project.id)", title: project.title,
+          sfSymbol: RegistryIcons.sfSymbol(for: "place.project")) { [weak self] in
+            self?.move(to: .project(project.id))
+          })
+      }
+    }
+    return nodes
+  }
+
+  /// "Suggested: <List>" — the same pick the row's "→ Suggested" capsule
+  /// shows, so the menu and the capsule never name different lists. Single
+  /// selection only: a pick is ranked for one title.
+  private func suggestedMoveNode(selection: [SeptenaTask], projects: [Project]) -> RegistryMenuNode? {
+    guard selection.count == 1, let task = selection.first else { return nil }
+    // The capsule's snapshot first (Inbox); else the same GATE live
+    // (`TaskFilingSuggestions.top`) so Area pages still offer a suggested
+    // child project inside the Move submenu even without a row capsule.
+    guard let suggestion = filingSuggestions[task.id]
+      ?? TaskFilingSuggestions.top(
+        for: task, filter: filter, engine: SuggestionEngine.shared,
+        childProjectIds: Self.childProjectIds(in: projects))
+    else { return nil }
+    return RegistryMenuEntry.slot(
+      id: "suggested",
+      title: String(localized: "Suggested: \(suggestion.title)",
+                    comment: "SeptaskKit: Move submenu, the filing suggestion"),
+      sfSymbol: suggestion.kind == .project ? "number" : "folder") { [weak self] in
+        self?.applyFilingSuggestion(taskID: task.id, suggestion: suggestion)
+      }
+  }
+
+  /// Area → its active child projects, the shape `TaskFilingSuggestions` asks
+  /// for. One builder, so the capsule and the menu rank an area-direct row
+  /// against the same set of destinations.
+  private static func childProjectIds(in projects: [Project]) -> (String) -> Set<String> {
+    { areaId in
+      Set(projects.filter { $0.area == areaId && $0.status == .active }.map(\.id))
+    }
+  }
+
+  /// Move to Section ▸ — No Section, then every heading of the project page.
+  private func sectionDestinationNodes(selection: [SeptenaTask]) -> [RegistryMenuNode] {
+    guard case .project = filter, !selection.isEmpty else { return [] }
+    let headings = rows.compactMap(\.task).filter(\.isHeading)
+    guard !headings.isEmpty else { return [] }
+    let ids = selection.map(\.id)
+    var nodes: [RegistryMenuNode] = [
+      RegistryMenuEntry.slot(id: "section.none", title: String(localized: "No Section")) { [weak self] in
+        self?.fileIntoHeading(ids, heading: nil)
+      },
+      .divider(id: "sections.divider"),
+    ]
+    for heading in headings {
+      nodes.append(RegistryMenuEntry.slot(id: "section.\(heading.id)", title: heading.title) { [weak self] in
+        self?.fileIntoHeading(ids, heading: heading.id)
+      })
+    }
+    return nodes
+  }
+
+  /// File `ids` under `heading` (nil = the un-headed block) at the foot of
+  /// that group — the same rule as the SwiftUI project page.
+  private func fileIntoHeading(_ ids: [String], heading: String?) {
+    let members = rows.compactMap(\.task)
+      .filter { !$0.isHeading && $0.heading == heading && !ids.contains($0.id) }
+    let slots = TaskOrder.positions(count: ids.count,
+                                    above: members.last?.orderKey(in: orderLane), below: nil)
+    for (id, position) in zip(ids, slots) {
+      mutator.setHeading(id: id, heading: heading)
+      mutator.reorder(id: id, toPosition: position, in: orderLane)
+    }
+    reload()
   }
 
   @objc private func menuKeepFaded() {
@@ -4133,12 +4187,13 @@ final class SeptaskKitTaskListController: NSViewController {
   // shape as SwiftUI's `handleGroupedTaskDrop`/`handleHeadingDrop`.
 
   /// Right-click on blank list space, project pages only — where "New
-  /// Section" lives when there's no heading row to right-click yet.
+  /// Section" lives when there's no heading row to right-click yet
+  /// (registry `project.blankSpace`).
   private func buildBlankSpaceMenu() -> NSMenu {
-    let menu = NSMenu()
-    menu.addItem(item(String(localized: "New Section", comment: "SeptaskKit: heading CRUD"),
-                      #selector(menuNewSection), "", []))
-    return menu
+    KitRegistryMenu.build(RegistryActions.menu("project.blankSpace")) { [weak self] id in
+      guard let self, id == "section.new", case .project = self.filter else { return nil }
+      return .init { self.menuNewSection() }
+    }
   }
 
   /// The page title's own navigation dropdown — the AppKit counterpart of
@@ -4227,51 +4282,69 @@ final class SeptaskKitTaskListController: NSViewController {
     onNavigate?(destination)
   }
 
-  /// Right-click on a heading row: rename (same field-editor path as any
-  /// task) and delete — nothing else on the normal task menu applies to a
-  /// section divider.
+  /// Right-click on a heading row (registry `project.heading`): rename (same
+  /// field-editor path as any task), a new task in the section, and delete —
+  /// nothing else on the normal task menu applies to a section divider.
   private func buildHeadingContextMenu() -> NSMenu {
-    let menu = NSMenu()
-    menu.addItem(item(String(localized: "Rename", comment: "SeptaskKit: context menu"),
-                      #selector(menuRename), "r", [.command]))
-    menu.addItem(.separator())
-    menu.addItem(item(String(localized: "Delete Section", comment: "SeptaskKit: heading CRUD"),
-                      #selector(menuDeleteHeading), "", []))
-    return menu
+    KitRegistryMenu.build(RegistryActions.menu("project.heading")) { [weak self] id in
+      guard let self else { return nil }
+      switch id {
+      case "section.rename": return .init { self.beginEditSelectedRow() }
+      case "section.newTask": return .init { self.createTaskUnderSelectedHeading() }
+      case "section.delete": return .init { self.menuDeleteHeading() }
+      default: return nil
+      }
+    }
   }
 
-  /// Right-click on a Get started step: the same three things the keyboard
-  /// does (Return, ⌘K) plus hiding the checklist. Nothing from the task menu
-  /// applies to a step.
+  /// Right-click on a Get started step (registry `notice.getStartedStep`):
+  /// the same things the keyboard does (Return, ⌘K) plus hiding the
+  /// checklist. Nothing from the task menu applies to a step.
   private func buildNoticeStepMenu() -> NSMenu {
-    let menu = NSMenu()
-    menu.addItem(item(String(localized: "Open", comment: "SeptaskKit: Get started step menu"),
-                      #selector(menuOpenNoticeStep), "", []))
     let steps = selectedNoticeSteps
-    let toggleTitle = !steps.isEmpty && steps.allSatisfy(\.done)
-      ? String(localized: "Mark as Not Done", comment: "SeptaskKit: Get started step menu")
-      : String(localized: "Mark as Done", comment: "SeptaskKit: Get started step menu")
-    menu.addItem(item(toggleTitle, #selector(menuToggleNoticeStep), "k", [.command]))
-    menu.addItem(.separator())
-    menu.addItem(item(String(localized: "Hide Get Started", comment: "SeptaskKit: Get started step menu"),
-                      #selector(menuHideGetStarted), "", []))
-    return menu
+    let allDone = !steps.isEmpty && steps.allSatisfy(\.done)
+    return KitRegistryMenu.build(RegistryActions.menu("notice.getStartedStep")) { [weak self] id in
+      guard let self else { return nil }
+      switch id {
+      case "notice.openStep":
+        return .init(perform: steps.isEmpty ? nil : { self.menuOpenNoticeStep() })
+      case "notice.toggleStep":
+        return .init(variant: allDone ? .active : .base,
+                     perform: steps.isEmpty ? nil : { self.toggleSelectedNoticeSteps() })
+      case "notice.hideGetStarted": return .init { self.dismissNotice(.getStarted) }
+      default: return nil
+      }
+    }
   }
 
-  @objc private func menuOpenNoticeStep() {
+  /// New Task in Section: a titleless row filed under the selected heading,
+  /// open for typing — the same as the SwiftUI page's heading menu.
+  private func createTaskUnderSelectedHeading() {
+    let row = tableView.selectedRow
+    guard rows.indices.contains(row), let heading = rows[row].task, heading.isHeading,
+          case .project(let projectId) = filter else { return }
+    commitOpenEdits()
+    let task = mutator.create(title: "", area: nil, project: projectId,
+                              scheduled: nil, today: false, deferPush: true, atBottom: true)
+    mutator.setHeading(id: task.id, heading: heading.id)
+    pendingNewTaskId = task.id
+    reload(animated: false)
+    guard let newRow = rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
+    tableView.selectRowIndexes([newRow], byExtendingSelection: false)
+    tableView.scrollRowToVisible(newRow)
+    beginEditingRow(newRow)
+  }
+
+  private func menuOpenNoticeStep() {
     guard let step = selectedNoticeSteps.first else { return }
     openNoticeStep(step.id)
   }
-
-  @objc private func menuToggleNoticeStep() { toggleSelectedNoticeSteps() }
-
-  @objc private func menuHideGetStarted() { dismissNotice(.getStarted) }
 
   /// New Section lands as a named row and opens for editing, the way ⌘N lands
   /// a new task and the way Finder lands a new folder. It used to stop the app
   /// with a modal text prompt while the row it was about to create sat right
   /// there, editable.
-  @objc private func menuNewSection() {
+  private func menuNewSection() {
     guard case .project(let projectId) = filter else { return }
     let heading = mutator.createHeading(
       title: String(localized: "New Section", comment: "SeptaskKit: heading CRUD"),
@@ -4284,7 +4357,7 @@ final class SeptaskKitTaskListController: NSViewController {
     beginEditingRow(row)
   }
 
-  @objc private func menuDeleteHeading() {
+  private func menuDeleteHeading() {
     let row = tableView.selectedRow
     guard row >= 0, let heading = rows[row].task, heading.isHeading else { return }
     // Exact copy from TaskListView's confirmationDialog — same story either shell.
@@ -4301,197 +4374,20 @@ final class SeptaskKitTaskListController: NSViewController {
       self.reload()
     }
   }
-
-  private func item(_ title: String, _ action: Selector, _ key: String,
-                    _ modifiers: NSEvent.ModifierFlags) -> NSMenuItem {
-    let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
-    item.keyEquivalentModifierMask = modifiers
-    item.target = self
-    return item
-  }
-
-  @objc private func menuToggleComplete() { toggleCompleteSelection() }
-  @objc private func menuCancel() { cancelSelection() }
-  @objc private func menuToggleToday() { toggleTodaySelection() }
-  @objc private func menuToggleStar() { toggleStarSelection() }
-  @objc private func menuTags() { presentTagPopover() }
-  @objc private func menuRename() { beginEditSelectedRow() }
-  @objc private func menuInspector() { onToggleInspector?() }
-  @objc private func menuDuplicate() { duplicateSelection() }
-
-  @objc private func menuMoveTo(_ sender: NSMenuItem) {
-    let snapshot = StructureCache.snapshot(in: context)
-    guard let destination = KitMoveMenu.destination(for: sender,
-                                                    areas: snapshot.areas,
-                                                    projects: snapshot.projects)
-    else { return }
-    move(to: destination)
-  }
-
-  /// The Move submenu's "Suggested" item. The tag indexes `menuSuggestions`,
-  /// which `menuNeedsUpdate` rebuilt for the row that is still selected.
-  @objc private func menuApplySuggestion(_ sender: NSMenuItem) {
-    let selection = actionableSelection
-    guard selection.count == 1, let task = selection.first,
-          menuSuggestions.indices.contains(sender.tag) else { return }
-    applyFilingSuggestion(taskID: task.id, suggestion: menuSuggestions[sender.tag])
-  }
-
-  @objc private func menuWhen() { presentDatePopover(kind: .when) }
-  @objc private func menuDeadline() { presentDatePopover(kind: .deadline) }
-  @objc private func menuClearSchedule() { clearScheduleSelection() }
-
-  @objc private func menuRepeat() { presentRecurrencePanel() }
-  @objc private func menuReminder() { presentReminderPopover() }
-
-  @objc private func menuPauseResumeRepeat() {
-    let selection = actionableSelection.filter { $0.recurrence != nil }
-    guard !selection.isEmpty else { return }
-    setRecurrencePaused(!selection.allSatisfy(\.recurrencePaused))
-  }
-  @objc private func menuCreateNextCopy() { createNextCopySelection() }
-  @objc private func menuDelete() { deleteSelection() }
 }
 
-// MARK: - Context menu validation
+// MARK: - Menu validation
 
 extension SeptaskKitTaskListController: NSMenuItemValidation {
-  /// The row menus are built once and reused, so every item is checked
-  /// against the REAL selection each time it opens — never left enabled for
-  /// a selection that no longer holds a task.
+  /// The page title's navigation dropdown is the one selector-based menu
+  /// left here; the row menus are registry menus whose items carry their own
+  /// enabled state (`KitRegistryMenu`).
   func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
     switch menuItem.action {
-    // Navigation and page-level items don't depend on a selected row.
     case #selector(navMenuSelect(_:)):
-      return true
-    case #selector(menuNewSection):
-      if case .project = filter { return true }
-      return false
-    case #selector(menuRename):
-      let row = tableView.selectedRow
-      return rows.indices.contains(row) && rows[row].task != nil
-    case #selector(menuDeleteHeading):
-      let row = tableView.selectedRow
-      return rows.indices.contains(row) && rows[row].task?.isHeading == true
-    case #selector(menuApplySuggestion(_:)):
-      return actionableSelection.count == 1 && menuSuggestions.indices.contains(menuItem.tag)
-    case #selector(menuPauseResumeRepeat), #selector(menuCreateNextCopy):
-      return actionableSelection.contains { $0.recurrence != nil }
-    case #selector(menuOpenNoticeStep), #selector(menuToggleNoticeStep):
-      return !selectedNoticeSteps.isEmpty
-    case #selector(menuHideGetStarted):
       return true
     default:
       return hasActionableSelection
-    }
-  }
-}
-
-// MARK: - Context menu freshness
-
-extension SeptaskKitTaskListController: NSMenuDelegate {
-  /// Refresh selection-dependent items each time the menu opens — move
-  /// destinations from live structure, and Today / Clear Schedule from the
-  /// current selection (see `refreshPlacementMenuItems`).
-  func menuNeedsUpdate(_ menu: NSMenu) {
-    let snapshot = StructureCache.snapshot(in: context)
-    let moveMenu = KitMoveMenu.build(areas: snapshot.areas,
-                                     projects: snapshot.projects,
-                                     target: self,
-                                     action: #selector(menuMoveTo(_:)))
-    insertSuggestedMoveItem(into: moveMenu, projects: snapshot.projects)
-    moveMenuItem.submenu = moveMenu
-    refreshPlacementMenuItems()
-  }
-
-  /// "Suggested: <List>" as the FIRST item of the Move submenu — the same
-  /// pick the row's "→ Suggested" capsule shows, so the menu and the capsule
-  /// never name different lists. Single selection only: a pick is ranked for
-  /// one title, so a multi-selection has no subject. Mirrors the SwiftUI
-  /// menu's Move submenu (`TaskListRowContextMenu`).
-  private func insertSuggestedMoveItem(into moveMenu: NSMenu, projects: [Project]) {
-    menuSuggestions = []
-    let selection = actionableSelection
-    guard selection.count == 1, let task = selection.first else { return }
-    // The capsule's snapshot first (Inbox); else the same GATE live
-    // (`TaskFilingSuggestions.top`) so Area pages still offer a suggested
-    // child project inside the Move submenu even without a row capsule.
-    let capsulePick = filingSuggestions[task.id]
-    guard let suggestion = capsulePick
-      ?? TaskFilingSuggestions.top(
-        for: task, filter: filter, engine: SuggestionEngine.shared,
-        childProjectIds: Self.childProjectIds(in: projects))
-    else { return }
-
-    menuSuggestions = [suggestion]
-    let item = NSMenuItem(title: String(localized: "Suggested: \(suggestion.title)",
-                                        comment: "SeptaskKit: Move submenu, the filing suggestion"),
-                          action: #selector(menuApplySuggestion(_:)), keyEquivalent: "")
-    item.target = self
-    item.tag = 0
-    // ⌥⌘M files into the row's visible capsule pick; only advertise the
-    // binding when the row actually carries a capsule (Inbox), so the menu
-    // never promises a shortcut that is a deliberate no-op on Area pages.
-    if capsulePick != nil {
-      item.keyEquivalent = "m"
-      item.keyEquivalentModifierMask = [.command, .option]
-    }
-    // Same glyph as the capsule.
-    item.image = NSImage(systemSymbolName: "arrow.turn.down.right", accessibilityDescription: nil)
-    moveMenu.insertItem(item, at: 0)
-    moveMenu.insertItem(.separator(), at: 1)
-  }
-
-  /// Area → its active child projects, the shape `TaskFilingSuggestions` asks
-  /// for. One builder, so the capsule and the menu rank an area-direct row
-  /// against the same set of destinations.
-  private static func childProjectIds(in projects: [Project]) -> (String) -> Set<String> {
-    { areaId in
-      Set(projects.filter { $0.area == areaId && $0.status == .active }.map(\.id))
-    }
-  }
-
-  /// Directional Today labels; hide the Today item on the Today list (you're
-  /// already there — Clear Schedule is the exit). Hide Clear Schedule when
-  /// nothing would change.
-  private func refreshPlacementMenuItems() {
-    let selection = actionableSelection
-
-    infoMenuItem.title = UserDefaults.standard.bool(forKey: SettingsKey.septaskInspectorVisible)
-      ? String(localized: "Hide Info", comment: "SeptaskKit: context menu")
-      : String(localized: "Show Info", comment: "SeptaskKit: context menu")
-
-    // On Today: every row is already "on Today", so a Today action just
-    // competes with Clear Schedule. Hide it; ⌘T still works via the key
-    // binding on the table.
-    if filter == .today || selection.isEmpty {
-      todayMenuItem.isHidden = true
-    } else if selection.allSatisfy(\.isOnToday) {
-      todayMenuItem.isHidden = false
-      todayMenuItem.title = String(localized: "Remove from Today",
-                                   comment: "SeptaskKit: context menu")
-    } else {
-      todayMenuItem.isHidden = false
-      todayMenuItem.title = String(localized: "Move to Today",
-                                   comment: "SeptaskKit: context menu")
-    }
-
-    let allStarred = !selection.isEmpty && selection.allSatisfy(\.starred)
-    starMenuItem.isHidden = selection.isEmpty
-    starMenuItem.title = allStarred
-      ? String(localized: "Remove Star", comment: "SeptaskKit: context menu")
-      : String(localized: "Star", comment: "SeptaskKit: context menu")
-
-    let canClear = selection.contains { $0.isOnToday || $0.scheduled != nil }
-    clearScheduleMenuItem.isHidden = !canClear
-
-    let repeating = !selection.isEmpty && selection.allSatisfy { $0.recurrence != nil }
-    pauseRepeatMenuItem.isHidden = !repeating
-    if repeating {
-      let paused = selection.allSatisfy(\.recurrencePaused)
-      pauseRepeatMenuItem.title = paused
-        ? String(localized: "Resume Repeat", comment: "SeptaskKit: recurrence")
-        : String(localized: "Pause Repeat", comment: "SeptaskKit: recurrence")
     }
   }
 }
@@ -7388,7 +7284,7 @@ enum KitDayFormat {
 
 // MARK: - Table subclass (keyboard)
 
-/// Keyboard seam: the `TaskRowShortcuts` equivalents intercept on the
+/// Keyboard seam: the registry shortcut equivalents intercept on the
 /// responder chain ahead of the menu bar (whose SwiftUI items are disabled in
 /// this window anyway — no focused task-list publisher), Return opens the
 /// rename field editor. Everything else — arrows, type-select, ⇧-extension —
@@ -7584,7 +7480,7 @@ final class SeptaskKitTableView: NSTableView {
     }
 
     // ⌘⇧D / ⌘⇧. — deliberately the shifted forms (bare ⌘. is the system
-    // Cancel equivalent), matching TaskRowShortcuts. ⌘⇧F is Quick Find, the
+    // Cancel equivalent), matching the registry shortcuts. ⌘⇧F is Quick Find, the
     // same binding the SwiftUI window uses.
     if flags == [.command, .shift] {
       switch key {
@@ -7623,7 +7519,7 @@ final class SeptaskKitTableView: NSTableView {
     case "m": onMove?(); return true
     case "v": if onPasteAttachment?() == true { return true }; return super.performKeyEquivalent(with: event)
     case ",": SeptaskKitSettingsWindow.show(); return true
-    case "\u{7f}": onDelete?(); return true   // ⌘⌫, matching TaskRowShortcuts.delete
+    case "\u{7f}": onDelete?(); return true   // ⌘⌫, matching registry task.delete
     default: return super.performKeyEquivalent(with: event)
     }
   }

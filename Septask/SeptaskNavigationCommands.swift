@@ -31,78 +31,6 @@ extension FocusedValues {
 }
 
 #if os(macOS)
-/// The AppKit shell's row commands, with the same titles and bindings as
-/// `TaskRowCommands` so the two shells teach one set of muscle memory.
-private struct SeptaskKitRowCommands: View {
-  var body: some View {
-    // Same set, order, and bindings as the shell's context menu and as
-    // `TaskRowCommands` in the SwiftUI shell. Copy is deliberately absent:
-    // it lives in the standard Edit menu, which reaches the task list through
-    // the responder chain — a second ⌘C here would fight it for the binding.
-    // Each item is enabled on its own: the shell routes these to the pane
-    // that holds the keyboard, and on the sidebar only Rename and Delete have
-    // a target (an area or project) — see `SeptaskKitWindowController.canRun`.
-    Group {
-      Button("Rename") { SeptaskKitCommands.row(.rename) }
-        .keyboardShortcut("r", modifiers: .command)
-        .disabled(!SeptaskKitCommands.canRun(.rename))
-      Button("Duplicate") { SeptaskKitCommands.row(.duplicate) }
-        .keyboardShortcut("d", modifiers: .command)
-        .disabled(!SeptaskKitCommands.canRun(.duplicate))
-      Divider()
-      Menu("Complete") {
-        Button("Mark as Complete") { SeptaskKitCommands.row(.toggleComplete) }
-          .keyboardShortcut(TaskRowShortcuts.markComplete)
-          .disabled(!SeptaskKitCommands.canRun(.toggleComplete))
-        Button("Cancel Task") { SeptaskKitCommands.row(.cancel) }
-          .keyboardShortcut(TaskRowShortcuts.cancel)
-          .disabled(!SeptaskKitCommands.canRun(.cancel))
-        Divider()
-        Button("Delete") { SeptaskKitCommands.row(.delete) }
-          .keyboardShortcut(.delete, modifiers: .command)
-          .disabled(!SeptaskKitCommands.canRun(.delete))
-      }
-      Button("Toggle Today") { SeptaskKitCommands.row(.toggleToday) }
-        .keyboardShortcut("t", modifiers: .command)
-        .disabled(!SeptaskKitCommands.canRun(.toggleToday))
-      Button("Toggle Star") { SeptaskKitCommands.row(.toggleStar) }
-        .keyboardShortcut("s", modifiers: [.command, .option])
-        .disabled(!SeptaskKitCommands.canRun(.toggleStar))
-      Button("Tags…") { SeptaskKitCommands.row(.editTags) }
-        .keyboardShortcut("t", modifiers: [.command, .shift])
-        .disabled(!SeptaskKitCommands.canRun(.editTags))
-      Button("Add Checklist Item") { SeptaskKitCommands.row(.addChecklistItem) }
-        .keyboardShortcut("c", modifiers: [.command, .shift])
-        .disabled(!SeptaskKitCommands.canRun(.addChecklistItem))
-      Button("When…") { SeptaskKitCommands.row(.when) }
-        .keyboardShortcut("s", modifiers: .command)
-        .disabled(!SeptaskKitCommands.canRun(.when))
-      Button("Deadline…") { SeptaskKitCommands.row(.deadline) }
-        .keyboardShortcut("d", modifiers: [.command, .shift])
-        .disabled(!SeptaskKitCommands.canRun(.deadline))
-      Button("Reminder…") { SeptaskKitCommands.row(.reminder) }
-        .keyboardShortcut("r", modifiers: [.command, .option])
-        .disabled(!SeptaskKitCommands.canRun(.reminder))
-      Button("Move…") { SeptaskKitCommands.row(.move) }
-        .keyboardShortcut("m", modifiers: [.command, .shift])
-        .disabled(!SeptaskKitCommands.canRun(.move))
-      // Bare ⌘M is intentionally reclaimed by the focused task list. Keep
-      // this alias hidden so Window ▸ Minimize cannot win the event.
-      Button("Move…") { SeptaskKitCommands.row(.move) }
-        .keyboardShortcut("m", modifiers: .command)
-        .disabled(!SeptaskKitCommands.canRun(.move))
-        .hidden()
-      Button("Clear Schedule") { SeptaskKitCommands.row(.clearSchedule) }
-        .keyboardShortcut(".", modifiers: [.command, .shift])
-        .disabled(!SeptaskKitCommands.canRun(.clearSchedule))
-      Button("Repeat…") { SeptaskKitCommands.row(.repeatEditor) }
-        .disabled(!SeptaskKitCommands.canRun(.repeatEditor))
-      Button("Create Next Copy") { SeptaskKitCommands.row(.createNextCopy) }
-        .disabled(!SeptaskKitCommands.canRun(.createNextCopy))
-    }
-  }
-}
-
 /// Opens the classic SwiftUI window. It's suppressed at launch now that the
 /// AppKit shell is the default, but it still hosts everything the shell hasn't
 /// covered — so it stays one menu item away.
@@ -116,11 +44,170 @@ private struct ClassicWindowCommand: View {
 }
 #endif
 
+/// The Task menu, rendered from the registry's `menuBar` `task` menu — the
+/// same items, order, titles and bindings in either shell. Copy is absent on
+/// purpose: it lives in the standard Edit menu.
+///
+/// On macOS the AppKit shell drives it when no SwiftUI scene is focused (the
+/// shell publishes no `taskActions`); each item is enabled on its own, since
+/// the shell routes row commands to the pane that holds the keyboard (see
+/// `SeptaskKitWindowController.canRun`).
+private struct SeptaskTaskMenu: View {
+  let navigation: SeptaskNavigationActions?
+  let canNavigate: Bool
+  @FocusedValue(\.taskActions) private var taskActions
+  @FocusedValue(\.nextListActions) private var nextActions
+
+  private var usesKit: Bool {
+    #if os(macOS)
+    return navigation == nil
+    #else
+    return false
+    #endif
+  }
+
+  var body: some View {
+    let nodes = RegistryMenuResolver.resolve(
+      RegistryActions.menuBarMenu("task")?.items ?? [], bind: bind)
+    RegistryMenuContent(nodes: nodes)
+    #if os(macOS)
+    // NSMenuItem has one visible key-equivalent slot. Alternate bindings
+    // (bare ⌘M for Move…) and the SwiftUI list's row commands the menu does
+    // not show (⌘C) ride as hidden items, so Window ▸ Minimize cannot win the
+    // event. The AppKit list handles both keys itself.
+    if !usesKit {
+      ForEach(hiddenBindings(nodes), id: \.id) { binding in
+        Button(binding.title) { binding.perform?() }
+          .keyboardShortcut(binding.shortcut.keyboardShortcut)
+          .disabled(binding.perform == nil)
+          .hidden()
+      }
+    }
+    #endif
+  }
+
+  private func bind(_ id: String) -> RegistryActionBinding? {
+    switch id {
+    case "sidebar.newProject":
+      return .init(perform: canNavigate ? newProject : nil)
+    case "sidebar.newArea":
+      return .init(perform: canNavigate ? newArea : nil)
+    default:
+      break
+    }
+    #if os(macOS)
+    if usesKit {
+      guard let command = Self.kitCommand(for: id) else { return nil }
+      return .init(perform: SeptaskKitCommands.canRun(command) ? { SeptaskKitCommands.row(command) } : nil)
+    }
+    #endif
+    guard TaskActions.supports(id) else { return nil }
+    let action = taskActions?.handler(for: id)
+      ?? (id == "task.toggleComplete" ? nextActions?.toggleComplete : nil)
+    #if os(iOS)
+    // iPad: the task list can't publish `\.taskActions` (a focused scene
+    // value from the split-view detail SIGKILLs iPad, see TaskListView), so
+    // the list's own hidden shortcut buttons serve its rows. Show only what
+    // has a live handler here (the Next checklist's ⌘K), so the hold-⌘ HUD
+    // lists each command once.
+    guard action != nil else { return nil }
+    #endif
+    return .init(perform: action)
+  }
+
+  private func newProject() {
+    if let navigation {
+      navigation.newProject()
+    } else {
+      #if os(macOS)
+      SeptaskKitCommands.newProject()
+      #endif
+    }
+  }
+
+  private func newArea() {
+    if let navigation {
+      navigation.newArea()
+    } else {
+      #if os(macOS)
+      SeptaskKitCommands.newArea()
+      #endif
+    }
+  }
+
+  #if os(macOS)
+  private struct HiddenBinding {
+    let id: String
+    let title: String
+    let shortcut: RegistryShortcut
+    let perform: (() -> Void)?
+  }
+
+  /// Alternate shortcuts of the menu's items, plus row commands from the
+  /// shortcuts sheet that the SwiftUI list serves but the menu leaves out.
+  private func hiddenBindings(_ nodes: [RegistryMenuNode]) -> [HiddenBinding] {
+    var shown = Set<String>()
+    var out: [HiddenBinding] = []
+    func walk(_ nodes: [RegistryMenuNode]) {
+      for node in nodes {
+        switch node {
+        case .item(let entry):
+          shown.insert(entry.id)
+          for (index, alternate) in (RegistryActions.shortcut(for: entry.id)?.alternates ?? []).enumerated() {
+            out.append(HiddenBinding(id: "\(entry.id).alt\(index)", title: entry.title,
+                                     shortcut: alternate, perform: entry.perform))
+          }
+        case .submenu(_, _, _, let children):
+          walk(children)
+        case .divider:
+          break
+        }
+      }
+    }
+    walk(nodes)
+    for id in TaskActions.rowCommandIds where !shown.contains(id) {
+      guard let shortcut = RegistryActions.shortcut(for: id) else { continue }
+      out.append(HiddenBinding(id: id, title: RegistryActions.title(id), shortcut: shortcut,
+                               perform: taskActions?.handler(for: id)))
+    }
+    return out
+  }
+
+  /// The AppKit shell's row command for a registry action.
+  private static func kitCommand(for id: String) -> SeptaskKitWindowController.RowCommand? {
+    switch id {
+    case "task.editDetails": return .rename
+    case "task.duplicate": return .duplicate
+    case "task.toggleComplete": return .toggleComplete
+    case "task.cancel": return .cancel
+    case "task.delete": return .delete
+    case "task.toggleToday": return .toggleToday
+    case "task.toggleStar": return .toggleStar
+    case "task.tags": return .editTags
+    case "task.addChecklistItem": return .addChecklistItem
+    case "task.when": return .when
+    case "task.deadline": return .deadline
+    case "task.reminder": return .reminder
+    case "task.move": return .move
+    case "task.clearSchedule": return .clearSchedule
+    case "task.repeat": return .repeatEditor
+    case "task.createNextCopy": return .createNextCopy
+    default: return nil
+    }
+  }
+  #endif
+}
+
 /// The app-level menu shell reads the focused main-window actions instead of a
 /// NavigationState stored on `App`. This keeps two restored/windows scenes from
 /// steering each other while preserving the standard menu shortcuts.
+///
+/// Every menu except Go renders from the registry's `menuBar` composition
+/// (`registry/actions.json`): the App, File, View, Task and Help items, their
+/// order, titles and shortcuts. This struct binds each action ID to a handler.
 struct SeptaskCommandMenus: Commands {
   @FocusedValue(\.septaskNavigationActions) private var actions
+  @FocusedValue(\.taskActions) private var taskActions
   @AppStorage(SettingsKey.textSizeStep) private var textSizeRaw = 0
 
   /// A navigation command has a target when a SwiftUI window is focused, or —
@@ -220,6 +307,110 @@ struct SeptaskCommandMenus: Commands {
     textSizeSelection.wrappedValue = current + delta
   }
 
+  /// One registry `menuBar` menu, resolved against `bind`.
+  private func menuBar(_ id: String, slot: (String) -> [RegistryMenuNode] = { _ in [] }) -> RegistryMenuContent {
+    RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
+      RegistryActions.menuBarMenu(id)?.items ?? [], bind: bind, slot: slot))
+  }
+
+  // MARK: - Bindings (App, File, View, Help)
+
+  private func bind(_ id: String) -> RegistryActionBinding? {
+    switch id {
+    case "app.settings":
+      return .init(perform: canOpenSettings ? showSettings : nil)
+
+    case "app.newTask":
+      return newTaskBinding
+
+    case "app.quickAdd":
+      // The registry gates Quick Add off macOS (Quick Entry covers capture).
+      return .init(perform: actions.map { actions in { actions.showQuickAdd() } })
+
+    case "app.keyboardShortcuts":
+      #if os(macOS)
+      // SwiftUI-window only: the AppKit shell has no shortcuts sheet, and a
+      // permanently disabled item is worse than none.
+      guard let actions else { return nil }
+      return .init { actions.showKeyboardShortcuts() }
+      #else
+      return .init(perform: actions.map { actions in { actions.showKeyboardShortcuts() } })
+      #endif
+
+    case "app.toggleSidebar":
+      // ⌃⌘S is macOS only: the registry excludes it on iOS, where the system
+      // already owns ⌃⌘S and UIKit aborts the app on a duplicate shortcut.
+      return .init(variant: sidebarIsHidden ? .add : .remove,
+                   perform: canNavigate ? toggleSidebar : nil)
+
+    #if os(macOS)
+    case "task.toggleInfo":
+      return .init(variant: inspectorVisible ? .active : .base,
+                   perform: actions == nil && SeptaskKitCommands.canHandle
+                     ? { SeptaskKitCommands.showInspector() } : nil)
+
+    case "app.toggleSidebarCounts":
+      // AppKit-shell-only (the SwiftUI sidebar has no count-hiding toggle).
+      return .init(variant: sidebarCountsHidden ? .base : .active,
+                   perform: SeptaskKitCommands.canHandle ? { SeptaskKitCommands.toggleSidebarCounts() } : nil)
+    #endif
+
+    case "app.textSizeIncrease":
+      return .init(perform: TextSizeStep.resolve(textSizeRaw) == .xLarge ? nil : { adjustTextSize(by: 1) })
+    case "app.textSizeDecrease":
+      return .init(perform: TextSizeStep.resolve(textSizeRaw) == .xSmall ? nil : { adjustTextSize(by: -1) })
+    case "app.textSizeReset":
+      return .init(perform: TextSizeStep.resolve(textSizeRaw) == .normal
+                   ? nil : { textSizeSelection.wrappedValue = TextSizeStep.normal.rawValue })
+
+    default:
+      return nil
+    }
+  }
+
+  /// View ▸ Text Size ▸ the five steps, the current one checked. Writes the
+  /// same preference as Settings → Text Size.
+  private func textSizeSteps(_ id: String) -> [RegistryMenuNode] {
+    guard id == "textSizeSteps" else { return [] }
+    let current = TextSizeStep.resolve(textSizeRaw)
+    return TextSizeStep.allCases.map { step in
+      RegistryMenuEntry.slot(id: "textSize.\(step.rawValue)", title: step.label,
+                             isOn: step == current) {
+        textSizeSelection.wrappedValue = step.rawValue
+      }
+    }
+  }
+
+  /// ⌘N belongs to whichever shell is in front: a focused task list makes
+  /// the new row inherit its project / area; otherwise the window's own
+  /// new-task path (Inbox + draft row) runs.
+  private var newTaskBinding: RegistryActionBinding {
+    #if os(macOS)
+    if actions == nil {
+      return .init(perform: SeptaskKitCommands.canHandle ? { SeptaskKitCommands.newTask() } : nil)
+    }
+    #endif
+    let taskActions = taskActions
+    let actions = actions
+    return .init {
+      if let taskActions {
+        taskActions.newTask()
+      } else {
+        actions?.newTask()
+      }
+    }
+  }
+
+  private func toggleSidebar() {
+    if let actions {
+      actions.toggleSidebar()
+    } else {
+      #if os(macOS)
+      SeptaskKitCommands.toggleSidebar()
+      #endif
+    }
+  }
+
   var body: some Commands {
     CommandMenu("Go") {
       Button("Today") { go(.today) }
@@ -263,78 +454,13 @@ struct SeptaskCommandMenus: Commands {
       #endif
     }
 
-    CommandMenu("Task") {
-      Button("New Project") {
-        if let actions {
-          actions.newProject()
-        } else {
-          #if os(macOS)
-          SeptaskKitCommands.newProject()
-          #endif
-        }
-      }
-      .disabled(!canNavigate)
-      Button("New Area") {
-        if let actions {
-          actions.newArea()
-        } else {
-          #if os(macOS)
-          SeptaskKitCommands.newArea()
-          #endif
-        }
-      }
-      .disabled(!canNavigate)
-      Divider()
-      #if os(macOS)
-      // The shell publishes no `taskActions` (that's a SwiftUI focused value),
-      // so it gets its own row commands with the same bindings rather than a
-      // menu full of permanently-disabled items.
-      if actions == nil {
-        SeptaskKitRowCommands()
-      } else {
-        TaskCommandsMenu()
-      }
-      #else
-      TaskCommandsMenu()
-      #endif
+    CommandMenu(RegistryActions.menuBarMenu("task")?.title ?? "Task") {
+      SeptaskTaskMenu(navigation: actions, canNavigate: canNavigate)
     }
 
     CommandGroup(after: .sidebar) {
-      Button(sidebarIsHidden ? "Show Sidebar" : "Hide Sidebar") {
-        if let actions {
-          actions.toggleSidebar()
-        } else {
-          #if os(macOS)
-          SeptaskKitCommands.toggleSidebar()
-          #endif
-        }
-      }
-      #if os(macOS)
-      // ⌃⌘S — the platform's standard sidebar toggle. macOS only: on iOS the
-      // system already owns ⌃⌘S (its own Show Sidebar command), and UIKit
-      // aborts the app at launch on a duplicate menu shortcut (2026-11-19).
-      .keyboardShortcut("s", modifiers: [.control, .command])
-      #endif
-      .disabled(!canNavigate)
-
-      #if os(macOS)
-      Button(inspectorVisible ? "Hide Info" : "Show Info") {
-        SeptaskKitCommands.showInspector()
-      }
-      .keyboardShortcut("i", modifiers: [.command, .option])
-      .disabled(actions != nil || !SeptaskKitCommands.canHandle)
-
-      // AppKit-shell-only for now (the SwiftUI sidebar has no count-hiding
-      // toggle) — so this is unconditionally gated on the shell, not on
-      // `actions == nil` like the other rows here. Dynamic title, same
-      // pattern as "Show/Hide Sidebar" above — the setting lives in
-      // UserDefaults (read by the AppKit sidebar directly), not a SwiftUI
-      // published value, so this reads it fresh rather than binding to it.
-      Button(sidebarCountsHidden ? "Show Sidebar Counts" : "Hide Sidebar Counts") {
-        SeptaskKitCommands.toggleSidebarCounts()
-      }
-      .disabled(!SeptaskKitCommands.canHandle)
-      #endif
+      // Registry View menu: sidebar, Info, sidebar counts, Text Size ▸.
+      menuBar("view", slot: textSizeSteps)
 
       // View options for the lists themselves. Not shell-gated: it writes a
       // stored preference both shells read, and on iPadOS this same group is
@@ -343,92 +469,22 @@ struct SeptaskCommandMenus: Commands {
       TaskViewOptions()
     }
 
-    // Standard macOS text-size affordances: the View menu exposes both a
-    // discoverable five-step scale and the familiar increase/decrease/reset
-    // shortcuts. This writes the same preference as Settings → Text Size.
-    CommandGroup(after: .toolbar) {
-      Menu("Text Size") {
-        Picker("Text Size", selection: textSizeSelection) {
-          ForEach(TextSizeStep.allCases) { step in
-            Text(step.label).tag(step.rawValue)
-          }
-        }
-        Divider()
-        Button("Increase Text Size") { adjustTextSize(by: 1) }
-          .keyboardShortcut("+", modifiers: .command)
-          .disabled(TextSizeStep.resolve(textSizeRaw) == .xLarge)
-        Button("Decrease Text Size") { adjustTextSize(by: -1) }
-          .keyboardShortcut("-", modifiers: .command)
-          .disabled(TextSizeStep.resolve(textSizeRaw) == .xSmall)
-        Button("Reset Text Size") { textSizeSelection.wrappedValue = TextSizeStep.normal.rawValue }
-          .keyboardShortcut("0", modifiers: .command)
-          .disabled(TextSizeStep.resolve(textSizeRaw) == .normal)
-      }
-    }
-
-    #if os(macOS)
-    // ⌘N belongs to whichever shell is in front; the shared NewTaskCommand
-    // only knows about SwiftUI scenes.
-    CommandGroup(replacing: .newItem) {
-      if actions == nil {
-        Button("New To-Do") { SeptaskKitCommands.newTask() }
-          .keyboardShortcut("n", modifiers: .command)
-          .disabled(!SeptaskKitCommands.canHandle)
-      } else {
-        NewTaskCommand()
-      }
-    }
-    #else
-    CommandGroup(replacing: .newItem) { NewTaskCommand() }
-    #endif
+    CommandGroup(replacing: .newItem) { menuBar("file") }
 
     #if os(macOS)
     CommandGroup(replacing: .undoRedo) { SeptaskUndoRedoCommands() }
     #endif
 
-    CommandGroup(after: .newItem) {
-      #if os(macOS)
-      // SwiftUI-window only: the AppKit shell has no Quick Add sheet (Quick
-      // Entry covers capture), and a permanently disabled item is worse
-      // than none.
-      if actions != nil {
-        Button("Quick Add…") { actions?.showQuickAdd() }
-          .keyboardShortcut("i", modifiers: .command)
-      }
-      #else
-      Button("Quick Add…") { actions?.showQuickAdd() }
-        .keyboardShortcut("i", modifiers: .command)
-        .disabled(actions == nil)
-      #endif
-    }
+    CommandGroup(replacing: .appSettings) { menuBar("app") }
 
-    CommandGroup(replacing: .appSettings) {
-      Button("Settings…") { showSettings() }
-        .keyboardShortcut(",", modifiers: .command)
-      // Stays available from the Settings window itself, which is why this
-      // checks "a shell exists" rather than "a shell is frontmost".
-      .disabled(!canOpenSettings)
-    }
-
-    CommandGroup(after: .help) {
-      #if os(macOS)
-      // SwiftUI-window only, for the same reason as Quick Add above.
-      if actions != nil {
-        Button("Keyboard Shortcuts") { actions?.showKeyboardShortcuts() }
-          .keyboardShortcut("/", modifiers: [.command, .shift])
-      }
-      #else
-      Button("Keyboard Shortcuts") { actions?.showKeyboardShortcuts() }
-        .keyboardShortcut("/", modifiers: [.command, .shift])
-        .disabled(actions == nil)
-      #endif
-    }
+    CommandGroup(after: .help) { menuBar("help") }
 
     #if os(macOS)
     SeptaskMacAppCommands()
     #endif
   }
 }
+
 
 #if os(macOS)
 /// Extracted so `SeptaskCommandMenus.body` stays within SwiftUI's 10-child

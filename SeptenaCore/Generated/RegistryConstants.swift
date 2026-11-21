@@ -135,6 +135,7 @@ enum RegistryIcons {
     "action.complete": "checkmark.circle",
     "action.cancel": "xmark.circle",
     "action.delete": "trash",
+    "action.let_go": "wind",
     "action.restore": "arrow.uturn.backward",
     "action.today_add": "sun.max.fill",
     "action.today_remove": "sun.min",
@@ -148,6 +149,7 @@ enum RegistryIcons {
     "action.repeat_pause": "pause.circle",
     "action.repeat_resume": "play.circle",
     "action.repeat_next_copy": "plus.circle",
+    "action.move_section": "text.append",
     "action.move_up": "chevron.up",
     "action.move_down": "chevron.down",
     "action.add": "plus",
@@ -633,6 +635,18 @@ struct RegistryShortcut: Sendable, Hashable {
   let modifiers: [String]
   let keycaps: [String]
   let excludePlatforms: [String]
+  /// Extra bindings for the same action (a menu item shows only one).
+  var alternates: [RegistryShortcut] = []
+}
+
+/// Where an action applies (`availability` in `registry/actions.json`).
+/// Empty `platforms` means every platform.
+struct RegistryActionAvailability: Sendable, Hashable {
+  let selection: String
+  let platforms: [String]
+  let excludeDestinations: [String]
+  let onlyDestinations: [String]
+  let requiresRecurrence: Bool
 }
 
 /// One item in a context menu or menu-bar menu (`registry/actions.json`).
@@ -663,6 +677,7 @@ enum RegistryActions {
     "task.cancel": RegistryL10n.t("Cancel Task"),
     "task.toggleToday": RegistryL10n.t("Toggle Today"),
     "task.toggleStar": RegistryL10n.t("Toggle Star"),
+    "task.tags": RegistryL10n.t("Tags…"),
     "task.addChecklistItem": RegistryL10n.t("Add Checklist Item"),
     "task.when": RegistryL10n.t("When…"),
     "task.deadline": RegistryL10n.t("Deadline…"),
@@ -676,8 +691,12 @@ enum RegistryActions {
     "task.delete": RegistryL10n.t("Delete"),
     "task.restore": RegistryL10n.t("Restore"),
     "task.deletePermanently": RegistryL10n.t("Delete Permanently"),
+    "task.keepFaded": RegistryL10n.t("Keep"),
+    "task.letGoFaded": RegistryL10n.t("Let Go"),
     "area.newProject": RegistryL10n.t("New Project in Area"),
     "area.rename": RegistryL10n.t("Rename"),
+    "area.moveUp": RegistryL10n.t("Move Up"),
+    "area.moveDown": RegistryL10n.t("Move Down"),
     "area.delete": RegistryL10n.t("Delete Area"),
     "project.rename": RegistryL10n.t("Rename"),
     "project.moveUp": RegistryL10n.t("Move Up"),
@@ -688,6 +707,7 @@ enum RegistryActions {
     "sidebar.newArea": RegistryL10n.t("New Area"),
     "sidebar.newProject": RegistryL10n.t("New Project"),
     "section.new": RegistryL10n.t("New Section"),
+    "section.newTask": RegistryL10n.t("New Task in Section"),
     "section.rename": RegistryL10n.t("Rename"),
     "section.delete": RegistryL10n.t("Delete Section"),
     "notice.openStep": RegistryL10n.t("Open"),
@@ -717,6 +737,7 @@ enum RegistryActions {
     "task.cancel": "xmark.circle",
     "task.toggleToday": "sun.max.fill",
     "task.toggleStar": "star",
+    "task.tags": "tag",
     "task.addChecklistItem": "checklist",
     "task.when": "calendar",
     "task.deadline": "flag",
@@ -730,8 +751,12 @@ enum RegistryActions {
     "task.delete": "trash",
     "task.restore": "arrow.uturn.backward",
     "task.deletePermanently": "trash",
+    "task.keepFaded": "arrow.uturn.backward",
+    "task.letGoFaded": "wind",
     "area.newProject": "plus",
     "area.rename": "pencil",
+    "area.moveUp": "chevron.up",
+    "area.moveDown": "chevron.down",
     "area.delete": "trash",
     "project.rename": "pencil",
     "project.moveUp": "chevron.up",
@@ -742,6 +767,7 @@ enum RegistryActions {
     "sidebar.newArea": "plus",
     "sidebar.newProject": "plus",
     "section.new": "plus",
+    "section.newTask": "plus",
     "section.rename": "pencil",
     "section.delete": "trash",
     "notice.openStep": "info.circle",
@@ -762,19 +788,21 @@ enum RegistryActions {
     "app.classicWindow": "macwindow",
   ]
 
-  /// Other titles of an action: `desktopTitle`, `activeTitle` (state on), `pluralTitle`, `addTitle`, `removeTitle`.
+  /// Other titles of an action: `desktopTitle`, `activeTitle` (state on), `pluralTitle`, `addTitle`, `removeTitle`, `shortTitle` (swipe buttons).
   static let alternateTitles: [String: [String: String]] = [
     "task.editDetails": ["desktopTitle": RegistryL10n.t("Rename")],
     "task.toggleInfo": ["activeTitle": RegistryL10n.t("Hide Info")],
     "task.duplicate": ["pluralTitle": RegistryL10n.t("Duplicate Tasks")],
     "task.cancel": ["pluralTitle": RegistryL10n.t("Cancel Tasks")],
-    "task.toggleToday": ["addTitle": RegistryL10n.t("Move to Today"), "removeTitle": RegistryL10n.t("Remove from Today")],
+    "task.toggleToday": ["addTitle": RegistryL10n.t("Move to Today"), "removeTitle": RegistryL10n.t("Remove from Today"), "shortTitle": RegistryL10n.t("Today")],
     "task.toggleStar": ["addTitle": RegistryL10n.t("Star"), "removeTitle": RegistryL10n.t("Remove Star")],
+    "task.when": ["shortTitle": RegistryL10n.t("Schedule")],
     "task.reminder": ["addTitle": RegistryL10n.t("Add Reminder…")],
-    "task.move": ["pluralTitle": RegistryL10n.t("Move Tasks")],
+    "task.move": ["pluralTitle": RegistryL10n.t("Move Tasks"), "shortTitle": RegistryL10n.t("Move")],
     "task.pauseResumeRepeat": ["activeTitle": RegistryL10n.t("Resume Repeat")],
     "task.delete": ["pluralTitle": RegistryL10n.t("Delete Tasks")],
     "notice.toggleStep": ["activeTitle": RegistryL10n.t("Mark as Not Done")],
+    "app.toggleSidebar": ["addTitle": RegistryL10n.t("Show Sidebar"), "removeTitle": RegistryL10n.t("Hide Sidebar")],
     "app.toggleSidebarCounts": ["activeTitle": RegistryL10n.t("Hide Sidebar Counts")],
   ]
 
@@ -787,11 +815,12 @@ enum RegistryActions {
     "task.cancel": RegistryShortcut(key: "k", modifiers: ["primary", "alt"], keycaps: ["⌥", "⌘", "K"], excludePlatforms: []),
     "task.toggleToday": RegistryShortcut(key: "t", modifiers: ["primary"], keycaps: ["⌘", "T"], excludePlatforms: []),
     "task.toggleStar": RegistryShortcut(key: "s", modifiers: ["primary", "alt"], keycaps: ["⌥", "⌘", "S"], excludePlatforms: []),
+    "task.tags": RegistryShortcut(key: "t", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "T"], excludePlatforms: []),
     "task.addChecklistItem": RegistryShortcut(key: "c", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "C"], excludePlatforms: []),
     "task.when": RegistryShortcut(key: "s", modifiers: ["primary"], keycaps: ["⌘", "S"], excludePlatforms: []),
     "task.deadline": RegistryShortcut(key: "d", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "D"], excludePlatforms: []),
     "task.reminder": RegistryShortcut(key: "r", modifiers: ["primary", "alt"], keycaps: ["⌥", "⌘", "R"], excludePlatforms: []),
-    "task.move": RegistryShortcut(key: "m", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "M"], excludePlatforms: []),
+    "task.move": RegistryShortcut(key: "m", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "M"], excludePlatforms: [], alternates: [RegistryShortcut(key: "m", modifiers: ["primary"], keycaps: ["⌘", "M"], excludePlatforms: [])]),
     "task.moveSuggested": RegistryShortcut(key: "m", modifiers: ["primary", "alt"], keycaps: ["⌥", "⌘", "M"], excludePlatforms: []),
     "task.clearSchedule": RegistryShortcut(key: ".", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "."], excludePlatforms: []),
     "task.delete": RegistryShortcut(key: "delete", modifiers: ["primary"], keycaps: ["⌘", "⌫"], excludePlatforms: []),
@@ -810,6 +839,79 @@ enum RegistryActions {
     "app.textSizeReset": RegistryShortcut(key: "0", modifiers: ["primary"], keycaps: ["⌘", "0"], excludePlatforms: []),
   ]
 
+  /// Actions whose `role` is `destructive` (red in menus and swipes).
+  static let destructive: Set<String> = [
+    "task.delete",
+    "task.deletePermanently",
+    "area.delete",
+    "project.delete",
+    "section.delete",
+  ]
+
+  static let availability: [String: RegistryActionAvailability] = [
+    "task.editDetails": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
+    "task.toggleInfo": RegistryActionAvailability(selection: "any", platforms: ["macos", "web", "windows"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "task.copy": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "task.duplicate": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
+    "task.toggleComplete": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
+    "task.cancel": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
+    "task.toggleToday": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
+    "task.toggleStar": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
+    "task.tags": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
+    "task.addChecklistItem": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
+    "task.when": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
+    "task.deadline": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
+    "task.reminder": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
+    "task.move": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
+    "task.moveSuggested": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: ["logbook", "recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
+    "task.clearSchedule": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
+    "task.repeat": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
+    "task.pauseResumeRepeat": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: true),
+    "task.createNextCopy": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: true),
+    "task.delete": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
+    "task.restore": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: ["recentlyDeleted"], requiresRecurrence: false),
+    "task.deletePermanently": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: ["recentlyDeleted"], requiresRecurrence: false),
+    "task.keepFaded": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: ["faded"], requiresRecurrence: false),
+    "task.letGoFaded": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: ["faded"], requiresRecurrence: false),
+    "area.newProject": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "area.rename": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "area.moveUp": RegistryActionAvailability(selection: "single", platforms: ["ios", "ipados", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "area.moveDown": RegistryActionAvailability(selection: "single", platforms: ["ios", "ipados", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "area.delete": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "project.rename": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "project.moveUp": RegistryActionAvailability(selection: "single", platforms: ["ios", "ipados", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "project.moveDown": RegistryActionAvailability(selection: "single", platforms: ["ios", "ipados", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "project.markDone": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "project.cancel": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "project.delete": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "sidebar.newArea": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "sidebar.newProject": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "section.new": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "section.newTask": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "section.rename": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "section.delete": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "notice.openStep": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "notice.toggleStep": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "notice.hideGetStarted": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "app.newTask": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "app.quickAdd": RegistryActionAvailability(selection: "none", platforms: ["ios", "ipados", "web", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "app.quickEntry": RegistryActionAvailability(selection: "none", platforms: ["macos", "windows"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "app.quickFind": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "app.toggleSidebar": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "app.settings": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "app.keyboardShortcuts": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "app.toggleSidebarCounts": RegistryActionAvailability(selection: "none", platforms: ["macos", "ipados", "web", "windows"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "app.textSizeIncrease": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "app.textSizeDecrease": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "app.textSizeReset": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "app.septenaWindow": RegistryActionAvailability(selection: "none", platforms: ["macos"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "app.classicWindow": RegistryActionAvailability(selection: "none", platforms: ["macos"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+  ]
+
+  /// Swipe slots in screen order, left to right (`swipeActions`).
+  static let swipeLeading: [String] = ["task.toggleToday", "task.when"]
+  static let swipeTrailing: [String] = ["task.move", "task.delete"]
+
   static let contextMenus: [String: [RegistryMenuItem]] = [
     "task.row": [
       RegistryMenuItem(kind: "action", id: "task.editDetails", title: RegistryL10n.t("Edit Details…"), sfSymbol: "info.circle", items: []),
@@ -819,8 +921,10 @@ enum RegistryActions {
       RegistryMenuItem(kind: "submenu", id: "complete", title: RegistryL10n.t("Complete"), sfSymbol: "checkmark.circle", items: [RegistryMenuItem(kind: "action", id: "task.toggleComplete", title: RegistryL10n.t("Mark as Complete"), sfSymbol: "checkmark.circle", items: []), RegistryMenuItem(kind: "action", id: "task.cancel", title: RegistryL10n.t("Cancel Task"), sfSymbol: "xmark.circle", items: []), RegistryMenuItem(kind: "divider", id: "divider.2", title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "action", id: "task.delete", title: RegistryL10n.t("Delete"), sfSymbol: "trash", items: [])]),
       RegistryMenuItem(kind: "action", id: "task.toggleToday", title: RegistryL10n.t("Toggle Today"), sfSymbol: "sun.max.fill", items: []),
       RegistryMenuItem(kind: "action", id: "task.toggleStar", title: RegistryL10n.t("Toggle Star"), sfSymbol: "star", items: []),
+      RegistryMenuItem(kind: "action", id: "task.tags", title: RegistryL10n.t("Tags…"), sfSymbol: "tag", items: []),
       RegistryMenuItem(kind: "submenu", id: "schedule", title: RegistryL10n.t("Schedule"), sfSymbol: "calendar", items: [RegistryMenuItem(kind: "action", id: "task.when", title: RegistryL10n.t("When…"), sfSymbol: "calendar", items: []), RegistryMenuItem(kind: "action", id: "task.deadline", title: RegistryL10n.t("Deadline…"), sfSymbol: "flag", items: []), RegistryMenuItem(kind: "action", id: "task.reminder", title: RegistryL10n.t("Reminder…"), sfSymbol: "bell", items: []), RegistryMenuItem(kind: "divider", id: "divider.3", title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "action", id: "task.clearSchedule", title: RegistryL10n.t("Clear Schedule"), sfSymbol: "calendar.badge.minus", items: [])]),
       RegistryMenuItem(kind: "submenu", id: "move", title: RegistryL10n.t("Move"), sfSymbol: "folder", items: [RegistryMenuItem(kind: "slot", id: "moveDestinations", title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "divider", id: "divider.1", title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "action", id: "task.move", title: RegistryL10n.t("Move…"), sfSymbol: "folder", items: [])]),
+      RegistryMenuItem(kind: "submenu", id: "moveToSection", title: RegistryL10n.t("Move to Section"), sfSymbol: "text.append", items: [RegistryMenuItem(kind: "slot", id: "sectionDestinations", title: nil, sfSymbol: nil, items: [])]),
       RegistryMenuItem(kind: "action", id: "task.repeat", title: RegistryL10n.t("Repeat…"), sfSymbol: "arrow.clockwise", items: []),
       RegistryMenuItem(kind: "action", id: "task.pauseResumeRepeat", title: RegistryL10n.t("Pause Repeat"), sfSymbol: "pause.circle", items: []),
       RegistryMenuItem(kind: "action", id: "task.createNextCopy", title: RegistryL10n.t("Create Next Copy"), sfSymbol: "plus.circle", items: []),
@@ -830,10 +934,19 @@ enum RegistryActions {
       RegistryMenuItem(kind: "divider", id: "divider.1", title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "task.deletePermanently", title: RegistryL10n.t("Delete Permanently"), sfSymbol: "trash", items: []),
     ],
+    "task.faded": [
+      RegistryMenuItem(kind: "action", id: "task.keepFaded", title: RegistryL10n.t("Keep"), sfSymbol: "arrow.uturn.backward", items: []),
+      RegistryMenuItem(kind: "action", id: "task.letGoFaded", title: RegistryL10n.t("Let Go"), sfSymbol: "wind", items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.2", title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "action", id: "task.delete", title: RegistryL10n.t("Delete"), sfSymbol: "trash", items: []),
+    ],
     "sidebar.area": [
       RegistryMenuItem(kind: "action", id: "area.newProject", title: RegistryL10n.t("New Project in Area"), sfSymbol: "plus", items: []),
       RegistryMenuItem(kind: "divider", id: "divider.1", title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "area.rename", title: RegistryL10n.t("Rename"), sfSymbol: "pencil", items: []),
+      RegistryMenuItem(kind: "action", id: "area.moveUp", title: RegistryL10n.t("Move Up"), sfSymbol: "chevron.up", items: []),
+      RegistryMenuItem(kind: "action", id: "area.moveDown", title: RegistryL10n.t("Move Down"), sfSymbol: "chevron.down", items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.5", title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "area.delete", title: RegistryL10n.t("Delete Area"), sfSymbol: "trash", items: []),
     ],
     "sidebar.project": [
@@ -854,7 +967,8 @@ enum RegistryActions {
     ],
     "project.heading": [
       RegistryMenuItem(kind: "action", id: "section.rename", title: RegistryL10n.t("Rename"), sfSymbol: "pencil", items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.1", title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "action", id: "section.newTask", title: RegistryL10n.t("New Task in Section"), sfSymbol: "plus", items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.2", title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "section.delete", title: RegistryL10n.t("Delete Section"), sfSymbol: "trash", items: []),
     ],
     "project.blankSpace": [
@@ -907,6 +1021,7 @@ enum RegistryActions {
       RegistryMenuItem(kind: "submenu", id: "complete", title: RegistryL10n.t("Complete"), sfSymbol: "checkmark.circle", items: [RegistryMenuItem(kind: "action", id: "task.toggleComplete", title: RegistryL10n.t("Mark as Complete"), sfSymbol: "checkmark.circle", items: []), RegistryMenuItem(kind: "action", id: "task.cancel", title: RegistryL10n.t("Cancel Task"), sfSymbol: "xmark.circle", items: []), RegistryMenuItem(kind: "divider", id: "divider.2", title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "action", id: "task.delete", title: RegistryL10n.t("Delete"), sfSymbol: "trash", items: [])]),
       RegistryMenuItem(kind: "action", id: "task.toggleToday", title: RegistryL10n.t("Toggle Today"), sfSymbol: "sun.max.fill", items: []),
       RegistryMenuItem(kind: "action", id: "task.toggleStar", title: RegistryL10n.t("Toggle Star"), sfSymbol: "star", items: []),
+      RegistryMenuItem(kind: "action", id: "task.tags", title: RegistryL10n.t("Tags…"), sfSymbol: "tag", items: []),
       RegistryMenuItem(kind: "action", id: "task.addChecklistItem", title: RegistryL10n.t("Add Checklist Item"), sfSymbol: "checklist", items: []),
       RegistryMenuItem(kind: "action", id: "task.when", title: RegistryL10n.t("When…"), sfSymbol: "calendar", items: []),
       RegistryMenuItem(kind: "action", id: "task.deadline", title: RegistryL10n.t("Deadline…"), sfSymbol: "flag", items: []),
@@ -938,6 +1053,7 @@ enum RegistryActions {
     RegistryShortcutEntry(id: "task.cancel", label: RegistryL10n.t("Cancel Task"), keycaps: ["⌥", "⌘", "K"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.toggleToday", label: RegistryL10n.t("Toggle Today"), keycaps: ["⌘", "T"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.toggleStar", label: RegistryL10n.t("Toggle Star"), keycaps: ["⌥", "⌘", "S"], excludePlatforms: []),
+    RegistryShortcutEntry(id: "task.tags", label: RegistryL10n.t("Tags…"), keycaps: ["⇧", "⌘", "T"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.addChecklistItem", label: RegistryL10n.t("Add Checklist Item"), keycaps: ["⇧", "⌘", "C"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.when", label: RegistryL10n.t("When…"), keycaps: ["⌘", "S"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.deadline", label: RegistryL10n.t("Deadline…"), keycaps: ["⇧", "⌘", "D"], excludePlatforms: []),

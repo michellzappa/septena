@@ -58,6 +58,7 @@
       "title": "Toggle Today",
       "addTitle": "Move to Today",
       "removeTitle": "Remove from Today",
+      "shortTitle": "Today",
       "icon": "action.today_add",
       "role": "default",
       "shortcut": { "key": "t", "modifiers": ["primary"] },
@@ -74,6 +75,14 @@
       "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "lists.starred"
     },
+    "task.tags": {
+      "title": "Tags…",
+      "icon": "action.tag",
+      "role": "default",
+      "shortcut": { "key": "t", "modifiers": ["primary", "shift"] },
+      "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
+      "featureId": "task.tags"
+    },
     "task.addChecklistItem": {
       "title": "Add Checklist Item",
       "icon": "action.checklist",
@@ -84,6 +93,7 @@
     },
     "task.when": {
       "title": "When…",
+      "shortTitle": "Schedule",
       "icon": "action.when",
       "role": "default",
       "shortcut": { "key": "s", "modifiers": ["primary"] },
@@ -110,6 +120,7 @@
     "task.move": {
       "title": "Move…",
       "pluralTitle": "Move Tasks",
+      "shortTitle": "Move",
       "icon": "action.move",
       "role": "default",
       "shortcut": { "key": "m", "modifiers": ["primary", "shift"], "alternates": [{ "key": "m", "modifiers": ["primary"] }] },
@@ -178,6 +189,8 @@
       "availability": { "selection": "any", "onlyDestinations": ["recentlyDeleted"] },
       "featureId": "lists.recently-deleted"
     },
+    "task.keepFaded": { "title": "Keep", "icon": "action.restore", "role": "default", "availability": { "selection": "any", "onlyDestinations": ["faded"] }, "featureId": "fade.sweep" },
+    "task.letGoFaded": { "title": "Let Go", "icon": "action.let_go", "role": "default", "availability": { "selection": "any", "onlyDestinations": ["faded"] }, "featureId": "fade.sweep" },
     "area.newProject": {
       "title": "New Project in Area",
       "icon": "action.add",
@@ -186,6 +199,20 @@
       "featureId": "places.projects"
     },
     "area.rename": { "title": "Rename", "icon": "action.rename", "role": "default", "availability": { "selection": "single" }, "featureId": "places.areas" },
+    "area.moveUp": {
+      "title": "Move Up",
+      "icon": "action.move_up",
+      "role": "default",
+      "availability": { "selection": "single", "platforms": ["ios", "ipados", "android"] },
+      "featureId": "places.areas"
+    },
+    "area.moveDown": {
+      "title": "Move Down",
+      "icon": "action.move_down",
+      "role": "default",
+      "availability": { "selection": "single", "platforms": ["ios", "ipados", "android"] },
+      "featureId": "places.areas"
+    },
     "area.delete": { "title": "Delete Area", "icon": "action.delete", "role": "destructive", "availability": { "selection": "single" }, "featureId": "places.areas" },
     "project.rename": { "title": "Rename", "icon": "action.rename", "role": "default", "availability": { "selection": "single" }, "featureId": "places.projects" },
     "project.moveUp": {
@@ -220,6 +247,13 @@
     "sidebar.newArea": { "title": "New Area", "icon": "action.add", "role": "default", "availability": { "selection": "none" }, "featureId": "places.areas" },
     "sidebar.newProject": { "title": "New Project", "icon": "action.add", "role": "default", "availability": { "selection": "none" }, "featureId": "places.projects" },
     "section.new": { "title": "New Section", "icon": "action.add", "role": "default", "availability": { "selection": "none" }, "featureId": "places.sections" },
+    "section.newTask": {
+      "title": "New Task in Section",
+      "icon": "action.add",
+      "role": "default",
+      "availability": { "selection": "single" },
+      "featureId": "places.sections"
+    },
     "section.rename": {
       "title": "Rename",
       "icon": "action.rename",
@@ -280,6 +314,8 @@
     },
     "app.toggleSidebar": {
       "title": "Show / Hide Sidebar",
+      "addTitle": "Show Sidebar",
+      "removeTitle": "Hide Sidebar",
       "icon": "action.sidebar",
       "role": "default",
       "shortcut": { "key": "s", "modifiers": ["ctrl", "primary"], "excludePlatforms": ["ios", "ipados"] },
@@ -369,6 +405,7 @@
       },
       { "kind": "action", "id": "task.toggleToday" },
       { "kind": "action", "id": "task.toggleStar" },
+      { "kind": "action", "id": "task.tags" },
       {
         "kind": "submenu",
         "id": "schedule",
@@ -389,15 +426,31 @@
         "icon": "action.move",
         "items": [{ "kind": "slot", "slot": "moveDestinations" }, { "kind": "divider" }, { "kind": "action", "id": "task.move" }]
       },
+      {
+        "kind": "submenu",
+        "id": "moveToSection",
+        "title": "Move to Section",
+        "icon": "action.move_section",
+        "items": [{ "kind": "slot", "slot": "sectionDestinations" }]
+      },
       { "kind": "action", "id": "task.repeat" },
       { "kind": "action", "id": "task.pauseResumeRepeat" },
       { "kind": "action", "id": "task.createNextCopy" }
     ],
     "task.recentlyDeleted": [{ "kind": "action", "id": "task.restore" }, { "kind": "divider" }, { "kind": "action", "id": "task.deletePermanently" }],
+    "task.faded": [
+      { "kind": "action", "id": "task.keepFaded" },
+      { "kind": "action", "id": "task.letGoFaded" },
+      { "kind": "divider" },
+      { "kind": "action", "id": "task.delete" }
+    ],
     "sidebar.area": [
       { "kind": "action", "id": "area.newProject" },
       { "kind": "divider" },
       { "kind": "action", "id": "area.rename" },
+      { "kind": "action", "id": "area.moveUp" },
+      { "kind": "action", "id": "area.moveDown" },
+      { "kind": "divider" },
       { "kind": "action", "id": "area.delete" }
     ],
     "sidebar.project": [
@@ -419,7 +472,12 @@
       { "kind": "action", "id": "project.delete" }
     ],
     "sidebar.empty": [{ "kind": "action", "id": "sidebar.newArea" }, { "kind": "action", "id": "sidebar.newProject" }],
-    "project.heading": [{ "kind": "action", "id": "section.rename" }, { "kind": "divider" }, { "kind": "action", "id": "section.delete" }],
+    "project.heading": [
+      { "kind": "action", "id": "section.rename" },
+      { "kind": "action", "id": "section.newTask" },
+      { "kind": "divider" },
+      { "kind": "action", "id": "section.delete" }
+    ],
     "project.blankSpace": [{ "kind": "action", "id": "section.new" }],
     "notice.getStartedStep": [
       { "kind": "action", "id": "notice.openStep" },
@@ -502,6 +560,7 @@
         },
         { "kind": "action", "id": "task.toggleToday" },
         { "kind": "action", "id": "task.toggleStar" },
+        { "kind": "action", "id": "task.tags" },
         { "kind": "action", "id": "task.addChecklistItem" },
         { "kind": "action", "id": "task.when" },
         { "kind": "action", "id": "task.deadline" },
@@ -533,6 +592,7 @@
         "task.cancel",
         "task.toggleToday",
         "task.toggleStar",
+        "task.tags",
         "task.addChecklistItem",
         "task.when",
         "task.deadline",

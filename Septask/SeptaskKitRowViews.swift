@@ -689,20 +689,6 @@ enum KitMoveMenu {
     let projectId: String?
   }
 
-  /// Context-menu / submenu targets — areas only. A long flat `NSMenu` of
-  /// every project is unwieldy; the type-to-filter modal
-  /// (`pickerDestinations`) is where projects live.
-  /// `emoji` rides alongside `title` rather than getting folded into it —
-  /// `build()` prefixes the menu title with it (a plain `NSMenuItem` has no
-  /// icon-column slot of its own); `SeptaskKitMovePicker` swaps its icon
-  /// column glyph for it instead, same "emoji replaces the generic glyph,
-  /// never both" rule `KitScreenTitleCell`/`SidebarCell` already follow.
-  static func destinations(areas: [Area], projects: [Project])
-    -> [(title: String, target: Destination, emoji: String?)] {
-    [(String(localized: "Inbox", comment: "SeptaskKit: move destination"), .none, nil)]
-      + areas.map { ($0.title, .area($0.id), $0.emoji) }
-  }
-
   /// Full Move picker list — Inbox, loose projects, then each area with
   /// its active projects nested. Mirrors `MovePickerSheet`'s hierarchy.
   static func pickerDestinations(areas: [Area], projects: [Project]) -> [PickerRow] {
@@ -724,27 +710,6 @@ enum KitMoveMenu {
       }
     }
     return rows
-  }
-
-  static func build(areas: [Area], projects: [Project],
-                    target: AnyObject, action: Selector) -> NSMenu {
-    let menu = NSMenu()
-    for (index, entry) in destinations(areas: areas, projects: projects).enumerated() {
-      let title = entry.emoji.map { "\($0)  \(entry.title)" } ?? entry.title
-      let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
-      item.target = target
-      item.tag = index
-      menu.addItem(item)
-      if index == 0 { menu.addItem(.separator()) }
-    }
-    return menu
-  }
-
-  static func destination(for item: NSMenuItem,
-                          areas: [Area], projects: [Project]) -> Destination? {
-    let all = destinations(areas: areas, projects: projects)
-    guard all.indices.contains(item.tag) else { return nil }
-    return all[item.tag].target
   }
 }
 

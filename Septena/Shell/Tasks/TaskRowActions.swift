@@ -118,6 +118,16 @@ struct TaskRowActions: ViewModifier {
             }
             onChange?()
           },
+          onToggleComplete: { ids in
+            let wasDone = task.status == .done
+            Haptics.tick()
+            for id in ids {
+              if wasDone { mutator.uncomplete(id: id) } else { mutator.complete(id: id) }
+              mutator.acknowledge(id: id)
+            }
+            TaskUndo.recordCompletion(ids: ids, wasDone: wasDone, mutator: mutator)
+            onChange?()
+          },
           onOpenWhen: { target in
             whenSheet = .init(taskIds: target.ids, kind: .scheduled)
           },
@@ -300,88 +310,80 @@ struct TaskRowActions: ViewModifier {
     }
   }
 
+  /// Agent proposals swap the Today slot for Accept and Delete for Dismiss;
+  /// everything else is the registry's `swipeActions` slots.
+  private var isProposal: Bool {
+    task.source == TaskSource.mcp && task.acknowledgedAt == nil
+  }
+
   private var swipeLeadingActions: [TaskRowSwipeAction] {
-    var actions: [TaskRowSwipeAction] = []
-    if task.source == TaskSource.mcp, task.acknowledgedAt == nil {
-      actions.append(TaskRowSwipeAction(
-        id: "accept",
-        title: String(localized: "Accept", comment: "Swipe action accept agent proposal"),
-        systemImage: "checkmark",
-        tint: .green
-      ) {
-        Haptics.tick()
-        recordingSchedule(String(localized: "Move to Today", comment: "Undo action name"), [task.id]) {
-          mutator.moveToToday(id: task.id, today: true)
-          mutator.acknowledge(id: task.id)
-          promoteFlash.flash(task.id)
+    TaskRowSwipeAction.leading { id in
+      switch id {
+      case "task.toggleToday":
+        if isProposal {
+          return TaskRowSwipeAction(
+            id: "accept",
+            title: String(localized: "Accept", comment: "Swipe action accept agent proposal"),
+            systemImage: "checkmark",
+            tint: .green
+          ) { moveToToday() }
         }
-        onChange?()
-      })
-    } else if task.isOnToday {
-      actions.append(TaskRowSwipeAction(
-        id: "remove-today",
-        title: String(localized: "Remove from Today", comment: "Swipe action remove from Today"),
-        systemImage: "sun.min",
-        tint: .gray
-      ) {
-        Haptics.tick()
-        recordingSchedule(String(localized: "Remove from Today", comment: "Undo action name"), [task.id]) {
-          mutator.removeFromToday(id: task.id)
-          mutator.acknowledge(id: task.id)
+        if task.isOnToday {
+          return .registry(id, variant: .remove,
+                           systemImage: RegistryIcons.sfSymbol(for: "action.today_remove"),
+                           tint: .gray) {
+            Haptics.tick()
+            recordingSchedule(RegistryActions.title(id, .remove), [task.id]) {
+              mutator.removeFromToday(id: task.id)
+              mutator.acknowledge(id: task.id)
+            }
+            onChange?()
+          }
         }
-        onChange?()
-      })
-    } else {
-      actions.append(TaskRowSwipeAction(
-        id: "today",
-        title: String(localized: "Today", comment: "Swipe action pin to Today"),
-        systemImage: "sun.max.fill",
-        tint: .orange
-      ) {
-        Haptics.tick()
-        recordingSchedule(String(localized: "Move to Today", comment: "Undo action name"), [task.id]) {
-          mutator.moveToToday(id: task.id, today: true)
-          mutator.acknowledge(id: task.id)
-          promoteFlash.flash(task.id)
+        return .registry(id, tint: TaskRowSwipeAction.tint(for: id)) { moveToToday() }
+      case "task.when":
+        return .registry(id, tint: TaskRowSwipeAction.tint(for: id)) {
+          whenSheet = .init(taskIds: [task.id], kind: .scheduled)
         }
-        onChange?()
-      })
+      default:
+        return nil
+      }
     }
-    actions.append(TaskRowSwipeAction(
-      id: "schedule",
-      title: String(localized: "Schedule", comment: "Swipe action schedule when"),
-      systemImage: "calendar",
-      tint: .indigo
-    ) {
-      whenSheet = .init(taskIds: [task.id], kind: .scheduled)
-    })
-    return actions
+  }
+
+  private func moveToToday() {
+    Haptics.tick()
+    recordingSchedule(RegistryActions.title("task.toggleToday", .add), [task.id]) {
+      mutator.moveToToday(id: task.id, today: true)
+      mutator.acknowledge(id: task.id)
+      promoteFlash.flash(task.id)
+    }
+    onChange?()
   }
 
   private var swipeTrailingActions: [TaskRowSwipeAction] {
-    let isProposal = task.source == TaskSource.mcp && task.acknowledgedAt == nil
-    return [
-      TaskRowSwipeAction(
-        id: "delete",
-        title: isProposal
-          ? String(localized: "Dismiss", comment: "Swipe action dismiss agent proposal")
-          : String(localized: "Delete", comment: "Swipe action delete task"),
-        systemImage: "trash",
-        tint: .red,
-        role: .destructive
-      ) {
-        applyDelete(task)
-      },
-      TaskRowSwipeAction(
-        id: "move",
-        title: String(localized: "Move", comment: "Swipe action move task"),
-        systemImage: "folder",
-        tint: .blue
-      ) {
-        moveTargetIds = [task.id]
-        showingMoveSheet = true
+    TaskRowSwipeAction.trailing { id in
+      switch id {
+      case "task.delete":
+        if isProposal {
+          return TaskRowSwipeAction(
+            id: id,
+            title: String(localized: "Dismiss", comment: "Swipe action dismiss agent proposal"),
+            systemImage: RegistryActions.sfSymbols[id] ?? "trash",
+            tint: .red,
+            role: .destructive
+          ) { applyDelete(task) }
+        }
+        return .registry(id, tint: TaskRowSwipeAction.tint(for: id)) { applyDelete(task) }
+      case "task.move":
+        return .registry(id, tint: TaskRowSwipeAction.tint(for: id)) {
+          moveTargetIds = [task.id]
+          showingMoveSheet = true
+        }
+      default:
+        return nil
       }
-    ]
+    }
   }
 
   private func applyDelete(_ task: SeptenaTask) {
@@ -473,6 +475,51 @@ struct TaskRowSwipeAction: Identifiable {
   let tint: Color
   var role: ButtonRole? = nil
   let perform: () -> Void
+}
+
+extension TaskRowSwipeAction {
+  /// A swipe button for a registry action: its title (the short swipe title
+  /// when the registry has one), icon and role come from `registry/actions.json`.
+  /// The shell supplies only the tint and the handler.
+  static func registry(_ id: String, variant: RegistryTitleVariant? = nil,
+                       systemImage: String? = nil, tint: Color,
+                       perform: @escaping () -> Void) -> TaskRowSwipeAction {
+    let title = variant.map { RegistryActions.title(id, $0) }
+      ?? RegistryActions.alternateTitles[id]?[RegistryTitleVariant.short.rawValue]
+      ?? RegistryActions.title(id)
+    return TaskRowSwipeAction(
+      id: id,
+      title: title,
+      systemImage: systemImage ?? RegistryActions.sfSymbols[id] ?? "circle",
+      tint: tint,
+      role: RegistryActions.destructive.contains(id) ? .destructive : nil,
+      perform: perform)
+  }
+
+  /// The leading swipe buttons the registry slots name, outermost first.
+  static func leading(_ make: (String) -> TaskRowSwipeAction?) -> [TaskRowSwipeAction] {
+    RegistryActions.swipeLeading.compactMap(make)
+  }
+
+  /// The trailing swipe buttons, outermost first. The registry lists them in
+  /// screen order, so the outermost (the right edge) is the last one.
+  static func trailing(_ make: (String) -> TaskRowSwipeAction?) -> [TaskRowSwipeAction] {
+    RegistryActions.swipeTrailing.reversed().compactMap(make)
+  }
+
+  /// The swipe tint for a registry action, one per action on every surface.
+  static func tint(for id: String) -> Color {
+    switch id {
+    case "task.toggleToday": return .orange
+    case "task.when": return .indigo
+    case "task.move": return .blue
+    case "task.delete", "task.deletePermanently": return .red
+    case "task.restore": return .green
+    case "task.keepFaded": return .blue
+    case "task.letGoFaded": return .orange
+    default: return .gray
+    }
+  }
 }
 
 extension Notification.Name {

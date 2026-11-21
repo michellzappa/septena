@@ -76,7 +76,7 @@ enum KeyboardShortcutsCatalogue {
     #endif
   }
 
-  /// Row commands are GENERATED from `RegistryActions` / `TaskRowCommands` so
+  /// Row commands are GENERATED from `RegistryActions` so
   /// this sheet can no longer advertise a binding the app doesn't have. Only
   /// the keys that aren't row commands — the selection/navigation keys the list
   /// handles itself — are listed by hand.
@@ -88,15 +88,7 @@ enum KeyboardShortcutsCatalogue {
       KeyboardShortcut2(keys: ["esc"], label: "Save and close the open task"),
       KeyboardShortcut2(keys: ["⌘", "N"], label: "New to-do"),
     ]
-    #if SEPTASK
     shortcuts += fromRegistry(RegistryActions.shortcutsTaskList)
-    #else
-    shortcuts += TaskRowCommands.all.flatMap { command in
-      command.allShortcuts.map { shortcut in
-        KeyboardShortcut2(keys: TaskRowCommand.keycaps(for: shortcut), label: command.title)
-      }
-    }
-    #endif
     return KeyboardShortcutGroup(title: "Task list", shortcuts: shortcuts)
   }
 

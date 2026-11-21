@@ -824,6 +824,18 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let modifiers: [String]");
   lines.push("  let keycaps: [String]");
   lines.push("  let excludePlatforms: [String]");
+  lines.push("  /// Extra bindings for the same action (a menu item shows only one).");
+  lines.push("  var alternates: [RegistryShortcut] = []");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// Where an action applies (`availability` in `registry/actions.json`).");
+  lines.push("/// Empty `platforms` means every platform.");
+  lines.push("struct RegistryActionAvailability: Sendable, Hashable {");
+  lines.push("  let selection: String");
+  lines.push("  let platforms: [String]");
+  lines.push("  let excludeDestinations: [String]");
+  lines.push("  let onlyDestinations: [String]");
+  lines.push("  let requiresRecurrence: Bool");
   lines.push("}");
   lines.push("");
   lines.push("/// One item in a context menu or menu-bar menu (`registry/actions.json`).");
@@ -874,8 +886,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   }
   lines.push("  ]");
   lines.push("");
-  const altFields = ["desktopTitle", "activeTitle", "pluralTitle", "addTitle", "removeTitle"];
-  lines.push("  /// Other titles of an action: `desktopTitle`, `activeTitle` (state on), `pluralTitle`, `addTitle`, `removeTitle`.");
+  const altFields = ["desktopTitle", "activeTitle", "pluralTitle", "addTitle", "removeTitle", "shortTitle"];
+  lines.push("  /// Other titles of an action: `desktopTitle`, `activeTitle` (state on), `pluralTitle`, `addTitle`, `removeTitle`, `shortTitle` (swipe buttons).");
   lines.push("  static let alternateTitles: [String: [String: String]] = [");
   for (const [id, a] of Object.entries(actions.actions)) {
     const pairs = altFields.filter((f) => typeof a[f] === "string").map((f) => `${swiftStr(f)}: ${L(a[f], a, f)}`);
@@ -887,9 +899,31 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const [id, a] of Object.entries(actions.actions)) {
     if (!a.shortcut) continue;
     const sc = a.shortcut;
-    lines.push(`    ${swiftStr(id)}: RegistryShortcut(key: ${swiftStr(sc.key)}, modifiers: [${sc.modifiers.map(swiftStr).join(", ")}], keycaps: [${appleKeycaps(sc).map(swiftStr).join(", ")}], excludePlatforms: [${(sc.excludePlatforms ?? []).map(swiftStr).join(", ")}]),`);
+    const excl = `[${(sc.excludePlatforms ?? []).map(swiftStr).join(", ")}]`;
+    const one = (k) => `RegistryShortcut(key: ${swiftStr(k.key)}, modifiers: [${k.modifiers.map(swiftStr).join(", ")}], keycaps: [${appleKeycaps(k).map(swiftStr).join(", ")}], excludePlatforms: ${excl}`;
+    const alts = (sc.alternates ?? []).map((k) => `${one(k)})`);
+    lines.push(`    ${swiftStr(id)}: ${one(sc)}${alts.length ? `, alternates: [${alts.join(", ")}]` : ""}),`);
   }
   lines.push("  ]");
+  lines.push("");
+  lines.push("  /// Actions whose `role` is `destructive` (red in menus and swipes).");
+  lines.push("  static let destructive: Set<String> = [");
+  for (const [id, a] of Object.entries(actions.actions)) {
+    if (a.role === "destructive") lines.push(`    ${swiftStr(id)},`);
+  }
+  lines.push("  ]");
+  lines.push("");
+  lines.push("  static let availability: [String: RegistryActionAvailability] = [");
+  for (const [id, a] of Object.entries(actions.actions)) {
+    const av = a.availability ?? {};
+    const arr = (v) => `[${(v ?? []).map(swiftStr).join(", ")}]`;
+    lines.push(`    ${swiftStr(id)}: RegistryActionAvailability(selection: ${swiftStr(av.selection ?? "any")}, platforms: ${arr(av.platforms)}, excludeDestinations: ${arr(av.excludeDestinations)}, onlyDestinations: ${arr(av.onlyDestinations)}, requiresRecurrence: ${av.requiresRecurrence === true}),`);
+  }
+  lines.push("  ]");
+  lines.push("");
+  lines.push("  /// Swipe slots in screen order, left to right (`swipeActions`).");
+  lines.push(`  static let swipeLeading: [String] = [${actions.swipeActions.leading.map(swiftStr).join(", ")}]`);
+  lines.push(`  static let swipeTrailing: [String] = [${actions.swipeActions.trailing.map(swiftStr).join(", ")}]`);
   lines.push("");
   lines.push("  static let contextMenus: [String: [RegistryMenuItem]] = [");
   for (const [name, items] of Object.entries(actions.contextMenus)) {

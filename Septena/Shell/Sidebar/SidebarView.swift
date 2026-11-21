@@ -906,108 +906,86 @@ struct SidebarRootView: View {
 
   // MARK: - Context menus
 
-  @ViewBuilder
+  /// Registry `sidebar.project`, the same menu the AppKit sidebar renders.
   private func projectMenu(_ project: Project) -> some View {
-    Button {
-      renameDraft = project.title
-      renameProjectTarget = project
-    } label: {
-      Label("Rename", systemImage: "pencil")
-    }
     let siblings = projects.filter { $0.area == project.area && $0.status == .active }
-    if let idx = siblings.firstIndex(where: { $0.id == project.id }) {
-      Divider()
-      Button {
-        reorderProject(project.id, before: siblings[idx - 1].id, parent: project.area)
-      } label: {
-        Label("Move Up", systemImage: "chevron.up")
-      }
-      .disabled(idx == 0)
-      Button {
-        let next = siblings[idx + 1]
-        reorderProject(next.id, before: project.id, parent: project.area)
-      } label: {
-        Label("Move Down", systemImage: "chevron.down")
-      }
-      .disabled(idx == siblings.count - 1)
-    }
-    Divider()
-    Menu {
-      Button {
-        moveProject(project, to: nil)
-      } label: {
-        Label("No Area", systemImage: "tray")
-      }
-      .disabled(project.area == nil)
-      if !areas.isEmpty {
-        Divider()
-        ForEach(areas) { area in
-          Button {
-            moveProject(project, to: area.id)
-          } label: {
-            Label(area.title, systemImage: "square.stack.3d.up.fill")
+    let idx = siblings.firstIndex(where: { $0.id == project.id })
+    return RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
+      RegistryActions.menu("sidebar.project"),
+      bind: { id in
+        switch id {
+        case "project.rename":
+          return .init {
+            renameDraft = project.title
+            renameProjectTarget = project
           }
-          .disabled(project.area == area.id)
+        case "project.moveUp":
+          guard let idx else { return nil }
+          return .init(perform: idx == 0 ? nil : {
+            reorderProject(project.id, before: siblings[idx - 1].id, parent: project.area)
+          })
+        case "project.moveDown":
+          guard let idx else { return nil }
+          return .init(perform: idx == siblings.count - 1 ? nil : {
+            reorderProject(siblings[idx + 1].id, before: project.id, parent: project.area)
+          })
+        case "project.markDone": return .init { setProjectStatus(project, to: .done) }
+        case "project.cancel": return .init { setProjectStatus(project, to: .cancelled) }
+        case "project.delete": return .init { deleteProjectTarget = project }
+        default: return nil
         }
-      }
-    } label: {
-      Label("Move to Area", systemImage: "folder")
-    }
-    Divider()
-    Button {
-      setProjectStatus(project, to: .done)
-    } label: {
-      Label("Mark Done", systemImage: "checkmark.circle")
-    }
-    Button {
-      setProjectStatus(project, to: .cancelled)
-    } label: {
-      Label("Cancel Project", systemImage: "xmark.circle")
-    }
-    Divider()
-    Button(role: .destructive) {
-      deleteProjectTarget = project
-    } label: {
-      Label("Delete Project", systemImage: "trash")
-    }
+      },
+      slot: { id in
+        guard id == "moveToAreaDestinations" else { return [] }
+        return projectAreaDestinations(project)
+      }))
   }
 
-  @ViewBuilder
+  /// Move to Area ▸ — No Area, then every area; the current parent is
+  /// checked and inert. Same slot the AppKit sidebar fills.
+  private func projectAreaDestinations(_ project: Project) -> [RegistryMenuNode] {
+    var nodes: [RegistryMenuNode] = [
+      RegistryMenuEntry.slot(id: "area.none", title: String(localized: "No Area"),
+                             isOn: project.area == nil,
+                             perform: project.area == nil ? nil : { moveProject(project, to: nil) }),
+    ]
+    if !areas.isEmpty { nodes.append(.divider(id: "areas.divider")) }
+    for area in areas {
+      nodes.append(RegistryMenuEntry.slot(
+        id: "area.\(area.id)", title: area.title, isOn: project.area == area.id,
+        perform: project.area == area.id ? nil : { moveProject(project, to: area.id) }))
+    }
+    return nodes
+  }
+
+  /// Registry `sidebar.area`, the same menu the AppKit sidebar renders.
   private func areaMenu(_ area: Area) -> some View {
-    Button {
-      renameDraft = area.title
-      renameAreaTarget = area
-    } label: {
-      Label("Rename", systemImage: "pencil")
-    }
-    Button {
-      newProjectInArea = area.id
-      showingNewProject = true
-    } label: {
-      Label("New Project", systemImage: "plus.square")
-    }
-    if let idx = areas.firstIndex(where: { $0.id == area.id }) {
-      Divider()
-      Button {
-        reorderArea(area.id, before: areas[idx - 1].id)
-      } label: {
-        Label("Move Up", systemImage: "chevron.up")
-      }
-      .disabled(idx == 0)
-      Button {
-        let next = areas[idx + 1]
-        reorderArea(next.id, before: area.id)
-      } label: {
-        Label("Move Down", systemImage: "chevron.down")
-      }
-      .disabled(idx == areas.count - 1)
-    }
-    Divider()
-    Button(role: .destructive) {
-      deleteAreaTarget = area
-    } label: {
-      Label("Delete Area", systemImage: "trash")
-    }
+    let idx = areas.firstIndex(where: { $0.id == area.id })
+    return RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
+      RegistryActions.menu("sidebar.area")) { id in
+        switch id {
+        case "area.newProject":
+          return .init {
+            newProjectInArea = area.id
+            showingNewProject = true
+          }
+        case "area.rename":
+          return .init {
+            renameDraft = area.title
+            renameAreaTarget = area
+          }
+        case "area.moveUp":
+          guard let idx else { return nil }
+          return .init(perform: idx == 0 ? nil : { reorderArea(area.id, before: areas[idx - 1].id) })
+        case "area.moveDown":
+          guard let idx else { return nil }
+          return .init(perform: idx == areas.count - 1 ? nil : {
+            reorderArea(areas[idx + 1].id, before: area.id)
+          })
+        case "area.delete": return .init { deleteAreaTarget = area }
+        default: return nil
+        }
+      })
   }
 
   /// Move the area with id `movedId` to the position immediately before

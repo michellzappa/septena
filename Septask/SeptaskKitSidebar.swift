@@ -1254,66 +1254,69 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       outlineView.selectRowIndexes([row], byExtendingSelection: false)
     }
 
-    let menu = NSMenu()
+    // Registry menus (`sidebar.area`, `sidebar.project`, `sidebar.empty`) —
+    // the same trees the SwiftUI sidebar renders.
+    let menu: NSMenu
     switch node?.content {
-    case .area(let area):
-      menu.addItem(item(String(localized: "New Project in \(area.title)",
-                               comment: "SeptaskKit: sidebar context menu"),
-                        #selector(newProjectInSelectedArea)))
-      menu.addItem(.separator())
-      menu.addItem(item(String(localized: "Rename Area…", comment: "SeptaskKit: sidebar context menu"),
-                        #selector(renameSelected)))
-      menu.addItem(item(String(localized: "Delete Area…", comment: "SeptaskKit: sidebar context menu"),
-                        #selector(deleteSelected)))
+    case .area:
+      menu = KitRegistryMenu.build(RegistryActions.menu("sidebar.area")) { [weak self] id in
+        guard let self else { return nil }
+        switch id {
+        case "area.newProject": return .init { self.newProjectInSelectedArea() }
+        case "area.rename": return .init { self.renameSelected() }
+        case "area.delete": return .init { self.deleteSelected() }
+        default: return nil
+        }
+      }
     case .project(let project, _):
-      menu.addItem(item(String(localized: "Rename", comment: "SeptaskKit: sidebar context menu"),
-                        #selector(renameSelected)))
-      menu.addItem(moveToAreaItem(for: project))
-      menu.addItem(.separator())
-      menu.addItem(item(String(localized: "Mark Done", comment: "SeptaskKit: sidebar context menu"),
-                        #selector(markSelectedProjectDone)))
-      menu.addItem(item(String(localized: "Cancel Project", comment: "SeptaskKit: sidebar context menu"),
-                        #selector(cancelSelectedProject)))
-      menu.addItem(.separator())
-      menu.addItem(item(String(localized: "Delete Project…", comment: "SeptaskKit: sidebar context menu"),
-                        #selector(deleteSelected)))
+      menu = KitRegistryMenu.build(RegistryActions.menu("sidebar.project"), bind: { [weak self] id in
+        guard let self else { return nil }
+        switch id {
+        case "project.rename": return .init { self.renameSelected() }
+        case "project.markDone": return .init { self.markSelectedProjectDone() }
+        case "project.cancel": return .init { self.cancelSelectedProject() }
+        case "project.delete": return .init { self.deleteSelected() }
+        default: return nil
+        }
+      }, slot: { [weak self] id in
+        guard let self, id == "moveToAreaDestinations" else { return [] }
+        return self.areaDestinationNodes(for: project)
+      })
     case .filter(_, _, _), .none:
-      menu.addItem(item(String(localized: "New Area…", comment: "SeptaskKit: sidebar context menu"),
-                        #selector(newArea)))
-      menu.addItem(item(String(localized: "New Project…", comment: "SeptaskKit: sidebar context menu"),
-                        #selector(newProjectLoose)))
+      menu = KitRegistryMenu.build(RegistryActions.menu("sidebar.empty")) { [weak self] id in
+        guard let self else { return nil }
+        switch id {
+        case "sidebar.newArea": return .init { self.newArea() }
+        case "sidebar.newProject": return .init { self.newProjectLoose() }
+        default: return nil
+        }
+      }
     }
     menu.popUp(positioning: nil, at: point, in: outlineView)
   }
 
   /// "Move to Area ▸" — No Area, then every area; the current parent is
-  /// checked and inert.
-  private func moveToAreaItem(for project: Project) -> NSMenuItem {
-    let parent = NSMenuItem(title: String(localized: "Move to Area",
-                                          comment: "SeptaskKit: sidebar context menu"),
-                            action: nil, keyEquivalent: "")
-    let submenu = NSMenu()
-    let none = item(String(localized: "No Area", comment: "SeptaskKit: sidebar context menu"),
-                    #selector(moveSelectedProject(_:)))
-    none.representedObject = NSNull()
-    none.state = project.area == nil ? .on : .off
-    submenu.addItem(none)
+  /// checked and inert. The same slot the SwiftUI sidebar fills.
+  private func areaDestinationNodes(for project: Project) -> [RegistryMenuNode] {
     let areas = StructureCache.snapshot(in: context).areas
-    if !areas.isEmpty { submenu.addItem(.separator()) }
+    var nodes: [RegistryMenuNode] = [
+      RegistryMenuEntry.slot(
+        id: "area.none",
+        title: String(localized: "No Area", comment: "SeptaskKit: sidebar context menu"),
+        isOn: project.area == nil,
+        perform: project.area == nil ? nil : { [weak self] in self?.moveProject(project, toArea: nil) }),
+    ]
+    if !areas.isEmpty { nodes.append(.divider(id: "areas.divider")) }
     for area in areas {
-      let entry = item(area.title, #selector(moveSelectedProject(_:)))
-      entry.representedObject = area.id
-      entry.state = project.area == area.id ? .on : .off
-      submenu.addItem(entry)
+      nodes.append(RegistryMenuEntry.slot(
+        id: "area.\(area.id)", title: area.title, isOn: project.area == area.id,
+        perform: project.area == area.id ? nil : { [weak self] in self?.moveProject(project, toArea: area.id) }))
     }
-    parent.submenu = submenu
-    return parent
+    return nodes
   }
 
-  private func item(_ title: String, _ action: Selector) -> NSMenuItem {
-    let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
-    item.target = self
-    return item
+  private func moveProject(_ project: Project, toArea area: String?) {
+    moveProject(project, toArea: area, at: nil, snapshot: StructureCache.snapshot(in: context))
   }
 
   private var selectedNode: Node? {
@@ -1489,13 +1492,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// Context menu ▸ Move to Area — the keyboard-and-pointer twin of dragging
   /// a project onto an area row. `representedObject` is the area id, or
   /// `NSNull` for "No Area".
-  @objc private func moveSelectedProject(_ sender: NSMenuItem) {
-    guard case .project(let project, _) = selectedNode?.content else { return }
-    let target = sender.representedObject as? String
-    guard target != project.area else { return }
-    moveProject(project, toArea: target, at: nil, snapshot: StructureCache.snapshot(in: context))
-  }
-
   /// Matches `SidebarView.projectMenu` and `registry/actions.json` (`sidebar.project`).
   @objc private func markSelectedProjectDone() {
     setSelectedProjectStatus(.done)
