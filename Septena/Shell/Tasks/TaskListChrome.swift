@@ -162,10 +162,20 @@ private struct TaskCardChrome: ViewModifier {
       .background(alignment: .bottom) {
         ZStack(alignment: .bottom) {
           if useLiquidGlass {
-            // Single uniform frosted-glass recipe across `.solo`, `.top`, `.middle`,
-            // and `.bottom` so 1-item and multi-item lists share identical brightness.
+            #if os(iOS)
+            // Translucent frosted glass without per-row live CoreAnimation
+            // backdrop blurs (`shape.fill(.thinMaterial)` on 15+ scrolling rows
+            // stalls ProMotion 120 Hz). Keeps the exact luminous floating-glass
+            // feel over the crisp Header Wash contours at zero blur cost.
+            shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.78 : 0.80))
+            shape.strokeBorder(
+              Color.white.opacity(colorScheme == .dark ? 0.07 : 0.48),
+              lineWidth: 0.5
+            )
+            #else
             shape.fill(.thinMaterial)
             shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.28 : 0.36))
+            #endif
             if isSelected {
               shape.fill(Theme.listSelectionFill)
             }
@@ -185,15 +195,21 @@ private struct TaskCardChrome: ViewModifier {
             shape.strokeBorder(Theme.border, lineWidth: 0.5)
           }
           #endif
+          #if os(macOS)
           if hovered && !isSelected && !isEditing {
             shape.fill(Color.primary.opacity(Theme.pointerHoverOpacity))
           }
+          #endif
           if (position == .top || position == .middle) && !isSelected && !isEditing {
             Rectangle().fill(Theme.border).frame(height: 0.5)
           }
         }
         #if os(iOS)
-        .shadow(color: isEditing ? Color.black.opacity(0.10) : .clear, radius: 12, y: 4)
+        .shadow(
+          color: isEditing ? Color.black.opacity(0.10) : .clear,
+          radius: isEditing ? 12 : 0,
+          y: isEditing ? 4 : 0
+        )
         .overlay {
           if isEditing {
             // Absorb stray taps on empty space inside the open editor card so
@@ -207,7 +223,9 @@ private struct TaskCardChrome: ViewModifier {
       }
       .padding(.horizontal, TaskCardMetrics.margin)
       .padding(.bottom, position.trailingGap)
+      #if os(macOS)
       .onHover { hovered = $0 }
+      #endif
   }
 }
 
