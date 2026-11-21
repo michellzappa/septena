@@ -59,29 +59,30 @@ struct BackfillChoresSheet: View {
 
   private func row(for chore: ChoreItem) -> some View {
     let isDone = doneIDs.contains(chore.id)
-    return Button {
+    let toggle = {
       if isDone {
         checklistMutator.uncompleteChore(id: chore.id, date: date)
       } else {
         checklistMutator.completeChore(id: chore.id, date: date)
       }
       Haptics.tick()
-    } label: {
-      HStack(spacing: 12) {
-        Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
-          .foregroundStyle(isDone ? accent : .secondary)
-          .font(.title3)
-        if let e = chore.emoji, !e.isEmpty {
-          Text(e)
-        }
-        Text(chore.name)
-          .foregroundStyle(.primary)
-          .strikethrough(isDone, color: .secondary)
-        Spacer()
-      }
-      .contentShape(Rectangle())
     }
-    .buttonStyle(.plain)
+    return HStack(spacing: Theme.iconTextGap) {
+      TaskCheckbox(tint: accent, isDone: isDone, onToggle: toggle)
+      Button(action: toggle) {
+        HStack(spacing: 8) {
+          if let e = chore.emoji, !e.isEmpty {
+            Text(e)
+          }
+          Text(chore.name)
+            .foregroundStyle(.primary)
+            .strikethrough(isDone, color: .secondary)
+          Spacer()
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+    }
   }
 
   private func reload() {

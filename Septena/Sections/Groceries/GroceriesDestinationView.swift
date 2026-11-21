@@ -149,14 +149,12 @@ struct GroceriesDestinationView: View {
   private func groceryButton(item: GroceryItem,
                              categoryLabel: String,
                              showCategory: Bool) -> some View {
-    Button { editing = item } label: {
-      GroceryRow(item: item,
-                 categoryLabel: categoryLabel,
-                 accent: accent,
-                 showCategory: showCategory,
-                 onToggle: { toggle(item) })
-    }
-    .buttonStyle(.plain)
+    GroceryRow(item: item,
+               categoryLabel: categoryLabel,
+               accent: accent,
+               showCategory: showCategory,
+               onToggle: { toggle(item) },
+               onEdit: { editing = item })
     .contextMenu {
       Button { editing = item } label: {
         Label("Edit", systemImage: "pencil")
@@ -239,39 +237,37 @@ private struct GroceryRow: View {
   let accent: Color
   let showCategory: Bool
   let onToggle: () -> Void
+  let onEdit: () -> Void
 
   @Environment(\.rowHInset) private var rowHInset
 
   var body: some View {
     HStack(spacing: Theme.iconTextGap) {
-      Button(action: onToggle) {
-        Image(systemName: item.low ? "circle" : "checkmark.circle.fill")
-          .font(.title3)
-          .foregroundStyle(item.low ? Theme.iconMuted : accent)
-          .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
-      }
-      .buttonStyle(.plain)
+      TaskCheckbox(tint: accent, isDone: !item.low, onToggle: onToggle)
 
       // Low items lead with full-ink prominence — they need action.
       // Stocked items stay calm/secondary but fully legible: the filled
       // accent checkmark already signals "in stock," so no strikethrough
       // (which would read as disabled/unavailable — the opposite of true).
-      VStack(alignment: .leading, spacing: 2) {
-        Text(item.name)
-          .font(.septenaTaskTitle)
-          .foregroundStyle(item.low ? Theme.inkPrimary : Theme.inkSecondary)
-        if showCategory, !item.category.isEmpty {
-          Text(categoryLabel)
-            .font(.septenaMeta)
-            .foregroundStyle(Theme.inkSecondary)
+      Button(action: onEdit) {
+        HStack {
+          VStack(alignment: .leading, spacing: 2) {
+            Text(item.name)
+              .font(.septenaTaskTitle)
+              .foregroundStyle(item.low ? Theme.inkPrimary : Theme.inkSecondary)
+            if showCategory, !item.category.isEmpty {
+              Text(categoryLabel)
+                .font(.septenaMeta)
+                .foregroundStyle(Theme.inkSecondary)
+            }
+          }
+          Spacer()
         }
+        .contentShape(Rectangle())
       }
-      Spacer()
+      .buttonStyle(.plain)
     }
     .padding(.horizontal, rowHInset)
     .padding(.vertical, Theme.rowVPadding + 2)
-    // Whole row opens the editor (groceryButton wraps this) — make the
-    // Spacer and trailing area tappable, not just the name text.
-    .contentShape(Rectangle())
   }
 }

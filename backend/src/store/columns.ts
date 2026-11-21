@@ -59,6 +59,10 @@ export const SETTING_VALUES = {
   /// "Pause all agents" (docs/TASK_FACTORY_SPEC.md §10). While true, no
   /// agent claim succeeds and the agent queue reads as empty.
   agentsPaused: z.boolean(),
+  /// "Get started" checklist (Septask): true once dismissed or all steps finished.
+  getStartedDismissed: z.boolean(),
+  /// "Get started" checklist steps completed (step raw IDs).
+  getStartedSteps: z.array(z.string().max(64)).max(32),
 } satisfies Record<string, z.ZodTypeAny>;
 
 export type SettingKey = keyof typeof SETTING_VALUES;

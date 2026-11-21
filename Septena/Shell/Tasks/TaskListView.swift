@@ -766,6 +766,11 @@ struct TaskListView: View {
     .onReceive(NotificationCenter.default.publisher(for: .septenaStructureChanged)) { _ in
       reloadOrDeferWhileEditing(coalescing: true)
     }
+    .onReceive(NotificationCenter.default.publisher(for: .septaskSettingsPulled)) { _ in
+      // Synced notice state (Get started, rolled-in dismissal) arrived from
+      // another device — re-evaluate Today's notices immediately.
+      noticeEpoch += 1
+    }
     // The moment an inline editor / quick-add / composer folds, catch up on any
     // background refresh we held back so the list never reshuffles under a
     // focused title field (the "type one char, lose focus" bug).

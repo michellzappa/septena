@@ -1728,6 +1728,15 @@ struct AppSettings: Codable {
   /// holds on all of them. Nil → not paused.
   var agentsPaused: Bool? = nil
 
+  /// "Get started" checklist (Septask): true once dismissed or every step is
+  /// complete, synced so finishing onboarding on one device hides it on all
+  /// other devices too. Nil → not dismissed.
+  var getStartedDismissed: Bool? = nil
+
+  /// "Get started" checklist steps completed (raw `TaskNoticeStep.ID` values),
+  /// synced across devices so progress carries over. Nil → none recorded.
+  var getStartedSteps: [String]? = nil
+
   /// When the first-run welcome (section picker + chained onboarding) was
   /// completed. The durable, cross-device "this account has been welcomed"
   /// marker: synced so a returning user's *new* device never re-shows the
@@ -1771,8 +1780,13 @@ struct AppSettings: Codable {
     case targets, units, time, theme, eink, nutrition
     case hkSync = "hk_sync"
     case welcomeName = "welcome_name"
+    case supporter
     case morningCutoffHour = "morning_cutoff_hour"
     case afternoonCutoffHour = "afternoon_cutoff_hour"
+    case rolledInDismissedOn = "rolled_in_dismissed_on"
+    case agentsPaused = "agents_paused"
+    case getStartedDismissed = "get_started_dismissed"
+    case getStartedSteps = "get_started_steps"
     case onboardedAt = "onboarded_at"
     case reports
     case nextSkips = "next_skips"

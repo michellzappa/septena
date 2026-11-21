@@ -360,6 +360,42 @@ enum SettingsMirror {
     upsert(settings: settings, context: context, engine: engine)
   }
 
+  // MARK: - "Get started" checklist (Septask)
+
+  /// Synced dismissal flag for the "Get started" checklist. True once dismissed
+  /// or every step is completed on any device.
+  static func getStartedDismissed(context: ModelContext) -> Bool {
+    loadSettings(context: context)?.getStartedDismissed == true
+  }
+
+  /// Mark "Get started" dismissed account-wide so other devices stop showing it.
+  /// Idempotent: a repeat write changes no bytes and pushes nothing.
+  static func dismissGetStarted(context: ModelContext, engine: CKEngine?) {
+    var settings = loadSettings(context: context)
+      ?? AppSettings(sectionOrder: nil, targets: nil, units: nil, time: nil,
+                     theme: nil, eink: nil, nutrition: nil, hkSync: nil)
+    guard settings.getStartedDismissed != true else { return }
+    settings.getStartedDismissed = true
+    upsert(settings: settings, context: context, engine: engine)
+  }
+
+  /// Synced set of completed "Get started" step raw IDs, or `nil` when no
+  /// device has published step progress yet.
+  static func getStartedSteps(context: ModelContext) -> [String]? {
+    loadSettings(context: context)?.getStartedSteps
+  }
+
+  /// Persist the completed "Get started" step raw IDs account-wide.
+  static func setGetStartedSteps(_ steps: [String], context: ModelContext, engine: CKEngine?) {
+    let sorted = Array(Set(steps)).sorted()
+    var settings = loadSettings(context: context)
+      ?? AppSettings(sectionOrder: nil, targets: nil, units: nil, time: nil,
+                     theme: nil, eink: nil, nutrition: nil, hkSync: nil)
+    guard settings.getStartedSteps != sorted else { return }
+    settings.getStartedSteps = sorted
+    upsert(settings: settings, context: context, engine: engine)
+  }
+
   static func upsert(settings: AppSettings,
                      context: ModelContext,
                      engine: CKEngine? = nil) {

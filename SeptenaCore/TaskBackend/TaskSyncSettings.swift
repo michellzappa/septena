@@ -23,7 +23,7 @@ import Foundation
 
 enum SeptaskSyncedSettings {
   static let keys = ["welcomeName", "telemetryLevel", "calendarHiddenTitles", "rolledInDismissedOn", "homeTimezone",
-                     "agentsPaused"]
+                     "agentsPaused", "getStartedDismissed", "getStartedSteps"]
 
   /// The blob. `v1`: the shape is `AppSettings`' own JSON.
   static let storeKey = "septask.syncedSettings.v1"
@@ -64,6 +64,8 @@ enum SeptaskSyncedSettings {
     case "rolledInDismissedOn": return .from(s.rolledInDismissedOn)
     case "homeTimezone": return .from(s.time?.homeTimezone)
     case "agentsPaused": return s.agentsPaused.map { .bool($0) } ?? .null
+    case "getStartedDismissed": return s.getStartedDismissed.map { .bool($0) } ?? .null
+    case "getStartedSteps": return s.getStartedSteps.map { .array($0.map { .string($0) }) } ?? .null
     default: return .null
     }
   }
@@ -94,6 +96,21 @@ enum SeptaskSyncedSettings {
       switch v {
       case .null: s.agentsPaused = nil
       case .bool(let b): s.agentsPaused = b
+      default: return false
+      }
+    case "getStartedDismissed":
+      switch v {
+      case .null: s.getStartedDismissed = nil
+      case .bool(let b): s.getStartedDismissed = b
+      default: return false
+      }
+    case "getStartedSteps":
+      switch v {
+      case .null: s.getStartedSteps = nil
+      case .array(let list):
+        let steps = list.compactMap(\.stringValue)
+        guard steps.count == list.count else { return false }
+        s.getStartedSteps = steps
       default: return false
       }
     case "calendarHiddenTitles":

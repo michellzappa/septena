@@ -540,7 +540,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // SwiftUI window don't post anything (its views refresh themselves), so
     // window-becomes-key covers the cross-window A/B case.
     for name in [Notification.Name.septenaTasksChanged, .septenaStructureChanged,
-                 .septenaDataChanged] {
+                 .septenaDataChanged, .septaskSettingsPulled] {
       observers.append(NotificationCenter.default.addObserver(
         forName: name, object: nil, queue: .main
       ) { [weak self] note in

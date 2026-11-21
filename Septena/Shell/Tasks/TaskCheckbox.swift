@@ -102,9 +102,8 @@ enum TaskRowFlags {
 // MARK: - Checkbox
 
 struct TaskCheckbox: View {
-  @Environment(SectionTheme.self) private var theme
   /// Optional override — used by non-task items (habits/supplements/chores)
-  /// to wear their section accent. `nil` means inherit list tint.
+  /// to tint the celebration pulse ring with their section accent.
   var tint: Color? = nil
   let isDone: Bool
   /// Readiness form (language v2): when true the open box is drawn dashed to
@@ -182,24 +181,69 @@ struct TaskCheckbox: View {
   @State private var bodySquash: CGFloat = 1   // drop: impact squash
   @State private var bodyDip: CGFloat = 0      // tuck: box dips, then recovers
 
+  /// On macOS, use the native system checkbox control for every standard open
+  /// and done state. Fall back to custom drawing only for open cues the system
+  /// checkbox cannot express (dashed proposal / gold Today indicator).
+  private var usesStandardCheckbox: Bool {
+    #if os(macOS)
+    !dashed && (!isToday || isDone)
+    #else
+    false
+    #endif
+  }
+
+  @ViewBuilder private var pulseRings: some View {
+    // Echo ring (habits) — the second, quieter pulse behind the main one.
+    RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
+      .strokeBorder((tint ?? boxFillColor).opacity(echoOpacity), lineWidth: 1.2)
+      .frame(width: Self.boxSize, height: Self.boxSize)
+      .scaleEffect(echoScale)
+    // Main pulse ring — every feel throws exactly one (tuck's drifts
+    // down as it fades). Local and brief on purpose: checkable rows
+    // celebrate at the box, never on the canvas.
+    RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
+      .strokeBorder((ringStroke ?? tint ?? boxFillColor).opacity(ringOpacity), lineWidth: 1.5)
+      .frame(width: Self.boxSize, height: Self.boxSize)
+      .scaleEffect(ringScale)
+      .offset(y: ringDrift)
+  }
+
+  @ViewBuilder private var cornerDotOverlay: some View {
+    // Unread-context corner dot (language v2): a haloed accent dot pinned to
+    // the box's top-right, reading as an "unread" marker on a committed task.
+    if let cornerDot, TaskRowFlags.languageV2 {
+      Circle()
+        .fill(cornerDot)
+        .frame(width: 7, height: 7)
+        .overlay(Circle().stroke(Theme.paperBackground, lineWidth: 1.5))
+        .offset(x: Self.boxSize / 2, y: -Self.boxSize / 2)
+        .allowsHitTesting(false)
+    }
+  }
+
+  #if os(macOS)
+  private var standardMacCheckbox: some View {
+    ZStack {
+      pulseRings
+      Toggle("", isOn: Binding(get: { isDone }, set: { _ in onToggle() }))
+        .toggleStyle(.checkbox)
+        .labelsHidden()
+        .scaleEffect(x: 1, y: bodySquash, anchor: .bottom)
+        .offset(y: bodyDrop + bodyDip)
+      cornerDotOverlay
+    }
+    .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
+    .accessibilityLabel(TaskA11y.checkboxLabel())
+    .accessibilityValue(TaskA11y.checkboxValue(isDone: isDone))
+  }
+  #endif
+
   private var checkboxButton: some View {
     Button(action: onToggle) {
       ZStack {
         // No tenure tint on the box: the row fades instead (`TaskFade`,
         // applied by `CheckableRow`), so the checkbox stays a plain target.
-        // Echo ring (habits) — the second, quieter pulse behind the main one.
-        RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
-          .strokeBorder((tint ?? boxFillColor).opacity(echoOpacity), lineWidth: 1.2)
-          .frame(width: Self.boxSize, height: Self.boxSize)
-          .scaleEffect(echoScale)
-        // Main pulse ring — every feel throws exactly one (tuck's drifts
-        // down as it fades). Local and brief on purpose: checkable rows
-        // celebrate at the box, never on the canvas.
-        RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
-          .strokeBorder((ringStroke ?? tint ?? boxFillColor).opacity(ringOpacity), lineWidth: 1.5)
-          .frame(width: Self.boxSize, height: Self.boxSize)
-          .scaleEffect(ringScale)
-          .offset(y: ringDrift)
+        pulseRings
         // Open chrome — fades out under the arriving fill. Language v2 draws it
         // dashed for an unratified proposal (a provisional, not-yet task).
         RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
@@ -224,8 +268,6 @@ struct TaskCheckbox: View {
             .a11yAnimation(isDone ? Theme.Motion.check : Theme.Motion.quick, value: isDone)
           Image(systemName: "checkmark")
             .scaledFont(size: Self.checkSize, weight: .bold)
-            // NOT `.white` — the fill is adaptive label ink, so a white check
-            // disappears into a white box in dark mode. See `Theme.checkboxCheck`.
             .foregroundStyle(Theme.checkboxCheck)
             .scaleEffect(isDone ? 1 : 0.25)
             .opacity(isDone ? 1 : 0)
@@ -234,15 +276,7 @@ struct TaskCheckbox: View {
         .scaleEffect(x: 1, y: bodySquash, anchor: .bottom)
         .offset(y: bodyDrop + bodyDip)
 
-        // Unread-context corner dot (language v2): a haloed accent dot pinned to
-        // the box's top-right, reading as an "unread" marker on a committed task.
-        if let cornerDot, TaskRowFlags.languageV2 {
-          Circle()
-            .fill(cornerDot)
-            .frame(width: 7, height: 7)
-            .overlay(Circle().stroke(Theme.paperBackground, lineWidth: 1.5))
-            .offset(x: Self.boxSize / 2, y: -Self.boxSize / 2)
-        }
+        cornerDotOverlay
       }
       .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
       #if os(iOS)
@@ -262,8 +296,20 @@ struct TaskCheckbox: View {
     .accessibilityAddTraits(.isToggle)
   }
 
-  var body: some View {
+  @ViewBuilder private var checkboxControl: some View {
+    #if os(macOS)
+    if usesStandardCheckbox {
+      standardMacCheckbox
+    } else {
+      checkboxButton
+    }
+    #else
     checkboxButton
+    #endif
+  }
+
+  var body: some View {
+    checkboxControl
       .offset(x: -Theme.checkboxLeadingNudge)
     // Keep the checkbox OUT of the keyboard focus ring. On macOS a focusable
     // button inside a selected List row gets activated by Space — which silently

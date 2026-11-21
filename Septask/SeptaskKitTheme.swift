@@ -76,13 +76,11 @@ enum SeptaskKitTheme {
 
   /// Theme.checkboxStroke (open box).
   static let checkboxStroke: NSColor = .secondaryLabelColor
-  /// Theme.checkboxFill (done box) — same family, slightly heavier.
-  static let checkboxFill: NSColor = .labelColor.withAlphaComponent(0.78)
-  /// Theme.checkboxCheck — the check glyph inside a done box. NOT white:
-  /// `checkboxFill` is label ink, which is near-white in dark mode, so a white
-  /// check vanished the instant you ticked a row. This flips with the
-  /// appearance alongside the fill.
-  static let checkboxCheck: NSColor = .textBackgroundColor
+  /// Theme.checkboxFill (done box / completion pulse) — dynamic platform accent,
+  /// matching the standard macOS checkbox in both light and dark appearances.
+  static var checkboxFill: NSColor { systemAccentColor }
+  /// Theme.checkboxCheck — crisp white check over the accent fill.
+  static let checkboxCheck: NSColor = .white
   /// Theme.todayAccent — the gold "promoted to Today" cue on the checkbox.
   static let todayAccent = NSColor(Theme.todayAccent)
   /// Theme.overdueRed — late deadlines, platform red.
@@ -90,7 +88,15 @@ enum SeptaskKitTheme {
   /// Theme.noticeWarning — the glyph of a warning notice (`KitNoticeCell`).
   static let noticeWarning = NSColor(Theme.noticeWarning)
   /// Light wash over the card surface for a warning notice's fill.
-  static let noticeWarningWash = NSColor(Theme.noticeWarning).withAlphaComponent(0.12)
+  /// Dynamic provider so `.withAlphaComponent` resolves per-appearance instead
+  /// of freezing to light mode at static init time.
+  static let noticeWarningWash = NSColor(name: nil) { appearance in
+    var resolved = NSColor.systemOrange
+    appearance.performAsCurrentDrawingAppearance {
+      resolved = NSColor(Theme.noticeWarning).withAlphaComponent(0.12)
+    }
+    return resolved
+  }
   /// Theme.inkPrimary.
   static let inkPrimary: NSColor = .labelColor
   /// Theme.inkSecondary.
@@ -113,7 +119,14 @@ enum SeptaskKitTheme {
   static let chipFill = NSColor(Theme.mutedSurface)
   /// Theme.inkPrimary.opacity(0.10) — filled/active elective pill. Matches
   /// SwiftUI's neutral `AttributePill` (a gray wash, never a black slab).
-  static let pillOnFill = NSColor.labelColor.withAlphaComponent(0.10)
+  /// Dynamic provider so `.labelColor.withAlphaComponent` adapts to dark mode.
+  static let pillOnFill = NSColor(name: nil) { appearance in
+    var resolved = NSColor.labelColor
+    appearance.performAsCurrentDrawingAppearance {
+      resolved = NSColor.labelColor.withAlphaComponent(0.10)
+    }
+    return resolved
+  }
   /// Theme.sidebarBackground — the source list's backing.
   static let sidebarBackground = NSColor(Theme.sidebarBackground)
 
