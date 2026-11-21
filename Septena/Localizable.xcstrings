@@ -719,6 +719,48 @@
         }
       }
     },
+    "%lld files" : {
+      "comment" : "Generated from registry surfaces.taskAttributes.attachments.countLabel. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld file"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld files"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld arquivo"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld arquivos"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld habits left today" : {
       "localizations" : {
         "en" : {
@@ -834,6 +876,48 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld projetos"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld tags" : {
+      "comment" : "Generated from registry surfaces.taskAttributes.tags.countLabel. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tag"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tags"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tag"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tags"
                 }
               }
             }
@@ -2779,6 +2863,18 @@
     },
     "Checking iCloud…" : {
 
+    },
+    "Checklist" : {
+      "comment" : "Generated from registry surfaces.taskAttributes.checklist.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checklist"
+          }
+        }
+      }
     },
     "Chest" : {
       "localizations" : {
@@ -8095,6 +8191,10 @@
         }
       }
     },
+    "Open a task or choose Keep to bring it back, or sweep the list to let the rest go." : {
+      "comment" : "Generated from registry surfaces.notices.items.fadedPile.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Open tasks without a date live here." : {
       "comment" : "Generated from registry destinations.destinations.anytime.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -8924,6 +9024,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lembre-se do que tomou a cada dia"
+          }
+        }
+      }
+    },
+    "Remind" : {
+      "comment" : "Generated from registry surfaces.taskAttributes.reminder.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lembrar"
           }
         }
       }
@@ -10595,6 +10707,10 @@
         }
       }
     },
+    "Sweep…" : {
+      "comment" : "Generated from registry surfaces.notices.items.fadedPile.primaryTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Symptoms" : {
 
     },
@@ -10662,6 +10778,18 @@
         }
       }
     },
+    "Tags" : {
+      "comment" : "Generated from registry surfaces.taskAttributes.tags.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tags"
+          }
+        }
+      }
+    },
     "Tags…" : {
       "comment" : "Generated from registry actions.actions.task.tags.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -10669,7 +10797,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Etiquetas…"
+            "value" : "Tags…"
           }
         }
       }
@@ -10895,6 +11023,10 @@
           }
         }
       }
+    },
+    "Tasks without activity for 14 days" : {
+      "comment" : "Generated from registry surfaces.notices.items.fadedPile.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Tasks without activity for 14 days fade out and move to Faded." : {
       "comment" : "Generated from registry settings.rootGroups.lists_root.items.2.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

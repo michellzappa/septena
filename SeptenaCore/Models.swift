@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // Mirror of Septena api/routers/tasks.py — tasks/projects/areas only.
 
@@ -60,6 +61,17 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   var status: TaskStatus
   var created: String?         // YYYY-MM-DD
   var scheduled: String?       // YYYY-MM-DD
+  /// Optional 24-hour wall-clock start time (`HH:MM`, docs/TASK_TIMES_AND_ICAL_SPEC.md).
+  var startTime: String? = nil
+  /// Optional duration in minutes (`5..1440`).
+  var durationMinutes: Int? = nil
+  /// Optional IANA time zone (nil = floating local time).
+  var timeZone: String? = nil
+
+  /// Quiet human-readable time range (`14:00–15:00` or `14:00`), nil when date-only.
+  var timeSlotLabel: String? {
+    TaskTimeSlot.format(startTime: startTime, durationMinutes: durationMinutes)
+  }
   /// Hard date the task is owed by. Things-style: rendering only — the
   /// server unions deadline-today rows into Today.items at view time, no
   /// mutation. Reschedule the deadline forward and the task drops out of
@@ -334,6 +346,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     status: TaskStatus,
     created: String?,
     scheduled: String?,
+    startTime: String? = nil,
+    durationMinutes: Int? = nil,
+    timeZone: String? = nil,
     deadline: String?,
     today: Bool,
     starred: Bool = false,
@@ -369,6 +384,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     self.status = status
     self.created = created
     self.scheduled = scheduled
+    self.startTime = startTime
+    self.durationMinutes = durationMinutes
+    self.timeZone = timeZone
     self.deadline = deadline
     self.today = today
     self.starred = starred
@@ -401,7 +419,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   }
 
   enum CodingKeys: String, CodingKey {
-    case id, title, status, created, scheduled, deadline, today, starred, tags
+    case id, title, status, created, scheduled, startTime, durationMinutes, timeZone, deadline, today, starred, tags
     case todaySetOn = "today_set_on"
     case completedAt = "completed_at"
     case area, project, notes, recurrence, reminder
@@ -424,6 +442,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     status = (try? c.decode(TaskStatus.self, forKey: .status)) ?? .open
     created = try c.decodeIfPresent(String.self, forKey: .created)
     scheduled = try c.decodeIfPresent(String.self, forKey: .scheduled)
+    startTime = try c.decodeIfPresent(String.self, forKey: .startTime)
+    durationMinutes = try c.decodeIfPresent(Int.self, forKey: .durationMinutes)
+    timeZone = try c.decodeIfPresent(String.self, forKey: .timeZone)
     // Prefer the canonical `deadline`; fall back to legacy `due` for old
     // payloads (cached responses, old server builds).
     if let dl = try c.decodeIfPresent(String.self, forKey: .deadline) {
@@ -445,6 +466,59 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     nextOccurrence = try c.decodeIfPresent(String.self, forKey: .nextOccurrence)
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     deletedAt = try c.decodeIfPresent(String.self, forKey: .deletedAt)
+  }
+}
+
+// MARK: - Optional task start/end time helper (docs/TASK_TIMES_AND_ICAL_SPEC.md)
+
+enum TaskTimeSlot {
+  /// Quick duration presets shown behind progressive disclosure.
+  static let quickDurations: [(minutes: Int, label: String)] = [
+    (15, "15m"),
+    (30, "30m"),
+    (60, "1h"),
+    (120, "2h"),
+  ]
+
+  /// Parse `"HH:MM"` into `(hour, minute)`.
+  static func parse(_ hhmm: String?) -> (hour: Int, minute: Int)? {
+    guard let hhmm, hhmm.count == 5 else { return nil }
+    let parts = hhmm.split(separator: ":")
+    guard parts.count == 2,
+          let h = Int(parts[0]), let m = Int(parts[1]),
+          (0...23).contains(h), (0...59).contains(m) else { return nil }
+    return (h, m)
+  }
+
+  /// Format `(hour, minute)` into canonical 24-hour `"HH:MM"`.
+  static func hhmm(hour: Int, minute: Int) -> String {
+    String(format: "%02d:%02d", max(0, min(23, hour)), max(0, min(59, minute)))
+  }
+
+  /// Format `Date`'s local wall-clock hour/minute into `"HH:MM"`.
+  static func hhmm(from date: Date, calendar: Calendar = .current) -> String {
+    let comps = calendar.dateComponents([.hour, .minute], from: date)
+    return hhmm(hour: comps.hour ?? 9, minute: comps.minute ?? 0)
+  }
+
+  /// Convert `"HH:MM"` to a `Date` on today's calendar day for date pickers.
+  static func pickerDate(from hhmm: String?, calendar: Calendar = .current) -> Date {
+    let parsed = parse(hhmm) ?? (9, 0)
+    var comps = calendar.dateComponents([.year, .month, .day], from: Date())
+    comps.hour = parsed.hour
+    comps.minute = parsed.minute
+    comps.second = 0
+    return calendar.date(from: comps) ?? Date()
+  }
+
+  /// Format quiet display range (`"14:00–15:00"` when duration present, else `"14:00"`).
+  static func format(startTime: String?, durationMinutes: Int?) -> String? {
+    guard let (h, m) = parse(startTime) else { return nil }
+    let start = hhmm(hour: h, minute: m)
+    guard let dur = durationMinutes, dur >= 5 else { return start }
+    let total = (h * 60 + m + dur) % (24 * 60)
+    let end = hhmm(hour: total / 60, minute: total % 60)
+    return "\(start)–\(end)"
   }
 }
 
@@ -1257,7 +1331,27 @@ enum SeptenaDate {
     return cal.date(from: c)
   }
 
-  static var today: String { formatter.string(from: Date()) }
+  /// Today's `yyyy-MM-dd`. Row filters read this several times per task on
+  /// every list repaint (`isOnToday`, triage, the row-object build), so the
+  /// string is formatted once per day, not once per read. The memo holds the
+  /// day's bounds in the formatter's own time zone, and a clock that moves
+  /// outside them (midnight, a manual clock change) formats again.
+  static var today: String {
+    let now = Date()
+    if let hit = todayMemo.withLock({ m in
+      m.flatMap { now >= $0.start && now < $0.end ? $0.day : nil }
+    }) { return hit }
+    let day = formatter.string(from: now)
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = formatter.timeZone
+    let start = cal.startOfDay(for: now)
+    let end = cal.date(byAdding: .day, value: 1, to: start) ?? now
+    todayMemo.withLock { $0 = (day, start, end) }
+    return day
+  }
+
+  private static let todayMemo =
+    OSAllocatedUnfairLock<(day: String, start: Date, end: Date)?>(initialState: nil)
 
   /// ISO date `n` calendar days after `iso` (negative = before).
   static func offsetDays(_ n: Int, from iso: String) -> String? {
@@ -1294,6 +1388,10 @@ enum SeptenaDate {
   /// weekday name within the last week, else "MMM d". Returns the raw
   /// string unchanged if it can't be parsed. Single home for the
   /// browse/backfill sheet titles that each carried a copy of this.
+  /// Localized short month + day ("May 14"). One shared formatter: row date
+  /// labels used to build a new `DateFormatter` on every render.
+  static func monthDay(_ d: Date) -> String { monthDayFormatter.string(from: d) }
+
   static func friendlyLabel(_ iso: String) -> String {
     guard let d = parse(iso) else { return iso }
     let cal = Calendar.current

@@ -446,7 +446,11 @@ function validateSurfaces(surfaces, icons, caps) {
   for (const p of surfaces.prompts.items) {
     assert(p.featureId in caps.capabilities, `surfaces.json: prompt ${p.id} unknown featureId "${p.featureId}"`);
   }
+  const attrIds = new Set();
   for (const attr of surfaces.taskAttributes) {
+    assert(!attrIds.has(attr.id), `surfaces.json: duplicate attribute ${attr.id}`);
+    attrIds.add(attr.id);
+    assert(["field", "inline", "popover"].includes(attr.surfaceTier), `surfaces.json: attribute ${attr.id} unknown surfaceTier "${attr.surfaceTier}"`);
     assert(attr.icon in icons.icons, `surfaces.json: attribute ${attr.id} unknown icon "${attr.icon}"`);
     assert(attr.featureId in caps.capabilities, `surfaces.json: attribute ${attr.id} unknown featureId "${attr.featureId}"`);
   }
@@ -1110,11 +1114,48 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  lines.push("/// One task attribute (`registry/surfaces.json` `taskAttributes`): a composer");
+  lines.push("/// pill, an inspector row and a picker title. `surfaceTier` `field` is an");
+  lines.push("/// always-visible field (notes), not a pill. `editOnly` needs a saved task.");
+  lines.push("struct RegistryTaskAttribute: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let label: String");
+  lines.push("  let iconId: String");
+  lines.push("  let sfSymbol: String");
+  lines.push("  let commitContract: String");
+  lines.push("  let surfaceTier: String");
+  lines.push("  let featureId: String");
+  lines.push("  let editOnly: Bool");
+  lines.push("  /// Pill text while the attribute's work runs (Discuss).");
+  lines.push("  let workingLabel: String?");
+  lines.push("  var isPill: Bool { surfaceTier != \"field\" }");
+  lines.push("}");
+  lines.push("");
   lines.push("enum RegistrySurfaces {");
   lines.push(`  static let taskAttributeOrder: [String] = [${surfaces.taskAttributes.map((a) => swiftStr(a.id)).join(", ")}]`);
-  lines.push("  static let taskAttributeLabels: [String: String] = [");
-  for (const a of surfaces.taskAttributes) lines.push(`    ${swiftStr(a.id)}: ${L(a.label, a, "label")},`);
+  lines.push("  static let taskAttributes: [RegistryTaskAttribute] = [");
+  for (const a of surfaces.taskAttributes) {
+    lines.push(`    RegistryTaskAttribute(id: ${swiftStr(a.id)}, label: ${L(a.label, a, "label")}, iconId: ${swiftStr(a.icon)}, sfSymbol: ${swiftStr(icons.icons[a.icon].sfSymbol)}, commitContract: ${swiftStr(a.commitContract)}, surfaceTier: ${swiftStr(a.surfaceTier)}, featureId: ${swiftStr(a.featureId)}, editOnly: ${a.editOnly === true}, workingLabel: ${LOpt(a.workingLabel, a, "workingLabel")}),`);
+  }
   lines.push("  ]");
+  lines.push("  /// The pills, in rail order (every attribute except fields).");
+  lines.push("  static let taskAttributePills: [RegistryTaskAttribute] = taskAttributes.filter(\\.isPill)");
+  lines.push("  static let taskAttributeLabels: [String: String] = Dictionary(uniqueKeysWithValues: taskAttributes.map { ($0.id, $0.label) })");
+  lines.push("  /// The attribute with `id`. Traps on an unknown id: the ids are a closed set.");
+  lines.push("  static func taskAttribute(_ id: String) -> RegistryTaskAttribute {");
+  lines.push("    guard let a = taskAttributes.first(where: { $0.id == id }) else { preconditionFailure(\"unknown task attribute \\(id)\") }");
+  lines.push("    return a");
+  lines.push("  }");
+  lines.push("  /// Count text for a pill value (`countLabel`), or nil when the attribute has none.");
+  lines.push("  static func taskAttributeCount(_ id: String, count: Int) -> String? {");
+  lines.push("    switch id {");
+  for (const a of surfaces.taskAttributes) {
+    if (a.countLabel === undefined) continue;
+    lines.push(`    case ${swiftStr(a.id)}: return ${L10N.swiftTemplate(BY_KEY, tmplKey(a.countLabel, a, "countLabel")).body}`);
+  }
+  lines.push("    default: return nil");
+  lines.push("    }");
+  lines.push("  }");
   lines.push("}");
   lines.push("");
 

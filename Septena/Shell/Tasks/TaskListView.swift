@@ -1171,16 +1171,6 @@ struct TaskListView: View {
     draftEditIds = draftEditIds.filter { $0 == open }
   }
 
-  /// Open the next new task after Return saved one, in the slot the saved one
-  /// was captured in (a Today area / project section, else the list default).
-  private func continueCreating(in target: QuickAddGroupTarget?) {
-    switch target {
-    case .area(let id)?:    startCreate(areaId: id)
-    case .project(let id)?: startCreate(projectId: id)
-    case .inbox?, nil:      openContextualQuickAdd()
-    }
-  }
-
   /// External "+" / ⌘N trigger. On iOS, tapping "+" while an inline editor is
   /// already open closes that editor instead of jumping into a new editor mode.
   private func handleExternalCreateTrigger() {
@@ -2107,16 +2097,15 @@ struct TaskListView: View {
         noticeStepRows(notice.steps)
       }
     } else if filter == .faded, !visibleItems.isEmpty {
+      let pile = TaskNotices.fadedPile
       TaskListNotice(
-        kind: .info,
-        symbol: "circle.dashed",
-        title: Text(String(localized: "Tasks without activity for 14 days",
-                           comment: "Faded pile top notice title")),
-        detail: Text(String(localized: "Open a task or choose Keep to bring it back, or sweep the list to let the rest go.",
-                            comment: "Faded pile top notice detail")),
+        kind: pile.kind,
+        symbol: pile.symbol,
+        title: Text(pile.title),
+        detail: pile.detail.map { Text($0) },
         onDismiss: nil
       ) {
-        Button(String(localized: "Sweep…", comment: "Faded pile sweep action")) {
+        Button(pile.primaryTitle ?? "") {
           sweepSheetTasks = visibleItems
         }
         .buttonStyle(.bordered)
@@ -2204,7 +2193,7 @@ struct TaskListView: View {
   @ViewBuilder
   private func noticeAction(_ notice: TaskNotice) -> some View {
     if notice.id == .weeklySweep {
-      Button(notice.primaryTitle ?? String(localized: "Sweep", comment: "Weekly sweep button")) {
+      Button(notice.primaryTitle ?? "") {
         let candidates = TaskNotices.sweepCandidates(context: modelContext)
         if !candidates.isEmpty { sweepSheetTasks = candidates }
       }
@@ -3561,11 +3550,7 @@ struct TaskListView: View {
   /// scroll), on a neutral highlighted card. Folding it (Return, opening another
   /// row, leaving the list) autosaves via the card's `.onDisappear`.
   private func expandedEditorRow(_ task: SeptenaTask) -> some View {
-    // The capture slot this draft was opened in, read now (at render), because
-    // saving it clears `quickAddGroupTarget` before the chain can reuse it.
-    let captureTarget = quickAddGroupTarget
-    let isDraft = draftEditIds.contains(task.id)
-    return TaskComposerCard(
+    TaskComposerCard(
       mode: .edit(task),
       areas: areas,
       projects: projects,
@@ -3603,10 +3588,7 @@ struct TaskListView: View {
         guard draftEditIds.contains(task.id) else { return }
         draftEditIds.remove(task.id)
         purgeDraftIfEmpty(id: task.id)
-      },
-      // Return on a titled NEW task: it is already saved; open the next new
-      // task in the same slot (Things-style capture chain).
-      onSubmitNew: isDraft ? { continueCreating(in: captureTarget) } : nil
+      }
     )
     .frame(maxWidth: .infinity, alignment: .leading)
     // No own card or screen margin: the surrounding `TaskCardChrome` slice paints
@@ -5152,8 +5134,10 @@ struct TaskListView: View {
     // we're still inside applyDidFinishBatch — CKSyncEngine asserts.
     // The mirror is already up to date by the time the notification
     // fires, so a plain re-read is correct.
+    // Today and its triage band share one fetch of the open rows.
+    let todayLists = filter == .today ? LocalCache.todayAndTriage(in: modelContext) : nil
     let outcome = model.merge(prior: items,
-                             fresh: localTasks(),
+                             fresh: todayLists?.today ?? localTasks(),
                              context: modelContext,
                              animateArrivals: loadedFilters.contains(filter),
                              ownCreations: ownCreateExclusions(),
@@ -5176,7 +5160,7 @@ struct TaskListView: View {
       // completed row — same preservation `items` gets above.
       let triageOutcome = model.merge(
         prior: triageStorage,
-        fresh: LocalCache.tasks(in: modelContext, filter: .triage),
+        fresh: todayLists?.triage ?? LocalCache.tasks(in: modelContext, filter: .triage),
         context: modelContext,
         animateArrivals: loadedFilters.contains(filter),
         ownCreations: ownCreateExclusions(),

@@ -17,6 +17,9 @@ export interface TaskOut {
   starred?: boolean;
   tags?: string[];
   scheduled?: string;
+  startTime?: string;
+  durationMinutes?: number;
+  timeZone?: string;
   deadline?: string;
   area?: string;
   project?: string;

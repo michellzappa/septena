@@ -35,6 +35,7 @@
   "Cancel Tasks": "Cancelar tarefas",
   "Carambola": "Carambola",
   "Caustic Glass": "Vidro cáustico",
+  "Checklist": "Checklist",
   "Classic Window": "Janela clássica",
   "Claude can take a task, ask you a question, and hand back the result.": "O Claude pode pegar uma tarefa, fazer uma pergunta e devolver o resultado.",
   "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.": "O Claude lê e altera suas tarefas pela sua conta Septena. Você decide em quais tarefas ele trabalha.",
@@ -201,6 +202,7 @@
   "Quick Entry": "Entrada rápida",
   "Quick Find…": "Busca rápida…",
   "Recently Deleted": "Apagadas recentemente",
+  "Remind": "Lembrar",
   "Reminders": "Lembretes",
   "Reminder…": "Lembrete…",
   "Remove Star": "Remover estrela",
@@ -253,7 +255,8 @@
   "Sync & storage diagnostics": "Diagnóstico de sincronização e armazenamento",
   "Syncing…": "Sincronizando…",
   "Tactile": "Tátil",
-  "Tags…": "Etiquetas…",
+  "Tags": "Tags",
+  "Tags…": "Tags…",
   "Tamarillo": "Tamarilho",
   "Tap + to add a task.": "Toque em + para adicionar uma tarefa.",
   "Task": "Tarefa",
@@ -263,6 +266,7 @@
   "Tasks without activity for 14 days fade out and move to Faded.": "Tarefas sem atividade por 14 dias esmaecem e vão para Esmaecidas.",
   "Text Size": "Tamanho do texto",
   "The tasks move to Recently Deleted. You can undo this.": "As tarefas vão para Apagadas recentemente. Você pode desfazer.",
+  "Thinking…": "Pensando…",
   "This account is already set up. Your tasks are syncing to this device.": "Esta conta já está configurada. Suas tarefas estão sincronizando com este dispositivo.",
   "Thorough": "Minucioso",
   "Three": "Três",
@@ -303,9 +307,17 @@
   "Your tasks stay in step on iPhone, iPad and Mac.": "Suas tarefas ficam em sincronia no iPhone, iPad e Mac.",
   "Your tasks, areas, projects, and conversations are erased from the server and this device.": "Suas tarefas, áreas, projetos e conversas são apagados do servidor e deste dispositivo.",
   "Yuzu": "Yuzu",
+  "{count} files": {
+    "one": "{count} arquivo",
+    "other": "{count} arquivos"
+  },
   "{count} projects": {
     "one": "1 projeto",
     "other": "{count} projetos"
+  },
+  "{count} tags": {
+    "one": "{count} tag",
+    "other": "{count} tags"
   },
   "{count} tasks": {
     "one": "1 tarefa",

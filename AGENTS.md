@@ -446,6 +446,18 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   getter and the setter. Enforced by the `model-reserved-name` lint rule
   (entity, entityName, objectID, description, isDeleted,
   managedObjectContext, isFault, hasChanges).
+- **Never build every task to read a few.** `LocalCache.allTasks` /
+  `liveTasks(in:)` build a row object for each live task, logbook included,
+  and each one decodes JSON. Every task change makes the open list, both
+  sidebars and the area page read the store again on the main actor, so a
+  whole-store read there runs on every tap and grows with the user's
+  history. Pick by id with `liveTasks(ids:in:)`. Count from
+  `liveAggregateEntities`. Read rings through `projectCompletionRatios`
+  (memoized). Fetch Today and its band once with `todayAndTriage`. Never read
+  the store in a view `body` or `init`. The full rules are in
+  `docs/LAUNCH_PERF.md` ("Interaction performance"). The id-lookup form is
+  enforced by the `whole-store-id-lookup` lint rule. The rest is not
+  greppable, so this note is the guardrail.
 - **A deep SwiftUI view type overflows the iOS main-thread stack at launch.**
   The crash is `EXC_BAD_ACCESS` in `swift_getTypeByMangledName`, before any
   view draws. `TaskListView.taskListRows` hit it: a large `@ViewBuilder`

@@ -227,6 +227,12 @@
       "tokens.textures.causticGlass.name"
     ]
   },
+  "Checklist": {
+    "text": "Checklist",
+    "paths": [
+      "surfaces.taskAttributes.checklist.label"
+    ]
+  },
   "Classic Window": {
     "text": "Classic Window",
     "paths": [
@@ -1117,6 +1123,12 @@
       "surfaces.firstRun.steps.done.primary.title"
     ]
   },
+  "Open a task or choose Keep to bring it back, or sweep the list to let the rest go.": {
+    "text": "Open a task or choose Keep to bring it back, or sweep the list to let the rest go.",
+    "paths": [
+      "surfaces.notices.items.fadedPile.detail"
+    ]
+  },
   "Open tasks without a date live here.": {
     "text": "Open tasks without a date live here.",
     "paths": [
@@ -1244,6 +1256,12 @@
     "text": "Recently Deleted",
     "paths": [
       "destinations.destinations.recentlyDeleted.title"
+    ]
+  },
+  "Remind": {
+    "text": "Remind",
+    "paths": [
+      "surfaces.taskAttributes.reminder.label"
     ]
   },
   "Reminders": {
@@ -1504,7 +1522,8 @@
   "Star": {
     "text": "Star",
     "paths": [
-      "actions.actions.task.toggleStar.addTitle"
+      "actions.actions.task.toggleStar.addTitle",
+      "surfaces.taskAttributes.star.label"
     ]
   },
   "Star important tasks to keep them one tap away.": {
@@ -1549,6 +1568,12 @@
       "surfaces.notices.items.weeklySweep.primaryTitle"
     ]
   },
+  "Sweep…": {
+    "text": "Sweep…",
+    "paths": [
+      "surfaces.notices.items.fadedPile.primaryTitle"
+    ]
+  },
   "Sync & storage diagnostics": {
     "text": "Sync & storage diagnostics",
     "paths": [
@@ -1565,6 +1590,12 @@
     "text": "Tactile",
     "paths": [
       "tokens.textures.washiPaper.tag"
+    ]
+  },
+  "Tags": {
+    "text": "Tags",
+    "paths": [
+      "surfaces.taskAttributes.tags.label"
     ]
   },
   "Tags…": {
@@ -1609,6 +1640,12 @@
       "destinations.destinations.upcoming.emptyState.detail"
     ]
   },
+  "Tasks without activity for 14 days": {
+    "text": "Tasks without activity for 14 days",
+    "paths": [
+      "surfaces.notices.items.fadedPile.title"
+    ]
+  },
   "Tasks without activity for 14 days fade out and move to Faded.": {
     "text": "Tasks without activity for 14 days fade out and move to Faded.",
     "paths": [
@@ -1628,6 +1665,12 @@
       "surfaces.prompts.items.deleteArea.variants.tasksOnly.message",
       "surfaces.prompts.items.deleteArea.variants.projectsAndTasks.message",
       "surfaces.prompts.items.deleteProject.variants.withTasks.message"
+    ]
+  },
+  "Thinking…": {
+    "text": "Thinking…",
+    "paths": [
+      "surfaces.taskAttributes.discuss.workingLabel"
     ]
   },
   "This account is already set up. Your tasks are syncing to this device.": {
@@ -1658,8 +1701,7 @@
     "text": "Today",
     "paths": [
       "destinations.destinations.today.title",
-      "actions.actions.task.toggleToday.shortTitle",
-      "surfaces.taskAttributes.today.label"
+      "actions.actions.task.toggleToday.shortTitle"
     ]
   },
   "Today shows what to do now. Anything you skipped stays on the Get started list.": {
@@ -1874,6 +1916,18 @@
       "tokens.fruitAccents.yuzu.name"
     ]
   },
+  "{count} files": {
+    "forms": {
+      "one": "{count} file",
+      "other": "{count} files"
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.taskAttributes.attachments.countLabel"
+    ]
+  },
   "{count} projects": {
     "forms": {
       "one": "1 project",
@@ -1884,6 +1938,18 @@
     ],
     "paths": [
       "surfaces.prompts.countPhrases.projects.label"
+    ]
+  },
+  "{count} tags": {
+    "forms": {
+      "one": "{count} tag",
+      "other": "{count} tags"
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.taskAttributes.tags.countLabel"
     ]
   },
   "{count} tasks": {

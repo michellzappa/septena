@@ -4,6 +4,7 @@
     "id": "^[A-Za-z0-9._:-]{1,128}$",
     "clientOpId": "^[A-Za-z0-9_-]{8,64}$",
     "day": "^\\d{4}-\\d{2}-\\d{2}$",
+    "time24": "^([01]\\d|2[0-3]):[0-5]\\d$",
     "stamp": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}"
   },
   "limits": {
@@ -71,6 +72,9 @@
         "project": { "kind": "text", "format": "id", "nullable": true },
         "created": { "kind": "text", "format": "day", "nullable": true },
         "scheduled": { "kind": "text", "format": "day", "nullable": true },
+        "startTime": { "kind": "text", "format": "time24", "max": 5, "nullable": true },
+        "durationMinutes": { "kind": "int", "min": 5, "max": 1440, "nullable": true },
+        "timeZone": { "kind": "text", "max": 64, "nullable": true },
         "deadline": { "kind": "text", "format": "day", "nullable": true },
         "today": { "kind": "bool", "default": 0 },
         "starred": { "kind": "bool", "default": 0 },

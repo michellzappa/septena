@@ -206,6 +206,7 @@ targets:
     platform: iOS
     sources:
       - path: ShareExtension/ShareViewController.swift
+      - path: ShareExtension/PrivacyInfo.xcprivacy
       - path: SeptenaCore/SharedTaskCapture.swift
     info:
       path: ShareExtension/SeptaskShare-Info.plist

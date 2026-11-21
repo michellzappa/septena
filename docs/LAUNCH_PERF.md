@@ -134,3 +134,52 @@ signpost with its time since process start.
 |---|---|---|---|---|---|---|---|
 | | | iPhone Air | | | | | baseline before #81 |
 | | | iPhone Air | | | | | after #81 |
+
+## Interaction performance (after launch)
+
+Target: a tap (complete, move, reschedule, reorder) draws its result in the
+next frame, like Things. Each task change posts `.septenaTasksChanged`. Then
+the open list, the sidebar, the area page and the Mac shell each read the
+store again on the main actor. So the cost of one tap is the sum of those
+reads. Before `77c565d2`, most of them built a row object (`SeptenaTask`) for
+every live task, logbook included. Each row object decodes the task's
+conversation and recurrence JSON. The cost grew with the user's history.
+
+### Rules
+
+- **Pick tasks by id with `LocalCache.liveTasks(ids:in:)`.** Never call
+  `allTasks` / `liveTasks(in:)` and then filter by id. Undo snapshots
+  (`TaskUndo`, `TaskRowActions`), the attribute bar, a Mac move and a sidebar
+  drop run on every gesture. The `whole-store-id-lookup` lint rule enforces
+  this.
+- **Count from entities, not row objects.** Badges and roll-ups read
+  `LocalCache.liveAggregateEntities(in:)` (the same rows as `liveTasks`). Read
+  the raw column before a JSON getter: `conversationJSON != nil` before
+  `conversation`, `recurrenceUnit != nil` before `recurrence`.
+- **Project rings come from `LocalCache.projectCompletionRatios`.**
+  `ProjectProgressCache` memoizes the result until the next task, structure
+  or data notification. Its observer runs on the posting thread, so the cache
+  is stale for no reader. The aggregate fetches three columns only
+  (`propertiesToFetch`).
+- **Today and its triage band come from `LocalCache.todayAndTriage(in:)`,**
+  one fetch of the open rows. The Mac "done today" block reads
+  `LocalCache.tasksCompleted(onDay:in:)`, which pages the logbook
+  newest-first and stops at the previous day.
+- **No store read inside a view `body` or a view `init`.** SwiftUI runs both
+  on every parent render. Read in `load()` into `@State`, or through a
+  process-wide memo (`StructureCache`, `ProjectProgressCache`,
+  `SidebarSeed`).
+- **No `DateFormatter()` per call.** Use a static formatter
+  (`SeptenaDate.monthDay`, `SeptenaDate.today`, which formats once a day).
+- **Decoded conversations are cached by JSON text** (`TaskConvoDecodeCache`).
+  An edit is a new key, so the cache never returns a stale decode.
+
+### Not done yet
+
+- Store reads still run on the main actor. A background `ModelContext` that
+  builds the rows, with the main actor only applying them, is the next step.
+  Measure first: add signposts around `TaskListView.performLoad` and
+  `SeptaskKitTaskListController.reload`, then compare one Instruments run on
+  real data before and after.
+- `TaskReads.dashboardStats` and the sidebar roll-up each scan every live
+  entity once per change. They could share one pass.

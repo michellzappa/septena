@@ -23,11 +23,11 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let tagsButton = NSButton()
   private let addChecklistButton = NSButton()
   private let checklistLabel = NSTextField(labelWithString:
-    String(localized: "Checklist", comment: "SeptaskKit: inspector section"))
+    RegistrySurfaces.taskAttribute("checklist").label)
   private let checklistView = KitChecklistView()
   private let attachFileButton = NSButton()
   private let attachmentsLabel = NSTextField(labelWithString:
-    String(localized: "Attachments", comment: "SeptaskKit: inspector attachments section"))
+    RegistrySurfaces.taskAttribute("attachments").label)
   private let attachmentsView = KitAttachmentsView()
   private let listLabel = NSTextField(labelWithString: "")
   private let placeholder = NSTextField(labelWithString: String(localized: "No Selection",
@@ -101,8 +101,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       fontSize: SeptaskKitTheme.notesFontSize)
     notesScroll.documentView = notesView
 
-    let notesLabel = NSTextField(labelWithString: String(localized: "Notes",
-                                                         comment: "SeptaskKit: inspector field"))
+    let notesLabel = NSTextField(labelWithString: RegistrySurfaces.taskAttribute("notes").label)
     notesLabel.font = SeptaskKitTheme.chip
     notesLabel.textColor = SeptaskKitTheme.iconMuted
 
@@ -433,25 +432,23 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// The dates/list/repeat controls — safe to resync on every re-show,
   /// same-task or not, since nothing here is a live text edit in progress.
   private func refreshReadOnlyFields(_ next: SeptenaTask) {
-    let when: String = if next.today {
+    let whenBase: String = if next.today {
       String(localized: "Today", comment: "Smart list title")
     } else if let scheduled = next.scheduled {
       KitDayFormat.display(scheduled)
     } else {
       String(localized: "Anytime", comment: "Smart list title")
     }
-    whenButton.title = String(localized: "When: \(when)",
-                              comment: "SeptaskKit: inspector when field")
+    let when = next.timeSlotLabel.map { "\(whenBase) · \($0)" } ?? whenBase
+    whenButton.title = Self.field("when", when)
     let deadlineValue = next.deadline.map(KitDayFormat.display)
       ?? String(localized: "None", comment: "No deadline")
-    deadlineButton.title = String(localized: "Deadline: \(deadlineValue)",
-                                  comment: "SeptaskKit: inspector deadline field")
+    deadlineButton.title = Self.field("deadline", deadlineValue)
     if let badge = next.reminder?.badgeText() {
-      reminderButton.title = String(localized: "Reminder: \(badge.text)",
-                                    comment: "SeptaskKit: inspector reminder field")
+      reminderButton.title = Self.field("reminder", badge.text)
     } else {
-      reminderButton.title = String(localized: "Add Reminder…",
-                                    comment: "SeptaskKit: inspector add reminder")
+      reminderButton.title = RegistryActions.alternateTitles["task.reminder"]?["addTitle"]
+        ?? RegistrySurfaces.taskAttribute("reminder").label
     }
     listLabel.stringValue = listDescription(for: next)
 
@@ -461,16 +458,22 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
         : ""
       return "\(rule.shortLabel)\(paused)"
     } ?? String(localized: "None", comment: "No repeat")
-    repeatButton.title = String(localized: "Repeat: \(repeatValue)",
-                                comment: "SeptaskKit: inspector repeat field")
+    repeatButton.title = Self.field("repeat", repeatValue)
+    let starTitles = RegistryActions.alternateTitles["task.toggleStar"] ?? [:]
+    let starLabel = RegistrySurfaces.taskAttribute("star").label
     starButton.title = next.starred
-      ? String(localized: "Starred ★", comment: "SeptaskKit: inspector starred active")
-      : String(localized: "Star", comment: "SeptaskKit: inspector star button")
+      ? starTitles["removeTitle"] ?? starLabel
+      : starTitles["addTitle"] ?? starLabel
     let resolvedTags = LocalCache.resolvedTags(for: next, tagsByID: LocalCache.tagsByID(in: context))
     tagsButton.title = resolvedTags.isEmpty
       ? String(localized: "Add Tags…", comment: "SeptaskKit: inspector add tags")
-      : String(localized: "Tags: \(resolvedTags.map(\.name).joined(separator: ", "))",
-               comment: "SeptaskKit: inspector tags field")
+      : Self.field("tags", resolvedTags.map(\.name).joined(separator: ", "))
+  }
+
+  /// "Label: value" for an inspector row, the label from the registry's
+  /// `taskAttributes` (ADR 0020) so it matches the composer pill.
+  private static func field(_ id: String, _ value: String) -> String {
+    "\(RegistrySurfaces.taskAttribute(id).label): \(value)"
   }
 
   /// Show or hide the conversation section. Hiding the LABEL too is the point:
@@ -747,8 +750,28 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     case .deadline: KitDayFormat.date(fromWire: current.deadline)
     }
 
-    SeptaskKitDatePopover.present(kind: kind, initial: initial,
-                                  relativeTo: button.bounds, of: button) { [weak self] date, today in
+    SeptaskKitDatePopover.present(
+      kind: kind,
+      initial: initial,
+      initialStartTime: kind == .when ? current.startTime : nil,
+      initialDurationMinutes: kind == .when ? current.durationMinutes : nil,
+      relativeTo: button.bounds,
+      of: button,
+      onTimeSlotChange: kind == .when ? { [weak self] start, duration in
+        guard let self else { return }
+        let live = LocalCache.task(id: current.id, in: self.context) ?? current
+        let before = [TaskUndo.ScheduleSnapshot(live)]
+        self.mutator.setTimeSlot(id: current.id, startTime: start, durationMinutes: duration)
+        if start != nil, !live.today, live.scheduled == nil {
+          self.mutator.moveToToday(id: current.id)
+        }
+        TaskUndo.recordScheduleChange(
+          name: String(localized: "Change Time", comment: "SeptaskKit: undo action"),
+          before: before, context: self.context, mutator: self.mutator)
+        NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+        self.refresh()
+      } : nil
+    ) { [weak self] date, today in
       guard let self else { return }
       // Same shared stack as the list's own date popover — an inspector edit
       // has to be as undoable as the ⌘S one, or ⌘Z means different things on

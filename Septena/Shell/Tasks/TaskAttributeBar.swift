@@ -1,8 +1,8 @@
 import SwiftUI
 
 // The composer's elective-pill rail — a single row of circular icon buttons
-// (When / Deadline / Repeat / List / Attachments / Discuss) under the title &
-// notes — and the inline panels a button expands into. Split out of
+// under the title & notes, in the registry's `taskAttributes` order — and the
+// inline panels a button expands into. Split out of
 // TaskComposer.swift.
 //
 // `TaskAttributeBar` is the entry point; the pill and the three inline panels
@@ -35,51 +35,50 @@ struct TaskAttributeBar: View {
   /// Written whenever `showsDiscuss` changes so the composer can Tab to the pill.
   @Binding var discussVisible: Bool
 
-  /// The electives, in rail order. Each is fully described by the enum (icon /
-  /// label / how it presents); per-attribute *values* are derived from the draft
-  /// in `value(for:)` / `isSet(_:)`, and each editor lives in its own panel. So
-  /// every pill is wired identically — one `ForEach`, one `select(_:)` — and the
-  /// rail grows by adding a case, not another hand-written call.
-  enum Attribute: Identifiable {
-    case when, deadline, reminder, repeatRule, star, list, tags, checklist, attachments
-    /// Edit-mode AI kickoff — rendered separately, not part of `draftCases`.
+  /// The electives. Order, label and icon come from the registry
+  /// (`registry/surfaces.json` `taskAttributes`, ADR 0020) so the AppKit
+  /// composer and every other client show the same rail; per-attribute
+  /// *values* are derived from the draft in `value(for:)` / `isSet(_:)`, and
+  /// each editor lives in its own panel. So every pill is wired identically:
+  /// one `ForEach`, one `select(_:)`. The raw value is the registry id.
+  enum Attribute: String, Identifiable {
+    case when, deadline, reminder, repeatRule = "repeat", star, list, tags, checklist, attachments
+    /// Edit-mode AI kickoff — shown only before a conversation exists.
     case discuss
     var id: Self { self }
 
-    /// Scheduling / filing electives — the `ForEach` rail.
-    static let draftCases: [Attribute] = [.when, .deadline, .reminder, .repeatRule, .star, .list]
+    private var registry: RegistryTaskAttribute { RegistrySurfaces.taskAttribute(rawValue) }
 
-    var icon: String {
-      switch self {
-      case .when:       "calendar"
-      case .deadline:   "flag"
-      case .reminder:   "bell"
-      case .repeatRule: "repeat"
-      case .star:       "star"
-      case .list:       "folder"
-      case .tags:       "tag"
-      case .checklist:  "checklist"
-      case .attachments:"paperclip"
-      case .discuss:    "bubble.left.and.bubble.right"
-      }
-    }
-    var label: String {
-      switch self {
-      case .when:       "When"
-      case .deadline:   "Deadline"
-      case .reminder:   "Remind"
-      case .repeatRule: "Repeat"
-      case .star:       "Star"
-      case .list:       "List"
-      case .tags:       "Tags"
-      case .checklist:  "Checklist"
-      case .attachments:"Attachments"
-      case .discuss:    "Discuss"
-      }
-    }
+    /// Every pill, in registry rail order.
+    static let rail: [Attribute] = RegistrySurfaces.taskAttributePills.compactMap { Attribute(rawValue: $0.id) }
+    /// The pills a draft without a saved task can use (registry `editOnly` false).
+    static let draftCases: [Attribute] = rail.filter { !$0.editOnly }
+
+    var icon: String { registry.sfSymbol }
+    var label: String { registry.label }
+    /// Needs a saved task (tags, checklist, attachments, discuss).
+    var editOnly: Bool { registry.editOnly }
     /// List opens a sheet — a rich, searchable area/project picker reused across
     /// the Tasks surfaces. Every other pill expands an inline panel under the rail.
     var presentsSheet: Bool { self == .list }
+  }
+
+  /// Edit-only pill values, read once per render from the live task.
+  private struct EditOnlyState {
+    let tagNames: [String]
+    let stepsDone: Int
+    let stepsTotal: Int
+    let attachments: Int
+
+    @MainActor init(task: SeptenaTask) {
+      let ctx = LocalStore.shared.container.mainContext
+      let live = LocalCache.liveTasks(ids: [task.id], in: ctx).first ?? task
+      tagNames = LocalCache.resolvedTags(for: live, tagsByID: LocalCache.tagsByID(in: ctx)).map(\.name)
+      let steps = LocalCache.checklistItems(forTaskID: task.id, in: ctx)
+      stepsDone = steps.filter(\.checked).count
+      stepsTotal = steps.count
+      attachments = SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: task.id)
+    }
   }
 
   /// The currently expanded inline pill (never `.list`, which presents a sheet).
@@ -110,56 +109,18 @@ struct TaskAttributeBar: View {
       // on one row even on compact iPhone widths. "Today" lives inside the When
       // control rather than duplicating the rail.
       HStack(spacing: 8) {
-        ForEach(Attribute.draftCases) { attr in
-          AttributePill(icon: attr.icon, label: attr.label,
-                        value: value(for: attr), isSet: isSet(attr),
-                        isActive: expanded == attr, isFocused: focus == .pill(attr),
-                        accent: accent, neutral: neutral) { select(attr) }
-            .focused($focus, equals: .pill(attr))
-        }
-        if let task = discussTask {
-          let ctx = LocalStore.shared.container.mainContext
-          let liveTask = LocalCache.allTasks(in: ctx).first(where: { $0.id == task.id }) ?? task
-          let taskTags = LocalCache.resolvedTags(for: liveTask, tagsByID: LocalCache.tagsByID(in: ctx))
-          let tagValue: String? = taskTags.isEmpty
-            ? nil
-            : (taskTags.count == 1 ? taskTags[0].name : "\(taskTags.count) tags")
-          AttributePill(icon: Attribute.tags.icon, label: Attribute.tags.label,
-                        value: tagValue,
-                        isSet: !taskTags.isEmpty, isActive: expanded == .tags,
-                        isFocused: focus == .pill(.tags), accent: accent, neutral: neutral) {
-            select(.tags)
+        let edit = discussTask.map(EditOnlyState.init(task:))
+        ForEach(Attribute.rail) { attr in
+          if shows(attr) {
+            AttributePill(icon: attr.icon, label: attr.label,
+                          value: value(for: attr, edit: edit), isSet: isSet(attr, edit: edit),
+                          isActive: attr != .discuss && expanded == attr,
+                          isLoading: attr == .discuss && discussWorking,
+                          isFocused: focus == .pill(attr),
+                          accent: accent, neutral: neutral) { select(attr) }
+              .focused($focus, equals: .pill(attr))
+              .disabled(attr == .discuss && discussWorking)
           }
-          .focused($focus, equals: .pill(.tags))
-
-          let steps = LocalCache.checklistItems(forTaskID: task.id, in: ctx)
-          let doneSteps = steps.filter(\.checked).count
-          AttributePill(icon: Attribute.checklist.icon, label: Attribute.checklist.label,
-                        value: steps.isEmpty ? nil : "\(doneSteps)/\(steps.count)",
-                        isSet: !steps.isEmpty, isActive: expanded == .checklist,
-                        isFocused: focus == .pill(.checklist), accent: accent, neutral: neutral) {
-            select(.checklist)
-          }
-          .focused($focus, equals: .pill(.checklist))
-
-          let count = SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: task.id)
-          AttributePill(icon: Attribute.attachments.icon, label: Attribute.attachments.label,
-                        value: count == 0 ? nil : "\(count) file\(count == 1 ? "" : "s")",
-                        isSet: count > 0, isActive: expanded == .attachments,
-                        isFocused: focus == .pill(.attachments), accent: accent, neutral: neutral) {
-            select(.attachments)
-          }
-          .focused($focus, equals: .pill(.attachments))
-        }
-        if showsDiscuss {
-          AttributePill(icon: Attribute.discuss.icon, label: Attribute.discuss.label,
-                        value: discussWorking ? "Thinking…" : nil,
-                        isSet: discussWorking, isActive: false,
-                        isLoading: discussWorking,
-                        isFocused: focus == .pill(.discuss),
-                        accent: accent, neutral: neutral) { select(.discuss) }
-            .focused($focus, equals: .pill(.discuss))
-            .disabled(discussWorking)
         }
       }
 
@@ -190,27 +151,50 @@ struct TaskAttributeBar: View {
     discussTask != nil && !discussStarted && OnDeviceAI.isAvailable
   }
 
+  /// Whether a pill is on the rail: edit-only pills need a saved task, and
+  /// Discuss only shows before a conversation exists.
+  private func shows(_ attr: Attribute) -> Bool {
+    if attr == .discuss { return showsDiscuss }
+    return !attr.editOnly || discussTask != nil
+  }
+
   /// The value shown on a pill (its `nil` falls back to the plain label). All
   /// values are derived from the draft — the single read-side of the rail.
-  private func value(for attr: Attribute) -> String? {
+  private func value(for attr: Attribute, edit: EditOnlyState?) -> String? {
     switch attr {
-    case .discuss: return nil
-    case .tags: return nil
-    case .checklist: return nil
-    case .attachments: return nil
+    case .discuss:
+      return discussWorking ? RegistrySurfaces.taskAttribute(attr.rawValue).workingLabel : nil
+    case .tags:
+      guard let names = edit?.tagNames, !names.isEmpty else { return nil }
+      return names.count == 1 ? names[0] : RegistrySurfaces.taskAttributeCount(attr.rawValue, count: names.count)
+    case .checklist:
+      guard let edit, edit.stepsTotal > 0 else { return nil }
+      return "\(edit.stepsDone)/\(edit.stepsTotal)"
+    case .attachments:
+      guard let count = edit?.attachments, count > 0 else { return nil }
+      return RegistrySurfaces.taskAttributeCount(attr.rawValue, count: count)
     // "When" folds in Today: a task pinned to today (no date) reads "Today", a
     // future planning date reads its date, nothing set reads as Anytime (nil).
     case .when:
-      if let s = draft.scheduled { return Self.dateLabel(s) }
-      return draft.onToday ? "Today" : nil
+      let slot = TaskTimeSlot.format(startTime: draft.startTime, durationMinutes: draft.durationMinutes)
+      if let s = draft.scheduled {
+        let base = Self.dateLabel(s)
+        return slot.map { "\(base) · \($0)" } ?? base
+      }
+      if draft.onToday {
+        let today = String(localized: "Today", comment: "Relative date")
+        return slot.map { "\(today) · \($0)" } ?? today
+      }
+      return slot
     case .deadline:
       return draft.deadline.map(Self.dateLabel)
     case .reminder:
       return draft.reminder?.badgeText()?.text
     case .repeatRule:
       return draft.recurrence?.shortLabel
+    // The filled pill already says it; no second word for "starred".
     case .star:
-      return draft.starred ? "Starred" : nil
+      return nil
     // The List pill always names its destination — "Inbox" by default, the area
     // or project once filed (but tinted only when explicitly filed, see isSet).
     case .list:
@@ -219,23 +203,18 @@ struct TaskAttributeBar: View {
   }
 
   /// Whether a pill counts as "filled" — drives the accent tint.
-  private func isSet(_ attr: Attribute) -> Bool {
+  private func isSet(_ attr: Attribute, edit: EditOnlyState?) -> Bool {
     switch attr {
-    case .discuss:    discussWorking
-    case .tags:
-      discussTask.map { task in
-        let ctx = LocalStore.shared.container.mainContext
-        let live = LocalCache.allTasks(in: ctx).first(where: { $0.id == task.id }) ?? task
-        return !LocalCache.resolvedTags(for: live, tagsByID: LocalCache.tagsByID(in: ctx)).isEmpty
-      } ?? false
-    case .checklist:  discussTask.map { !LocalCache.checklistItems(forTaskID: $0.id, in: LocalStore.shared.container.mainContext).isEmpty } ?? false
-    case .attachments: discussTask.map { SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: $0.id) > 0 } ?? false
-    case .when:       draft.scheduled != nil || draft.onToday
-    case .deadline:   draft.deadline != nil
-    case .reminder:   draft.reminder != nil
-    case .repeatRule: draft.recurrence != nil
-    case .star:       draft.starred
-    case .list:       draft.areaId != nil || draft.projectId != nil
+    case .discuss:     discussWorking
+    case .tags:        !(edit?.tagNames.isEmpty ?? true)
+    case .checklist:   (edit?.stepsTotal ?? 0) > 0
+    case .attachments: (edit?.attachments ?? 0) > 0
+    case .when:        draft.scheduled != nil || draft.onToday
+    case .deadline:    draft.deadline != nil
+    case .reminder:    draft.reminder != nil
+    case .repeatRule:  draft.recurrence != nil
+    case .star:        draft.starred
+    case .list:        draft.areaId != nil || draft.projectId != nil
     }
   }
 
@@ -251,7 +230,7 @@ struct TaskAttributeBar: View {
     // One transition for every inline panel — they all slide down from the rail.
     Group {
       switch expanded {
-      case .when:       InlineWhenPanel(draft: $draft, fill: panelFill)
+      case .when:       InlineWhenPanel(draft: $draft, accent: accent, fill: panelFill)
       case .deadline:   InlineDatePanel(date: $draft.deadline, fill: panelFill)
       case .reminder:   InlineReminderPanel(reminder: $draft.reminder,
                                             accent: accent,
@@ -332,11 +311,9 @@ struct TaskAttributeBar: View {
   /// "Today" / "Tomorrow" / "May 14" for a pill value.
   static func dateLabel(_ d: Date) -> String {
     let cal = Calendar.current
-    if cal.isDateInToday(d) { return "Today" }
-    if cal.isDateInTomorrow(d) { return "Tomorrow" }
-    let f = DateFormatter()
-    f.setLocalizedDateFormatFromTemplate("MMMd")
-    return f.string(from: d)
+    if cal.isDateInToday(d) { return String(localized: "Today", comment: "Relative date") }
+    if cal.isDateInTomorrow(d) { return String(localized: "Tomorrow", comment: "Relative date") }
+    return SeptenaDate.monthDay(d)
   }
 }
 
@@ -446,19 +423,98 @@ private struct AttributePillGlassBackground: ViewModifier {
 /// keeps the task in Anytime.
 private struct InlineWhenPanel: View {
   @Binding var draft: TaskDraft
+  let accent: Color
   let fill: Color
+  @State private var showTimeControls = false
 
   var body: some View {
-    TaskDateBoard(
-      selected: draft.scheduled,
-      todayActive: draft.onToday && draft.scheduled == nil,
-      clearLabel: (draft.scheduled != nil || draft.onToday) ? "No Date" : nil,
-      onToday: { a11yAnimate(.snappy(duration: 0.2)) { draft.setToday() } },
-      onPick: { d in a11yAnimate(.snappy(duration: 0.2)) { draft.setScheduled(d) } },
-      onClear: { a11yAnimate(.snappy(duration: 0.2)) { draft.clearWhen() } })
+    VStack(alignment: .leading, spacing: 10) {
+      TaskDateBoard(
+        selected: draft.scheduled,
+        todayActive: draft.onToday && draft.scheduled == nil,
+        clearLabel: (draft.scheduled != nil || draft.onToday || draft.startTime != nil) ? "No Date" : nil,
+        onToday: { a11yAnimate(.snappy(duration: 0.2)) { draft.setToday() } },
+        onPick: { d in a11yAnimate(.snappy(duration: 0.2)) { draft.setScheduled(d) } },
+        onClear: { a11yAnimate(.snappy(duration: 0.2)) { draft.clearWhen(); showTimeControls = false } })
+
+      Divider()
+
+      if showTimeControls || draft.startTime != nil {
+        VStack(alignment: .leading, spacing: 8) {
+          HStack {
+            Label("Time", systemImage: "clock")
+              .font(.septenaLabel)
+              .foregroundStyle(Theme.inkPrimary)
+            Spacer()
+            DatePicker(
+              "Start time",
+              selection: Binding(
+                get: { TaskTimeSlot.pickerDate(from: draft.startTime) },
+                set: { newDate in
+                  draft.startTime = TaskTimeSlot.hhmm(from: newDate)
+                  if !draft.onToday && draft.scheduled == nil { draft.setToday() }
+                }
+              ),
+              displayedComponents: .hourAndMinute
+            )
+            .labelsHidden()
+            Button("Clear") {
+              a11yAnimate(.snappy(duration: 0.18)) {
+                draft.startTime = nil
+                draft.durationMinutes = nil
+                showTimeControls = false
+              }
+            }
+            .buttonStyle(.plain)
+            .font(.septenaCaption)
+            .foregroundStyle(Theme.inkSecondary)
+            .contentShape(Rectangle())
+          }
+
+          HStack(spacing: 6) {
+            ForEach(TaskTimeSlot.quickDurations, id: \.minutes) { preset in
+              SelectableChip(preset.label,
+                             isSelected: draft.durationMinutes == preset.minutes,
+                             tint: accent) {
+                Haptics.tick()
+                a11yAnimate(.snappy(duration: 0.18)) {
+                  if draft.startTime == nil { draft.startTime = "09:00" }
+                  if !draft.onToday && draft.scheduled == nil { draft.setToday() }
+                  draft.durationMinutes = draft.durationMinutes == preset.minutes ? nil : preset.minutes
+                }
+              }
+            }
+            Spacer(minLength: 0)
+          }
+        }
+      } else {
+        Button {
+          a11yAnimate(.snappy(duration: 0.2)) {
+            showTimeControls = true
+            if draft.startTime == nil { draft.startTime = "09:00" }
+            if !draft.onToday && draft.scheduled == nil { draft.setToday() }
+          }
+        } label: {
+          HStack(spacing: 6) {
+            Image(systemName: "clock")
+              .scaledFont(size: 12)
+            Text("Add time")
+              .font(.septenaLabel)
+            Spacer(minLength: 0)
+          }
+          .foregroundStyle(Theme.inkSecondary)
+          .padding(.vertical, 2)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+      }
+    }
     .padding(12)
     .background(fill,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .onAppear {
+      showTimeControls = draft.startTime != nil
+    }
   }
 }
 
@@ -1275,7 +1331,7 @@ private struct TaskTagsPanel: View {
   private func reload() {
     let ctx = LocalStore.shared.container.mainContext
     allTags = LocalCache.allTags(in: ctx)
-    assignedIDs = LocalCache.allTasks(in: ctx).first(where: { $0.id == taskID })?.tags ?? []
+    assignedIDs = LocalCache.liveTasks(ids: [taskID], in: ctx).first?.tags ?? []
   }
 
   private func toggle(_ tag: TaskTag) {

@@ -1004,8 +1004,11 @@ final class SeptaskKitTaskListController: NSViewController {
     // falls to the next task by id instead of to nothing.
     let lastSelectedIndex = tableView.selectedRowIndexes.last
 
-    let rawPool = LocalCache.tasks(in: context, filter: filter)
-    let rawTriage = filter == .today ? LocalCache.tasks(in: context, filter: .triage) : []
+    // Today and its triage band come from one fetch of the open rows; the
+    // band feeds the suggestion snapshot, the tag bar and `triageBand(_:)`.
+    let todayLists = filter == .today ? LocalCache.todayAndTriage(in: context) : nil
+    let rawPool = todayLists?.today ?? LocalCache.tasks(in: context, filter: filter)
+    let rawTriage = todayLists?.triage ?? []
     // Progressive disclosure: discover ONLY tags actually present in this list;
     // when none exist, no tag filter bar appears (docs/TAGS_SPEC.md §3).
     let listTags: [TaskTag] = {
@@ -1045,7 +1048,7 @@ final class SeptaskKitTaskListController: NSViewController {
     var newRows: [Row]
     switch filter {
     case .today where todayGroupsByList:
-      newRows = titleRows + noticeRows(pool) + agenda() + triageBand()
+      newRows = titleRows + noticeRows(pool) + agenda() + triageBand(rawTriage)
         + groupedByList(withoutTriage(pool), inboxFooter: newTaskLine)
         + todayLoggedRows()
     case .today:
@@ -1077,7 +1080,7 @@ final class SeptaskKitTaskListController: NSViewController {
                               comment: "SeptaskKit: flat Today divider above tasks filed in an area or project"),
                 icon: .symbol("list.bullet"), count: classified.count)
       ]
-      newRows = titleRows + noticeRows(pool) + agenda() + triageBand()
+      newRows = titleRows + noticeRows(pool) + agenda() + triageBand(rawTriage)
         + loose.map(chipped) + newTaskLine
         + listsHeader
         + classified.map(chipped)
@@ -1145,14 +1148,7 @@ final class SeptaskKitTaskListController: NSViewController {
     case .faded:
       var fadedRows = titleRows
       if !pool.isEmpty {
-        fadedRows.append(.notice(TaskNotice(
-          id: .weeklySweep, kind: .info, symbol: "circle.dashed",
-          title: String(localized: "Tasks without activity for 14 days",
-                        comment: "Faded pile top notice title"),
-          detail: String(localized: "Open a task or choose Keep to bring it back, or sweep the list to let the rest go.",
-                         comment: "Faded pile top notice detail"),
-          primaryTitle: String(localized: "Sweep…", comment: "Faded pile sweep button"),
-          dismissible: false)))
+        fadedRows.append(.notice(TaskNotices.fadedPile))
       }
       newRows = fadedRows + pool.map(chipped)
     default:
@@ -1647,8 +1643,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// capture slot whether or not anything sits in it. Matches
   /// `TaskListView.triageSection`, which shows the section whenever
   /// `allowsInlineCreate` regardless of row count.
-  private func triageBand() -> [Row] {
-    let rawBand = LocalCache.tasks(in: context, filter: .triage)
+  private func triageBand(_ rawBand: [SeptenaTask]) -> [Row] {
     let band = activeTagFilterIDs.isEmpty
       ? rawBand
       : rawBand.filter { activeTagFilterIDs.isSubset(of: Set($0.tags)) }
@@ -1992,8 +1987,7 @@ final class SeptaskKitTaskListController: NSViewController {
   private func todayLoggedRows() -> [Row] {
     guard todayShowsCompleted else { return [] }
     let today = SeptenaDate.today
-    let done = LocalCache.tasks(in: context, filter: .logbook)
-      .filter { ($0.completedAt ?? "").hasPrefix(today) }
+    let done = LocalCache.tasksCompleted(onDay: today, in: context)
       .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
     return loggedFooterRows(completed: done)
   }
@@ -2287,7 +2281,7 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   private func move(to destination: KitMoveMenu.Destination, taskIDs: [String]) {
-    let liveByID = Dictionary(LocalCache.allTasks(in: context).map { ($0.id, $0) },
+    let liveByID = Dictionary(LocalCache.liveTasks(ids: taskIDs, in: context).map { ($0.id, $0) },
                               uniquingKeysWith: { current, _ in current })
     // A task already filed at `destination` is a no-op: no write and no undo
     // step (⌘Z must not "undo" nothing and skip the real action behind it).
@@ -2848,8 +2842,31 @@ final class SeptaskKitTaskListController: NSViewController {
     case .deadline: KitDayFormat.date(fromWire: selection.first?.deadline)
     }
 
-    SeptaskKitDatePopover.present(kind: kind, initial: initial,
-                                  relativeTo: anchor, of: tableView) { [weak self] date, today in
+    SeptaskKitDatePopover.present(
+      kind: kind,
+      initial: initial,
+      initialStartTime: kind == .when && selection.count == 1 ? selection[0].startTime : nil,
+      initialDurationMinutes: kind == .when && selection.count == 1 ? selection[0].durationMinutes : nil,
+      relativeTo: anchor,
+      of: tableView,
+      onTimeSlotChange: kind == .when ? { [weak self] start, duration in
+        guard let self else { return }
+        let liveSel = selection.map { LocalCache.task(id: $0.id, in: self.context) ?? $0 }
+        let before = liveSel.map(self.scheduleSnapshot)
+        for task in liveSel {
+          self.mutator.setTimeSlot(id: task.id, startTime: start, durationMinutes: duration)
+          if start != nil, !task.today, task.scheduled == nil {
+            self.mutator.moveToToday(id: task.id)
+          }
+          self.refreshComposerRow(taskId: task.id)
+        }
+        self.reload()
+        self.recordScheduleUndo(
+          name: String(localized: "Change Time", comment: "SeptaskKit: undo action"),
+          before: before)
+        self.onStoreChanged?()
+      } : nil
+    ) { [weak self] date, today in
       guard let self else { return }
       let before = selection.map(self.scheduleSnapshot)
       var deferredTo: Date?
@@ -3187,17 +3204,11 @@ final class SeptaskKitTaskListController: NSViewController {
     guard let row = rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
     tableView.selectRowIndexes([row], byExtendingSelection: false)
     tableView.scrollRowToVisible(row)
-    if inInbox {
-      // The foot-of-Inbox line is a deliberately light capture affordance —
-      // click, type, done. A pill rail there would be heavier than the
-      // gesture that opened it.
-      beginEditingRow(row)
-    } else {
-      // ⌘N opens the full composer, so a new task can be given its When /
-      // Deadline / List / Repeat without a second gesture. The bare field
-      // editor is still one keystroke away as ⌘R.
-      beginComposing(id: task.id)
-    }
+    // Every new task opens the full composer, the "New task" line included
+    // (#205), so it can be given its When / Deadline / List / Repeat without a
+    // second gesture, the same as SwiftUI's inline create. The bare field
+    // editor is still one keystroke away as ⌘R.
+    beginComposing(id: task.id)
   }
 
   /// Move a just-created task to sit directly below `anchor`, when it landed
@@ -3317,7 +3328,7 @@ final class SeptaskKitTaskListController: NSViewController {
     guard let row = rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
     tableView.selectRowIndexes([row], byExtendingSelection: false)
     tableView.scrollRowToVisible(row)
-    beginEditingRow(row)
+    beginComposing(id: task.id)
   }
 
   /// The task that should seed ⌘N's area/project — the table's focused row,
@@ -3735,7 +3746,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// value and would otherwise keep acting on a stale pre-edit snapshot.
   private func refreshComposerRow(taskId: String) {
     guard composingTaskId == taskId,
-          let fresh = LocalCache.allTasks(in: context).first(where: { $0.id == taskId }),
+          let fresh = LocalCache.liveTasks(ids: [taskId], in: context).first,
           let row = rows.firstIndex(where: { $0.task?.id == taskId }),
           let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false)
             as? KitComposerCell
@@ -3876,9 +3887,30 @@ final class SeptaskKitTaskListController: NSViewController {
         self.toggleTodaySelection()
 
       case .when(let anchor):
-        SeptaskKitDatePopover.present(kind: .when,
-                                      initial: KitDayFormat.date(fromWire: task.scheduled),
-                                      relativeTo: anchor.bounds, of: anchor) { [weak self] date, today in
+        let liveTask = LocalCache.task(id: task.id, in: self.context) ?? task
+        SeptaskKitDatePopover.present(
+          kind: .when,
+          initial: KitDayFormat.date(fromWire: liveTask.scheduled),
+          initialStartTime: liveTask.startTime,
+          initialDurationMinutes: liveTask.durationMinutes,
+          relativeTo: anchor.bounds,
+          of: anchor,
+          onTimeSlotChange: { [weak self] start, duration in
+            guard let self else { return }
+            let current = LocalCache.task(id: task.id, in: self.context) ?? task
+            let before = [current].map(self.scheduleSnapshot)
+            self.mutator.setTimeSlot(id: task.id, startTime: start, durationMinutes: duration)
+            if start != nil, !current.today, current.scheduled == nil {
+              self.mutator.moveToToday(id: task.id)
+            }
+            self.refreshComposerRow(taskId: task.id)
+            self.reload()
+            self.recordScheduleUndo(
+              name: String(localized: "Change Time", comment: "SeptaskKit: undo action"),
+              before: before)
+            self.onStoreChanged?()
+          }
+        ) { [weak self] date, today in
           guard let self else { return }
           // Capture at the gesture (from the STORE: an earlier pill may have
           // moved the captured `task` on), record after: the same undo step
@@ -5872,9 +5904,18 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       let coveredByTodayPill = !done && task.isOnToday && filter != .today && task.deletedAt == nil && !task.isFaded && scheduledDay <= todayDay
       if !coveredByTodayPill && (filter != .today || scheduledDay > todayDay) {
         configureScheduleGlyph(named: "calendar", color: SeptaskKitTheme.inkSecondary)
-        detail.stringValue = KitDayFormat.taskDate(scheduled)
+        let dateText = KitDayFormat.taskDate(scheduled)
+        detail.stringValue = task.timeSlotLabel.map { "\(dateText) · \($0)" } ?? dateText
+        detail.isHidden = false
+      } else if let slot = task.timeSlotLabel, !done {
+        configureScheduleGlyph(named: "clock", color: SeptaskKitTheme.inkSecondary)
+        detail.stringValue = slot
         detail.isHidden = false
       }
+    } else if let slot = task.timeSlotLabel, !done {
+      configureScheduleGlyph(named: "clock", color: SeptaskKitTheme.inkSecondary)
+      detail.stringValue = slot
+      detail.isHidden = false
     }
   }
 
@@ -6913,9 +6954,7 @@ final class KitReminderCell: NSTableCellView {
     if cal.isDateInTomorrow(date) {
       return String(localized: "Tomorrow", comment: "Relative day label")
     }
-    let f = DateFormatter()
-    f.setLocalizedDateFormatFromTemplate("MMMd")
-    return f.string(from: date)
+    return SeptenaDate.monthDay(date)
   }
 
   /// Reads `SeptenaDate.today` rather than `Date()`, so time travel moves this

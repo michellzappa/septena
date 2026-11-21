@@ -100,10 +100,6 @@ struct TaskComposerCard: View {
   /// — but only once the save has definitely had its chance, so a just-typed
   /// title can never be purged out from under the (animation-delayed) autosave.
   var onVanish: (() -> Void)? = nil
-  /// Inline create only: Return on a titled NEW task saves it and asks the host
-  /// to open the next new task below (the Things capture chain). Nil means
-  /// Return saves and closes, the edit-mode behavior.
-  var onSubmitNew: (() -> Void)? = nil
 
   @Environment(TaskMutator.self) private var mutator
   @Environment(\.modelContext) private var modelContext
@@ -188,8 +184,7 @@ struct TaskComposerCard: View {
        heroMatchNS: Namespace.ID? = nil, heroMatchIsSource: Bool = true,
        showsTodayIndicator: Bool = true,
        onDone: @escaping () -> Void,
-       onVanish: (() -> Void)? = nil,
-       onSubmitNew: (() -> Void)? = nil) {
+       onVanish: (() -> Void)? = nil) {
     self.mode = mode
     self.areas = areas
     self.projects = projects
@@ -205,7 +200,6 @@ struct TaskComposerCard: View {
     self.showsTodayIndicator = showsTodayIndicator
     self.onDone = onDone
     self.onVanish = onVanish
-    self.onSubmitNew = onSubmitNew
     #if os(iOS)
     // Seed the iPhone sheet height before first presentation so editing opens
     // directly at half height instead of flashing full then snapping down.
@@ -315,7 +309,7 @@ struct TaskComposerCard: View {
           draft.title = TaskTitleText.withoutLineBreaks(newValue)
             .trimmingCharacters(in: .whitespacesAndNewlines)
           if draft.canSave { commit(); return }
-          // Return on an empty NEW task ends the capture chain.
+          // Return on an empty NEW task closes it (its draft is then purged).
           if isCreating { close(); return }
         } else {
           draft.title = TaskTitleText.singleLine(newValue)
@@ -899,13 +893,10 @@ struct TaskComposerCard: View {
     guard draft.canSave else { return }
     Haptics.tick()
     persistOnce()
-    // A new inline task chains: the host saves this one (done above) and
-    // opens the next new task below. Edits, and the drawer, just close.
-    if isCreating, presentation == .inline, let onSubmitNew {
-      onSubmitNew()
-    } else {
-      close()
-    }
+    // Return saves and closes, for a new task too. A new task used to chain
+    // into a second blank draft below it (the Things capture chain); that
+    // blank row read as a leftover "New task" ghost, so it is gone.
+    close()
   }
 
   // MARK: - Keyboard focus traversal
@@ -913,10 +904,13 @@ struct TaskComposerCard: View {
   /// Tab order: title → notes → every pill (including Discuss when edit mode offers it).
   private var focusOrder: [TaskEditFocus] {
     var order: [TaskEditFocus] = [.title, .notes]
-    order += TaskAttributeBar.Attribute.draftCases.map { .pill($0) }
-    if isEditing { order.append(.pill(.attachments)) }
-    if discussKickoffVisible {
-      order.append(.pill(.discuss))
+    // Rail order from the registry; edit-only pills join once a task exists.
+    for attr in TaskAttributeBar.Attribute.rail {
+      if attr == .discuss {
+        if discussKickoffVisible { order.append(.pill(.discuss)) }
+      } else if !attr.editOnly || isEditing {
+        order.append(.pill(attr))
+      }
     }
     return order
   }

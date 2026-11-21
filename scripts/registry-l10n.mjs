@@ -31,7 +31,7 @@ const FIELDS = {
   surfaces: new Set([
     "title", "primaryTitle", "detail", "message", "confirmTitle", "cancelTitle", "format",
     "emptyTitleFormat", "singularFormat", "body", "footnote", "returningTitle", "returningBody",
-    "label", "instructions", "setup", "first", "placeholder", "untitledName",
+    "label", "countLabel", "workingLabel", "instructions", "setup", "first", "placeholder", "untitledName",
   ]),
   tokens: new Set(["name", "tag", "label"]),
 };
