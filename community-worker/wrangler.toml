@@ -3,7 +3,7 @@ main = "src/worker.ts"
 compatibility_date = "2024-11-01"
 
 # Open-source template. Replace placeholders before deploying your own worker.
-account_id = "50894cc73fc5188e3efb7eb9819c54e9"
+account_id = "1d2ed1f57832a528b7f197b5a9d68d39"
 # Keep the *.workers.dev URL off: the worker must only be reachable through the
 # custom domain, where Cloudflare Access sits in front of /admin.
 workers_dev = false
@@ -17,20 +17,20 @@ custom_domain = true
 [[d1_databases]]
 binding = "DB"
 database_name = "septena-community"
-database_id = "0dfcbd99-e8d6-4cca-a76e-09c1caa9482a"
+database_id = "186de353-d169-48df-b3fa-dcdde28d1916"
 migrations_dir = "migrations"
 
 [[kv_namespaces]]
 binding = "ATTEST"
-id = "10bb35645a93423591188c0ef8160b95"
+id = "1d3f2d0925804c01bb23b2d56e71e4d3"
 
 [[kv_namespaces]]
 binding = "CHALLENGES"
-id = "a473762726b74e34aa07226a82aca718"
+id = "14504cb083914ff58cb7224649addb09"
 
 [[kv_namespaces]]
 binding = "RL"
-id = "80b89a7a4b2a4102b6f4393c50496afc"
+id = "4b24aa6a1dbf4b568a69b204286a1248"
 
 # Optional, for avatars and support attachments. Wire this after the identity
 # foundation is deployed and tested.
