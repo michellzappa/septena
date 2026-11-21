@@ -156,9 +156,10 @@ final class SeptaskKitTaskListController: NSViewController {
     var isCardRow: Bool {
       switch self {
       case .header, .screenTitle, .fadedFooter, .loggedFooter, .addSection, .containerNotes: return false
-      // A notice, not an item: it sits on the page like a header, NOT on a
-      // card. A statement about your list must not look like a row of it.
-      case .notice: return false
+      // A standalone notice sits on the page with its own card fill. A notice
+      // with checklist steps (`Get started`) heads its steps' card so the
+      // header and rows share one seamless frosted surface (matching iOS).
+      case .notice(let notice): return !notice.steps.isEmpty
       // Rides the Inbox card with the reminder rows it acts on.
       case .importAllReminders: return true
       case .projectTarget, .event, .newTask, .reminder: return true

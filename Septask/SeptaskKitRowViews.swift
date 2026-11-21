@@ -875,11 +875,7 @@ final class KitCardRowView: NSTableRowView {
 
   private func ensureGlassBackdrop() {
     guard glassBackdrop == nil else { return }
-    let effect = KitPassthroughVisualEffectView()
-    effect.blendingMode = .withinWindow
-    effect.state = .active
-    effect.material = .headerView
-    effect.wantsLayer = true
+    let effect = KitCardGlassStyle.makeBackdrop()
     let mask = CAShapeLayer()
     effect.layer?.mask = mask
     addSubview(effect, positioned: .below, relativeTo: nil)
@@ -1217,10 +1213,41 @@ final class KitSidebarRowView: NSTableRowView {
   override var interiorBackgroundStyle: NSView.BackgroundStyle { .normal }
 }
 
-/// Non-interactive frosted `NSVisualEffectView` used behind grouped task cards
-/// when a procedural Header Wash texture is active.
+/// Shared frosted-glass recipe for EVERY card surface in the AppKit task list
+/// (grouped task cards in `KitCardRowView` and inline notices in
+/// `KitNoticeFill`). One definition so notices and task cards never diverge in
+/// material, veil opacity, or top specular rim — matching SwiftUI's unified
+/// `TaskCardChrome` / `TaskListNotice` recipe.
 @MainActor
-private final class KitPassthroughVisualEffectView: NSVisualEffectView {
+enum KitCardGlassStyle {
+  static let topRimHeight: CGFloat = 0.75
+
+  static func makeBackdrop() -> KitPassthroughVisualEffectView {
+    let effect = KitPassthroughVisualEffectView()
+    effect.blendingMode = .withinWindow
+    effect.state = .active
+    effect.material = .headerView
+    effect.wantsLayer = true
+    return effect
+  }
+
+  static func isDark(_ appearance: NSAppearance) -> Bool {
+    appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+  }
+
+  static func veilColor(isDark: Bool) -> NSColor {
+    SeptaskKitTheme.cardSurface.withAlphaComponent(isDark ? 0.28 : 0.38)
+  }
+
+  static func topRimColor(isDark: Bool) -> NSColor {
+    NSColor.white.withAlphaComponent(isDark ? 0.16 : 0.78)
+  }
+}
+
+/// Non-interactive frosted `NSVisualEffectView` used behind task cards and
+/// inline notices when a procedural Header Wash texture is active.
+@MainActor
+final class KitPassthroughVisualEffectView: NSVisualEffectView {
   override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
@@ -1240,17 +1267,18 @@ private final class KitCardGlassOverlayView: NSView {
 
   override func draw(_ dirtyRect: NSRect) {
     guard let slice = slicePath else { return }
-    let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+    let isDark = KitCardGlassStyle.isDark(effectiveAppearance)
     NSGraphicsContext.saveGraphicsState()
     NSBezierPath(rect: bounds).setClip()
     // Light frosted veil so the Header Wash frosts through legibly.
-    SeptaskKitTheme.cardSurface.withAlphaComponent(isDark ? 0.28 : 0.38).setFill()
+    KitCardGlassStyle.veilColor(isDark: isDark).setFill()
     slice.fill()
     if isFirstInGroup && !showSelection {
       NSGraphicsContext.saveGraphicsState()
       slice.addClip()
-      let rim = NSRect(x: bounds.minX, y: bounds.minY, width: bounds.width, height: 0.75)
-      NSColor.white.withAlphaComponent(isDark ? 0.16 : 0.78).setFill()
+      let rim = NSRect(x: bounds.minX, y: bounds.minY,
+                       width: bounds.width, height: KitCardGlassStyle.topRimHeight)
+      KitCardGlassStyle.topRimColor(isDark: isDark).setFill()
       rim.fill()
       NSGraphicsContext.restoreGraphicsState()
     }

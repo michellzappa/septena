@@ -114,21 +114,26 @@ struct TaskListNotice<Actions: View>: View {
   @ViewBuilder
   private var fill: some View {
     let shape = (headsCard ? TaskCardPosition.top : .solo).cardShape
-    if useLiquidGlass {
-      ZStack(alignment: .top) {
-        shape.fill(.thinMaterial)
-        shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.28 : 0.36))
-        if kind == .warning {
-          shape.fill(Theme.noticeWarning.opacity(0.12))
+    ZStack(alignment: .bottom) {
+      if useLiquidGlass {
+        ZStack(alignment: .top) {
+          shape.fill(.thinMaterial)
+          shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.28 : 0.36))
+          if kind == .warning {
+            shape.fill(Theme.noticeWarning.opacity(0.12))
+          }
+          Color.white.opacity(colorScheme == .dark ? 0.14 : 0.72)
+            .frame(height: 0.75)
         }
-        Color.white.opacity(colorScheme == .dark ? 0.14 : 0.72)
-          .frame(height: 0.75)
+        .clipShape(shape)
+      } else {
+        shape
+          .fill(Theme.cardSurface)
+          .overlay(shape.fill(kind == .warning ? Theme.noticeWarning.opacity(0.12) : Color.clear))
       }
-      .clipShape(shape)
-    } else {
-      shape
-        .fill(Theme.cardSurface)
-        .overlay(shape.fill(kind == .warning ? Theme.noticeWarning.opacity(0.12) : Color.clear))
+      if headsCard {
+        Rectangle().fill(Theme.border).frame(height: 0.5)
+      }
     }
   }
 
