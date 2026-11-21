@@ -1,7 +1,6 @@
 # Project notes — spec
 
-**Status:** proposal. Written 2026-11-21. Open questions keep their defaults
-until mz overrules them (§10).
+**Status:** accepted 2026-11-21, with every default in §10. Not started.
 **Decisions:** [ADR 0012](adr/0012-project-notes-are-agent-context.md),
 [ADR 0008](adr/0008-agent-loop-rules-live-in-the-store.md),
 [ADR 0005](adr/0005-tasks-as-factory-intake.md).

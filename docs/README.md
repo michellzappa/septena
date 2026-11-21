@@ -77,7 +77,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [PROJECT_SHARING_SPEC.md](PROJECT_SHARING_SPEC.md) | accepted |
 | [TASK_FACTORY_SPEC.md](TASK_FACTORY_SPEC.md) | accepted |
 | [TASK_FADE_SPEC.md](TASK_FADE_SPEC.md) | accepted |
-| [PROJECT_NOTES_SPEC.md](PROJECT_NOTES_SPEC.md) | proposal (ADR 0012) |
+| [PROJECT_NOTES_SPEC.md](PROJECT_NOTES_SPEC.md) | accepted (ADR 0012) |
 | [NATIVE_PROJECT_SHARING_SPEC.md](NATIVE_PROJECT_SHARING_SPEC.md) | superseded by PROJECT_SHARING_SPEC |
 | [SEPTASK_ANDROID_PLAN.md](SEPTASK_ANDROID_PLAN.md) | superseded on architecture (ADR 0002) |
 | [TASK_CONVERSATIONS_PLAN.md](TASK_CONVERSATIONS_PLAN.md) | shipped — historical, still the design rationale |

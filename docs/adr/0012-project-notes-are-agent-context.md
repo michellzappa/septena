@@ -1,6 +1,6 @@
 # 0012. Project notes are the context agents read first
 
-- Status: proposed (2026-11-21), agent defaults — mz may overrule
+- Status: accepted (2026-11-21), with the agent defaults
 - Date: 2026-11-21
 - Deciders: mz (agent proposed)
 
