@@ -22,6 +22,9 @@ final class SeptaskKitNextController: NSViewController {
   /// `onNavigate` uses, so a jump always leaves the two in agreement. Set
   /// before this pane is first displayed.
   var onNavigate: ((Route) -> Void)?
+  /// Shared window toast store — injected into the hosted SwiftUI hierarchy so
+  /// any SwiftUI surface here posts straight to the AppKit window's capsule.
+  var toastStore: SeptenaToastStore?
 
   /// Whether the page's own big title is still on screen. The hosted page
   /// reports it; `syncWindowTitle` applies it.
@@ -56,6 +59,7 @@ final class SeptaskKitNextController: NSViewController {
                                 dayClock: SeptaskMacRuntime.dayClock,
                                 logCommit: SeptaskMacRuntime.logCommit,
                                 services: SeptenaServices.shared)
+      .environment(\.septenaToast, toastStore)
       .modelContainer(LocalStore.shared.container)
       .septenaTextSize()
 

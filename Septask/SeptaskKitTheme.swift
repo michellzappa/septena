@@ -57,6 +57,16 @@ enum SeptaskKitTheme {
     .systemFont(ofSize: SeptenaTypeScale.size(.caption2), weight: .semibold)
   }
 
+  /// Toast confirmation copy — mirrors SwiftUI's `.callout` in `SeptenaToastOverlay`.
+  static var toastMessage: NSFont {
+    .systemFont(ofSize: SeptenaTypeScale.size(.callout))
+  }
+
+  /// Toast Undo action — semibold at the same rung as `toastMessage`.
+  static var toastAction: NSFont {
+    .systemFont(ofSize: SeptenaTypeScale.size(.callout), weight: .semibold)
+  }
+
   /// Task notes body — two rungs above the old subheadline notes face so
   /// prose matches `TaskMarkdownNotesEditor` (SwiftUI) at the body size.
   static var notesFontSize: CGFloat { SeptenaTypeScale.size(.body) }

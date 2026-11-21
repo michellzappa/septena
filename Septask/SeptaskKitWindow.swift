@@ -48,13 +48,22 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   private var sidebar: SeptaskKitSidebarController?
   private var splitController: NSSplitViewController?
   private var inspectorItem: NSSplitViewItem?
+  /// Shared toast store for this window — the same `SeptenaToastStore` contract
+  /// the SwiftUI surfaces use, rendered in the AppKit detail pane's bottom
+  /// glass capsule (`SeptaskKitToastPresenter`) and injected into hosted
+  /// SwiftUI views (Next).
+  let toastStore = SeptenaToastStore()
 
   private init() {
     let list = SeptaskKitTaskListController()
     let next = SeptaskKitNextController()
-    let detail = KitDetailPaneController()
+    let detail = KitDetailPaneController(toastStore: toastStore)
     let sidebar = SeptaskKitSidebarController()
     let inspector = SeptaskKitInspectorController()
+    list.toastStore = toastStore
+    next.toastStore = toastStore
+    sidebar.toastStore = toastStore
+    inspector.toastStore = toastStore
     // Tab / Shift-Tab crosses between the two panes — the only two stops in
     // this window's keyboard-nav loop. (`sidebar.onSelect` itself is wired
     // below, after `super.init`, since `show(_:)` captures `self`.)
@@ -298,17 +307,39 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
 
 /// Swaps the middle split pane between the task list and the Next host without
 /// rebuilding the `NSSplitViewController` — both children stay alive so
-/// returning to a list keeps selection / scroll position.
+/// returning to a list keeps selection / scroll position. Also hosts the
+/// window's bottom toast capsule above the active child so swapping panes never
+/// drops or covers a live confirmation.
 @MainActor
 private final class KitDetailPaneController: NSViewController {
   private weak var current: NSViewController?
+  private let contentContainer = NSView()
+  private let toastPresenter: SeptaskKitToastPresenter
+
+  init(toastStore: SeptenaToastStore) {
+    self.toastPresenter = SeptaskKitToastPresenter(store: toastStore)
+    super.init(nibName: nil, bundle: nil)
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitDetailPaneController is code-only") }
 
   override func loadView() {
-    view = NSView()
+    let root = NSView()
+    contentContainer.translatesAutoresizingMaskIntoConstraints = false
+    root.addSubview(contentContainer)
+    NSLayoutConstraint.activate([
+      contentContainer.topAnchor.constraint(equalTo: root.topAnchor),
+      contentContainer.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+      contentContainer.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+      contentContainer.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+    ])
+    toastPresenter.attach(to: root)
+    view = root
   }
 
   func display(_ child: NSViewController) {
     if current === child { return }
+    _ = view
     if let current {
       // Manual containment (`addChild`/`addSubview`, not one of AppKit's
       // built-in container APIs) doesn't forward appearance transitions on
@@ -328,15 +359,16 @@ private final class KitDetailPaneController: NSViewController {
     addChild(child)
     child.view.translatesAutoresizingMaskIntoConstraints = false
     child.viewWillAppear()
-    view.addSubview(child.view)
+    contentContainer.addSubview(child.view)
     NSLayoutConstraint.activate([
-      child.view.topAnchor.constraint(equalTo: view.topAnchor),
-      child.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-      child.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-      child.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+      child.view.topAnchor.constraint(equalTo: contentContainer.topAnchor),
+      child.view.bottomAnchor.constraint(equalTo: contentContainer.bottomAnchor),
+      child.view.leadingAnchor.constraint(equalTo: contentContainer.leadingAnchor),
+      child.view.trailingAnchor.constraint(equalTo: contentContainer.trailingAnchor),
     ])
     child.viewDidAppear()
     current = child
+    toastPresenter.bringToFront()
   }
 }
 

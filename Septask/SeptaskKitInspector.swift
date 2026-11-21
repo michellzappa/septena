@@ -42,6 +42,8 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// same "leave notes" gesture the inline composer answers. The pane stays
   /// open; ⌘↩ is the notes exit, Escape is the pane's.
   var onRequestFocusList: (() -> Void)?
+  /// Shared window toast store — defer confirmations post here.
+  var toastStore: SeptenaToastStore?
 
   private var task: SeptenaTask?
   /// What was loaded into the fields, so a commit can tell "the user changed
@@ -430,6 +432,13 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
         before: before, context: self.context, mutator: self.mutator)
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
       self.refresh()
+      if kind == .when, !today, let deferredDate = date,
+         !Calendar.current.isDateInToday(deferredDate) {
+        self.toastStore?.show(.deferred(to: deferredDate) { [weak self] in
+          TaskUndo.undo()
+          self?.refresh()
+        })
+      }
     }
   }
 }

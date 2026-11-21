@@ -137,6 +137,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// Tab pressed while the sidebar holds focus — the window owns moving
   /// focus to the list (mirrors the list's own `onFocusSidebar`).
   var onFocusList: (() -> Void)?
+  /// Shared window toast store — drop-to-move / drop-to-defer confirmations
+  /// post here.
+  var toastStore: SeptenaToastStore?
 
   private let outlineView = KitSidebarOutlineView()
   private var roots: [Node] = []
@@ -595,12 +598,13 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let dropped = LocalCache.allTasks(in: context).filter { ids.contains($0.id) }
     let scheduleBefore = dropped.map(TaskUndo.ScheduleSnapshot.init)
     let filingBefore = dropped.map(TaskUndo.FilingSnapshot.init)
+    let tomorrow = KitDayFormat.tomorrow()
     for id in ids {
       switch action {
       case .today:
         mutator.moveToToday(id: id)
       case .scheduleTomorrow:
-        mutator.schedule(id: id, date: KitDayFormat.tomorrow())
+        mutator.schedule(id: id, date: tomorrow)
         mutator.removeFromToday(id: id)
       case .anytime:
         mutator.schedule(id: id, date: nil)
@@ -616,12 +620,29 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       TaskUndo.recordScheduleChange(
         name: String(localized: "Move to Today", comment: "SeptaskKit: undo action"),
         before: scheduleBefore, context: context, mutator: mutator)
-    case .scheduleTomorrow, .anytime:
+    case .scheduleTomorrow:
+      TaskUndo.recordScheduleChange(
+        name: String(localized: "Change When", comment: "SeptaskKit: undo action"),
+        before: scheduleBefore, context: context, mutator: mutator)
+      toastStore?.show(.deferred(to: tomorrow, count: dropped.count) {
+        TaskUndo.undo()
+      })
+    case .anytime:
       TaskUndo.recordScheduleChange(
         name: String(localized: "Change When", comment: "SeptaskKit: undo action"),
         before: scheduleBefore, context: context, mutator: mutator)
     case .area, .project:
       TaskUndo.recordMove(before: filingBefore, context: context, mutator: mutator)
+      let destName: String? = switch node.content {
+      case .area(let area): area.title
+      case .project(let project, _): project.title
+      default: nil
+      }
+      if let destName {
+        toastStore?.show(.moved(to: destName, count: dropped.count) {
+          TaskUndo.undo()
+        })
+      }
     }
     return true
   }

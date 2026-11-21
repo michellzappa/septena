@@ -2197,16 +2197,16 @@ struct TaskListView: View {
     // The toast routes through the SAME stack rather than calling `restore`
     // itself, so tapping Undo and pressing ⌘Z cannot disagree, and the toast
     // consumes the stack entry instead of leaving a stale one behind it.
-    showToast(title.isEmpty ? "Task deleted" : "\"\(title)\" deleted") {
+    toastStore.show(.deleted(title: title) {
       TaskUndo.undo()
       Task { await load() }
-    }
+    })
   }
 
-  /// Present the bottom snackbar. The overlay's `.task(id:)` owns the
-  /// auto-dismiss; this just sets the payload (a fresh id restarts the clock).
-  private func showToast(_ message: String, undo: (() -> Void)? = nil) {
-    toastStore.show(message, undo: undo)
+  /// Present the bottom snackbar. `SeptenaToastStore` owns the 7 s timer and
+  /// replaces any active toast in place.
+  private func showToast(_ toast: SeptenaToast) {
+    toastStore.show(toast)
   }
 
   private struct MoveSnapshot {
@@ -2262,7 +2262,7 @@ struct TaskListView: View {
     guard let snap = applyMoveCore(id: id, areaId: areaId, projectId: projectId) else { return }
     Task { await load() }
     let destName = destinationName(areaId: areaId, projectId: projectId)
-    showToast("Moved to \(destName)") { undoMove([snap]) }
+    showToast(.moved(to: destName) { undoMove([snap]) })
   }
 
   private func applyMove(_ ids: [String], areaId: String?, projectId: String?) {
@@ -2272,10 +2272,7 @@ struct TaskListView: View {
     guard !snaps.isEmpty else { return }
     Task { await load() }
     let destName = destinationName(areaId: areaId, projectId: projectId)
-    let message = snaps.count == 1
-      ? "Moved to \(destName)"
-      : "Moved \(snaps.count) tasks to \(destName)"
-    showToast(message) { undoMove(snaps) }
+    showToast(.moved(to: destName, count: snaps.count) { undoMove(snaps) })
   }
 
   private func applyMoveToSelection(_ ids: [String], areaId: String?, projectId: String?) {
@@ -2811,7 +2808,7 @@ struct TaskListView: View {
     if filter == .today, wasInTriage { promoteFlash.flash(task.id) }
     Task { await load() }
 
-    showToast("Moved to \(suggestion.title)") {
+    showToast(.moved(to: suggestion.title) {
       if let prevProject {
         mutator.moveToProject(id: task.id, project: prevProject)
       } else {
@@ -2820,7 +2817,7 @@ struct TaskListView: View {
       }
       if wasInTriage { mutator.moveToToday(id: task.id, today: false) }
       Task { await load() }
-    }
+    })
   }
 
   /// The one-tap row chip — same top pick as the context menu (snapshotted in `load()`).
@@ -3373,7 +3370,7 @@ struct TaskListView: View {
         mutator.reschedule(id: id, date: d, mode: mode)
         // Deferring drops the row off Today; confirm where it landed. No
         // Undo — re-opening the When picker is the natural reversal.
-        showToast("Deferred to \(SeptenaDate.scheduleHeaderLabel(for: d))")
+        showToast(.deferred(to: d))
       }
     } else {
       mutator.reschedule(id: id, date: nil, mode: .makeException)

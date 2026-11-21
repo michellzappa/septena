@@ -259,28 +259,107 @@ final class PromoteFlashStore {
 // MARK: - Transient snackbar toast
 //
 // Bottom glass-capsule confirmations (delete / move / defer) with an optional
-// Undo. Host surfaces own a `SeptenaToastStore` @State, inject it via
-// `.septenaToastStore(_)` on the root, and attach `.septenaToastOverlay(store:)`
-// once. The overlay takes the store directly — `@Environment` can't see values
-// injected on the modified content beneath an outer modifier.
+// Undo — ONE contract shared by SwiftUI (`.septenaToastOverlay`) and the macOS
+// AppKit shell (`SeptaskKitToastPresenter`), so call sites post the same
+// `SeptenaToast` payload and copy to whichever shell hosts them.
+//
+// Host surfaces own a `SeptenaToastStore`, inject it via `.septenaToastStore(_)`
+// on the SwiftUI root (and attach `.septenaToastOverlay(store:)` once), or bind
+// it to `SeptaskKitToastPresenter` in an AppKit window. A new toast always
+// replaces the current one (never stacks) and restarts the 7 s auto-dismiss
+// timer.
 
 struct SeptenaToast: Identifiable {
+  static let defaultDuration: Double = 7
+
   let id = UUID()
   var message: String
-  var duration: Double = 7
+  var duration: Double = defaultDuration
   var undo: (() -> Void)?
+
+  // MARK: Shared task confirmation copy
+
+  /// Single source of truth for move / defer / delete toast copy so SwiftUI
+  /// (`TaskRowActions`, `TaskListView`) and AppKit (`SeptaskKit*`) cannot drift.
+  static func deferred(to date: Date,
+                       count: Int = 1,
+                       undo: (() -> Void)? = nil) -> SeptenaToast {
+    let label = SeptenaDate.scheduleHeaderLabel(for: date)
+    let message = count == 1
+      ? "Deferred to \(label)"
+      : "Deferred \(count) tasks to \(label)"
+    return SeptenaToast(message: message, undo: undo)
+  }
+
+  static func moved(to destinationName: String,
+                    count: Int = 1,
+                    undo: (() -> Void)? = nil) -> SeptenaToast {
+    let message = count == 1
+      ? "Moved to \(destinationName)"
+      : "Moved \(count) tasks to \(destinationName)"
+    return SeptenaToast(message: message, undo: undo)
+  }
+
+  static func moved(count: Int, undo: (() -> Void)? = nil) -> SeptenaToast {
+    SeptenaToast(
+      message: count == 1 ? "Task moved" : "Moved \(count) tasks",
+      undo: undo
+    )
+  }
+
+  static func deleted(title: String, undo: (() -> Void)? = nil) -> SeptenaToast {
+    SeptenaToast(
+      message: title.isEmpty ? "Task deleted" : "\"\(title)\" deleted",
+      undo: undo
+    )
+  }
+
+  static func deleted(count: Int,
+                      singleTitle: String? = nil,
+                      undo: (() -> Void)? = nil) -> SeptenaToast {
+    if count == 1 {
+      return deleted(title: singleTitle ?? "", undo: undo)
+    }
+    return SeptenaToast(message: "\(count) tasks deleted", undo: undo)
+  }
 }
 
 @MainActor
 @Observable
 final class SeptenaToastStore {
   var current: SeptenaToast?
+  @ObservationIgnored private var dismissTask: Task<Void, Never>?
 
-  func show(_ message: String, undo: (() -> Void)? = nil, duration: Double = 7) {
-    current = SeptenaToast(message: message, duration: duration, undo: undo)
+  func show(_ toast: SeptenaToast) {
+    dismissTask?.cancel()
+    current = toast
+    A11y.announce(toast.message)
+    let id = toast.id
+    let seconds = toast.duration
+    dismissTask = Task { [weak self] in
+      try? await Task.sleep(for: .seconds(seconds))
+      guard !Task.isCancelled, let self, self.current?.id == id else { return }
+      self.dismiss()
+    }
+  }
+
+  func show(_ message: String,
+            undo: (() -> Void)? = nil,
+            duration: Double = SeptenaToast.defaultDuration) {
+    show(SeptenaToast(message: message, duration: duration, undo: undo))
+  }
+
+  /// Dismiss first so double-taps cannot fire twice (and so an undo closure
+  /// that posts a follow-up toast or triggers undo notifications stays clean).
+  func performUndo() {
+    guard let undo = current?.undo else { return }
+    dismiss()
+    undo()
   }
 
   func dismiss() {
+    dismissTask?.cancel()
+    dismissTask = nil
     current = nil
   }
 }
@@ -309,13 +388,7 @@ private struct SeptenaToastOverlay: ViewModifier {
   func body(content: Content) -> some View {
     content
       .overlay(alignment: .bottom) { snackbar }
-      .animation(.snappy, value: store.current?.id)
-      .task(id: store.current?.id) {
-        guard let seconds = store.current?.duration else { return }
-        try? await Task.sleep(for: .seconds(seconds))
-        guard !Task.isCancelled else { return }
-        store.dismiss()
-      }
+      .a11yAnimation(.snappy, value: store.current?.id)
   }
 
   @ViewBuilder
@@ -326,11 +399,10 @@ private struct SeptenaToastOverlay: ViewModifier {
           .font(.callout)
           .foregroundStyle(.primary)
           .lineLimit(1)
-        if let undo = toast.undo {
+        if toast.undo != nil {
           Spacer(minLength: 0)
           Button("Undo") {
-            undo()
-            store.dismiss()
+            store.performUndo()
           }
           .font(.callout.weight(.semibold))
           .tint(.accentColor)

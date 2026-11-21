@@ -207,7 +207,7 @@ struct TaskRowActions: ViewModifier {
           } else {
             mutator.moveToToday(id: id, today: false)
             mutator.schedule(id: id, date: d)
-            toastStore?.show("Deferred to \(SeptenaDate.scheduleHeaderLabel(for: d))")
+            toastStore?.show(.deferred(to: d))
           }
         } else {
           mutator.schedule(id: id, date: nil)
@@ -254,7 +254,7 @@ struct TaskRowActions: ViewModifier {
       projectId.flatMap { pid in projects.first { $0.id == pid }?.title }
       ?? areaId.flatMap { aid in areas.first { $0.id == aid }?.title }
       ?? "No Project"
-    toastStore?.show("Moved to \(destName)") {
+    toastStore?.show(.moved(to: destName) {
       if let prevProject {
         mutator.moveToProject(id: id, project: prevProject)
       } else {
@@ -263,7 +263,7 @@ struct TaskRowActions: ViewModifier {
       }
       if wasInTriage { mutator.moveToToday(id: id, today: false) }
       onChange?()
-    }
+    })
   }
 
   private func applyDelete(_ task: SeptenaTask) {
@@ -272,10 +272,10 @@ struct TaskRowActions: ViewModifier {
     mutator.delete(id: task.id)
     TaskUndo.recordDelete(ids: [task.id], mutator: mutator)
     onChange?()
-    toastStore?.show(title.isEmpty ? "Task deleted" : "\"\(title)\" deleted") {
+    toastStore?.show(.deleted(title: title) {
       mutator.restore(id: task.id)
       onChange?()
-    }
+    })
   }
 }
 

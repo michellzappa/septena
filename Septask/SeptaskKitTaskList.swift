@@ -277,6 +277,8 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Tab pressed while the list holds focus — the window owns moving focus
   /// to the sidebar (see `focusList()`'s sibling, `focusSidebar()`).
   var onFocusSidebar: (() -> Void)?
+  /// Shared window toast store — move / defer / delete confirmations post here.
+  var toastStore: SeptenaToastStore?
 
   private var context: ModelContext { LocalStore.shared.container.mainContext }
 
@@ -1510,6 +1512,17 @@ final class SeptaskKitTaskListController: NSViewController {
     TaskUndo.recordMove(before: before, context: context, mutator: mutator)
     reload()
     playPendingPromoteFlashes()
+    let destinations = Set(picks.map(\.suggestion.title))
+    let undo: () -> Void = { [weak self] in
+      TaskUndo.undo()
+      self?.reload()
+      self?.onStoreChanged?()
+    }
+    if destinations.count == 1, let destName = destinations.first {
+      toastStore?.show(.moved(to: destName, count: picks.count, undo: undo))
+    } else {
+      toastStore?.show(.moved(count: picks.count, undo: undo))
+    }
   }
 
   private func chip(for task: SeptenaTask) -> Chip? {
@@ -1918,6 +1931,23 @@ final class SeptaskKitTaskListController: NSViewController {
     // with the final rows.
     reload(animated: false)
     onStoreChanged?()
+    let destName = destinationName(for: destination)
+    toastStore?.show(.moved(to: destName, count: selection.count) {
+      TaskUndo.undo()
+    })
+  }
+
+  /// Display name matching SwiftUI's `TaskRowActions` / `TaskListView` copy.
+  private func destinationName(for destination: KitMoveMenu.Destination) -> String {
+    let snapshot = StructureCache.snapshot(in: context)
+    switch destination {
+    case .none:
+      return "No Project"
+    case .area(let areaId):
+      return snapshot.areas.first(where: { $0.id == areaId })?.title ?? "No Project"
+    case .project(let projectId):
+      return snapshot.projects.first(where: { $0.id == projectId })?.title ?? "No Project"
+    }
   }
 
   /// ⌘M / ⌘⇧M — the type-to-filter Move picker (`SeptaskKitMovePicker`), the
@@ -2282,6 +2312,7 @@ final class SeptaskKitTaskListController: NSViewController {
                                   relativeTo: anchor, of: tableView) { [weak self] date, today in
       guard let self else { return }
       let before = selection.map(self.scheduleSnapshot)
+      var appliedCount = 0
       for task in selection {
         switch kind {
         case .when:
@@ -2291,13 +2322,16 @@ final class SeptaskKitTaskListController: NSViewController {
             self.mutator.reschedule(id: task.id, date: target, mode: mode)
             self.mutator.schedule(id: task.id, date: nil)
             self.mutator.moveToToday(id: task.id)
+            appliedCount += 1
           } else {
             guard let mode = self.rescheduleMode(for: task, newDate: date) else { continue }
             self.mutator.reschedule(id: task.id, date: date, mode: mode)
             self.mutator.removeFromToday(id: task.id)
+            appliedCount += 1
           }
         case .deadline:
           self.mutator.setDeadline(id: task.id, date: date)
+          appliedCount += 1
         }
         self.mutator.acknowledge(id: task.id)
       }
@@ -2307,6 +2341,12 @@ final class SeptaskKitTaskListController: NSViewController {
           ? String(localized: "Change When", comment: "SeptaskKit: undo action")
           : String(localized: "Change Deadline", comment: "SeptaskKit: undo action"),
         before: before)
+      if kind == .when, !today, let deferredDate = date,
+         !Calendar.current.isDateInToday(deferredDate), appliedCount > 0 {
+        self.toastStore?.show(.deferred(to: deferredDate, count: appliedCount) {
+          TaskUndo.undo()
+        })
+      }
     }
   }
 
@@ -2392,6 +2432,9 @@ final class SeptaskKitTaskListController: NSViewController {
         mutator.delete(id: task.id)
       }
       reload()
+      toastStore?.show(.deleted(count: victims.count, singleTitle: victims.first?.title) {
+        TaskUndo.undo()
+      })
     }
     // Standard list behavior: selection moves to the nearest surviving row.
     if !rows.isEmpty {
@@ -3137,6 +3180,7 @@ final class SeptaskKitTaskListController: NSViewController {
                                       initial: KitDayFormat.date(fromWire: task.scheduled),
                                       relativeTo: anchor.bounds, of: anchor) { [weak self] date, today in
           guard let self else { return }
+          let before = [self.scheduleSnapshot(task)]
           if today {
             self.mutator.moveToToday(id: task.id)
           } else {
@@ -3144,7 +3188,15 @@ final class SeptaskKitTaskListController: NSViewController {
             self.mutator.removeFromToday(id: task.id)
           }
           self.mutator.acknowledge(id: task.id)
+          self.recordScheduleUndo(
+            name: String(localized: "Change When", comment: "SeptaskKit: undo action"),
+            before: before)
           self.refreshComposerRow(taskId: task.id)
+          if !today, let deferredDate = date, !Calendar.current.isDateInToday(deferredDate) {
+            self.toastStore?.show(.deferred(to: deferredDate) {
+              TaskUndo.undo()
+            })
+          }
         }
 
       case .deadline(let anchor):
@@ -4034,17 +4086,33 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
 
     let byId = Dictionary(rows.compactMap(\.task).map { ($0.id, $0) },
                           uniquingKeysWith: { a, _ in a })
+    var movedBefore: [TaskUndo.FilingSnapshot] = []
     for id in ids {
       guard let task = byId[id] else { continue }
-      var moved = false
       // Area only matters outside a project group (a project implies its area).
       let destinationChanged = task.project != targetProject
         || (targetProject == nil && task.area != targetArea)
       if destinationChanged {
+        movedBefore.append(TaskUndo.FilingSnapshot(task))
         mutator.moveToList(id: id, area: targetArea, project: targetProject)
-        moved = true
+        mutator.acknowledge(id: id)
       }
-      if moved { mutator.acknowledge(id: id) }
+    }
+    if !movedBefore.isEmpty {
+      TaskUndo.recordMove(before: movedBefore, context: context, mutator: mutator)
+      let dest: KitMoveMenu.Destination = if let targetProject {
+        .project(targetProject)
+      } else if let targetArea {
+        .area(targetArea)
+      } else {
+        .none
+      }
+      let destName = destinationName(for: dest)
+      toastStore?.show(.moved(to: destName, count: movedBefore.count) { [weak self] in
+        TaskUndo.undo()
+        self?.reload()
+        self?.onStoreChanged?()
+      })
     }
   }
 
