@@ -116,6 +116,10 @@ final class SeptaskKitTaskListController: NSViewController {
     /// Return, ⌘K, type-select, right-click) that is never a task. Every task
     /// command reads `task`, which is nil here, so it does nothing.
     case noticeStep(TaskNoticeStep)
+    /// The project's or area's notes, under the page title
+    /// (`KitContainerNotesCell`, ADR 0012). Not selectable: it carries no
+    /// task, and a click opens its editor popover.
+    case containerNotes(isArea: Bool, id: String, text: String)
 
     var key: String {
       switch self {
@@ -132,6 +136,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .notice(let notice): return "notice:" + notice.id.rawValue
       case .noticeStep(let step): return step.selectionID
       case .importAllReminders: return "import-all-reminders"
+      case .containerNotes: return "container-notes"
       }
     }
 
@@ -150,7 +155,7 @@ final class SeptaskKitTaskListController: NSViewController {
     /// so they break the card run the same way a Today area/project header does.
     var isCardRow: Bool {
       switch self {
-      case .header, .screenTitle, .fadedFooter, .loggedFooter, .addSection: return false
+      case .header, .screenTitle, .fadedFooter, .loggedFooter, .addSection, .containerNotes: return false
       // A notice, not an item: it sits on the page like a header, NOT on a
       // card. A statement about your list must not look like a row of it.
       case .notice: return false
@@ -714,6 +719,22 @@ final class SeptaskKitTaskListController: NSViewController {
     if abs(scrollView.contentInsets.top - top) > 0.5 {
       scrollView.contentInsets.top = top
     }
+    remeasureNotesRowIfWidthChanged()
+  }
+
+  /// The table width the notes row was last measured at.
+  private var notesRowMeasuredWidth: CGFloat = 0
+
+  /// The notes row wraps, so its height depends on the width: re-note it when
+  /// the width moves. Guarded on a real change, for the same re-entry reason
+  /// as the inset above.
+  private func remeasureNotesRowIfWidthChanged() {
+    let width = tableView.bounds.width
+    guard abs(width - notesRowMeasuredWidth) > 0.5 else { return }
+    notesRowMeasuredWidth = width
+    guard let index = rows.firstIndex(where: { if case .containerNotes = $0 { return true }; return false }),
+          index < tableView.numberOfRows else { return }
+    tableView.noteHeightOfRows(withIndexesChanged: [index])
   }
 
   deinit {
@@ -1027,8 +1048,9 @@ final class SeptaskKitTaskListController: NSViewController {
 
       let open = pool.filter { $0.status == .open }
       let faded = showsFadedInLists ? LocalCache.fadedTasks(in: context, scope: filter) : []
+      let notesRows = containerNotesRows()
       if case .project(let projectId) = filter {
-        newRows = titleRows + projectGrouped(open: open, projectId: projectId)
+        newRows = titleRows + notesRows + projectGrouped(open: open, projectId: projectId)
           + fadedFooterRows(faded: faded)
           + loggedFooterRows(completed: completed)
       } else {
@@ -1057,7 +1079,7 @@ final class SeptaskKitTaskListController: NSViewController {
               }
           }
         }
-        newRows = titleRows + direct.map(unchipped)
+        newRows = titleRows + notesRows + direct.map(unchipped)
           + projectRows
           + fadedFooterRows(faded: faded)
           + loggedFooterRows(completed: completed)
@@ -1781,6 +1803,42 @@ final class SeptaskKitTaskListController: NSViewController {
     case .area(let id):
       guard let area = snapshot.areas.first(where: { $0.id == id }) else { return nil }
       return .screenTitle(title: area.title, icon: area.emoji.map(GroupIcon.emoji) ?? .areaDot)
+    }
+  }
+
+  /// The notes row under a project's or area's title — on every such page,
+  /// empty or not, so the notes are always one click away (ADR 0012).
+  private func containerNotesRows() -> [Row] {
+    let snapshot = StructureCache.snapshot(in: context)
+    switch filter {
+    case .project(let id):
+      guard let project = snapshot.projects.first(where: { $0.id == id }) else { return [] }
+      return [.containerNotes(isArea: false, id: id, text: project.notes ?? "")]
+    case .area(let id):
+      guard let area = snapshot.areas.first(where: { $0.id == id }) else { return [] }
+      return [.containerNotes(isArea: true, id: id, text: area.context ?? "")]
+    default:
+      return []
+    }
+  }
+
+  /// Opens the notes editor anchored to the notes row; closing it saves
+  /// through the same mutators the SwiftUI project and area pages use.
+  private func editContainerNotes(isArea: Bool, id: String, text: String, anchor: NSView) {
+    KitContainerNotesPopover.present(isArea: isArea, notes: text, relativeTo: anchor) { [weak self] newText in
+      let value: String? = newText.isEmpty ? nil : newText
+      Task { @MainActor in
+        do {
+          if isArea {
+            try await SeptenaServices.shared.areasMutator.setContext(id: id, context: value)
+          } else {
+            try await SeptenaServices.shared.projectsMutator.setNotes(id: id, notes: value)
+          }
+        } catch {
+          SeptenaLog.error("[notes] save failed for \(isArea ? "area" : "project") \(id)", error)
+        }
+        self?.reload()
+      }
     }
   }
 
@@ -4276,6 +4334,11 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     case .newTask: return SeptaskKitTheme.rowHeight
     // Same band as the logged footer — both are quiet meta-font page footers.
     case .addSection: return SeptenaTypeScale.size(.footnote) + 24
+    case .containerNotes(let isArea, _, let text):
+      return KitContainerNotes.height(
+        text: text,
+        placeholder: isArea ? ContainerNotes.areaPlaceholder : ContainerNotes.projectPlaceholder,
+        rowWidth: tableView.bounds.width)
     // Reminder rows read as task rows (they become tasks on click); their
     // header sits on the page like every other group header.
     case .reminder: return SeptaskKitTheme.rowHeight
@@ -4868,6 +4931,17 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitAddSectionCell
         ?? KitAddSectionCell(identifier: identifier)
       cell.onTap = { [weak self] in self?.menuNewSection() }
+      return cell
+
+    case .containerNotes(let isArea, let id, let text):
+      let identifier = NSUserInterfaceItemIdentifier("containerNotesCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitContainerNotesCell
+        ?? KitContainerNotesCell(identifier: identifier)
+      cell.configure(text: text,
+                     placeholder: isArea ? ContainerNotes.areaPlaceholder : ContainerNotes.projectPlaceholder)
+      cell.onEdit = { [weak self] anchor in
+        self?.editContainerNotes(isArea: isArea, id: id, text: text, anchor: anchor)
+      }
       return cell
 
     case .importAllReminders(let count, let importing):

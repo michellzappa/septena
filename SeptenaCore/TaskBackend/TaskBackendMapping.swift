@@ -145,7 +145,9 @@ enum TaskBackendMapping {
       "created": c.day("created", p.created),
       "completedAt": c.stamp("completedAt", p.completedAt),
       "notes": c.text("notes", p.notes, max: notesMax),
-      "context": c.text("context", p.context, max: notesMax),
+      // No "context": retired (ADR 0012). The backend merged it into notes
+      // and refuses agent writes to it; pushing the stale local copy on
+      // every project change would bring the duplicate back.
       "githubRepo": c.text("githubRepo", p.githubRepo, max: 200),
       "attachment": c.pointer("attachment", p.attachmentJSON),
       "position": .int(Int64(p.position)),

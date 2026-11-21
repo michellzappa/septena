@@ -66,6 +66,16 @@ scripts/build.sh SeptaskMac 'platform=macOS'
 If the change *does* touch watch code, **stop and tell the user** — installing a
 multi-GB runtime is their call, never the agent's.
 
+**Building on mz-mini** (`remote-build`): the mini has no development
+certificate, so `SeptaskMac` fails before compiling ("requires signing with a
+development certificate"). Compile unsigned with `SEPTENA_NO_SIGNING=1`.
+`remote-build` copies uncommitted edits too, so run it from a clean worktree
+when you need to check exactly what is committed:
+
+```bash
+remote-build "xcodegen generate && SEPTENA_NO_SIGNING=1 ./scripts/build.sh SeptaskMac 'platform=macOS'"
+```
+
 **Do NOT test — the user tests.** The compile above is the ONLY verification an
 agent runs. Never launch the app, boot a simulator, run UI tests, screenshot, or
 otherwise "verify it works" — when the change is built, report it and **ask the

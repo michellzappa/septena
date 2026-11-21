@@ -16,12 +16,16 @@ import SwiftData
 ///   • Text(AttributedString(markdown:)) overlays on top when the field
 ///     isn't focused and has content; tap forwards focus.
 ///   • Hit testing is gated on focus so taps go to the right layer.
+/// `selection` lets the project view drop the cursor under the first heading
+/// of a freshly inserted notes template (`ContainerNotes.template`).
 @ViewBuilder
 func notesField(_ text: Binding<String>,
+                placeholder: String,
+                selection: Binding<TextSelection?> = .constant(nil),
                 focused: FocusState<Bool>.Binding) -> some View {
   let showRender = !focused.wrappedValue && !text.wrappedValue.isEmpty
   ZStack(alignment: .topLeading) {
-    TextField("Notes", text: text, axis: .vertical)
+    TextField(placeholder, text: text, selection: selection, axis: .vertical)
       .textFieldStyle(.plain)
       .focusEffectDisabled()
       .font(.septenaNotes)
@@ -60,9 +64,16 @@ func markdownAttributed(_ raw: String) -> AttributedString {
     for run in attr.runs where run.presentationIntent != nil {
       for component in run.presentationIntent?.components ?? [] {
         if case .header(let level) = component.kind {
-          let size: CGFloat = level == 1 ? 18 : (level == 2 ? 16 : 15)
-          attr[run.range].font = .system(size: size, weight: .semibold)
-          attr[run.range].foregroundColor = Theme.inkPrimary
+          if level >= 3 {
+            // `### <day> · <agent>` is how an agent log entry starts
+            // (ContainerNotes): a quiet byline, not a section title.
+            attr[run.range].font = .septenaLabel
+            attr[run.range].foregroundColor = Theme.inkSecondary
+          } else {
+            let size: CGFloat = level == 1 ? 18 : 16
+            attr[run.range].font = .system(size: size, weight: .semibold)
+            attr[run.range].foregroundColor = Theme.inkPrimary
+          }
         }
       }
     }
@@ -158,7 +169,7 @@ struct AreaDetailView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
           }
-          notesField($draftNotes, focused: $notesFocused)
+          notesField($draftNotes, placeholder: ContainerNotes.areaPlaceholder, focused: $notesFocused)
           AttachmentZone(attachment: draftAttachment) { showingAttachmentEditor = true }
         }
         // Park the whole header on the task cards' content column so the area
@@ -386,6 +397,8 @@ struct ProjectDetailView: View {
   /// reflects completions made elsewhere too.
   @State private var progress: Double = 0
   @FocusState private var notesFocused: Bool
+  /// Cursor for the notes field; set when the template is inserted.
+  @State private var notesSelection: TextSelection?
   /// Global task sort — kept in sync via @AppStorage so flipping it from
   /// this menu instantly re-renders the embedded TaskListView (which reads
   /// the same key).
@@ -442,7 +455,8 @@ struct ProjectDetailView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
           }
-          notesField($draftNotes, focused: $notesFocused)
+          notesField($draftNotes, placeholder: ContainerNotes.projectPlaceholder,
+                     selection: $notesSelection, focused: $notesFocused)
           AttachmentZone(attachment: draftAttachment) { showingAttachmentEditor = true }
         }
         // Match the area page: park the header on the task cards' content
@@ -452,7 +466,19 @@ struct ProjectDetailView: View {
         .padding(.top, 12)
         .padding(.bottom, 16)
         .onChange(of: notesFocused) { _, focused in
-          if !focused { commitNotes() }
+          if focused {
+            // Empty notes start from the template headings, cursor under
+            // the first one (docs/PROJECT_NOTES_SPEC.md §6).
+            if draftNotes.isEmpty {
+              draftNotes = ContainerNotes.template
+              notesSelection = TextSelection(
+                insertionPoint: ContainerNotes.templateCursorIndex(in: draftNotes))
+            }
+          } else {
+            // A template nobody typed into is not notes: keep them empty.
+            if ContainerNotes.isUntouchedTemplate(draftNotes) { draftNotes = "" }
+            commitNotes()
+          }
         }
 
         Hairline()

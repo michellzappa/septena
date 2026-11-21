@@ -24,6 +24,9 @@ the block and update each, same change. Treat this like a hotspot file.
 
 ## 1. The facts — never exceed these
 
+In public copy, round fluid counts ("about two thousand commits", "more than
+half"): mz dislikes over-specific figures. Exact numbers stay in this table.
+
 Every maker claim must trace to a row here. Numbers are a **snapshot** (git as of
 2026-11-21, `michellzappa/septena`); they're for storytelling, not a live
 readout. Restamp when you cite fresh ones.
@@ -240,8 +243,8 @@ Todo story only. Humanizer pass done 2026-11-21. Facts trace to §1.
 > **How it's made**
 >
 > I build it with AI. Mostly Claude, sometimes Gemini, often several sessions at
-> once. Of the 1,912 commits in the repo, 1,133 name Claude as co-author. The repo
-> has an AGENTS.md that gives every agent the rules, the traps that earlier
+> once. The repo has about two thousand commits, and more than half name Claude as
+> co-author. It also has an AGENTS.md that gives every agent the rules, the traps that earlier
 > sessions fell into, and the things it may not do alone. Much of that file exists
 > because an agent got something wrong first.
 >
@@ -318,7 +321,7 @@ Where the identity appears, which block, which repo/file, current state.
 | Patronage / Septena+ | cloud · `SettingsPanes.swift` (`SeptenaPlus.reasons` → "Pays the AI bill") | C | **done** (iOS+Mac green 2026-06-21) |
 | Support intro line | cloud · `SupportSettingsPane.swift` (ticket footer + email fallback) | F | **done** (iOS+Mac green 2026-06-21) |
 | Changelog voice | cloud · `Septena/Resources/changelog.json` | E | ongoing, tighten |
-| Website /about | site · `app/about/page.tsx` | B + D | **done** 2026-11-21 (site `bda5a91`): Block B, todo story |
+| Website /about | site · `app/about/page.tsx` | B + D | **done** 2026-11-21: Block B, todo story. Same text on michellzappa.com/blog/septena-2026 |
 | Website /ownership | site · `app/ownership/page.tsx` | B + D | review vs. this doc |
 | Website /support | site · `app/support/page.tsx` | C + F | reframe |
 | Website /supporters | site · `app/supporters/page.tsx` | C | review |
