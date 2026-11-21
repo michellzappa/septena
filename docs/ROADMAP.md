@@ -5,7 +5,7 @@ milestone has a matching GitHub milestone on `michellzappa/septena`; each phase
 is one issue there. Update this file when the order changes. Rules:
 `docs/README.md`.
 
-**Last updated:** 2026-11-21 (reconciled with Starlings Docs `/strategy/product-roadmap` and ADR 0011).
+**Last updated:** 2026-11-21 (reconciled with Starlings Docs `/strategy/product-roadmap`, ADR 0011, the GitHub milestones, and the site work of 2026-11-21).
 
 **Public roadmap.** An issue labelled `roadmap` appears on
 `septena.app/roadmap`. Its public copy and feature ID live in the site repo,
@@ -63,10 +63,17 @@ The task app ships as **Septena** (ADR 0007). Needs M1. Runs before M2
 - #31 / #48 rename pass: user-facing "Septask" → "Septena", life OS →
   "Septena Life", in the apps, the MCP skill text and the App Store copy.
   Code identifiers stay.
-- #50 / #107 site rewrite around the task app and pricing page (private site repo)
+- #50 / #107 site rewrite around the task app and pricing page (private site repo).
+  Website expansion #105 with #106, #109–#113 (all in this milestone). Live on
+  2026-11-21: footer, features and workflow pages, platform pages, help,
+  pricing (marked planned), moving-in hub, comparison registry, `/llms.txt`.
+  Open: per-agent guides (#112), source moving-in pages (#111, #135), footer
+  update card (#106). #95 done: `/changelog` shows task-app updates.
 - #49 (mz) trademark search for "Septena" (classes 9 and 42)
 - #3 privacy copy for the iCloud exit
 - #43 P3 Stripe for the web client waits for the web client (M3)
+- #118 move septena.app and every Septena worker to a dedicated Cloudflare
+  account (infrastructure, no milestone; must not start during a launch week)
 
 Exit: a sandbox purchase turns on sync with protected annual renewal pricing,
 the stores and the site say "Septena", and the trademark search is clear.
@@ -91,6 +98,10 @@ multiplatform access and an agentic UX*):
   To Do closes 30 June 2027)
 - #103 Agent-first onboarding (invite agent connection on first run, propose
   real areas/projects/tasks/emoji for review before creating; reuses `#70`)
+- Switcher gaps specced 2026-11-21, not yet ranked against Ranks 1–3: #126
+  richer repeats, #127 Star/Important, #128 start/end times and an iCal feed,
+  #129 widgets, #130 data export, #131 Mac attachment parity, #132 iOS swipe
+  actions
 
 **Lane B — Agent loop, trust & directories:**
 - #87 Agents propose done, only the human accepts (blocks shipping trust line)
@@ -117,6 +128,10 @@ GitHub milestone: `"M3 Factory ships code"`.
 - F3 `code` workflow on linked repos, run log (needs L0–L1)
 - #21 Web client on `api.septena.app` (Rank 4 first wave — reaches Windows,
   Linux and browsers first; #43 Stripe billing pairs here)
+- #133 natural-language capture in titles · #134 email-to-task address
+- #137 Sign in with Google, Microsoft or an email link (decided 2026-11-21):
+  the web client, Android, Windows and self-hosting all need a way in that is
+  not Sign in with Apple. Changes the "no email address" privacy promise.
 - Rank 5 moving-in adapters on `#99`: #100 Todoist & TickTick (direct read-only
   OAuth APIs), #101 Superlist (verify export schema first), #102 OmniFocus 4
   (CSV/TaskPaper) & Any.do (guided fallback)
