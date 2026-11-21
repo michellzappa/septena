@@ -120,6 +120,7 @@ enum TaskUndo {
     let deadline: Date?
     let recurrence: Recurrence?
     let recurrencePaused: Bool
+    let reminder: TaskReminder?
 
     init(_ task: SeptenaTask) {
       id = task.id
@@ -128,6 +129,7 @@ enum TaskUndo {
       deadline = SeptenaDate.parse(task.deadline)
       recurrence = task.recurrence
       recurrencePaused = task.recurrencePaused
+      reminder = task.reminder
     }
   }
 
@@ -154,6 +156,7 @@ enum TaskUndo {
       if snapshot.recurrence != nil {
         mutator.setRecurrencePaused(id: snapshot.id, paused: snapshot.recurrencePaused)
       }
+      mutator.setReminder(id: snapshot.id, reminder: snapshot.reminder)
       mutator.moveToToday(id: snapshot.id, today: snapshot.today)
     }
   }

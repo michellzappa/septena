@@ -78,6 +78,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// future copies. This is local task state, not part of the HTTP recurrence
   /// payload, so old server responses continue to decode as false.
   var recurrencePaused: Bool = false
+  var reminder: TaskReminder? = nil
   /// For open recurring tasks: the date the next instance would land if
   /// completed today. Computed server-side per request; absent on non-
   /// recurring or already-completed tasks. Used to render
@@ -338,6 +339,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     notes: String?,
     recurrence: Recurrence?,
     recurrencePaused: Bool = false,
+    reminder: TaskReminder? = nil,
     nextOccurrence: String? = nil,
     updatedAt: String?,
     deletedAt: String?,
@@ -370,6 +372,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     self.notes = notes
     self.recurrence = recurrence
     self.recurrencePaused = recurrencePaused
+    self.reminder = reminder
     self.nextOccurrence = nextOccurrence
     self.updatedAt = updatedAt
     self.deletedAt = deletedAt
@@ -393,7 +396,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     case id, title, status, created, scheduled, deadline, today
     case todaySetOn = "today_set_on"
     case completedAt = "completed_at"
-    case area, project, notes, recurrence
+    case area, project, notes, recurrence, reminder
     case nextOccurrence = "next_occurrence"
     case updatedAt = "updated_at"
     case deletedAt = "deleted_at"
@@ -428,6 +431,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     project = try c.decodeIfPresent(String.self, forKey: .project)
     notes = try c.decodeIfPresent(String.self, forKey: .notes)
     recurrence = try c.decodeIfPresent(Recurrence.self, forKey: .recurrence)
+    reminder = try c.decodeIfPresent(TaskReminder.self, forKey: .reminder)
     nextOccurrence = try c.decodeIfPresent(String.self, forKey: .nextOccurrence)
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     deletedAt = try c.decodeIfPresent(String.self, forKey: .deletedAt)

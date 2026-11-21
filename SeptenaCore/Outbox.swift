@@ -225,6 +225,30 @@ final class TaskMutator {
     cloudBackend.setDeadline(id: id, date: date)
   }
 
+  func setReminder(id: String, reminder: TaskReminder?) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setReminder called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.setReminder(id: id, reminder: reminder)
+  }
+
+  func snoozeReminder(id: String, until: Date) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] snoozeReminder called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.snoozeReminder(id: id, until: until)
+  }
+
+  func dismissReminder(id: String, at date: Date = Date()) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] dismissReminder called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.dismissReminder(id: id, at: date)
+  }
+
   func setRecurrence(id: String, recurrence: Recurrence?) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] setRecurrence called before CK bound — dropping", nil)

@@ -144,6 +144,11 @@ enum TaskHistory {
         ? String(localized: "Repeat paused", comment: "Task history")
         : String(localized: "Repeat resumed", comment: "Task history"))
     }
+    if diff["reminderAt"] != nil {
+      lines.append(after("reminderAt").isNull
+        ? String(localized: "Reminder removed", comment: "Task history")
+        : String(localized: "Reminder set", comment: "Task history"))
+    }
     // Order, Today bookkeeping, acknowledgement and provenance fields are
     // left out: they change on every reorder and mean nothing to read.
     return lines

@@ -425,3 +425,118 @@ enum RecurrenceDateCalculator {
     return "recur-\(String(format: "%016llx", hash))"
   }
 }
+
+// MARK: - Timed Task Reminders (docs/TIMED_REMINDERS_SPEC.md)
+
+enum TaskReminderMode: String, Codable, Hashable, Sendable {
+  case floating
+  case fixed
+}
+
+/// Value representation of a task's timed reminder. Wraps the flat persisted
+/// columns (`reminderAt`, `reminderMode`, `reminderSnoozedUntil`,
+/// `reminderDismissedAt`) on `TaskEntity`.
+struct TaskReminder: Codable, Hashable, Sendable {
+  /// Wall-clock `YYYY-MM-DDTHH:MM` (floating) or UTC ISO-8601 `YYYY-MM-DDTHH:MM:SSZ` (fixed).
+  var fireAt: String
+  var mode: TaskReminderMode
+  var snoozedUntil: String?
+  var dismissedAt: String?
+
+  enum CodingKeys: String, CodingKey {
+    case fireAt = "reminder_at"
+    case mode = "reminder_mode"
+    case snoozedUntil = "reminder_snoozed_until"
+    case dismissedAt = "reminder_dismissed_at"
+  }
+
+  init(fireAt: String,
+       mode: TaskReminderMode = .floating,
+       snoozedUntil: String? = nil,
+       dismissedAt: String? = nil) {
+    self.fireAt = fireAt
+    self.mode = mode
+    self.snoozedUntil = snoozedUntil
+    self.dismissedAt = dismissedAt
+  }
+}
+
+/// Pure timed-reminder arithmetic and arming rules.
+/// LOCKSTEP with `backend/src/reminders.ts` and `registry/conformance/reminders.json`.
+enum TaskReminderRules {
+  private static let utcCalendar: Calendar = {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = TimeZone(secondsFromGMT: 0)!
+    return cal
+  }()
+
+  private static func parseYMD(_ ymd: String) -> Date? {
+    let prefix = String(ymd.prefix(10))
+    let parts = prefix.split(separator: "-")
+    guard parts.count == 3,
+          let y = Int(parts[0]),
+          let m = Int(parts[1]),
+          let d = Int(parts[2]),
+          (1...12).contains(m),
+          (1...31).contains(d) else { return nil }
+    return utcCalendar.date(from: DateComponents(year: y, month: m, day: d))
+  }
+
+  private static func formatYMD(_ date: Date) -> String {
+    let c = utcCalendar.dateComponents([.year, .month, .day], from: date)
+    return String(format: "%04d-%02d-%02d", c.year ?? 1970, c.month ?? 1, c.day ?? 1)
+  }
+
+  static func shiftForRecurrence(sourceReminderAt: String?,
+                                 sourceScheduled: String?,
+                                 nextScheduled: String?) -> String? {
+    guard let src = sourceReminderAt,
+          let nextDay = nextScheduled,
+          src.count > 10 else { return nil }
+    let idx = src.index(src.startIndex, offsetBy: 10)
+    guard src[idx] == "T" else { return nil }
+    let remDayStr = String(src[..<idx])
+    let timeSuffix = String(src[idx...])
+    guard let nextDate = parseYMD(nextDay) else { return nil }
+
+    var offsetDays = 0
+    if let sched = sourceScheduled,
+       let remDate = parseYMD(remDayStr),
+       let schedDate = parseYMD(sched) {
+      offsetDays = utcCalendar.dateComponents([.day], from: schedDate, to: remDate).day ?? 0
+    }
+    guard let target = utcCalendar.date(byAdding: .day, value: offsetDays, to: nextDate) else {
+      return nil
+    }
+    return formatYMD(target) + timeSuffix
+  }
+
+  static func shiftOnReschedule(reminderAt: String?,
+                                oldScheduled: String?,
+                                newScheduled: String?) -> String? {
+    guard let rem = reminderAt else { return nil }
+    guard let oldS = oldScheduled, let newS = newScheduled, rem.count > 10 else { return rem }
+    let idx = rem.index(rem.startIndex, offsetBy: 10)
+    guard rem[idx] == "T" else { return rem }
+    let remDay = String(rem[..<idx])
+    let oldDay = String(oldS.prefix(10))
+    let newDay = String(newS.prefix(10))
+    guard remDay == oldDay else { return rem }
+    return newDay + String(rem[idx...])
+  }
+
+  static func shouldArm(status: String,
+                        isDeleted: Bool,
+                        isHeading: Bool,
+                        isUnratifiedProposal: Bool,
+                        reminderAt: String?,
+                        reminderDismissedAt: String?) -> Bool {
+    guard status == "open",
+          !isDeleted,
+          !isHeading,
+          !isUnratifiedProposal,
+          let rem = reminderAt, !rem.isEmpty,
+          reminderDismissedAt == nil else { return false }
+    return true
+  }
+}

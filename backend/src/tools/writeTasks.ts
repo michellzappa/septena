@@ -1,4 +1,5 @@
 import type { ConvoTurn, TaskConvo } from "./taskShared.js";
+import { isValidReminderAt, type ReminderMode } from "../reminders.js";
 
 // Pure task-write logic (planning, ids, recurrence and conversation helpers)
 // and the tool input schemas. No I/O: src/shadow/writes.ts turns the plans
@@ -96,6 +97,15 @@ export const createTaskJsonSchema = {
     project: { type: "string", description: "Project id (e.g. 'septena')" },
     notes: { type: "string", description: "Free-text note body for the task." },
     recurrence: recurrenceJsonSchema,
+    reminder_at: {
+      type: "string",
+      description: "Optional timed alert. Wall-clock YYYY-MM-DDTHH:MM (floating, default) or UTC ISO-8601 YYYY-MM-DDTHH:MM:SSZ (fixed). Agent proposals do not arm OS alerts until accepted by the user.",
+    },
+    reminder_mode: {
+      type: "string",
+      enum: ["floating", "fixed"],
+      description: "Timezone mode for reminder_at: floating (device local wall-clock, default) or fixed (exact UTC instant).",
+    },
     origin: {
       type: "string",
       enum: ["user_request", "agent_suggestion"],
@@ -125,6 +135,15 @@ export const updateTaskJsonSchema = {
     status: { type: "string", enum: ["open", "cancelled"] },
     notes: { type: ["string", "null"], description: 'Free-text note body, or null/"" to clear' },
     recurrence: recurrenceJsonSchema,
+    reminder_at: {
+      type: ["string", "null"],
+      description: "Optional timed alert (YYYY-MM-DDTHH:MM or YYYY-MM-DDTHH:MM:SSZ), or null to clear.",
+    },
+    reminder_mode: {
+      type: ["string", "null"],
+      enum: ["floating", "fixed", null],
+      description: "Timezone mode for reminder_at: floating or fixed.",
+    },
   },
 } as const;
 
@@ -151,6 +170,10 @@ export interface CreateTaskInput {
   project?: string;
   notes?: string;
   recurrence?: RecurrenceInput | null;
+  reminder_at?: string | null;
+  reminderAt?: string | null;
+  reminder_mode?: ReminderMode | null;
+  reminderMode?: ReminderMode | null;
   /**
    * Provenance (docs/TASK_ROW_LANGUAGE_SPEC.md §3.4). `user_request` commits the
    * task (placed where specified); `agent_suggestion` (or omitted — the gateway's
@@ -172,6 +195,10 @@ export interface UpdateTaskInput {
   status?: "open" | "cancelled";
   notes?: string | null;
   recurrence?: RecurrenceInput | null;
+  reminder_at?: string | null;
+  reminderAt?: string | null;
+  reminder_mode?: ReminderMode | null;
+  reminderMode?: ReminderMode | null;
 }
 
 /** Wire form of a repeat rule. `afterCompletion` is accepted as an alias for
@@ -285,6 +312,26 @@ export function recurrenceEcho(rule: RecurrenceRuleInput) {
   return out;
 }
 
+export function parseReminderInput(
+  rawAt: string | null | undefined,
+  rawMode: ReminderMode | null | undefined,
+): { reminderAt: string | null; reminderMode: ReminderMode | null } | undefined {
+  if (rawAt === undefined) return undefined;
+  if (rawAt === null || rawAt === "") return { reminderAt: null, reminderMode: null };
+  const inferredMode: ReminderMode = rawMode ?? (/(?:Z|[+-]\d{2}:\d{2})$/.test(rawAt) ? "fixed" : "floating");
+  if (inferredMode !== "floating" && inferredMode !== "fixed") {
+    throw new Error("reminder_mode must be 'floating' or 'fixed'");
+  }
+  if (!isValidReminderAt(rawAt, inferredMode)) {
+    throw new Error(
+      inferredMode === "fixed"
+        ? "reminder_at must be ISO-8601 UTC/offset (YYYY-MM-DDTHH:MM:SSZ) when reminder_mode='fixed'"
+        : "reminder_at must be local wall-clock YYYY-MM-DDTHH:MM when reminder_mode='floating'",
+    );
+  }
+  return { reminderAt: rawAt, reminderMode: inferredMode };
+}
+
 /**
  * The data-source-free part of `tasks_create`: the parsed rule, provenance
  * and the result echo. Throws on a bad rule, before anything is written.
@@ -292,13 +339,22 @@ export function recurrenceEcho(rule: RecurrenceRuleInput) {
  */
 export function planCreate(input: CreateTaskInput) {
   const rule = parseRecurrenceInput(input.recurrence, input.scheduled);
+  const reminder = parseReminderInput(
+    input.reminder_at !== undefined ? input.reminder_at : input.reminderAt,
+    input.reminder_mode !== undefined ? input.reminder_mode : input.reminderMode,
+  );
   // Provenance (docs/TASK_ROW_LANGUAGE_SPEC.md §3.4): only an explicit
   // `user_request` commits; anything else lands as a proposal.
   const committed = input.origin === "user_request";
   const placement: "committed" | "inbox_proposal" = committed ? "committed" : "inbox_proposal";
   const deadline = input.deadline ?? input.due;
-  const echo = rule ? { recurrence: recurrenceEcho(rule) } : {};
-  return { rule, committed, placement, deadline, echo };
+  const echo: Record<string, unknown> = {};
+  if (rule) echo.recurrence = recurrenceEcho(rule);
+  if (reminder?.reminderAt) {
+    echo.reminder_at = reminder.reminderAt;
+    echo.reminder_mode = reminder.reminderMode;
+  }
+  return { rule, reminder, committed, placement, deadline, echo };
 }
 
 /**
@@ -318,6 +374,8 @@ export interface TaskUpdatePlan {
     status?: "open" | "cancelled";
     notes?: string | null;
     recurrence?: RecurrenceRuleInput | null;
+    reminderAt?: string | null;
+    reminderMode?: ReminderMode | null;
   };
   updated: string[];
 }
@@ -367,6 +425,14 @@ export function planUpdate(input: UpdateTaskInput, storedScheduled?: string | nu
   }
   if (input.status !== undefined) { f.status = input.status; updated.push("status"); }
   if (input.notes !== undefined) { f.notes = input.notes ?? null; updated.push("notes"); }
+  const rawRemAt = input.reminder_at !== undefined ? input.reminder_at : input.reminderAt;
+  const rawRemMode = input.reminder_mode !== undefined ? input.reminder_mode : input.reminderMode;
+  const parsedRem = parseReminderInput(rawRemAt, rawRemMode);
+  if (parsedRem !== undefined) {
+    f.reminderAt = parsedRem.reminderAt;
+    f.reminderMode = parsedRem.reminderMode;
+    updated.push("reminder_at");
+  }
   // Recurrence last, so it validates against the schedule this call may have
   // just set. Present-with-null clears; absent leaves the rule alone.
   if (input.recurrence !== undefined) {

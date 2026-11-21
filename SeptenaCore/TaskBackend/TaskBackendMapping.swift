@@ -192,6 +192,10 @@ enum TaskBackendMapping {
         guard let ow = t.recurrence?.ordinalWeekday else { return .null }
         return .object(["ordinal": .int(Int64(ow.ordinal)), "weekday": .int(Int64(ow.weekday))])
       }(),
+      "reminderAt": c.text("reminderAt", t.reminderAt, max: 32),
+      "reminderMode": c.text("reminderMode", t.reminderMode, max: 16),
+      "reminderSnoozedUntil": c.stamp("reminderSnoozedUntil", t.reminderSnoozedUntil),
+      "reminderDismissedAt": c.stamp("reminderDismissedAt", t.reminderDismissedAt),
       "source": c.text("source", t.source, max: 64),
       "sourceClient": c.text("sourceClient", t.sourceClient, max: 64),
       "acknowledgedAt": t.acknowledgedAt.map { .string(stamp($0)) } ?? .null,

@@ -9,6 +9,11 @@ installWorkerTestHooks();
 
 const { nextScheduledDate, occurrenceID } = await import("../src/recurrence.ts");
 const {
+  shiftReminderForRecurrence,
+  shiftReminderOnReschedule,
+  shouldArmReminder,
+} = await import("../src/reminders.ts");
+const {
   awaitsReasoning,
   daysOnToday,
   inInbox,
@@ -103,6 +108,28 @@ describe("Conformance: recurrence.json", () => {
   for (const c of fixture.occurrenceID) {
     it(`occurrenceID: ${c.sourceTaskID} | ${c.scheduled}`, () => {
       assert.equal(occurrenceID(c.sourceTaskID, c.scheduled), c.expected);
+    });
+  }
+});
+
+describe("Conformance: reminders.json", () => {
+  const fixture = readJSON("conformance/reminders.json");
+
+  for (const c of fixture.shiftReminderForRecurrence) {
+    it(`shiftReminderForRecurrence: ${c.name}`, () => {
+      assert.equal(shiftReminderForRecurrence(c.input), c.expected);
+    });
+  }
+
+  for (const c of fixture.shiftReminderOnReschedule) {
+    it(`shiftReminderOnReschedule: ${c.name}`, () => {
+      assert.equal(shiftReminderOnReschedule(c.input), c.expected);
+    });
+  }
+
+  for (const c of fixture.shouldArmReminder) {
+    it(`shouldArmReminder: ${c.name}`, () => {
+      assert.equal(shouldArmReminder(c.input), c.expected);
     });
   }
 });

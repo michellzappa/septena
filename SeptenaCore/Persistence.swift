@@ -66,6 +66,11 @@ final class TaskEntity {
   var recurrenceMonthDay: Int?
   /// JSON-encoded `RecurrenceOrdinalWeekday` for fixed monthly/yearly ordinal rules (RV0).
   var recurrenceOrdinalWeekdayJSON: String?
+  /// Timed task reminder fields (docs/TIMED_REMINDERS_SPEC.md, TR0).
+  var reminderAt: String?
+  var reminderMode: String?
+  var reminderSnoozedUntil: String?
+  var reminderDismissedAt: String?
   /// Bumped every time we apply a server payload. Lets the syncer detect
   /// rows that the latest pull didn't touch (= server-side deletions).
   var lastSyncedAt: Date
@@ -184,6 +189,10 @@ final class TaskEntity {
        recurrenceWeekdaysJSON: String? = nil,
        recurrenceMonthDay: Int? = nil,
        recurrenceOrdinalWeekdayJSON: String? = nil,
+       reminderAt: String? = nil,
+       reminderMode: String? = nil,
+       reminderSnoozedUntil: String? = nil,
+       reminderDismissedAt: String? = nil,
        lastSyncedAt: Date = .distantPast,
        sortIndex: Int = 0,
        position: Double = 0,
@@ -221,6 +230,10 @@ final class TaskEntity {
     self.recurrenceWeekdaysJSON = recurrenceWeekdaysJSON
     self.recurrenceMonthDay = recurrenceMonthDay
     self.recurrenceOrdinalWeekdayJSON = recurrenceOrdinalWeekdayJSON
+    self.reminderAt = reminderAt
+    self.reminderMode = reminderMode
+    self.reminderSnoozedUntil = reminderSnoozedUntil
+    self.reminderDismissedAt = reminderDismissedAt
     self.lastSyncedAt = lastSyncedAt
     self.sortIndex = sortIndex
     self.position = position
@@ -342,6 +355,25 @@ final class TaskEntity {
       } else {
         recurrenceOrdinalWeekdayJSON = nil
       }
+    }
+  }
+
+  var reminder: TaskReminder? {
+    get {
+      guard let fireAt = reminderAt, !fireAt.isEmpty else { return nil }
+      let mode = reminderMode.flatMap(TaskReminderMode.init(rawValue:)) ?? .floating
+      return TaskReminder(
+        fireAt: fireAt,
+        mode: mode,
+        snoozedUntil: reminderSnoozedUntil,
+        dismissedAt: reminderDismissedAt
+      )
+    }
+    set {
+      reminderAt = newValue?.fireAt
+      reminderMode = newValue?.mode.rawValue
+      reminderSnoozedUntil = newValue?.snoozedUntil
+      reminderDismissedAt = newValue?.dismissedAt
     }
   }
 }
@@ -1850,6 +1882,7 @@ extension SeptenaTask {
       notes: e.notes,
       recurrence: e.recurrence,
       recurrencePaused: e.recurrencePaused,
+      reminder: e.reminder,
       // Pass the series' LOGICAL slot, the way `complete` does — without it
       // the preview rebases on a one-off exception date and shows a next
       // occurrence the completion will not actually create. (`DayClock.appToday`
