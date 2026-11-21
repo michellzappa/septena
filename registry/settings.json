@@ -73,6 +73,66 @@
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
       "featureId": "lists.today"
     },
+    "accentColor": {
+      "scope": "synced",
+      "storageKey": "septena.appearance.accentColor",
+      "type": "enum",
+      "enum": "accentColor",
+      "default": "colorful",
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "settings.display"
+    },
+    "canvasTexture": {
+      "scope": "synced",
+      "storageKey": "septena.appearance.canvasTexture",
+      "type": "enum",
+      "enum": "canvasTexture",
+      "default": "none",
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "settings.display"
+    },
+    "textureIntensity": {
+      "scope": "synced",
+      "storageKey": "septena.appearance.textureIntensity",
+      "type": "int",
+      "min": 15,
+      "max": 100,
+      "default": 55,
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "settings.display"
+    },
+    "textureMotion": {
+      "scope": "synced",
+      "storageKey": "septena.appearance.textureMotion",
+      "type": "enum",
+      "enum": "textureMotion",
+      "default": "still",
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "settings.display"
+    },
+    "appearanceMode": {
+      "scope": "device",
+      "storageKey": "septena.appearance.mode",
+      "type": "enum",
+      "enum": "appearanceMode",
+      "default": "system",
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "settings.display"
+    },
+    "syncTheme": {
+      "scope": "device",
+      "storageKey": "septena.appearance.syncTheme",
+      "type": "bool",
+      "default": true,
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "settings.display"
+    },
     "todayShowCompleted": {
       "scope": "device",
       "storageKey": "septena.today.showCompleted",

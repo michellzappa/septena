@@ -74,6 +74,14 @@ export const SETTING_VALUES = {
   getStartedDismissed: z.boolean(),
   /// "Get started" checklist steps completed (step raw IDs).
   getStartedSteps: z.array(z.string().max(64)).max(32),
+  /// App accent color ID (ADR 0019: colorful default + 7 exotic fruits).
+  accentColor: z.enum(ENTITY_ENUMS.accentColor),
+  /// Procedural header-wash canvas texture ID (ADR 0019).
+  canvasTexture: z.enum(ENTITY_ENUMS.canvasTexture),
+  /// Header-wash intensity (15..100).
+  textureIntensity: z.number().int().min(15).max(100),
+  /// Header-wash motion mode ("still" | "slowDrift").
+  textureMotion: z.enum(ENTITY_ENUMS.textureMotion),
 } satisfies Record<string, z.ZodTypeAny>;
 
 export type SettingKey = keyof typeof SETTING_VALUES;

@@ -1,6 +1,6 @@
 # 0019. Use procedural canvas textures and exotic-fruit accents over a Colorful default
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-21
 - Deciders: mz
 

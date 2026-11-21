@@ -65,6 +65,10 @@ enum SeptaskSyncedSettings {
     case "agentsPaused": return s.agentsPaused.map { .bool($0) } ?? .null
     case "getStartedDismissed": return s.getStartedDismissed.map { .bool($0) } ?? .null
     case "getStartedSteps": return s.getStartedSteps.map { .array($0.map { .string($0) }) } ?? .null
+    case "accentColor": return .from(s.accentColor)
+    case "canvasTexture": return .from(s.canvasTexture)
+    case "textureIntensity": return s.textureIntensity.map { .int(Int64($0)) } ?? .null
+    case "textureMotion": return .from(s.textureMotion)
     default: return .null
     }
   }
@@ -121,6 +125,21 @@ enum SeptaskSyncedSettings {
         s.calendarHiddenTitles = titles
       default: return false
       }
+    case "accentColor":
+      guard let x = string() else { return false }
+      s.accentColor = x
+    case "canvasTexture":
+      guard let x = string() else { return false }
+      s.canvasTexture = x
+    case "textureIntensity":
+      switch v {
+      case .null: s.textureIntensity = nil
+      case .int(let n): s.textureIntensity = Int(n)
+      default: return false
+      }
+    case "textureMotion":
+      guard let x = string() else { return false }
+      s.textureMotion = x
     default:
       return false
     }

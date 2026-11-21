@@ -46,6 +46,10 @@ enum RegistryEntityEnums {
   static let convoTurnRole: [String] = ["user", "provider"]
   static let convoTurnStep: [String] = ["confirm", "ground", "scope", "decide", "work"]
   static let telemetryLevel: [String] = ["none", "minimal", "balanced", "full"]
+  static let appearanceMode: [String] = ["system", "light", "dark"]
+  static let accentColor: [String] = ["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "acai", "pitaya", "jabuticaba"]
+  static let canvasTexture: [String] = ["none", "topography", "fieldMatrix", "stippleDrift", "causticGlass", "ridges", "washiPaper"]
+  static let textureMotion: [String] = ["still", "slowDrift"]
   static let entityNames: [String] = ["task", "area", "project", "attachment", "convo", "setting"]
   static let deletableEntities: [String] = ["task", "area", "project", "attachment"]
 }
@@ -150,6 +154,25 @@ enum RegistryIcons {
   }
 }
 
+/// Exotic-fruit app accent descriptor (`registry/tokens.json`, ADR 0019).
+struct RegistryFruitAccent: Sendable, Hashable, Identifiable {
+  let id: String
+  let name: String
+  let origin: String
+  let lightHex: String
+  let darkHex: String
+  let checkLightHex: String
+  let checkDarkHex: String
+  let multicolor: Bool
+}
+
+/// Procedural header-wash texture descriptor (`registry/tokens.json`, ADR 0019).
+struct RegistryTextureOption: Sendable, Hashable, Identifiable {
+  let id: String
+  let name: String
+  let tag: String
+}
+
 /// Shared numeric and palette design tokens (`registry/tokens.json`).
 enum RegistryTokens {
   enum Selection {
@@ -181,6 +204,25 @@ enum RegistryTokens {
     static let titleBarGap: Double = 20
   }
   static let accentPalette: [String] = ["#ef4444", "#f97316", "#f59e0b", "#eab308", "#84cc16", "#22c55e", "#10b981", "#14b8a6", "#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#ec4899", "#f43f5e"]
+  static let fruitAccents: [RegistryFruitAccent] = [
+    RegistryFruitAccent(id: "colorful", name: "Colorful", origin: "Default · Blue + semantic", lightHex: "#007AFF", darkHex: "#0A84FF", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: true),
+    RegistryFruitAccent(id: "tamarillo", name: "Tamarillo", origin: "Andes · Crimson", lightHex: "#D6333F", darkHex: "#FF5C67", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: false),
+    RegistryFruitAccent(id: "persimmon", name: "Persimmon", origin: "East Asia · Vermilion", lightHex: "#E05212", darkHex: "#FF7738", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: false),
+    RegistryFruitAccent(id: "yuzu", name: "Yuzu", origin: "Japan · Citrus gold", lightHex: "#C28500", darkHex: "#F2BF2C", checkLightHex: "#FFFFFF", checkDarkHex: "#141518", multicolor: false),
+    RegistryFruitAccent(id: "carambola", name: "Carambola", origin: "SE Asia · Starfruit", lightHex: "#5B8C00", darkHex: "#9EE034", checkLightHex: "#FFFFFF", checkDarkHex: "#141518", multicolor: false),
+    RegistryFruitAccent(id: "acai", name: "Açaí", origin: "Amazon · Indigo", lightHex: "#6544D6", darkHex: "#9B82FF", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: false),
+    RegistryFruitAccent(id: "pitaya", name: "Pitaya", origin: "Mesoamerica · Dragonfruit", lightHex: "#D4266C", darkHex: "#FF5C9B", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: false),
+    RegistryFruitAccent(id: "jabuticaba", name: "Jabuticaba", origin: "Brazil · Obsidian ink", lightHex: "#27272E", darkHex: "#E4E4EA", checkLightHex: "#FFFFFF", checkDarkHex: "#141518", multicolor: false),
+  ]
+  static let textures: [RegistryTextureOption] = [
+    RegistryTextureOption(id: "none", name: "Pure Canvas", tag: "Baseline"),
+    RegistryTextureOption(id: "topography", name: "Topography", tag: "Height Map"),
+    RegistryTextureOption(id: "fieldMatrix", name: "Field Matrix", tag: "Industrial"),
+    RegistryTextureOption(id: "stippleDrift", name: "Stipple Drift", tag: "Print / Ink"),
+    RegistryTextureOption(id: "causticGlass", name: "Caustic Glass", tag: "Optical"),
+    RegistryTextureOption(id: "ridges", name: "Ridge Lines", tag: "Elevation"),
+    RegistryTextureOption(id: "washiPaper", name: "Washi Paper", tag: "Tactile"),
+  ]
   static let textScaleFactors: [Int: Double] = [
     -2: 0.85,
     -1: 0.92,
@@ -259,12 +301,18 @@ struct RegistrySettingsPage: Sendable, Hashable, Identifiable {
 
 /// Unified task-app settings keys, defaults, synced-key list, and taxonomy (`registry/settings.json`).
 enum RegistrySettings {
-  static let syncedKeys: [String] = ["welcomeName", "telemetryLevel", "calendarHiddenTitles", "rolledInDismissedOn", "homeTimezone", "agentsPaused", "getStartedDismissed", "getStartedSteps"]
+  static let syncedKeys: [String] = ["welcomeName", "telemetryLevel", "calendarHiddenTitles", "rolledInDismissedOn", "homeTimezone", "agentsPaused", "getStartedDismissed", "getStartedSteps", "accentColor", "canvasTexture", "textureIntensity", "textureMotion"]
 
   enum StorageKey {
     static let welcomeName = "septena.homepage.welcomeName"
     static let telemetryLevel = "septena.privacy.telemetryLevel"
     static let rolledInDismissedOn = "septena.newTodos.dismissedDate"
+    static let accentColor = "septena.appearance.accentColor"
+    static let canvasTexture = "septena.appearance.canvasTexture"
+    static let textureIntensity = "septena.appearance.textureIntensity"
+    static let textureMotion = "septena.appearance.textureMotion"
+    static let appearanceMode = "septena.appearance.mode"
+    static let syncTheme = "septena.appearance.syncTheme"
     static let todayShowCompleted = "septena.today.showCompleted"
     static let todayGroupByList = "septena.today.groupByList"
     static let tasksShowAging = "septena.tasks.showAging"
@@ -288,6 +336,12 @@ enum RegistrySettings {
     static let telemetryLevel: String = "balanced"
     static let agentsPaused: Bool = false
     static let getStartedDismissed: Bool = false
+    static let accentColor: String = "colorful"
+    static let canvasTexture: String = "none"
+    static let textureIntensity: Int = 55
+    static let textureMotion: String = "still"
+    static let appearanceMode: String = "system"
+    static let syncTheme: Bool = true
     static let todayShowCompleted: Bool = true
     static let todayGroupByList: Bool = true
     static let tasksShowAging: Bool = true

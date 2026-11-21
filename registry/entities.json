@@ -46,7 +46,11 @@
     "convoHandoffActionType": ["open_url", "compose", "call", "none"],
     "convoTurnRole": ["user", "provider"],
     "convoTurnStep": ["confirm", "ground", "scope", "decide", "work"],
-    "telemetryLevel": ["none", "minimal", "balanced", "full"]
+    "telemetryLevel": ["none", "minimal", "balanced", "full"],
+    "appearanceMode": ["system", "light", "dark"],
+    "accentColor": ["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "acai", "pitaya", "jabuticaba"],
+    "canvasTexture": ["none", "topography", "fieldMatrix", "stippleDrift", "causticGlass", "ridges", "washiPaper"],
+    "textureMotion": ["still", "slowDrift"]
   },
   "entities": {
     "task": {

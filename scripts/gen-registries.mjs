@@ -120,6 +120,22 @@ function validateTokens(tokens) {
   for (const hex of tokens.accentPalette) {
     assert(/^#[0-9a-fA-F]{6}$/.test(hex), `tokens.json: invalid hex "${hex}"`);
   }
+  if (tokens.fruitAccents !== undefined) {
+    assert(Array.isArray(tokens.fruitAccents) && tokens.fruitAccents.length > 0, "tokens.json: fruitAccents must be non-empty array");
+    for (const a of tokens.fruitAccents) {
+      assert(typeof a.id === "string" && a.id.length > 0, "tokens.json: fruitAccent missing id");
+      for (const h of [a.light, a.dark, a.checkLight, a.checkDark]) {
+        assert(/^#[0-9a-fA-F]{6}$/.test(h), `tokens.json: fruitAccent ${a.id} invalid hex "${h}"`);
+      }
+    }
+  }
+  if (tokens.textures !== undefined) {
+    assert(Array.isArray(tokens.textures) && tokens.textures.length > 0, "tokens.json: textures must be non-empty array");
+    for (const t of tokens.textures) {
+      assert(typeof t.id === "string" && t.id.length > 0, "tokens.json: texture missing id");
+      assert(typeof t.name === "string" && t.name.length > 0, `tokens.json: texture ${t.id} missing name`);
+    }
+  }
   assert(Array.isArray(tokens.textScale?.steps) && tokens.textScale.steps.length === 5, "tokens.json: textScale must have 5 steps");
 }
 
@@ -439,6 +455,25 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("");
 
   // 4. Design Tokens
+  lines.push("/// Exotic-fruit app accent descriptor (`registry/tokens.json`, ADR 0019).");
+  lines.push("struct RegistryFruitAccent: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let name: String");
+  lines.push("  let origin: String");
+  lines.push("  let lightHex: String");
+  lines.push("  let darkHex: String");
+  lines.push("  let checkLightHex: String");
+  lines.push("  let checkDarkHex: String");
+  lines.push("  let multicolor: Bool");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// Procedural header-wash texture descriptor (`registry/tokens.json`, ADR 0019).");
+  lines.push("struct RegistryTextureOption: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let name: String");
+  lines.push("  let tag: String");
+  lines.push("}");
+  lines.push("");
   lines.push("/// Shared numeric and palette design tokens (`registry/tokens.json`).");
   lines.push("enum RegistryTokens {");
   lines.push("  enum Selection {");
@@ -470,6 +505,16 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`    static let titleBarGap: Double = ${tokens.desktopColumn.titleBarGap}`);
   lines.push("  }");
   lines.push(`  static let accentPalette: [String] = [${tokens.accentPalette.map(swiftStr).join(", ")}]`);
+  lines.push("  static let fruitAccents: [RegistryFruitAccent] = [");
+  for (const a of tokens.fruitAccents ?? []) {
+    lines.push(`    RegistryFruitAccent(id: ${swiftStr(a.id)}, name: ${swiftStr(a.name)}, origin: ${swiftStr(a.origin)}, lightHex: ${swiftStr(a.light)}, darkHex: ${swiftStr(a.dark)}, checkLightHex: ${swiftStr(a.checkLight)}, checkDarkHex: ${swiftStr(a.checkDark)}, multicolor: ${Boolean(a.multicolor)}),`);
+  }
+  lines.push("  ]");
+  lines.push("  static let textures: [RegistryTextureOption] = [");
+  for (const t of tokens.textures ?? []) {
+    lines.push(`    RegistryTextureOption(id: ${swiftStr(t.id)}, name: ${swiftStr(t.name)}, tag: ${swiftStr(t.tag)}),`);
+  }
+  lines.push("  ]");
   lines.push("  static let textScaleFactors: [Int: Double] = [");
   for (const s of tokens.textScale.steps) {
     lines.push(`    ${s.step}: ${s.factor},`);
@@ -787,7 +832,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const VIEW_ALIASES = ${JSON.stringify(dests.viewAliases)} as const;`);
   lines.push(`export const DESTINATIONS = ${JSON.stringify(dests.destinations)} as const;`);
   lines.push(`export const ICONS = ${JSON.stringify(icons.icons)} as const;`);
-  lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, selection: tokens.selection, colors: tokens.colors, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
+  lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, swipeActions: actions.swipeActions, shortcutsSheet: actions.shortcutsSheet })} as const;`);
   lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes })} as const;`);

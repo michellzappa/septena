@@ -1044,6 +1044,13 @@ struct AppSettings: Codable {
   /// synced across devices so progress carries over. Nil → none recorded.
   var getStartedSteps: [String]? = nil
 
+  /// Appearance customization (ADR 0019 / docs/CUSTOMIZATION_SPEC.md). Synced
+  /// across devices when device-local `syncTheme` is enabled.
+  var accentColor: String? = nil
+  var canvasTexture: String? = nil
+  var textureIntensity: Int? = nil
+  var textureMotion: String? = nil
+
   /// When the first-run welcome (section picker + chained onboarding) was
   /// completed. The durable, cross-device "this account has been welcomed"
   /// marker: synced so a returning user's *new* device never re-shows the
