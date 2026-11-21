@@ -100,6 +100,8 @@
 		381C31B4815244EBDA43D21E /* TaskListChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B423CA3E56845C72374F434 /* TaskListChrome.swift */; };
 		385F2F36B8A5E69A2A3940AB /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD295FAB7B881CAC43EE8C34 /* Outbox.swift */; };
 		386157A887E032273284ED60 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = D09BA73660B9E4E0E7ECF146 /* Sparkle */; };
+		3A8A8BDBD41CAD23DA99D3C4 /* TaskReminderScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1771CDE768EFDFECB5DE5A97 /* TaskReminderScheduler.swift */; };
+		3ADD5FF47A92DA71CC701AED /* TaskReminderScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1771CDE768EFDFECB5DE5A97 /* TaskReminderScheduler.swift */; };
 		3B06F33EA5F566B2630A8557 /* TaskCheckbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0EF20A42D5CF76D88B8EADA /* TaskCheckbox.swift */; };
 		3B445E3B58ED439E4047057D /* SeptaskWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D72A1514292FB8D98B35257C /* SeptaskWatchApp.swift */; };
 		3BB7AA7DC2E5F0347B15B393 /* SeptaskKitQuickEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61ECA105E694199D54C07F49 /* SeptaskKitQuickEntry.swift */; };
@@ -546,6 +548,7 @@
 		14C225D655D3B2B11F2054B6 /* SolarClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolarClock.swift; sourceTree = "<group>"; };
 		15F376CF1F8AAFD193002AF6 /* ConversationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationEngine.swift; sourceTree = "<group>"; };
 		1734D6038C418B2F57FDECFA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		1771CDE768EFDFECB5DE5A97 /* TaskReminderScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskReminderScheduler.swift; sourceTree = "<group>"; };
 		189C19A4B6A31EEF867A2EA8 /* Accessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Accessibility.swift; sourceTree = "<group>"; };
 		18E48AC7FB126378FB07EF7F /* TaskHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskHistory.swift; sourceTree = "<group>"; };
 		19948915BBC3EF38BB4CA0B7 /* TaskA11y.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskA11y.swift; sourceTree = "<group>"; };
@@ -1228,6 +1231,7 @@
 				DD71B99BB832F620DA99B6C1 /* TaskFade.swift */,
 				22A8E34A615D06FDC1DF1773 /* TaskListOrder.swift */,
 				2FEC52E838E893E9D37A00D6 /* TaskRecordNames.swift */,
+				1771CDE768EFDFECB5DE5A97 /* TaskReminderScheduler.swift */,
 				E4FD8156022B5BC0FAA1DDC2 /* TaskStructureOrder.swift */,
 				5BC3E1673BA9289B29884918 /* TasksWatchWire.swift */,
 				909E479DF4C6E8141D0C8044 /* TaskUndo.swift */,
@@ -1740,6 +1744,7 @@
 				434D2E9EE8E08BF36EA2B5ED /* TaskPickerSheets.swift in Sources */,
 				3E86C458DD50C0143EE6C258 /* TaskReads.swift in Sources */,
 				B09E65F1746E1B5CC311CFED /* TaskRecordNames.swift in Sources */,
+				3A8A8BDBD41CAD23DA99D3C4 /* TaskReminderScheduler.swift in Sources */,
 				2A70C7E73453E59C5BBCDBD2 /* TaskRowActions.swift in Sources */,
 				8115B4D49CB48DDADA10A7FD /* TaskSettingsSections.swift in Sources */,
 				03FE984F48F40345769DC87C /* TaskSkeletonRows.swift in Sources */,
@@ -1986,6 +1991,7 @@
 				AE7D28112FB5E32562A58283 /* TaskPickerSheets.swift in Sources */,
 				C23DB117D9740A048D5DA42B /* TaskReads.swift in Sources */,
 				846F71B34106883861EE2215 /* TaskRecordNames.swift in Sources */,
+				3ADD5FF47A92DA71CC701AED /* TaskReminderScheduler.swift in Sources */,
 				4D385248117B5B1C3B53F777 /* TaskRowActions.swift in Sources */,
 				EF23BD559A591B28E7827CDA /* TaskSettingsSections.swift in Sources */,
 				F27E163709DD0E60D26DA5FF /* TaskSkeletonRows.swift in Sources */,
