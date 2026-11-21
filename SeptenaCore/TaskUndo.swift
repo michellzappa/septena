@@ -261,6 +261,55 @@ enum TaskUndo {
            redo: { for id in ids { mutator.delete(id: id) } })
   }
 
+  // MARK: - Task fade (keep / weekly sweep — docs/TASK_FADE_SPEC.md §4 & §5)
+
+  /// Fade & completion state captured before keeping or dropping faded tasks,
+  /// so undo puts each task back into the Faded pile with its original stamps.
+  struct FadedSnapshot: Equatable {
+    let id: String
+    let statusRaw: String
+    let completedAt: String?
+    let dropReason: String?
+    let fadedAt: Date?
+    let touchedAt: Date?
+    let deferCount: Int
+
+    init(_ task: SeptenaTask) {
+      id = task.id
+      statusRaw = task.status.rawValue
+      completedAt = task.completedAt
+      dropReason = task.dropReason
+      fadedAt = task.fadedAt
+      touchedAt = task.touchedAt
+      deferCount = task.deferCount
+    }
+  }
+
+  /// Undo for keeping one or more tasks out of the Faded pile (§4).
+  static func recordKeepFaded(before: [FadedSnapshot], mutator: TaskMutator) {
+    guard !before.isEmpty else { return }
+    let ids = before.map(\.id)
+    let name = before.count == 1
+      ? String(localized: "Keep Task", comment: "Undo action name: keep faded task")
+      : String(localized: "Keep Tasks", comment: "Undo action name: keep faded tasks")
+    record(name: name,
+           undo: { mutator.restoreFaded(before) },
+           redo: { mutator.keepFaded(ids: ids) })
+  }
+
+  /// Undo for "Let the rest go" in the weekly sweep (§5) — ONE undo entry
+  /// for every dropped task in the sweep.
+  static func recordSweepDrop(before: [FadedSnapshot], mutator: TaskMutator) {
+    guard !before.isEmpty else { return }
+    let ids = before.map(\.id)
+    let name = before.count == 1
+      ? String(localized: "Let Task Go", comment: "Undo action name: drop faded task")
+      : String(localized: "Let Faded Tasks Go", comment: "Undo action name: drop faded tasks in sweep")
+    record(name: name,
+           undo: { mutator.restoreFaded(before) },
+           redo: { mutator.dropFaded(ids: ids) })
+  }
+
   /// Title edit. `before` is the title as it stood when the editor opened.
   static func recordRename(id: String, before: String, after: String,
                            mutator: TaskMutator) {

@@ -152,6 +152,7 @@ struct SeptenaApp: App {
               // place to advance fixed-schedule repeats. Idempotent — keep in
               // parity with `SeptaskLaunch.activate()`.
               services.taskMutator.catchUpFixedSchedules()
+              services.runFadePassIfDue()
             }
             // Present the support moment armed in a prior session — before the
             // fresh milestone check below, so a thank-you ask and a brand-new

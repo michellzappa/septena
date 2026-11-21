@@ -75,6 +75,7 @@ enum SeptaskLaunch {
     // the reliable place to advance fixed-schedule repeats. Idempotent —
     // keep in parity with Septena's `.active` branch in App.swift.
     services.taskMutator.catchUpFixedSchedules()
+    services.runFadePassIfDue()
   }
 
   /// iOS: hold deferred launch work until the first Today frame is drawn.

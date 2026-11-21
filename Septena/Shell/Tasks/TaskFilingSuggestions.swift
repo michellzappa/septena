@@ -32,7 +32,7 @@ enum TaskFilingSuggestions {
     -> [SuggestionEngine.Suggestion]? {
     guard TaskRowFlags.filingSuggestionsEnabled else { return nil }
     guard task.status == .open else { return nil }
-    guard filter != .logbook && filter != .recentlyDeleted else { return nil }
+    guard filter != .logbook && filter != .faded && filter != .recentlyDeleted else { return nil }
     guard task.project == nil else { return nil }
 
     // Inbox → area or project. BOTH populations that share the Today Inbox
@@ -96,7 +96,7 @@ enum TaskFilingSuggestions {
                     projects: [Project],
                     areas: [Area]) {
     guard TaskRowFlags.filingSuggestionsEnabled,
-          filter != .logbook, filter != .recentlyDeleted else { return }
+          filter != .logbook, filter != .faded, filter != .recentlyDeleted else { return }
     if filter == .today {
       engine.refresh(inbox: LocalCache.tasks(in: context, filter: .triage),
                      allTasks: LocalCache.trainingTasks(in: context),

@@ -78,9 +78,9 @@ struct TaskSettingsPane<Destination: Hashable>: View {
       // Announced for the same reason as the grouping toggle below: Septask's
       // AppKit Today reads the key from UserDefaults and must rebuild.
       Toggle("Show completed tasks", isOn: TaskViewOptions.announcing($todayShowCompleted))
-      Toggle(isOn: $showAging) {
-        rowLabel("Show aging",
-                 detail: "Fade a task a little more each day it carries over.")
+      Toggle(isOn: TaskViewOptions.announcing($showAging)) {
+        rowLabel("Fade untouched tasks",
+                 detail: "Tasks untouched for 14 days fade out and move to Faded.")
       }
       // Same switch as View ▸ Group Today by List; `announcing` is what keeps
       // Septask's AppKit list in step when it's flipped from here.
@@ -91,7 +91,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
     } header: {
       Text("Today")
     } footer: {
-      Text("A task starts fading the day after it lands on Today and keeps fading for a week. It comes back to full strength when you move it off Today or check it off.")
+      Text("Undated, non-repeating tasks fade over 14 days without a touch and move to Faded until a weekly sweep lets you keep them or let them go. Touching a task restores full strength.")
     }
   }
 

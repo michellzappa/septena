@@ -444,7 +444,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // `LocalCache.convert`, but sharing this snapshot avoids refetching the
     // entire open table for every smart-list badge on every task edit.
     let all = LocalCache.allTasks(in: context).filter { !$0.isHeading }
-    let open = all.filter { $0.status == .open }
+    // Faded open tasks leave every list count and project ratio (docs/TASK_FADE_SPEC.md §4).
+    let open = all.filter { $0.status == .open && !$0.isFaded }
+    let fadedCount = all.filter(\.isFaded).count
     let today = SeptenaDate.today
     let inboxCount = open.filter { $0.isInTriageBand }.count
     let todayCount = open.filter { $0.isOnToday && !$0.isInTriageBand }.count
@@ -504,8 +506,12 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
                                                           today: todayCount + inboxCount,
                                                           doneToday: doneTodayCount))
     }
-    // Only shown once there's something in it — same gate the SwiftUI
-    // sidebar uses, so an empty trash doesn't sit in the list forever.
+    // Faded pile & Recently Deleted: shown once non-empty, matching the SwiftUI sidebar.
+    if fadedCount > 0 {
+      let faded = KitSidebarDestination.filter(.faded,
+                                               title: TaskFilter.faded.title)
+      views.append(Node(faded.nodeContent, count: fadedCount))
+    }
     let recentlyDeletedCount = LocalCache.tasks(in: context, filter: .recentlyDeleted).count
     if recentlyDeletedCount > 0 {
       let deleted = KitSidebarDestination.filter(.recentlyDeleted,

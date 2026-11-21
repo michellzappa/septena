@@ -750,6 +750,13 @@ struct TaskComposerCard: View {
       // vanish from the Inbox on dismiss with no decision made. Ratification
       // happens on Save, and only when the edit actually (re)places it (see
       // `persist`).
+      // Opening a faded task keeps it (`docs/TASK_FADE_SPEC.md` §4): clears
+      // `fadedAt`, stamps `touchedAt`, and records undo.
+      if !deferredCreate, task.isFaded {
+        let snap = TaskUndo.FadedSnapshot(task)
+        mutator.keepFaded(ids: [task.id])
+        TaskUndo.recordKeepFaded(before: [snap], mutator: mutator)
+      }
       //
       // On the iPhone sheet, editing opens at half height (seeded in `init`)
       // with no autofocus: you're reviewing an existing task, not entering one,

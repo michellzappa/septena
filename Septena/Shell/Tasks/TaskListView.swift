@@ -504,6 +504,8 @@ struct TaskListView: View {
   /// Bumped when a notice is dismissed, so `noticesRow` re-reads
   /// `TaskNotices` (which owns the dismissal state).
   @State private var noticeEpoch = 0
+  /// Non-nil presents the Weekly Sweep sheet (`docs/TASK_FADE_SPEC.md` §5).
+  @State private var sweepSheetTasks: [SeptenaTask]? = nil
   /// One group-title line of space above the logged footer (scales with
   /// Dynamic Type like the titles it matches).
   @ScaledMetric(relativeTo: .headline) private var loggedFooterGap: CGFloat = 34
@@ -536,6 +538,18 @@ struct TaskListView: View {
           Task { await load() }
         }
       ))
+      .sheet(isPresented: Binding(
+        get: { sweepSheetTasks != nil },
+        set: { if !$0 { sweepSheetTasks = nil } }
+      )) {
+        if let tasks = sweepSheetTasks {
+          TaskFadeSweepSheet(tasks: tasks, areas: areas, projects: projects) {
+            sweepSheetTasks = nil
+            noticeEpoch += 1
+            Task { await load() }
+          }
+        }
+      }
       .confirmationDialog(
         "Reschedule Repeating Task?",
         isPresented: Binding(
@@ -644,9 +658,9 @@ struct TaskListView: View {
 
   private var showsEmbeddedNewTaskToolbar: Bool {
     #if os(iOS)
-    embedded && filter != .recentlyDeleted && !usesPushNavigation
+    embedded && filter != .recentlyDeleted && filter != .faded && !usesPushNavigation
     #else
-    embedded && filter != .recentlyDeleted
+    embedded && filter != .recentlyDeleted && filter != .faded
     #endif
   }
 
@@ -666,7 +680,7 @@ struct TaskListView: View {
     // regular the "+" merges with the sidebar's "···" in the tab bar; on iPhone
     // a pushed list shows gear + "+" in its own nav bar.
     .modifier(TaskListStandaloneChrome(embedded: embedded,
-                                       recentlyDeleted: filter == .recentlyDeleted,
+                                       recentlyDeleted: filter == .recentlyDeleted || filter == .faded,
                                        showsViewOptions: filter == .today,
                                        onNew: { openContextualQuickAdd() }))
     // (Keyboard navigation — ↑↓ traversal, Return/Esc, focus reclaim —
@@ -1004,7 +1018,7 @@ struct TaskListView: View {
   /// the `+`/⌘N composer there (it lets you pick the day).
   private var allowsInlineCreate: Bool {
     switch filter {
-    case .logbook, .recentlyDeleted, .upcoming, .repeating, .review: return false
+    case .logbook, .faded, .recentlyDeleted, .upcoming, .repeating, .review: return false
     default:                                    return true
     }
   }
@@ -1610,6 +1624,23 @@ struct TaskListView: View {
         .plainListChrome()
         noticeStepRows(notice.steps)
       }
+    } else if filter == .faded, !visibleItems.isEmpty {
+      TaskListNotice(
+        kind: .info,
+        symbol: "circle.dashed",
+        title: Text(String(localized: "Tasks untouched for 14 days wait here.",
+                           comment: "Faded pile top notice title")),
+        detail: Text(String(localized: "Tap Keep or open a task to bring it back, or run a sweep.",
+                            comment: "Faded pile top notice detail")),
+        onDismiss: nil
+      ) {
+        Button(String(localized: "Sweep…", comment: "Faded pile sweep action")) {
+          sweepSheetTasks = visibleItems
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+      }
+      .plainListChrome()
     }
   }
 
@@ -1690,6 +1721,14 @@ struct TaskListView: View {
 
   @ViewBuilder
   private func noticeAction(_ notice: TaskNotice) -> some View {
+    if notice.id == .weeklySweep {
+      Button(notice.primaryTitle ?? String(localized: "Review", comment: "Weekly sweep button")) {
+        let candidates = TaskNotices.sweepCandidates(context: modelContext)
+        if !candidates.isEmpty { sweepSheetTasks = candidates }
+      }
+      .buttonStyle(.bordered)
+      .controlSize(.small)
+    }
     #if SEPTASK
     if notice.id == .signIn { SeptaskSignInButton(compact: true) }
     #endif
@@ -1806,6 +1845,15 @@ struct TaskListView: View {
           "Nothing to review",
           systemImage: titleIcon,
           description: Text("Tasks Claude finishes appear here so you can check and accept them.")
+        )
+        .frame(maxWidth: .infinity)
+        .padding(.top, 40)
+        .plainListChrome()
+      } else if filter == .faded {
+        ContentUnavailableView(
+          "No Faded Tasks",
+          systemImage: titleIcon,
+          description: Text("Undated tasks untouched for 14 days appear here until you keep them or let them go.")
         )
         .frame(maxWidth: .infinity)
         .padding(.top, 40)
@@ -2857,7 +2905,9 @@ struct TaskListView: View {
     // right-click `.contextMenu`). `quickMenu` still gates the one-tap "file
     // here" suggestion capsule, now threaded into the row as the inboard-most
     // trailing accessory (left of the date) rather than appended at the edge.
-    staticRow(task, accessory: quickMenu ? suggestionCapsule(for: task) : nil)
+    staticRow(task, accessory: filter == .faded
+              ? keepFadedCapsule(for: task)
+              : (quickMenu ? suggestionCapsule(for: task) : nil))
     // Drag a row (or the whole selection) to a sidebar area/project to re-home
     // it, or between rows of a manually-ordered list to reorder. `.draggable`
     // pairs with the sidebar's `.dropDestination(for:)` and `TaskReorderDrop`;
@@ -2911,6 +2961,50 @@ struct TaskListView: View {
       .fixedSize()
       .accessibilityLabel("File in \(suggestion.title)")
     )
+  }
+
+  /// One-tap "Keep" capsule shown on each row in the Faded pile
+  /// (`docs/TASK_FADE_SPEC.md` §4). Brings the task back to its list in one
+  /// undoable gesture.
+  private func keepFadedCapsule(for task: SeptenaTask) -> AnyView? {
+    AnyView(
+      Button {
+        keepFadedTasks([task.id])
+      } label: {
+        Text(String(localized: "Keep", comment: "Faded pile row keep button"))
+          .scaledFont(size: 12, weight: .medium)
+          .lineLimit(1)
+          .padding(.horizontal, 10)
+          .padding(.vertical, 3)
+          .background(Capsule().fill(Theme.mutedSurface))
+          .foregroundStyle(Theme.inkPrimary)
+          .contentShape(Capsule())
+      }
+      .buttonStyle(.plain)
+      .inlineHover(capsule: true)
+      .fixedSize()
+      .accessibilityLabel(String(localized: "Keep \(task.title)", comment: "Faded pile keep button accessibility"))
+    )
+  }
+
+  private func keepFadedTasks(_ ids: [String]) {
+    let snapshots = ids.compactMap { currentTask(id: $0) }.map(TaskUndo.FadedSnapshot.init)
+    guard !snapshots.isEmpty else { return }
+    Haptics.tick()
+    mutator.keepFaded(ids: snapshots.map(\.id))
+    TaskUndo.recordKeepFaded(before: snapshots, mutator: mutator)
+    for id in snapshots.map(\.id) { removeLocally(id: id) }
+    Task { await load() }
+  }
+
+  private func dropFadedTasks(_ ids: [String]) {
+    let snapshots = ids.compactMap { currentTask(id: $0) }.map(TaskUndo.FadedSnapshot.init)
+    guard !snapshots.isEmpty else { return }
+    Haptics.warning()
+    mutator.dropFaded(ids: snapshots.map(\.id))
+    TaskUndo.recordSweepDrop(before: snapshots, mutator: mutator)
+    for id in snapshots.map(\.id) { removeLocally(id: id) }
+    Task { await load() }
   }
 
   /// The canonical closed row — checkbox + title + subtitle/date — plus the
@@ -3057,6 +3151,26 @@ struct TaskListView: View {
         }
       } label: {
         Label("Delete Permanently", systemImage: "trash")
+      }
+    } else if filter == .faded {
+      // Faded pile (`docs/TASK_FADE_SPEC.md` §4): Keep restores to the task's
+      // original list with undo; Let Go cancels with dropReason = "faded".
+      Button {
+        keepFadedTasks(target.ids)
+      } label: {
+        Label("Keep", systemImage: "arrow.uturn.backward")
+      }
+      Button {
+        dropFadedTasks(target.ids)
+      } label: {
+        Label("Let Go", systemImage: "wind")
+      }
+      Divider()
+      Button(role: .destructive) {
+        Haptics.warning()
+        for id in target.ids { applyDelete(id) }
+      } label: {
+        Label("Delete", systemImage: "trash")
       }
     } else {
       TaskListRowContextMenu(
@@ -3493,7 +3607,7 @@ struct TaskListView: View {
     // Every open-work list hides done tasks (a just-completed one lingers via
     // the settle exception in `visibleItems`, then fades). Only the Logbook and
     // Recently Deleted — whose whole job is showing finished/trashed tasks — keep them.
-    case .project, .area, .unscheduled, .upcoming, .triage, .repeating, .review: return true
+    case .project, .area, .unscheduled, .upcoming, .triage, .repeating, .review, .faded: return true
     case .today:
       return !todayShowCompleted
     case .logbook, .recentlyDeleted: return false

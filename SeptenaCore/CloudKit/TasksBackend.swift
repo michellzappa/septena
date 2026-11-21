@@ -446,6 +446,7 @@ final class CloudKitTasksBackend {
     }
     entity.statusRaw = TaskStatus.open.rawValue
     entity.completedAt = nil
+    entity.dropReason = nil
     entity.pendingSync = true
     commitAndPush(entity, op: "uncomplete")
   }
@@ -1092,24 +1093,122 @@ final class CloudKitTasksBackend {
     commitAndPush(entity, op: "reorderToday")
   }
 
-  // MARK: Fade clock (docs/TASK_FADE_SPEC.md §3)
+  // MARK: Fade clock & fade pass (docs/TASK_FADE_SPEC.md §3–§5)
 
-  /// The ONE place `touchedAt` / `deferCount` are written. A user gesture
-  /// stamps `touchedAt`; a defer also adds 1 to `deferCount`, and any other
-  /// gesture resets it to 0. Local save only: the task backend has no column
-  /// for these fields until the cutover, so there is nothing to push and no
-  /// list to repaint (P1 has no UI). A failed save is logged by `StoreHealth`
-  /// and loses only the stamp.
+  /// The ONE place `touchedAt` / `deferCount` are written for user gestures.
+  /// A user gesture stamps `touchedAt` (and clears `fadedAt`, keeping any
+  /// faded task the user edits); a defer also adds 1 to `deferCount`, and any
+  /// other gesture resets it to 0. Local save only (the task backend has no
+  /// fade columns until the cutover), followed by a repaint notice so row
+  /// opacity snaps back to full strength and kept tasks return to their list.
   func touch(ids: [String], deferredIDs: Set<String> = []) {
     var changed = false
-    let now = Date()
+    let now = DayClock.appNow
     for id in ids {
       guard let entity = fetch(id: id), entity.deletedAt == nil else { continue }
       entity.touchedAt = now
       entity.deferCount = deferredIDs.contains(id) ? entity.deferCount + 1 : 0
+      if entity.fadedAt != nil { entity.fadedAt = nil }
       changed = true
     }
-    if changed { StoreHealth.save(context, op: "touch") }
+    if changed {
+      if StoreHealth.save(context, op: "touch") {
+        NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+      }
+    }
+  }
+
+  /// Daily idempotent fade pass (`docs/TASK_FADE_SPEC.md` §4). Stamps
+  /// `fadedAt = now` on every open, eligible task untouched for the fade
+  /// window (14 days). Never stamps `touchedAt` and never registers undo.
+  @discardableResult
+  func runFadePass(now explicitNow: Date? = nil, today explicitToday: String? = nil) -> Int {
+    guard TaskFade.isEnabled else { return 0 }
+    let now = explicitNow ?? DayClock.appNow
+    let today = explicitToday ?? DayClock.appToday
+    let descriptor = FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { e in
+        e.deletedAt == nil && !e.pendingDeletion && e.statusRaw == "open"
+      }
+    )
+    let candidates = (try? context.fetch(descriptor)) ?? []
+    var faded = 0
+    for entity in candidates {
+      let convo = entity.conversation
+      let isAgentTurn = deriveConvo(convo).badge == .working
+      let isAssignedToClaude = convo.assignee == .claude
+      guard TaskFade.shouldFade(
+        isOpen: entity.status == .open,
+        isHeading: entity.isHeading,
+        isDeleted: entity.deletedAt != nil,
+        isFaded: entity.isFaded,
+        deadline: entity.deadline,
+        scheduled: entity.scheduled,
+        hasRecurrence: entity.recurrence != nil,
+        isAgentTurn: isAgentTurn,
+        isAssignedToClaude: isAssignedToClaude,
+        touchedAt: entity.touchedAt,
+        createdAt: entity.createdAt,
+        created: entity.created,
+        now: now,
+        today: today
+      ) else { continue }
+      entity.fadedAt = now
+      faded += 1
+    }
+    guard faded > 0 else { return 0 }
+    if StoreHealth.save(context, op: "fadePass") {
+      SeptenaLog.info("[Fade] faded \(faded) untouched task(s) on \(today)")
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    }
+    return faded
+  }
+
+  /// Keep faded task(s) out of the Faded pile (§4): clears `fadedAt`, stamps
+  /// `touchedAt`, resets `deferCount`. Routed through `touch` so there stays
+  /// one stamp site.
+  func keepFaded(ids: [String]) {
+    touch(ids: ids)
+  }
+
+  /// Drop faded task(s) in the weekly sweep (§5): sets status `cancelled`,
+  /// `dropReason = "faded"`, `completedAt = now`. Syncs the cancelled status
+  /// through `commitAndPush` so other devices see the drop in the Logbook.
+  func dropFaded(ids: [String]) {
+    let stamp = ckCompletionTimestamp()
+    for id in ids {
+      guard let entity = fetch(id: id), entity.deletedAt == nil, entity.status == .open else { continue }
+      entity.statusRaw = TaskStatus.cancelled.rawValue
+      entity.dropReason = TaskDropReason.faded
+      entity.completedAt = stamp
+      entity.pendingSync = true
+      commitAndPush(entity, op: "dropFaded")
+    }
+  }
+
+  /// Undo target for `TaskUndo.recordKeepFaded` and `TaskUndo.recordSweepDrop`:
+  /// restores exact pre-action fade & status fields without re-stamping `touchedAt`.
+  func restoreFaded(_ snapshots: [TaskUndo.FadedSnapshot]) {
+    var localOnlyChanged = false
+    for snap in snapshots {
+      guard let entity = fetch(id: snap.id), entity.deletedAt == nil else { continue }
+      let statusChanged = entity.statusRaw != snap.statusRaw || entity.completedAt != snap.completedAt
+      entity.statusRaw = snap.statusRaw
+      entity.completedAt = snap.completedAt
+      entity.dropReason = snap.dropReason
+      entity.fadedAt = snap.fadedAt
+      entity.touchedAt = snap.touchedAt
+      entity.deferCount = snap.deferCount
+      if statusChanged {
+        entity.pendingSync = true
+        commitAndPush(entity, op: "restoreFaded")
+      } else {
+        localOnlyChanged = true
+      }
+    }
+    if localOnlyChanged, StoreHealth.save(context, op: "restoreFaded") {
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    }
   }
 
   // MARK: Headings (project section dividers — docs/ORDERING_AND_HEADINGS_PLAN.md)

@@ -392,6 +392,7 @@ final class SeptenaServices {
       ) { _ in
         Task { @MainActor in
           SeptenaServices.shared.taskMutator.catchUpFixedSchedules()
+          SeptenaServices.shared.runFadePassIfDue()
           SeptenaServices.shared.purgeExpiredTasksIfDue()
         }
       }
@@ -462,6 +463,10 @@ final class SeptenaServices {
     // occurrences another device already created are in the mirror by now, so
     // the deterministic-id guard sees them and this adds only what is missing.
     taskMutator.catchUpFixedSchedules()
+    // Daily task-fade pass (docs/TASK_FADE_SPEC.md §4): move untouched open
+    // tasks past the 14-day window into the Faded pile. After fetch so remote
+    // edits are already applied.
+    runFadePassIfDue()
     // 30-day auto-purge of Recently Deleted (docs/RECENTLY_DELETED_SPEC.md).
     // Here so BOTH apps run it, after the pull so synced deletions count.
     purgeExpiredTasksIfDue()
@@ -472,6 +477,20 @@ final class SeptenaServices {
     // Publish this device's timezone so the gateway resolves the user's real
     // zone instead of defaulting to UTC — task tools need it too.
     SettingsMirror.publishDeviceTimezone(context: context, engine: ckEngine)
+  }
+
+  /// The app calendar day the fade pass last ran in this process.
+  private var lastFadePassDay: String?
+
+  /// Idempotent daily fade pass (`docs/TASK_FADE_SPEC.md` §4). Runs at most
+  /// once per `DayClock.appToday` per process (on launch after pull, at day
+  /// rollover, and on foreground), so time-travel in Debug also exercises it.
+  @MainActor
+  func runFadePassIfDue() {
+    let day = DayClock.appToday
+    guard lastFadePassDay != day else { return }
+    lastFadePassDay = day
+    taskMutator.runFadePass(now: DayClock.appNow, today: day)
   }
 
   /// The real calendar day the Recently Deleted purge last ran in this process.

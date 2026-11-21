@@ -421,10 +421,10 @@ struct TaskCheckboxModel {
       if task.conversation.hasStarted, deriveConvo(task.conversation).badge != nil { return accent }
       return nil
     }()
-    // Aging shows only where the Today badge is suppressed, which is the
-    // Today list itself (`showsTodayIndicator == filter != .today`). Inside an
-    // area or project it would grade a list the row isn't judged in.
-    tenureFill = TaskRowFlags.agingEnabled && !showsTodayIndicator && !isDeleted ? task.todayTenureFill() : nil
+    // Countdown toward the 14-day fade window in every open list
+    // (`docs/TASK_FADE_SPEC.md` §4). Already-faded tasks return nil from
+    // `fadeFill()` so rows in the Faded pile stay fully readable.
+    tenureFill = TaskRowFlags.agingEnabled && !isDeleted ? task.fadeFill() : nil
   }
 }
 
@@ -614,13 +614,22 @@ struct TaskRow: View {
     let cal = Calendar.current
     let today = todayAnchor
     // Completed tasks show WHEN they were done (the Completed view reads as a
-    // dated archive); the date prefix strips the time off `completedAt`.
+    // dated archive); dropped tasks carry a distinct "Let go" label
+    // (`docs/TASK_FADE_SPEC.md` §5).
     if task.status == .done, let done = task.completedAt.flatMap({ SeptenaDate.parse(String($0.prefix(10))) }) {
       HStack(spacing: 4) {
         Image(systemName: "checkmark").scaledFont(size: 11)
         Text(Self.shortDate(done)).font(.septenaMeta)
       }
       .foregroundStyle(Theme.inkSecondary)
+    } else if task.status == .cancelled {
+      let label = task.dropReason != nil
+        ? String(localized: "Let go", comment: "Logbook label for dropped task")
+        : String(localized: "Cancelled", comment: "Logbook label for cancelled task")
+      let dateText = task.completedAt.flatMap { SeptenaDate.parse(String($0.prefix(10))) }.map(Self.shortDate)
+      Text(dateText.map { "\(label) · \($0)" } ?? label)
+        .font(.septenaMeta)
+        .foregroundStyle(Theme.inkSecondary)
     } else if let due = task.deadline.flatMap(SeptenaDate.parse) {
       let dueDay = cal.startOfDay(for: due)
       if dueDay <= today {
