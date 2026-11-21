@@ -1,7 +1,7 @@
 name = "septena-mcp-gateway"
-# The Centaur-Labs account. Pinned so a wrangler login with several accounts
+# The Septena account (ADR 0018, moved 2026-11-21). Pinned so a wrangler login with several accounts
 # cannot deploy or create resources on the wrong one.
-account_id = "50894cc73fc5188e3efb7eb9819c54e9"
+account_id = "1d2ed1f57832a528b7f197b5a9d68d39"
 main = "src/index.ts"
 compatibility_date = "2024-12-15"
 compatibility_flags = ["nodejs_compat_v2"]
@@ -49,15 +49,15 @@ APPLE_IAP_ENVIRONMENTS = "Production,Sandbox"
 # Created via `wrangler kv namespace create <NAME>`; paste returned IDs here.
 [[kv_namespaces]]
 binding = "STATE"
-id = "2ad8a91b6ba54e579d843f5bdf215bf4"
+id = "4066d642849946a5bcdb5523b52a35d5"
 
 [[kv_namespaces]]
 binding = "TOKENS"
-id = "d89bf617d013488096dd64be9f826d7e"
+id = "1b8f0af54763424190a01dcb85109852"
 
 [[kv_namespaces]]
 binding = "CLIENTS"
-id = "8d9200723c194a03ac3e1482f24f173d"
+id = "c6550511896e493aa5abd8685e9dd6a1"
 
 # Task backend: one TaskStore Durable Object (SQLite) per user.
 [[durable_objects.bindings]]
