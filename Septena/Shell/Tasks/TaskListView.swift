@@ -294,6 +294,17 @@ struct TaskListView: View {
   @State private var headingRenameTarget: SeptenaTask?
   @State private var headingDeleteTarget: SeptenaTask?
   @State private var headingDraftTitle: String = ""
+  /// Confirmation target for swipe "Delete Permanently" in Recently Deleted
+  /// (`docs/IOS_SWIPE_ACTIONS_SPEC.md` §2 — permanent delete has no undo).
+  @State private var permanentDeleteConfirmTask: SeptenaTask?
+
+  private var isSwipeEditModeActive: Bool {
+    #if os(iOS)
+    return editMode?.wrappedValue.isEditing == true
+    #else
+    return false
+    #endif
+  }
   // The title/checkbox hero-glide (`matchedGeometryEffect`) was removed: it
   // ANIMATED the title's position between the closed row and the inline editor,
   // and because a `Text` and a `TextField` never sit at a pixel-identical
@@ -774,6 +785,25 @@ struct TaskListView: View {
         headingDeleteTarget = nil
       }
       Button("Cancel", role: .cancel) { headingDeleteTarget = nil }
+    }
+    .alert(
+      "Delete Permanently?",
+      isPresented: Binding(
+        get: { permanentDeleteConfirmTask != nil },
+        set: { if !$0 { permanentDeleteConfirmTask = nil } }
+      )
+    ) {
+      Button("Delete Permanently", role: .destructive) {
+        if let t = permanentDeleteConfirmTask {
+          Haptics.warning()
+          removeLocally(id: t.id)
+          mutator.purge(id: t.id)
+        }
+        permanentDeleteConfirmTask = nil
+      }
+      Button("Cancel", role: .cancel) { permanentDeleteConfirmTask = nil }
+    } message: {
+      Text("This task will be permanently deleted and cannot be undone.")
     }
     // Re-load on every appearance so completed tasks (kept visible in-place
     // while the user is on the screen) drop off when they return.
@@ -2303,6 +2333,33 @@ struct TaskListView: View {
       _ = handleHeadingDrop(ids: TaskDragIDs.newTask.ids, targetHeading: heading, before: true)
     }
     .contextMenu { headingContextMenu(heading) }
+    .taskRowSwipeActions(
+      id: "heading-\(heading.id)",
+      enabled: !isInlineEditing && !selectionScope.isMulti && !isSwipeEditModeActive,
+      leading: [],
+      allowsLeadingFullSwipe: false,
+      trailing: [
+        TaskRowSwipeAction(
+          id: "delete-heading",
+          title: String(localized: "Delete", comment: "Swipe action delete section heading"),
+          systemImage: "trash",
+          tint: .red,
+          role: .destructive
+        ) {
+          headingDeleteTarget = heading
+        },
+        TaskRowSwipeAction(
+          id: "rename-heading",
+          title: String(localized: "Rename", comment: "Swipe action rename section heading"),
+          systemImage: "pencil",
+          tint: .blue
+        ) {
+          headingDraftTitle = heading.title
+          headingRenameTarget = heading
+        }
+      ],
+      allowsTrailingFullSwipe: false
+    )
     .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
   }
 
@@ -3238,11 +3295,11 @@ struct TaskListView: View {
 
   @ViewBuilder
   private func row(_ task: SeptenaTask, quickMenu: Bool = false) -> some View {
-    // No swipe actions and no inline "⋯" button on task rows (removed by
-    // request — completion is the checkbox; everything else is the deep-press /
-    // right-click `.contextMenu`). `quickMenu` still gates the one-tap "file
-    // here" suggestion capsule, now threaded into the row as the inboard-most
-    // trailing accessory (left of the date) rather than appended at the edge.
+    // No inline "⋯" button on task rows (completion is the checkbox; iOS adds
+    // horizontal swipe actions via `.taskRowSwipeActions` in `cardedRows`; deep-
+    // press / right-click `.contextMenu` carries the full menu). `quickMenu`
+    // still gates the one-tap "file here" suggestion capsule, now threaded into
+    // the row as the inboard-most trailing accessory (left of the date).
     staticRow(task, accessory: filter == .faded
               ? keepFadedCapsule(for: task)
               : (quickMenu ? suggestionCapsule(for: task) : nil))
@@ -3605,6 +3662,149 @@ struct TaskListView: View {
     }
   }
 
+  /// Leading iOS swipe actions (and VoiceOver accessibility actions) for a task
+  /// row, sharing the exact same mutator/undo/haptic paths as `rowActionsMenu`
+  /// (`docs/IOS_SWIPE_ACTIONS_SPEC.md` §2).
+  private func swipeLeadingActions(for task: SeptenaTask) -> [TaskRowSwipeAction] {
+    if filter == .recentlyDeleted {
+      return [
+        TaskRowSwipeAction(
+          id: "restore",
+          title: String(localized: "Restore", comment: "Swipe action restore deleted task"),
+          systemImage: "arrow.uturn.backward",
+          tint: .green
+        ) {
+          Haptics.tick()
+          mutator.restore(id: task.id)
+          removeLocally(id: task.id)
+          Task { await load() }
+        }
+      ]
+    }
+    if filter == .faded || task.isFaded {
+      return [
+        TaskRowSwipeAction(
+          id: "keep",
+          title: String(localized: "Keep", comment: "Swipe action keep faded task"),
+          systemImage: "arrow.uturn.backward",
+          tint: .blue
+        ) {
+          keepFadedTasks([task.id])
+        }
+      ]
+    }
+    var actions: [TaskRowSwipeAction] = []
+    let isProposal = task.source == TaskSource.mcp && task.acknowledgedAt == nil
+    if isProposal {
+      actions.append(TaskRowSwipeAction(
+        id: "accept",
+        title: String(localized: "Accept", comment: "Swipe action accept agent proposal"),
+        systemImage: "checkmark",
+        tint: .green
+      ) {
+        Haptics.tick()
+        promoteToToday([task.id])
+        mutator.acknowledge(id: task.id)
+        Task { await load() }
+      })
+    } else if task.isOnToday {
+      actions.append(TaskRowSwipeAction(
+        id: "remove-today",
+        title: String(localized: "Remove from Today", comment: "Swipe action remove from Today"),
+        systemImage: "sun.min",
+        tint: .gray
+      ) {
+        applyRemoveFromToday([task.id])
+      })
+    } else {
+      actions.append(TaskRowSwipeAction(
+        id: "today",
+        title: String(localized: "Today", comment: "Swipe action pin to Today"),
+        systemImage: "sun.max.fill",
+        tint: .orange
+      ) {
+        Haptics.tick()
+        promoteToToday([task.id])
+        mutator.acknowledge(id: task.id)
+        Task { await load() }
+      })
+    }
+    actions.append(TaskRowSwipeAction(
+      id: "schedule",
+      title: String(localized: "Schedule", comment: "Swipe action schedule task"),
+      systemImage: "calendar",
+      tint: .indigo
+    ) {
+      whenSheet = WhenSheet(taskIds: [task.id], kind: .scheduled)
+    })
+    return actions
+  }
+
+  /// Trailing iOS swipe actions (and VoiceOver accessibility actions) for a
+  /// task row. Full swipe is intentionally disabled on destructive actions
+  /// (`docs/IOS_SWIPE_ACTIONS_SPEC.md` §2).
+  private func swipeTrailingActions(for task: SeptenaTask) -> [TaskRowSwipeAction] {
+    if filter == .recentlyDeleted {
+      return [
+        TaskRowSwipeAction(
+          id: "purge",
+          title: String(localized: "Delete Permanently", comment: "Swipe action permanent delete"),
+          systemImage: "trash",
+          tint: .red,
+          role: .destructive
+        ) {
+          permanentDeleteConfirmTask = task
+        }
+      ]
+    }
+    if filter == .faded || task.isFaded {
+      return [
+        TaskRowSwipeAction(
+          id: "delete",
+          title: String(localized: "Delete", comment: "Swipe action delete task"),
+          systemImage: "trash",
+          tint: .red,
+          role: .destructive
+        ) {
+          Haptics.warning()
+          applyDelete(task.id)
+        },
+        TaskRowSwipeAction(
+          id: "let-go",
+          title: String(localized: "Let Go", comment: "Swipe action let go faded task"),
+          systemImage: "wind",
+          tint: .orange
+        ) {
+          dropFadedTasks([task.id])
+        }
+      ]
+    }
+    let isProposal = task.source == TaskSource.mcp && task.acknowledgedAt == nil
+    return [
+      TaskRowSwipeAction(
+        id: "delete",
+        title: isProposal
+          ? String(localized: "Dismiss", comment: "Swipe action dismiss agent proposal")
+          : String(localized: "Delete", comment: "Swipe action delete task"),
+        systemImage: "trash",
+        tint: .red,
+        role: .destructive
+      ) {
+        Haptics.warning()
+        applyDelete(task.id)
+      },
+      TaskRowSwipeAction(
+        id: "move",
+        title: String(localized: "Move", comment: "Swipe action move task"),
+        systemImage: "folder",
+        tint: .blue
+      ) {
+        moveTargetIds = [task.id]
+        showingMoveSheet = true
+      }
+    ]
+  }
+
   /// "Move to Section ▸" — the reliable, standard-macOS way to file a task into
   /// a project heading (drag-to-section also works, but pointer drag in a custom
   /// scroll list is finicky on macOS). Shown only on a project page that has
@@ -3943,6 +4143,14 @@ struct TaskListView: View {
                         // fade back. Closed selected rows keep the selection fill.
                         isSelected: isExpanded ? false : selection.contains(task.id),
                         isEditing: isExpanded)
+        .taskRowSwipeActions(
+          id: task.id,
+          enabled: !isExpanded && !isInlineEditing && !selectionScope.isMulti && !isSwipeEditModeActive,
+          leading: swipeLeadingActions(for: task),
+          allowsLeadingFullSwipe: true,
+          trailing: swipeTrailingActions(for: task),
+          allowsTrailingFullSwipe: false
+        )
         // After the chrome, so the iOS lift preview includes the card
         // background, clipped to this row's slice of the card.
         .taskCardContextMenu(position) { taskContextMenu(for: task) }
