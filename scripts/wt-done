@@ -8,8 +8,8 @@
 #
 # Usage:  scripts/wt-done [--prebuilt] [--no-push] <name>
 #
-# The gate builds the Mac schemes (WT_GATE, default "SeptenaMac SeptaskMac",
-# each on platform=macOS). Not the iOS schemes: they embed a watch app and stop
+# The gate builds the Mac scheme (WT_GATE, default "SeptaskMac",
+# on platform=macOS). Not the iOS scheme: it embeds the watch app and stops
 # on the watchOS runtime gap (AGENTS.md), which aborted every merge.
 #   --prebuilt  the branch head already passed the gate. When the merged tree
 #               is byte-identical to the branch tree (main had not moved), the
@@ -30,7 +30,7 @@ while [ $# -gt 0 ]; do
 done
 name="${1:?usage: wt-done [--prebuilt] [--no-push] <name>}"
 branch="wt/$name"
-gate="${WT_GATE:-SeptenaMac SeptaskMac}"
+gate="${WT_GATE:-SeptaskMac}"
 
 main=$(git worktree list --porcelain | awk '/^worktree /{w=$2} /^branch refs\/heads\/main$/{print w; exit}')
 [ -n "$main" ] || { echo "wt-done: no worktree is on 'main'"; exit 1; }
@@ -50,7 +50,7 @@ echo "merging $branch → main (staged, not finalized)…"
 if ! git -C "$main" merge --no-ff --no-commit "$branch"; then
   echo "✗ merge conflict. Resolve in $main (hotspot files — xcstrings/pbxproj/CloudKitSchema.md"
   echo "  — are usually union merges: keep both additions). Then:"
-  echo "    git -C \"$main\" commit && scripts/build.sh SeptenaMac 'platform=macOS' && git -C \"$main\" push"
+  echo "    git -C \"$main\" commit && scripts/build.sh SeptaskMac 'platform=macOS' && git -C \"$main\" push"
   echo "    git -C \"$main\" worktree remove \"$path\" && git -C \"$main\" branch -d \"$branch\""
   exit 1
 fi

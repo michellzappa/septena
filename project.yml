@@ -53,167 +53,6 @@ settings:
       SWIFT_OPTIMIZATION_LEVEL: "-Osize"
 
 targets:
-  Septena:
-    type: application
-    platform: iOS
-    sources:
-      - path: Septena
-        excludes:
-          - "**/.DS_Store"
-          - "**/*.entitlements"
-      - path: SeptenaCore
-        excludes:
-          - "**/.DS_Store"
-    dependencies:
-      # SeptenaShare (share text or a link into Tasks) is not embedded:
-      # Septena Life retired Tasks (ADR 0007, issue #61). The target stays
-      # defined; restore these three lines to embed it again.
-      #- target: SeptenaShare
-      #  embed: true
-      #  codeSign: true
-      # ⛔️ WATCH_EMBED_DISABLED — TEMPORARY, MUST BE RESTORED BEFORE ANY RELEASE.
-      # Uncommented = the Septena app embeds SeptenaWatch. While it's commented out the
-      # iOS scheme neither builds nor needs a watchOS runtime, which is the only
-      # way to run Septena on device when the installed watchOS simulator runtimes
-      # don't match the SDK this Xcode ships. Nothing else changes.
-      # Re-enable: delete the three '#' below, then `xcodegen generate`.
-      # An archive/upload made in this state SHIPS WITHOUT THE WATCH APP.
-      #- target: SeptenaWatch
-      #  embed: true
-      #  codeSign: true
-      - sdk: FoundationModels.framework
-      - target: SeptenaLiveActivitiesExtension
-        embed: true
-        codeSign: true
-      - target: SeptenaWidgets
-        embed: true
-        codeSign: true
-    info:
-      path: Septena/Info.plist
-      properties:
-        CFBundleShortVersionString: $(MARKETING_VERSION)
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleDisplayName: Septena Life
-        ITSAppUsesNonExemptEncryption: false
-        CFBundleLocalizations:
-          - en
-          - fr
-          - de
-          - es
-          - pt-BR
-        UILaunchScreen: {}
-        UIApplicationSceneManifest:
-          UIApplicationSupportsMultipleScenes: true
-          UISceneConfigurations:
-            UIWindowSceneSessionRoleApplication:
-              - UISceneConfigurationName: Default
-                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SeptenaSceneDelegate
-        UIApplicationSupportsIndirectInputEvents: true
-        UIBackgroundModes:
-          - remote-notification
-        NSSupportsLiveActivities: true
-        CFBundleURLTypes:
-          - CFBundleURLName: com.septena.cloud
-            CFBundleURLSchemes:
-              - septena
-        UISupportedInterfaceOrientations~ipad:
-          - UIInterfaceOrientationPortrait
-          - UIInterfaceOrientationPortraitUpsideDown
-          - UIInterfaceOrientationLandscapeLeft
-          - UIInterfaceOrientationLandscapeRight
-        UISupportedInterfaceOrientations~iphone:
-          - UIInterfaceOrientationPortrait
-          - UIInterfaceOrientationLandscapeLeft
-          - UIInterfaceOrientationLandscapeRight
-        NSRemindersFullAccessUsageDescription: Septena Life imports tasks from your Reminders lists into the Inbox.
-        NSRemindersUsageDescription: Septena Life imports tasks from your Reminders lists into the Inbox.
-        NSCalendarsFullAccessUsageDescription: Septena Life shows upcoming events from your calendars on the Week dashboard.
-        NSCalendarsUsageDescription: Septena Life shows upcoming events from your calendars on the Week dashboard.
-        NSHealthShareUsageDescription: Septena Life reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.
-        NSHealthUpdateUsageDescription: Septena Life saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device.
-        NSPhotoLibraryUsageDescription: Septena Life attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.
-        NSCameraUsageDescription: Septena Life uses the camera to photograph your meals so it can read the nutrition label or estimate macros on-device. Photos stay on your device.
-        NSFaceIDUsageDescription: Septena Life uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone.
-        WithingsClientID: $(WITHINGS_CLIENT_ID)
-        WithingsClientSecret: $(WITHINGS_CLIENT_SECRET)
-        CloudKitWebAPIToken: $(CLOUDKIT_WEB_API_TOKEN)
-    configFiles:
-      Debug: Config/Base.xcconfig
-      Release: Config/Base.xcconfig
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIconRed AppIconOrange AppIconYellow AppIconGreen AppIconCyan AppIconBlue AppIconPurple"
-        # No global accent: controls, toggles, selection and menus use the
-        # platform accent (the user's System Settings accent on macOS).
-        GENERATE_INFOPLIST_FILE: NO
-        CODE_SIGN_ENTITLEMENTS: Septena/Septena.entitlements
-
-  SeptenaMac:
-    type: application
-    platform: macOS
-    sources:
-      - path: Septena
-        excludes:
-          - "**/.DS_Store"
-          - Widgets
-          - "**/*.entitlements"
-      - path: SeptenaCore
-        excludes:
-          - "**/.DS_Store"
-      # Standalone icns generated with iconutil — Xcode's asset-catalog
-      # compiler on this SDK silently drops Mac icon slots above 128px when
-      # they share content with other slots. Bundling a pre-built icns
-      # sidesteps that entirely.
-      - path: Septena/AppIcon.icns
-        type: file
-    info:
-      path: Septena/Info-Mac.plist
-      properties:
-        CFBundleShortVersionString: $(MARKETING_VERSION)
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleDisplayName: Septena Life
-        CFBundleName: Septena Life
-        ITSAppUsesNonExemptEncryption: false
-        CFBundleLocalizations:
-          - en
-          - fr
-          - de
-          - es
-          - pt-BR
-        CFBundleIconFile: AppIcon
-        NSRemindersFullAccessUsageDescription: Septena Life imports tasks from your Reminders lists into the Inbox.
-        NSRemindersUsageDescription: Septena Life imports tasks from your Reminders lists into the Inbox.
-        NSCalendarsFullAccessUsageDescription: Septena Life shows upcoming events from your calendars on the Week dashboard.
-        NSCalendarsUsageDescription: Septena Life shows upcoming events from your calendars on the Week dashboard.
-        NSHealthShareUsageDescription: Septena Life reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.
-        NSHealthUpdateUsageDescription: Septena Life saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device.
-        NSPhotoLibraryUsageDescription: Septena Life attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.
-        NSCameraUsageDescription: Septena Life uses the camera to photograph your meals so it can read the nutrition label or estimate macros on-device. Photos stay on your device.
-        NSFaceIDUsageDescription: Septena Life uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone.
-        WithingsClientID: $(WITHINGS_CLIENT_ID)
-        WithingsClientSecret: $(WITHINGS_CLIENT_SECRET)
-        CloudKitWebAPIToken: $(CLOUDKIT_WEB_API_TOKEN)
-    configFiles:
-      Debug: Config/Base.xcconfig
-      Release: Config/Base.xcconfig
-    settings:
-      base:
-        # Target is named SeptenaMac (to disambiguate from the iOS target), but
-        # the shipped app is just "Septena" — without this the built bundle is
-        # SeptenaMac.app, which is what kept "renaming" the app.
-        PRODUCT_NAME: Septena
-        # Same bundle ID as iOS: one App Store record per product, one purchase
-        # on both platforms (ADR 0007). Was com.septena.cloud.mac until 2026-11-19.
-        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud
-        GENERATE_INFOPLIST_FILE: NO
-        CODE_SIGN_ENTITLEMENTS: Septena/SeptenaMac.entitlements
-        # No global accent: controls, toggles, selection and menus use the
-        # platform accent (the user's System Settings accent on macOS).
-    dependencies:
-      - sdk: FoundationModels.framework
-
   # Septask — the focused task app over the same private task data
   # (docs/SEPTASK.md). Same SeptenaCore sources compiled in, different
   # composition root: the SEPTASK compilation condition flips
@@ -404,35 +243,6 @@ targets:
         Release:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "SEPTASK"
 
-  SeptenaShare:
-    type: app-extension
-    platform: iOS
-    sources:
-      - path: ShareExtension/ShareViewController.swift
-      - path: SeptenaCore/SharedTaskCapture.swift
-    info:
-      path: ShareExtension/SeptenaShare-Info.plist
-      properties:
-        CFBundleDisplayName: Septena Life
-        CFBundleShortVersionString: $(MARKETING_VERSION)
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.share-services
-          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
-          NSExtensionAttributes:
-            NSExtensionActivationRule:
-              NSExtensionActivationSupportsText: true
-              NSExtensionActivationSupportsWebURLWithMaxCount: 1
-    configFiles:
-      Debug: Config/Base.xcconfig
-      Release: Config/Base.xcconfig
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.share
-        GENERATE_INFOPLIST_FILE: NO
-        CODE_SIGN_ENTITLEMENTS: ShareExtension/SeptenaShare.entitlements
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS: SHARE_EXTENSION
-
   SeptaskShare:
     type: app-extension
     platform: iOS
@@ -577,113 +387,6 @@ targets:
         Release:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "SEPTASK"
 
-  SeptenaWatch:
-    type: application
-    platform: watchOS
-    sources:
-      - path: SeptenaWatch
-        excludes:
-          - "**/.DS_Store"
-          - "**/*.entitlements"
-      # Shared "Next" wire/membership types compiled straight into the watch
-      # target (no shared framework), so the phone and watch can never disagree
-      # about Next's shape. These are single-sourced in SeptenaCore — see the
-      # header in NextWire.swift / NextBlocks.swift. NextWire needs DayBucket.
-      - path: SeptenaCore/NextWire.swift
-      - path: SeptenaCore/DayBucket.swift
-      - path: SeptenaCore/NextBlocks.swift
-      # Quick-log dispatch table for actionable suggestions (caffeine/cannabis/
-      # mood) — single-sourced like NextBlocks so the wrist write can't drift.
-      - path: SeptenaCore/SuggestionBlocks.swift
-      # Generic container math for intake trackers — the wrist + menu renders
-      # each wire kind's choices with the same logic as the phone.
-      - path: SeptenaCore/ConsumableContainer.swift
-      # Canonical mood word grid, shared with the phone's MoodCatalog so the
-      # watch's 3×3 emotion picker can't diverge.
-      - path: SeptenaCore/MoodVocabulary.swift
-      # The fasting state machine, so the watch decides fed-vs-fasting itself at
-      # its own `now` (FastingComplication.liveState) — the morph then appears
-      # overnight and rolls over at midnight without the phone republishing.
-      - path: SeptenaCore/Fasting.swift
-      # Time-of-day sky: the physical atmosphere renderer + the no-permission
-      # solar-elevation source, compiled straight into the watch (the same files
-      # the phone's SkyTopWash and the widget's dial use) so the wrist's sky
-      # can't drift from the phone's. Pure Foundation/simd — no DayClock/UIKit.
-      - path: Septena/Shell/UI/SkyAtmosphere.swift
-      - path: Septena/Shell/UI/SolarClock.swift
-      # Shared ring renderer + per-metric styling, compiled into both the watch
-      # app (the in-app macro / training summary pages) and the complication
-      # extension (the rings on the watch face) so the two can't drift.
-      - path: SeptenaWatchComplication/ComplicationRingsView.swift
-      - path: SeptenaWatchComplication/RingStyles.swift
-      # Task recurrence for the wrist: WatchConnectivity completes tasks straight
-      # to CloudKit and must generate the same next date + record id the phone
-      # would. TasksWatchRecurrence forwards to RecurrenceDateCalculator, so both
-      # files are needed. (Without them this target does not compile at all.)
-      - path: SeptenaCore/TasksWatchWire.swift
-      - path: SeptenaCore/DateParser.swift
-      # Vendored WolfActivityRing (MIT) — the Apple-style activity ring that
-      # renders the over-100% lap via color contrast (works in the complication).
-      - path: SeptenaWatchComplication/WolfActivityRing.swift
-    dependencies:
-      - target: SeptenaWatchComplication
-        embed: true
-        codeSign: true
-    info:
-      path: SeptenaWatch/Info.plist
-      properties:
-        CFBundleShortVersionString: $(MARKETING_VERSION)
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleDisplayName: Septena Life
-        WKApplication: true
-        WKCompanionAppBundleIdentifier: com.septena.cloud
-        # Tap a training Live Activity card on the wrist → open the Watch app
-        # (routes to the training summary via `NextWatchView.onOpenURL`).
-        WKSupportsLiveActivityLaunchAttributeTypes:
-          - TrainingActivityAttributes
-    configFiles:
-      Debug: Config/Base.xcconfig
-      Release: Config/Base.xcconfig
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.watchkitapp
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        GENERATE_INFOPLIST_FILE: NO
-        CODE_SIGN_ENTITLEMENTS: SeptenaWatch/SeptenaWatch.entitlements
-
-  SeptenaWatchComplication:
-    type: app-extension
-    platform: watchOS
-    sources:
-      - path: SeptenaWatchComplication
-        excludes:
-          - "**/.DS_Store"
-          - "**/*.entitlements"
-      - path: SeptenaWatch/SharedComplicationData.swift
-      # Canonical bucket labels (DayBucket.label) so the complication renders
-      # the same localized "Morning"/"Afternoon"/"Evening" as every other
-      # surface instead of capitalizing a raw string.
-      - path: SeptenaCore/DayBucket.swift
-      # The fasting state machine — the complication face re-decides fed-vs-fasting
-      # per timeline entry (FastingComplication.liveState) so the morph steps over
-      # the fast and across midnight without a provider reload or a phone republish.
-      - path: SeptenaCore/Fasting.swift
-    info:
-      path: SeptenaWatchComplication/Info.plist
-      properties:
-        CFBundleShortVersionString: $(MARKETING_VERSION)
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.widgetkit-extension
-    configFiles:
-      Debug: Config/Base.xcconfig
-      Release: Config/Base.xcconfig
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.watchkitapp.next
-        GENERATE_INFOPLIST_FILE: NO
-        CODE_SIGN_ENTITLEMENTS: SeptenaWatchComplication/SeptenaWatchComplication.entitlements
-
   SeptaskWatch:
     type: application
     platform: watchOS
@@ -749,88 +452,6 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: SeptaskWatchComplication/SeptaskWatchComplication.entitlements
 
-  SeptenaLiveActivitiesExtension:
-    type: app-extension
-    platform: iOS
-    sources:
-      - path: SeptenaLiveActivitiesExtension
-        excludes:
-          - "**/.DS_Store"
-          - "**/*.entitlements"
-      - path: SeptenaCore/TrainingLiveActivity.swift
-      - path: SeptenaCore/AdaptiveColor.swift
-    info:
-      path: SeptenaLiveActivitiesExtension/Info.plist
-      properties:
-        CFBundleShortVersionString: $(MARKETING_VERSION)
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.widgetkit-extension
-    configFiles:
-      Debug: Config/Base.xcconfig
-      Release: Config/Base.xcconfig
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.liveactivities
-        GENERATE_INFOPLIST_FILE: NO
-        CODE_SIGN_ENTITLEMENTS: SeptenaLiveActivitiesExtension/SeptenaLiveActivitiesExtension.entitlements
-
-  SeptenaWidgets:
-    type: app-extension
-    platform: iOS
-    sources:
-      - path: SeptenaWidgets
-        excludes:
-          - "**/.DS_Store"
-          - "**/*.entitlements"
-      # Shared "Next" wire types compiled straight into the widget (same pattern
-      # as the watch target). The widget renders NextItem snapshots, so it needs
-      # NextWire + DayBucket. NextWire needs DayBucket.
-      - path: SeptenaCore/NextWire.swift
-      - path: SeptenaCore/DayBucket.swift
-      # Time-wheel ("Rhythm") widget: the shared wire blob + the dial view it
-      # renders. TimeOfDayWheel needs Theme (token bag) and AdaptiveColor (the
-      # hex→Color resolver, split out of SectionTheme so the widget needn't pull
-      # in the whole theme runtime). SolarClock gives the dial its night arc
-      # on-device (no location, no payload field).
-      - path: SeptenaCore/RhythmWire.swift
-      - path: SeptenaCore/AdaptiveColor.swift
-      - path: SeptenaCore/HomepageDomain.swift
-      - path: SeptenaCore/TileWidgetWire.swift
-      - path: SeptenaCore/TileWidgetSnapshotStore.swift
-      - path: SeptenaCore/MacroWidgetWire.swift
-      - path: SeptenaCore/MacroWidgetSnapshotStore.swift
-      - path: SeptenaCore/TasksWidgetWire.swift
-      - path: SeptenaCore/TasksWidgetSnapshotStore.swift
-      - path: SeptenaCore/HeatmapLevels.swift
-      - path: SeptenaCore/WakingDay.swift
-      - path: Septena/Shell/UI/SectionGlyph.swift
-      - path: Septena/Shell/UI/ModuleTile.swift
-      - path: Septena/Shell/UI/ConsistencyHeatmap.swift
-      - path: Septena/Shell/Dashboard/HeatmapTileRow.swift
-      - path: Septena/Shell/UI/TimeOfDayWheel.swift
-      - path: SeptenaCore/Generated/RegistryConstants.swift
-      - path: Septena/Shell/UI/Theme.swift
-      - path: Septena/Shell/UI/SolarClock.swift
-      # Control Center "Add Task" — intent type for ControlWidgetButton.
-      - path: Septena/App/Intents/OpenNewTaskControlIntent.swift
-    info:
-      path: SeptenaWidgets/Info.plist
-      properties:
-        CFBundleShortVersionString: $(MARKETING_VERSION)
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.widgetkit-extension
-    configFiles:
-      Debug: Config/Base.xcconfig
-      Release: Config/Base.xcconfig
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.widgets
-        GENERATE_INFOPLIST_FILE: NO
-        CODE_SIGN_ENTITLEMENTS: SeptenaWidgets/SeptenaWidgets.entitlements
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS: WIDGET_EXTENSION
-
   # Hermetic unit tests for pure SeptenaCore logic. SeptenaCore is NOT a
   # framework — it's source compiled into each app target — so there's nothing
   # to @testable import. Instead this standalone macOS test bundle recompiles
@@ -874,43 +495,6 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.coretests
-
-  SeptenaUITests:
-    type: bundle.ui-testing
-    platform: iOS
-    sources:
-      - path: SeptenaUITests
-        excludes:
-          - "**/.DS_Store"
-    dependencies:
-      - target: Septena
-    configFiles:
-      Debug: Config/Base.xcconfig
-      Release: Config/Base.xcconfig
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.uitests
-        GENERATE_INFOPLIST_FILE: YES
-        TEST_TARGET_NAME: Septena
-
-  # Mac marketing-screenshot capture (App Store viz pipeline, appstore/).
-  SeptenaMacUITests:
-    type: bundle.ui-testing
-    platform: macOS
-    sources:
-      - path: SeptenaMacUITests
-        excludes:
-          - "**/.DS_Store"
-    dependencies:
-      - target: SeptenaMac
-    configFiles:
-      Debug: Config/Base.xcconfig
-      Release: Config/Base.xcconfig
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.macuitests
-        GENERATE_INFOPLIST_FILE: YES
-        TEST_TARGET_NAME: SeptenaMac
 
   # Septask marketing-screenshot capture (App Store viz pipeline, appstore/,
   # SEPTENA_APP=septask). Task-only sidebar navigation; see the test file.
@@ -968,27 +552,6 @@ targets:
 # App Store screenshot pipeline runs against `DemoSeedMode` (`-SeptenaSeed`),
 # which is compiled out of Release.
 schemes:
-  Septena:
-    build:
-      targets:
-        Septena: all
-    run:
-      config: Release
-      debugEnabled: false
-      # Local StoreKit testing: the support purchases resolve against this
-      # config file (no App Store Connect needed). See Config/Septena.storekit.
-      storeKitConfiguration: Config/Septena.storekit
-    test:
-      config: Debug
-      targets:
-        - SeptenaUITests
-    profile:
-      config: Release
-    analyze:
-      config: Release
-    archive:
-      config: Release
-
   Septask:
     build:
       targets:
@@ -1024,19 +587,6 @@ schemes:
     archive:
       config: Release
 
-  SeptenaWatch:
-    build:
-      targets:
-        SeptenaWatch: all
-    run:
-      config: Release
-    profile:
-      config: Release
-    analyze:
-      config: Debug
-    archive:
-      config: Release
-
   SeptaskWatch:
     build:
       targets:
@@ -1049,18 +599,6 @@ schemes:
       config: Debug
     archive:
       config: Release
-
-  SeptenaMac:
-    build:
-      targets:
-        SeptenaMac: all
-    run:
-      config: Release
-      storeKitConfiguration: Config/Septena.storekit
-    test:
-      config: Debug
-      targets:
-        - SeptenaMacUITests
 
   # Standalone unit-test scheme. Runs fast (no host app):
   #   xcodebuild test -scheme SeptenaCoreTests -destination 'platform=macOS'
