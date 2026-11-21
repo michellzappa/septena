@@ -121,7 +121,7 @@ enum TaskJSONTransfer {
   private static func areaDict(_ e: AreaEntity) -> [String: Any] {
     compact([
       "id": e.id, "title": e.title, "context": e.context,
-      "emoji": e.emoji, "attachmentJSON": e.attachmentJSON,
+      "emoji": e.emoji,
       "position": e.position, "updatedAt": e.updatedAt,
     ])
   }
@@ -131,7 +131,6 @@ enum TaskJSONTransfer {
       "id": e.id, "title": e.title, "status": e.statusRaw, "area": e.area,
       "created": e.created, "completedAt": e.completedAt,
       "notes": e.notes, "githubRepo": e.githubRepo,
-      "attachmentJSON": e.attachmentJSON,
       "position": e.position, "updatedAt": e.updatedAt, "deletedAt": e.deletedAt,
     ])
   }
@@ -317,7 +316,6 @@ enum TaskJSONTransfer {
     entity.title = title
     entity.context = r["context"] as? String
     entity.emoji = r["emoji"] as? String
-    entity.attachmentJSON = nonEmptyString(r["attachmentJSON"])
     if let pos = intValue(r["position"]) { entity.position = pos }
     if let updated = r["updatedAt"] as? String { entity.updatedAt = updated }
     return id
@@ -345,7 +343,6 @@ enum TaskJSONTransfer {
       day: SeptenaDate.today)
     entity.context = nil
     entity.githubRepo = r["githubRepo"] as? String
-    entity.attachmentJSON = nonEmptyString(r["attachmentJSON"])
     if let pos = intValue(r["position"]) { entity.position = pos }
     entity.updatedAt = r["updatedAt"] as? String
     entity.deletedAt = r["deletedAt"] as? String

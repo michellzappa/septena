@@ -90,20 +90,6 @@ enum TaskBackendMapping {
       if !v.isFinite { problems.append("\(name) is not a finite number") }
       return .double(v)
     }
-    /// `AreaAttachment` JSON: must be an object, at most `attachmentPointerMax` characters.
-    mutating func pointer(_ name: String, _ json: String?) -> BackendJSON {
-      guard let json, !json.isEmpty else { return .null }
-      guard let data = json.data(using: .utf8),
-            let value = try? JSONDecoder().decode(BackendJSON.self, from: data),
-            case .object = value else {
-        problems.append("\(name) is not a JSON object")
-        return .null
-      }
-      if json.utf16.count > RegistryEntityLimits.attachmentPointerMax {
-        problems.append("\(name) longer than \(RegistryEntityLimits.attachmentPointerMax)")
-      }
-      return value
-    }
     mutating func rowID(_ v: String) {
       if v.wholeMatch(of: TaskBackendMapping.idPattern) == nil { problems.append("id is not valid") }
     }
@@ -128,7 +114,6 @@ enum TaskBackendMapping {
       "title": c.text("title", a.title),
       "context": c.text("context", a.context, max: notesMax),
       "emoji": c.text("emoji", a.emoji, max: 16),
-      "attachment": c.pointer("attachment", a.attachmentJSON),
       "position": .int(Int64(a.position)),
     ]
     return finish(.area, a.id, c, fields, deleted: false)
@@ -149,7 +134,6 @@ enum TaskBackendMapping {
       // and refuses agent writes to it; pushing the stale local copy on
       // every project change would bring the duplicate back.
       "githubRepo": c.text("githubRepo", p.githubRepo, max: 200),
-      "attachment": c.pointer("attachment", p.attachmentJSON),
       "position": .int(Int64(p.position)),
     ]
     return finish(.project, p.id, c, fields, deleted: p.deletedAt != nil)

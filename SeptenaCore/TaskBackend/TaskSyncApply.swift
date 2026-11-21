@@ -599,7 +599,6 @@ extension TaskSyncEngine {
     take("title") { a.title = $0.stringValue ?? a.title }
     take("context") { a.context = $0.stringValue }
     take("emoji") { a.emoji = $0.stringValue }
-    take("attachment") { a.attachmentJSON = Self.jsonText($0) }
     take("position") { a.position = Self.int($0) ?? 0 }
     return applied
   }
@@ -620,7 +619,6 @@ extension TaskSyncEngine {
     take("notes") { p.notes = $0.stringValue }
     take("context") { p.context = $0.stringValue }
     take("githubRepo") { p.githubRepo = $0.stringValue }
-    take("attachment") { p.attachmentJSON = Self.jsonText($0) }
     take("position") { p.position = Self.int($0) ?? 0 }
     return applied
   }
@@ -676,12 +674,6 @@ extension TaskSyncEngine {
     case .int(let i): return Double(i)
     default: return nil
     }
-  }
-
-  /// An `AreaAttachment` object back to the JSON text the entity stores.
-  static func jsonText(_ v: BackendJSON) -> String? {
-    guard case .object = v, let data = try? JSONEncoder().encode(v) else { return nil }
-    return String(data: data, encoding: .utf8)
   }
 
   /// ISO-8601 with or without fractions, or the app's zone-less

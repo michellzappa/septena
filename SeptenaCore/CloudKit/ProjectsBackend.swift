@@ -13,7 +13,6 @@ protocol ProjectsBackend: AnyObject {
   func setStatus(id: String, status: ProjectStatus) async throws
   func setArea(id: String, area: String?) async throws
   func setGithubRepo(id: String, repo: String?) async throws
-  func setAttachment(id: String, attachment: AreaAttachment?) async throws
   func delete(id: String) async throws
   /// Renumber projects to match `orderedIDs` (synced sidebar order — the
   /// caller passes one parent group's ids). See `docs/DRAG_AND_DROP.md` §5.
@@ -68,9 +67,6 @@ final class ProjectsMutator: ProjectsBackend {
   func setGithubRepo(id: String, repo: String?) async throws {
     try await requireBackend().setGithubRepo(id: id, repo: repo)
   }
-  func setAttachment(id: String, attachment: AreaAttachment?) async throws {
-    try await requireBackend().setAttachment(id: id, attachment: attachment)
-  }
   /// Delete a project and everything in it: every task (open AND done) and
   /// every section heading goes to Recently Deleted — the same soft delete as
   /// deleting a task — then the project row goes. Nothing lands in the Inbox
@@ -122,7 +118,6 @@ final class ProjectsMutator: ProjectsBackend {
     let notes: String?
     let context: String?
     let githubRepo: String?
-    let attachmentJSON: String?
     let position: Int
     let cloudKitSystemFields: Data?
   }
@@ -133,7 +128,7 @@ final class ProjectsMutator: ProjectsBackend {
     return DeletedProject(id: e.id, title: e.title, statusRaw: e.statusRaw, area: e.area,
                           created: e.created, completedAt: e.completedAt, notes: e.notes,
                           context: e.context, githubRepo: e.githubRepo,
-                          attachmentJSON: e.attachmentJSON, position: e.position,
+                          position: e.position,
                           cloudKitSystemFields: e.cloudKitSystemFields)
   }
 
@@ -235,7 +230,7 @@ final class CloudKitProjectsBackend: ProjectsBackend {
     let entity = ProjectEntity(id: id, title: s.title, statusRaw: s.statusRaw, area: s.area,
                                created: s.created, completedAt: s.completedAt, notes: s.notes,
                                context: s.context, githubRepo: s.githubRepo,
-                               attachmentJSON: s.attachmentJSON, position: s.position,
+                               position: s.position,
                                cloudKitSystemFields: keepSystemFields ? s.cloudKitSystemFields : nil)
     context.insert(entity)
     DeletedContainerLedger.forget(.project, id)
@@ -276,18 +271,6 @@ final class CloudKitProjectsBackend: ProjectsBackend {
     guard let entity = fetch(id: id) else { return }
     entity.githubRepo = (repo?.isEmpty == true) ? nil : repo
     commitAndPush(entity, op: "setGithubRepo")
-  }
-
-  func setAttachment(id: String, attachment: AreaAttachment?) async throws {
-    guard let entity = fetch(id: id) else { return }
-    let normalized = attachment?.normalized
-    entity.attachmentJSON = normalized?.encodedString()
-    // Keep the legacy `githubRepo` pointer mirrored while agentic tooling
-    // still reads it: populate it for a `.git` attachment, clear it otherwise
-    // so the entity-level read-fallback can't resurrect a stale repo after the
-    // user switches kinds or detaches.
-    entity.githubRepo = (normalized?.kind == .git) ? normalized?.ref : nil
-    commitAndPush(entity, op: "setAttachment")
   }
 
   func delete(id: String) async throws {

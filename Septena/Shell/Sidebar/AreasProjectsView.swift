@@ -98,8 +98,6 @@ struct AreaDetailView: View {
   @State private var draftEmoji: String
   @State private var originalEmoji: String
   @State private var showingEmojiEditor = false
-  @State private var draftAttachment: AreaAttachment?
-  @State private var showingAttachmentEditor = false
   @State private var areas: [Area]
   @State private var projects: [Project]
   @State private var projectProgress: [String: Double] = [:]
@@ -115,7 +113,6 @@ struct AreaDetailView: View {
     _originalNotes = State(initialValue: area.context ?? "")
     _draftEmoji = State(initialValue: area.emoji ?? "")
     _originalEmoji = State(initialValue: area.emoji ?? "")
-    _draftAttachment = State(initialValue: area.attachment)
     // Seed area + project lists from cache before first render so the
     // project rows are present immediately on navigate-in.
     let ctx = LocalStore.shared.container.mainContext
@@ -170,7 +167,6 @@ struct AreaDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
           }
           notesField($draftNotes, placeholder: ContainerNotes.areaPlaceholder, focused: $notesFocused)
-          AttachmentZone(attachment: draftAttachment) { showingAttachmentEditor = true }
         }
         // Park the whole header on the task cards' content column so the area
         // glyph, notes, and the project rings / task checkboxes below all line
@@ -211,11 +207,6 @@ struct AreaDetailView: View {
       }
     }
     #endif
-    .sheet(isPresented: $showingAttachmentEditor) {
-      AttachmentEditorSheet(initial: draftAttachment) { commitAttachment($0) }
-        .presentationDetents([.height(340), .large])
-        .septenaSheetChrome()
-    }
     .alert("Error", isPresented: Binding(
       get: { errorMessage != nil },
       set: { if !$0 { errorMessage = nil } }
@@ -327,13 +318,6 @@ struct AreaDetailView: View {
         draftEmoji = serverEmoji
       }
     }
-
-    // Same for the attachment pointer — refresh from the loaded record unless
-    // the editor is open (so we never clobber an in-flight edit).
-    if !showingAttachmentEditor, let fresh = areas.first(where: { $0.id == area.id }) {
-      draftAttachment = fresh.attachment
-    }
-
   }
 
   private func commitName(_ trimmed: String) {
@@ -368,14 +352,6 @@ struct AreaDetailView: View {
       }
     }
   }
-
-  private func commitAttachment(_ attachment: AreaAttachment?) {
-    draftAttachment = attachment
-    Task {
-      do { try await areasMutator.setAttachment(id: area.id, attachment: attachment) }
-      catch { errorMessage = error.localizedDescription }
-    }
-  }
 }
 
 // MARK: - Project detail (rename + notes + task list)
@@ -392,12 +368,10 @@ struct ProjectDetailView: View {
   @State private var draftNotes: String
   @State private var originalName: String
   @State private var originalNotes: String
-  @State private var draftAttachment: AreaAttachment?
   @State private var status: ProjectStatus
   @State private var errorMessage: String?
   @State private var showingDeleteConfirm = false
   @State private var showingMoveToArea = false
-  @State private var showingAttachmentEditor = false
   @State private var areas: [Area] = []
   /// Fraction of this project's tasks that are done (0...1). Drives the pie
   /// icon next to the project title — reloads whenever the page appears so it
@@ -416,7 +390,6 @@ struct ProjectDetailView: View {
     _draftNotes = State(initialValue: project.notes ?? "")
     _originalName = State(initialValue: project.title)
     _originalNotes = State(initialValue: project.notes ?? "")
-    _draftAttachment = State(initialValue: project.attachment)
     _status = State(initialValue: project.status)
     // Seed the progress ring synchronously from the local cache so the very
     // first render already shows the right fraction — otherwise it paints an
@@ -464,7 +437,6 @@ struct ProjectDetailView: View {
           }
           notesField($draftNotes, placeholder: ContainerNotes.projectPlaceholder,
                      selection: $notesSelection, focused: $notesFocused)
-          AttachmentZone(attachment: draftAttachment) { showingAttachmentEditor = true }
         }
         // Match the area page: park the header on the task cards' content
         // column so the progress ring sits over the checkboxes below.
@@ -500,11 +472,6 @@ struct ProjectDetailView: View {
       .presentationDetents([.medium, .large])
       .septenaSheetChrome()
     }
-    .sheet(isPresented: $showingAttachmentEditor) {
-      AttachmentEditorSheet(initial: draftAttachment) { commitAttachment($0) }
-        .presentationDetents([.height(340), .large])
-        .septenaSheetChrome()
-    }
     .confirmationDialog(deleteCopy.title, isPresented: $showingDeleteConfirm,
                         titleVisibility: .visible) {
       Button("Delete", role: .destructive) { deleteProject() }
@@ -537,9 +504,6 @@ struct ProjectDetailView: View {
         let notes = fresh.notes ?? ""
         draftNotes = notes
         originalNotes = notes
-      }
-      if !showingAttachmentEditor, draftAttachment == old.attachment {
-        draftAttachment = fresh.attachment
       }
       status = fresh.status
     }
@@ -584,11 +548,6 @@ struct ProjectDetailView: View {
   private var projectOverflowMenu: some View {
     OverflowMenu {
       Button {
-        showingAttachmentEditor = true
-      } label: {
-        Label("Attach…", systemImage: "paperclip")
-      }
-      Button {
         showingMoveToArea = true
       } label: {
         Label("Move to Area…", systemImage: "folder")
@@ -628,9 +587,6 @@ struct ProjectDetailView: View {
     if serverNotes != draftNotes {
       draftNotes = serverNotes
       originalNotes = serverNotes
-    }
-    if !showingAttachmentEditor {
-      draftAttachment = fresh.attachment
     }
   }
 
@@ -691,14 +647,6 @@ struct ProjectDetailView: View {
     }
   }
 
-  private func commitAttachment(_ attachment: AreaAttachment?) {
-    draftAttachment = attachment
-    Task {
-      do { try await projectsMutator.setAttachment(id: project.id, attachment: attachment) }
-      catch { errorMessage = error.localizedDescription }
-    }
-  }
-
   private func setStatus(_ newStatus: ProjectStatus) {
     switch newStatus {
     case .done: Haptics.success()
@@ -745,236 +693,6 @@ struct ProjectDetailView: View {
   }
 }
 
-
-// MARK: - Attachment (the one read-only context feed on an area/project)
-
-/// Inline zone under an area/project title: a tappable chip (kind glyph +
-/// name) with the attachment's live feed rows beneath it — upcoming events,
-/// recent commits, or latest feed entries. Muted "Attach…" affordance when
-/// none is set. Tapping the chip opens `AttachmentEditorSheet`. Paints the
-/// cached snapshot immediately, then refreshes from the network per-device.
-struct AttachmentZone: View {
-  let attachment: AreaAttachment?
-  let onTap: () -> Void
-
-  @State private var snapshot: AttachmentSnapshot?
-  @State private var didAttempt = false
-  @State private var failureReason: String?
-  @State private var expanded = false
-
-  /// Collapsed row count before the "Show all" expander kicks in.
-  private static let collapsedCount = 3
-  /// How many items to pull into the snapshot so the expander has something to
-  /// reveal without a refetch.
-  private static let fetchDepth = 25
-
-  var body: some View {
-    if let attachment {
-      let items = visibleItems(attachment)
-      let shown = expanded ? items : Array(items.prefix(Self.collapsedCount))
-      VStack(alignment: .leading, spacing: 5) {
-        Button(action: onTap) { chip(attachment) }
-          .buttonStyle(.plain)
-          .contentShape(Rectangle())
-
-        ForEach(shown) { item in
-          itemRow(item)
-        }
-
-        if items.count > Self.collapsedCount {
-          Button {
-            a11yAnimate(.easeInOut(duration: 0.18)) { expanded.toggle() }
-          } label: {
-            Text(expanded ? "Show less" : "Show all (\(items.count))")
-              .scaledFont(size: 11, weight: .medium)
-              .foregroundStyle(Theme.inkSecondary)
-              .padding(.leading, 17)
-          }
-          .buttonStyle(.plain)
-        }
-
-        // A failed fetch would otherwise look identical to "just a link" —
-        // make it legible, and name the reason (e.g. "HTTP 410") so a
-        // server-side block is diagnosable without a debugger.
-        if didAttempt && snapshot == nil {
-          Text(failureReason.map { "Couldn't load — \($0)" } ?? "Couldn't load — tap to check the URL")
-            .scaledFont(size: 11)
-            .foregroundStyle(Theme.iconMuted)
-            .padding(.leading, 17)
-        }
-      }
-      .task(id: attachment) {
-        didAttempt = false
-        failureReason = nil
-        expanded = false
-        snapshot = AttachmentFeedLoader.shared.cached(for: attachment)
-        let outcome = await AttachmentFeedLoader.shared.fetch(attachment, maxItems: Self.fetchDepth)
-        if let fresh = outcome.snapshot { snapshot = fresh }
-        failureReason = outcome.failureReason
-        didAttempt = true
-      }
-    } else {
-      Button(action: onTap) {
-        HStack(spacing: 6) {
-          Image(systemName: "paperclip")
-            .scaledFont(size: 11, weight: .medium)
-          Text("Attach…")
-            .font(.septenaNotes)
-        }
-        .foregroundStyle(Theme.iconMuted)
-      }
-      .buttonStyle(.plain)
-      .contentShape(Rectangle())
-    }
-  }
-
-  /// Snapshot items after the calendar's per-attachment all-day filter.
-  /// git/feed items are never all-day, so their lists pass through unchanged.
-  private func visibleItems(_ attachment: AreaAttachment) -> [AttachmentFeedItem] {
-    let items = snapshot?.items ?? []
-    guard attachment.kind == .calendar else { return items }
-    switch attachment.allDayFilter {
-    case .all:  return items
-    case .hide: return items.filter { !$0.isAllDay }
-    case .only: return items.filter { $0.isAllDay }
-    }
-  }
-
-  @ViewBuilder
-  private func chip(_ attachment: AreaAttachment) -> some View {
-    HStack(spacing: 6) {
-      Image(systemName: attachment.kind.glyph)
-        .scaledFont(size: 11, weight: .medium)
-        .foregroundStyle(Theme.inkSecondary)
-      Text(snapshot?.subtitle ?? attachment.displayName)
-        .font(.septenaNotes)
-        .foregroundStyle(Theme.inkSecondary)
-        .lineLimit(1)
-        .truncationMode(.middle)
-    }
-  }
-
-  @ViewBuilder
-  private func itemRow(_ item: AttachmentFeedItem) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: 8) {
-      Text(item.title)
-        .scaledFont(size: 13)
-        .foregroundStyle(Theme.inkPrimary)
-        .lineLimit(1)
-        .truncationMode(.tail)
-      Spacer(minLength: 4)
-      if let detail = item.detail {
-        Text(detail)
-          .scaledFont(size: 11)
-          .foregroundStyle(Theme.iconMuted)
-          .lineLimit(1)
-          .layoutPriority(1)
-      }
-    }
-    // Align event/commit text with the chip label (past the glyph column).
-    .padding(.leading, 17)
-  }
-}
-
-/// Intake for the one attachment: pick a kind (repo / calendar / feed), enter
-/// the ref, or remove. `onCommit(nil)` detaches.
-struct AttachmentEditorSheet: View {
-  let initial: AreaAttachment?
-  let onCommit: (AreaAttachment?) -> Void
-  @Environment(\.dismiss) private var dismiss
-  @State private var kind: AreaAttachment.Kind
-  @State private var ref: String
-  @State private var allDay: AreaAttachment.AllDayFilter
-  @FocusState private var focused: Bool
-
-  init(initial: AreaAttachment?, onCommit: @escaping (AreaAttachment?) -> Void) {
-    self.initial = initial
-    self.onCommit = onCommit
-    _kind = State(initialValue: initial?.kind ?? .calendar)
-    _ref = State(initialValue: initial?.ref ?? "")
-    _allDay = State(initialValue: initial?.allDayFilter ?? .all)
-  }
-
-  var body: some View {
-    NavigationStack {
-      VStack(alignment: .leading, spacing: 16) {
-        Picker("Kind", selection: $kind) {
-          ForEach(AreaAttachment.Kind.allCases, id: \.self) { k in
-            Text(k.label).tag(k)
-          }
-        }
-        .pickerStyle(.segmented)
-
-        HStack(spacing: 6) {
-          Image(systemName: kind.glyph)
-            .scaledFont(size: 11, weight: .medium)
-            .foregroundStyle(Theme.inkSecondary)
-          TextField(kind.refPlaceholder, text: $ref)
-            .textFieldStyle(.plain)
-            .focusEffectDisabled()
-            .font(.septenaNotes)
-            .foregroundStyle(Theme.inkSecondary)
-            .focused($focused)
-            #if os(iOS)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .keyboardType(kind == .git ? .default : .URL)
-            #endif
-            .onSubmit { commit() }
-        }
-
-        // Calendar-only: how to treat all-day events (trips, birthdays…).
-        if kind == .calendar {
-          VStack(alignment: .leading, spacing: 6) {
-            Text("All-day events")
-              .scaledFont(size: 11, weight: .medium)
-              .foregroundStyle(Theme.iconMuted)
-            Picker("All-day events", selection: $allDay) {
-              ForEach(AreaAttachment.AllDayFilter.allCases, id: \.self) { f in
-                Text(f.label).tag(f)
-              }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-          }
-        }
-
-        if initial != nil {
-          Button(role: .destructive) {
-            onCommit(nil)
-            dismiss()
-          } label: {
-            Label("Remove Attachment", systemImage: "trash")
-              .font(.septenaNotes)
-          }
-          .buttonStyle(.plain)
-        }
-
-        Spacer()
-      }
-      .padding(.horizontal, Theme.hPadding)
-      .padding(.top, 12)
-      .navigationTitle("Attachment")
-      .septenaInlineTitle()
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Done") { commit() }
-        }
-      }
-      .onAppear { focused = true }
-    }
-    .macSheetFrame(width: 460, height: kind == .calendar ? 320 : 260)
-  }
-
-  private func commit() {
-    onCommit(AreaAttachment(kind: kind, ref: ref,
-                            allDay: kind == .calendar ? allDay : nil).normalized)
-    dismiss()
-  }
-}
 
 // MARK: - Area picker (used by Project "Move to Area…")
 

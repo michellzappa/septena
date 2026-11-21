@@ -148,7 +148,7 @@ Candidates (confirmed by compile in step 4, not by this list):
   `TaskStoreRollback.swift` are deleted after the cutover, not moved.
 - `TaskUndo.swift`, `TaskConvo.swift`, `ConvoDerived.swift`,
   `TaskListOrder.swift`, `TaskStructureOrder.swift`, `TaskRecordNames.swift`,
-  `TaskAttachments.swift`, `AreaAttachment.swift`, `AttachmentFeed.swift`,
+  `TaskAttachments.swift`,
   `SharedTaskCapture.swift`, `RemindersBridge.swift`, `SeptaskDiagnostics.swift`,
   `TasksWatchWire.swift`, `TasksWatchBuilder.swift`, `ThingsImport/*`.
 - `CloudKit/TasksBackend.swift`, `CloudKit/AreasBackend.swift`,

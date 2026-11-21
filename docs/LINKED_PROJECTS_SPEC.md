@@ -21,11 +21,6 @@ First providers:
 - **Starlings tasks** — one project per Starlings project (a subject), on one
   or more Starlings workspaces (`hq`, `envisioning`, `bipe`, `uitwijken`, …).
 
-A link is not the existing `AreaAttachment` of kind `.git`
-(`SeptenaCore/AreaAttachment.swift`). That attachment is a read-only context
-feed: it shows commits next to a project and never creates tasks. A link
-creates and updates task rows. The two can exist on one project.
-
 ## 2. Why the server, not the device
 
 A link that runs on a device works only while the app runs, as
