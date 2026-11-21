@@ -122,6 +122,71 @@
       "deletedBulk": { "format": "{count} tasks deleted", "singularFormat": "Task deleted", "undoable": true }
     }
   },
+  "firstRun": {
+    "featureId": "onboarding.first-run",
+    "completionSetting": "onboardedAt",
+    "prompts": {
+      "setup": "Set up Septena for me using https://septena.app/agents.md",
+      "first": "Set up my Septena areas, projects, and tasks by following https://api.septena.app/onboard.md"
+    },
+    "steps": [
+      {
+        "id": "welcome", "kind": "intro", "icon": "onboarding.welcome",
+        "title": "Welcome to Septena",
+        "body": "A task list you share with your AI.",
+        "points": [
+          { "icon": "onboarding.devices", "title": "On every device", "detail": "Your tasks stay in step on iPhone, iPad and Mac." },
+          { "icon": "onboarding.agent", "title": "Work with Claude", "detail": "Claude can take a task, ask you a question, and hand back the result." },
+          { "icon": "onboarding.notes", "title": "Notes keep the context", "detail": "Each project has notes, so you and Claude know what it's for." }
+        ],
+        "primary": { "title": "Continue", "action": "next" }
+      },
+      {
+        "id": "account", "kind": "account", "icon": "onboarding.account",
+        "title": "Sign in to sync",
+        "body": "Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.",
+        "footnote": "If you skip this, your tasks stay on this device until you sign in.",
+        "skipWhen": "signedIn",
+        "primary": { "title": "Sign in with Apple", "action": "signIn" },
+        "secondary": { "title": "Not now", "action": "next" }
+      },
+      {
+        "id": "moveIn", "kind": "choices", "icon": "onboarding.move_in",
+        "title": "Bring your tasks",
+        "body": "Start from the list you already have, or start empty.",
+        "completesGetStartedStep": "importTasks",
+        "choices": [
+          { "id": "things", "icon": "onboarding.things", "title": "From Things", "detail": "Copies your areas, projects and tasks. Nothing in Things changes.", "action": "importThings", "platforms": ["ios", "ipados", "macos"] },
+          { "id": "reminders", "icon": "settings.reminders", "title": "From Reminders", "detail": "Pick a Reminders list. Its items wait in your Inbox until you bring them in.", "action": "importReminders", "platforms": ["ios", "ipados", "macos"] },
+          { "id": "fresh", "icon": "onboarding.fresh", "title": "Start empty", "detail": "Add tasks as they come up.", "action": "next", "platforms": ["ios", "ipados", "macos", "web", "android", "windows"] }
+        ]
+      },
+      {
+        "id": "connectClaude", "kind": "connectAgent", "icon": "settings.claude",
+        "title": "Connect Claude",
+        "body": "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.",
+        "requires": "signedIn",
+        "completesGetStartedStep": "connectAI",
+        "instructions": [
+          "Copy the setup prompt and paste it into Claude.",
+          "When Claude shows a code, enter it below.",
+          "Paste the first prompt. Claude sets up your areas and projects with you."
+        ],
+        "primary": { "title": "Copy setup prompt", "action": "copySetupPrompt" },
+        "tertiary": { "title": "Copy first prompt", "action": "copyFirstPrompt" },
+        "secondary": { "title": "Later", "action": "next" },
+        "afterDone": { "title": "Continue", "action": "next" }
+      },
+      {
+        "id": "done", "kind": "finish", "icon": "onboarding.done",
+        "title": "You're all set",
+        "body": "Today shows what to do now. Anything you skipped stays on the Get started list.",
+        "returningTitle": "Welcome back",
+        "returningBody": "This account is already set up. Your tasks are syncing to this device.",
+        "primary": { "title": "Open Today", "action": "finish" }
+      }
+    ]
+  },
   "taskAttributes": [
     { "id": "today", "label": "Today", "icon": "action.today_add", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "lists.today" },
     { "id": "when", "label": "When", "icon": "action.when", "commitContract": "pickCommits", "surfaceTier": "popover", "featureId": "task.when-deadline" },

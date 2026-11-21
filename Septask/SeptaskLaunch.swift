@@ -227,9 +227,11 @@ final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate {
     // Accessibility permission, no event tap). ⌃Space is the system input
     // source switch and Moom's binding, so it is not used.
     SeptaskKitQuickEntry.installHotKey()
-    // No welcome screen: a fresh install lands on Today, where the Get
-    // started checklist and the sign-in notice (`TaskNotices`) take over.
+    // A fresh account gets the first run as a sheet on this window
+    // (`SeptaskKitFirstRun.swift`); after it, the Get started checklist and
+    // the sign-in notice (`TaskNotices`) hold whatever was skipped.
     SeptaskKitWindowController.show()
+    Task { @MainActor in await SeptaskKitFirstRunWindow.presentIfNeeded() }
     // Sparkle starts scheduled checks when the controller is created. Local
     // Debug builds intentionally have no update key and must not prompt.
     #if !DEBUG
