@@ -118,7 +118,8 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 |---|---|
 | [DesignSpec.md](DesignSpec.md) | canonical |
 | [PAGE_CHROME_SPEC.md](PAGE_CHROME_SPEC.md), [DRAWER_MODES_SPEC.md](DRAWER_MODES_SPEC.md), [GLASS_DOTS_SPEC.md](GLASS_DOTS_SPEC.md), [WAKING_DAY_WHEEL.md](WAKING_DAY_WHEEL.md) | mixed: see each status line |
-| [SETTINGS_FLATTEN_SPEC.md](SETTINGS_FLATTEN_SPEC.md) | building (task app settings) |
+| [SETTINGS_UX_SPEC.md](SETTINGS_UX_SPEC.md) | proposal (task app Settings IA + `registry/settings.json` v2, S0–S3) |
+| [SETTINGS_FLATTEN_SPEC.md](SETTINGS_FLATTEN_SPEC.md) | superseded by SETTINGS_UX_SPEC.md |
 | [SETTINGS_REORG_PROPOSAL.md](SETTINGS_REORG_PROPOSAL.md) | life app; mostly built |
 | [FRONT_DOOR_IDENTITY.md](FRONT_DOOR_IDENTITY.md) | roadmap |
 | [LOCALIZATION_PLAN.md](LOCALIZATION_PLAN.md) | pt-BR pilot done |

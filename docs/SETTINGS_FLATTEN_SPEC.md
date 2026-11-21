@@ -1,6 +1,6 @@
 # Settings flatten (task app) — spec
 
-**Status:** building. Written 2026-11-19. Scope: the task app (target
+**Status:** superseded by [SETTINGS_UX_SPEC.md](SETTINGS_UX_SPEC.md) (2026-11-21). Kept in place as historical record of the first flatten pass (`docs/README.md` rule 4). Written 2026-11-19. Scope: the task app (target
 `Septask`, product name now Septena). The life app's settings
 (`Septena/Shell/Settings/`) are out of scope.
 
