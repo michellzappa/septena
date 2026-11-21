@@ -17,6 +17,13 @@
 # Release means the green gate matches what runs on device. Pass a third
 # argument (or set SEPTENA_CONFIG) for a Debug compile:
 #     scripts/build.sh SeptaskMac 'platform=macOS' Debug
+#
+# SEPTENA_NO_SIGNING=1 compiles without code signing. Use it where no
+# development certificate is installed, e.g. on mz-mini through remote-build:
+# SeptaskMac's entitlements otherwise stop the build before it compiles
+# ("requires signing with a development certificate"). The result proves the
+# code compiles; it cannot run on a device.
+#     SEPTENA_NO_SIGNING=1 scripts/build.sh SeptaskMac 'platform=macOS'
 set -o pipefail
 
 LOCKDIR="/tmp/auto-build.lock.d"
@@ -116,6 +123,14 @@ trap 'rmdir "$LOCKDIR" 2>/dev/null' EXIT
 # mismatches seen 2026-07-11), so each toolchain gets its own cache.
 DERIVED="/tmp/septena-agent-derived/$(printf '%s' "$REPO|${DEVELOPER_DIR:-default}" | shasum | cut -c1-12)"
 
-echo "build.sh: building $SCHEME [$DEST] $CONFIG in $REPO (derived: $DERIVED)"
+# Unsigned builds get their own DerivedData too, so their products never
+# replace a signed build's incremental state.
+SIGNING=()
+if [ "${SEPTENA_NO_SIGNING:-}" = "1" ]; then
+  SIGNING=(CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO)
+  DERIVED="$DERIVED-unsigned"
+fi
+
+echo "build.sh: building $SCHEME [$DEST] $CONFIG in $REPO (derived: $DERIVED)${SIGNING:+, unsigned}"
 ( cd "$REPO" && xcodebuild -scheme "$SCHEME" -destination "$DEST" -configuration "$CONFIG" \
-    -derivedDataPath "$DERIVED" build )
+    -derivedDataPath "$DERIVED" "${SIGNING[@]}" build )
