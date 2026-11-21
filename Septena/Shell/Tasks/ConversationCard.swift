@@ -19,6 +19,8 @@ struct ConversationCard: View {
   @State private var otherText = ""
   @State private var showSendBack = false
   @State private var sendBackNote = ""
+  @State private var showReply = false
+  @State private var replyText = ""
   @State private var showInfo = false
 
   /// Seed `convo` from the already-loaded task so the card paints on the FIRST
@@ -60,6 +62,10 @@ struct ConversationCard: View {
             terminalRow
           } else {
             agentRow
+          }
+
+          if openQuestion == nil, isTaskOpen, convo.endState != .needsVerify {
+            followUpBlock
           }
 
           // The agent-done bar (distinct from task completion = human-done).
@@ -128,14 +134,38 @@ struct ConversationCard: View {
         AIModelTagBadge(tag: AIModelTag(q.provider))
       }
 
-      // Options as content-width pills (wrap), with "Other" opening a field.
-      FlowLayout(spacing: 8) {
-        ForEach(q.options ?? [], id: \.self) { option in
-          Button { choose(option, replyTo: q.seq, step: q.step) } label: { Text(option) }
-            .buttonStyle(.bordered).buttonBorderShape(.capsule).tint(accent)
+      // Short choices flow as compact capsule chips; longer options stack as
+      // full-width wrapped rounded cards so text never clips off-screen.
+      let options = q.options ?? []
+      if options.contains(where: { $0.count > 22 }) {
+        VStack(alignment: .leading, spacing: 8) {
+          ForEach(options, id: \.self) { option in
+            Button { choose(option, replyTo: q.seq, step: q.step) } label: {
+              Text(option)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.roundedRectangle(radius: 12))
+            .tint(accent)
+          }
+          Button { a11yAnimate { showOther.toggle() } } label: { Text("Other…") }
+            .buttonStyle(.bordered).buttonBorderShape(.capsule)
         }
-        Button { a11yAnimate { showOther.toggle() } } label: { Text("Other…") }
-          .buttonStyle(.bordered).buttonBorderShape(.capsule)
+      } else {
+        FlowLayout(spacing: 8) {
+          ForEach(options, id: \.self) { option in
+            Button { choose(option, replyTo: q.seq, step: q.step) } label: {
+              Text(option)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .buttonStyle(.bordered).buttonBorderShape(.capsule).tint(accent)
+          }
+          Button { a11yAnimate { showOther.toggle() } } label: { Text("Other…") }
+            .buttonStyle(.bordered).buttonBorderShape(.capsule)
+        }
       }
 
       if showOther {
@@ -208,6 +238,27 @@ struct ConversationCard: View {
           }
         }
       }
+    }
+  }
+
+  @ViewBuilder private var followUpBlock: some View {
+    if showReply {
+      HStack(spacing: 6) {
+        TextField("Reply to thread", text: $replyText)
+          .textFieldStyle(.roundedBorder)
+          .onSubmit(submitReply)
+        Button("Send", action: submitReply)
+          .buttonStyle(.borderedProminent)
+          .controlSize(.small)
+          .disabled(replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+      }
+    } else {
+      Button { a11yAnimate { showReply = true } } label: {
+        Label("Reply…", systemImage: "arrowshape.turn.up.left")
+          .font(.septenaCaption)
+      }
+      .buttonStyle(.borderless)
+      .foregroundStyle(.secondary)
     }
   }
 
@@ -359,6 +410,15 @@ struct ConversationCard: View {
     append(ConvoTurn(seq: 0, role: .user, step: step, otherText: text, inReplyTo: replyTo, ts: Date()))
     otherText = ""
     showOther = false
+  }
+
+  private func submitReply() {
+    let text = replyText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return }
+    append(ConvoTurn(seq: 0, role: .user, step: .work, note: text, ts: Date()))
+    Haptics.tick()
+    replyText = ""
+    showReply = false
   }
 
   private func setStopped(_ stopped: Bool) {

@@ -4,7 +4,7 @@ struct FlowLayout: Layout {
   var spacing: CGFloat = 8
 
   func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-    let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+    let sizes = measure(subviews: subviews, maxWidth: proposal.width)
     return layout(sizes: sizes, proposal: proposal).size
   }
 
@@ -12,13 +12,28 @@ struct FlowLayout: Layout {
                      proposal: ProposedViewSize,
                      subviews: Subviews,
                      cache: inout ()) {
-    let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+    let sizes = measure(subviews: subviews, maxWidth: bounds.width)
     let offsets = layout(sizes: sizes,
                          proposal: ProposedViewSize(width: bounds.width, height: nil)).offsets
 
-    for (offset, subview) in zip(offsets, subviews) {
-      subview.place(at: CGPoint(x: bounds.minX + offset.x, y: bounds.minY + offset.y),
-                    proposal: .unspecified)
+    for ((offset, size), subview) in zip(zip(offsets, sizes), subviews) {
+      subview.place(
+        at: CGPoint(x: bounds.minX + offset.x, y: bounds.minY + offset.y),
+        proposal: ProposedViewSize(width: min(size.width, bounds.width), height: size.height)
+      )
+    }
+  }
+
+  /// Measure each child at its ideal size unless it exceeds `maxWidth`, in
+  /// which case re-measure constrained to `maxWidth` so wrapping labels stay
+  /// inside the container instead of overflowing off-screen.
+  private func measure(subviews: Subviews, maxWidth: CGFloat?) -> [CGSize] {
+    subviews.map { subview in
+      let ideal = subview.sizeThatFits(.unspecified)
+      if let maxWidth, maxWidth > 0, ideal.width > maxWidth {
+        return subview.sizeThatFits(ProposedViewSize(width: maxWidth, height: nil))
+      }
+      return ideal
     }
   }
 
@@ -34,7 +49,7 @@ struct FlowLayout: Layout {
     var rowHeight: CGFloat = 0
 
     for size in sizes {
-      if currentX + size.width > containerWidth {
+      if currentX > 0 && currentX + size.width > containerWidth {
         currentX = 0
         currentY += rowHeight + spacing
         rowHeight = 0
