@@ -69,7 +69,13 @@ export const zPushBody = z.object({
 }).strict();
 
 export type Op =
-  | { clientOpId: string; op: "upsert"; entity: EntityName; id: string; fields: Record<string, unknown> }
+  | {
+      clientOpId: string; op: "upsert"; entity: EntityName; id: string; fields: Record<string, unknown>;
+      /// The notes revision the writer read (ADR 0012). Required for an agent
+      /// write that changes a project's or an area's notes. Not on the wire:
+      /// only server-side callers (the MCP connector) set it.
+      baseNoteRev?: number;
+    }
   | { clientOpId: string; op: "delete"; entity: Exclude<EntityName, "convo" | "setting">; id: string }
   | { clientOpId: string; op: "appendTurn"; taskId: string; turn: Turn };
 
@@ -77,7 +83,11 @@ export type OpResult =
   | { clientOpId: string; status: "applied"; rev: number; seq?: number }
   | { clientOpId: string; status: "noop" }
   | { clientOpId: string; status: "dropped"; rev: number; reason: "deleted" }
-  | { clientOpId: string; status: "rejected"; reason: string; rule?: string };
+  | {
+      clientOpId: string; status: "rejected"; reason: string; rule?: string;
+      /// On a `stale` notes refusal: the notes as they are now, to re-read.
+      current?: { notes: string | null; noteRev: number };
+    };
 
 export interface PushResult {
   appliedThrough: number;

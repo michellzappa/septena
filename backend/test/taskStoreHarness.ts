@@ -110,10 +110,12 @@ function makeSqlStorage(db: DatabaseSync) {
 }
 
 /// Creates a real `TaskStore` instance backed by an in-memory SQLite database.
-export async function createTestTaskStore() {
+/// Pass `existing` to open a second store on the same database, the way a
+/// Durable Object restarts on its stored data (runs migrations again).
+export async function createTestTaskStore(existing?: DatabaseSync) {
   installWorkerTestHooks();
   const { TaskStore } = await import("../src/store/TaskStore.ts");
-  const db = new DatabaseSync(":memory:");
+  const db = existing ?? new DatabaseSync(":memory:");
   let alarm: number | null = null;
   let inTx = false;
 

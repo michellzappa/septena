@@ -122,7 +122,11 @@ export const ENTITIES = {
     table: "areas",
     columns: {
       title: text(),
+      // The area's notes (shown as "notes"; the wire name stays). ADR 0012.
       context: text(NOTES_MAX),
+      // Notes revision, bumped by the store on every notes change. Agents
+      // name it as `baseNoteRev` so a stale write is refused. Never pushed.
+      noteRev: { kind: "int", zod: z.never() },
       emoji: text(16),
       attachment: json(zAttachmentPointer),
       position: int(),
@@ -138,7 +142,11 @@ export const ENTITIES = {
       created: day(),
       completedAt: stamp(),
       notes: text(NOTES_MAX),
+      // Retired by ADR 0012: merged into `notes` once, kept so old clients'
+      // pushes still validate. Agents may not write it.
       context: text(NOTES_MAX),
+      // Notes revision (see area.noteRev). Never pushed.
+      noteRev: { kind: "int", zod: z.never() },
       githubRepo: text(200),
       attachment: json(zAttachmentPointer),
       position: int(),

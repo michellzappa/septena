@@ -59,6 +59,12 @@ export const isAgentActor = (actor: string) => actor.startsWith("mcp:");
 /// the rule instead of retrying (ADR 0008).
 export const AGENT_WRITE_RULES: Record<string, string> = {
   stopped: "The user stopped agent work on this task. Do not write to it; only the user can resume it.",
+  stale:
+    "The notes changed since you read them. Read `current`, then write again on top of it with its noteRev as baseNoteRev.",
+  brief_is_users:
+    "The text above `## Log` is the user's brief. Append a dated entry under `## Log`, or propose a new brief for the user to accept.",
+  paused: "The user paused all agents. Do not write; only the user can unpause.",
+  "retired:context": "Project context is retired (ADR 0012). Write the project's notes instead.",
   human_accepts:
     "Only the user marks a Claude-assigned task done. Call tasks_set_endstate with endState \"needs_verify\" and a note describing what to check.",
 };
@@ -71,6 +77,51 @@ export const CLAIM_TTL_MAX_MS = DOMAIN_RULES.claimTtlMaxSeconds * 1000;
 export const AGENT_RUN_BUDGET = DOMAIN_RULES.agentRunBudget;
 
 const LOG_TEXT_MAX = 4_000;
+
+// ---- notes (ADR 0012, docs/PROJECT_NOTES_SPEC.md §3–§4) ----
+
+/// The containers whose notes are agent context, and the column that holds
+/// them. An area's notes keep their old wire name.
+export const NOTE_FIELD = { project: "notes", area: "context" } as const;
+export type NoteContainer = keyof typeof NOTE_FIELD;
+const isNoteContainer = (e: string): e is NoteContainer => e in NOTE_FIELD;
+
+export interface NoteRevision {
+  rev: number;
+  actor: string;
+  at: string;
+  reason: string | null;
+  /// Full text of this version (null = cleared). Omitted unless asked for.
+  body?: string | null;
+}
+
+/// Notes split at the first line that is exactly `## Log`. Everything above
+/// is the user's brief; everything below is the agent log. No such line
+/// means the whole note is brief.
+export function splitNotes(body: string | null | undefined): { brief: string; log: string | null } {
+  if (!body) return { brief: "", log: null };
+  const m = /^## Log[ \t]*$/m.exec(body);
+  if (!m) return { brief: body, log: null };
+  return { brief: body.slice(0, m.index), log: body.slice(m.index + m[0].length) };
+}
+
+/// The retired project `context` appended to the brief, above `## Log`.
+function mergeContextIntoNotes(notes: string | null, context: string, day: string): string {
+  const block = `## Context (merged ${day})\n\n${context.trim()}\n`;
+  const { brief, log } = splitNotes(notes);
+  const top = brief.trim() ? `${brief.trimEnd()}\n\n${block}` : block;
+  return log === null ? top : `${top}\n## Log${log}`;
+}
+
+/// True when an agent may change notes from `before` to `after`: the brief
+/// stays as it is (unless it was empty), and the log only grows at its end.
+export function agentMayWriteNotes(before: string | null, after: string | null): boolean {
+  const old = splitNotes(before);
+  const next = splitNotes(after);
+  if (old.brief.trim() !== "" && next.brief.trim() !== old.brief.trim()) return false;
+  const oldLog = (old.log ?? "").trimEnd();
+  return (next.log ?? "").startsWith(oldLog);
+}
 
 /// Long text (notes, artifacts) is cut in the log; the row itself keeps it.
 function clipForLog(v: unknown): unknown {
@@ -153,6 +204,66 @@ export class TaskStore extends DurableObject<Env> {
     );
     if (!changeCols.has("diff")) this.sql.exec("ALTER TABLE changes ADD COLUMN diff TEXT");
     if (!changeCols.has("reason")) this.sql.exec("ALTER TABLE changes ADD COLUMN reason TEXT");
+    if (this.meta("notesV1") === 0) this.ctx.storage.transactionSync(() => this.migrateNotesV1());
+  }
+
+  /// One time (ADR 0012): give every existing note a first revision, then
+  /// merge each project's retired `context` into its notes, above `## Log`.
+  private migrateNotesV1(): void {
+    const now = new Date().toISOString();
+    for (const container of Object.keys(NOTE_FIELD) as NoteContainer[]) {
+      const field = NOTE_FIELD[container];
+      const table = ENTITIES[container].table;
+      const rows = this.sql.exec<{ id: string; body: string | null }>(
+        `SELECT id, "${field}" AS body FROM ${table} WHERE deletedAt IS NULL AND "${field}" IS NOT NULL AND "${field}" != '' AND COALESCE(noteRev, 0) = 0`,
+      ).toArray();
+      for (const r of rows) this.recordNoteRevision(container, r.id, r.body, "system:migration", now, 0, "first revision");
+    }
+    const merges = this.sql.exec<{ id: string; notes: string | null; context: string; noteRev: number | null }>(
+      "SELECT id, notes, context, noteRev FROM projects WHERE deletedAt IS NULL AND context IS NOT NULL AND TRIM(context) != ''",
+    ).toArray();
+    const reason = "merge project context into notes";
+    for (const r of merges) {
+      const notes = mergeContextIntoNotes(r.notes, r.context, now.slice(0, 10));
+      const rev = this.nextRev();
+      this.sql.exec("UPDATE projects SET notes = ?, context = NULL, rev = ?, updatedAt = ? WHERE id = ?", notes, rev, now, r.id);
+      const prevReason = this.reason;
+      this.reason = reason;
+      this.log(rev, "project", r.id, "upsert", ["notes", "context"], null, "system:migration", now,
+        this.diffFor({ notes: r.notes, context: r.context }, { notes, context: null }));
+      this.reason = prevReason;
+      this.recordNoteRevision("project", r.id, notes, "system:migration", now, r.noteRev ?? 0, reason);
+    }
+    this.setMeta("notesV1", 1);
+  }
+
+  /// Writes one notes revision and bumps the row's `noteRev`. Returns it.
+  private recordNoteRevision(
+    container: NoteContainer, id: string, body: string | null, actor: string, at: string,
+    prevNoteRev: number, reason: string | null,
+  ): number {
+    const noteRev = prevNoteRev + 1;
+    this.sql.exec(`UPDATE ${ENTITIES[container].table} SET noteRev = ? WHERE id = ?`, noteRev, id);
+    this.sql.exec(
+      "INSERT INTO note_revisions (container, id, rev, body, actor, at, reason) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      container, id, noteRev, body, actor, at, reason,
+    );
+    return noteRev;
+  }
+
+  /// The notes refusal for an agent upsert on a project or area, or null.
+  private agentNotesRefusal(
+    op: Extract<Op, { op: "upsert" }>, container: NoteContainer, row: Record<string, unknown> | undefined,
+  ): { reason: string; current?: { notes: string | null; noteRev: number } } | null {
+    const field = NOTE_FIELD[container];
+    if (!(field in op.fields)) return null;
+    if (this.readSetting("agentsPaused") === true) return { reason: "paused" };
+    if (!row) return null; // A new container has nothing to overwrite.
+    const before = (row[field] as string | null) ?? null;
+    const noteRev = (row.noteRev as number | null) ?? 0;
+    if (op.baseNoteRev !== noteRev) return { reason: "stale", current: { notes: before, noteRev } };
+    if (!agentMayWriteNotes(before, (op.fields[field] as string | null) ?? null)) return { reason: "brief_is_users" };
+    return null;
   }
 
   private migrateTables(): void {
@@ -185,6 +296,11 @@ export class TaskStore extends DurableObject<Env> {
       );
       CREATE TABLE IF NOT EXISTS sessions (
         hash TEXT PRIMARY KEY, createdAt INTEGER NOT NULL, expiresAt INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS note_revisions (
+        container TEXT NOT NULL, id TEXT NOT NULL, rev INTEGER NOT NULL,
+        body TEXT, actor TEXT NOT NULL, at TEXT NOT NULL, reason TEXT,
+        PRIMARY KEY (container, id, rev)
       );
       CREATE TABLE IF NOT EXISTS entitlements (
         id TEXT PRIMARY KEY, source TEXT NOT NULL, productId TEXT, expiresAt INTEGER,
@@ -317,6 +433,17 @@ export class TaskStore extends DurableObject<Env> {
       return { clientOpId: op.clientOpId, status: "applied", rev };
     }
 
+    const noteContainer = isNoteContainer(op.entity) ? op.entity : null;
+    if (noteContainer && isAgentActor(actor) && !row?.deletedAt) {
+      const refusal = this.agentNotesRefusal(op, noteContainer, row as Record<string, unknown> | undefined);
+      if (refusal) {
+        return {
+          clientOpId: op.clientOpId, status: "rejected", reason: refusal.reason, rule: AGENT_WRITE_RULES[refusal.reason],
+          ...(refusal.current ? { current: refusal.current } : {}),
+        };
+      }
+    }
+
     const names = Object.keys(op.fields);
     if (row?.deletedAt) {
       const rev = this.nextRev();
@@ -355,6 +482,13 @@ export class TaskStore extends DurableObject<Env> {
     }
     const before = row ? decodeRow(spec, row as Record<string, unknown>) : null;
     this.log(rev, op.entity, op.id, "upsert", names, op.clientOpId, actor, now, this.diffFor(before, op.fields));
+    if (noteContainer) {
+      const field = NOTE_FIELD[noteContainer];
+      const next = (op.fields[field] as string | null | undefined) ?? null;
+      if (field in op.fields && next !== ((before?.[field] as string | null | undefined) ?? null)) {
+        this.recordNoteRevision(noteContainer, op.id, next, actor, now, (row?.noteRev as number | null) ?? 0, this.reason);
+      }
+    }
     return { clientOpId: op.clientOpId, status: "applied", rev };
   }
 
@@ -365,6 +499,7 @@ export class TaskStore extends DurableObject<Env> {
   private agentRefusal(op: Op): string | null {
     if (op.op === "upsert" && op.entity === "convo" && "stoppedAt" in op.fields) return "human_only:stoppedAt";
     if (op.op === "upsert" && op.entity === "setting" && op.id === "agentsPaused") return "human_only:agentsPaused";
+    if (op.op === "upsert" && op.entity === "project" && "context" in op.fields) return "retired:context";
     const taskId = op.op === "appendTurn" ? op.taskId
       : (op.entity === "task" || op.entity === "convo") ? op.id
       : op.entity === "attachment" && op.op === "upsert" ? (op.fields.taskId as string | undefined) ?? null
@@ -702,6 +837,27 @@ export class TaskStore extends DurableObject<Env> {
 
   /// One synced setting's value (columns.ts `SETTING_VALUES`), or null when
   /// it was never set.
+  /// One container's notes and their revision, or null when it is missing.
+  readNote(container: NoteContainer, id: string): { notes: string | null; noteRev: number } | null {
+    const field = NOTE_FIELD[container];
+    const row = this.sql.exec<{ body: string | null; noteRev: number | null }>(
+      `SELECT "${field}" AS body, noteRev FROM ${ENTITIES[container].table} WHERE id = ? AND deletedAt IS NULL`, id,
+    ).toArray()[0];
+    return row ? { notes: row.body, noteRev: row.noteRev ?? 0 } : null;
+  }
+
+  /// A note's revisions, newest first. Paged by rev: pass the smallest rev
+  /// seen as `before`. Bodies only when asked for (they can be long).
+  noteRevisions(container: NoteContainer, id: string, before: number | null, limit: number, includeBody: boolean): NoteRevision[] {
+    const rows = this.sql.exec<{ rev: number; body: string | null; actor: string; at: string; reason: string | null }>(
+      `SELECT rev, body, actor, at, reason FROM note_revisions WHERE container = ? AND id = ?${before !== null ? " AND rev < ?" : ""} ORDER BY rev DESC LIMIT ?`,
+      ...(before !== null ? [container, id, before, limit] : [container, id, limit]),
+    ).toArray();
+    return rows.map((r) => ({
+      rev: r.rev, actor: r.actor, at: r.at, reason: r.reason, ...(includeBody ? { body: r.body } : {}),
+    }));
+  }
+
   readSetting(key: string): Json {
     const raw = this.sql.exec("SELECT * FROM settings WHERE id = ? AND deletedAt IS NULL", key).toArray()[0];
     if (!raw) return null;
@@ -869,6 +1025,10 @@ export class TaskStore extends DurableObject<Env> {
         this.sql.exec(`DELETE FROM ${table} WHERE deletedAt IS NOT NULL AND deletedAt < ?`, tombstoneCutoff);
       }
       this.sql.exec("DELETE FROM turns WHERE taskId NOT IN (SELECT id FROM tasks)");
+      // Notes history lives as long as its container, then goes with it.
+      for (const c of Object.keys(NOTE_FIELD) as NoteContainer[]) {
+        this.sql.exec(`DELETE FROM note_revisions WHERE container = ? AND id NOT IN (SELECT id FROM ${ENTITIES[c].table})`, c);
+      }
       this.setMeta("purgedThrough", purged);
       this.sql.exec("DELETE FROM client_ops WHERE at < ?", now - CLIENT_OP_TTL_MS);
       this.sql.exec("DELETE FROM changes WHERE at < ?", new Date(now - CHANGE_LOG_TTL_MS).toISOString());
