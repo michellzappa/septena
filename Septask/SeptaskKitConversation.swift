@@ -21,11 +21,15 @@ import AppKit
 final class KitConversationView: NSView {
   private let stack = NSStackView()
   private let otherField = NSTextField()
+  private let sendBackField = NSTextField()
   private var taskID: String?
   private var convo = TaskConvo()
+  private var isTaskOpen = true
   /// The free-text escape hatch is collapsed until asked for, like SwiftUI's
   /// `showOther` — options first, typing second.
   private var showOther = false
+  /// Send-back note input for `needs_verify` review tasks.
+  private var showSendBack = false
 
   /// Called after a turn is appended, so the host can re-read and redraw.
   var onAppend: (() -> Void)?
@@ -52,6 +56,13 @@ final class KitConversationView: NSView {
     otherField.bezelStyle = .roundedBezel
     otherField.target = self
     otherField.action = #selector(submitOther)
+
+    sendBackField.placeholderString = String(localized: "What needs another pass?",
+                                             comment: "SeptaskKit: send-back note placeholder")
+    sendBackField.font = SeptaskKitTheme.taskTitle
+    sendBackField.bezelStyle = .roundedBezel
+    sendBackField.target = self
+    sendBackField.action = #selector(submitSendBack)
   }
 
   required init?(coder: NSCoder) { fatalError("KitConversationView is code-only") }
@@ -59,15 +70,18 @@ final class KitConversationView: NSView {
   /// Point this at a task. Returns false when there is nothing worth showing,
   /// so the host can hide the whole section rather than leave an empty header.
   @discardableResult
-  func configure(taskID: String, convo: TaskConvo) -> Bool {
+  func configure(taskID: String, convo: TaskConvo, isTaskOpen: Bool = true) -> Bool {
     let sameTask = self.taskID == taskID
     // A different task must not inherit the previous one's half-typed reply.
     if !sameTask {
       showOther = false
       otherField.stringValue = ""
+      showSendBack = false
+      sendBackField.stringValue = ""
     }
     self.taskID = taskID
     self.convo = convo
+    self.isTaskOpen = isTaskOpen
     guard convo.hasStarted else {
       isHidden = true
       return false
@@ -82,10 +96,10 @@ final class KitConversationView: NSView {
     return true
   }
 
-  /// The free-text reply field holds the keyboard.
+  /// The free-text reply or send-back field holds the keyboard.
   var isEditingReply: Bool {
     guard let editor = window?.firstResponder as? NSTextView else { return false }
-    return editor.delegate === otherField
+    return editor.delegate === otherField || editor.delegate === sendBackField
   }
 
   // MARK: - Building
@@ -107,7 +121,11 @@ final class KitConversationView: NSView {
     }
     if let open { stack.addArrangedSubview(questionBlock(open)) }
     if let meta = metaRow() { stack.addArrangedSubview(meta) }
-    if convo.isTerminal { stack.addArrangedSubview(terminalRow()) }
+    if convo.endState == .needsVerify {
+      stack.addArrangedSubview(reviewBlock())
+    } else if convo.isTerminal {
+      stack.addArrangedSubview(terminalRow())
+    }
     if let agent = agentRow() { stack.addArrangedSubview(agent) }
     if let artifact = convo.artifact { stack.addArrangedSubview(artifactBlock(artifact)) }
     if let handoff = convo.handoff { stack.addArrangedSubview(handoffView(handoff)) }
@@ -134,7 +152,7 @@ final class KitConversationView: NSView {
       }
       return nil
     }
-    guard let answer = turn.chosen ?? turn.otherText else { return nil }
+    guard let answer = turn.chosen ?? turn.otherText ?? turn.note else { return nil }
     return row(symbol: "checkmark.circle.fill", tint: .systemGreen,
                text: answer, font: SeptaskKitTheme.taskTitle,
                ink: SeptaskKitTheme.inkPrimary)
@@ -278,6 +296,68 @@ final class KitConversationView: NSView {
     return row
   }
 
+  /// Agent finished and asked the human to verify (`needs_verify`, #87).
+  /// Offers Accept (marks the task done) and Send back (appends a user turn
+  /// with a note and reopens the conversation for Claude).
+  private func reviewBlock() -> NSView {
+    let block = NSStackView()
+    block.orientation = .vertical
+    block.alignment = .leading
+    block.spacing = 8
+
+    let heading = isTaskOpen
+      ? String(localized: "Needs review", comment: "SeptaskKit: conversation needs_verify heading")
+      : String(localized: "Accepted", comment: "SeptaskKit: conversation needs_verify accepted")
+    block.addArrangedSubview(row(symbol: isTaskOpen ? "eye" : "checkmark.seal.fill",
+                                 tint: isTaskOpen ? .systemYellow : .systemGreen,
+                                 text: heading, font: SeptaskKitTheme.taskTitle,
+                                 ink: SeptaskKitTheme.inkPrimary))
+
+    if let note = convo.endStateNote, !note.isEmpty {
+      let detail = NSTextField(wrappingLabelWithString: note)
+      detail.font = SeptaskKitTheme.meta
+      detail.textColor = SeptaskKitTheme.inkSecondary
+      detail.isSelectable = true
+      block.addArrangedSubview(detail)
+    }
+
+    if isTaskOpen {
+      let accept = NSButton(title: String(localized: "Accept", comment: "SeptaskKit: accept review task"),
+                            target: self, action: #selector(acceptReview))
+      accept.bezelStyle = .rounded
+      accept.controlSize = .small
+      accept.refusesFirstResponder = true
+
+      let sendBack = NSButton(title: String(localized: "Send back", comment: "SeptaskKit: send back review task"),
+                              target: self, action: #selector(toggleSendBack))
+      sendBack.bezelStyle = .rounded
+      sendBack.controlSize = .small
+      sendBack.refusesFirstResponder = true
+
+      let actions = NSStackView(views: [accept, sendBack])
+      actions.orientation = .horizontal
+      actions.alignment = .centerY
+      actions.spacing = 8
+      block.addArrangedSubview(actions)
+
+      if showSendBack {
+        let send = NSButton(title: String(localized: "Send", comment: "SeptaskKit: send back with note"),
+                            target: self, action: #selector(submitSendBack))
+        send.bezelStyle = .rounded
+        send.controlSize = .small
+        send.keyEquivalent = "\r"
+        let replyRow = NSStackView(views: [sendBackField, send])
+        replyRow.orientation = .horizontal
+        replyRow.alignment = .centerY
+        replyRow.spacing = 6
+        sendBackField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        block.addArrangedSubview(replyRow)
+        replyRow.widthAnchor.constraint(equalTo: block.widthAnchor).isActive = true
+      }
+    }
+    return block
+  }
+
   /// The conversation reached a terminal state. `wontDo` reads grey and
   /// neutral rather than red — deciding not to do something is a valid
   /// outcome, not a failure.
@@ -417,6 +497,37 @@ final class KitConversationView: NSView {
     mutator.setConvoStopped(id: taskID, convo.stoppedAt == nil)
     convo = mutator.conversation(id: taskID) ?? convo
     rebuild()
+  }
+
+  @objc private func acceptReview() {
+    guard let taskID else { return }
+    mutator.complete(id: taskID)
+    mutator.acknowledge(id: taskID)
+    let id = taskID
+    let mutator = self.mutator
+    TaskUndo.recordCompletion(ids: [id], wasDone: false, mutator: mutator)
+    isTaskOpen = false
+    showSendBack = false
+    rebuild()
+    onAppend?()
+  }
+
+  @objc private func toggleSendBack() {
+    showSendBack.toggle()
+    rebuild()
+    if showSendBack { window?.makeFirstResponder(sendBackField) }
+  }
+
+  @objc private func submitSendBack() {
+    guard let taskID else { return }
+    let text = sendBackField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return }
+    sendBackField.stringValue = ""
+    showSendBack = false
+    mutator.sendBackConvo(id: taskID, note: text)
+    convo = mutator.conversation(id: taskID) ?? convo
+    rebuild()
+    onAppend?()
   }
 
   /// `seq: 0` is deliberate — `appendConvoTurn` assigns the real sequence

@@ -36,7 +36,7 @@ struct TaskDraft: Equatable {
     case .upcoming:        scheduled = Calendar.current.date(byAdding: .day, value: 1, to: DayClock.appNow)
     case .project(let id): projectId = id
     case .area(let id):    areaId = id
-    case .triage, .unscheduled, .repeating, .logbook, .recentlyDeleted: break
+    case .triage, .review, .unscheduled, .repeating, .logbook, .recentlyDeleted: break
     }
   }
 

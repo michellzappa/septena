@@ -54,6 +54,14 @@ export interface AgentEvent {
 /// (`app:<client>`) is the human.
 export const isAgentActor = (actor: string) => actor.startsWith("mcp:");
 
+/// Guidance attached to agent write refusals, so any connector or runner knows
+/// the rule instead of retrying (ADR 0008).
+export const AGENT_WRITE_RULES: Record<string, string> = {
+  stopped: "The user stopped agent work on this task. Do not write to it; only the user can resume it.",
+  human_accepts:
+    "Only the user marks a Claude-assigned task done. Call tasks_set_endstate with endState \"needs_verify\" and a note describing what to check.",
+};
+
 /// Lease bounds for a claim. An agent that stops writing loses the task when
 /// the lease ends; the maximum keeps a crashed run from holding it for long.
 export const CLAIM_TTL_DEFAULT_MS = 30 * 60 * 1000;
@@ -276,7 +284,12 @@ export class TaskStore extends DurableObject<Env> {
     const now = new Date().toISOString();
     if (isAgentActor(actor)) {
       const refusal = this.agentRefusal(op);
-      if (refusal) return { clientOpId: op.clientOpId, status: "rejected", reason: refusal };
+      if (refusal) {
+        const rule = AGENT_WRITE_RULES[refusal];
+        return rule
+          ? { clientOpId: op.clientOpId, status: "rejected", reason: refusal, rule }
+          : { clientOpId: op.clientOpId, status: "rejected", reason: refusal };
+      }
     }
     if (op.op === "appendTurn") return this.appendTurn(op.clientOpId, op.taskId, op.turn, actor, now);
 
@@ -345,8 +358,9 @@ export class TaskStore extends DurableObject<Env> {
   }
 
   /// The rules an agent write must pass, enforced here so no connector can
-  /// skip them: the stop is the human's alone, and a stopped task takes no
-  /// agent writes at all.
+  /// skip them: the stop is the human's alone, a stopped task takes no agent
+  /// writes at all, and an agent cannot mark a Claude-assigned task done —
+  /// only the human accepts it after review (`human_accepts`).
   private agentRefusal(op: Op): string | null {
     if (op.op === "upsert" && op.entity === "convo" && "stoppedAt" in op.fields) return "human_only:stoppedAt";
     if (op.op === "upsert" && op.entity === "setting" && op.id === "agentsPaused") return "human_only:agentsPaused";
@@ -355,11 +369,21 @@ export class TaskStore extends DurableObject<Env> {
       : op.entity === "attachment" && op.op === "upsert" ? (op.fields.taskId as string | undefined) ?? null
       : null;
     if (taskId && this.convoStopped(taskId)) return "stopped";
+    if (op.op === "upsert" && op.entity === "task" && op.fields.status === "done" && this.convoAssignedToClaude(op.id)) {
+      return "human_accepts";
+    }
     return null;
   }
 
   private convoStopped(taskId: string): boolean {
     return this.sql.exec("SELECT 1 FROM convos WHERE id = ? AND deletedAt IS NULL AND stoppedAt IS NOT NULL", taskId).toArray().length > 0;
+  }
+
+  private convoAssignedToClaude(taskId: string): boolean {
+    return this.sql.exec(
+      "SELECT 1 FROM convos WHERE id = ? AND deletedAt IS NULL AND assignee = 'claude'",
+      taskId,
+    ).toArray().length > 0;
   }
 
   private liveTask(id: string): boolean {
