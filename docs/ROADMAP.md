@@ -24,6 +24,7 @@ on a listed issue without the label). Feature IDs: Starlings Docs
 | Project sharing | `docs/PROJECT_SHARING_SPEC.md`, ADR 0004 | `track:sharing` |
 | Switcher essentials, moving in & other clients (web, Android) | Starlings `/strategy/product-roadmap`, `docs/SEPTASK_ANDROID_PLAN.md` | `track:clients` |
 | Task fade | `docs/TASK_FADE_SPEC.md`, ADR 0006 | `track:fade` |
+| Project notes as agent context | `docs/PROJECT_NOTES_SPEC.md`, ADR 0012 | `track:factory` |
 | Launch — Septena name, free tier, paid sync, rate lock | `docs/SYNC_SUBSCRIPTION_SPEC.md`, ADR 0007, ADR 0010 | `track:launch` |
 
 ## Milestones
@@ -99,6 +100,10 @@ multiplatform access and an agentic UX*):
 - F0 claims/stop/pause (built 2026-11-19) + Agent smart list UI
 - #5 F1 scheduled runner, push questions, wake on answer
 - #6 L0 GitHub links (read-only) → #7 L1 GitHub write-back
+- Project notes as agent context (`docs/PROJECT_NOTES_SPEC.md`, ADR 0012):
+  #120 N0 store rules and history → #121 N1 MCP tools and claim payload ·
+  #122 N2 notes first in the app → #123 N3 proposals and history UI ·
+  #124 N4 notes-first content for #103
 
 Exit: a switcher brings their lists over with clear loss disclosure, connects
 Claude on first run, assigns a task, answers a question from the phone, and

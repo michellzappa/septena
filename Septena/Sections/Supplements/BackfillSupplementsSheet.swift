@@ -60,26 +60,27 @@ struct BackfillSupplementsSheet: View {
   }
 
   private func row(for item: SupplementDayItem) -> some View {
-    Button {
+    let toggle = {
       let next = !item.done
       checklistMutator.toggleSupplement(id: item.id, date: date, done: next)
       Haptics.tick()
-    } label: {
-      HStack(spacing: 12) {
-        Image(systemName: item.done ? "checkmark.circle.fill" : "circle")
-          .foregroundStyle(item.done ? accent : .secondary)
-          .font(.title3)
-        if let e = item.emoji, !e.isEmpty {
-          Text(e)
-        }
-        Text(item.name)
-          .foregroundStyle(.primary)
-          .strikethrough(item.done, color: .secondary)
-        Spacer()
-      }
-      .contentShape(Rectangle())
     }
-    .buttonStyle(.plain)
+    return HStack(spacing: Theme.iconTextGap) {
+      TaskCheckbox(tint: accent, isDone: item.done, onToggle: toggle)
+      Button(action: toggle) {
+        HStack(spacing: 8) {
+          if let e = item.emoji, !e.isEmpty {
+            Text(e)
+          }
+          Text(item.name)
+            .foregroundStyle(.primary)
+            .strikethrough(item.done, color: .secondary)
+          Spacer()
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+    }
   }
 
   private func reload() {

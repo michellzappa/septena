@@ -140,34 +140,14 @@ enum Theme {
     #endif
   }()
 
-  /// Done-checkbox fill — same family as `checkboxStroke`, slightly heavier.
-  static let checkboxFill: Color = {
-    #if os(macOS)
-    return Color(nsColor: .labelColor).opacity(0.78)
-    #elseif canImport(UIKit)
-    return Color(uiColor: .label).opacity(0.78)
-    #else
-    return Color.primary.opacity(0.78)
-    #endif
-  }()
+  /// Done-checkbox fill — platform accent (System Settings accent on macOS,
+  /// system blue on iOS), matching native system checkboxes in both light and
+  /// dark appearances.
+  static var checkboxFill: Color { selectionAccent }
 
-  /// Ink for the check GLYPH inside a done checkbox.
-  ///
-  /// `checkboxFill` is label ink — near-black in light, near-WHITE in dark —
-  /// so the hardcoded white check this replaces was white-on-white the moment
-  /// you ticked a box in dark mode. The glyph has to be the *background*
-  /// counterpart of the fill, which flips with the appearance the same way the
-  /// fill does. Same trap as `.background(Color.accentColor).foregroundStyle(.white)`
-  /// (see CLAUDE.md, "the app accent is adaptive INK, not a hue").
-  static let checkboxCheck: Color = {
-    #if os(macOS)
-    return Color(nsColor: .textBackgroundColor)
-    #elseif canImport(UIKit)
-    return Color(uiColor: .systemBackground)
-    #else
-    return Color.white
-    #endif
-  }()
+  /// Ink for the check GLYPH inside a done checkbox. White reads crisply over
+  /// the platform accent fill in both light and dark appearances.
+  static let checkboxCheck: Color = .white
 
   /// Icon color when an icon should recede behind row text. `.tertiary`
   /// matches what Reminders uses for non-tinted glyphs (calendar, bell,
@@ -231,8 +211,10 @@ enum Theme {
   static var selectionAccent: Color {
     #if os(macOS)
     return Color(nsColor: systemAccentNSColor)
-    #else
+    #elseif canImport(UIKit)
     return Color(uiColor: .systemBlue)
+    #else
+    return Color.blue
     #endif
   }
 

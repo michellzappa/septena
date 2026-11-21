@@ -17,6 +17,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0009](0009-trustable-private-ai.md) | Run AI on tasks with checkable privacy guarantees | proposed |
 | [0010](0010-free-server-tier-with-limits.md) | Offer a free server tier with limits; paid lifts them | accepted |
 | [0011](0011-self-hostable-backend.md) | Keep the backend self-hostable on the user's own Cloudflare account | accepted |
+| [0012](0012-project-notes-are-agent-context.md) | Project notes are the context agents read first | proposed |
 
 ## Template
 

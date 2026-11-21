@@ -103,8 +103,8 @@ enum TaskNotices {
     return out
   }
 
-  /// Remembers a dismissal. Rolled-in is per day and account-wide (synced);
-  /// an explainer is once per device, until explainers get a synced key.
+  /// Remembers a dismissal. Rolled-in and Get started are account-wide (synced);
+  /// other explainers are once per device until they get a synced key.
   static func dismiss(_ id: TaskNotice.ID, today: String, context: ModelContext) {
     switch id {
     case .signIn:
@@ -112,7 +112,11 @@ enum TaskNotices {
     case .rolledIn:
       SettingsMirror.dismissRolledIn(on: today, context: context,
                                      engine: SeptenaServices.shared.ckEngine)
-    case .fadeIntro, .getStarted:
+    case .getStarted:
+      markSeen(id)
+      SettingsMirror.dismissGetStarted(context: context,
+                                       engine: SeptenaServices.shared.ckEngine)
+    case .fadeIntro:
       markSeen(id)
     }
   }
@@ -129,19 +133,36 @@ enum TaskNotices {
 
   /// Ticks a checklist step: by hand from its checkbox, or from the code
   /// path that just did the thing (pairing approved, an import finished).
-  static func completeStep(_ id: TaskNoticeStep.ID) {
-    var done = Set(UserDefaults.standard.stringArray(forKey: stepsKey) ?? [])
-    guard done.insert(id.rawValue).inserted else { return }
-    UserDefaults.standard.set(done.sorted(), forKey: stepsKey)
+  static func completeStep(_ id: TaskNoticeStep.ID, context: ModelContext? = nil) {
+    let ctx = context ?? LocalStore.shared.container.mainContext
+    let synced = SettingsMirror.getStartedSteps(context: ctx)
+    var done = Set(synced ?? (UserDefaults.standard.stringArray(forKey: stepsKey) ?? []))
+    let inserted = done.insert(id.rawValue).inserted
+    let sorted = done.sorted()
+    if inserted || UserDefaults.standard.stringArray(forKey: stepsKey) != sorted {
+      UserDefaults.standard.set(sorted, forKey: stepsKey)
+    }
+    SettingsMirror.setGetStartedSteps(sorted, context: ctx,
+                                      engine: SeptenaServices.shared.ckEngine)
+    if TaskNoticeStep.ID.allCases.allSatisfy({ done.contains($0.rawValue) }) {
+      markSeen(.getStarted)
+      SettingsMirror.dismissGetStarted(context: ctx,
+                                       engine: SeptenaServices.shared.ckEngine)
+    }
   }
 
   /// Unticks a step ticked by hand (Mark as Not Done). A step the data shows
   /// as done (an agent task, an import, a first task) ticks itself again on
   /// the next read, the same as before.
-  static func reopenStep(_ id: TaskNoticeStep.ID) {
-    var done = Set(UserDefaults.standard.stringArray(forKey: stepsKey) ?? [])
+  static func reopenStep(_ id: TaskNoticeStep.ID, context: ModelContext? = nil) {
+    let ctx = context ?? LocalStore.shared.container.mainContext
+    let synced = SettingsMirror.getStartedSteps(context: ctx)
+    var done = Set(synced ?? (UserDefaults.standard.stringArray(forKey: stepsKey) ?? []))
     guard done.remove(id.rawValue) != nil else { return }
-    UserDefaults.standard.set(done.sorted(), forKey: stepsKey)
+    let sorted = done.sorted()
+    UserDefaults.standard.set(sorted, forKey: stepsKey)
+    SettingsMirror.setGetStartedSteps(sorted, context: ctx,
+                                      engine: SeptenaServices.shared.ckEngine)
   }
 
   /// Ticks or unticks a step: the ⌘K / checkbox gesture on a step row, the
@@ -208,13 +229,38 @@ enum TaskNotices {
 
   private static func getStarted(context: ModelContext) -> TaskNotice? {
     #if SEPTASK
-    guard !hasSeen(.getStarted) else { return nil }
-    let latched = Set(UserDefaults.standard.stringArray(forKey: stepsKey) ?? [])
+    let syncedDismissed = SettingsMirror.getStartedDismissed(context: context)
+    let localDismissed = hasSeen(.getStarted)
+    if syncedDismissed || localDismissed {
+      if syncedDismissed && !localDismissed { markSeen(.getStarted) }
+      // Promote a pre-sync local dismissal so sibling devices hide it too.
+      if localDismissed && !syncedDismissed {
+        SettingsMirror.dismissGetStarted(context: context,
+                                         engine: SeptenaServices.shared.ckEngine)
+      }
+      return nil
+    }
+    let syncedSteps = SettingsMirror.getStartedSteps(context: context)
+    let localSteps = UserDefaults.standard.stringArray(forKey: stepsKey) ?? []
+    let latched: Set<String>
+    if let syncedSteps {
+      latched = Set(syncedSteps)
+      if localSteps != syncedSteps {
+        UserDefaults.standard.set(syncedSteps, forKey: stepsKey)
+      }
+    } else {
+      latched = Set(localSteps)
+      if !localSteps.isEmpty {
+        // Promote pre-sync local step progress so sibling devices see it.
+        SettingsMirror.setGetStartedSteps(localSteps, context: context,
+                                          engine: SeptenaServices.shared.ckEngine)
+      }
+    }
     func done(_ id: TaskNoticeStep.ID, source: String) -> Bool {
       if latched.contains(id.rawValue) { return true }
       let descriptor = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.source == source })
       guard ((try? context.fetchCount(descriptor)) ?? 0) > 0 else { return false }
-      completeStep(id)
+      completeStep(id, context: context)
       return true
     }
     let steps = [
@@ -239,7 +285,12 @@ enum TaskNotices {
         detail: addTaskDetail,
         done: done(.addTask, source: TaskSource.app)),
     ]
-    guard steps.contains(where: { !$0.done }) else { return nil }
+    guard steps.contains(where: { !$0.done }) else {
+      markSeen(.getStarted)
+      SettingsMirror.dismissGetStarted(context: context,
+                                       engine: SeptenaServices.shared.ckEngine)
+      return nil
+    }
     return TaskNotice(
       id: .getStarted, kind: .info, symbol: "sparkles",
       title: String(localized: "Get started with Septena",

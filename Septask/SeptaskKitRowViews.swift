@@ -12,9 +12,13 @@ import AppKit
 
 // MARK: - Checkbox
 
-/// The task checkbox — AppKit rendering of `TaskCheckbox` (macOS geometry:
-/// 14pt rounded square, 3.5 corner, 1.2 stroke). Forms: open, dashed
-/// (unratified proposal), gold (promoted to Today), filled + check (done).
+/// The task checkbox — AppKit rendering of `TaskCheckbox`. Uses a standard
+/// macOS `NSButton` checkbox (`setButtonType(.switch)`) for every standard open
+/// and done state so light mode, dark mode, Liquid Glass, and the user's System
+/// Settings accent work natively. Falls back to custom `NSBezierPath` drawing
+/// only for open states the system control cannot express: dashed (unratified
+/// proposal / New task placeholder) and gold (promoted to Today on off-Today
+/// lists).
 ///
 /// A real `NSButton`, not a hand-tracked `NSView`. Same lesson as
 /// `KitDisclosureView` / `KitScreenTitleCell`: `NSTableView`'s mouseDown
@@ -28,18 +32,32 @@ final class KitCheckboxView: NSButton {
   private static let corner: CGFloat = 3.5
   private static let stroke: CGFloat = 1.2
 
-  var isDone = false { didSet { needsDisplay = true; refreshAccessibility() } }
-  var isDashed = false { didSet { needsDisplay = true; refreshAccessibility() } }
-  var isToday = false { didSet { needsDisplay = true; refreshAccessibility() } }
+  /// Native macOS checkbox shown for every standard checkable state.
+  private let standardBox = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+  /// Non-interactive overlay above `standardBox` for the unread-context corner
+  /// dot and fresh-agent cue ring.
+  private let cueOverlay = KitCheckboxCueOverlay()
+
+  var isDone = false { didSet { syncDisplay() } }
+  var isDashed = false { didSet { syncDisplay() } }
+  var isToday = false { didSet { syncDisplay() } }
   /// Days carried on Today as 0…1 (`SeptenaTask.todayTenureFill`). The box
   /// draws nothing for it: the cell fades its row instead (`TaskFade`). Kept
   /// for the VoiceOver hint only.
-  var tenureFill: Double? = nil { didSet { needsDisplay = true; refreshAccessibility() } }
+  var tenureFill: Double? = nil { didSet { refreshAccessibility() } }
   /// Unread agent context on a committed task — the haloed corner dot.
-  var cornerDot = false { didSet { needsDisplay = true; refreshAccessibility() } }
+  var cornerDot = false { didSet { syncDisplay() } }
   /// A fresh, unacknowledged agent-created row — the cue ring.
-  var agentCue = false { didSet { needsDisplay = true; refreshAccessibility() } }
+  var agentCue = false { didSet { syncDisplay() } }
   var onToggle: (() -> Void)?
+
+  override var isEnabled: Bool {
+    didSet { standardBox.isEnabled = isEnabled }
+  }
+
+  private var usesStandardBox: Bool {
+    isDone || (!isDashed && !isToday)
+  }
 
   override var intrinsicContentSize: NSSize {
     NSSize(width: Self.tapSize, height: Self.tapSize)
@@ -56,10 +74,54 @@ final class KitCheckboxView: NSButton {
     // Keyboard focus stays on the table — mirrors `.focusable(false)` on the
     // SwiftUI checkbox, so Space can never activate a completion.
     refusesFirstResponder = true
-    refreshAccessibility()
+
+    standardBox.title = ""
+    standardBox.imagePosition = .imageOnly
+    standardBox.controlSize = .regular
+    standardBox.refusesFirstResponder = true
+    standardBox.target = self
+    standardBox.action = #selector(fireFromStandard)
+    standardBox.translatesAutoresizingMaskIntoConstraints = false
+    standardBox.kitA11yIgnore()
+
+    cueOverlay.translatesAutoresizingMaskIntoConstraints = false
+    cueOverlay.kitA11yIgnore()
+
+    addSubview(standardBox)
+    addSubview(cueOverlay)
+    NSLayoutConstraint.activate([
+      standardBox.centerXAnchor.constraint(equalTo: centerXAnchor),
+      standardBox.centerYAnchor.constraint(equalTo: centerYAnchor),
+      cueOverlay.leadingAnchor.constraint(equalTo: leadingAnchor),
+      cueOverlay.trailingAnchor.constraint(equalTo: trailingAnchor),
+      cueOverlay.topAnchor.constraint(equalTo: topAnchor),
+      cueOverlay.bottomAnchor.constraint(equalTo: bottomAnchor),
+    ])
+
+    syncDisplay()
   }
 
   required init?(coder: NSCoder) { fatalError("KitCheckboxView is code-only") }
+
+  private func syncDisplay() {
+    let useStandard = usesStandardBox
+    standardBox.isHidden = !useStandard
+    if useStandard {
+      standardBox.state = isDone ? .on : .off
+    }
+    cueOverlay.cornerDot = !isDone && cornerDot
+    cueOverlay.agentCue = !isDone && agentCue
+    cueOverlay.isHidden = !cueOverlay.cornerDot && !cueOverlay.agentCue
+    cueOverlay.needsDisplay = !cueOverlay.isHidden
+    needsDisplay = true
+    refreshAccessibility()
+  }
+
+  @objc private func fireFromStandard() {
+    // Keep the native control synced to the model; `onToggle` drives `isDone`.
+    standardBox.state = isDone ? .on : .off
+    fire()
+  }
 
   @objc private func fire() {
     // Celebrate on the way IN only, like SwiftUI's `playFeel()` — unchecking
@@ -101,7 +163,9 @@ final class KitCheckboxView: NSButton {
     ring.path = CGPath(roundedRect: box, cornerWidth: Self.corner,
                        cornerHeight: Self.corner, transform: nil)
     ring.fillColor = nil
-    ring.strokeColor = color.cgColor
+    effectiveAppearance.performAsCurrentDrawingAppearance {
+      ring.strokeColor = color.cgColor
+    }
     ring.lineWidth = Self.stroke
     ring.opacity = 0
     host.addSublayer(ring)
@@ -147,17 +211,11 @@ final class KitCheckboxView: NSButton {
   }
 
   override func draw(_ dirtyRect: NSRect) {
+    guard !usesStandardBox else { return }
+
     let box = NSRect(x: (bounds.width - Self.boxSize) / 2,
                      y: (bounds.height - Self.boxSize) / 2,
                      width: Self.boxSize, height: Self.boxSize)
-
-    if isDone {
-      SeptaskKitTheme.checkboxFill.setFill()
-      NSBezierPath(roundedRect: box, xRadius: Self.corner, yRadius: Self.corner).fill()
-      drawCheck(in: box)
-      return
-    }
-
     let inset = box.insetBy(dx: Self.stroke / 2, dy: Self.stroke / 2)
     let path = NSBezierPath(roundedRect: inset, xRadius: Self.corner, yRadius: Self.corner)
     path.lineWidth = Self.stroke
@@ -171,23 +229,39 @@ final class KitCheckboxView: NSButton {
       SeptaskKitTheme.checkboxStroke.setStroke()
     }
     path.stroke()
+  }
+}
+
+/// Non-interactive overlay drawing the agent cue ring and unread-context corner
+/// dot above `KitCheckboxView`'s standard checkbox control.
+@MainActor
+private final class KitCheckboxCueOverlay: NSView {
+  var cornerDot = false
+  var agentCue = false
+
+  override var isFlipped: Bool { true }
+  override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+  override func draw(_ dirtyRect: NSRect) {
+    let boxSize = KitCheckboxView.boxSize
+    let corner: CGFloat = 3.5
+    let box = NSRect(x: (bounds.width - boxSize) / 2,
+                     y: (bounds.height - boxSize) / 2,
+                     width: boxSize, height: boxSize)
 
     // Agent cue — a soft ring outside the box marking a fresh, unengaged
     // agent-created row. Clears when the row is acknowledged.
     if agentCue {
       let ring = NSBezierPath(roundedRect: box.insetBy(dx: -2.5, dy: -2.5),
-                              xRadius: Self.corner + 2, yRadius: Self.corner + 2)
+                              xRadius: corner + 2, yRadius: corner + 2)
       ring.lineWidth = 1.4
       SeptaskKitTheme.todayAccent.withAlphaComponent(0.55).setStroke()
       ring.stroke()
     }
 
     // Unread-context dot, haloed so it reads on any row background.
-    // Visual top-right — `isFlipped` swaps which edge is "top" (NSButton
-    // is flipped; the old NSView subclass was not).
     if cornerDot {
-      let topY = isFlipped ? box.minY - 1 : box.maxY + 1
-      let center = NSPoint(x: box.maxX + 1, y: topY)
+      let center = NSPoint(x: box.maxX + 1, y: box.minY - 1)
       let halo = NSRect(x: center.x - 3.4, y: center.y - 3.4, width: 6.8, height: 6.8)
       SeptaskKitTheme.cardSurface.setFill()
       NSBezierPath(ovalIn: halo).fill()
@@ -195,26 +269,6 @@ final class KitCheckboxView: NSButton {
       SeptaskKitTheme.todayAccent.setFill()
       NSBezierPath(ovalIn: dot).fill()
     }
-  }
-
-  /// The check mark inside a completed box (`checkSize` 9 in TaskCheckbox).
-  /// Fractions are top-down visual (0 = top of box) so the glyph stays upright
-  /// whether the view is flipped (`NSButton`) or not.
-  private func drawCheck(in box: NSRect) {
-    func y(_ fromTop: CGFloat) -> CGFloat {
-      isFlipped
-        ? box.minY + box.height * fromTop
-        : box.maxY - box.height * fromTop
-    }
-    let path = NSBezierPath()
-    path.move(to: NSPoint(x: box.minX + box.width * 0.26, y: y(0.48)))
-    path.line(to: NSPoint(x: box.minX + box.width * 0.44, y: y(0.74)))
-    path.line(to: NSPoint(x: box.minX + box.width * 0.76, y: y(0.28)))
-    path.lineWidth = 1.6
-    path.lineCapStyle = .round
-    path.lineJoinStyle = .round
-    SeptaskKitTheme.checkboxCheck.setStroke()
-    path.stroke()
   }
 }
 
