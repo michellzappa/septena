@@ -348,6 +348,9 @@ final class MagicPlusDragState {
   var homeCenter: CGPoint = .zero
   /// Currently targeted drop zone, if any.
   var activeTarget: ActiveTarget? = nil
+  /// Drop action when no zone is registered at all (an empty list): the host
+  /// creates a plain new task, so a drop outside the cancel socket always lands.
+  @ObservationIgnored var fallbackDrop: (() -> Void)? = nil
 
   /// Non-observed registry so scrolling rows never trigger SwiftUI view invalidations.
   @ObservationIgnored private var zones: [String: Zone] = [:]
@@ -394,7 +397,14 @@ final class MagicPlusDragState {
     }
     if let hit, let action {
       action(hit.before)
+    } else if !isOverHome(location) {
+      fallbackDrop?()
     }
+  }
+
+  private func isOverHome(_ location: CGPoint) -> Bool {
+    homeCenter != .zero
+      && hypot(location.x - homeCenter.x, location.y - homeCenter.y) < 40
   }
 
   /// Clear stale zones when switching tabs / navigation routes.
@@ -404,11 +414,16 @@ final class MagicPlusDragState {
     zones.removeAll()
   }
 
+  /// Shortest distance from a point to a rect (0 inside it).
+  private static func distance(from point: CGPoint, to rect: CGRect) -> CGFloat {
+    let dx = max(rect.minX - point.x, 0, point.x - rect.maxX)
+    let dy = max(rect.minY - point.y, 0, point.y - rect.maxY)
+    return hypot(dx, dy)
+  }
+
   private func resolveTarget(for location: CGPoint) {
     // Dragging back onto the resting orb socket cancels cleanly.
-    let dx = location.x - homeCenter.x
-    let dy = location.y - homeCenter.y
-    if homeCenter != .zero && hypot(dx, dy) < 40 {
+    if isOverHome(location) {
       if activeTarget != nil {
         a11yAnimate(.snappy(duration: 0.18)) { activeTarget = nil }
       }
@@ -422,9 +437,19 @@ final class MagicPlusDragState {
       return zone.frame.insetBy(dx: -8, dy: -padY).contains(probe)
     }
 
+    // No holes: when the probe sits in a gap (row spacing, between sections,
+    // empty space below the last row, the nav bar), fall back to the nearest
+    // registered zone so every drop position has a destination. A row picked
+    // this way resolves before/after by the midline, so space under the last
+    // row lands after it and space above the first lands before it.
     let best = candidates.max { a, b in
       if a.priority != b.priority { return a.priority < b.priority }
       return abs(a.frame.midY - probe.y) > abs(b.frame.midY - probe.y)
+    } ?? zones.values.min { a, b in
+      let da = Self.distance(from: probe, to: a.frame)
+      let db = Self.distance(from: probe, to: b.frame)
+      if da != db { return da < db }
+      return a.priority > b.priority
     }
 
     guard let best else {

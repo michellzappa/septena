@@ -328,6 +328,9 @@ struct SeptaskRootView: View {
       MagicPlusFloatingOverlay(drag: magicPlusDrag)
     }
     .environment(\.magicPlusDrag, magicPlusDrag)
+    .onAppear {
+      magicPlusDrag.fallbackDrop = { triggerInlineNewTask() }
+    }
     .onChange(of: nav.path) { _, _ in
       if !magicPlusDrag.isDragging {
         magicPlusDrag.reset()
