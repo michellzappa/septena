@@ -66,21 +66,48 @@ struct SeptaskApp: App {
 
     #if os(macOS)
     Window("Settings", id: "septask-settings") {
-      SeptaskSettingsView()
-        // Its own scene, so it replicates the main window's chain — via the
-        // same shared injector, which also gives this scene the NavigationState
-        // it was previously missing.
-        .septenaSharedEnvironment(navigation: settingsNavigation, theme: theme,
-                                  settings: settingsStore, dayClock: dayClock,
-                                  logCommit: logCommit, services: services)
-        .modelContainer(localStore.container)
-        .septenaTextSize()
+      SeptaskSettingsSceneRoot(
+        settingsNavigation: settingsNavigation,
+        theme: theme,
+        settingsStore: settingsStore,
+        dayClock: dayClock,
+        logCommit: logCommit,
+        services: services,
+        localStore: localStore
+      )
     }
     .windowStyle(.hiddenTitleBar)
     .windowResizability(.contentSize)
     #endif
   }
 }
+
+#if os(macOS)
+private struct SeptaskSettingsSceneRoot: View {
+  let settingsNavigation: NavigationState
+  let theme: SectionTheme
+  let settingsStore: SettingsStore
+  let dayClock: DayClock
+  let logCommit: LogCommitCenter
+  let services: SeptenaServices
+  let localStore: LocalStore
+  private let appearance = AppearancePreferences.shared
+
+  var body: some View {
+    SeptaskSettingsView()
+      // Its own scene, so it replicates the main window's chain — via the
+      // same shared injector, which also gives this scene the NavigationState
+      // it was previously missing.
+      .septenaSharedEnvironment(navigation: settingsNavigation, theme: theme,
+                                settings: settingsStore, dayClock: dayClock,
+                                logCommit: logCommit, services: services)
+      .modelContainer(localStore.container)
+      .septenaTextSize()
+      .tint(appearance.accentSwiftUIColor)
+      .preferredColorScheme(appearance.preferredColorScheme)
+  }
+}
+#endif
 
 /// The main-window composition root. Its `NavigationState` is intentionally
 /// created here, inside the WindowGroup content closure, rather than on App.
@@ -94,12 +121,15 @@ private struct SeptaskMainWindow: View {
   let iPadChrome: IPadChromeModel
   let logCommit: LogCommitCenter
   let settingsStore: SettingsStore
+  private let appearance = AppearancePreferences.shared
 
   @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
     SeptaskRootView()
       .overlay { LogCommitOverlay() }
+      .tint(appearance.accentSwiftUIColor)
+      .preferredColorScheme(appearance.preferredColorScheme)
       // No CloudKit batch listener: Septask's settings arrive with the task
       // backend pull, and `SettingsStore` reloads itself on
       // `.septaskSettingsPulled`. Septask has no section colors to repaint.

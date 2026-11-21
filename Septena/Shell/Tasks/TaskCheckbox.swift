@@ -174,13 +174,18 @@ struct TaskCheckbox: View {
   @State private var bodySquash: CGFloat = 1   // drop: impact squash
   @State private var bodyDip: CGFloat = 0      // tuck: box dips, then recovers
 
-  /// On macOS, use the native system checkbox control for every standard open
-  /// and done state. Fall back to custom drawing only for dashed proposals.
+  /// On macOS, use the native system checkbox control for standard states in
+  /// `Colorful` mode. Fall back to custom drawing for dashed proposals and
+  /// done checkboxes under a custom fruit accent (ADR 0019) so the fruit fill
+  /// and dark-mode check ink render faithfully.
   private var usesStandardCheckbox: Bool {
     #if os(macOS)
-    !dashed || isDone
+    #if SEPTASK
+    if isDone && !AppearancePreferences.shared.isColorful { return false }
+    #endif
+    return !dashed || isDone
     #else
-    false
+    return false
     #endif
   }
 

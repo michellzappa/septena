@@ -65,6 +65,8 @@ struct SeptaskRootView: View {
       .environment(ckEngine)
       .environment(settingsStore)
       .environment(logCommit)
+      .tint(AppearancePreferences.shared.accentSwiftUIColor)
+      .preferredColorScheme(AppearancePreferences.shared.preferredColorScheme)
   }
 
   var body: some View {

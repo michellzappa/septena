@@ -28,14 +28,11 @@ enum SeptaskKitSettingsWindow {
     settings.reloadFromMirror(context: LocalStore.shared.container.mainContext)
     theme.paintFromCache()
 
-    let root = SeptaskSettingsView()
-      .septenaSharedEnvironment(navigation: navigation, theme: theme,
-                                settings: settings,
-                                dayClock: SeptaskMacRuntime.dayClock,
-                                logCommit: SeptaskMacRuntime.logCommit,
-                                services: SeptenaServices.shared)
-      .modelContainer(LocalStore.shared.container)
-      .septenaTextSize()
+    let root = SeptaskKitSettingsRoot(
+      navigation: navigation,
+      theme: theme,
+      settings: settings
+    )
 
     let host = NSHostingController(rootView: AnyView(root))
     let window = NSWindow(contentViewController: host)
@@ -46,6 +43,26 @@ enum SeptaskKitSettingsWindow {
     let windowController = NSWindowController(window: window)
     controller = windowController
     windowController.window?.makeKeyAndOrderFront(nil)
+  }
+}
+
+private struct SeptaskKitSettingsRoot: View {
+  let navigation: NavigationState
+  let theme: SectionTheme
+  let settings: SettingsStore
+  private let appearance = AppearancePreferences.shared
+
+  var body: some View {
+    SeptaskSettingsView()
+      .septenaSharedEnvironment(navigation: navigation, theme: theme,
+                                settings: settings,
+                                dayClock: SeptaskMacRuntime.dayClock,
+                                logCommit: SeptaskMacRuntime.logCommit,
+                                services: SeptenaServices.shared)
+      .modelContainer(LocalStore.shared.container)
+      .septenaTextSize()
+      .tint(appearance.accentSwiftUIColor)
+      .preferredColorScheme(appearance.preferredColorScheme)
   }
 }
 #endif

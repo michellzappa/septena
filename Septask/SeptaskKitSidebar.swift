@@ -293,6 +293,15 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     ) { [weak self] _ in
       MainActor.assumeIsolated { self?.refreshTextSize() }
     })
+    observers.append(NotificationCenter.default.addObserver(
+      forName: .septenaAppearanceChanged, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated {
+        self?.outlineView.enumerateAvailableRowViews { rowView, _ in
+          rowView.needsDisplay = true
+        }
+      }
+    })
   }
 
   deinit {

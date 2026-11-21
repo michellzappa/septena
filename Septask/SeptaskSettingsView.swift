@@ -492,15 +492,7 @@ struct SeptaskSettingsView: View {
   private func inlineSurface(for surface: String, item: RegistrySettingsItem) -> some View {
     switch surface {
     case "accent_color":
-      HStack {
-        Text(item.label ?? "Accent")
-        Spacer()
-        PaletteSwatchButton(selectedHex: theme.token(for: "tasks")) { hex in
-          SettingsMirror.setSectionColor("tasks", hex: hex,
-                                         context: modelContext, engine: ckEngine)
-          theme.setColor(hex, for: "tasks")
-        }
-      }
+      AppearancePickerView()
     default:
       EmptyView()
     }

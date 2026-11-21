@@ -41,6 +41,7 @@ enum SeptaskLaunch {
       await services.absorbRemoteChanges()
       let context = localStore.container.mainContext
       settings.reloadFromMirror(context: context)
+      AppearancePreferences.shared.adoptSynced(SeptaskSyncedSettings.current())
       settings.reconcileWelcomeName(context: context, engine: services.ckEngine)
       settings.reconcileTelemetryLevel(context: context, engine: services.ckEngine)
       settings.reconcileHiddenCalendars(context: context, engine: services.ckEngine)
@@ -221,6 +222,7 @@ enum SeptaskMacRuntime {
 @MainActor
 final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
+    AppearancePreferences.shared.applyPlatformAppearance()
     // Global Quick Entry hotkey, ⌃⌥Space (Carbon RegisterEventHotKey: no
     // Accessibility permission, no event tap). ⌃Space is the system input
     // source switch and Moom's binding, so it is not used.
