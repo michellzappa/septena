@@ -31,6 +31,11 @@ import SwiftData
 // auto-purge, recurrence spawning a next occurrence, and the watch. Recording
 // inside them would put sync traffic on the user's undo stack and let ⌘Z
 // "undo" a change another device made. Callers say what the user did.
+//
+// The same reasoning makes these recorders the fade clock's stamp sites
+// (docs/TASK_FADE_SPEC.md §3): schedule, move, Today, complete, cancel and
+// title / notes edits call `TaskMutator.touch` here, because a recorder only
+// runs for a user gesture. Undo / redo replays do not re-stamp.
 @MainActor
 enum TaskUndo {
   /// The process-wide manager. One instance: a second would split the stack
@@ -169,9 +174,27 @@ enum TaskUndo {
       .filter { wanted.contains($0.id) }
       .map(ScheduleSnapshot.init)
     guard !after.isEmpty else { return }
+    let beforeByID = Dictionary(before.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    let deferred = Set(after.compactMap { a -> String? in
+      guard let b = beforeByID[a.id] else { return nil }
+      return isDefer(from: b, to: a) ? a.id : nil
+    })
+    mutator.touch(ids: after.map(\.id), deferredIDs: deferred)
     record(name: name,
            undo: { restore(before, using: mutator) },
            redo: { restore(after, using: mutator) })
+  }
+
+  /// A defer (docs/TASK_FADE_SPEC.md §3): the task left Today, or its
+  /// scheduled day moved later than it was. Scheduling an unscheduled task is
+  /// not a defer.
+  private static func isDefer(from b: ScheduleSnapshot, to a: ScheduleSnapshot) -> Bool {
+    if b.today && !a.today { return true }
+    if let was = b.scheduled, let now = a.scheduled,
+       Calendar.current.startOfDay(for: now) > Calendar.current.startOfDay(for: was) {
+      return true
+    }
+    return false
   }
 
   // MARK: - Creation
@@ -203,6 +226,7 @@ enum TaskUndo {
                                wasDone: Bool,
                                mutator: TaskMutator) {
     guard !ids.isEmpty else { return }
+    mutator.touch(ids: ids)
     let name = wasDone
       ? String(localized: "Reopen Task", comment: "Undo action name")
       : String(localized: "Complete Task", comment: "Undo action name")
@@ -221,6 +245,7 @@ enum TaskUndo {
   /// menu can't invent a different one.
   static func recordCancel(ids: [String], mutator: TaskMutator) {
     guard !ids.isEmpty else { return }
+    mutator.touch(ids: ids)
     record(name: String(localized: "Cancel Task", comment: "Undo action name"),
            undo: { for id in ids { mutator.uncomplete(id: id) } },
            redo: { for id in ids { mutator.cancel(id: id) } })
@@ -240,6 +265,7 @@ enum TaskUndo {
   static func recordRename(id: String, before: String, after: String,
                            mutator: TaskMutator) {
     guard before != after else { return }
+    mutator.touch(id: id)
     record(name: String(localized: "Rename Task", comment: "Undo action name"),
            undo: { mutator.update(id: id, title: before) },
            redo: { mutator.update(id: id, title: after) })
@@ -259,6 +285,7 @@ enum TaskUndo {
       recordRename(id: id, before: beforeTitle, after: afterTitle, mutator: mutator)
       return
     }
+    mutator.touch(id: id)
     func apply(title: String, notes: String?) {
       mutator.update(id: id,
                      title: titleChanged ? title : nil,
@@ -410,6 +437,7 @@ enum TaskUndo {
     // order differ.
     let beforeByID = Dictionary(before.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
     guard after.contains(where: { beforeByID[$0.id] != $0 }) else { return }
+    mutator.touch(ids: after.map(\.id))
     record(name: String(localized: "Move Task", comment: "Undo action name"),
            undo: { restore(before, using: mutator) },
            redo: { restore(after, using: mutator) })

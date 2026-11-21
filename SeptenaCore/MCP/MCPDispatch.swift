@@ -415,6 +415,15 @@ enum MCPDispatch {
     if let v = e.source { out["source"] = v }
     if let v = e.notes { out["notes"] = v }
     if let v = e.recurrence { out["recurrence"] = recurrenceJSON(v) }
+    // Task fade fields (docs/TASK_FADE_SPEC.md §3), read-only over MCP.
+    let iso = ISO8601DateFormatter()
+    // Never touched reads as `createdAt`; a legacy row with neither omits it.
+    let clock = e.touchedAt ?? e.createdAt
+    if clock != .distantPast { out["touchedAt"] = iso.string(from: clock) }
+    out["deferCount"] = e.deferCount
+    if let v = e.fadedAt { out["fadedAt"] = iso.string(from: v) }
+    if let v = e.dropReason { out["dropReason"] = v }
+    if let v = e.effort { out["effort"] = v }
     let c = e.conversation
     var convo: [String: Any] = [
       "turns": c.thread.count,

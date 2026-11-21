@@ -83,6 +83,26 @@ final class TaskEntity {
   /// no longer shows tasks). Name checked: NSManagedObject has no
   /// `todayPosition` / `setTodayPosition:` selector.
   var todayPosition: Double?
+  /// Task fade fields (docs/TASK_FADE_SPEC.md §3, ADR 0006). All have defaults,
+  /// so the migration is lightweight. Local only for now: the task backend
+  /// gets the matching columns at the cutover (docs/SEPTASK_BACKEND.md §5.2),
+  /// and there is no CloudKit field. Names checked: NSManagedObject has none
+  /// of these selectors.
+  ///
+  /// Last user gesture on the task. nil on legacy rows: read as `createdAt`
+  /// (`fadeClock`). Written only by `TasksBackend.touch`, which the user
+  /// gesture sites reach through `TaskMutator.touch` — never by a sync apply,
+  /// recurrence spawn, purge, agent write or the fade pass.
+  var touchedAt: Date?
+  /// Times the user pushed the task to a later day. Resets to 0 on any other
+  /// user gesture (`TasksBackend.touch`).
+  var deferCount: Int = 0
+  /// Set when the task fades (P2). Cleared when the user keeps it.
+  var fadedAt: Date?
+  /// `"faded"` when the sweep drops the task, `"user"` for a manual drop.
+  var dropReason: String?
+  /// `"light"` / `"heavy"`. nil = unknown.
+  var effort: String?
   /// Legacy FastAPI-era optimistic-write guard; no longer consulted on the
   /// CloudKit path. Retained as a schema field pending Phase-2 cleanup.
   var pendingSync: Bool = false
@@ -1788,6 +1808,11 @@ extension SeptenaTask {
       createdAt: e.createdAt,
       position: e.position,
       todayPosition: e.todayPosition,
+      touchedAt: e.touchedAt,
+      deferCount: e.deferCount,
+      fadedAt: e.fadedAt,
+      dropReason: e.dropReason,
+      effort: e.effort,
       kind: e.kind,
       heading: e.heading,
       conversation: e.conversation
@@ -1796,6 +1821,10 @@ extension SeptenaTask {
 
   /// Manual-order sort key — see `TaskOrder.key`.
   var orderKey: Double { TaskOrder.key(position: position, createdAt: createdAt) }
+
+  /// The fade clock's start: the last user gesture, or `createdAt` on a row
+  /// never touched (docs/TASK_FADE_SPEC.md §3).
+  var fadeClock: Date { touchedAt ?? createdAt }
 
   /// Today's sort key — see `TaskOrder.todayKey`.
   var todayOrderKey: Double { todayPosition ?? orderKey }

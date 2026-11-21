@@ -115,11 +115,16 @@ first inside each. Docs-only issues before Swift issues.
    (since 2026-09-14): the factory commits its own work. Push only as
    §0 "Push" allows.
 4. **Code change:** `scripts/wt-new factory-<date>-<N>`, work and commit there.
-   Gate on the Mac schemes. Integrate per the repo's worktree rules. If
-   integration is not possible (main dirty, the merge gate builds an iOS
-   scheme, signing fails in the worktree), leave the work committed on its
-   `wt/` branch, comment the branch name on the issue, and report it. Never
-   force it.
+   Gate in the worktree on both Mac schemes
+   (`scripts/build.sh SeptenaMac 'platform=macOS'`, then `SeptaskMac`); a
+   worktree builds without `Config/Secrets.xcconfig` (checked 2026-11-21).
+   Integrate with `scripts/wt-done --prebuilt --no-push factory-<date>-<N>`:
+   it merges into `main`, rebuilds both Mac schemes on the merged tree only
+   when `main` moved since the branch (else the worktree gate stands), and
+   removes the worktree and branch. Push once at the end (§0 "Push"). If
+   integration is not possible (main dirty, a merge conflict, a red merged
+   tree), leave the work committed on its `wt/` branch, comment the branch
+   name on the issue, and report it. Never force it.
 5. One commit per issue, body ending `Fixes #N` and the attribution trailer.
 6. Outcomes:
    - Done → remove `agent:building`; the commit closes the issue when it
