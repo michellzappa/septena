@@ -127,6 +127,17 @@ The app uses it since #66: `TaskEntity.todayPosition` (local, no CloudKit
 field), written by `TaskMutator.reorderToday` and cleared when an open task
 leaves Today; every Today surface sorts by `todayPosition ?? position`.
 
+**Fade fields, specified for the cutover** (docs/TASK_FADE_SPEC.md §3, P1):
+the `tasks` table gets `touchedAt` (stamp), `deferCount` (int, default 0),
+`fadedAt` (stamp), `dropReason` (text 16: `faded` / `user`) and `effort`
+(text 16: `light` / `heavy`). The app has them locally since fade P1
+(`TaskEntity.touchedAt` and siblings, no CloudKit field) but does NOT push
+them yet: a push with a column the deployed Worker does not know fails
+validation and blocks the row. So the column change in
+`backend/src/store/columns.ts`, the deploy, and the app's
+`TaskBackendMapping` / `TaskSyncApply` lines land as one unit, deploy first.
+Only the app writes them; agent writes never stamp `touchedAt`.
+
 **areas:** id, title, context, emoji, attachment, position, rev, updatedAt,
 deletedAt.
 

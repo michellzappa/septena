@@ -298,6 +298,19 @@ final class TaskMutator {
     cloudBackend.reorderToday(id: id, toPosition: position)
   }
 
+  /// Stamp the fade clock (docs/TASK_FADE_SPEC.md §3): `touchedAt` = now,
+  /// and `deferCount` + 1 for the ids in `deferredIDs`, reset to 0 for the
+  /// rest. Call ONLY from a user gesture — the `TaskUndo` recorders and the
+  /// conversation card's answer. Never from a sync apply, recurrence spawn,
+  /// purge, agent / MCP write or the fade pass: those would keep a task alive
+  /// that the user has not looked at.
+  func touch(ids: [String], deferredIDs: Set<String> = []) {
+    guard !ids.isEmpty else { return }
+    cloudBackend?.touch(ids: ids, deferredIDs: deferredIDs)
+  }
+
+  func touch(id: String) { touch(ids: [id]) }
+
   /// The write of `lane`: `reorder` for a list, `reorderToday` for Today.
   /// The one dispatch every reorder gesture goes through.
   func reorder(id: String, toPosition position: Double, in lane: TaskOrderLane) {
