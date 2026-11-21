@@ -33,25 +33,21 @@ Give Septena tactile, unmistakable warmth and personal ownership—the part peop
   - **No brand logo/check row** in the sidebar header.
 - Swatch UI renders as a crisp multicolor conic ring (same mental model as macOS System Settings ▸ Appearance ▸ Multicolor).
 
-### 2.2 Global Exotic-Fruit Overrides (11 curated colors)
+### 2.2 Global Exotic-Fruit Overrides (7 curated colors — locked 2026-11-21)
 Selecting any fruit overrides `selectionAccent`, `listSelectionFill`, `checkboxFill`, `SelectableChip` tint, unread dots, iOS active tab tint, and (when enabled) the generative texture tint. All values are Light/Dark calibrated for wash-plus-matching-ink contrast safety (`DesignSpec.md` §4.5).
 
 | ID | Display Name | Region / Character | Light Hex | Dark Hex | Done Check Ink (Light / Dark) |
 |---|---|---|---|---|---|
-| `colorful` | **Colorful** *(default)* | Blue-leaning + semantic multicolor | `#007AFF` | `#0A84FF` | `#FFFFFF` / `#FFFFFF` |
+| `colorful` | **Colorful** *(default)* | Blue-leaning + semantic | `#007AFF` | `#0A84FF` | `#FFFFFF` / `#FFFFFF` |
 | `tamarillo` | **Tamarillo** | Andes · Ruby crimson | `#D6333F` | `#FF5C67` | `#FFFFFF` / `#FFFFFF` |
 | `persimmon` | **Persimmon** | East Asia · Burnt vermilion | `#E05212` | `#FF7738` | `#FFFFFF` / `#FFFFFF` |
 | `yuzu` | **Yuzu** | Japan · Sunlit citrus gold | `#C28500` | `#F2BF2C` | `#FFFFFF` / `#141518` |
 | `carambola` | **Carambola** | SE Asia · Starfruit lime | `#5B8C00` | `#9EE034` | `#FFFFFF` / `#141518` |
-| `feijoa` | **Feijoa** | South America · Botanical emerald | `#15804A` | `#34D388` | `#FFFFFF` / `#141518` |
-| `jagua` | **Jagua** | Amazon · Mineral lagoon teal | `#0D7E8A` | `#2DD4DF` | `#FFFFFF` / `#141518` |
-| `haskap` | **Haskap** | Hokkaido · Deep cobalt blue | `#1D63DC` | `#4E94FF` | `#FFFFFF` / `#FFFFFF` |
 | `acai` | **Açaí** | Amazon · Royal indigo | `#6544D6` | `#9B82FF` | `#FFFFFF` / `#FFFFFF` |
-| `mangosteen` | **Mangosteen** | SE Asia · Velvet plum | `#9E2A7B` | `#DB62B7` | `#FFFFFF` / `#FFFFFF` |
 | `pitaya` | **Pitaya** | Mesoamerica · Dragonfruit rose | `#D4266C` | `#FF5C9B` | `#FFFFFF` / `#FFFFFF` |
 | `jabuticaba` | **Jabuticaba** | Brazil · Obsidian / ivory ink | `#27272E` | `#E4E4EA` | `#FFFFFF` / `#141518` |
 
-> Note on contrast: bright Dark-mode accents (`yuzu`, `carambola`, `feijoa`, `jagua`, `jabuticaba`) switch the check glyph inside a filled checkbox to `#141518` so the checkmark always clears WCAG AA against its fill.
+> Note on contrast: bright Dark-mode accents (`yuzu`, `carambola`, `jabuticaba`) switch the check glyph inside a filled checkbox to `#141518` so the checkmark always clears WCAG AA against its fill.
 
 ### 2.3 Accent Reach
 - **`restrained`** *(default)*: Accent applies to selection wash (`emphasizedAlphaLight: 0.22`, `emphasizedAlphaDark: 0.34`), done checkboxes, active chips/pills, active iOS tab, primary modal CTA, unread context dot, and optional texture tint. Today's gold sun, overdue red, and quiet gray filing-list icons remain untouched.
@@ -118,7 +114,7 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 |---|---|---|---|---|
 | `appearanceMode` | `device` | `enum: ["system", "light", "dark"]` | `"system"` | `septena.appearance.mode` |
 | `syncTheme` | `device` | `bool` | `true` | `septena.appearance.syncTheme` |
-| `accentColor` | `synced` *(honored locally if `syncTheme == false`)* | `enum` (12 IDs from `tokens.json`) | `"colorful"` | `septena.appearance.accentColor` |
+| `accentColor` | `synced` *(honored locally if `syncTheme == false`)* | `enum` (8 IDs from `tokens.json`) | `"colorful"` | `septena.appearance.accentColor` |
 | `canvasTexture` | `synced` *(honored locally if `syncTheme == false`)* | `enum` (texture IDs from `tokens.json`) | `"none"` | `septena.appearance.canvasTexture` |
 | `texturePlacement` | `synced` *(honored locally if `syncTheme == false`)* | `enum: ["behindCards", "headerWash", "railAndCanvas"]` | `"behindCards"` | `septena.appearance.texturePlacement` |
 | `textureIntensity` | `synced` *(honored locally if `syncTheme == false`)* | `int` (`15…100`) | `55` | `septena.appearance.textureIntensity` |
@@ -129,7 +125,7 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 - **How `syncTheme` works (Todoist idiom):** Always stored device-local (`default: true`). When `true`, writes to the 6 appearance keys push to `api.septena.app` settings KV and remote updates apply locally. When `false`, this device keeps its own local appearance (e.g., bold Persimmon on iPhone, quiet Jabuticaba on Mac) without overwriting other devices.
 - **`accent_color` customSurface** in `docs/SETTINGS_UX_SPEC.md` evolves into the unified **Appearance** picker surface:
   - Mode segmented control (`Light` / `Dark` / `System`) + `Sync across devices` toggle
-  - Mini-app preview card grid for `Colorful` + 11 exotic fruits (live-tinted sidebar + checkbox preview inside each card)
+  - Mini-app preview card grid for `Colorful` + 7 exotic fruits (live-tinted sidebar + checkbox preview inside each card)
   - Live-rendered procedural texture card strip + placement segmented pill + intensity presets + Shuffle seed button
 
 ---
@@ -189,6 +185,5 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 | **Today sidebar icon** | Keep Today's sidebar sun quiet gray (subdued), follow the chosen accent, or keep gold (`#F5C721`) under `Colorful` only? | Gray everywhere or Gold under `Colorful` only *(needs mz call)* |
 | **Default texture for new installs** | Start on `none` (pure canvas) or a whisper-subtle `washiPaper` / `topography`? | `none` — opt-in in Appearance *(default)* |
 | **Accent reach toggle** | Ship `restrained` only in v1, or expose `restrained` vs. `expressive` toggle in Settings? | `restrained` only in v1 *(default)* |
-| **Fruit roster & names** | Keep all 11 global exotic fruits (including `Jabuticaba` monochrome ink), or trim to 8–9? | All 11 + `Colorful` = 12 (clean 3×4 grid) *(default)* |
 | **Intensity control in UI** | 3 tactile presets (`Subtle` / `Balanced` / `Bold`) vs. continuous slider? | 3 presets (`35 / 55 / 80`) *(default)* |
 | **Milestone placement** | Keep in `M5 Breadth` (post-Launch/M2), or pull C0–C1 (exotic-fruit accents) forward into M3 polish? | `M5 Breadth` *(default)* |
