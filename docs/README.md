@@ -84,6 +84,10 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [DATA_EXPORT_SPEC.md](DATA_EXPORT_SPEC.md) | proposal (#130) |
 | [IOS_SWIPE_ACTIONS_SPEC.md](IOS_SWIPE_ACTIONS_SPEC.md) | proposal (#132) |
 | [TAGS_SPEC.md](TAGS_SPEC.md) | proposal (#96) |
+| [TASK_WIDGETS_SPEC.md](TASK_WIDGETS_SPEC.md) | proposal (#129) |
+| [STAR_PRIORITY_SPEC.md](STAR_PRIORITY_SPEC.md) | proposal (#127) |
+| [ATTACHMENTS_MAC_PARITY_SPEC.md](ATTACHMENTS_MAC_PARITY_SPEC.md) | proposal (#131) |
+| [TASK_TIMES_AND_ICAL_SPEC.md](TASK_TIMES_AND_ICAL_SPEC.md) | proposal (#128) |
 | [NATIVE_PROJECT_SHARING_SPEC.md](NATIVE_PROJECT_SHARING_SPEC.md) | superseded by PROJECT_SHARING_SPEC |
 | [ANDROID_CLIENT_SPEC.md](ANDROID_CLIENT_SPEC.md) | accepted (#20); shared Kotlin core for Windows |
 | [SEPTASK_ANDROID_PLAN.md](SEPTASK_ANDROID_PLAN.md) | superseded by ANDROID_CLIENT_SPEC.md |
