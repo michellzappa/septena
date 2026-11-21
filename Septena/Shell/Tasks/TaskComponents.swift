@@ -5,8 +5,18 @@ import UniformTypeIdentifiers
 
 /// Drag payload for re-homing one or more tasks onto a sidebar destination,
 /// or reordering them within a manually-ordered list (`TaskReorderDrop`).
+/// Also carries the floating Magic Plus sentinel (`newTask`) so native drag-
+/// and-drop from `+` reuses every existing row gap, heading, group, date, and
+/// sidebar drop target.
 struct TaskDragIDs: Codable, Hashable, Transferable {
+  static let newTaskSentinel = "__septena_magic_plus_new_task__"
+  static let newTask = TaskDragIDs(ids: [newTaskSentinel])
+
   let ids: [String]
+
+  static func isNewTaskPayload(_ ids: [String]) -> Bool {
+    ids == [newTaskSentinel]
+  }
 
   static var transferRepresentation: some TransferRepresentation {
     CodableRepresentation(contentType: .septenaTaskDragIDs)

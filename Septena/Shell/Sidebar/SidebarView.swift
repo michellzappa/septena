@@ -1753,12 +1753,18 @@ private struct SidebarTaskDrop: ViewModifier {
 
   let kind: Kind
   let mutator: TaskMutator
+  @Environment(NavigationState.self) private var nav
   @Environment(\.usesPushNavigation) private var usesPushNavigation
   @Environment(\.modelContext) private var modelContext
   @State private var isTargeted = false
 
   func body(content: Content) -> some View {
-    if usesPushNavigation {
+    #if os(iOS) && SEPTASK
+    let active = true
+    #else
+    let active = usesPushNavigation
+    #endif
+    if active {
       content
         .background(
           // ONE canonical emphasis: a drop-hover reuses the SAME fill as a
@@ -1771,6 +1777,20 @@ private struct SidebarTaskDrop: ViewModifier {
         .onDrop(of: [.septenaTaskDragIDs],
                 delegate: SidebarTaskDropDelegate(isTargeted: $isTargeted) { ids in
                   guard !ids.isEmpty else { return false }
+                  if TaskDragIDs.isNewTaskPayload(ids) {
+                    Haptics.tick()
+                    switch kind {
+                    case .area(let areaId):
+                      nav.go(to: .area(id: areaId))
+                    case .project(let projectId):
+                      nav.go(to: .project(id: projectId))
+                    case .today:
+                      nav.go(to: .filter(.today))
+                    }
+                    nav.requestNewTask()
+                    return true
+                  }
+                  guard usesPushNavigation else { return false }
                   // One drop = one undo step (shake / ⌘Z), covering every
                   // dragged row. Today rides in the filing snapshot, so a
                   // drop on Today undoes too.

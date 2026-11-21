@@ -1980,8 +1980,70 @@ struct TaskListView: View {
   /// in that order, and each group is a run of it, so the global neighbours
   /// place the row right in its group too. A target outside that order (a
   /// triage-band row in the Inbox card) only files.
+  /// Spawn a deferred inline-create draft positioned directly at a Magic Plus
+  /// drop target (between two rows, under a project heading, in a Today group,
+  /// in an Anytime group, or on an Upcoming day) and open its inline composer
+  /// right on that spot.
+  private func createInlineDraftAtDrop(
+    areaId: String? = nil,
+    projectId: String? = nil,
+    headingId: String? = nil,
+    scheduledDate: Date? = nil,
+    insertInto sequence: [SeptenaTask]? = nil,
+    at insertion: Int? = nil
+  ) -> Bool {
+    closeActiveEditIfNeeded()
+    var seed = TaskDraft(filter: filter)
+    if let projectId {
+      seed.projectId = projectId
+      seed.areaId = nil
+    } else if let areaId {
+      seed.areaId = areaId
+      seed.projectId = nil
+    }
+    if let scheduledDate {
+      seed.setScheduled(scheduledDate)
+    }
+    let draft = seed.create(via: mutator, deferPush: true, atBottom: true)
+    if let headingId {
+      mutator.setHeading(id: draft.id, heading: headingId)
+    }
+    if let sequence, let insertion {
+      applyManualOrder(ids: [draft.id], into: sequence, at: insertion)
+    }
+    model.noteCreated(draft.id)
+    draftEditIds.insert(draft.id)
+    Haptics.tick()
+    AddInfoSection.tasks.notifyTilesChanged()
+    Task {
+      await load()
+      if let loaded = items.first(where: { $0.id == draft.id }) {
+        beginEdit(loaded)
+      } else {
+        beginEdit(draft)
+      }
+    }
+    return true
+  }
+
   private func handleReorderDrop(ids: [String], target: SeptenaTask, before: Bool,
                                  refileTo group: TodayDropTarget? = nil) -> Bool {
+    if TaskDragIDs.isNewTaskPayload(ids) {
+      let remaining = excludingQuickAddCapture(visibleItems)
+      let destination = group.map(todayDropDestination)
+      if let targetIdx = remaining.firstIndex(where: { $0.id == target.id }) {
+        return createInlineDraftAtDrop(
+          areaId: destination?.areaId,
+          projectId: destination?.projectId,
+          insertInto: remaining,
+          at: before ? targetIdx : targetIdx + 1
+        )
+      }
+      return createInlineDraftAtDrop(
+        areaId: destination?.areaId,
+        projectId: destination?.projectId
+      )
+    }
     let dragged = Set(ids)
     guard !ids.isEmpty, !dragged.contains(target.id) else { return false }
     let remaining = excludingQuickAddCapture(visibleItems).filter { !dragged.contains($0.id) }
@@ -2121,6 +2183,17 @@ struct TaskListView: View {
   /// positions around the target within that group. Cross-group filing falls
   /// out of reading `target.heading` — no separate "move to section" gesture.
   private func handleGroupedTaskDrop(ids: [String], target: SeptenaTask, before: Bool) -> Bool {
+    if TaskDragIDs.isNewTaskPayload(ids) {
+      guard !projectHeadingIds.contains(target.id) else { return false }
+      let group = target.heading
+      let groupRows = visibleItems.filter { $0.heading == group }
+      let targetIdx = groupRows.firstIndex(where: { $0.id == target.id })
+      return createInlineDraftAtDrop(
+        headingId: group,
+        insertInto: targetIdx != nil ? groupRows : nil,
+        at: targetIdx.map { before ? $0 : $0 + 1 }
+      )
+    }
     let dragged = Set(ids)
     guard !ids.isEmpty, !dragged.contains(target.id) else { return false }
     // A heading dragged onto a task isn't meaningful — headings drop on headings.
@@ -2142,6 +2215,14 @@ struct TaskListView: View {
   /// A drop landed on a heading row. Headings dragged here reorder among the
   /// project's headings; tasks dragged here file under the heading (at its top).
   private func handleHeadingDrop(ids: [String], targetHeading: SeptenaTask, before: Bool) -> Bool {
+    if TaskDragIDs.isNewTaskPayload(ids) {
+      let members = visibleItems.filter { $0.heading == targetHeading.id }
+      return createInlineDraftAtDrop(
+        headingId: targetHeading.id,
+        insertInto: members,
+        at: 0
+      )
+    }
     let dragged = Set(ids)
     guard !ids.isEmpty, !dragged.contains(targetHeading.id) else { return false }
     let headingIds = projectHeadingIds
@@ -2772,6 +2853,19 @@ struct TaskListView: View {
 
   private func handleTodayMoveDrop(ids: [String], target: TodayDropTarget) -> Bool {
     guard filter == .today else { return false }
+    if TaskDragIDs.isNewTaskPayload(ids) {
+      if target == .inbox && inboxCollapsed {
+        a11yAnimate(.easeInOut(duration: 0.2)) { inboxCollapsed = false }
+      }
+      let destination = todayDropDestination(target)
+      let groupRows = excludingQuickAddCapture(visibleItems).filter { isTask($0, alreadyIn: target) }
+      return createInlineDraftAtDrop(
+        areaId: destination.areaId,
+        projectId: destination.projectId,
+        insertInto: groupRows.isEmpty ? nil : groupRows,
+        at: groupRows.isEmpty ? nil : 0
+      )
+    }
     let moving = ids.filter { id in
       guard let task = currentTask(id: id), !task.isHeading else { return false }
       return !isTask(task, alreadyIn: target)
@@ -2786,6 +2880,23 @@ struct TaskListView: View {
     TaskMoveDrop(perform: target.map { target in
       { ids in handleTodayMoveDrop(ids: ids, target: target) }
     })
+  }
+
+  private func handleUpcomingDateDrop(ids: [String], dateKey: String) -> Bool {
+    guard filter == .upcoming, let date = SeptenaDate.parse(dateKey) else { return false }
+    if TaskDragIDs.isNewTaskPayload(ids) {
+      return createInlineDraftAtDrop(scheduledDate: date)
+    }
+    applyWhenToSelection(ids, kind: .scheduled, date: date)
+    return true
+  }
+
+  private func handleGroupedListMoveDrop(ids: [String], areaId: String?, projectId: String?) -> Bool {
+    if TaskDragIDs.isNewTaskPayload(ids) {
+      return createInlineDraftAtDrop(areaId: areaId, projectId: projectId)
+    }
+    applyMove(ids, areaId: areaId, projectId: projectId)
+    return true
   }
 
   private func applyWhenToSelection(_ ids: [String], kind: WhenKind, date: Date?) {
@@ -3454,13 +3565,16 @@ struct TaskListView: View {
     // Areas in sidebar order: direct-area tasks, then each project's tasks.
     ForEach(areas) { area in
       let areaDropTarget: TodayDropTarget? = filter == .today ? .area(area.id) : nil
+      let areaCustomDrop: (([String]) -> Bool)? = filter == .today
+        ? nil : { ids in handleGroupedListMoveDrop(ids: ids, areaId: area.id, projectId: nil) }
       let areaTasks = byArea[area.id] ?? []
       if !areaTasks.isEmpty {
         Section {
           cardedRows(areaTasks,
                      appendQuickAdd: showsQuickAddInArea(area.id),
                      quickAddShowsEditor: true,
-                     moveDropTarget: areaDropTarget)
+                     moveDropTarget: areaDropTarget,
+                     onDropIDs: areaCustomDrop)
         } header: {
           groupHeader(icon: "square.stack.3d.up.fill",
                       title: area.title,
@@ -3471,17 +3585,21 @@ struct TaskListView: View {
                       },
                       onAdd: showsGroupedHeaderQuickAdd
                         ? { startCreate(areaId: area.id) } : nil,
-                      moveDropTarget: areaDropTarget)
+                      moveDropTarget: areaDropTarget,
+                      onDropIDs: areaCustomDrop)
         }
       }
       ForEach(projects.filter { $0.area == area.id }) { project in
         let projectDropTarget: TodayDropTarget? = filter == .today ? .project(project.id) : nil
+        let projectCustomDrop: (([String]) -> Bool)? = filter == .today
+          ? nil : { ids in handleGroupedListMoveDrop(ids: ids, areaId: nil, projectId: project.id) }
         if let tasks = byProject[project.id], !tasks.isEmpty {
           Section {
             cardedRows(tasks,
                        appendQuickAdd: showsQuickAddInProject(project.id),
                        quickAddShowsEditor: true,
-                       moveDropTarget: projectDropTarget)
+                       moveDropTarget: projectDropTarget,
+                       onDropIDs: projectCustomDrop)
           } header: {
             groupHeader(icon: nil,
                         title: project.title,
@@ -3492,7 +3610,8 @@ struct TaskListView: View {
                         },
                         onAdd: showsGroupedHeaderQuickAdd
                           ? { startCreate(projectId: project.id) } : nil,
-                        moveDropTarget: projectDropTarget)
+                        moveDropTarget: projectDropTarget,
+                        onDropIDs: projectCustomDrop)
           }
         }
       }
@@ -3501,12 +3620,15 @@ struct TaskListView: View {
     // Top-level projects (no area).
     ForEach(projects.filter { $0.area == nil }) { project in
       let projectDropTarget: TodayDropTarget? = filter == .today ? .project(project.id) : nil
+      let projectCustomDrop: (([String]) -> Bool)? = filter == .today
+        ? nil : { ids in handleGroupedListMoveDrop(ids: ids, areaId: nil, projectId: project.id) }
       if let tasks = byProject[project.id], !tasks.isEmpty {
         Section {
           cardedRows(tasks,
                      appendQuickAdd: showsQuickAddInProject(project.id),
                      quickAddShowsEditor: true,
-                     moveDropTarget: projectDropTarget)
+                     moveDropTarget: projectDropTarget,
+                     onDropIDs: projectCustomDrop)
         } header: {
           groupHeader(icon: nil,
                       title: project.title,
@@ -3517,7 +3639,8 @@ struct TaskListView: View {
                       },
                       onAdd: showsGroupedHeaderQuickAdd
                         ? { startCreate(projectId: project.id) } : nil,
-                      moveDropTarget: projectDropTarget)
+                      moveDropTarget: projectDropTarget,
+                      onDropIDs: projectCustomDrop)
         }
       }
     }
@@ -3536,17 +3659,20 @@ struct TaskListView: View {
                           quickAddShowsEditor: Bool = true,
                           reorderable: Bool = false,
                           grouped: Bool = false,
-                          moveDropTarget: TodayDropTarget? = nil) -> some View {
+                          moveDropTarget: TodayDropTarget? = nil,
+                          onDropIDs: (([String]) -> Bool)? = nil) -> some View {
     let rows = excludingQuickAddCapture(tasks)
     let cardCount = rows.count + (appendQuickAdd ? 1 : 0)
     // Today rows reorder in Today's own order (#66). The row's reorder drop
     // also files a row dragged in from another group, so the row-level
     // group drop steps aside (the group headers keep theirs).
     let todayReorder = filter == .today
+    let rowMoveDrop = onDropIDs.map { TaskMoveDrop(perform: $0) }
+      ?? todayMoveDrop(todayReorder ? nil : moveDropTarget)
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
       let position = TaskCardPosition(index: idx, count: cardCount)
       taskRow(task, quickMenu: quickMenu?(task) ?? false)
-        .modifier(todayMoveDrop(todayReorder ? nil : moveDropTarget))
+        .modifier(rowMoveDrop)
         .taskCardChrome(position,
                         // The "active" row — the selected row OR the one open in
                         // the inline editor — carries the neutral selection fill,
@@ -3624,12 +3750,15 @@ struct TaskListView: View {
                            projectProgress: Double? = nil,
                            onTap: (() -> Void)? = nil,
                            onAdd: (() -> Void)? = nil,
-                           moveDropTarget: TodayDropTarget? = nil) -> some View {
-    groupHeaderBody(icon: icon, title: title, areaEmoji: areaEmoji,
-                    projectProgress: projectProgress, onTap: onTap, onAdd: onAdd)
+                           moveDropTarget: TodayDropTarget? = nil,
+                           onDropIDs: (([String]) -> Bool)? = nil) -> some View {
+    let dropModifier = onDropIDs.map { TaskMoveDrop(perform: $0) }
+      ?? todayMoveDrop(moveDropTarget)
+    return groupHeaderBody(icon: icon, title: title, areaEmoji: areaEmoji,
+                           projectProgress: projectProgress, onTap: onTap, onAdd: onAdd)
       .textCase(nil)
       .selectionDisabled()
-      .modifier(todayMoveDrop(moveDropTarget))
+      .modifier(dropModifier)
   }
 
   private func groupHeaderBody(icon: String?, title: String,
@@ -3777,15 +3906,18 @@ struct TaskListView: View {
   private var groupedUpcomingItems: some View {
     let buckets = upcomingBuckets()
     ForEach(buckets, id: \.key) { bucket in
+      let dropOnDay: ([String]) -> Bool = { ids in
+        handleUpcomingDateDrop(ids: ids, dateKey: bucket.key)
+      }
       Section {
         // The day's calendar events frame it first (the agenda), then the tasks
         // scheduled for that day — matching Today, where the agenda sits on top.
         if !bucket.events.isEmpty {
           calendarEventsBlock(bucket.events).taskCardChrome(.solo)
         }
-        cardedRows(bucket.tasks)
+        cardedRows(bucket.tasks, onDropIDs: dropOnDay)
       } header: {
-        groupHeader(icon: "calendar", title: bucket.label)
+        groupHeader(icon: "calendar", title: bucket.label, onDropIDs: dropOnDay)
       }
     }
   }
