@@ -271,9 +271,18 @@ enum TaskNotices {
                                           engine: SeptenaServices.shared.ckEngine)
       }
     }
+    let headingKind = TaskKind.heading
     func done(_ id: TaskNoticeStep.ID, source: String) -> Bool {
       if latched.contains(id.rawValue) { return true }
-      let descriptor = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.source == source })
+      // Inline capture inserts an untitled placeholder (`title == ""`) as soon
+      // as the user taps "New task" and fills `title` only on save (or purges
+      // it if abandoned). Exclude blank drafts and project headings so a step
+      // — especially `.addTask` — concludes only once a real task is saved.
+      let descriptor = FetchDescriptor<TaskEntity>(
+        predicate: #Predicate {
+          $0.source == source && $0.title != "" && $0.kind != headingKind
+        }
+      )
       guard ((try? context.fetchCount(descriptor)) ?? 0) > 0 else { return false }
       completeStep(id, context: context)
       return true
