@@ -133,7 +133,13 @@ then.
 - Not moved: `septena-reports` (`reports.septena.app`), an unconfigured
   template no app calls; its `REPORTS` namespace (7 keys) stays on the old
   account.
-- Left: step 10 (mz signs in on devices), step 11 (Email Sending), the
+- Step 10 passed: mz's iPhone loads tasks against the new backend.
+- Step 11 done: Email Sending enabled for `septena.app` (records on
+  `cf-bounce`, DKIM `cf-bounce._domainkey`). Cloudflare set `_dmarc` to
+  `p=reject`; mz set it to `p=none` because the Gandi mailbox has no DKIM
+  record in the zone, so forwarded Gandi mail could be rejected. Add Gandi
+  DKIM, then return `_dmarc` to `p=reject`.
+- Left: ~~step 10~~ ~~step 11~~, step 11 (Email Sending), the
   community re-link if mz signs in to the community again, step 12 after
   14 days (old workers, KV, R2, D1, the three stray namespaces and the
   `_rehearsal` store on the new account).
