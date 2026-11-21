@@ -1084,6 +1084,12 @@
       "surfaces.firstRun.steps.done.primary.title"
     ]
   },
+  "Open a task or choose Keep to bring it back, or sweep the list to let the rest go.": {
+    "text": "Open a task or choose Keep to bring it back, or sweep the list to let the rest go.",
+    "paths": [
+      "surfaces.notices.items.fadedPile.detail"
+    ]
+  },
   "Open tasks without a date live here.": {
     "text": "Open tasks without a date live here.",
     "paths": [
@@ -1509,6 +1515,12 @@
       "surfaces.notices.items.weeklySweep.primaryTitle"
     ]
   },
+  "Sweep…": {
+    "text": "Sweep…",
+    "paths": [
+      "surfaces.notices.items.fadedPile.primaryTitle"
+    ]
+  },
   "Sync & storage diagnostics": {
     "text": "Sync & storage diagnostics",
     "paths": [
@@ -1561,6 +1573,12 @@
     "text": "Tasks with a future When or Deadline date appear here.",
     "paths": [
       "destinations.destinations.upcoming.emptyState.detail"
+    ]
+  },
+  "Tasks without activity for 14 days": {
+    "text": "Tasks without activity for 14 days",
+    "paths": [
+      "surfaces.notices.items.fadedPile.title"
     ]
   },
   "Tasks without activity for 14 days fade out and move to Faded.": {

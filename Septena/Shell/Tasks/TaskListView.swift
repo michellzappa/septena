@@ -2087,16 +2087,15 @@ struct TaskListView: View {
         noticeStepRows(notice.steps)
       }
     } else if filter == .faded, !visibleItems.isEmpty {
+      let pile = TaskNotices.fadedPile
       TaskListNotice(
-        kind: .info,
-        symbol: "circle.dashed",
-        title: Text(String(localized: "Tasks without activity for 14 days",
-                           comment: "Faded pile top notice title")),
-        detail: Text(String(localized: "Open a task or choose Keep to bring it back, or sweep the list to let the rest go.",
-                            comment: "Faded pile top notice detail")),
+        kind: pile.kind,
+        symbol: pile.symbol,
+        title: Text(pile.title),
+        detail: pile.detail.map { Text($0) },
         onDismiss: nil
       ) {
-        Button(String(localized: "Sweep…", comment: "Faded pile sweep action")) {
+        Button(pile.primaryTitle ?? "") {
           sweepSheetTasks = visibleItems
         }
         .buttonStyle(.bordered)
@@ -2184,7 +2183,7 @@ struct TaskListView: View {
   @ViewBuilder
   private func noticeAction(_ notice: TaskNotice) -> some View {
     if notice.id == .weeklySweep {
-      Button(notice.primaryTitle ?? String(localized: "Sweep", comment: "Weekly sweep button")) {
+      Button(notice.primaryTitle ?? "") {
         let candidates = TaskNotices.sweepCandidates(context: modelContext)
         if !candidates.isEmpty { sweepSheetTasks = candidates }
       }

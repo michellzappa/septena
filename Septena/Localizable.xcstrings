@@ -8035,6 +8035,10 @@
         }
       }
     },
+    "Open a task or choose Keep to bring it back, or sweep the list to let the rest go." : {
+      "comment" : "Generated from registry surfaces.notices.items.fadedPile.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Open tasks without a date live here." : {
       "comment" : "Generated from registry destinations.destinations.anytime.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -10523,6 +10527,10 @@
         }
       }
     },
+    "Sweep…" : {
+      "comment" : "Generated from registry surfaces.notices.items.fadedPile.primaryTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Symptoms" : {
 
     },
@@ -10811,6 +10819,10 @@
           }
         }
       }
+    },
+    "Tasks without activity for 14 days" : {
+      "comment" : "Generated from registry surfaces.notices.items.fadedPile.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Tasks without activity for 14 days fade out and move to Faded." : {
       "comment" : "Generated from registry settings.rootGroups.lists_root.items.2.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

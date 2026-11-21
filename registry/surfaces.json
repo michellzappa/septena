@@ -64,6 +64,18 @@
         "featureId": "fade.sweep"
       },
       {
+        "id": "fadedPile",
+        "kind": "info",
+        "priority": 5,
+        "icon": "notice.weekly_sweep",
+        "dismissScope": "none",
+        "dismissible": false,
+        "title": "Tasks without activity for 14 days",
+        "detail": "Open a task or choose Keep to bring it back, or sweep the list to let the rest go.",
+        "primaryTitle": "Sweep…",
+        "featureId": "lists.faded"
+      },
+      {
         "id": "fadeIntro",
         "kind": "info",
         "priority": 4,
