@@ -5,7 +5,7 @@
 //
 //   node scripts/account-move.mjs users
 //   node scripts/account-move.mjs kv
-//   node scripts/account-move.mjs stores [--suffix _rehearsal]
+//   node scripts/account-move.mjs stores [--suffix _rehearsal] [--resume]
 //   node scripts/account-move.mjs r2 [--suffix _rehearsal]
 //
 // --suffix writes each user into "<userId><suffix>" on the new account, so a
@@ -122,7 +122,10 @@ async function copyStores() {
   for (const id of ids) {
     const target = id + suffix;
     const before = (await admin(OLD.api, `/v1/admin/copy/${id}/snapshot`)).tables;
-    await admin(NEW.api, `/v1/admin/copy/${target}/import/begin`, { method: "POST" });
+    // --resume continues an import that stopped partway: copyImport needs the
+    // import flag, which an earlier begin left set, and INSERT OR REPLACE is
+    // safe to repeat.
+    if (!args.includes("--resume")) await admin(NEW.api, `/v1/admin/copy/${target}/import/begin`, { method: "POST" });
     for (const table of Object.keys(before)) {
       let after = 0;
       for (;;) {

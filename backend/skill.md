@@ -14,6 +14,9 @@ The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, 
 
 ## Guidance
 
+### First-time setup (onboarding)
+- When helping a user populate a new or sparse Septena account, follow the onboarding guide at `https://api.septena.app/onboard.md` (also exposed as the MCP prompt `onboard_septena`). Draw from what you already know about their ongoing work, projects, and responsibilities — or interview them briefly if starting fresh — to propose real Areas (with context + emoji), Projects (with context briefs), and at least a few concrete Tasks, and confirm before writing.
+
 ### Context first: project and area notes
 - Every project and area has **notes**: what it is for, who is involved, what was decided, what holds. They are the context for every task inside. Read them before you decide anything about a task. `tasks_claim` returns the task's project and area notes; `tasks_get(id, include_notes: true)` and `tasks_project_get(id)` return them too.
 - Notes have two parts. The **brief** is everything above a line `## Log`; it is the user's. The **log** is under it; agents add to it.

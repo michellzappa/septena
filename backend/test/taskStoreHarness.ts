@@ -1,6 +1,6 @@
 import { registerHooks } from "node:module";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -57,6 +57,22 @@ export function installWorkerTestHooks(): void {
               }
             }
           `,
+        };
+      }
+      if (url.startsWith("file:") && url.endsWith(".md")) {
+        const text = readFileSync(fileURLToPath(url), "utf8");
+        return {
+          format: "module",
+          shortCircuit: true,
+          source: `export default ${JSON.stringify(text)};`,
+        };
+      }
+      if (url.startsWith("file:") && url.endsWith(".json")) {
+        const text = readFileSync(fileURLToPath(url), "utf8");
+        return {
+          format: "module",
+          shortCircuit: true,
+          source: `export default ${text};`,
         };
       }
       return nextLoad(url, context);

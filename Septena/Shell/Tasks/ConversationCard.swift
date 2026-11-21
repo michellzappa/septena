@@ -45,6 +45,11 @@ struct ConversationCard: View {
           // Agent deliverable (agent_assisted) — what Claude produced.
           if let artifact = convo.artifact { artifactBlock(artifact) }
 
+          // Associated GitHub issue/PR when not already shown inside an artifact block.
+          if convo.artifact?.linkedIssue == nil, let issue = convo.linkedIssue {
+            issueLinkPill(issue)
+          }
+
           if let q = openQuestion {
             questionBlock(q)
           } else if convo.endState == .needsVerify {
@@ -223,19 +228,54 @@ struct ConversationCard: View {
   // MARK: Artifact + handoff (agent_assisted)
 
   @ViewBuilder private func artifactBlock(_ a: ConvoArtifact) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Label(a.title, systemImage: "doc.text").font(.subheadline).fontWeight(.medium)
-      Text(a.body).font(.caption).foregroundStyle(.primary)
+    VStack(alignment: .leading, spacing: 6) {
+      Label(a.title, systemImage: a.linkedIssue?.symbolName ?? "doc.text")
+        .font(.septenaLabel)
+      if !a.body.isEmpty {
+        Text(a.body).font(.septenaCaption).foregroundStyle(.primary)
+      }
       if let refs = a.refs, !refs.isEmpty {
         ForEach(refs, id: \.self) { ref in
-          Text(ref).font(.caption2).foregroundStyle(.secondary)
+          artifactRefRow(ref)
         }
+      } else if let issue = a.linkedIssue {
+        issueLinkPill(issue)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(10)
     .background(Theme.paperBackground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.quaternary))
+  }
+
+  @ViewBuilder private func artifactRefRow(_ ref: String) -> some View {
+    if let issue = ConvoIssueLink.parse(in: ref) {
+      issueLinkPill(issue)
+    } else if let url = ConvoIssueLink.parseURL(ref) {
+      Link(destination: url) {
+        Label(ref, systemImage: "arrow.up.right.square")
+          .font(.septenaCaption)
+          .lineLimit(1)
+          .truncationMode(.middle)
+      }
+    } else {
+      Text(ref).font(.septenaMetaMicro).foregroundStyle(.secondary)
+    }
+  }
+
+  @ViewBuilder private func issueLinkPill(_ issue: ConvoIssueLink) -> some View {
+    Link(destination: issue.url) {
+      HStack(spacing: 5) {
+        Image(systemName: issue.symbolName)
+        Text("Open \(issue.fullLabel)")
+        Image(systemName: "arrow.up.right")
+      }
+      .font(.septenaLabel)
+    }
+    .buttonStyle(.bordered)
+    .buttonBorderShape(.capsule)
+    .controlSize(.small)
+    .tint(accent)
   }
 
   @ViewBuilder private func handoffButton(_ h: ConvoHandoff) -> some View {

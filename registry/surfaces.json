@@ -35,8 +35,8 @@
         "title": "Get started with Septena",
         "featureId": "lists.today",
         "steps": [
-          { "id": "connectAI", "title": "Connect your AI", "detail": "Claude, ChatGPT, Claude Code and more" },
-          { "id": "importTasks", "title": "Bring in your tasks", "detail": "From Reminders or Things" },
+          { "id": "connectAI", "title": "Connect your AI", "detail": "Connect an assistant to your tasks" },
+          { "id": "importTasks", "title": "Bring in your tasks", "detail": "Import from another app" },
           { "id": "addTask", "title": "Add your first task", "detail": "It lands in your Inbox until you decide" }
         ]
       },
