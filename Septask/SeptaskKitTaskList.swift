@@ -4931,6 +4931,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let title = NSTextField(labelWithString: "")
   private let notesGlyph = NSImageView()
   private let chip = KitChipView()
+  private let issueChip = KitChipView()
   private let suggestionChip = KitSuggestionChipView()
   private let scheduleGlyph = NSImageView()
   private let detail = NSTextField(labelWithString: "")
@@ -5019,7 +5020,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     let trailingShove = NSView()
     trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
     trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
-    let trailing = NSStackView(views: [trailingShove, suggestionChip, chip, scheduleGlyph,
+    let trailing = NSStackView(views: [trailingShove, suggestionChip, issueChip, chip, scheduleGlyph,
                                       detail, repeatGlyph, notesGlyph])
     trailing.orientation = .horizontal
     trailing.alignment = .centerY
@@ -5041,6 +5042,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     shoveCollapsed.isActive = true
     trailing.kitA11yIgnore()
     chip.kitA11yIgnore()
+    issueChip.kitA11yIgnore()
 
     addSubview(checkbox)
     addSubview(title)
@@ -5133,6 +5135,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       checkbox.kitA11yIgnore()
       notesGlyph.isHidden = true
       chip.isHidden = true
+      issueChip.isHidden = true
       scheduleGlyph.isHidden = true
       detail.stringValue = ""
       title.font = SeptaskKitTheme.heading
@@ -5179,7 +5182,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       ? nil : task.fadeFill()
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
-    for view in [checkbox, title, notesGlyph, chip, suggestionChip, scheduleGlyph, detail, repeatGlyph] as [NSView] {
+    for view in [checkbox, title, notesGlyph, chip, issueChip, suggestionChip, scheduleGlyph, detail, repeatGlyph] as [NSView] {
       view.alphaValue = fade
     }
     checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted
@@ -5218,6 +5221,14 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // list is this in" — so a row never wears both. The suffix wins where it
     // is shown (flat Today): it sits on the title line where the eye already
     // is, and a pill repeating it on the far right is noise, not emphasis.
+    if let issue = task.linkedIssue {
+      issueChip.isHidden = false
+      issueChip.configure(symbol: issue.symbolName, title: issue.shortLabel)
+      issueChip.toolTip = "\(issue.fullLabel) (\(issue.owner)/\(issue.repo))"
+    } else {
+      issueChip.isHidden = true
+      issueChip.toolTip = nil
+    }
     if let chipValue, contextText == nil {
       chip.isHidden = false
       chip.configure(symbol: chipValue.symbol, title: chipValue.title)

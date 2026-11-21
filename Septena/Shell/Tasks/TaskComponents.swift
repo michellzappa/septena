@@ -564,11 +564,14 @@ struct TaskRow: View {
 
   // Right-side order (left → right): variable-width elements inboard, fixed-width
   // pinned to the right edge so the row's right margin stays stable.
-  //   accessory (Inbox "file here") · date  →  recurrence · notes · status-dot
-  // Accessory and date flex with their content; recurrence / notes / agent
-  // glyphs are fixed and anchor the trailing edge.
+  //   accessory (Inbox "file here") · issue · date  →  recurrence · notes · status-dot
+  // Accessory, issue chip and date flex with their content; recurrence / notes /
+  // agent glyphs are fixed and anchor the trailing edge.
   @ViewBuilder private var trailing: some View {
     if let accessory { accessory }
+    if let issue = task.linkedIssue {
+      TaskIssueChip(issue: issue)
+    }
     trailingDate
     if task.recurrence != nil {
       Image(systemName: "arrow.clockwise")
@@ -666,6 +669,27 @@ struct TaskRow: View {
     let f = DateFormatter()
     f.setLocalizedDateFormatFromTemplate("MMMd")
     return f.string(from: d)
+  }
+}
+
+/// Quiet read-only issue badge (`◉ #147`) on a task row when an agent has
+/// associated a GitHub issue or PR with the task. Non-interactive so row taps
+/// always open the task/conversation (where the clickable link lives).
+private struct TaskIssueChip: View {
+  let issue: ConvoIssueLink
+
+  var body: some View {
+    HStack(spacing: 3) {
+      Image(systemName: issue.symbolName)
+        .scaledFont(size: 10)
+      Text(issue.shortLabel)
+        .font(.septenaMetaSmall)
+    }
+    .foregroundStyle(Theme.inkSecondary)
+    .padding(.horizontal, 6)
+    .padding(.vertical, 2)
+    .background(Theme.mutedSurface, in: Capsule())
+    .accessibilityLabel(issue.fullLabel)
   }
 }
 
