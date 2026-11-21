@@ -278,72 +278,8 @@ func noteProjectDeletion(id: String) { if routeToTaskBackend(.project, id) { ret
     return true
   }
 func noteSettingsChange() { noteChange(recordName: SettingsCloudKitSchema.singletonID, kind: "settings") }
-func noteSectionChange(id: String) { noteChange(recordName: SectionCloudKitSchema.recordName(for: id), kind: "section") }
-func noteSectionDeletion(id: String) { noteDeletion(recordName: SectionCloudKitSchema.recordName(for: id), kind: "section") }
-func noteHabitDefinitionChange(id: String) { noteChange(recordName: HabitDefinitionCloudKitSchema.recordName(for: id), kind: "habitDefinition") }
-func noteHabitDefinitionDeletion(id: String) { noteDeletion(recordName: HabitDefinitionCloudKitSchema.recordName(for: id), kind: "habitDefinition") }
-func noteHabitEventChange(id: String) { noteChange(recordName: HabitEventCloudKitSchema.recordName(for: id), kind: "habitEvent") }
-func noteHabitEventDeletion(id: String) { noteDeletion(recordName: HabitEventCloudKitSchema.recordName(for: id), kind: "habitEvent") }
-func noteSupplementDefinitionChange(id: String) { noteChange(recordName: SupplementDefinitionCloudKitSchema.recordName(for: id), kind: "supplementDefinition") }
-func noteSupplementDefinitionDeletion(id: String) { noteDeletion(recordName: SupplementDefinitionCloudKitSchema.recordName(for: id), kind: "supplementDefinition") }
-func noteSupplementEventChange(id: String) { noteChange(recordName: SupplementEventCloudKitSchema.recordName(for: id), kind: "supplementEvent") }
-func noteSupplementEventDeletion(id: String) { noteDeletion(recordName: SupplementEventCloudKitSchema.recordName(for: id), kind: "supplementEvent") }
-func noteChoreDefinitionChange(id: String) { noteChange(recordName: ChoreDefinitionCloudKitSchema.recordName(for: id), kind: "choreDefinition") }
-func noteChoreDefinitionDeletion(id: String) { noteDeletion(recordName: ChoreDefinitionCloudKitSchema.recordName(for: id), kind: "choreDefinition") }
-func noteChoreEventChange(id: String) { noteChange(recordName: ChoreEventCloudKitSchema.recordName(for: id), kind: "choreEvent") }
-func noteChoreEventDeletion(id: String) { noteDeletion(recordName: ChoreEventCloudKitSchema.recordName(for: id), kind: "choreEvent") }
-func noteGoalChange(id: String) { noteChange(recordName: GoalCloudKitSchema.recordName(for: id), kind: "goal") }
-func noteGoalDeletion(id: String) { noteDeletion(recordName: GoalCloudKitSchema.recordName(for: id), kind: "goal") }
-func noteGoalMilestoneChange(id: String) { noteChange(recordName: GoalMilestoneCloudKitSchema.recordName(for: id), kind: "goalMilestone") }
-func noteGoalMilestoneDeletion(id: String) { noteDeletion(recordName: GoalMilestoneCloudKitSchema.recordName(for: id), kind: "goalMilestone") }
-func noteGutEventChange(id: String) { noteChange(recordName: GutEventCloudKitSchema.recordName(for: id), kind: "gutEvent") }
-func noteGutEventDeletion(id: String) { noteDeletion(recordName: GutEventCloudKitSchema.recordName(for: id), kind: "gutEvent") }
-func noteMoodEventChange(id: String) { noteChange(recordName: MoodEventCloudKitSchema.recordName(for: id), kind: "moodEvent") }
-func noteMoodEventDeletion(id: String) { noteDeletion(recordName: MoodEventCloudKitSchema.recordName(for: id), kind: "moodEvent") }
-func noteSymptomDefinitionChange(id: String) { noteChange(recordName: SymptomDefinitionCloudKitSchema.recordName(for: id), kind: "symptomDefinition") }
-func noteSymptomDefinitionDeletion(id: String) { noteDeletion(recordName: SymptomDefinitionCloudKitSchema.recordName(for: id), kind: "symptomDefinition") }
-func noteSymptomEventChange(id: String) { noteChange(recordName: SymptomEventCloudKitSchema.recordName(for: id), kind: "symptomEvent") }
-func noteSymptomEventDeletion(id: String) { noteDeletion(recordName: SymptomEventCloudKitSchema.recordName(for: id), kind: "symptomEvent") }
-func noteMedicationDefinitionChange(id: String) { noteChange(recordName: MedicationDefinitionCloudKitSchema.recordName(for: id), kind: "medicationDefinition") }
-func noteMedicationDefinitionDeletion(id: String) { noteDeletion(recordName: MedicationDefinitionCloudKitSchema.recordName(for: id), kind: "medicationDefinition") }
-func noteMedicationDoseEventChange(id: String) { noteChange(recordName: MedicationDoseEventCloudKitSchema.recordName(for: id), kind: "medicationDoseEvent") }
-func noteMedicationDoseEventDeletion(id: String) { noteDeletion(recordName: MedicationDoseEventCloudKitSchema.recordName(for: id), kind: "medicationDoseEvent") }
-func noteOuraNightChange(id: String) { noteChange(recordName: OuraNightCloudKitSchema.recordName(for: id), kind: "ouraNight") }
-func noteOuraNightDeletion(id: String) { noteDeletion(recordName: OuraNightCloudKitSchema.recordName(for: id), kind: "ouraNight") }
-func noteQuoteChange(id: String) { noteChange(recordName: QuoteCloudKitSchema.recordName(for: id), kind: "quote") }
-func noteQuoteDeletion(id: String) { noteDeletion(recordName: QuoteCloudKitSchema.recordName(for: id), kind: "quote") }
-/// Batched quote enqueue — ONE `state.add` for the whole set, for bulk imports
-/// (a Readwise sync can be thousands of rows). See `noteChanges`/`noteDeletions`.
-func noteQuoteChanges(ids: [String]) { noteChanges(recordNames: ids.map { QuoteCloudKitSchema.recordName(for: $0) }) }
-func noteQuoteDeletions(ids: [String]) { noteDeletions(recordNames: ids.map { QuoteCloudKitSchema.recordName(for: $0) }) }
-func noteWithingsRowChange(id: String) { noteChange(recordName: WithingsRowCloudKitSchema.recordName(for: id), kind: "withingsRow") }
-func noteWithingsRowDeletion(id: String) { noteDeletion(recordName: WithingsRowCloudKitSchema.recordName(for: id), kind: "withingsRow") }
-func noteIntakeKindChange(id: String) { noteChange(recordName: IntakeKindCloudKitSchema.recordName(for: id), kind: "intakeKind") }
-func noteIntakeKindDeletion(id: String) { noteDeletion(recordName: IntakeKindCloudKitSchema.recordName(for: id), kind: "intakeKind") }
-func noteIntakeItemChange(id: String) { noteChange(recordName: IntakeItemCloudKitSchema.recordName(for: id), kind: "intakeItem") }
-func noteIntakeItemDeletion(id: String) { noteDeletion(recordName: IntakeItemCloudKitSchema.recordName(for: id), kind: "intakeItem") }
-func noteIntakeEventChange(id: String) { noteChange(recordName: IntakeEventCloudKitSchema.recordName(for: id), kind: "intakeEvent") }
-func noteIntakeEventDeletion(id: String) { noteDeletion(recordName: IntakeEventCloudKitSchema.recordName(for: id), kind: "intakeEvent") }
-func noteGroceryItemChange(id: String) { noteChange(recordName: GroceryItemCloudKitSchema.recordName(for: id), kind: "groceryItem") }
-func noteGroceryItemDeletion(id: String) { noteDeletion(recordName: GroceryItemCloudKitSchema.recordName(for: id), kind: "groceryItem") }
-func noteGroceryCategoryChange(id: String) { noteChange(recordName: GroceryCategoryCloudKitSchema.recordName(for: id), kind: "groceryCategory") }
-func noteGroceryCategoryDeletion(id: String) { noteDeletion(recordName: GroceryCategoryCloudKitSchema.recordName(for: id), kind: "groceryCategory") }
-func noteExerciseEntryChange(id: String) { noteChange(recordName: ExerciseEntryCloudKitSchema.recordName(for: id), kind: "exerciseEntry") }
-func noteExerciseEntryDeletion(id: String) { noteDeletion(recordName: ExerciseEntryCloudKitSchema.recordName(for: id), kind: "exerciseEntry") }
-func noteExerciseDefinitionChange(id: String) { noteChange(recordName: ExerciseDefinitionCloudKitSchema.recordName(for: id), kind: "exerciseDefinition") }
-func noteExerciseDefinitionDeletion(id: String) { noteDeletion(recordName: ExerciseDefinitionCloudKitSchema.recordName(for: id), kind: "exerciseDefinition") }
-func noteSessionTypeChange(id: String) { noteChange(recordName: SessionTypeCloudKitSchema.recordName(for: id), kind: "sessionType") }
-func noteSessionTypeDeletion(id: String) { noteDeletion(recordName: SessionTypeCloudKitSchema.recordName(for: id), kind: "sessionType") }
-func noteNutritionEntryChange(id: String) { noteChange(recordName: NutritionEntryCloudKitSchema.recordName(for: id), kind: "nutritionEntry") }
-func noteNutritionEntryDeletion(id: String) { noteDeletion(recordName: NutritionEntryCloudKitSchema.recordName(for: id), kind: "nutritionEntry") }
-func noteNutritionDayChange(id: String) { noteChange(recordName: NutritionDailySummaryCloudKitSchema.recordName(for: id), kind: "nutritionDay") }
-func noteNutritionDayDeletion(id: String) { noteDeletion(recordName: NutritionDailySummaryCloudKitSchema.recordName(for: id), kind: "nutritionDay") }
-func noteActivityDayChange(id: String) { noteChange(recordName: ActivityDayCloudKitSchema.recordName(for: id), kind: "activityDay") }
-func noteActivityDayDeletion(id: String) { noteDeletion(recordName: ActivityDayCloudKitSchema.recordName(for: id), kind: "activityDay") }
-func noteCoachVoiceChange(id: String) { noteChange(recordName: CoachVoiceCloudKitSchema.recordName(for: id), kind: "coachVoice") }
-func noteCoachVoiceDeletion(id: String) { noteDeletion(recordName: CoachVoiceCloudKitSchema.recordName(for: id), kind: "coachVoice") }
-func noteCoachMessageChange(id: String) { noteChange(recordName: CoachMessageCloudKitSchema.recordName(for: id), kind: "coachMessage") }
-func noteCoachMessageDeletion(id: String) { noteDeletion(recordName: CoachMessageCloudKitSchema.recordName(for: id), kind: "coachMessage") }
+func noteSectionChange(id: String) { noteChange(recordName: "section:\(id)", kind: "section") }
+func noteSectionDeletion(id: String) { noteDeletion(recordName: "section:\(id)", kind: "section") }
 func noteTaskAttachmentChange(id: String) { if routeToTaskBackend(.attachment, id) { return }; noteChange(recordName: TaskAttachmentCloudKitSchema.recordName(for: id), kind: "taskAttachment") }
 func noteTaskAttachmentDeletion(id: String) { if routeToTaskBackend(.attachment, id) { return }; noteDeletion(recordName: TaskAttachmentCloudKitSchema.recordName(for: id), kind: "taskAttachment") }
 
@@ -449,32 +385,6 @@ func noteTaskAttachmentDeletion(id: String) { if routeToTaskBackend(.attachment,
       if case .saveRecord(let recordID) = change { return recordID.recordName == id }
       return false
     }
-  }
-
-  /// Drop any queued uploads/deletes for Readwise-imported quotes. Those rows are
-  /// now device-local (re-imported per device from the user's own token), so they
-  /// never belong in CloudKit — and this clears a backlog a pre-change build may
-  /// have left, where thousands of `quote:readwise:*` saves flooded the engine and
-  /// locked the UI on every launch. Quote records are named `quote:<origin>:<id>`,
-  /// so a `quote:readwise:` prefix match isolates exactly the imported highlights
-  /// (user-authored `quote:user:*` lines are untouched and keep syncing). Returns
-  /// how many were cleared. Idempotent: once the backlog is gone it's a no-op.
-  @discardableResult
-  func dropPendingReadwiseQuoteChanges() -> Int {
-    guard let engine else { return 0 }
-    let prefix = QuoteCloudKitSchema.recordName(for: "readwise:") // "quote:readwise:"
-    let stale = engine.state.pendingRecordZoneChanges.filter { change in
-      switch change {
-      // Only drop SAVES — those are the flood. DELETIONS are intentional cleanup
-      // a prior build may have enqueued and must survive a relaunch to finish.
-      case .saveRecord(let id): return id.recordName.hasPrefix(prefix)
-      default: return false
-      }
-    }
-    guard !stale.isEmpty else { return 0 }
-    engine.state.remove(pendingRecordZoneChanges: stale)
-    SeptenaLog.info("[CKEngine] cleared \(stale.count) stuck Readwise quote uploads")
-    return stale.count
   }
 
   /// Count of pending database-level operations (zone saves / deletes).
@@ -758,12 +668,6 @@ func handleEvent(
             failedSaves: sent.failedRecordSaves,
             failedDeletes: Array(sent.failedRecordDeletes)
           )
-        }
-        // The server now holds these changes — ring the same-device sibling
-        // app (Septena ↔ Septask) so it fetches now instead of on its next
-        // foreground. Purely a hint; see SiblingNudge.
-        if !sent.savedRecords.isEmpty || !sent.deletedRecordIDs.isEmpty {
-          SiblingNudge.post()
         }
       }
       // Our own writes echoing back. Fold in system fields (the save in the

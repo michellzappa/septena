@@ -2,69 +2,22 @@
 import Foundation
 import SwiftData
 
-/// DEBUG-only curated dataset for App Store / marketing screenshots.
-///
-/// Generates ~90 days of *realistic* data with a deterministic seeded PRNG, so
-/// heatmaps fill in, sparklines have shape, and the Correlations screen finds
-/// real signals (late/heavy caffeine → lower sleep → lower mood; training →
-/// better sleep). Inserts directly into the `ModelContext` (NOT mutators — no
-/// CloudKit, no notifications). Only runs when `DemoSeedMode.isOn`, against the
-/// in-memory store, so it never touches real data. Dates are relative to now.
-///
-/// Sleep (Oura) and Body (Withings) reach the dashboard because their providers
-/// fall back to the SwiftData mirror (`OuraStore`/`WithingsStore`) when there's
-/// no API token — so seeding `OuraNightEntity`/`WithingsRowEntity` is enough.
+/// DEBUG-only curated dataset for App Store / marketing screenshots and UI
+/// keyboard-contract tests. Inserts directly into the `ModelContext` (NOT
+/// mutators — no sync, no notifications). Only runs when `DemoSeedMode.isOn`,
+/// against the in-memory store, so it never touches real data.
 public enum DemoSeed {
   static let days = 90
 
   @MainActor
   public static func populate(context ctx: ModelContext, today: String) {
-    seedLayout()
-    guard (try? ctx.fetchCount(FetchDescriptor<HabitDefinitionEntity>())) == 0 else { return }
+    guard (try? ctx.fetchCount(FetchDescriptor<TaskEntity>())) == 0 else { return }
     var rng = SeededRNG(seed: 0x5EED_5E97_A11_C0DE)
-
-    // --- shared, correlated daily signals (index 0 = today) ---
-    var caffGrams = [Double?](repeating: nil, count: days)
-    var caffLate = [Bool](repeating: false, count: days)
-    var trainDay = [Bool](repeating: false, count: days)
-    var sleep = [Int](repeating: 0, count: days)
-    for d in 0..<days {
-      let wknd = isWeekend(-d)
-      if rng.chance(wknd ? 0.78 : 0.92) {
-        caffGrams[d] = Double(rng.int(16, 24))
-        caffLate[d] = rng.chance(0.22)            // an afternoon cup
-      }
-      trainDay[d] = rng.chance(wknd ? 0.40 : 0.6) // ~4 sessions / week
-    }
-    for d in 0..<days {
-      var s = 80.0
-      if caffLate[d] { s -= 9 }                    // the headline correlation
-      if let g = caffGrams[d], g > 22 { s -= 3 }
-      if trainDay[d] { s += 3 }
-      s += rng.dbl(-5, 5)
-      sleep[d] = Int(min(94, max(58, s)))
-    }
 
     seedTasks(ctx, &rng)
     if ProcessInfo.processInfo.arguments.contains("-SeptenaTaskContractSeed") {
       seedTaskKeyboardContract(ctx)
     }
-    seedHabits(ctx, &rng)
-    seedSupplements(ctx, &rng)
-    seedChores(ctx, &rng)
-    seedNutrition(ctx, &rng, trainDay: trainDay)
-    seedTraining(ctx, &rng, trainDay: trainDay)
-    seedIntake(ctx, &rng, caffGrams: caffGrams, caffLate: caffLate)
-    seedActivity(ctx, &rng, trainDay: trainDay)
-    seedSleep(ctx, &rng, scores: sleep)
-    seedMood(ctx, &rng, scores: sleep)
-    seedBody(ctx, &rng)
-    seedGut(ctx, &rng)
-    seedSymptoms(ctx, &rng)
-    seedMedications(ctx, &rng)
-    seedGoals(ctx)
-    seedGroceries(ctx)
-    seedSections(ctx)
     StoreHealth.save(ctx, op: "DemoSeed.populate")
   }
 
@@ -74,18 +27,13 @@ public enum DemoSeed {
     Calendar.current.date(byAdding: .day, value: off, to: Date()) ?? Date()
   }
   private static func day(_ off: Int) -> String { SeptenaDate.format(dateObj(off)) ?? SeptenaDate.today }
-  private static func at(_ off: Int, _ h: Int, _ m: Int = 0) -> Date {
-    Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: dateObj(off)) ?? dateObj(off)
-  }
-  private static func isWeekend(_ off: Int) -> Bool { Calendar.current.isDateInWeekend(dateObj(off)) }
 
-  // MARK: - sections
+  // MARK: - tasks, areas, projects
 
   private static func seedAreasProjects(_ ctx: ModelContext) {
     for (id, title) in [("area-work", "Work"), ("area-personal", "Personal"), ("area-health", "Health")] {
       ctx.insert(AreaEntity(id: id, title: title))
     }
-    // ProjectEntity.area links to AreaEntity.id (slug is legacy/unused).
     for (id, title, area) in [
       ("proj-q3", "Q3 launch", "area-work"),
       ("proj-website", "Website redesign", "area-work"),
@@ -99,12 +47,7 @@ public enum DemoSeed {
   private static func seedTasks(_ ctx: ModelContext, _ rng: inout SeededRNG) {
     seedAreasProjects(ctx)
     var pos = 1024.0
-    // (title, onToday, area, project) — a couple loose (inbox), a few on Today,
-    // the rest organized under projects/areas.
     let open: [(String, Bool, String?, String?)] = [
-      // Loose captures (no area/project, not on Today) — these surface in the
-      // Inbox / triage band above Today, so the Today view isn't just the
-      // ratified list. See `TaskEntity.isInTriageBand`.
       ("Reply to the landlord", false, nil, nil),
       ("Renew the parking permit", false, nil, nil),
       ("Text Mom back", false, nil, nil),
@@ -122,8 +65,6 @@ public enum DemoSeed {
       ctx.insert(TaskEntity(id: "demo-task-open-\(i)", title: t.0, today: t.1,
                             area: t.2, project: t.3, position: pos)); pos += 1024
     }
-    // 90 days of completions (1–4/day); ~⅓ attached to a project so projects
-    // have history. `tasksHistory` buckets by the date prefix of completedAt.
     let projects = [("proj-q3", "area-work"), ("proj-website", "area-work"),
                     ("proj-move", "area-personal"), ("proj-marathon", "area-health")]
     let verbs = ["Email", "Call", "Review", "Pay", "Schedule", "Fix", "Plan", "Send", "Order", "Book", "Tidy", "File"]
@@ -146,9 +87,7 @@ public enum DemoSeed {
     }
   }
 
-  /// Dense Today list used only by executable keyboard-contract UI tests. The
-  /// normal curated demo stays compact for screenshots; this opt-in launch
-  /// argument guarantees traversal must cross the visible viewport.
+  /// Dense Today list used only by executable keyboard-contract UI tests.
   private static func seedTaskKeyboardContract(_ ctx: ModelContext) {
     for index in 0..<48 {
       let ordinal = String(format: "%02d", index + 1)
@@ -159,9 +98,6 @@ public enum DemoSeed {
         position: 1_000_000 + Double(index) * 1_024
       ))
     }
-    // Today intentionally renders loose completed work only in the Logbook,
-    // not in its Inbox card. Keep one at a real position between two open rows
-    // so the keyboard contract catches any invisible cursor slot.
     ctx.insert(TaskEntity(
       id: "demo-keyboard-hidden-completed",
       title: "Hidden keyboard-contract completion",
@@ -170,424 +106,6 @@ public enum DemoSeed {
       completedAt: day(0),
       position: 1_000_000 + 2_560
     ))
-  }
-
-  private static func seedHabits(_ ctx: ModelContext, _ rng: inout SeededRNG) {
-    // (title, emoji, bucket, current streak, baseline adherence)
-    let habits: [(String, String, String, Int, Double)] = [
-      ("Morning walk", "🚶", "morning", 12, 0.85),
-      ("Meditate", "🧘", "morning", 5, 0.80),
-      ("Cold shower", "🚿", "morning", 9, 0.74),
-      ("Stretch", "🤸", "afternoon", 6, 0.78),
-      ("Desk break", "🧍", "afternoon", 4, 0.70),
-      ("Read", "📖", "evening", 8, 0.88),
-      ("Journal", "✍️", "evening", 3, 0.72),
-      ("No screens after 10", "📵", "evening", 7, 0.68),
-    ]
-    for (i, h) in habits.enumerated() {
-      let id = "demo-habit-\(i)"
-      ctx.insert(HabitDefinitionEntity(id: id, title: h.0, emoji: h.1, bucket: h.2, sortIndex: i))
-      for d in 0..<days {
-        let done: Bool
-        if d == 0 {
-          // Today is in progress: morning done, afternoon half, evening still
-          // open — so the drawer's current bucket has real, undone items to show
-          // rather than a finished "all done" list.
-          switch h.2 {
-          case "morning":   done = true
-          case "afternoon": done = rng.chance(0.5)
-          default:          done = false
-          }
-        } else {
-          done = d < h.3 ? true : rng.chance(h.4)   // force the streak, then realistic
-        }
-        let date = day(-d)
-        ctx.insert(HabitDayStateEntity(id: "habit:\(date):\(id)", date: date, habitID: id,
-                                       done: done, skipped: false))
-      }
-    }
-  }
-
-  private static func seedSupplements(_ ctx: ModelContext, _ rng: inout SeededRNG) {
-    let supps: [(String, String, String?)] = [
-      ("Magnesium", "💊", "evening"), ("Omega-3", "🐟", "morning"),
-      ("Vitamin D", "☀️", "morning"), ("Creatine", "💪", nil),
-    ]
-    for (i, s) in supps.enumerated() {
-      let id = "demo-supp-\(i)"
-      ctx.insert(SupplementDefinitionEntity(id: id, title: s.0, emoji: s.1, bucket: s.2, sortIndex: i))
-      for d in 0..<days {
-        let date = day(-d)
-        ctx.insert(SupplementDayStateEntity(id: "supplement:\(date):\(id)", date: date,
-                                            supplementID: id, done: rng.chance(0.82)))
-      }
-    }
-  }
-
-  private static func seedChores(_ ctx: ModelContext, _ rng: inout SeededRNG) {
-    let chores: [(String, String, Int, Int)] = [   // title, emoji, cadenceDays, lastDoneOffset
-      ("Water the plants", "🪴", 4, -5), ("Vacuum", "🧹", 7, -7),
-      ("Change the sheets", "🛏️", 7, -2), ("Clean the coffee machine", "☕️", 14, -10),
-      ("Take out recycling", "♻️", 7, -6),
-    ]
-    for (i, c) in chores.enumerated() {
-      let id = "demo-chore-\(i)"
-      ctx.insert(ChoreDefinitionEntity(id: id, title: c.0, emoji: c.1, cadenceDays: c.2, sortIndex: i))
-      // completion history every ~cadence days back to 90d, plus the explicit last-done.
-      var off = c.3
-      var n = 0
-      while off > -days {
-        let date = day(off)
-        ctx.insert(ChoreEventEntity(id: "demo-chore-ev-\(i)-\(n)", choreID: id, action: "complete",
-                                    date: date, sortKey: "\(date)::\(id)"))
-        off -= c.2 + rng.int(-1, 1); n += 1
-      }
-    }
-  }
-
-  private static func seedNutrition(_ ctx: ModelContext, _ rng: inout SeededRNG, trainDay: [Bool]) {
-    // Nutrition stats (and the today headline) are computed from ENTRIES, not
-    // summaries — so seed three meals every day for a full macro sparkline/
-    // heatmap and a correct "Xg protein" headline.
-    let meals: [(Int, String, [String])] = [
-      (8, "🥣", ["Oats, blueberries, yogurt", "Eggs and toast", "Protein smoothie"]),
-      (13, "🥗", ["Chicken, quinoa, veg", "Salmon poke bowl", "Turkey wrap"]),
-      (16, "🍎", ["Apple and almonds", "Greek yogurt", "Protein bar"]),
-      (19, "🍝", ["Salmon, pasta, salad", "Steak and potatoes", "Tofu stir-fry"]),
-    ]
-    for d in 0..<days {
-      let wknd = isWeekend(-d)
-      for (mi, m) in meals.enumerated() {
-        let protein = Double([22, 42, 12, 40][mi] + (trainDay[d] ? 6 : 0) + rng.int(-4, 6))
-        let carbs = Double([56, 50, 22, 64][mi] + (wknd ? 10 : 0) + rng.int(-8, 12))
-        let fat = Double([10, 16, 8, 24][mi] + rng.int(-3, 6))
-        ctx.insert(NutritionEntryEntity(
-          id: "demo-meal-\(d)-\(mi)", loggedAt: at(-d, m.0), emoji: m.1,
-          foods: m.2[rng.int(0, m.2.count - 1)], mealType: ["breakfast", "lunch", "snack", "dinner"][mi],
-          proteinG: protein, fatG: fat, carbsG: carbs,
-          kcal: 4 * protein + 9 * fat + 4 * carbs, waterMl: Double(300 + rng.int(0, 220))))
-      }
-    }
-  }
-
-  private static func seedTraining(_ ctx: ModelContext, _ rng: inout SeededRNG, trainDay: [Bool]) {
-    ctx.insert(SessionTypeEntity(id: "upper", label: "Upper", emoji: "💪",
-                                 exercises: ["bench-press", "row", "overhead-press"], sortIndex: 0))
-    ctx.insert(SessionTypeEntity(id: "lower", label: "Lower", emoji: "🦵", exercises: ["squat", "deadlift"], sortIndex: 1))
-    ctx.insert(SessionTypeEntity(id: "cardio", label: "Cardio", emoji: "🏃", exercises: ["run", "zone-2"], sortIndex: 2))
-    for (slug, name, type) in [("bench-press", "Bench press", "strength"), ("row", "Barbell row", "strength"),
-                               ("overhead-press", "Overhead press", "strength"), ("squat", "Back squat", "strength"),
-                               ("deadlift", "Deadlift", "strength"), ("run", "Run", "cardio"),
-                               ("zone-2", "Zone 2", "cardio")] {
-      ctx.insert(ExerciseDefinitionEntity(id: slug, name: name, type: type))
-    }
-    var n = 0
-    func add(_ off: Int, _ type: String, _ ex: String, w: Double? = nil, reps: String? = nil,
-             min: Double? = nil, dist: Double? = nil, hour: Int) {
-      let e = ExerciseEntryEntity(id: "demo-ex-\(n)", date: day(off),
-                                  sessionType: type, exercise: ex, weight: w, sets: w != nil ? "3" : nil,
-                                  reps: reps, durationMin: min, distanceM: dist)
-      e.occurredAt = at(off, hour); ctx.insert(e); n += 1
-    }
-    // Progressive overload: weights creep up as we approach today (smaller offset).
-    for d in 0..<days where trainDay[d] {
-      let progress = Double(days - d) / Double(days)           // 0 (old) → 1 (recent)
-      let kind = (d % 3)
-      switch kind {
-      case 0:
-        add(-d, "upper", "bench-press", w: (55 + progress * 12).rounded(), reps: "8", hour: 18)
-        add(-d, "upper", "row", w: (50 + progress * 10).rounded(), reps: "10", hour: 18)
-      case 1:
-        add(-d, "lower", "squat", w: (80 + progress * 18).rounded(), reps: "5", hour: 18)
-        add(-d, "lower", "deadlift", w: (100 + progress * 22).rounded(), reps: "3", hour: 18)
-      default:
-        add(-d, "cardio", "run", min: Double(28 + rng.int(0, 12)), dist: Double(4600 + rng.int(0, 1800)), hour: 7)
-      }
-    }
-    // Daily Zone 2: a steady easy-cardio block most days (incl. today) so the
-    // weekly Z2 minutes land near the 150 target and the per-day cardio bars in
-    // the Training drawer are populated rather than empty. Morning slot, away
-    // from the evening lifts. Skipped on the heaviest run days (kind 2) where a
-    // dedicated run already covers cardio.
-    for d in 0..<days {
-      if trainDay[d] && d % 3 == 2 { continue }     // run day already logs cardio
-      if d == 0 || rng.chance(0.7) {                // today forced; ~5 days/week otherwise
-        add(-d, "cardio", "zone-2", min: Double(22 + rng.int(0, 16)), hour: 8)
-      }
-    }
-  }
-
-  /// Caffeine intake — coffee + matcha, from the canonical first-run template
-  /// so the Caffeine section and the day dial both light up. The shared
-  /// `caffGrams`/`caffLate` signals (which already model the caffeine→sleep
-  /// headline) become the timestamped events the dial plots as dots. `today`
-  /// (offset 0) always gets a morning pour + matcha so the hero dial reads full
-  /// regardless of the modeled signal or capture time.
-  private static func seedIntake(_ ctx: ModelContext, _ rng: inout SeededRNG,
-                                 caffGrams: [Double?], caffLate: [Bool]) {
-    let seed = IntakeTemplates.caffeine()
-    let kind = IntakeKindEntity(
-      id: seed.id, name: seed.name, symbol: seed.symbol, color: seed.color,
-      sortIndex: 0, unit: seed.unit, doseStyle: seed.doseStyle,
-      catalogNoun: seed.catalogNoun, flourish: seed.flourish,
-      metricMode: seed.metricMode, objective: seed.objective, templateID: seed.templateID)
-    kind.methods = seed.methods
-    ctx.insert(kind)
-
-    var n = 0
-    func cup(_ off: Int, _ h: Int, _ m: Int, method: String, grams: Double) {
-      let e = IntakeEventEntity(id: "demo-intake-\(n)", kindID: seed.id,
-                                date: day(off), method: method, amount: grams)
-      e.occurredAt = at(off, h, m); ctx.insert(e); n += 1
-    }
-    for d in 0..<days {
-      // Today is forced; other days follow the modeled caffeine signal.
-      guard let g = caffGrams[d] ?? (d == 0 ? 20 : nil) else { continue }
-      cup(-d, 7, 30, method: "v60", grams: g)                     // morning pour-over
-      if d == 0 || rng.chance(0.45) { cup(-d, 10, 30, method: "matcha", grams: 2) }
-      if caffLate[d] { cup(-d, 15, 30, method: "v60", grams: (g * 0.8).rounded()) }  // afternoon cup
-    }
-  }
-
-  private static func seedSleep(_ ctx: ModelContext, _ rng: inout SeededRNG, scores: [Int]) {
-    for d in 0..<days {
-      let s = scores[d]
-      let total = 6.0 + Double(s - 58) / 36.0 * 2.3                 // ~6.0–8.3h
-      ctx.insert(OuraNightEntity(
-        id: day(-d), sleepScore: s, readinessScore: min(95, max(55, s + rng.int(-4, 4))),
-        totalH: (total * 10).rounded() / 10,
-        deepH: ((total * 0.18) * 10).rounded() / 10,
-        remH: ((total * 0.22) * 10).rounded() / 10,
-        efficiency: min(98, 82 + (s - 70) / 3),
-        hrv: 30 + Int(Double(s - 58) * 0.7) + rng.int(-4, 4),       // higher score → higher HRV
-        restingHr: 60 - Int(Double(s - 58) * 0.15) + rng.int(-2, 2),
-        bedtime: "23:1\(rng.int(0, 5))", wakeTime: "07:0\(rng.int(0, 9))"))
-    }
-  }
-
-  private static func seedMood(_ ctx: ModelContext, _ rng: inout SeededRNG, scores: [Int]) {
-    // Quadrant biased by that day's sleep — good sleep skews pleasant/activated.
-    for d in 0..<days {
-      let count = d < 7 ? 2 : (rng.chance(0.6) ? 1 : 0)            // denser recent history
-      for k in 0..<count {
-        let good = scores[d] >= 76
-        let morning = k == 0
-        let quadrant: String
-        let (arousal, valence, emotion): (Int, Int, String)
-        if good {
-          quadrant = morning ? "lap" : "hap"
-          (arousal, valence, emotion) = morning ? (1, 3, "Calm") : (3, 3, "Upbeat")
-        } else if scores[d] <= 66 {
-          quadrant = morning ? "lan" : "han"
-          (arousal, valence, emotion) = morning ? (1, 1, "Tired") : (2, 1, "Stressed")
-        } else {
-          quadrant = "lap"; (arousal, valence, emotion) = (2, 2, "Focused")
-        }
-        let h = morning ? 8 : 18
-        let e = MoodEventEntity(id: "demo-mood-\(d)-\(k)", date: day(-d),
-                                bucket: morning ? "morning" : "evening",
-                                quadrant: quadrant, arousal: arousal, valence: valence, emotion: emotion)
-        e.occurredAt = at(-d, h, 30); ctx.insert(e)
-      }
-    }
-  }
-
-  private static func seedBody(_ ctx: ModelContext, _ rng: inout SeededRNG) {
-    // Slow cut: ~78.6kg 90 days ago → ~76.6kg today, with daily noise. ~5 weigh-ins/week.
-    for d in 0..<days where rng.chance(0.7) {
-      let t = Double(d) / Double(days - 1)                         // 0 today → 1 oldest
-      let weight = 76.6 + t * 2.0 + rng.dbl(-0.3, 0.3)
-      let fat = 16.2 + t * 1.9 + rng.dbl(-0.25, 0.25)
-      ctx.insert(WithingsRowEntity(id: day(-d),
-                                   weightKg: (weight * 10).rounded() / 10,
-                                   fatPct: (fat * 10).rounded() / 10))
-    }
-  }
-
-  private static func seedGroceries(_ ctx: ModelContext) {
-    for (i, c) in ["Produce", "Pantry", "Dairy", "Household"].enumerated() {
-      ctx.insert(GroceryCategoryEntity(id: "demo-cat-\(i)", name: c, sortIndex: i))
-    }
-    let items: [(String, String, String, Bool)] = [
-      ("Bananas", "Produce", "🍌", true), ("Spinach", "Produce", "🥬", false),
-      ("Avocados", "Produce", "🥑", true), ("Oats", "Pantry", "🌾", false),
-      ("Olive oil", "Pantry", "🫒", true), ("Coffee beans", "Pantry", "☕️", false),
-      ("Greek yogurt", "Dairy", "🥛", false), ("Eggs", "Dairy", "🥚", true),
-      ("Dish soap", "Household", "🧼", false), ("Paper towels", "Household", "🧻", false),
-    ]
-    for (i, it) in items.enumerated() {
-      ctx.insert(GroceryItemEntity(id: "demo-groc-\(i)", name: it.0, category: it.1,
-                                   emoji: it.2, low: it.3, sortIndex: i))
-    }
-  }
-
-  private static func seedGut(_ ctx: ModelContext, _ rng: inout SeededRNG) {
-    let bristols = [3, 4, 4, 5, 3, 4, 5, 4, 2, 6]   // mostly healthy 3–5
-    for d in 0..<days where rng.chance(0.8) {
-      let e = GutEventEntity(id: "demo-gut-\(d)", date: day(-d),
-                             bristol: bristols[rng.int(0, bristols.count - 1)], blood: 0)
-      e.occurredAt = at(-d, 8, 20); ctx.insert(e)
-    }
-  }
-
-  /// Symptoms — a couple of recurring complaints (definitions) plus ~6 events
-  /// scattered over the past week so the Log tab has today's entries, the
-  /// 30-day severity trend has shape, and the per-symptom heatmap fills.
-  /// Severity is the canonical 0–10 scale (Mild 3 / Moderate 5 / Severe 8).
-  private static func seedSymptoms(_ ctx: ModelContext, _ rng: inout SeededRNG) {
-    // (id, title, emoji, bodySystem, defaultBodyRegion)
-    let defs: [(String, String, String, String, String)] = [
-      ("demo-symptom-headache", "Headache", "🤕", "Neurological", "Head"),
-      ("demo-symptom-congestion", "Congestion", "🤧", "Respiratory", "Sinuses"),
-    ]
-    for (i, d) in defs.enumerated() {
-      ctx.insert(SymptomDefinitionEntity(id: d.0, title: d.1, emoji: d.2,
-                                         bodySystem: d.3, defaultBodyRegion: d.4, sortIndex: i))
-    }
-    // (dayOffset, symptomID, severity 0–10, hour) — today + scattered week.
-    let events: [(Int, String, Int, Int)] = [
-      (0, "demo-symptom-headache", 4, 9),
-      (0, "demo-symptom-congestion", 3, 14),
-      (-1, "demo-symptom-headache", 6, 16),
-      (-3, "demo-symptom-congestion", 5, 8),
-      (-4, "demo-symptom-headache", 3, 11),
-      (-6, "demo-symptom-headache", 8, 20),
-    ]
-    for (n, e) in events.enumerated() {
-      let region = defs.first { $0.0 == e.1 }?.4
-      let ev = SymptomEventEntity(id: "demo-symptom-\(n)", date: day(e.0), symptomID: e.1,
-                                  severity: e.2, bodyRegion: region)
-      ev.occurredAt = at(e.0, e.3, rng.int(0, 50)); ctx.insert(ev)
-    }
-  }
-
-  /// Medications — daily morning + evening scheduled meds plus an as-needed
-  /// painkiller, with several days of taken/missed dose history so the Log tab
-  /// (today's doses) is populated and the adherence heatmap reads near-100%.
-  /// `status` is "taken" / "missed"; daily meds carry a `targetDosesPerDay`.
-  private static func seedMedications(_ ctx: ModelContext, _ rng: inout SeededRNG) {
-    // (id, title, form, strength, dose, doseUnit, bucket, scheduleKind, target)
-    ctx.insert(MedicationDefinitionEntity(
-      id: "demo-med-0", title: "Levothyroxine", form: "tablet", route: "oral",
-      strengthValue: 75, strengthUnit: "mcg", defaultDoseValue: 1, defaultDoseUnit: "tablet",
-      bucket: "morning", scheduleKind: "daily", targetDosesPerDay: 1, sortIndex: 0))
-    ctx.insert(MedicationDefinitionEntity(
-      id: "demo-med-1", title: "Atorvastatin", form: "tablet", route: "oral",
-      strengthValue: 20, strengthUnit: "mg", defaultDoseValue: 1, defaultDoseUnit: "tablet",
-      bucket: "evening", scheduleKind: "daily", targetDosesPerDay: 1, sortIndex: 1))
-    ctx.insert(MedicationDefinitionEntity(
-      id: "demo-med-2", title: "Ibuprofen", form: "tablet", route: "oral",
-      strengthValue: 200, strengthUnit: "mg", defaultDoseValue: 2, defaultDoseUnit: "tablet",
-      bucket: nil, scheduleKind: "asNeeded", targetDosesPerDay: nil, sortIndex: 2))
-
-    var n = 0
-    func dose(_ off: Int, _ medID: String, _ hour: Int, status: String,
-              value: Double, unit: String) {
-      let e = MedicationDoseEventEntity(id: "demo-med-dose-\(n)", date: day(off),
-                                        medicationID: medID, status: status,
-                                        doseValue: value, doseUnit: unit)
-      e.occurredAt = at(off, hour, rng.int(0, 50)); ctx.insert(e); n += 1
-    }
-    // 14 days of the two daily meds — high adherence, the odd missed evening dose.
-    for d in 0..<14 {
-      dose(-d, "demo-med-0", 7, status: rng.chance(0.95) ? "taken" : "missed",
-           value: 1, unit: "tablet")
-      // Today's evening dose is left unlogged so the Log tab shows a pending item.
-      if d > 0 {
-        dose(-d, "demo-med-1", 21, status: rng.chance(0.9) ? "taken" : "missed",
-             value: 1, unit: "tablet")
-      }
-    }
-    // A couple of as-needed ibuprofen doses for a headache.
-    dose(-1, "demo-med-2", 16, status: "taken", value: 2, unit: "tablet")
-    dose(-6, "demo-med-2", 20, status: "taken", value: 2, unit: "tablet")
-  }
-
-  /// Apple Health activity — steps, active kcal, exercise minutes per day, so
-  /// the Activity tile has a sparkline and a real headline instead of an empty
-  /// HealthKit-unavailable placeholder. Active days (training) skew higher.
-  private static func seedActivity(_ ctx: ModelContext, _ rng: inout SeededRNG, trainDay: [Bool]) {
-    for d in 0..<days {
-      let base = trainDay[d] ? 9500 : 7200
-      let steps = base + rng.int(-1800, 3200)
-      let exMin = (trainDay[d] ? 38 : 18) + rng.int(-6, 14)
-      ctx.insert(ActivityDayEntity(
-        id: day(-d), date: day(-d),
-        stepCount: max(2200, steps),
-        activeKcal: Double(280 + steps / 22 + rng.int(-40, 80)),
-        exerciseMinutes: max(0, exMin)))
-    }
-  }
-
-  private static func seedGoals(_ ctx: ModelContext) {
-    let goals: [(String, [String])] = [
-      ("Sleep 7+ hours most nights", ["sleep"]),
-      ("Hit 120g protein on training days", ["nutrition", "training"]),
-      ("Walk every morning", ["habits"]),
-      ("Cut back on afternoon coffee", ["intake", "sleep"]),
-      ("Read 20 pages before bed", ["habits"]),
-      ("Down to 75 kg", ["body"]),
-    ]
-    for (i, g) in goals.enumerated() {
-      ctx.insert(GoalEntity(id: "demo-goal-\(i)", text: g.0, sections: g.1,
-                            created: day(-(i * 9 + 5)), sortIndex: i))
-    }
-  }
-
-  // MARK: - presentation
-
-  /// Homepage layout for screenshots — Sparkline (`dense`) by default; override
-  /// with `-SeptenaLayout <dense|heatmap|tiles|correlations>` (also accepts
-  /// `sparkline`/`histogram`). Key mirrors `SettingsKey.homepageLayout`.
-  private static func seedLayout() {
-    var raw = "dense"
-    let args = CommandLine.arguments
-    if let i = args.firstIndex(of: "-SeptenaLayout"), i + 1 < args.count {
-      let v = args[i + 1]
-      raw = ["sparkline": "dense", "histogram": "tiles"][v] ?? v
-    }
-    UserDefaults.standard.set(raw, forKey: "septena.homepage.layout")
-  }
-
-  /// Paint every section from the brand palette AND enable the full dashboard.
-  /// The manifest enables only ~6 sections by default; here we turn on the
-  /// dashboard domains (`HomepageDomain` cases) so the demo reads like a power
-  /// user who tracks everything. `visibleDomains` shows enabled sections, so
-  /// flipping `isEnabled` is all it takes. SectionEntity.id is the section key.
-  private static func seedSections(_ ctx: ModelContext) {
-    let palette: [String: String] = [
-      "tasks": "#ef4444", "habits": "#22c55e", "training": "#f97316", "chores": "#a855f7",
-      "supplements": "#3b82f6", "sleep": "#6366f1", "nutrition": "#f59e0b", "groceries": "#84cc16",
-      "intake": "#92400e", "body": "#ec4899", "gut": "#b45309",
-      "activity": "#06b6d4", "goals": "#8b5cf6", "hydration": "#0ea5e9", "mood": "#f43f5e",
-      "symptoms": "#e11d48", "medications": "#4f46e5",
-    ]
-    // Tile order: sparkline-rich sections lead; list-only sections with no
-    // history strip (groceries) sink to the bottom so the dashboard reads dense
-    // from the top down. `show` is the enabled set; `order` drives sortIndex.
-    let order = [
-      "tasks", "training", "nutrition", "sleep", "activity", "body", "habits",
-      "supplements", "mood", "symptoms", "medications", "hydration", "intake", "gut",
-      "chores", "groceries",
-    ]
-    let show = Set(order)
-    for r in (try? ctx.fetch(FetchDescriptor<SectionEntity>())) ?? [] {
-      if let c = palette[r.id] { r.color = c }
-      if show.contains(r.id) {
-        r.isEnabled = true; r.showInToday = true; r.hasOnboarded = true
-      }
-    }
-    // Persist the tile order via the settings payload's `section_order` (the
-    // same field SettingsMirror reads). Merge into any existing payload so
-    // other settings survive; create the singleton row if absent.
-    let existing = (try? ctx.fetch(FetchDescriptor<SettingsEntity>()))?.first
-    var payload = (existing?.payloadData)
-      .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
-    payload["section_order"] = order
-    if let data = try? JSONSerialization.data(withJSONObject: payload) {
-      if let e = existing { e.payloadData = data; e.updatedAt = .now }
-      else { ctx.insert(SettingsEntity(payloadData: data)) }
-    }
   }
 }
 

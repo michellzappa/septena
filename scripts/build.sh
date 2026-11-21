@@ -8,7 +8,7 @@
 # when called as "<main-worktree>/scripts/build.sh" from elsewhere.
 #
 # Usage:  scripts/build.sh [scheme] [destination] [configuration]
-#   defaults: Septena (iOS, embeds watch+widgets+live activity),
+#   defaults: Septask (iOS, embeds watch + share extension),
 #             generic/platform=iOS, Release
 #
 # Release is the default because it is what the app actually ships as, and
@@ -16,14 +16,14 @@
 # cross-module optimization, and a pile of `#if DEBUG` branches). Verifying on
 # Release means the green gate matches what runs on device. Pass a third
 # argument (or set SEPTENA_CONFIG) for a Debug compile:
-#     scripts/build.sh SeptenaMac 'platform=macOS' Debug
+#     scripts/build.sh SeptaskMac 'platform=macOS' Debug
 set -o pipefail
 
 LOCKDIR="/tmp/auto-build.lock.d"
 STALE=3600          # steal the lock if older than 1h (a hung build/cron)
 MAX_WAIT=1800       # give up after 30m of waiting
 
-SCHEME="${1:-Septena}"
+SCHEME="${1:-Septask}"
 DEST="${2:-generic/platform=iOS}"
 CONFIG="${3:-${SEPTENA_CONFIG:-Release}}"
 
@@ -71,7 +71,6 @@ This scheme embeds the watch app, and there is no flag to skip an embedded
 target. Nothing is wrong with the project — Xcode.app works because you pick a
 concrete destination it can resolve.
   * Change doesn't touch watch code? Gate it on macOS instead:
-        scripts/build.sh SeptenaMac 'platform=macOS'
         scripts/build.sh SeptaskMac 'platform=macOS'
   * Change DOES touch watch code? Stop and tell the user: only they can decide
     to install the watchOS $want runtime (multi-GB). Do not download it.
