@@ -130,9 +130,9 @@ Refusals use the existing shape (`reason`, `rule`), with the new reasons
 
 **Skill text.** `backend/skill.md` gains a "Context first" section: claim,
 read the notes in the claim result, decide, and append one log entry per
-decision or learning before release. The in-app section skill
-(`Septena/Shell/Tasks/TasksSkill.swift`) and the in-app MCP server stay
-read-only on notes (ADR 0012). Their catalog text says so.
+decision or learning before release. The in-app MCP server was removed on
+2026-11-21 (commit `7b101882`), so the connector is the only MCP surface and
+ADR 0012's line about the in-app server no longer applies.
 
 **Server instructions.** The connector's `instructions` string adds one
 sentence: project and area notes are the context for every decision; read
