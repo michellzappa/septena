@@ -33,6 +33,12 @@ export interface TaskOut {
   // Emitted in the SAME shape tasks_create/tasks_update accept, so a read
   // round-trips into a write unchanged.
   recurrence?: { unit: string; interval: number; after_completion: boolean };
+  // Task fade user signals (docs/TASK_FADE_SPEC.md §3, read-only over MCP).
+  touchedAt?: string;
+  deferCount?: number;
+  fadedAt?: string;
+  dropReason?: string;
+  effort?: string;
   // Derived on output by `annotate` (absent = false / 0):
   // `inbox` = the row sits in Today's Inbox section in the app.
   // `daysOnToday` = days the row has carried over on Today undone; the app

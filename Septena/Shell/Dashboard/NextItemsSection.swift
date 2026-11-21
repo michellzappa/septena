@@ -144,6 +144,7 @@ final class TodayTasksModel {
         _ = actedTasks.remove(task.id)
       }
       mutator.uncomplete(id: task.id)
+      mutator.touch(id: task.id, kind: .edit)
     } else {
       // Done-side haptic is owned by the caller (TodayTaskRow), which fires
       // the context-scaled `TaskCelebration` haptic after this returns.
@@ -157,6 +158,7 @@ final class TodayTasksModel {
       }
       motion.run(Theme.Motion.settle) { tasks[i].status = .done }
       mutator.complete(id: task.id)
+      mutator.touch(id: task.id, kind: .edit)
     }
   }
 }

@@ -285,7 +285,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// (`reloadTextIfIdle`). A live edit is never overwritten — the old
   /// unconditional reload reverted typing mid-word and then lost the edit,
   /// because `loadedTitle` was reset along with the field.
-  func show(_ next: SeptenaTask?) {
+  func show(_ next: SeptenaTask?, isVisible: Bool = false) {
     guard next?.id != task?.id else {
       task = next
       if let next {
@@ -311,6 +311,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     // agent rows, so ratifying here would yank a proposal the moment it
     // became the selected row (even with this pane collapsed). Same
     // contract as SwiftUI `TaskComposer`. Disposition paths below ack.
+    // Opening in a VISIBLE inspector IS a user touch (`docs/TASK_FADE_SPEC.md` §3).
+    if isVisible {
+      mutator.touch(id: next.id, kind: .view)
+    }
 
     textUndo.removeAllActions()
     loadTitle(next.title)
@@ -319,6 +323,13 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     refreshConversation(next)
     historyView.configure(taskID: next.id)
     formScroll?.contentView.scroll(to: .zero)
+  }
+
+  /// Called when the inspector pane opens from collapsed state so the task
+  /// currently loaded in it records a user view touch (`docs/TASK_FADE_SPEC.md` §3).
+  func noteBecameVisible() {
+    guard let current = task, !current.isHeading else { return }
+    mutator.touch(id: current.id, kind: .view)
   }
 
   private func loadTitle(_ title: String) {

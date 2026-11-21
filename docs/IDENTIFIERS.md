@@ -102,6 +102,19 @@ Tasks are content, not labels. Keep `id` only.
   UUIDs — both are opaque from now on).
 - New tasks get base32-6 shortids for compactness.
 
+### Task fade & user-signal wire fields (`docs/TASK_FADE_SPEC.md` §3, ADR 0006)
+
+Exposed read-only on both MCP servers (`tasks_get` and `tasks_list`) and synced
+through the task backend (`tasks` table) and `TaskRecord`:
+
+| Field | Wire type | Default / absent | Meaning |
+|---|---|---|---|
+| `touchedAt` | ISO-8601 string? | `nil` (reads as `createdAt`) | Last user gesture on the task. Stamped only by `TaskMutator.touch(id:kind:)` — never by sync, recurrence, purge, agent/MCP, or fade. |
+| `deferCount` | Int | `0` | Times the user pushed `scheduled` later, removed from Today, or answered "not today". Resets to `0` on any other user edit. |
+| `fadedAt` | ISO-8601 string? | `nil` | Set when the task fades; cleared when the user keeps it. |
+| `dropReason` | String? | `nil` | `"faded"` (sweep drop) or `"user"` (manual drop), set alongside status `cancelled`. |
+| `effort` | String? | `nil` | `"light"` / `"heavy"`; `nil` = unknown. |
+
 ## Foreign keys
 
 Cross-type references store the **target id**, never the title. So

@@ -487,6 +487,11 @@ extension TaskSyncEngine {
     take("sourceClient") { t.sourceClient = $0.stringValue }
     take("acknowledgedAt") { t.acknowledgedAt = Self.parseStamp($0.stringValue) }
     take("createdAt") { t.createdAt = Self.parseStamp($0.stringValue) ?? .distantPast }
+    take("touchedAt") { t.touchedAt = Self.parseStamp($0.stringValue) }
+    take("deferCount") { t.deferCount = Self.int($0) ?? 0 }
+    take("fadedAt") { t.fadedAt = Self.parseStamp($0.stringValue) }
+    take("dropReason") { t.dropReason = $0.stringValue }
+    take("effort") { t.effort = $0.stringValue }
     return applied
   }
 

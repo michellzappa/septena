@@ -350,6 +350,9 @@ export class TaskStore extends DurableObject<Env> {
   private agentRefusal(op: Op): string | null {
     if (op.op === "upsert" && op.entity === "convo" && "stoppedAt" in op.fields) return "human_only:stoppedAt";
     if (op.op === "upsert" && op.entity === "setting" && op.id === "agentsPaused") return "human_only:agentsPaused";
+    if (op.op === "upsert" && op.entity === "task" && ("touchedAt" in op.fields || "deferCount" in op.fields)) {
+      return "human_only:touch";
+    }
     const taskId = op.op === "appendTurn" ? op.taskId
       : (op.entity === "task" || op.entity === "convo") ? op.id
       : op.entity === "attachment" && op.op === "upsert" ? (op.fields.taskId as string | undefined) ?? null

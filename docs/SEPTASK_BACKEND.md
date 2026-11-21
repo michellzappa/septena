@@ -117,7 +117,8 @@ iOS / Mac / Watch apps                 Claude (web, mobile, Code, agents)
 scheduled, deadline, today, todaySetOn, completedAt, notes, position,
 todayPosition, recurrenceUnit, recurrenceInterval, recurrenceAfterCompletion,
 recurrencePaused, recurrenceSeriesID, recurrenceAnchorDate, source,
-sourceClient, acknowledgedAt, createdAt, rev, updatedAt, deletedAt.
+sourceClient, acknowledgedAt, createdAt, touchedAt, deferCount, fadedAt,
+dropReason, effort, rev, updatedAt, deletedAt.
 
 `position` is the manual order inside the task's own list (Inbox, area,
 project). `todayPosition` is the manual order on Today, kept apart so

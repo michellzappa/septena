@@ -186,6 +186,12 @@ enum TaskBackendMapping {
       "acknowledgedAt": t.acknowledgedAt.map { .string(stamp($0)) } ?? .null,
       // `.distantPast` marks a row from before the field existed: unknown.
       "createdAt": t.createdAt == .distantPast ? .null : .string(stamp(t.createdAt)),
+      // Task fade user signals (docs/TASK_FADE_SPEC.md §3).
+      "touchedAt": t.touchedAt.map { .string(stamp($0)) } ?? .null,
+      "deferCount": .int(Int64(t.deferCount)),
+      "fadedAt": t.fadedAt.map { .string(stamp($0)) } ?? .null,
+      "dropReason": c.text("dropReason", t.dropReason, max: 32),
+      "effort": c.text("effort", t.effort, max: 32),
     ]
     return finish(.task, t.id, c, fields, deleted: t.deletedAt != nil)
   }

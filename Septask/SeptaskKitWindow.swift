@@ -67,9 +67,6 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     list.onFocusSidebar = { [weak sidebar] in sidebar?.focusSidebar() }
     detail.display(list)
 
-    list.onSelectionChange = { [weak inspector] task in
-      inspector?.show(task)
-    }
     list.onStoreChanged = { [weak inspector] in
       inspector?.refresh()
     }
@@ -92,6 +89,9 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     inspectorItem.isCollapsed = !UserDefaults.standard.bool(
       forKey: SettingsKey.septaskInspectorVisible)
     split.addSplitViewItem(inspectorItem)
+    list.onSelectionChange = { [weak inspector, weak inspectorItem] task in
+      inspector?.show(task, isVisible: inspectorItem?.isCollapsed == false)
+    }
     split.splitView.autosaveName = "SeptaskKitSplit"
     // Keep the View menu's Show/Hide Sidebar title truthful however the pane
     // collapsed (menu, ⌃⌘S, or dragging the divider shut).
@@ -286,6 +286,9 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
        let responder = window?.firstResponder as? NSView,
        responder.isDescendant(of: inspectorItem.viewController.view) {
       list?.focusList()
+    }
+    if visible {
+      inspector?.noteBecameVisible()
     }
     // Opening from the keyboard (⌥⌘I / Show Info) is a request to edit:
     // the title takes the keyboard. Next run-loop turn, once the pane is

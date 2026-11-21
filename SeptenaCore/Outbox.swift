@@ -9,6 +9,21 @@ import SwiftData
 
 // MARK: - TaskMutator
 
+/// What kind of user gesture touched a task (`docs/TASK_FADE_SPEC.md` §3).
+/// Every gesture stamps `touchedAt`. Deferring increments `deferCount`, any
+/// other edit resets `deferCount` to 0, and viewing (opening in the inspector
+/// or composer without editing) leaves `deferCount` untouched.
+enum TaskTouchKind {
+  /// Opened in the inspector or composer without editing yet.
+  case view
+  /// Any non-defer user edit (title/notes, move, set Today, schedule earlier/
+  /// clear, deadline, recurrence, complete, reopen, cancel, answer a card).
+  case edit
+  /// Pushed later (scheduled moved to a later day, removed from Today, or
+  /// answered "not today").
+  case `defer`
+}
+
 /// The single entry point for any code path that mutates a task. Its local
 /// store is bound to CKSyncEngine before use; callers must await
 /// `SeptenaServices.shared.start()` first.
@@ -91,12 +106,12 @@ final class TaskMutator {
     cloudBackend.uncomplete(id: id)
   }
 
-  func cancel(id: String) {
+  func cancel(id: String, dropReason: String? = nil) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] cancel called before CK bound — dropping", nil)
       return
     }
-    cloudBackend.cancel(id: id)
+    cloudBackend.cancel(id: id, dropReason: dropReason)
   }
 
   /// Soft-delete → Recently Deleted (recoverable; docs/RECENTLY_DELETED_SPEC.md).
@@ -425,6 +440,20 @@ final class TaskMutator {
       return
     }
     cloudBackend.unacknowledge(id: id)
+  }
+
+  /// Stamp `touchedAt` for a user gesture and update `deferCount`
+  /// (`docs/TASK_FADE_SPEC.md` §3). The single write point for user-touch
+  /// signals — call at user gesture sites (the same sites that record undo,
+  /// plus opening in the inspector and answering a card). Never call from sync
+  /// applies, recurrence spawns, the 30-day purge, agent / MCP writes, or the
+  /// fade pass.
+  func touch(id: String, kind: TaskTouchKind = .edit) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] touch called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.touch(id: id, kind: kind)
   }
 }
 

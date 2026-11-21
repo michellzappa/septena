@@ -750,6 +750,11 @@ struct TaskComposerCard: View {
       // vanish from the Inbox on dismiss with no decision made. Ratification
       // happens on Save, and only when the edit actually (re)places it (see
       // `persist`).
+      // Opening an existing task in the inspector / composer IS a user touch
+      // (`docs/TASK_FADE_SPEC.md` §3), without resetting `deferCount`.
+      if !deferredCreate {
+        mutator.touch(id: task.id, kind: .view)
+      }
       //
       // On the iPhone sheet, editing opens at half height (seeded in `init`)
       // with no autofocus: you're reviewing an existing task, not entering one,

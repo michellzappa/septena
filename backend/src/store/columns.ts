@@ -109,6 +109,12 @@ export const ENTITIES = {
       sourceClient: text(64),
       acknowledgedAt: stamp(),
       createdAt: stamp(),
+      // Task fade user signals (docs/TASK_FADE_SPEC.md §3, ADR 0006).
+      touchedAt: stamp(),
+      deferCount: { kind: "int", zod: z.number().int().min(0), dflt: 0 },
+      fadedAt: stamp(),
+      dropReason: { kind: "text", zod: z.enum(["faded", "user"]).nullable() },
+      effort: { kind: "text", zod: z.enum(["light", "heavy"]).nullable() },
     },
     requiredOnInsert: ["title", "status"],
   },
@@ -277,7 +283,7 @@ export function decodeRow(spec: EntitySpec, row: Record<string, unknown>): Recor
   for (const [name, col] of Object.entries(spec.columns)) {
     const v = row[name];
     if (v === null || v === undefined) {
-      out[name] = col.kind === "bool" ? false : null;
+      out[name] = col.kind === "bool" ? false : (col.dflt ?? null);
     } else if (col.kind === "bool") {
       out[name] = v === 1;
     } else if (col.kind === "json") {

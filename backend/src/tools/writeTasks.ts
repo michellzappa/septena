@@ -781,6 +781,15 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+function optionalNonNegativeInt(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : undefined;
+}
+
+function optionalIsoTimestamp(value: unknown): string | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
+  return optionalString(value);
+}
+
 // One-call "where is this task, what's its state?" — every core field plus a
 // compact conversation summary, regardless of which view (or none) the task
 // lives in. Use tasks_thread_get for the full turn-by-turn conversation.
@@ -805,6 +814,11 @@ export async function getTask(client: CloudKitClient, input: { id: string }) {
     completedAt: optionalString(fields.completedAt?.value),
     source: optionalString(fields.source?.value),
     notes: optionalString(fields.notesText?.value),
+    touchedAt: optionalIsoTimestamp(fields.touchedAt?.value),
+    deferCount: optionalNonNegativeInt(fields.deferCount?.value) ?? 0,
+    fadedAt: optionalIsoTimestamp(fields.fadedAt?.value),
+    dropReason: optionalString(fields.dropReason?.value),
+    effort: optionalString(fields.effort?.value),
     convo: convoSummary(convo),
   };
 }

@@ -135,6 +135,23 @@ final class TaskEntity {
   /// heading moves only its own row; members render under it wherever it lands
   /// by construction. Additive CloudKit field, conditional write.
   var heading: String?
+  /// Last user gesture on the task (`docs/TASK_FADE_SPEC.md` §3). nil on
+  /// legacy or untouched rows: read as `createdAt` (`effectiveTouchedAt`).
+  /// Stamped only via `TaskMutator.touch(id:kind:)` — never by sync applies,
+  /// recurrence spawns, the 30-day purge, agent/MCP writes, or the fade pass.
+  var touchedAt: Date?
+  /// Times the user pushed the task to a later day or off Today. Resets to 0
+  /// on any non-defer user edit. `= 0` is required for lightweight migration.
+  var deferCount: Int = 0
+  /// Set when the task fades (`docs/TASK_FADE_SPEC.md` §4). Cleared when the
+  /// user keeps it.
+  var fadedAt: Date?
+  /// `"faded"` when the weekly sweep drops the task, `"user"` for a manual
+  /// drop. Set alongside status `cancelled`.
+  var dropReason: String?
+  /// `"light"` / `"heavy"`. Set by the on-device model at capture or by the
+  /// user. nil = unknown.
+  var effort: String?
 
   init(id: String,
        title: String,
@@ -169,7 +186,12 @@ final class TaskEntity {
        createdAt: Date = Date.distantPast,
        kind: String = "",
        heading: String? = nil,
-       todayPosition: Double? = nil) {
+       todayPosition: Double? = nil,
+       touchedAt: Date? = nil,
+       deferCount: Int = 0,
+       fadedAt: Date? = nil,
+       dropReason: String? = nil,
+       effort: String? = nil) {
     self.id = id
     self.title = title
     self.statusRaw = statusRaw
@@ -204,7 +226,16 @@ final class TaskEntity {
     self.kind = kind
     self.heading = heading
     self.todayPosition = todayPosition
+    self.touchedAt = touchedAt
+    self.deferCount = deferCount
+    self.fadedAt = fadedAt
+    self.dropReason = dropReason
+    self.effort = effort
   }
+
+  /// Last user touch instant, falling back to `createdAt` for untouched /
+  /// legacy rows (`docs/TASK_FADE_SPEC.md` §3).
+  var effectiveTouchedAt: Date { touchedAt ?? createdAt }
 
   /// True when this row is a project section divider, not a to-do. The single
   /// read point — every feed/count/list gates on this so headings never leak
@@ -1790,6 +1821,11 @@ extension SeptenaTask {
       todayPosition: e.todayPosition,
       kind: e.kind,
       heading: e.heading,
+      touchedAt: e.touchedAt,
+      deferCount: e.deferCount,
+      fadedAt: e.fadedAt,
+      dropReason: e.dropReason,
+      effort: e.effort,
       conversation: e.conversation
     )
   }

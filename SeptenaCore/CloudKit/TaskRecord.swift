@@ -70,6 +70,16 @@ static let kind = "kind"
     /// additive. Absent for un-headed tasks and heading rows.
 static let heading = "heading"
 
+    // Task fade user signals (docs/TASK_FADE_SPEC.md §3, ADR 0006).
+    // `touchedAt` and `fadedAt` are TIMESTAMP (NSDate), matching `createdAt`/
+    // `acknowledgedAt`. `deferCount` is INT64 (conditional write: cleared to
+    // nil when 0 so untouched rows don't author 0 and resets propagate).
+static let touchedAt = "touchedAt"
+static let deferCount = "deferCount"
+static let fadedAt = "fadedAt"
+static let dropReason = "dropReason"
+static let effort = "effort"
+
     // Over-provisioned for schema flexibility post-Production deploy.
     // Adding fields later is allowed but slow to roll out; renaming /
     // retyping is impossible. Reserve a few slots now so we can absorb
@@ -155,6 +165,13 @@ extension TaskEntity: CloudKitSystemFieldsBacked {
     // SURVIVES in CloudKit (this is a record update); only `purge` deletes it.
     record[TaskCloudKitSchema.Field.reservedString1] = deletedAt
 
+    // Task fade user signals (docs/TASK_FADE_SPEC.md §3).
+    record[TaskCloudKitSchema.Field.touchedAt] = touchedAt as NSDate?
+    record[TaskCloudKitSchema.Field.deferCount] = deferCount != 0 ? deferCount : nil
+    record[TaskCloudKitSchema.Field.fadedAt] = fadedAt as NSDate?
+    record[TaskCloudKitSchema.Field.dropReason] = dropReason
+    record[TaskCloudKitSchema.Field.effort] = effort
+
     return record
   }
 }
@@ -217,6 +234,14 @@ func apply(_ record: CKRecord) {
     // including clearing it on restore, when the remote value is absent — so a
     // restore on another device un-trashes the task here too.
     deletedAt = optionalTaskString(record[TaskCloudKitSchema.Field.reservedString1])
+
+    // Task fade user signals (docs/TASK_FADE_SPEC.md §3). Mirror directly from
+    // the remote record; a sync apply never stamps `touchedAt` to now.
+    touchedAt = record[TaskCloudKitSchema.Field.touchedAt] as? Date
+    deferCount = (record[TaskCloudKitSchema.Field.deferCount] as? Int) ?? 0
+    fadedAt = record[TaskCloudKitSchema.Field.fadedAt] as? Date
+    dropReason = optionalTaskString(record[TaskCloudKitSchema.Field.dropReason])
+    effort = optionalTaskString(record[TaskCloudKitSchema.Field.effort])
 
     captureCloudKitSystemFields(from: record)
   }

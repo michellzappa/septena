@@ -37,6 +37,21 @@ public enum TaskKind {
   public static let heading = "heading"
 }
 
+/// Values stamped on a task's `dropReason` alongside status `cancelled`
+/// (`docs/TASK_FADE_SPEC.md` §3).
+public enum TaskDropReason {
+  /// Dropped by the weekly sweep after fading.
+  public static let faded = "faded"
+  /// Dropped manually by the user (or "Let it go" on the stuck card).
+  public static let user = "user"
+}
+
+/// Values stamped on a task's `effort` field (`docs/TASK_FADE_SPEC.md` §3, §9).
+public enum TaskEffort {
+  public static let light = "light"
+  public static let heavy = "heavy"
+}
+
 /// Tunables for the "agent created this" freshness cue. Provenance is
 /// permanent; the cue is transient and decays so a long-ignored agent row
 /// stops glowing even if never explicitly acknowledged.
@@ -109,6 +124,22 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// FK to the owning heading's id when this task is filed under one; else nil.
   /// Rides alongside the entity, not the wire.
   var heading: String? = nil
+  /// Last user gesture on the task (`docs/TASK_FADE_SPEC.md` §3). nil reads as
+  /// `createdAt` (`effectiveTouchedAt`). Rides alongside the entity, not the wire.
+  var touchedAt: Date? = nil
+  /// Times the user pushed the task to a later day or off Today. Resets to 0 on
+  /// any non-defer edit. Rides alongside the entity, not the wire.
+  var deferCount: Int = 0
+  /// Set when the task fades; cleared when the user keeps it. Rides alongside.
+  var fadedAt: Date? = nil
+  /// `"faded"` (sweep drop) or `"user"` (manual drop), set with status `cancelled`.
+  var dropReason: String? = nil
+  /// `"light"` / `"heavy"`; nil = unknown. Rides alongside the entity.
+  var effort: String? = nil
+
+  /// Last user touch instant, falling back to `createdAt` for untouched /
+  /// legacy rows (`docs/TASK_FADE_SPEC.md` §3).
+  var effectiveTouchedAt: Date { touchedAt ?? createdAt }
 
   /// True when this DTO is a project section divider, not a to-do — the mirror
   /// of `TaskEntity.isHeading`. Headings are excluded from every feed/count.
@@ -306,6 +337,11 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     todayPosition: Double? = nil,
     kind: String = "",
     heading: String? = nil,
+    touchedAt: Date? = nil,
+    deferCount: Int = 0,
+    fadedAt: Date? = nil,
+    dropReason: String? = nil,
+    effort: String? = nil,
     conversation: TaskConvo = TaskConvo()
   ) {
     self.id = id
@@ -333,6 +369,11 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     self.todayPosition = todayPosition
     self.kind = kind
     self.heading = heading
+    self.touchedAt = touchedAt
+    self.deferCount = deferCount
+    self.fadedAt = fadedAt
+    self.dropReason = dropReason
+    self.effort = effort
     self.conversation = conversation
   }
 

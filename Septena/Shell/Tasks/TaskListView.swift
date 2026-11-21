@@ -533,6 +533,7 @@ struct TaskListView: View {
         applyRecurrencePaused: { id, paused in
           Haptics.tick()
           mutator.setRecurrencePaused(id: id, paused: paused)
+          mutator.touch(id: id, kind: .edit)
           Task { await load() }
         }
       ))
@@ -3039,7 +3040,10 @@ struct TaskListView: View {
         },
         onSetRepeatPaused: { ids, paused in
           Haptics.tick()
-          for id in ids { mutator.setRecurrencePaused(id: id, paused: paused) }
+          for id in ids {
+            mutator.setRecurrencePaused(id: id, paused: paused)
+            mutator.touch(id: id, kind: .edit)
+          }
           Task { await load() }
         },
         onCreateNextCopy: { task in

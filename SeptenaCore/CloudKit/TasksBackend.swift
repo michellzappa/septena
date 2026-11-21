@@ -377,6 +377,23 @@ final class CloudKitTasksBackend {
     commitAndPush(entity, op: "unacknowledge")
   }
 
+  /// Single stamp site for `touchedAt` and `deferCount`
+  /// (`docs/TASK_FADE_SPEC.md` §3). Headings never fade or accumulate defers.
+  func touch(id: String, kind: TaskTouchKind = .edit) {
+    guard let entity = fetch(id: id), !entity.isHeading else { return }
+    entity.touchedAt = DayClock.appNow
+    switch kind {
+    case .view:
+      break
+    case .edit:
+      entity.deferCount = 0
+    case .defer:
+      entity.deferCount += 1
+    }
+    entity.pendingSync = true
+    commitAndPush(entity, op: "touch")
+  }
+
   func complete(id: String) {
     guard let entity = fetch(id: id) else { return }
     // Completion can arrive twice (e.g. an optimistic phone tap followed by a
@@ -425,6 +442,7 @@ final class CloudKitTasksBackend {
     }
     entity.statusRaw = TaskStatus.open.rawValue
     entity.completedAt = nil
+    entity.dropReason = nil
     entity.pendingSync = true
     commitAndPush(entity, op: "uncomplete")
   }
@@ -468,7 +486,7 @@ final class CloudKitTasksBackend {
     purge(id: spawnedID)
   }
 
-  func cancel(id: String) {
+  func cancel(id: String, dropReason: String? = nil) {
     guard let entity = fetch(id: id) else { return }
     // Cancelling one instance of a repeat is "skip this one", not "end the
     // series", so an OPEN source spawns its next occurrence exactly like
@@ -483,6 +501,7 @@ final class CloudKitTasksBackend {
       logicalScheduled: entity.recurrenceAnchorDate
     )
     entity.statusRaw = TaskStatus.cancelled.rawValue
+    if let dropReason { entity.dropReason = dropReason }
     // The app's clock, same as `complete`: un-cancel goes through `uncomplete`,
     // which recomputes the spawned occurrence id from this stamp. A closed row
     // keeps its original stamp so that recomputation still finds its successor.

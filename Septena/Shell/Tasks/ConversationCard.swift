@@ -252,11 +252,13 @@ struct ConversationCard: View {
 
   private func setStopped(_ stopped: Bool) {
     SeptenaServices.shared.taskMutator.setConvoStopped(id: taskID, stopped)
+    SeptenaServices.shared.taskMutator.touch(id: taskID, kind: .edit)
     reload()
   }
 
   private func append(_ turn: ConvoTurn) {
     SeptenaServices.shared.taskMutator.appendConvoTurn(id: taskID, turn)
+    SeptenaServices.shared.taskMutator.touch(id: taskID, kind: .edit)
     reload()
   }
 }

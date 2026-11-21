@@ -2341,10 +2341,16 @@ final class SeptaskKitTaskListController: NSViewController {
         // list. Rows still lingering from the same batch keep their beat.
         settlingIDs.subtract(reopening.map(\.id))
         restyle(ids: reopening.map(\.id), to: .open)
-        for task in reopening { mutator.uncomplete(id: task.id) }
+        for task in reopening {
+          mutator.uncomplete(id: task.id)
+          mutator.touch(id: task.id, kind: .edit)
+        }
         return
       }
-      for task in reopening { mutator.uncomplete(id: task.id) }
+      for task in reopening {
+        mutator.uncomplete(id: task.id)
+        mutator.touch(id: task.id, kind: .edit)
+      }
       reload()
       return
     }
@@ -2358,8 +2364,12 @@ final class SeptaskKitTaskListController: NSViewController {
       for task in completing {
         mutator.complete(id: task.id)
         mutator.acknowledge(id: task.id)
+        mutator.touch(id: task.id, kind: .edit)
       }
-      for task in reopening { mutator.uncomplete(id: task.id) }
+      for task in reopening {
+        mutator.uncomplete(id: task.id)
+        mutator.touch(id: task.id, kind: .edit)
+      }
       reload()
       return
     }
@@ -2373,8 +2383,12 @@ final class SeptaskKitTaskListController: NSViewController {
     for task in completing {
       mutator.complete(id: task.id)
       mutator.acknowledge(id: task.id)
+      mutator.touch(id: task.id, kind: .edit)
     }
-    for task in reopening { mutator.uncomplete(id: task.id) }
+    for task in reopening {
+      mutator.uncomplete(id: task.id)
+      mutator.touch(id: task.id, kind: .edit)
+    }
     beginSettle()
   }
 
@@ -3076,6 +3090,12 @@ final class SeptaskKitTaskListController: NSViewController {
     // agent rows (same contract as SwiftUI `TaskComposer`). Disposition
     // paths (complete / when / move / today) ratify.
     if composingTaskId != nil { collapseComposer(commit: true, animated: false) }
+    // Opening an existing task in the inline composer is a user touch
+    // (`docs/TASK_FADE_SPEC.md` §3). Run before `composingTaskId` is set so
+    // the synchronous store notification settles cleanly.
+    if id != pendingNewTaskId {
+      mutator.touch(id: id, kind: .view)
+    }
     composingTaskId = id
     guard let row = rows.firstIndex(where: { $0.task?.id == id }) else {
       composingTaskId = nil

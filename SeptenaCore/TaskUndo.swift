@@ -108,10 +108,12 @@ enum TaskUndo {
   /// before a change so undo can put them back. Hoisted verbatim from the
   /// AppKit shell — there is no second write path, `restore` replays the SAME
   /// mutators the forward commands use.
-  struct ScheduleSnapshot {
+  struct ScheduleSnapshot: Equatable {
     let id: String
     let scheduled: Date?
+    let scheduledDay: String?
     let today: Bool
+    let wasOnToday: Bool
     let deadline: Date?
     let recurrence: Recurrence?
     let recurrencePaused: Bool
@@ -119,7 +121,9 @@ enum TaskUndo {
     init(_ task: SeptenaTask) {
       id = task.id
       scheduled = SeptenaDate.parse(task.scheduled)
+      scheduledDay = task.scheduled
       today = task.today
+      wasOnToday = task.isOnToday
       deadline = SeptenaDate.parse(task.deadline)
       recurrence = task.recurrence
       recurrencePaused = task.recurrencePaused
@@ -169,6 +173,18 @@ enum TaskUndo {
       .filter { wanted.contains($0.id) }
       .map(ScheduleSnapshot.init)
     guard !after.isEmpty else { return }
+    // Stamp user touch & defer count (`docs/TASK_FADE_SPEC.md` §3) once per
+    // changed task on the net before→after delta so a gesture that runs both
+    // `schedule` and `removeFromToday` never double-counts a defer.
+    let beforeByID = Dictionary(before.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    for next in after {
+      guard let prev = beforeByID[next.id], prev != next else { continue }
+      let isDefer = TaskFade.isDefer(oldScheduled: prev.scheduledDay,
+                                     newScheduled: next.scheduledDay,
+                                     wasOnToday: prev.wasOnToday,
+                                     isNowOnToday: next.wasOnToday)
+      mutator.touch(id: next.id, kind: isDefer ? .defer : .edit)
+    }
     record(name: name,
            undo: { restore(before, using: mutator) },
            redo: { restore(after, using: mutator) })
@@ -203,6 +219,7 @@ enum TaskUndo {
                                wasDone: Bool,
                                mutator: TaskMutator) {
     guard !ids.isEmpty else { return }
+    for id in ids { mutator.touch(id: id, kind: .edit) }
     let name = wasDone
       ? String(localized: "Reopen Task", comment: "Undo action name")
       : String(localized: "Complete Task", comment: "Undo action name")
@@ -221,6 +238,7 @@ enum TaskUndo {
   /// menu can't invent a different one.
   static func recordCancel(ids: [String], mutator: TaskMutator) {
     guard !ids.isEmpty else { return }
+    for id in ids { mutator.touch(id: id, kind: .edit) }
     record(name: String(localized: "Cancel Task", comment: "Undo action name"),
            undo: { for id in ids { mutator.uncomplete(id: id) } },
            redo: { for id in ids { mutator.cancel(id: id) } })
@@ -240,6 +258,7 @@ enum TaskUndo {
   static func recordRename(id: String, before: String, after: String,
                            mutator: TaskMutator) {
     guard before != after else { return }
+    mutator.touch(id: id, kind: .edit)
     record(name: String(localized: "Rename Task", comment: "Undo action name"),
            undo: { mutator.update(id: id, title: before) },
            redo: { mutator.update(id: id, title: after) })
@@ -259,6 +278,7 @@ enum TaskUndo {
       recordRename(id: id, before: beforeTitle, after: afterTitle, mutator: mutator)
       return
     }
+    mutator.touch(id: id, kind: .edit)
     func apply(title: String, notes: String?) {
       mutator.update(id: id,
                      title: titleChanged ? title : nil,
@@ -409,7 +429,9 @@ enum TaskUndo {
     // behind it. Compared by id, because the caller's order and the store's
     // order differ.
     let beforeByID = Dictionary(before.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-    guard after.contains(where: { beforeByID[$0.id] != $0 }) else { return }
+    let moved = after.filter { beforeByID[$0.id] != $0 }
+    guard !moved.isEmpty else { return }
+    for item in moved { mutator.touch(id: item.id, kind: .edit) }
     record(name: String(localized: "Move Task", comment: "Undo action name"),
            undo: { restore(before, using: mutator) },
            redo: { restore(after, using: mutator) })

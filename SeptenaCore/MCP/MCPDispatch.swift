@@ -415,6 +415,11 @@ enum MCPDispatch {
     if let v = e.source { out["source"] = v }
     if let v = e.notes { out["notes"] = v }
     if let v = e.recurrence { out["recurrence"] = recurrenceJSON(v) }
+    if let v = e.touchedAt { out["touchedAt"] = TaskBackendMapping.stamp(v) }
+    out["deferCount"] = e.deferCount
+    if let v = e.fadedAt { out["fadedAt"] = TaskBackendMapping.stamp(v) }
+    if let v = e.dropReason { out["dropReason"] = v }
+    if let v = e.effort { out["effort"] = v }
     let c = e.conversation
     var convo: [String: Any] = [
       "turns": c.thread.count,
@@ -724,6 +729,11 @@ enum MCPDispatch {
     if let c = t.completedAt { out["completedAt"] = c }
     if let n = t.notes { out["notes"] = n }
     if let r = t.recurrence { out["recurrence"] = recurrenceJSON(r) }
+    if let v = t.touchedAt { out["touchedAt"] = TaskBackendMapping.stamp(v) }
+    if t.deferCount > 0 { out["deferCount"] = t.deferCount }
+    if let v = t.fadedAt { out["fadedAt"] = TaskBackendMapping.stamp(v) }
+    if let v = t.dropReason { out["dropReason"] = v }
+    if let v = t.effort { out["effort"] = v }
     // Derived, absent when false / 0: `inbox` = the row sits in Today's Inbox
     // section; `daysOnToday` = days carried over on Today undone (the
     // darkened checkbox, `todayTenureFill`).

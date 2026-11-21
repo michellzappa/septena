@@ -212,6 +212,11 @@ async function callTool(
         id: t.id, title: t.title, status: t.status, today: t.today,
         scheduled: t.scheduled, deadline: t.deadline, area: t.area, project: t.project,
         completedAt: t.completedAt, source: t.source, notes: t.notes,
+        touchedAt: t.touchedAt,
+        deferCount: t.deferCount ?? 0,
+        fadedAt: t.fadedAt,
+        dropReason: t.dropReason,
+        effort: t.effort,
         inbox: t.inbox, daysOnToday: t.daysOnToday,
         convo: convoSummary(convoOut(r.convo, r.turns)),
         agent: agentState(r.convo),
@@ -366,6 +371,11 @@ function taskOut(r: Row): TaskOut {
           after_completion: r.recurrenceAfterCompletion === true,
         }
       : undefined,
+    touchedAt: str(r.touchedAt),
+    deferCount: posInt(r.deferCount),
+    fadedAt: str(r.fadedAt),
+    dropReason: str(r.dropReason),
+    effort: str(r.effort),
   };
 }
 
@@ -420,6 +430,10 @@ function str(v: unknown): string | undefined {
 
 function num(v: unknown): number | undefined {
   return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
+function posInt(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isInteger(v) && v > 0 ? v : undefined;
 }
 
 /// ISO stamp → ms epoch, the unit the live tool emits for these fields.

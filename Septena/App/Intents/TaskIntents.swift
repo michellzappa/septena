@@ -110,7 +110,9 @@ struct CompleteTaskIntent: SectionLogIntent {
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
     try await requireSection()
-    SeptenaServices.shared.taskMutator.complete(id: task.id)
+    let mutator = SeptenaServices.shared.taskMutator
+    mutator.complete(id: task.id)
+    mutator.touch(id: task.id, kind: .edit)
     return .result(dialog: "Completed \(task.title).")
   }
 }
@@ -137,6 +139,7 @@ struct MoveTaskToTodayIntent: SectionLogIntent {
     let mutator = SeptenaServices.shared.taskMutator
     mutator.moveToToday(id: task.id)
     mutator.schedule(id: task.id, date: nil)
+    mutator.touch(id: task.id, kind: .edit)
     return .result(dialog: "Moved \(task.title) to Today.")
   }
 }
@@ -166,6 +169,7 @@ struct DeferTaskIntent: SectionLogIntent {
     let mutator = SeptenaServices.shared.taskMutator
     mutator.schedule(id: task.id, date: until)
     mutator.removeFromToday(id: task.id)
+    mutator.touch(id: task.id, kind: .defer)
     return .result(dialog: "Deferred \(task.title).")
   }
 }

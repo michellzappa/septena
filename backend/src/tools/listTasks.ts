@@ -94,6 +94,11 @@ export async function listTasks(
     createdAt: optionalNumber(r.fields.createdAt?.value),
     kind: optionalString(r.fields.kind?.value),
     recurrence: recurrenceOut(r.fields),
+    touchedAt: optionalIsoTimestamp(r.fields.touchedAt?.value),
+    deferCount: optionalPositiveInt(r.fields.deferCount?.value),
+    fadedAt: optionalIsoTimestamp(r.fields.fadedAt?.value),
+    dropReason: optionalString(r.fields.dropReason?.value),
+    effort: optionalString(r.fields.effort?.value),
   }));
 
   // Project headings (section dividers) are not to-dos — drop them from every
@@ -137,6 +142,15 @@ function optionalString(value: unknown): string | undefined {
 
 function optionalNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function optionalPositiveInt(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+function optionalIsoTimestamp(value: unknown): string | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
+  return optionalString(value);
 }
 
 function filtersForView(view: TaskView) {

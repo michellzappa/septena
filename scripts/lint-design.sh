@@ -184,6 +184,15 @@ if [ -n "$reserved_model" ]; then
   printf '%s\n' "$OFF"
 fi
 
+# ── Task fade user-touch stamp (docs/TASK_FADE_SPEC.md §3) ──────────────────
+# `touchedAt` and `deferCount` are user-gesture signals stamped only inside
+# `CloudKitTasksBackend.touch(id:kind:)` (via `TaskMutator.touch`). Writing
+# them from sync applies, recurrence spawns, MCP, or views breaks fade timing.
+scan task-touch-stamp error \
+  '\.(touchedAt|deferCount)[[:space:]]*([+\-]?=)' \
+  'Stamp touchedAt / deferCount only through TaskMutator.touch(id:kind:) — never write them directly.' \
+  'SeptenaCore/CloudKit/TasksBackend\.swift|SeptenaCore/CloudKit/TaskRecord\.swift|SeptenaCore/TaskBackend/TaskSyncApply\.swift|SeptenaCore/Persistence\.swift|SeptenaCore/Models\.swift'
+
 # ── Typography (DesignSpec §5) — advisory, we are paying this down ───────────
 scan type-raw-mono note \
   '\.font\([^)]*(monospacedDigit\(\)|design: \.monospaced)' \

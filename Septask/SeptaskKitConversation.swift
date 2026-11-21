@@ -415,6 +415,7 @@ final class KitConversationView: NSView {
   @objc private func toggleStopped() {
     guard let taskID else { return }
     mutator.setConvoStopped(id: taskID, convo.stoppedAt == nil)
+    mutator.touch(id: taskID, kind: .edit)
     convo = mutator.conversation(id: taskID) ?? convo
     rebuild()
   }
@@ -424,6 +425,7 @@ final class KitConversationView: NSView {
   private func append(_ turn: ConvoTurn) {
     guard let taskID else { return }
     mutator.appendConvoTurn(id: taskID, turn)
+    mutator.touch(id: taskID, kind: .edit)
     convo = mutator.conversation(id: taskID) ?? convo
     rebuild()
     onAppend?()

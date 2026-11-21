@@ -122,7 +122,7 @@ enum MCPToolCatalog {
                 "limit": ["type": "integer", "minimum": 1, "maximum": 500, "default": 100],
               ]]),
       MCPTool(name: "tasks_get",
-              description: "Inspect a single task by id: title, status, area, project, scheduled, deadline, today, completedAt, source, notes (free-text body), and a compact conversation summary. One call answers 'where is this task and what's its state?' regardless of view or status.",
+              description: "Inspect a single task by id: title, status, area, project, scheduled, deadline, today, completedAt, source, notes (free-text body), fade/touch fields (touchedAt, deferCount, fadedAt, dropReason, effort; read-only), and a compact conversation summary. One call answers 'where is this task and what's its state?' regardless of view or status.",
               inputSchema: ["type": "object", "required": ["id"], "properties": [
                 "id": ["type": "string"],
               ]]),

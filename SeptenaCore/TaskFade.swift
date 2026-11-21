@@ -21,4 +21,16 @@ enum TaskFade {
     guard let fill, fill.isFinite, fill > 0 else { return 1 }
     return 1 - min(1, fill) * (1 - minOpacity)
   }
+
+  /// Whether a user's schedule / Today change counts as a defer
+  /// (`docs/TASK_FADE_SPEC.md` §3): setting `scheduled` to a later day than
+  /// its current value, or taking a task off Today.
+  static func isDefer(oldScheduled: String?,
+                      newScheduled: String?,
+                      wasOnToday: Bool,
+                      isNowOnToday: Bool) -> Bool {
+    if wasOnToday && !isNowOnToday { return true }
+    if let old = oldScheduled, let new = newScheduled, new > old { return true }
+    return false
+  }
 }
