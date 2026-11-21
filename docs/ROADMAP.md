@@ -126,6 +126,11 @@ GitHub milestone: `"M3 Factory ships code"`.
 
 - F2 work profiles, approval cards, `errand`, kill switch
 - F3 `code` workflow on linked repos, run log (needs L0–L1)
+- Shared cross-platform registries ([ADR 0014](adr/0014-shared-registries-for-cross-platform-clients.md),
+  proposed; prerequisites to `#21`, `#20`, `#136`): `#141` R0 foundation, wire
+  schema & conformance suite · `#142` R1 settings · `#143` R2 actions, context
+  menus & shortcuts · `#144` R3 destinations, notices & prompts · `#145` R4
+  tokens, icons & capability parity ledger
 - #21 Web client on `api.septena.app` (Rank 4 first wave — reaches Windows,
   Linux and browsers first; #43 Stripe billing pairs here)
 - #133 natural-language capture in titles · #134 email-to-task address
