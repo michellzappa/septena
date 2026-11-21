@@ -1165,14 +1165,7 @@ final class SeptaskKitTaskListController: NSViewController {
     case .faded:
       var fadedRows = titleRows
       if !pool.isEmpty {
-        fadedRows.append(.notice(TaskNotice(
-          id: .weeklySweep, kind: .info, symbol: "circle.dashed",
-          title: String(localized: "Tasks without activity for 14 days",
-                        comment: "Faded pile top notice title"),
-          detail: String(localized: "Open a task or choose Keep to bring it back, or sweep the list to let the rest go.",
-                         comment: "Faded pile top notice detail"),
-          primaryTitle: String(localized: "Sweep…", comment: "Faded pile sweep button"),
-          dismissible: false)))
+        fadedRows.append(.notice(TaskNotices.fadedPile))
       }
       newRows = fadedRows + pool.map(chipped)
     default:

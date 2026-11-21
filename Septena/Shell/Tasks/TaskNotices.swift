@@ -351,17 +351,27 @@ enum TaskNotices {
                               lastSweepAt: TaskFade.lastSweepAt,
                               dismissedWeek: TaskFade.dismissedSweepWeek,
                               fadedDates: dates) else { return nil }
-    let count = candidates.count
+    let copy = RegistryNotices.byId["weeklySweep"]
     return TaskNotice(
-      id: .weeklySweep, kind: .info, symbol: "circle.dashed",
-      title: count == 1
-        ? String(localized: "1 task faded this week",
-                 comment: "Weekly sweep notice title: singular")
-        : String(localized: "\(count) tasks faded this week",
-                 comment: "Weekly sweep notice title: plural"),
+      id: .weeklySweep, kind: .info, symbol: copy?.sfSymbol ?? "circle.dashed",
+      title: RegistryNotices.weeklySweepTitle(count: candidates.count),
       detail: nil,
-      primaryTitle: String(localized: "Sweep", comment: "Weekly sweep notice action button"),
-      dismissible: true)
+      primaryTitle: copy?.primaryTitle,
+      dismissible: copy?.dismissible ?? true)
+  }
+
+  /// The notice on top of the Faded pile. Its action opens the same sweep
+  /// sheet as the weekly prompt, so it shares the `weeklySweep` id. Copy comes
+  /// from the registry (`registry/surfaces.json` `fadedPile`), so the Mac and
+  /// iOS shells cannot drift.
+  static var fadedPile: TaskNotice {
+    let copy = RegistryNotices.byId["fadedPile"]
+    return TaskNotice(
+      id: .weeklySweep, kind: .info, symbol: copy?.sfSymbol ?? "circle.dashed",
+      title: copy?.title ?? "",
+      detail: copy?.detail,
+      primaryTitle: copy?.primaryTitle,
+      dismissible: copy?.dismissible ?? false)
   }
 
   // MARK: - Explainers

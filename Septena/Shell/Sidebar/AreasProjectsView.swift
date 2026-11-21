@@ -445,17 +445,14 @@ struct ProjectDetailView: View {
   /// done / (done + open) for a project, computed synchronously from the local
   /// SwiftData mirror. `nil` when the project has no tasks cached yet (so the
   /// caller can keep whatever value it already has rather than reset to 0).
+  ///
+  /// Reads the memoized ratios (`ProjectProgressCache`), the same numbers the
+  /// sidebar ring draws. This runs from `init`, which SwiftUI re-runs on every
+  /// parent render; it used to build a row object for every project task in
+  /// the store, logbook included, each time.
   private static func cachedProgress(projectId: String,
                                      context: ModelContext) -> Double? {
-    var done = 0, total = 0
-    for t in LocalCache.tasksWithProject(in: context) where t.project == projectId {
-      switch t.status {
-      case .done: done += 1; total += 1
-      case .open: total += 1
-      case .cancelled: break
-      }
-    }
-    return total > 0 ? Double(done) / Double(total) : nil
+    LocalCache.projectCompletionRatios(in: context)[projectId]
   }
 
   var body: some View {

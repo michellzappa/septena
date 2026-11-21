@@ -1328,6 +1328,18 @@ private struct SidebarBehaviorModifier: ViewModifier {
   let onCreateArea: () -> Void
   let reload: () -> Void
 
+  /// The sidebar re-reads the store (two full entity passes) after each task
+  /// change. While it is off screen (another iPhone tab, or a project page
+  /// pushed on top) that work is wasted, so it waits and runs once when the
+  /// sidebar comes back. Same rule as `TaskListView.reloadOrDeferWhileEditing`.
+  @State private var isVisible = false
+  @State private var reloadPending = false
+
+  private func reloadIfVisible() {
+    guard isVisible else { reloadPending = true; return }
+    reload()
+  }
+
   func body(content: Content) -> some View {
     content
       .modifier(SidebarSheets(
@@ -1343,15 +1355,23 @@ private struct SidebarBehaviorModifier: ViewModifier {
         onCreateArea: onCreateArea
       ))
       .task { reload() }
+      .onAppear {
+        isVisible = true
+        if reloadPending {
+          reloadPending = false
+          reload()
+        }
+      }
+      .onDisappear { isVisible = false }
       // Debounced: a burst of toggles (or a CK batch fanning out per-record
       // mutator posts) coalesces into one reload instead of one per post.
       .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)
         .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
-        reload()
+        reloadIfVisible()
       }
       .onReceive(NotificationCenter.default.publisher(for: .septenaStructureChanged)
         .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
-        reload()
+        reloadIfVisible()
       }
   }
 }

@@ -132,5 +132,18 @@ if [ "${SEPTENA_NO_SIGNING:-}" = "1" ]; then
 fi
 
 echo "build.sh: building $SCHEME [$DEST] $CONFIG in $REPO (derived: $DERIVED)${SIGNING:+, unsigned}"
+STATUS=0
 ( cd "$REPO" && xcodebuild -scheme "$SCHEME" -destination "$DEST" -configuration "$CONFIG" \
-    -derivedDataPath "$DERIVED" "${SIGNING[@]}" build )
+    -derivedDataPath "$DERIVED" "${SIGNING[@]}" build ) || STATUS=$?
+
+# Unregister the built .app bundles from LaunchServices. Xcode registers every
+# product it builds, and each copy shares the bundle ID com.septena.tasks.
+# System UI that resolves an icon by bundle ID (the Sign in with Apple sheet)
+# can then pick any old agent build and show a retired logo. Only the copy in
+# /Applications must stay registered.
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+if [ -x "$LSREGISTER" ] && [ -d "$DERIVED/Build/Products" ]; then
+  find "$DERIVED/Build/Products" -maxdepth 2 -name '*.app' -type d \
+    -exec "$LSREGISTER" -u {} \; 2>/dev/null || true
+fi
+exit "$STATUS"
