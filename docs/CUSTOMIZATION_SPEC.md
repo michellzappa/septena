@@ -70,7 +70,7 @@ Selected by mz (2026-11-21); `relief`, `isoFlow`, and `terrainMesh` were dropped
 | `topography` | **Topography** | Marching-squares elevation contours over 4-octave **3D** fBm (every 4th contour weighted as an index line); subtly **morphs shape in place** along `z = t` when motion is on rather than flat scrolling | Swiss cartography, architectural calm |
 | `fieldMatrix` | **Field Matrix** | Precision micro-dot grid whose radius and opacity modulate across a 3D height field | Braun / Dieter Rams industrial grid |
 | `stippleDrift` | **Stipple Drift** | Deterministic elevation-gated stipple dither (fixed dot anchors, evolving height wave — zero flicker) | Risograph print / e-ink texture |
-| `causticGlass` | **Caustic Glass** | Domain-warped Voronoi edge filaments (`(1 - k·(d₂ - d₁))³`) simulating soft refraction through Liquid Glass | Subtle optical glass filaments |
+| `causticGlass` | **Caustic Glass** | Two interfering domain-warped Voronoi webs (`F₂ - F₁` core + halo) whose cells orbit with phase; brighter knots where they cross | Light on a pool floor |
 | `ridges` | **Ridge Lines** | Horizontal elevation cross-sections smoothly displaced by 3D noise, vertically tapered | Rhythmic terrain profiles |
 | `washiPaper` | **Washi Paper** | Fine laid-paper screen lines (`sugeta`) + long curved kozo/unryu mulberry fibers + short pulp micro-fibers (pure vector fiber geometry, zero tonal blobs) | Tactile handmade Japanese stationery |
 
