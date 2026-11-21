@@ -117,8 +117,16 @@ struct TaskListNotice<Actions: View>: View {
     ZStack(alignment: .bottom) {
       if useLiquidGlass {
         ZStack(alignment: .top) {
+          #if os(iOS)
+          shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.78 : 0.80))
+          shape.strokeBorder(
+            Color.white.opacity(colorScheme == .dark ? 0.07 : 0.48),
+            lineWidth: 0.5
+          )
+          #else
           shape.fill(.thinMaterial)
           shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.28 : 0.36))
+          #endif
           if kind == .warning {
             shape.fill(Theme.noticeWarning.opacity(0.12))
           }
