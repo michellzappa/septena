@@ -276,7 +276,7 @@ final class CloudKitTasksBackend {
     commitAndPush(entity, op: "convo.handoff")
   }
 
-  /// Sends a task in Review (`needs_verify`) back to Claude with a note:
+  /// Sends a task in Review (`needs_verify`) back to the agent with a note:
   /// appends a user turn carrying the note, reopens `endState` to `.open`,
   /// clears `endStateNote` and `stoppedAt`, and assigns to `.claude`.
   @discardableResult
@@ -295,6 +295,13 @@ final class CloudKitTasksBackend {
     entity.conversation = convo
     commitAndPush(entity, op: "convo.sendBack")
     return turn.seq
+  }
+
+  /// Restores a full conversation snapshot (used by `TaskUndo` for Send back).
+  func restoreConvo(id: String, _ convo: TaskConvo) {
+    guard let entity = fetch(id: id) else { return }
+    entity.conversation = convo
+    commitAndPush(entity, op: "convo.restore")
   }
 
   /// Tasks awaiting reasoning: explicitly marked for Claude, OR whose last
@@ -427,6 +434,14 @@ final class CloudKitTasksBackend {
     )
     entity.statusRaw = TaskStatus.done.rawValue
     entity.completedAt = ckCompletionTimestamp()
+    // Accepting / completing a task awaiting review transitions its conversation
+    // out of `needs_verify` (keeping `endStateNote` intact for history), so
+    // reopening the task later from Logbook does not snap it back into Review.
+    if entity.conversation.needsHumanReview {
+      var convo = entity.conversation
+      convo.endState = .agentAssistedDone
+      entity.conversation = convo
+    }
     // Do NOT clear `today` (or `scheduled`/`deadline`): every visibility test
     // (`isOnToday`, `isInTriageBand`) and every count site already gate on
     // `status == .open`, so a done task is invisible regardless of the pin.
@@ -1473,6 +1488,7 @@ final class CloudKitTasksBackend {
         hasRecurrence: entity.recurrence != nil,
         isAgentTurn: isAgentTurn,
         isAssignedToClaude: isAssignedToClaude,
+        isAwaitingHuman: convo.awaitsHuman,
         touchedAt: entity.touchedAt,
         createdAt: entity.createdAt,
         created: entity.created,

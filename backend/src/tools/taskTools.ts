@@ -29,10 +29,10 @@ export const listTasksJsonSchema = {
   properties: {
     view: {
       type: "string",
-      enum: ["today", "inbox", "anytime", "upcoming", "completed"],
+      enum: ["today", "inbox", "review", "anytime", "upcoming", "completed"],
       default: "today",
       description:
-        "Which task list to read. 'today' = the whole Today page as the app shows it: the Inbox section first, then every task due today. 'inbox' = only the Inbox section: tasks the user has not filed yet (no area or project) and your proposals they have not accepted. 'anytime' is the single home for open, dateless tasks. Rows carry `inbox: true` when they sit in the Inbox, and `daysOnToday: N` when they have carried over on Today undone for N days (the app darkens their checkbox; 7+ is long overdue for a decision).",
+        "Which task list to read. 'today' = the whole Today page as the app shows it: the Inbox section first, then every task due today. 'inbox' = only the Inbox section: tasks the user has not filed yet (no area or project) and your proposals they have not accepted. 'review' = open tasks awaiting the user's verification (`endState = needs_verify`). 'anytime' is the single home for open, dateless tasks. Rows carry `inbox: true` when they sit in the Inbox, and `daysOnToday: N` when they have carried over on Today undone for N days (the app darkens their checkbox; 7+ is long overdue for a decision).",
     },
     limit: {
       type: "integer",
@@ -76,7 +76,7 @@ export const TASK_TOOLS: Tool[] = [
     name: "tasks_list",
     title: "List tasks",
     description:
-      "List Septena tasks for a given view (today, inbox, upcoming, anytime, completed). 'today' is the whole Today page the user sees: the Inbox section first, then the filed tasks due today. 'inbox' is that Inbox section alone: unfiled tasks (no area or project) plus your proposals the user has not accepted. The user sees ONE Inbox; never describe it as two piles. Each row carries `inbox: true` when it sits in the Inbox, and `daysOnToday: N` when it has carried over on Today undone for N days (the app darkens its checkbox; flag rows at 7+ as stuck). Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
+      "List Septena tasks for a given view (today, inbox, review, upcoming, anytime, completed). 'today' is the whole Today page the user sees: the Inbox section first, then the filed tasks due today. 'inbox' is that Inbox section alone: unfiled tasks (no area or project) plus your proposals the user has not accepted. 'review' lists open tasks waiting for the user to check and accept (`needs_verify`). The user sees ONE Inbox; never describe it as two piles. Each row carries `inbox: true` when it sits in the Inbox, and `daysOnToday: N` when it has carried over on Today undone for N days (the app darkens its checkbox; flag rows at 7+ as stuck). Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
     inputSchema: listTasksJsonSchema,
     annotations: { title: "List tasks", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },

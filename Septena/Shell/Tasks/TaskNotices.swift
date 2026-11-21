@@ -360,7 +360,7 @@ enum TaskNotices {
         : String(localized: "\(count) tasks faded this week",
                  comment: "Weekly sweep notice title: plural"),
       detail: nil,
-      primaryTitle: String(localized: "Review", comment: "Weekly sweep notice action button"),
+      primaryTitle: String(localized: "Sweep", comment: "Weekly sweep notice action button"),
       dismissible: true)
   }
 

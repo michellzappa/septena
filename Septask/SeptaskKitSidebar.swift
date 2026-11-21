@@ -361,6 +361,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     }), collapsedKeys.contains(owner.key) {
       toggleFold(owner)
     }
+    if key == KitSidebarDestination.key(for: .filter(.review)), row(forKey: key) == nil {
+      rebuild(preserving: key)
+    }
     guard let row = row(forKey: key) else { return }
     outlineView.selectRowIndexes([row], byExtendingSelection: false)
     outlineView.scrollRowToVisible(row)
@@ -460,8 +463,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let today = SeptenaDate.today
     let inboxCount = open.filter { $0.isInTriageBand }.count
     let todayCount = open.filter { $0.isOnToday && !$0.isInTriageBand }.count
+    let reviewCount = open.filter { $0.conversation.needsHumanReview }.count
     let smartCounts: [TaskFilter: Int] = [
-      .review: open.filter { $0.conversation.endState == .needsVerify }.count,
+      .review: reviewCount,
       .upcoming: open.filter { task in
         guard !task.today else { return false }
         return task.scheduled.map { $0 > today } == true
@@ -515,6 +519,15 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
                                                           counts: smartCounts,
                                                           today: todayCount + inboxCount,
                                                           doneToday: doneTodayCount))
+    }
+    // Review: progressively disclosed right below Today when non-empty (or
+    // while selected so accepting the last item does not yank the row away).
+    let reviewDestination = KitSidebarDestination.filter(.review,
+                                                         title: TaskFilter.review.title)
+    if reviewCount > 0 || key == reviewDestination.key {
+      let insertAt = views.firstIndex(where: { $0.key == KitSidebarDestination.key(for: .filter(.today)) })
+        .map { $0 + 1 } ?? 0
+      views.insert(Node(reviewDestination.nodeContent, count: reviewCount.nilIfZero), at: insertAt)
     }
     // Starred, Faded & Recently Deleted: shown once non-empty (progressive disclosure).
     if starredCount > 0 {

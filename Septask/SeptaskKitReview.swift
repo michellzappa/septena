@@ -14,6 +14,7 @@ final class KitReviewTaskCell: NSTableCellView {
   private let glyph = NSImageView()
   private let titleLabel = NSTextField(labelWithString: "")
   private let noteLabel = NSTextField(wrappingLabelWithString: "")
+  private let metaLabel = NSTextField(labelWithString: "")
   private let acceptButton = NSButton()
   private let sendBackButton = NSButton()
   private let buttons = NSStackView()
@@ -44,7 +45,13 @@ final class KitReviewTaskCell: NSTableCellView {
     noteLabel.lineBreakMode = .byTruncatingTail
     noteLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-    let textStack = NSStackView(views: [titleLabel, noteLabel])
+    metaLabel.font = SeptaskKitTheme.chip
+    metaLabel.textColor = SeptaskKitTheme.inkSecondary
+    metaLabel.lineBreakMode = .byTruncatingTail
+    metaLabel.isHidden = true
+    metaLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+    let textStack = NSStackView(views: [titleLabel, noteLabel, metaLabel])
     textStack.orientation = .vertical
     textStack.alignment = .leading
     textStack.spacing = 3
@@ -131,6 +138,14 @@ final class KitReviewTaskCell: NSTableCellView {
     let checkNote = Self.noteText(for: task)
     noteLabel.stringValue = checkNote
 
+    if let meta = Self.metaSummary(for: task) {
+      metaLabel.stringValue = meta
+      metaLabel.isHidden = false
+    } else {
+      metaLabel.stringValue = ""
+      metaLabel.isHidden = true
+    }
+
     setAccessibilityElement(true)
     setAccessibilityRole(.group)
     setAccessibilityLabel("\(task.title). \(checkNote)")
@@ -156,6 +171,17 @@ final class KitReviewTaskCell: NSTableCellView {
     return String(localized: "Ready for review", comment: "SeptaskKit: fallback review note")
   }
 
+  static func metaSummary(for task: SeptenaTask) -> String? {
+    var parts: [String] = []
+    if let issue = task.linkedIssue {
+      parts.append(issue.fullLabel)
+    }
+    if let artifact = task.conversation.artifact, !artifact.title.isEmpty {
+      parts.append(artifact.title)
+    }
+    return parts.isEmpty ? nil : parts.joined(separator: " · ")
+  }
+
   static func height(for task: SeptenaTask, width: CGFloat) -> CGFloat {
     let inset = SeptaskKitLayout.inset(for: max(width, 360))
     // Reserve leading glyph + padding + trailing buttons (~170pt).
@@ -167,7 +193,10 @@ final class KitReviewTaskCell: NSTableCellView {
       attributes: [.font: SeptaskKitTheme.meta])
     let titleHeight = ceil(SeptaskKitTheme.taskTitle.ascender - SeptaskKitTheme.taskTitle.descender) + 2
     let noteHeight = min(ceil(noteRect.height) + 2, ceil(SeptaskKitTheme.meta.pointSize * 1.4 * 3))
-    return max(58, 10 + titleHeight + 3 + noteHeight + 10)
+    let metaHeight: CGFloat = metaSummary(for: task) == nil
+      ? 0
+      : 3 + ceil(SeptaskKitTheme.chip.ascender - SeptaskKitTheme.chip.descender) + 2
+    return max(58, 10 + titleHeight + 3 + noteHeight + metaHeight + 10)
   }
 }
 
@@ -193,7 +222,7 @@ final class KitSendBackPopover {
 
   private func show(relativeTo anchor: NSView, onClose: (() -> Void)?) {
     let heading = NSTextField(labelWithString: String(
-      localized: "Send back to Claude",
+      localized: "Send back for another pass",
       comment: "SeptaskKit: send-back popover heading"))
     heading.font = SeptaskKitTheme.chip
     heading.textColor = SeptaskKitTheme.inkSecondary

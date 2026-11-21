@@ -54,7 +54,7 @@ struct ConversationCard: View {
 
           if let q = openQuestion {
             questionBlock(q)
-          } else if convo.endState == .needsVerify {
+          } else if convo.needsHumanReview || (convo.endState == .agentAssistedDone && !isTaskOpen) {
             reviewBlock
           } else if let handoff = convo.handoff {
             handoffButton(handoff)            // human last-mile — show even when the agent's side is done
@@ -64,7 +64,7 @@ struct ConversationCard: View {
             agentRow
           }
 
-          if openQuestion == nil, isTaskOpen, convo.endState != .needsVerify {
+          if openQuestion == nil, isTaskOpen, !convo.needsHumanReview {
             followUpBlock
           }
 
@@ -382,9 +382,10 @@ struct ConversationCard: View {
 
   private func acceptReview() {
     let mutator = SeptenaServices.shared.taskMutator
+    let previousNote = convo.endStateNote
     mutator.complete(id: taskID)
     mutator.acknowledge(id: taskID)
-    TaskUndo.recordCompletion(ids: [taskID], wasDone: false, mutator: mutator)
+    TaskUndo.recordAcceptReview(id: taskID, previousNote: previousNote, mutator: mutator)
     Haptics.tick()
     showSendBack = false
     reload()
@@ -393,7 +394,11 @@ struct ConversationCard: View {
   private func submitSendBack() {
     let text = sendBackNote.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { return }
-    SeptenaServices.shared.taskMutator.sendBackConvo(id: taskID, note: text)
+    let mutator = SeptenaServices.shared.taskMutator
+    let before = convo
+    mutator.sendBackConvo(id: taskID, note: text)
+    let after = mutator.conversation(id: taskID) ?? before
+    TaskUndo.recordSendBack(id: taskID, before: before, after: after, mutator: mutator)
     Haptics.tick()
     sendBackNote = ""
     showSendBack = false

@@ -88,7 +88,7 @@ const zLimit = (max: number) => z.number().int().min(1).max(max);
 const zArgs = {
   tasks_list: z.object({
     // "triage" and "someday" are retired names, kept as aliases (normalizeView).
-    view: z.enum(["today", "inbox", "anytime", "upcoming", "completed", "triage", "someday"]).optional(),
+    view: z.enum(["today", "inbox", "review", "anytime", "upcoming", "completed", "triage", "someday"]).optional(),
     limit: zLimit(500).optional(),
     tag: z.union([z.string().min(1), z.array(z.string().min(1))]).optional(),
   }),
@@ -433,6 +433,15 @@ async function listTasks(
       total: effectiveTotal,
       truncated: effectiveTotal > Math.min(limit, mapped.length),
     };
+  }
+  if (view === "review") {
+    const { rows, notes, total } = await store.readReviewTasks(limit);
+    const tasks = rows.map((row) => {
+      const out = withChecklist(taskOut(row));
+      const note = notes[out.id];
+      return stripDays(note ? { ...out, reviewNote: note } : out);
+    });
+    return { tasks, total, truncated: total > rows.length };
   }
   // Open rows arrive ordered by scheduled, then position. Today re-sorts by
   // its own manual order: todayPosition, falling back to position.

@@ -181,6 +181,10 @@ final class TaskMutator {
     return cloudBackend.sendBackConvo(id: id, note: note)
   }
 
+  func restoreConvo(id: String, _ convo: TaskConvo) {
+    cloudBackend?.restoreConvo(id: id, convo)
+  }
+
   func pendingReasoning(limit: Int) -> [TaskEntity] {
     cloudBackend?.pendingReasoning(limit: limit) ?? []
   }

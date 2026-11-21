@@ -30,6 +30,15 @@ extension TaskConvo {
     return last.role == .provider && (last.options?.isEmpty == false)
   }
 
+  /// True when an agent finished work and handed the task back for the human
+  /// to verify and accept or send back (`#87`). Single source of truth for the
+  /// Review smart list and badge.
+  var needsHumanReview: Bool { endState == .needsVerify }
+
+  /// True when the conversation is waiting on a human action — either verifying
+  /// finished agent work (`needs_verify`) or answering an open choice card.
+  var awaitsHuman: Bool { needsHumanReview || hasOpenProviderQuestion }
+
   /// There's a conversation worth surfacing at all.
   var hasStarted: Bool {
     !thread.isEmpty || confirmedIntent != nil || isTerminal || artifact != nil || handoff != nil
@@ -50,7 +59,7 @@ extension TaskConvo {
 func deriveConvo(_ convo: TaskConvo) -> ConvoDerived {
   let pending = convo.isPendingReasoning()
 
-  if convo.endState == .needsVerify {
+  if convo.needsHumanReview {
     return ConvoDerived(stage: .awaitingHuman, badge: .needsYou,
                         nextAction: convo.endStateNote ?? "Needs review",
                         pendingReasoning: false)

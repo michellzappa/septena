@@ -1351,7 +1351,7 @@ enum LocalCache {
       return e.isInTriageBand ? SeptenaTask(e) : nil
     case .review:
       // Agent-worked tasks awaiting the human's verification and acceptance (#87).
-      guard e.status == .open, e.conversation.endState == .needsVerify else { return nil }
+      guard e.status == .open, e.conversation.needsHumanReview else { return nil }
       return SeptenaTask(e)
     case .upcoming:
       guard e.status == .open, !e.today else { return nil }

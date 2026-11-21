@@ -7,7 +7,7 @@ import { DOMAIN_RULES, VIEW_ALIASES } from "../generated/registries.js";
 // disagree on what "Today" or "pending reasoning" means.
 
 export type TaskView =
-  | "today" | "inbox" | "anytime" | "upcoming" | "completed";
+  | "today" | "inbox" | "review" | "anytime" | "upcoming" | "completed";
 
 export interface TaskOut {
   id: string;
@@ -55,6 +55,7 @@ export interface TaskOut {
   // darkens the checkbox one seventh per day (SeptenaCore todayTenureFill).
   inbox?: true;
   daysOnToday?: number;
+  reviewNote?: string;
 }
 
 /// Retired view names stay accepted so existing agent calls keep working:

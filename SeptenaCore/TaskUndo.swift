@@ -245,6 +245,34 @@ enum TaskUndo {
            })
   }
 
+  /// Accept a task in Review (`needs_verify` → done + `agent_assisted_done`).
+  /// Undoing reopens the task AND puts it back in Review with its check note.
+  static func recordAcceptReview(id: String,
+                                 previousNote: String?,
+                                 mutator: TaskMutator) {
+    mutator.touch(id: id)
+    record(name: String(localized: "Accept Review", comment: "Undo action name"),
+           undo: {
+             mutator.uncomplete(id: id)
+             mutator.setConvoEndState(id: id, .needsVerify, note: previousNote)
+           },
+           redo: {
+             mutator.complete(id: id)
+           })
+  }
+
+  /// Send a task in Review back to the agent with a note. Undoing restores
+  /// the pre-send-back conversation snapshot (`needs_verify`).
+  static func recordSendBack(id: String,
+                             before: TaskConvo,
+                             after: TaskConvo,
+                             mutator: TaskMutator) {
+    mutator.touch(id: id)
+    record(name: String(localized: "Send Back", comment: "Undo action name"),
+           undo: { mutator.restoreConvo(id: id, before) },
+           redo: { mutator.restoreConvo(id: id, after) })
+  }
+
   /// Cancel / reopen. Cancelling parks a task as "won't do" rather than
   /// finishing it, so the inverse is `uncomplete` (status → open) — the same
   /// inverse the AppKit shell already uses, hoisted here so the SwiftUI row

@@ -1313,8 +1313,7 @@
   "Review": {
     "text": "Review",
     "paths": [
-      "destinations.destinations.review.title",
-      "surfaces.notices.items.weeklySweep.primaryTitle"
+      "destinations.destinations.review.title"
     ]
   },
   "Ridge Lines": {
@@ -1504,6 +1503,12 @@
       "settings.rootGroups.lists_root.items.4.label"
     ]
   },
+  "Sweep": {
+    "text": "Sweep",
+    "paths": [
+      "surfaces.notices.items.weeklySweep.primaryTitle"
+    ]
+  },
   "Sync & storage diagnostics": {
     "text": "Sync & storage diagnostics",
     "paths": [
@@ -1550,12 +1555,6 @@
     "text": "Task list",
     "paths": [
       "actions.shortcutsSheet.taskList.title"
-    ]
-  },
-  "Tasks Claude finishes appear here so you can check and accept them.": {
-    "text": "Tasks Claude finishes appear here so you can check and accept them.",
-    "paths": [
-      "destinations.destinations.review.emptyState.detail"
     ]
   },
   "Tasks with a future When or Deadline date appear here.": {
@@ -1746,6 +1745,12 @@
     "text": "Where AI runs",
     "paths": [
       "settings.pages.ai_preferences.sections.reach.header"
+    ]
+  },
+  "Work an agent finished appears here so you can check and accept it.": {
+    "text": "Work an agent finished appears here so you can check and accept it.",
+    "paths": [
+      "destinations.destinations.review.emptyState.detail"
     ]
   },
   "Work with Claude": {

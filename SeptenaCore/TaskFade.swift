@@ -62,7 +62,8 @@ enum TaskFade {
   /// - no hard `deadline`;
   /// - `scheduled` is nil or strictly in the past (`< today`);
   /// - no recurrence rule;
-  /// - conversation is not on the agent's turn and `assignee` is not `claude`.
+  /// - conversation is not on the agent's turn, `assignee` is not `claude`,
+  ///   and it is not waiting on the human in Review / an open question card.
   static func isEligible(isOpen: Bool,
                          isHeading: Bool,
                          isDeleted: Bool,
@@ -72,12 +73,13 @@ enum TaskFade {
                          hasRecurrence: Bool,
                          isAgentTurn: Bool,
                          isAssignedToClaude: Bool,
+                         isAwaitingHuman: Bool = false,
                          today: String) -> Bool {
     guard isOpen, !isHeading, !isDeleted, !isFaded else { return false }
     if let deadline, !deadline.isEmpty { return false }
     if let scheduled, !scheduled.isEmpty, String(scheduled.prefix(10)) >= today { return false }
     guard !hasRecurrence else { return false }
-    guard !isAgentTurn, !isAssignedToClaude else { return false }
+    guard !isAgentTurn, !isAssignedToClaude, !isAwaitingHuman else { return false }
     return true
   }
 
@@ -91,6 +93,7 @@ enum TaskFade {
                          hasRecurrence: Bool,
                          isAgentTurn: Bool,
                          isAssignedToClaude: Bool,
+                         isAwaitingHuman: Bool = false,
                          touchedAt: Date?,
                          createdAt: Date,
                          created: String?,
@@ -99,7 +102,8 @@ enum TaskFade {
     guard isEligible(isOpen: isOpen, isHeading: isHeading, isDeleted: isDeleted,
                      isFaded: isFaded, deadline: deadline, scheduled: scheduled,
                      hasRecurrence: hasRecurrence, isAgentTurn: isAgentTurn,
-                     isAssignedToClaude: isAssignedToClaude, today: today) else {
+                     isAssignedToClaude: isAssignedToClaude,
+                     isAwaitingHuman: isAwaitingHuman, today: today) else {
       return false
     }
     guard let clock = clockDate(touchedAt: touchedAt, createdAt: createdAt, created: created) else {
@@ -120,6 +124,7 @@ enum TaskFade {
                        hasRecurrence: Bool,
                        isAgentTurn: Bool,
                        isAssignedToClaude: Bool,
+                       isAwaitingHuman: Bool = false,
                        showsAgentCue: Bool,
                        touchedAt: Date?,
                        createdAt: Date,
@@ -130,7 +135,8 @@ enum TaskFade {
           isEligible(isOpen: isOpen, isHeading: isHeading, isDeleted: isDeleted,
                      isFaded: isFaded, deadline: deadline, scheduled: scheduled,
                      hasRecurrence: hasRecurrence, isAgentTurn: isAgentTurn,
-                     isAssignedToClaude: isAssignedToClaude, today: today),
+                     isAssignedToClaude: isAssignedToClaude,
+                     isAwaitingHuman: isAwaitingHuman, today: today),
           let clock = clockDate(touchedAt: touchedAt, createdAt: createdAt, created: created) else {
       return nil
     }

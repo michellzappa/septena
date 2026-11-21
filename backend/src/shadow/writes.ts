@@ -57,7 +57,7 @@ const ORDER_GAP = 1024;
 /// The DO's methods as plain async calls. Typed from TaskStore's own
 /// declarations: the generated RPC stub type recurses too deep on JSON rows.
 type StoreMethod =
-  | "readTasks" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates"
+  | "readTasks" | "readReviewTasks" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates"
   | "readChecklistItems" | "readChecklistItem" | "readChecklistCounts"
   | "readTags" | "readTagByName"
   | "readOrderTop" | "readSetting" | "push" | "claim" | "release" | "agentEvents" | "history" | "head"

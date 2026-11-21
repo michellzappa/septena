@@ -121,7 +121,7 @@ final class KitConversationView: NSView {
     }
     if let open { stack.addArrangedSubview(questionBlock(open)) }
     if let meta = metaRow() { stack.addArrangedSubview(meta) }
-    if convo.endState == .needsVerify {
+    if convo.needsHumanReview || (convo.endState == .agentAssistedDone && !isTaskOpen) {
       stack.addArrangedSubview(reviewBlock())
     } else if convo.isTerminal {
       stack.addArrangedSubview(terminalRow())
@@ -542,11 +542,11 @@ final class KitConversationView: NSView {
 
   @objc private func acceptReview() {
     guard let taskID else { return }
+    let previousNote = convo.endStateNote
     mutator.complete(id: taskID)
     mutator.acknowledge(id: taskID)
-    let id = taskID
-    let mutator = self.mutator
-    TaskUndo.recordCompletion(ids: [id], wasDone: false, mutator: mutator)
+    TaskUndo.recordAcceptReview(id: taskID, previousNote: previousNote, mutator: mutator)
+    convo = mutator.conversation(id: taskID) ?? convo
     isTaskOpen = false
     showSendBack = false
     rebuild()
@@ -565,8 +565,11 @@ final class KitConversationView: NSView {
     guard !text.isEmpty else { return }
     sendBackField.stringValue = ""
     showSendBack = false
+    let before = convo
     mutator.sendBackConvo(id: taskID, note: text)
-    convo = mutator.conversation(id: taskID) ?? convo
+    let after = mutator.conversation(id: taskID) ?? before
+    TaskUndo.recordSendBack(id: taskID, before: before, after: after, mutator: mutator)
+    convo = after
     rebuild()
     onAppend?()
   }

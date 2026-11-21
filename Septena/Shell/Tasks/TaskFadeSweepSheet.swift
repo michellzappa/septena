@@ -44,7 +44,7 @@ struct TaskFadeSweepSheet: View {
         Divider()
         footer
       }
-      .navigationTitle(String(localized: "Review Faded Tasks", comment: "Sweep sheet title"))
+      .navigationTitle(String(localized: "Faded Tasks", comment: "Sweep sheet title"))
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
@@ -110,7 +110,7 @@ struct TaskFadeSweepSheet: View {
         .foregroundStyle(Theme.inkSecondary)
       Text(keptCount > 0
            ? String(localized: "You kept everything.", comment: "Sweep sheet empty after keeping all")
-           : String(localized: "Nothing to review.", comment: "Sweep sheet empty"))
+           : String(localized: "No faded tasks to check.", comment: "Sweep sheet empty"))
         .font(.septenaLabel)
         .foregroundStyle(Theme.inkPrimary)
       if keptCount > 0 {

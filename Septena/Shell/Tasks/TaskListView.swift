@@ -2092,11 +2092,11 @@ struct TaskListView: View {
         symbol: "circle.dashed",
         title: Text(String(localized: "Tasks without activity for 14 days",
                            comment: "Faded pile top notice title")),
-        detail: Text(String(localized: "Open a task or choose Keep to bring it back, or review the list to let the rest go.",
+        detail: Text(String(localized: "Open a task or choose Keep to bring it back, or sweep the list to let the rest go.",
                             comment: "Faded pile top notice detail")),
         onDismiss: nil
       ) {
-        Button(String(localized: "Review…", comment: "Faded pile review action")) {
+        Button(String(localized: "Sweep…", comment: "Faded pile sweep action")) {
           sweepSheetTasks = visibleItems
         }
         .buttonStyle(.bordered)
@@ -2184,7 +2184,7 @@ struct TaskListView: View {
   @ViewBuilder
   private func noticeAction(_ notice: TaskNotice) -> some View {
     if notice.id == .weeklySweep {
-      Button(notice.primaryTitle ?? String(localized: "Review", comment: "Weekly sweep button")) {
+      Button(notice.primaryTitle ?? String(localized: "Sweep", comment: "Weekly sweep button")) {
         let candidates = TaskNotices.sweepCandidates(context: modelContext)
         if !candidates.isEmpty { sweepSheetTasks = candidates }
       }
@@ -2304,7 +2304,7 @@ struct TaskListView: View {
         ContentUnavailableView(
           "Nothing to review",
           systemImage: titleIcon,
-          description: Text("Tasks Claude finishes appear here so you can check and accept them.")
+          description: Text("Work an agent finished appears here so you can check and accept it.")
         )
         .frame(maxWidth: .infinity)
         .padding(.top, 40)
@@ -2372,10 +2372,20 @@ struct TaskListView: View {
             #endif
             beginEdit(task)
           },
-          onAccept: { toggle(task) },
+          onAccept: {
+            Haptics.tick()
+            let previousNote = task.conversation.endStateNote
+            mutator.complete(id: task.id)
+            mutator.acknowledge(id: task.id)
+            TaskUndo.recordAcceptReview(id: task.id, previousNote: previousNote, mutator: mutator)
+            Task { await load() }
+          },
           onSendBack: { note in
             Haptics.tick()
+            let before = task.conversation
             mutator.sendBackConvo(id: task.id, note: note)
+            let after = mutator.conversation(id: task.id) ?? before
+            TaskUndo.recordSendBack(id: task.id, before: before, after: after, mutator: mutator)
             Task { await load() }
           }
         )

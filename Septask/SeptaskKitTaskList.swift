@@ -177,6 +177,8 @@ final class SeptaskKitTaskListController: NSViewController {
   private let headerWashView = KitHeaderWashView()
   private let emptyLabel = NSTextField(labelWithString: String(localized: "No Tasks",
                                                                 comment: "SeptaskKit: empty list"))
+  private let emptyDetailLabel = NSTextField(wrappingLabelWithString: "")
+  private let emptyStack = NSStackView()
   private var rows: [Row] = []
   private var filter: TaskFilter = .today
   private var observers: [NSObjectProtocol] = []
@@ -380,11 +382,19 @@ final class SeptaskKitTaskListController: NSViewController {
     if sync.signedIn && sync.isSyncing && sync.lastPull == nil {
       emptyLabel.stringValue = String(localized: "Syncing…",
                                       comment: "SeptaskKit: empty list during the first task-backend pull")
+      emptyDetailLabel.stringValue = ""
+      emptyDetailLabel.isHidden = true
     } else if filter == .review {
       emptyLabel.stringValue = String(localized: "Nothing to review",
                                       comment: "SeptaskKit: empty review list")
+      emptyDetailLabel.stringValue = String(
+        localized: "Work an agent finished appears here so you can check and accept it.",
+        comment: "SeptaskKit: empty review list detail")
+      emptyDetailLabel.isHidden = false
     } else {
       emptyLabel.stringValue = String(localized: "No Tasks", comment: "SeptaskKit: empty list")
+      emptyDetailLabel.stringValue = ""
+      emptyDetailLabel.isHidden = true
     }
   }
 
@@ -582,11 +592,25 @@ final class SeptaskKitTaskListController: NSViewController {
 
     emptyLabel.font = SeptaskKitTheme.taskTitle
     emptyLabel.textColor = SeptaskKitTheme.iconMuted
-    emptyLabel.translatesAutoresizingMaskIntoConstraints = false
-    view.addSubview(emptyLabel)
+    emptyLabel.alignment = .center
+    emptyDetailLabel.font = SeptaskKitTheme.meta
+    emptyDetailLabel.textColor = SeptaskKitTheme.inkSecondary
+    emptyDetailLabel.alignment = .center
+    emptyDetailLabel.maximumNumberOfLines = 3
+    emptyDetailLabel.isHidden = true
+    emptyStack.orientation = .vertical
+    emptyStack.alignment = .centerX
+    emptyStack.spacing = 6
+    emptyStack.translatesAutoresizingMaskIntoConstraints = false
+    emptyStack.addArrangedSubview(emptyLabel)
+    emptyStack.addArrangedSubview(emptyDetailLabel)
+    view.addSubview(emptyStack)
     NSLayoutConstraint.activate([
-      emptyLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-      emptyLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+      emptyStack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      emptyStack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+      emptyStack.widthAnchor.constraint(lessThanOrEqualToConstant: 320),
+      emptyStack.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 24),
+      emptyStack.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -24),
     ])
     refreshEmptyLabel()
     // The bottom toast (move / defer / delete confirmations), on top of the
@@ -881,6 +905,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// View ▸ Text Size takes effect immediately in the main shell.
   func refreshTextSize() {
     emptyLabel.font = SeptaskKitTheme.taskTitle
+    emptyDetailLabel.font = SeptaskKitTheme.meta
     tableView.reloadData()
     if tableView.numberOfRows > 0 {
       tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<tableView.numberOfRows))
@@ -1138,9 +1163,9 @@ final class SeptaskKitTaskListController: NSViewController {
           id: .weeklySweep, kind: .info, symbol: "circle.dashed",
           title: String(localized: "Tasks without activity for 14 days",
                         comment: "Faded pile top notice title"),
-          detail: String(localized: "Open a task or choose Keep to bring it back, or review the list to let the rest go.",
+          detail: String(localized: "Open a task or choose Keep to bring it back, or sweep the list to let the rest go.",
                          comment: "Faded pile top notice detail"),
-          primaryTitle: String(localized: "Review…", comment: "Faded pile review button"),
+          primaryTitle: String(localized: "Sweep…", comment: "Faded pile sweep button"),
           dismissible: false)))
       }
       newRows = fadedRows + pool.map(chipped)
@@ -1173,7 +1198,11 @@ final class SeptaskKitTaskListController: NSViewController {
     let priorRows = rows
     let live = liveEditorIDs
     apply(pinned(newRows, liveEditors: live), animated: animated, preserving: live)
-    emptyLabel.isHidden = !rows.isEmpty
+    let hasContent = rows.contains { row in
+      if case .screenTitle = row { return false }
+      return true
+    }
+    emptyStack.isHidden = hasContent
     refreshEmptyLabel()
     onStoreChanged?()
 
@@ -5282,20 +5311,27 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     return nil
   }
 
-  /// Accept a `needs_verify` task from the Review stage: completes it via the
-  /// normal completion path (undo + acknowledge + sync).
+  /// Accept a `needs_verify` task from the Review stage: completes it with
+  /// lossless undo back into Review (`needs_verify` + check note).
   private func acceptReviewTask(id: String) {
     guard let task = LocalCache.task(id: id, in: context), task.status == .open else { return }
-    apply(completing: [task], reopening: [])
+    let previousNote = task.conversation.endStateNote
+    mutator.complete(id: id)
+    mutator.acknowledge(id: id)
+    TaskUndo.recordAcceptReview(id: id, previousNote: previousNote, mutator: mutator)
+    reload()
   }
 
-  /// Send a `needs_verify` task back to Claude with a user turn note.
+  /// Send a `needs_verify` task back to the agent with a user turn note (with undo).
   private func presentSendBackPopover(taskID: String, anchor: NSView) {
     sendBackPopover = KitSendBackPopover.present(
       relativeTo: anchor,
       onSend: { [weak self] note in
         guard let self else { return }
+        let before = self.mutator.conversation(id: taskID) ?? TaskConvo()
         self.mutator.sendBackConvo(id: taskID, note: note)
+        let after = self.mutator.conversation(id: taskID) ?? before
+        TaskUndo.recordSendBack(id: taskID, before: before, after: after, mutator: self.mutator)
         self.reload()
       },
       onClose: { [weak self] in

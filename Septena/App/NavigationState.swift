@@ -71,11 +71,13 @@ extension Route {
 /// See `docs/DRAG_AND_DROP.md` §5.
 @MainActor
 enum TaskDestinations {
-  /// Smart lists, in display order. Next is intentionally absent here — on
+  /// Always-visible smart lists, in display order (`visibility: "always"` in
+  /// `registry/destinations.json`). Next is intentionally absent here — on
   /// Septena it's a top-level tab; Septask has no Next (removed 2026-11-19).
+  /// Review, Starred, Faded, and Recently Deleted are progressively disclosed
+  /// by each sidebar when non-empty (or currently selected).
   static let smartListRoutes: [Route] = [
     .filter(.today),
-    .filter(.review),
     .filter(.upcoming),
     .filter(.repeating),
     .filter(.unscheduled),

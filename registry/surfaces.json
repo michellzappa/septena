@@ -60,7 +60,7 @@
         "dismissScope": "accountWeek",
         "dismissible": true,
         "title": { "one": "1 task faded this week", "other": "{count} tasks faded this week" },
-        "primaryTitle": "Review",
+        "primaryTitle": "Sweep",
         "featureId": "fade.sweep"
       },
       {

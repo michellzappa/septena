@@ -255,7 +255,7 @@ struct SeptaskSettingsView: View {
                 }
               } footer: {
                 if item.key == "agentsPaused" {
-                  Text("While paused, no agent can pick up or work on a task. Stop one task from its conversation instead.")
+                  Text("While paused, no agent can pick up or work on a task. Stop one task from its conversation instead. Agents never close assigned tasks on their own — finished work lands in Review for you to accept or send back.")
                 }
               }
             }

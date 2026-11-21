@@ -46,7 +46,7 @@
       "title": "Review",
       "icon": "list.review",
       "sidebarOrder": 1,
-      "visibility": "always",
+      "visibility": "whenNonEmpty",
       "countRule": "needsVerify",
       "supportsManualOrder": false,
       "supportsGroupByList": false,
@@ -55,7 +55,7 @@
       "supportsInlineCreate": false,
       "dropBehavior": "none",
       "featureId": "lists.review",
-      "emptyState": { "title": "Nothing to review", "detail": "Tasks Claude finishes appear here so you can check and accept them." }
+      "emptyState": { "title": "Nothing to review", "detail": "Work an agent finished appears here so you can check and accept it." }
     },
     {
       "id": "upcoming",

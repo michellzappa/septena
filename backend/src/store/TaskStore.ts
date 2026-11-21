@@ -68,7 +68,7 @@ export const AGENT_WRITE_RULES: Record<string, string> = {
   paused: "The user paused all agents. Do not write; only the user can unpause.",
   "retired:context": "Project context is retired (ADR 0012). Write the project's notes instead.",
   human_accepts:
-    "Only the user marks a Claude-assigned task done. Call tasks_set_endstate with endState \"needs_verify\" and a note describing what to check.",
+    "Only the user marks an agent-worked task done. Call tasks_set_endstate with endState \"needs_verify\" and a note describing what to check.",
 };
 
 /// Lease bounds for a claim. An agent that stops writing loses the task when
@@ -531,12 +531,16 @@ export class TaskStore extends DurableObject<Env> {
         this.recordNoteRevision(noteContainer, op.id, next, actor, now, (row?.noteRev as number | null) ?? 0, this.reason);
       }
     }
+    if (isAgentActor(actor) && op.entity === "convo" && op.fields.endState === "needs_verify") {
+      // Handing off to Review puts the ball in the human's court, so the claim ends.
+      this.writeConvoServerFields(op.id, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
+    }
     return { clientOpId: op.clientOpId, status: "applied", rev };
   }
 
   /// The rules an agent write must pass, enforced here so no connector can
   /// skip them: the stop is the human's alone, a stopped task takes no agent
-  /// writes at all, and an agent cannot mark a Claude-assigned task done —
+  /// writes at all, and an agent cannot mark an agent-worked task done —
   /// only the human accepts it after review (`human_accepts`).
   private agentRefusal(op: Op): string | null {
     if (op.op === "upsert" && op.entity === "convo" && "stoppedAt" in op.fields) return "human_only:stoppedAt";
@@ -548,7 +552,7 @@ export class TaskStore extends DurableObject<Env> {
       : op.entity === "checklistItem" ? this.checklistItemTaskId(op)
       : null;
     if (taskId && this.convoStopped(taskId)) return "stopped";
-    if (op.op === "upsert" && op.entity === "task" && op.fields.status === "done" && this.convoAssignedToClaude(op.id)) {
+    if (op.op === "upsert" && op.entity === "task" && op.fields.status === "done" && this.convoRequiresHumanAccept(op.id)) {
       return "human_accepts";
     }
     return null;
@@ -558,11 +562,19 @@ export class TaskStore extends DurableObject<Env> {
     return this.sql.exec("SELECT 1 FROM convos WHERE id = ? AND deletedAt IS NULL AND stoppedAt IS NOT NULL", taskId).toArray().length > 0;
   }
 
-  private convoAssignedToClaude(taskId: string): boolean {
-    return this.sql.exec(
-      "SELECT 1 FROM convos WHERE id = ? AND deletedAt IS NULL AND assignee = 'claude'",
+  /// True when an agent must hand the task to Review (`needs_verify`) rather
+  /// than closing it directly: assigned to an agent (`claude`), already waiting
+  /// in Review (`needs_verify`), or currently held under a live agent claim.
+  private convoRequiresHumanAccept(taskId: string): boolean {
+    const row = this.sql.exec<{
+      assignee: string | null; endState: string | null; claimedBy: string | null; claimUntil: string | null;
+    }>(
+      "SELECT assignee, endState, claimedBy, claimUntil FROM convos WHERE id = ? AND deletedAt IS NULL",
       taskId,
-    ).toArray().length > 0;
+    ).toArray()[0];
+    if (!row) return false;
+    if (row.assignee === "claude" || row.endState === "needs_verify") return true;
+    return !!row.claimedBy && !!row.claimUntil && Date.parse(row.claimUntil) > Date.now();
   }
 
   private liveTask(id: string): boolean {
@@ -836,6 +848,30 @@ export class TaskStore extends DurableObject<Env> {
     const args: unknown[] = status === "done" ? [status, Math.min(Math.max(limit, 1), 500)] : [status];
     const rows = this.sql.exec(`SELECT * FROM tasks WHERE ${where} ${order}`, ...args).toArray().map((r) => decodeRow(spec, r) as Row);
     return { rows, total };
+  }
+
+  /// Open non-heading tasks awaiting human review (`convos.endState = 'needs_verify'`),
+  /// newest hand-off first. Mirrors `TaskConvo.needsHumanReview` in SeptenaCore.
+  readReviewTasks(limit: number): { rows: Row[]; notes: Record<string, string | null>; total: number } {
+    const spec: EntitySpec = ENTITIES.task;
+    const n = Math.min(Math.max(limit, 1), 500);
+    const where =
+      "t.deletedAt IS NULL AND t.status = 'open' AND (t.kind IS NULL OR t.kind != 'heading') " +
+      "AND c.deletedAt IS NULL AND c.endState = 'needs_verify'";
+    const total = this.sql.exec<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM tasks t JOIN convos c ON c.id = t.id WHERE ${where}`,
+    ).one().n;
+    const raw = this.sql.exec(
+      `SELECT t.*, c.endStateNote AS _reviewNote FROM tasks t JOIN convos c ON c.id = t.id WHERE ${where} ORDER BY c.updatedAt DESC, c.rev DESC LIMIT ?`,
+      n,
+    ).toArray();
+    const notes: Record<string, string | null> = {};
+    const rows: Row[] = raw.map((r) => {
+      const id = r.id as string;
+      notes[id] = (r._reviewNote as string | null | undefined) ?? null;
+      return decodeRow(spec, r) as Row;
+    });
+    return { rows, notes, total };
   }
 
   /// One live task with its conversation row and turns (oldest first).

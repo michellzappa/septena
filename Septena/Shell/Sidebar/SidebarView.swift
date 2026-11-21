@@ -33,6 +33,7 @@ struct SidebarRootView: View {
   @State private var counts: TasksCounts? = nil
   /// Tasks completed today — drives the Logbook tile/row count.
   @State private var doneTodayCount: Int = 0
+  @State private var reviewCount: Int = 0
   @State private var starredCount: Int = 0
   @State private var fadedCount: Int = 0
   @State private var recentlyDeletedCount: Int = 0
@@ -588,8 +589,19 @@ struct SidebarRootView: View {
   // No separate Inbox row — loose captures now live in the triage band on top
   // of Today (docs/TRIAGE_BAND_SPEC.md). Next is a top-level tab on Septena;
   // Septask inserts it after Today via `TaskDestinations.sidebarRoutes`.
+  private var visibleSmartListRoutes: [Route] {
+    var routes = TaskDestinations.sidebarRoutes
+    // Review progressively discloses right below Today when non-empty (or
+    // while currently selected so accepting the last item keeps focus calm).
+    if reviewCount > 0 || isSelected(.filter(.review)) {
+      let insertAt = routes.firstIndex(where: { $0.sameDestination(as: .filter(.today)) }).map { $0 + 1 } ?? 0
+      routes.insert(.filter(.review), at: insertAt)
+    }
+    return routes
+  }
+
   private var smartListSpecs: [SmartListSpec] {
-    TaskDestinations.sidebarRoutes.map { route in
+    visibleSmartListRoutes.map { route in
       SmartListSpec(route: route,
                     icon: route.icon,
                     color: smartListColor(route),
@@ -615,9 +627,7 @@ struct SidebarRootView: View {
     // Today total = pinned-today + scheduled/due rolling in. Both buckets live
     // on Today, so the user-facing count is the sum.
     case .filter(.today):       return counts.map { $0.todayCount + $0.reviewCount }
-    case .filter(.review):
-      let n = LocalCache.tasks(in: modelContext, filter: .review).count
-      return n > 0 ? n : nil
+    case .filter(.review):      return reviewCount > 0 ? reviewCount : nil
     case .filter(.upcoming):    return counts?.upcomingCount
     case .filter(.repeating):   return LocalCache.tasks(in: modelContext, filter: .repeating).count
     case .filter(.unscheduled): return counts?.unscheduledCount
@@ -652,7 +662,7 @@ struct SidebarRootView: View {
   /// active project, and (when present) Recently Deleted. Used to resolve a
   /// `Route.id` tag back to its full `Route` for the selection binding.
   private var selectableRoutes: [Route] {
-    var routes = TaskDestinations.sidebarRoutes
+    var routes = visibleSmartListRoutes
     routes += areas.map { .area(id: $0.id) }
     routes += projects.filter { $0.status == .active }.map { .project(id: $0.id) }
     if starredCount > 0 { routes.append(.filter(.starred)) }
@@ -1114,6 +1124,7 @@ struct SidebarRootView: View {
     var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: modelContext), today: clock.today)
     agg.counts = stats.counts
     agg.doneTodayCount = stats.history.daily.last?.done ?? 0
+    let review = LocalCache.tasks(in: modelContext, filter: .review).count
     let starred = LocalCache.tasks(in: modelContext, filter: .starred).count
     let faded = LocalCache.tasks(in: modelContext, filter: .faded).count
     let deleted = LocalCache.tasks(in: modelContext, filter: .recentlyDeleted).count
@@ -1125,6 +1136,7 @@ struct SidebarRootView: View {
     projects = structure.projects
     apply(aggregate: agg)
     SidebarSeed.aggregate = agg
+    reviewCount = review
     starredCount = starred
     fadedCount = faded
     recentlyDeletedCount = deleted
