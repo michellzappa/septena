@@ -87,10 +87,26 @@ GitHub milestone: `"M2 Agent intake v0"`. Two parallel lanes immediately after
 Launch, reflecting the 2026-11-20 product direction (*Things-like simplicity,
 multiplatform access and an agentic UX*):
 
-**Lane A — Switcher essentials, Moving in & Agent-first onboarding (Ranks 1–3):**
-- #76 Checklists inside a task (compact UI, sync, MCP, import mapping)
-- #96 Tags (compact UI, filter, sync, MCP, import mapping)
-- #97 Timed reminders (specific time alerts, sync, MCP, import mapping)
+**Lane A — Switcher essentials, Moving in & Agent-first onboarding:**
+
+Switcher features in build order (ranked by mz, 2026-11-21: does its absence
+stop a switch, does it back a promise the site makes, how small is it):
+
+1. #97 Timed reminders (specific time alerts, sync, MCP, import mapping)
+2. #126 Richer repeats (yearly, specific weekdays, ordinal monthly)
+3. #76 Checklists inside a task (compact UI, sync, MCP, import mapping)
+4. #130 Data export (backs "your tasks never depend on us")
+5. #132 iOS swipe actions
+6. #96 Tags (compact UI, filter, sync, MCP, import mapping)
+7. #129 Widgets (pair with #89 App Intents)
+8. #127 Star / Important (waits on the urgency-marker decision)
+9. #131 Mac attachment parity
+
+M3, not M2: #133 natural-language capture, #134 email-to-task.
+#128 start/end times and an iCal feed stays in M2 but last: it pulls toward
+calendar planning, which the positioning rules out.
+
+Alongside the features:
 - #98 Moving-in coverage tracker & #99 shared migration engine (preview, field
   mapping, loss report, counts reconciliation, retry, batch undo; audit existing
   Things/Reminders paths)
@@ -98,10 +114,6 @@ multiplatform access and an agentic UX*):
   To Do closes 30 June 2027)
 - #103 Agent-first onboarding (invite agent connection on first run, propose
   real areas/projects/tasks/emoji for review before creating; reuses `#70`)
-- Switcher gaps specced 2026-11-21, not yet ranked against Ranks 1–3: #126
-  richer repeats, #127 Star/Important, #128 start/end times and an iCal feed,
-  #129 widgets, #130 data export, #131 Mac attachment parity, #132 iOS swipe
-  actions
 
 **Lane B — Agent loop, trust & directories:**
 - #87 Agents propose done, only the human accepts (blocks shipping trust line)
@@ -180,10 +192,16 @@ M5 breadth items ahead of Launch and switcher readiness:
 
 1. **Build now (already specced):** `#46`, `#47` (paywall + free mode), `#87`
    (agents propose done), `#85` (directories, once free-tier agent policy is set).
-2. **Spec first, then add `ready-for-agent`:** `#108` (annual rate lock) →
-   `#76` (Checklists), `#96` (Tags), `#97` (Timed reminders) → `#99` + `#52`
-   (migration engine + Microsoft To Do) → `#103` (agent-first onboarding).
-3. **Hold off `ready-for-agent` until M3–M5:** `#28`, `#53`–`#56` (Task Fade),
+2. **Switcher features, in Lane A rank order:** `#97` (timed reminders) →
+   `#126` (richer repeats) → `#76` (checklists) → `#130` (export) → `#132`
+   (swipe actions) → `#96` (tags) → `#129` (widgets) → `#127` (star) → `#131`
+   (Mac attachments) → `#128` (times and iCal). Pick the highest-ranked one
+   whose spec is ready. `#133` and `#134` are M3 work: take them only after
+   Lane A.
+3. **Spec first, then add `ready-for-agent`:** `#108` (annual rate lock) →
+   `#99` + `#52` (migration engine + Microsoft To Do) → `#103` (agent-first
+   onboarding).
+4. **Hold off `ready-for-agent` until M3–M5:** `#28`, `#53`–`#56` (Task Fade),
    `#65` (Watch), `#20`, `#21` (until specs are written for M3/M4).
 
 ## Decisions waiting for mz
