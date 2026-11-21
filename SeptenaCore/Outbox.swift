@@ -355,6 +355,16 @@ final class TaskMutator {
     cloudBackend.moveToList(id: id, area: area, project: project)
   }
 
+  /// Batch list move preserving the caller's `[0, 1, ...]` relative order at
+  /// the top of the destination (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §7.1).
+  func moveToList(ids: [String], area: String?, project: String?, acknowledge: Bool = true) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] moveToList(ids:) called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.moveToList(ids: ids, area: area, project: project, acknowledge: acknowledge)
+  }
+
   func moveToProject(id: String, project: String?) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] moveToProject called before CK bound — dropping", nil)

@@ -1252,6 +1252,20 @@ final class CloudKitTasksBackend {
     }
   }
 
+  /// Move a batch of tasks into an area, project, or Inbox while preserving
+  /// their relative `[0, 1, 2, ...]` order at the top of the destination.
+  /// `moveToList(id:...)` stamps `TaskOrder.topPosition(in:)` per call, so
+  /// iterating in reverse lands `ids[0]` at the very top followed by `ids[1]`,
+  /// `ids[2]`, etc.
+  func moveToList(ids: [String], area: String?, project: String?, acknowledge: Bool = true) {
+    for id in ids.reversed() {
+      moveToList(id: id, area: area, project: project)
+      if acknowledge {
+        self.acknowledge(id: id)
+      }
+    }
+  }
+
   func moveToProject(id: String, project: String?) {
     guard let entity = fetch(id: id) else { return }
     let ratifying = project != nil && entity.isInTriageBand

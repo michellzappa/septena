@@ -698,24 +698,29 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let dropped = LocalCache.allTasks(in: context).filter { ids.contains($0.id) }
     let scheduleBefore = dropped.map(TaskUndo.ScheduleSnapshot.init)
     let filingBefore = dropped.map(TaskUndo.FilingSnapshot.init)
-    for id in ids {
-      switch action {
-      case .today:
-        mutator.moveToToday(id: id)
-      case .scheduleTomorrow:
-        mutator.schedule(id: id, date: KitDayFormat.tomorrow())
-        mutator.removeFromToday(id: id)
-      case .anytime:
-        mutator.schedule(id: id, date: nil)
-        mutator.removeFromToday(id: id)
-      case .area(let areaId):
-        mutator.moveToList(id: id, area: areaId, project: nil)
-      case .project(let projectId):
-        mutator.moveToList(id: id, area: nil, project: projectId)
+    switch action {
+    case .area(let areaId):
+      mutator.moveToList(ids: ids, area: areaId, project: nil, acknowledge: true)
+    case .project(let projectId):
+      mutator.moveToList(ids: ids, area: nil, project: projectId, acknowledge: true)
+    case .today, .scheduleTomorrow, .anytime:
+      for id in ids {
+        switch action {
+        case .today:
+          mutator.moveToToday(id: id)
+        case .scheduleTomorrow:
+          mutator.schedule(id: id, date: KitDayFormat.tomorrow())
+          mutator.removeFromToday(id: id)
+        case .anytime:
+          mutator.schedule(id: id, date: nil)
+          mutator.removeFromToday(id: id)
+        case .area, .project:
+          break
+        }
+        // A drop is a disposition, like filing from the list: it clears the
+        // agent cue, so a proposal leaves the Inbox once the user has placed it.
+        mutator.acknowledge(id: id)
       }
-      // A drop is a disposition, like filing from the list: it clears the
-      // agent cue, so a proposal leaves the Inbox once the user has placed it.
-      mutator.acknowledge(id: id)
     }
     switch action {
     case .today:

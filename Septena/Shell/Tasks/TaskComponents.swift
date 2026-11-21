@@ -256,6 +256,9 @@ struct CheckableRow<Leading: View, Trailing: View>: View {
   var isSelected: Bool = false
   /// Native `List(selection:)` cursor — keep title ink dark on the gray capsule.
   var isListSelected: Bool = false
+  /// Soften the leading checkbox while touch multi-select is active so the row
+  /// visually cues "tap anywhere to select" rather than "tap to complete".
+  var checkboxDimmed: Bool = false
   /// Rising-edge counter from `PromoteFlashStore` — plays a brief amber row wash.
   var promoteFlashTrigger: Int = 0
   /// Optional hero-animation anchors (`matchedGeometryEffect`): the Things-style
@@ -304,7 +307,7 @@ struct CheckableRow<Leading: View, Trailing: View>: View {
         .alignmentGuide(.rowTitleCenter) { d in d[VerticalAlignment.center] }
         // The leading control fades with the row, by the same amount (mz, 2026-11-20),
         // so a slipping task reads as one fading line. It stays tappable.
-        .opacity(TaskFade.rowOpacity(tenureFill))
+        .opacity(TaskFade.rowOpacity(tenureFill) * (checkboxDimmed ? 0.45 : 1))
 
       if let leadingEmoji {
         Text(leadingEmoji).font(.body)
@@ -381,6 +384,7 @@ extension CheckableRow where Leading == TaskCheckboxSlot {
     titleLineLimit: Int = 2,
     isSelected: Bool = false,
     isListSelected: Bool = false,
+    checkboxDimmed: Bool = false,
     promoteFlashTrigger: Int = 0,
     titleMatchID: String? = nil,
     checkboxMatchID: String? = nil,
@@ -401,6 +405,7 @@ extension CheckableRow where Leading == TaskCheckboxSlot {
       titleLineLimit: titleLineLimit,
       isSelected: isSelected,
       isListSelected: isListSelected,
+      checkboxDimmed: checkboxDimmed,
       promoteFlashTrigger: promoteFlashTrigger,
       titleMatchID: titleMatchID,
       heroMatchNS: heroMatchNS,
@@ -573,6 +578,8 @@ struct TaskRow: View {
   var isSelected: Bool = false
   /// Native `List(selection:)` cursor on the deep task list.
   var isListSelected: Bool = false
+  /// Soften the checkbox during iOS touch multi-select mode.
+  var checkboxDimmed: Bool = false
   /// Optional inboard-most trailing accessory — the deep list passes the Inbox
   /// "file here" capsule here so it sits left of the date (a variable-width
   /// element kept inboard of the fixed glyphs). Nil on every other surface.
@@ -647,6 +654,7 @@ struct TaskRow: View {
       titleLineLimit: titleLineLimit,
       isSelected: isSelected,
       isListSelected: isListSelected,
+      checkboxDimmed: checkboxDimmed,
       promoteFlashTrigger: promoteFlash.trigger(for: task.id),
       titleMatchID: titleMatchID,
       checkboxMatchID: checkboxMatchID,

@@ -1,5 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
+#if os(iOS)
+import UIKit
+#endif
 
 // MARK: - Grouped task-card chrome
 
@@ -713,6 +716,235 @@ struct MagicPlusFloatingOverlay: View {
         .strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
     )
     .shadow(color: .black.opacity(0.3), radius: 14, y: 6)
+  }
+}
+#endif
+
+// MARK: - Multi-task stacked drag preview
+
+/// Tactile drag preview for `.draggable(TaskDragIDs)`: a compact rounded task
+/// card when lifting one row, or a subtle physical stack with an accent count
+/// badge when lifting a multi-selection (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §6.1).
+struct TaskDragStackPreview: View {
+  let title: String
+  let count: Int
+  var accent: Color = .accentColor
+
+  var body: some View {
+    ZStack(alignment: .topTrailing) {
+      ZStack {
+        if count > 2 {
+          RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Theme.cardSurface.opacity(0.75))
+            .overlay(
+              RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Theme.border, lineWidth: 0.5)
+            )
+            .padding(.horizontal, 10)
+            .offset(y: 7)
+        }
+        if count > 1 {
+          RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Theme.cardSurface.opacity(0.9))
+            .overlay(
+              RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Theme.border, lineWidth: 0.5)
+            )
+            .padding(.horizontal, 5)
+            .offset(y: 3.5)
+        }
+        HStack(spacing: 8) {
+          RoundedRectangle(cornerRadius: 4, style: .continuous)
+            .strokeBorder(Theme.inkSecondary.opacity(0.55), lineWidth: 1.25)
+            .frame(width: 14, height: 14)
+          Text(title.isEmpty ? "Task" : title)
+            .scaledFont(size: 13, weight: .medium)
+            .foregroundStyle(Theme.inkPrimary)
+            .lineLimit(1)
+            .truncationMode(.tail)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: 260, alignment: .leading)
+        .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+          RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .strokeBorder(Theme.border, lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
+      }
+      .padding(.top, count > 1 ? 6 : 0)
+      .padding(.trailing, count > 1 ? 8 : 0)
+      .padding(.bottom, count > 2 ? 8 : (count > 1 ? 4 : 0))
+
+      if count > 1 {
+        Text("\(count)")
+          .scaledFont(size: 11, weight: .bold)
+          .monospacedDigit()
+          .foregroundStyle(Color.white)
+          .padding(.horizontal, 6)
+          .frame(minWidth: 20, minHeight: 20)
+          .background(AdaptiveColor.fillForWhiteInk(accent), in: Capsule())
+          .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
+      }
+    }
+  }
+}
+
+// MARK: - iOS swipe-to-select (pull-left toggle on SelectableScrollList)
+
+extension View {
+  /// Things-style horizontal pull-left gesture to toggle task selection on iOS
+  /// and iPadOS (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §3). Pass-through
+  /// on macOS or when `enabled` is false.
+  @ViewBuilder
+  func taskRowSwipeToSelect(
+    enabled: Bool,
+    isSelected: Bool,
+    onToggleSelect: @escaping () -> Void
+  ) -> some View {
+    #if os(iOS)
+    if enabled {
+      modifier(TaskRowSwipeToSelectModifier(isSelected: isSelected,
+                                            onToggleSelect: onToggleSelect))
+    } else {
+      self
+    }
+    #else
+    self
+    #endif
+  }
+}
+
+#if os(iOS)
+private struct TaskRowSwipeToSelectModifier: ViewModifier {
+  let isSelected: Bool
+  let onToggleSelect: () -> Void
+
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var dragOffset: CGFloat = 0
+  @State private var armed = false
+
+  private static let commitThreshold: CGFloat = 36
+  private static let disarmThreshold: CGFloat = 28
+  private static let maxTravel: CGFloat = 56
+
+  private var progress: CGFloat {
+    min(1, max(0, -dragOffset / Self.commitThreshold))
+  }
+
+  func body(content: Content) -> some View {
+    ZStack(alignment: .trailing) {
+      if dragOffset < -2 {
+        Image(systemName: indicatorSymbol)
+          .scaledFont(size: 18, weight: .semibold)
+          .foregroundStyle(armed ? Color.accentColor : Theme.inkSecondary)
+          .scaleEffect(armed ? 1.12 : 0.85 + 0.15 * progress)
+          .opacity(Double(min(1, progress * 1.25)))
+          .padding(.trailing, 14)
+          .a11yAnimation(.snappy(duration: 0.16), value: armed)
+          .accessibilityHidden(true)
+      }
+
+      content
+        .offset(x: reduceMotion ? 0 : dragOffset)
+    }
+    .clipped()
+    .gesture(
+      HorizontalLeftPanGesture(
+        onChanged: { rawDx in
+          let pull = max(0, -rawDx)
+          let dampened: CGFloat
+          if pull <= Self.commitThreshold {
+            dampened = pull
+          } else {
+            let extra = pull - Self.commitThreshold
+            dampened = Self.commitThreshold + (Self.maxTravel - Self.commitThreshold) * (1 - exp(-extra / 36))
+          }
+          dragOffset = -dampened
+          if !armed, pull >= Self.commitThreshold {
+            armed = true
+            Haptics.tick()
+          } else if armed, pull < Self.disarmThreshold {
+            armed = false
+          }
+        },
+        onEnded: { _ in
+          let shouldToggle = armed
+          a11yAnimate(.snappy(duration: 0.22)) {
+            dragOffset = 0
+            armed = false
+          }
+          if shouldToggle {
+            onToggleSelect()
+          }
+        },
+        onCancelled: {
+          a11yAnimate(.snappy(duration: 0.22)) {
+            dragOffset = 0
+            armed = false
+          }
+        }
+      )
+    )
+    .accessibilityAction(named: isSelected ? "Deselect" : "Select") {
+      onToggleSelect()
+    }
+  }
+
+  private var indicatorSymbol: String {
+    if isSelected {
+      return armed ? "minus.circle.fill" : "checkmark.circle.fill"
+    }
+    return armed ? "checkmark.circle.fill" : "circle"
+  }
+}
+
+/// First-party SwiftUI wrapper over `UIPanGestureRecognizer` that claims only
+/// deliberate horizontal leftward pulls, immediately yielding vertical pans to
+/// `ScrollView` and leading-edge swipes to `NavigationStack`.
+private struct HorizontalLeftPanGesture: UIGestureRecognizerRepresentable {
+  let onChanged: (CGFloat) -> Void
+  let onEnded: (CGFloat) -> Void
+  let onCancelled: () -> Void
+
+  func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator {
+    Coordinator()
+  }
+
+  func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+    let pan = UIPanGestureRecognizer()
+    pan.maximumNumberOfTouches = 1
+    pan.delegate = context.coordinator
+    return pan
+  }
+
+  func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
+    let dx = recognizer.translation(in: recognizer.view).x
+    switch recognizer.state {
+    case .began, .changed:
+      onChanged(dx)
+    case .ended:
+      onEnded(dx)
+    case .cancelled, .failed:
+      onCancelled()
+    default:
+      break
+    }
+  }
+
+  final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+      guard let pan = gestureRecognizer as? UIPanGestureRecognizer,
+            let view = pan.view else { return false }
+      // Never steal the system interactive back-swipe from the leading screen edge.
+      if let window = view.window, pan.location(in: window).x < 24 {
+        return false
+      }
+      let velocity = pan.velocity(in: view)
+      // Require clearly horizontal leftward intent so vertical scrolling always wins.
+      return velocity.x < -20 && abs(velocity.x) > abs(velocity.y) * 1.4
+    }
   }
 }
 #endif
