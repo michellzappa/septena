@@ -145,6 +145,7 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 3. **Color only on Today** — Today's sun carries `#F5C721`; all other smart-list glyphs stay quiet secondary gray.
 4. **Emoji on Areas (no `"Area"` text header)** — Areas render as clickable semibold rows with their leading emoji (or muted dot), trailing fold chevron, and count.
 5. **Progress rings on Projects** — Projects render with `ProjectProgressIcon`-style completion pie rings on the same flush left glyph axis (regular weight, no indentation step).
+6. **Non-selectable demo chrome** — `.task-surface` (and all interactive app demo components) must set `user-select: none; -webkit-user-select: none; cursor: default;` (allowing `user-select: text; cursor: text;` only on actual `<input>` / `<textarea>` controls) so hovering or clicking never flashes an I-beam cursor or highlights mockup copy.
 
 - Extend `registry/tokens.json` with `fruitAccents` (light/dark hex + check ink + origin metadata) and `textures` (catalog IDs + defaults).
 - Update `septena-site/scripts/task-tokens.mjs` (in the site repo) to consume `registry/tokens.json` so `--task-color-accent`, `--task-color-accentWash`, and optional `[data-accent="<fruit>"]` / texture canvas layers stay 1:1 with the native apps.
