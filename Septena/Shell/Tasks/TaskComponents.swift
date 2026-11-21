@@ -841,9 +841,7 @@ struct TaskRow: View {
     let cal = Calendar.current
     if cal.isDateInToday(d) { return "Today" }
     if cal.isDateInTomorrow(d) { return "Tomorrow" }
-    let f = DateFormatter()
-    f.setLocalizedDateFormatFromTemplate("MMMd")
-    return f.string(from: d)
+    return SeptenaDate.monthDay(d)
   }
 }
 

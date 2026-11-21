@@ -176,8 +176,7 @@ enum TaskUndo {
                                    mutator: TaskMutator) {
     guard !before.isEmpty else { return }
     let wanted = Set(before.map(\.id))
-    let after = LocalCache.allTasks(in: context)
-      .filter { wanted.contains($0.id) }
+    let after = LocalCache.liveTasks(ids: wanted, in: context)
       .map(ScheduleSnapshot.init)
     guard !after.isEmpty else { return }
     let beforeByID = Dictionary(before.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
@@ -486,7 +485,7 @@ enum TaskUndo {
                                            _ field: KeyPath<SeptenaTask, Value>) -> [String: Value] {
     let wanted = Set(ids)
     var result: [String: Value] = [:]
-    for task in LocalCache.allTasks(in: context) where wanted.contains(task.id) {
+    for task in LocalCache.liveTasks(ids: wanted, in: context) {
       result[task.id] = task[keyPath: field]
     }
     return result
@@ -510,8 +509,7 @@ enum TaskUndo {
                          mutator: TaskMutator) {
     guard !before.isEmpty else { return }
     let wanted = Set(before.map(\.id))
-    let after = LocalCache.allTasks(in: context)
-      .filter { wanted.contains($0.id) }
+    let after = LocalCache.liveTasks(ids: wanted, in: context)
       .map(FilingSnapshot.init)
     guard !after.isEmpty else { return }
     // A move into the list the task already lives in changed nothing, so it

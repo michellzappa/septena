@@ -57,8 +57,7 @@ struct TaskRowActions: ViewModifier {
   /// source `TaskUndo.recordScheduleChange` re-reads for the redo side, so the
   /// two halves can't disagree.
   private func scheduleSnapshots(_ ids: [String]) -> [TaskUndo.ScheduleSnapshot] {
-    LocalCache.allTasks(in: modelContext)
-      .filter { ids.contains($0.id) }
+    LocalCache.liveTasks(ids: ids, in: modelContext)
       .map(TaskUndo.ScheduleSnapshot.init)
   }
 
@@ -272,8 +271,7 @@ struct TaskRowActions: ViewModifier {
   // Mirrors `TaskListView.applyMove`, minus the Inbox suggestion-rejection
   // bookkeeping (no classifier on surfaces that use this).
   private func applyMove(id: String, areaId: String?, projectId: String?) {
-    let undoBefore = LocalCache.allTasks(in: modelContext)
-      .filter { $0.id == id }
+    let undoBefore = LocalCache.liveTasks(ids: [id], in: modelContext)
       .map(TaskUndo.FilingSnapshot.init)
     // Already there: a no-op, so no write, no toast and no undo step.
     guard let current = undoBefore.first else { return }
