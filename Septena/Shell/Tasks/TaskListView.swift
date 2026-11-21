@@ -685,7 +685,13 @@ struct TaskListView: View {
   #endif
 
   private var showsEmbeddedNewTaskToolbar: Bool {
-    #if os(iOS) && !SEPTASK
+    #if os(iOS) && SEPTASK
+    // Compact iPhone Septena uses the canonical bottom-right Magic Plus orb
+    // for creation; top-right stays Search (and Project's overflow menu).
+    // Split layouts (iPad / unfolded Duo) have no Magic Plus orb, so embedded
+    // Area/Project lists keep the toolbar "+" there.
+    embedded && filter != .recentlyDeleted && filter != .faded && usesPushNavigation
+    #elseif os(iOS)
     embedded && filter != .recentlyDeleted && filter != .faded && !usesPushNavigation
     #else
     embedded && filter != .recentlyDeleted && filter != .faded
