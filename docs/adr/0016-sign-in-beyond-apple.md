@@ -1,6 +1,6 @@
 # 0016. Sign in beyond Apple: approve a new device from a signed-in one, or use an email code
 
-- Status: proposed
+- Status: accepted (2026-11-21)
 - Date: 2026-11-21
 - Deciders: mz
 
@@ -34,7 +34,7 @@
 
 ## Decision
 
-*(defaults chosen for mz; mz can overrule)*
+Accepted by mz on 2026-11-21 with all defaults below.
 
 1. **Approve a new device from a signed-in one.** A new client (web,
    Android, Windows) shows a QR code and the same 8-character code. A

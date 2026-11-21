@@ -1,6 +1,6 @@
 # Android client spec
 
-**Status:** proposal (2026-11-21). Replaces the architecture of
+**Status:** accepted (2026-11-21), defaults accepted by mz. Replaces the architecture of
 `docs/SEPTASK_ANDROID_PLAN.md`, which assumed CloudKit. Issue #20, milestone
 M4.
 
