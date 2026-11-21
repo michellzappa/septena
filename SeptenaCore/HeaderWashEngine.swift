@@ -201,7 +201,7 @@ enum HeaderWashEngine {
                      mini: params.mini, sample: sample, setStroke: setStroke)
     case .fieldMatrix:
       drawFieldMatrix(ctx: ctx, w: w, h: h, isDark: params.isDark, intensity: intensity,
-                      mini: params.mini, sample: sample, setFill: setFill)
+                      mini: params.mini, phase: params.phase, vol: vol, setFill: setFill)
     case .stippleDrift:
       drawStippleDrift(ctx: ctx, w: w, h: h, isDark: params.isDark, intensity: intensity,
                        seed: params.seed, mini: params.mini, sample: sample, setFill: setFill)
@@ -316,18 +316,22 @@ enum HeaderWashEngine {
 
   private static func drawFieldMatrix(
     ctx: CGContext, w: Double, h: Double, isDark: Bool, intensity: Double,
-    mini: Bool, sample: (Double, Double, Int) -> Double, setFill: (Double) -> Void
+    mini: Bool, phase: Double, vol: NoiseVolume, setFill: (Double) -> Void
   ) {
     let gap = mini ? 8.5 : 14.0
     let freq = mini ? 0.018 : 0.0065
     let maxR = (mini ? 2.0 : 2.9) * (0.65 + intensity * 0.55)
     let alphaBase = isDark ? 0.36 : 0.30
+    // Fixed-grid dots need ~5x faster 3D slice evolution than continuous contour
+    // lines so the dot-radius tide reads as gently alive instead of frozen.
+    // Still starts at z = 0 when phase == 0 (zero jump on Slow drift toggle).
+    let z = phase * 0.18
 
     var y = gap / 2
     while y < h {
       var x = gap / 2
       while x < w {
-        let v = sample(x * freq, y * freq, 3)
+        let v = vol.fbm(x * freq, y * freq, z: z, octaves: 3)
         let norm = max(0, min(1, (v - 0.26) / 0.48))
         let r = 0.45 + norm * norm * maxR
         setFill((0.04 + norm * alphaBase) * (0.4 + intensity * 0.85))
