@@ -65,35 +65,30 @@ Selecting any fruit overrides `selectionAccent`, `listSelectionFill`, `checkboxF
 
 ## 3. Procedural Generative Canvas Textures
 
-### 3.1 Shortlist (v1 Confirmed + Fine-Tuning Candidates)
+### 3.1 Locked v1 Texture Roster (6 procedural + `none`)
 
-**Confirmed v1 set (5 procedural + `none`):**
+Selected by mz (2026-11-21); `relief`, `isoFlow`, and `terrainMesh` were dropped after visual review:
 
 | ID | Display Name | Generative Primitive | Aesthetic Feel |
 |---|---|---|---|
 | `none` | **Pure Canvas** *(default)* | Flat system grouped background | Zero visual noise baseline |
-| `topography` | **Topography** | Marching-squares elevation contours over 4-octave 2D fBm, every 4th contour weighted as an index line | Swiss cartography, architectural calm |
-| `ridges` | **Ridge Lines** | Horizontal elevation cross-sections smoothly displaced by 2D noise, vertically tapered | Rhythmic terrain profiles |
-| `fieldMatrix` | **Field Matrix** | Precision micro-dot grid whose radius and opacity modulate across a height field | Braun / Dieter Rams industrial grid |
+| `topography` | **Topography** | Marching-squares elevation contours over 4-octave **3D** fBm (every 4th contour weighted as an index line); subtly **morphs shape in place** along `z = t` when motion is on rather than flat scrolling | Swiss cartography, architectural calm |
+| `fieldMatrix` | **Field Matrix** | Precision micro-dot grid whose radius and opacity modulate across a 3D height field | Braun / Dieter Rams industrial grid |
+| `stippleDrift` | **Stipple Drift** | Deterministic elevation-gated stipple dither (fixed dot anchors, evolving height wave — zero flicker) | Risograph print / e-ink texture |
+| `causticGlass` | **Caustic Glass** | Domain-warped Voronoi edge filaments (`(1 - k·(d₂ - d₁))³`) simulating soft refraction through Liquid Glass | Subtle optical glass filaments |
+| `ridges` | **Ridge Lines** | Horizontal elevation cross-sections smoothly displaced by 3D noise, vertically tapered | Rhythmic terrain profiles |
 | `washiPaper` | **Washi Paper** | Low-frequency tonal clouding + sparse deterministic micro-fibers | Fine tactile stationery, near-subliminal |
-| `stippleDrift` | **Stipple Drift** | Deterministic elevation-gated stipple dither | Risograph print / e-ink texture |
-
-**Fine-tuning candidates (evaluate before C2 freeze):**
-- `relief` (**Relief Terrain**): Normalized Lambertian hillshade over a ridged height map (embossed cotton paper / sculpted obsidian).
-- `isoFlow` (**Iso-Flow**): Curl-noise streamlines tracing iso-elevation paths.
-- `terrainMesh` (**Terrain Mesh**): Fine geometric drafting lattice lifted by the height field.
-- *(Dropped from v1: `caustics` — optical Voronoi webs feel busier than Septena's calm architectural tone.)*
 
 ### 3.2 Texture Parameters & Placement
 
 | Parameter | Type / Range | Default | Notes |
 |---|---|---|---|
-| `canvasTexture` | enum (`none`, `topography`, `ridges`, `fieldMatrix`, `washiPaper`, `stippleDrift`, …) | `"none"` *(default; could preview `"topography"` in onboarding)* | |
+| `canvasTexture` | enum (`none`, `topography`, `fieldMatrix`, `stippleDrift`, `causticGlass`, `ridges`, `washiPaper`) | `"none"` *(default; could preview `"topography"` in onboarding)* | |
 | `texturePlacement` | enum (`behindCards`, `headerWash`, `railAndCanvas`) | `"behindCards"` | `behindCards` keeps cards crisp paper; `headerWash` fades softly over the top ~180–200pt like a modern list cover |
 | `textureIntensity` | int `15…100` (exposed as 3 presets in UI: `Subtle` 35 / `Balanced` 55 / `Bold` 80, or continuous slider) | `55` | Clamped so high values never hurt contrast |
 | `textureSeed` | int `1…9999` | `42` | User can tap **Shuffle** to pick a new terrain; deterministic everywhere |
 | `textureTintWithAccent` | bool | `true` | Blends texture ink ~58% toward active accent + subtle radial glow; `false` uses pure neutral ink |
-| `textureMotion` | enum (`still`, `slowDrift`) | `"still"` | Optional glacial height-field drift (~20fps GPU cadence, auto-pauses under Reduce Motion, Low Power Mode, and inactive/background windows) |
+| `textureMotion` | enum (`still`, `slowDrift`) | `"still"` | Optional glacial **3D slice morphing** (`z = t * speed` so shapes evolve in place rather than treadmill-scrolling; ~20fps GPU cadence, auto-pauses under Reduce Motion, Low Power Mode, and inactive/background windows) |
 
 ### 3.3 Per-Project Deterministic Identity (Phase C3)
 - When `projectHeaderTextures` is enabled (opt-in or automatic when a texture is active), opening a Project uses `headerWash` seeded deterministically from `FNV-1a(project.id)` (already in `registry/rules.json` for `occurrenceID`).
@@ -190,7 +185,8 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 
 | Topic | Decision | Default |
 |---|---|---|
-| **v1 texture shortlist** | Ship 5 confirmed (`topography`, `ridges`, `fieldMatrix`, `washiPaper`, `stippleDrift`) + `none`, or include any of `relief` / `isoFlow` / `terrainMesh`? | 5 confirmed + `none` *(default)* |
+| **List card glass over texture** | Keep cards solid paper (`DesignSpec.md` §5.5), or allow frosted/Liquid Glass translucency (`5–8px` blur) when a canvas texture is active (auto-solid under Reduce Transparency)? | Frosted veil when textured; solid when `none` *(default)* |
+| **Today sidebar icon** | Keep Today's sidebar sun quiet gray (subdued), follow the chosen accent, or keep gold (`#F5C721`) under `Colorful` only? | Gray everywhere or Gold under `Colorful` only *(needs mz call)* |
 | **Default texture for new installs** | Start on `none` (pure canvas) or a whisper-subtle `washiPaper` / `topography`? | `none` — opt-in in Appearance *(default)* |
 | **Accent reach toggle** | Ship `restrained` only in v1, or expose `restrained` vs. `expressive` toggle in Settings? | `restrained` only in v1 *(default)* |
 | **Fruit roster & names** | Keep all 11 global exotic fruits (including `Jabuticaba` monochrome ink), or trim to 8–9? | All 11 + `Colorful` = 12 (clean 3×4 grid) *(default)* |
