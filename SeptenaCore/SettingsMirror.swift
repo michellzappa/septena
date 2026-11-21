@@ -396,6 +396,17 @@ enum SettingsMirror {
     upsert(settings: settings, context: context, engine: engine)
   }
 
+  /// Clear synced "Get started" state (Settings ▸ About ▸ Show Get started
+  /// again, or after deleting an account). Writes `nil` (never deletes the
+  /// setting row — backend clears with `value: null`).
+  static func resetGetStarted(context: ModelContext, engine: CKEngine?) {
+    guard var settings = loadSettings(context: context) else { return }
+    guard settings.getStartedDismissed != nil || settings.getStartedSteps != nil else { return }
+    settings.getStartedDismissed = nil
+    settings.getStartedSteps = nil
+    upsert(settings: settings, context: context, engine: engine)
+  }
+
   static func upsert(settings: AppSettings,
                      context: ModelContext,
                      engine: CKEngine? = nil) {
