@@ -3,10 +3,11 @@ import SwiftUI
 /// Septask's top-level tabs (iPhone). Tasks hosts the full sidebar module —
 /// same label and checkmark as Septena's Tasks tab, so the ✓ means "the task
 /// module" in both apps; Today and Upcoming are first-class destinations.
-/// Quick capture lives in the separate floating Magic Plus orb (`magicPlusOrb`)
-/// bottom-trailing above the tab bar — tap starts an inline task in place, and
-/// hold-and-drag drops a new inline task onto any row gap, heading, group,
-/// Upcoming day, or Tasks destination. Search lives in the trailing nav bar.
+/// Quick capture lives in the native iOS 26 `.tabViewBottomAccessory` (collapses
+/// inline beside the minimized tab circle on scroll): tap opens the create quick
+/// menu, and hold-and-drag drops a new inline task onto any row gap, heading,
+/// group, or Upcoming day — or creates a Project/Area on the Tasks page.
+/// Search lives in the trailing nav bar.
 ///
 /// Septask has no Next page (removed 2026-11-19: it showed life-OS content,
 /// not tasks; Today covers "what's next" for tasks).
@@ -36,9 +37,12 @@ struct SeptaskRootView: View {
   @Environment(CKEngine.self) private var ckEngine
   @Environment(SettingsStore.self) private var settingsStore
   @Environment(LogCommitCenter.self) private var logCommit
+  @Environment(\.modelContext) private var modelContext
   @State private var selection: SeptaskTab = .today
-  @AppStorage("septena.magicPlusDragHintSeen") private var magicPlusDragHintSeen = false
-  @Namespace private var tabBubble
+  @State private var showingNewProjectSheet = false
+  @State private var newProjectInitialAreaId: String? = nil
+  @State private var showingNewAreaAlert = false
+  @State private var newAreaName = ""
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   @Environment(\.verticalSizeClass) private var vSize
@@ -106,6 +110,22 @@ struct SeptaskRootView: View {
       #if os(iOS)
       .sheet(isPresented: $nav.showSettings) {
         withEnvironment(SeptaskSettingsView())
+      }
+      .sheet(isPresented: $showingNewProjectSheet, onDismiss: { newProjectInitialAreaId = nil }) {
+        let areas = StructureCache.snapshot(in: modelContext).areas
+        withEnvironment(
+          NewProjectSheet(areas: areas,
+                          initialAreaId: newProjectInitialAreaId) { title, areaId in
+            createProject(title: title, areaId: areaId)
+          }
+        )
+        .presentationDetents([.medium])
+        .septenaSheetChrome()
+      }
+      .alert("New Area", isPresented: $showingNewAreaAlert) {
+        TextField("Area name", text: $newAreaName)
+        Button("Create") { createArea() }
+        Button("Cancel", role: .cancel) { newAreaName = "" }
       }
       #else
       .onChange(of: nav.showSettings) { _, open in
@@ -192,24 +212,24 @@ struct SeptaskRootView: View {
   #endif
 
   #if os(iOS)
-  /// User tap on a bottom tab item:
+  /// User tab-bar selection bridge:
   /// - Tapping `Tasks` (switching from Today/Upcoming or re-tapping Tasks)
   ///   always clears `nav.path` so Tasks lands at its top-level index.
   /// - Switching to Today or Upcoming clears any stale Tasks stack route.
   ///
   /// Programmatic navigation (e.g. tapping a project from Quick Find or a task
-  /// row) sets `selection = .tasks` directly in `.onChange(of: nav.path)` so
-  /// the pushed route is preserved.
-  private func selectTab(_ tapped: SeptaskTab) {
-    Haptics.tap()
-    if !nav.path.isEmpty {
-      nav.path = []
-    }
-    if selection != tapped {
-      a11yAnimate(.snappy(duration: 0.24)) {
+  /// row) sets `selection = .tasks` directly in `.onChange(of: nav.path)` and
+  /// bypasses this setter so the pushed route is preserved.
+  private var tabSelection: Binding<SeptaskTab> {
+    Binding(
+      get: { selection },
+      set: { tapped in
+        if !nav.path.isEmpty {
+          nav.path = []
+        }
         selection = tapped
       }
-    }
+    )
   }
 
   /// Start a new task inline (never a modal sheet/drawer):
@@ -238,150 +258,128 @@ struct SeptaskRootView: View {
     nav.requestNewTask()
   }
 
-  /// Compact iPhone root: active tab full-screen with bottom scroll clearance,
-  /// paired with a single bottom row — Liquid Glass 3-tab pill aligned leftmost
-  /// and the separate draggable Magic Plus orb at the exact same height on the
-  /// bottom-right.
+  /// Real iOS 26 `TabView` (`Tasks`, `Today`, `Upcoming`) with system scroll
+  /// minimization and native `.tabViewBottomAccessory` hosting Magic Plus.
   private var systemTabView: some View {
-    ZStack(alignment: .bottom) {
-      activeTabContent
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .safeAreaPadding(.bottom, 76)
-
-      VStack(alignment: .trailing, spacing: 10) {
-        if !magicPlusDragHintSeen {
-          magicPlusDragHint
-        }
-        HStack(alignment: .center, spacing: 12) {
-          bottomTabPill
-          Spacer(minLength: 0)
-          magicPlusOrb
-        }
+    TabView(selection: tabSelection) {
+      // Septask has no section colors: the bar, the tabs and their content
+      // all take the platform accent (no `.tint` on the TabView).
+      Tab("Tasks", systemImage: "checkmark", value: SeptaskTab.tasks) {
+        ContentView()
       }
-      .padding(.horizontal, 16)
-      .padding(.bottom, 21)
-      .ignoresSafeArea(.all, edges: .bottom)
-    }
-  }
-
-  @ViewBuilder
-  private var activeTabContent: some View {
-    switch selection {
-    case .tasks:
-      ContentView()
-    case .today:
-      NavigationStack { TaskListView(filter: .today) }.tint(theme.accent)
-    case .upcoming:
-      NavigationStack { TaskListView(filter: .upcoming) }.tint(theme.accent)
-    }
-  }
-
-  private var bottomTabItems: [(tab: SeptaskTab, title: String, icon: String)] {
-    [
-      (.tasks, "Tasks", "checkmark"),
-      (.today, "Today", "sun.max.fill"),
-      (.upcoming, "Upcoming", "calendar"),
-    ]
-  }
-
-  /// Left-aligned Liquid Glass 3-tab pill matching iOS 26 tab-bar proportions
-  /// and height (`60pt`) alongside the bottom-right Magic Plus orb.
-  private var bottomTabPill: some View {
-    GlassEffectContainer {
-      HStack(spacing: 2) {
-        ForEach(bottomTabItems, id: \.tab) { item in
-          let isActive = selection == item.tab
-          Button {
-            selectTab(item.tab)
-          } label: {
-            VStack(spacing: 2) {
-              Image(systemName: item.icon)
-                .scaledFont(size: 18, weight: .semibold)
-              Text(item.title)
-                .scaledFont(size: 10, weight: .medium)
-                .lineLimit(1)
-            }
-            .foregroundStyle(isActive ? Color.accentColor : Color.primary)
-            .frame(minWidth: 74, maxHeight: .infinity)
-            .padding(.horizontal, 6)
-            .background {
-              if isActive {
-                Capsule()
-                  .fill(Color.primary.opacity(0.11))
-                  .matchedGeometryEffect(id: "septask-tab-pill", in: tabBubble)
-              }
-            }
-            .contentShape(Capsule())
-          }
-          .buttonStyle(.plain)
-          .glassEffectID(item.tab, in: tabBubble)
-        }
+      Tab("Today", systemImage: "sun.max.fill", value: SeptaskTab.today) {
+        NavigationStack { TaskListView(filter: .today) }.tint(theme.accent)
       }
-      .padding(4)
-      .frame(height: 60)
-      .glassSegmentTrack()
+      Tab("Upcoming", systemImage: "calendar", value: SeptaskTab.upcoming) {
+        NavigationStack { TaskListView(filter: .upcoming) }.tint(theme.accent)
+      }
+    }
+    .tabBarMinimizeBehavior(.onScrollDown)
+    .tabViewBottomAccessory {
+      MagicPlusTabAccessory(
+        isViewingProject: isViewingProject,
+        onNewTask: { triggerInlineNewTask() },
+        onNewSection: { nav.shouldCreateHeading = true },
+        onNewProject: {
+          newProjectInitialAreaId = activeAreaIdForNewProject
+          showingNewProjectSheet = true
+        },
+        onNewArea: {
+          newAreaName = ""
+          showingNewAreaAlert = true
+        }
+      )
     }
   }
 
-  /// One-time subtle coach pill above Magic Plus so users discover press-and-
-  /// drag placement without cluttering the chrome permanently. Dismisses on tap
-  /// or automatically after the first Magic Plus drag-and-drop.
-  private var magicPlusDragHint: some View {
+  private var isViewingProject: Bool {
+    if selection == .tasks, case .project = nav.path.last { return true }
+    return false
+  }
+
+  private var activeAreaIdForNewProject: String? {
+    if selection == .tasks, case .area(let id) = nav.path.last { return id }
+    return nil
+  }
+
+  private func createProject(title: String, areaId: String?) {
+    let trimmed = title.trimmingCharacters(in: .whitespaces)
+    guard !trimmed.isEmpty else { return }
+    Task {
+      _ = try? await projectsMutator.create(title: trimmed, area: areaId)
+    }
+  }
+
+  private func createArea() {
+    let name = newAreaName.trimmingCharacters(in: .whitespaces)
+    newAreaName = ""
+    guard !name.isEmpty else { return }
+    Task {
+      _ = try? await areasMutator.create(title: name)
+    }
+  }
+  #endif
+}
+
+#if os(iOS)
+/// Native iOS 26 `tabViewBottomAccessory` hosting Magic Plus:
+/// - Automatically adapts between `.expanded` (above the 3-tab bar) and
+///   `.inline` (tucked beside the minimized tab circle on scroll down).
+/// - Tap opens a quick menu (`New Task` inline, `New Section` in projects,
+///   `New Project`, `New Area`).
+/// - Hold & drag carries `TaskDragIDs.newTask` through native iOS drag and
+///   drop into any row gap, heading, Today/Anytime group, Upcoming day, or
+///   Tasks index Project/Area drop target.
+private struct MagicPlusTabAccessory: View {
+  @Environment(\.tabViewBottomAccessoryPlacement) private var placement
+  @State private var showingMenu = false
+
+  let isViewingProject: Bool
+  let onNewTask: () -> Void
+  let onNewSection: () -> Void
+  let onNewProject: () -> Void
+  let onNewArea: () -> Void
+
+  private var isInline: Bool { placement == .inline }
+
+  var body: some View {
     Button {
-      a11yAnimate(.easeOut(duration: 0.2)) {
-        magicPlusDragHintSeen = true
-      }
+      Haptics.tap()
+      showingMenu = true
     } label: {
-      HStack(spacing: 5) {
-        Image(systemName: "hand.point.up.left.and.text")
-          .scaledFont(size: 11, weight: .medium)
-        Text("Hold & drag + to place")
-          .font(.septenaCaption)
-      }
-      .foregroundStyle(.secondary)
-      .padding(.horizontal, 10)
-      .padding(.vertical, 6)
-      .contentShape(Capsule())
-      .glassCapsule()
-    }
-    .buttonStyle(.plain)
-    .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .bottomTrailing)))
-  }
-
-  /// Separate floating Magic Plus orb anchored in the detached bottom-right
-  /// tab-bar slot:
-  /// - Solid accent orb + subtle 6-dot grip beneath `+` communicates a
-  ///   grabbable object rather than a flat tap-only tab icon.
-  /// - Tap: starts a new inline task in the active list (never a modal/drawer).
-  /// - Hold & drag: carries `TaskDragIDs.newTask` through native iOS drag and
-  ///   drop into any `TaskReorderDrop`, `TaskMoveDrop`, or `SidebarTaskDrop`.
-  private var magicPlusOrb: some View {
-    Button {
-      triggerInlineNewTask()
-    } label: {
-      ZStack {
-        Circle()
-          .fill(Color.accentColor.gradient)
-          .overlay(
-            Circle()
-              .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.75)
-          )
-          .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
-        VStack(spacing: 4) {
+      HStack(spacing: isInline ? 8 : 10) {
+        ZStack {
+          Circle()
+            .fill(Color.accentColor.gradient)
           Image(systemName: "plus")
-            .scaledFont(size: 21, weight: .bold)
+            .scaledFont(size: isInline ? 13 : 14, weight: .bold)
             .foregroundStyle(Color.white)
-          magicPlusGripDots
         }
-        .offset(y: 2)
+        .frame(width: isInline ? 26 : 30, height: isInline ? 26 : 30)
+
+        Text(isInline ? "New" : "New…")
+          .font(.septenaButton)
+          .foregroundStyle(.primary)
+          .lineLimit(1)
+
+        if !isInline {
+          Spacer(minLength: 0)
+        }
+
+        gripDots
       }
-      .frame(width: 60, height: 60)
-      .contentShape(Circle())
+      .padding(.horizontal, isInline ? 12 : 14)
+      .frame(maxWidth: isInline ? nil : .infinity, maxHeight: .infinity)
+      .contentShape(Capsule())
     }
     .buttonStyle(.plain)
-    .contentShape(.dragPreview, Circle())
-    .accessibilityLabel("New Task")
-    .accessibilityHint("Tap to add a task inline, or hold and drag onto a list position.")
+    .contentShape(.dragPreview, Capsule())
+    .accessibilityLabel("New")
+    .accessibilityHint("Tap for create options, or hold and drag onto a list position.")
+    .popover(isPresented: $showingMenu, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+      quickMenu
+        .presentationCompactAdaptation(.popover)
+    }
     .draggable(TaskDragIDs.newTask) {
       ZStack {
         Circle()
@@ -396,22 +394,70 @@ struct SeptaskRootView: View {
     }
   }
 
-  /// Subtle 3×2 tactile grip dots under `+` signaling the orb can be dragged.
-  private var magicPlusGripDots: some View {
-    VStack(spacing: 2.5) {
+  /// Subtle 3×2 tactile grip dots signaling the accessory can be held & dragged.
+  private var gripDots: some View {
+    VStack(spacing: 3) {
       ForEach(0..<2, id: \.self) { _ in
         HStack(spacing: 3) {
           ForEach(0..<3, id: \.self) { _ in
             Circle()
-              .fill(Color.white.opacity(0.55))
-              .frame(width: 2.5, height: 2.5)
+              .fill(Color.secondary.opacity(0.5))
+              .frame(width: 3, height: 3)
           }
         }
       }
     }
+    .accessibilityHidden(true)
   }
-  #endif
+
+  private var quickMenu: some View {
+    VStack(alignment: .leading, spacing: 2) {
+      menuRow(title: "New Task", icon: "checkmark.circle") {
+        showingMenu = false
+        onNewTask()
+      }
+      if isViewingProject {
+        menuRow(title: "New Section", icon: "rectangle.split.1x2") {
+          showingMenu = false
+          onNewSection()
+        }
+      }
+      Divider()
+        .padding(.vertical, 4)
+      menuRow(title: "New Project", icon: "number") {
+        showingMenu = false
+        onNewProject()
+      }
+      menuRow(title: "New Area", icon: "square.stack.3d.up") {
+        showingMenu = false
+        onNewArea()
+      }
+    }
+    .padding(.vertical, 8)
+    .padding(.horizontal, 6)
+    .frame(minWidth: 196)
+  }
+
+  private func menuRow(title: String, icon: String, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      HStack(spacing: 12) {
+        Image(systemName: icon)
+          .scaledFont(size: 16, weight: .medium)
+          .foregroundStyle(Color.accentColor)
+          .frame(width: 22)
+        Text(title)
+          .font(.septenaSidebarRow)
+          .foregroundStyle(.primary)
+        Spacer(minLength: 8)
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 10)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+  }
 }
+#endif
 
 /// Quick-add sheet: a fresh router per presentation so the draft never
 /// leaks between opens. Sizing comes from the host's `septenaModalSheet`.

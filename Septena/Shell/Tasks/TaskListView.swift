@@ -852,6 +852,12 @@ struct TaskListView: View {
     .onChange(of: nav.shouldStartCreating) { _, _ in
       consumeStartCreatingRequest()
     }
+    .onChange(of: nav.shouldCreateHeading) { _, want in
+      guard want, isOnScreen, case .project(let pid) = filter else { return }
+      nav.shouldCreateHeading = false
+      headingDraftTitle = ""
+      headingCreateProject = pid
+    }
     .onAppear(perform: didAppearOnScreen)
     .onDisappear { isOnScreen = false }
     .onChange(of: scenePhase) { _, phase in handleScenePhase(phase) }
@@ -2040,9 +2046,6 @@ struct TaskListView: View {
     }
     model.noteCreated(draft.id)
     draftEditIds.insert(draft.id)
-    if fromDrag {
-      UserDefaults.standard.set(true, forKey: "septena.magicPlusDragHintSeen")
-    }
     Haptics.tick()
     AddInfoSection.tasks.notifyTilesChanged()
     Task {

@@ -344,6 +344,14 @@ struct SidebarRootView: View {
         }
         areaProjectSections()
       }
+      #if os(iOS) && SEPTASK
+      .onDrop(of: [.septenaTaskDragIDs],
+              delegate: SidebarNewAreaDropDelegate {
+                Haptics.tick()
+                newAreaName = ""
+                showingNewArea = true
+              })
+      #endif
       .modifier(IOSSidebarListChrome())
       .septenaNeutralListSelection()
       .pageChrome(
@@ -822,9 +830,12 @@ struct SidebarRootView: View {
     #else
     .contextMenu { areaMenu(area) }
     #endif
-    // Drag-a-task-here re-home. Self-gates to the co-visible sidebar+list
-    // canvas (iPad full-screen + Mac); inert on iPhone/compact.
-    .modifier(SidebarTaskDrop(kind: .area(area.id), mutator: taskMutator))
+    // Drag-a-task-here re-home on co-visible sidebar+list (iPad/Mac); on compact
+    // iPhone Septena, dropping Magic Plus on an Area creates a New Project in it.
+    .modifier(SidebarTaskDrop(kind: .area(area.id), mutator: taskMutator) {
+      newProjectInArea = area.id
+      showingNewProject = true
+    })
   }
 
   @ViewBuilder
@@ -847,9 +858,12 @@ struct SidebarRootView: View {
     #else
     .contextMenu { projectMenu(project) }
     #endif
-    // Drag-a-task-here re-home. Self-gates to the co-visible sidebar+list
-    // canvas (iPad full-screen + Mac); inert on iPhone/compact.
-    .modifier(SidebarTaskDrop(kind: .project(project.id), mutator: taskMutator))
+    // Drag-a-task-here re-home on co-visible sidebar+list (iPad/Mac); on compact
+    // iPhone Septena, dropping Magic Plus on a Project creates a sibling Project.
+    .modifier(SidebarTaskDrop(kind: .project(project.id), mutator: taskMutator) {
+      newProjectInArea = parent
+      showingNewProject = true
+    })
   }
 
   // MARK: - Context menus
@@ -1753,6 +1767,7 @@ private struct SidebarTaskDrop: ViewModifier {
 
   let kind: Kind
   let mutator: TaskMutator
+  var onMagicPlusDrop: (() -> Void)? = nil
   @Environment(NavigationState.self) private var nav
   @Environment(\.usesPushNavigation) private var usesPushNavigation
   @Environment(\.modelContext) private var modelContext
@@ -1778,8 +1793,11 @@ private struct SidebarTaskDrop: ViewModifier {
                 delegate: SidebarTaskDropDelegate(isTargeted: $isTargeted) { ids in
                   guard !ids.isEmpty else { return false }
                   if TaskDragIDs.isNewTaskPayload(ids) {
-                    UserDefaults.standard.set(true, forKey: "septena.magicPlusDragHintSeen")
                     Haptics.tick()
+                    if let onMagicPlusDrop {
+                      onMagicPlusDrop()
+                      return true
+                    }
                     switch kind {
                     case .area(let areaId):
                       nav.go(to: .area(id: areaId))
@@ -1854,6 +1872,32 @@ private struct SidebarTaskDropDelegate: DropDelegate {
             !payload.ids.isEmpty
       else { return }
       DispatchQueue.main.async { _ = perform(payload.ids) }
+    }
+    return true
+  }
+}
+
+/// Catches Magic Plus drops landing on the Tasks index background (between
+/// area cards or below the last section) to create a new Area.
+private struct SidebarNewAreaDropDelegate: DropDelegate {
+  let onDropNewArea: () -> Void
+
+  func validateDrop(info: DropInfo) -> Bool {
+    info.hasItemsConforming(to: [.septenaTaskDragIDs])
+  }
+
+  func dropUpdated(info: DropInfo) -> DropProposal? {
+    DropProposal(operation: .copy)
+  }
+
+  func performDrop(info: DropInfo) -> Bool {
+    guard let provider = info.itemProviders(for: [.septenaTaskDragIDs]).first else { return false }
+    provider.loadDataRepresentation(forTypeIdentifier: UTType.septenaTaskDragIDs.identifier) { data, _ in
+      guard let data,
+            let payload = try? JSONDecoder().decode(TaskDragIDs.self, from: data),
+            TaskDragIDs.isNewTaskPayload(payload.ids)
+      else { return }
+      DispatchQueue.main.async { onDropNewArea() }
     }
     return true
   }
