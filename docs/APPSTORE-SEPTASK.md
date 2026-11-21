@@ -1,11 +1,12 @@
-# App Store metadata — Septask (source of truth)
+# App Store metadata: Septena, the task app (source of truth)
 
-This is the canonical store listing copy for **Septask**, the focused tasks app
-over Septena's own task data. `appstore/metadata.mjs` parses it (run with
+This is the canonical store listing copy for **Septena**, the task app (code
+name Septask; the name never ships). Septena Life's copy lives in
+`docs/APPSTORE.md`. `appstore/metadata.mjs` parses it (run with
 `SEPTENA_APP=septask`) into fastlane `deliver` metadata files
 (`appstore/metadata-septask/<locale>/*.txt`, and `metadata-septask-mac/` for the
 Mac app) and the viz manifest. Edit copy **here**, never in the generated `.txt`
-files. Septena's own copy lives in `docs/APPSTORE.md`.
+files.
 
 **Parse rules** (identical to APPSTORE.md; keep intact):
 
@@ -18,11 +19,15 @@ files. Septena's own copy lives in `docs/APPSTORE.md`.
 - A platform with `### status` of `planned` is parsed but not emitted.
 - Panel **visuals** live in `appstore/panels.septask.mjs`; copy lives here.
 
-**Listing strategy** (keep panels honest to this): angle is *a real, private,
-AI-drivable task manager* for people who want data ownership without the whole
-life OS (the Things crowd). The screenshots must prove **a focused task UI**,
-**today is a verb** (triage, not a dumping ground), and **your own AI can drive
-it**. Shots come from `SeptaskUITests/ScreenshotTests.swift` (names are the
+**Listing strategy** (keep panels honest to this, updated 2026-11-21): the
+angle is *tasks that think with you*: a native task app with AI that asks before
+it acts, built for the agents people already use, and open source. Sources:
+Starlings `/strategy/positioning-septena-the-task-app` and the feature map
+`/product/feature-map-septena-task-app` (use the app's words: Anytime, not
+Someday; sections, not headings; When for the start date). Claim only what
+ships; web, Android, Windows and self-hosting stay out of store copy until they
+ship. The screenshots must prove **a focused task UI**, **today is your call**
+(the Inbox waits above Today), and **your own agent can work a task**. Shots come from `SeptaskUITests/ScreenshotTests.swift` (names are the
 contract): `tasks-today`, `tasks-upcoming`, `tasks-project`.
 
 **Character limits** (validated by `appstore/validate.mjs`): name 30, subtitle
@@ -49,7 +54,7 @@ A task app that thinks with you, on iPhone, iPad, and Mac. Inbox, Today, and pro
 Septena is a task app that thinks with you. It is for people who want a short list and a clear day. Capture a thought in a second, sort it when you're ready, and decide what today holds before it decides for you.
 
 THE BASICS, DONE CAREFULLY
-Inbox, Today, Upcoming, and Someday, with areas, projects, and headings to group the work. Deadlines, repeating tasks, notes, and attachments. Your calendar events sit next to today's tasks, so you plan against the hours you actually have.
+Inbox, Today, Upcoming, and Anytime, with areas, projects, and sections to group the work. Deadlines, repeating tasks, notes, and attachments. Your calendar events sit next to today's tasks, so you plan against the hours you actually have.
 
 TODAY IS YOUR CALL
 New and loose tasks wait in the Inbox above Today. Nothing lands on your day until you put it there. Septena also learns where you usually file things and suggests the right project, on your device.
@@ -57,14 +62,14 @@ New and loose tasks wait in the Inbox above Today. Nothing lands on your day unt
 AI THAT ASKS FIRST
 Some tasks need a moment of thinking before anyone can act on them. Open one and Septena asks a short question with a few answers to tap. Where it can, it drafts, compares, or looks something up. Then it hands you the one step only you can take. It runs on your device first and reaches further only when you let it.
 
-YOUR CLAUDE, IN YOUR LIST
-Connect Claude and it can read, add, and organize your tasks with you. Anything an agent writes is marked, so you can always see what it touched.
+YOUR AGENTS, IN YOUR LIST
+Connect Claude or another agent that speaks MCP. Hand it a task and it claims it, asks you in the task when it needs a decision, and leaves the result for you to check. You can stop it on one task or pause every agent at once. Anything an agent writes is marked, so you can see what it touched.
 
 COMING FROM THINGS OR REMINDERS
-Import your Things database and keep your areas and projects. Reminders show up in your Inbox. Septena never changes the original data.
+Import from Things once and keep your areas, projects, and sections. Things stays as it is. Pick a Reminders list and its reminders wait in your Inbox; each one you import moves out of Reminders.
 
 OPEN SOURCE
-The code is public. You can read exactly how your tasks are handled.
+The apps and the sync server are open source under the MIT License, so your tasks never depend on us. You can read how they are stored and how agents reach them.
 
 Native on iPhone, iPad, and Mac, with your tasks in sync across all three.
 
@@ -74,7 +79,7 @@ task manager,to-do,todo,tasks,things,reminders,projects,inbox,today,productivity
 
 ### release_notes
 
-The first release of Septena: Inbox, Today, Upcoming, and Someday, with areas and projects, Things and Reminders import, AI that asks before it acts, and a connector for Claude. Native on iPhone, iPad, and Mac.
+The first release of Septena: Inbox, Today, Upcoming, and Anytime, with areas and projects, Things and Reminders import, AI that asks before it acts, and a connector for your agents. Native on iPhone, iPad, and Mac.
 
 ### support_url
 
@@ -126,7 +131,7 @@ A task app that thinks with you, built for the Mac: keyboard first, Quick Entry 
 Septena is a task app that thinks with you, built as a real Mac app for people who want a short list and a clear day. Every action has a keyboard shortcut, and Quick Entry opens from anywhere so you can capture a task without leaving what you're doing.
 
 THE BASICS, DONE CAREFULLY
-Inbox, Today, Upcoming, and Someday, with areas, projects, and headings to group the work. Deadlines, repeating tasks, notes, and attachments. Your calendar events sit next to today's tasks, so you plan against the hours you actually have.
+Inbox, Today, Upcoming, and Anytime, with areas, projects, and sections to group the work. Deadlines, repeating tasks, notes, and attachments. Your calendar events sit next to today's tasks, so you plan against the hours you actually have.
 
 TODAY IS YOUR CALL
 New and loose tasks wait in the Inbox above Today. Nothing lands on your day until you put it there. Septena also learns where you usually file things and suggests the right project, on your device.
@@ -134,14 +139,14 @@ New and loose tasks wait in the Inbox above Today. Nothing lands on your day unt
 AI THAT ASKS FIRST
 Some tasks need a moment of thinking before anyone can act on them. Open one and Septena asks a short question with a few answers to tap. Where it can, it drafts, compares, or looks something up. Then it hands you the one step only you can take. It runs on your device first and reaches further only when you let it.
 
-YOUR CLAUDE, IN YOUR LIST
-Connect Claude and it can read, add, and organize your tasks with you. Anything an agent writes is marked, so you can always see what it touched.
+YOUR AGENTS, IN YOUR LIST
+Connect Claude or another agent that speaks MCP. Hand it a task and it claims it, asks you in the task when it needs a decision, and leaves the result for you to check. You can stop it on one task or pause every agent at once. Anything an agent writes is marked, so you can see what it touched.
 
 COMING FROM THINGS OR REMINDERS
-Import your Things database and keep your areas and projects. Reminders show up in your Inbox. Septena never changes the original data.
+Import from Things once and keep your areas, projects, and sections. Things stays as it is. Pick a Reminders list and its reminders wait in your Inbox; each one you import moves out of Reminders.
 
 OPEN SOURCE
-The code is public. You can read exactly how your tasks are handled.
+The apps and the sync server are open source under the MIT License, so your tasks never depend on us. You can read how they are stored and how agents reach them.
 
 Your tasks stay in sync across your Mac, iPhone, and iPad.
 
@@ -151,7 +156,7 @@ task manager,to-do,todo,tasks,things,reminders,projects,productivity,gtd,ai,clau
 
 ### release_notes
 
-The first release of Septena on the Mac: keyboard-first lists, Quick Entry from anywhere, areas and projects, Things and Reminders import, AI that asks before it acts, and a connector for Claude.
+The first release of Septena on the Mac: keyboard-first lists, Quick Entry from anywhere, areas and projects, Things and Reminders import, AI that asks before it acts, and a connector for your agents.
 
 ### support_url
 

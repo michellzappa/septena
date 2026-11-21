@@ -18,7 +18,7 @@ solution. Not a chatbot bolted onto tasks — a **decision machine**: the agent
 grounds the task, then hands you the smallest possible choice. Free text is the
 escape hatch, never the default surface.
 
-Status: **design dry-run done, nothing built.** Derived from two manual
+Status when written: **design dry-run done, nothing built** (see the Shipped note above). Derived from two manual
 walk-throughs of task `2zzxx2` (see Appendix). UX/data in §1–4, engine in §5–6,
 build phasing in §7.
 
