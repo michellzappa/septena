@@ -133,6 +133,11 @@ private struct TaskCardChrome: ViewModifier {
   var isSelected: Bool = false
   var isEditing: Bool = false
   @State private var hovered = false
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+  @Environment(\.colorScheme) private var colorScheme
+  #if SEPTASK
+  private let appearance = AppearancePreferences.shared
+  #endif
 
   private var effectiveShape: UnevenRoundedRectangle {
     #if os(iOS)
@@ -142,13 +147,37 @@ private struct TaskCardChrome: ViewModifier {
     #endif
   }
 
+  private var useLiquidGlass: Bool {
+    #if SEPTASK
+    return appearance.hasActiveTexture && !reduceTransparency && !isEditing
+    #else
+    return false
+    #endif
+  }
+
   func body(content: Content) -> some View {
     let shape = effectiveShape
     content
       .environment(\.rowHInset, TaskCardMetrics.contentInset)
       .background(alignment: .bottom) {
         ZStack(alignment: .bottom) {
-          shape.fill((isSelected && !isEditing) ? Theme.listSelectionFill : Theme.cardSurface)
+          if useLiquidGlass {
+            shape.fill(.ultraThinMaterial)
+            shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.56 : 0.66))
+            if isSelected {
+              shape.fill(Theme.listSelectionFill)
+            }
+            if (position == .top || position == .solo) && !isSelected {
+              VStack(spacing: 0) {
+                Color.white.opacity(colorScheme == .dark ? 0.14 : 0.72)
+                  .frame(height: 0.75)
+                Spacer(minLength: 0)
+              }
+              .clipShape(shape)
+            }
+          } else {
+            shape.fill((isSelected && !isEditing) ? Theme.listSelectionFill : Theme.cardSurface)
+          }
           #if os(iOS)
           if isEditing {
             shape.strokeBorder(Theme.border, lineWidth: 0.5)

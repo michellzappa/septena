@@ -342,10 +342,15 @@ struct SelectableScrollList<Content: View>: View {
       .frame(maxWidth: .infinity, alignment: .topLeading)
       #endif
       .background {
-        canvasFill
-          .ignoresSafeArea()
-          .contentShape(Rectangle())
-          .onTapGesture { onClear() }
+        ZStack(alignment: .top) {
+          canvasFill
+          #if SEPTASK
+          HeaderWashView()
+          #endif
+        }
+        .ignoresSafeArea()
+        .contentShape(Rectangle())
+        .onTapGesture { onClear() }
       }
       .softTopScrollEdgeEffectCompat()
       .environment(\.selectableRowActions, SelectableRowActions(

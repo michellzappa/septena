@@ -166,6 +166,7 @@ final class SeptaskKitTaskListController: NSViewController {
 
   private let tableView = SeptaskKitTableView()
   private let scrollView = NSScrollView()
+  private let headerWashView = KitHeaderWashView()
   private let emptyLabel = NSTextField(labelWithString: String(localized: "No Tasks",
                                                                 comment: "SeptaskKit: empty list"))
   private var rows: [Row] = []
@@ -519,8 +520,8 @@ final class SeptaskKitTaskListController: NSViewController {
 
     scrollView.documentView = tableView
     scrollView.hasVerticalScroller = true
-    scrollView.drawsBackground = true
-    scrollView.backgroundColor = SeptaskKitTheme.pageBackground
+    scrollView.drawsBackground = false
+    scrollView.contentView.drawsBackground = false
     // Breathing room above the first card and below the last — Things-style;
     // without it the list runs flush to the window's top and bottom edges.
     // `contentInsets` (not a spacer row) is the standard way to do this: it
@@ -541,7 +542,26 @@ final class SeptaskKitTaskListController: NSViewController {
     // a bare strip of tasks. This is the standard NSWindow title reveal, driven
     // by the clip view's own bounds notification; no NSEvent monitor.
     scrollView.contentView.postsBoundsChangedNotifications = true
-    view = scrollView
+
+    // Backdrop hosts the solid page fill + top-bleed procedural Header Wash
+    // behind the transparent scroll view so geometry extends all the way up
+    // behind the unified title bar and breathes behind translucent top cards.
+    let container = KitPageBackdropView()
+    headerWashView.translatesAutoresizingMaskIntoConstraints = false
+    scrollView.translatesAutoresizingMaskIntoConstraints = false
+    container.addSubview(headerWashView)
+    container.addSubview(scrollView)
+    NSLayoutConstraint.activate([
+      headerWashView.topAnchor.constraint(equalTo: container.topAnchor),
+      headerWashView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+      headerWashView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+      headerWashView.heightAnchor.constraint(equalToConstant: 256),
+      scrollView.topAnchor.constraint(equalTo: container.topAnchor),
+      scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+      scrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+      scrollView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+    ])
+    view = container
 
     emptyLabel.font = SeptaskKitTheme.taskTitle
     emptyLabel.textColor = SeptaskKitTheme.iconMuted
@@ -637,6 +657,36 @@ final class SeptaskKitTaskListController: NSViewController {
     ) { [weak self] _ in
       MainActor.assumeIsolated { self?.syncWindowTitle() }
     })
+    observers.append(NotificationCenter.default.addObserver(
+      forName: .septenaAppearanceChanged, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.refreshAppearance() }
+    })
+  }
+
+  /// Repaint the Header Wash, card surfaces, selection washes, and custom fruit
+  /// checkboxes live when the user updates Appearance settings.
+  private func refreshAppearance() {
+    view.needsDisplay = true
+    headerWashView.reloadConfig()
+    tableView.enumerateAvailableRowViews { rowView, _ in
+      rowView.needsDisplay = true
+      for col in 0..<rowView.numberOfColumns {
+        if let cell = rowView.view(atColumn: col) as? NSView {
+          Self.refreshCheckboxes(in: cell)
+        }
+      }
+    }
+  }
+
+  private static func refreshCheckboxes(in view: NSView) {
+    if let checkbox = view as? KitCheckboxView {
+      checkbox.refreshAppearance()
+      return
+    }
+    for sub in view.subviews {
+      refreshCheckboxes(in: sub)
+    }
   }
 
   /// Keep the first card clear of the title bar. The bar's height is the
@@ -675,6 +725,7 @@ final class SeptaskKitTaskListController: NSViewController {
     let today = SeptenaDate.today
     guard force || today != renderedDay else { return }
     renderedDay = today
+    headerWashView.dayISO = today
     scheduleReload(locallyChanged: [])
   }
 
@@ -699,6 +750,11 @@ final class SeptaskKitTaskListController: NSViewController {
     commitOpenEdits()
     cancelSettle()
     self.filter = filter
+    if case .project(let id) = filter {
+      headerWashView.projectID = id
+    } else {
+      headerWashView.projectID = nil
+    }
     reload(animated: false)
     if tableView.numberOfRows > 0 {
       tableView.scrollRowToVisible(0)

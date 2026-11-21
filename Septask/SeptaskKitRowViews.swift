@@ -56,7 +56,12 @@ final class KitCheckboxView: NSButton {
   }
 
   private var usesStandardBox: Bool {
-    isDone || !isDashed
+    if isDone && !AppearancePreferences.shared.isColorful { return false }
+    return isDone || !isDashed
+  }
+
+  func refreshAppearance() {
+    syncDisplay()
   }
 
   override var intrinsicContentSize: NSSize {
@@ -216,6 +221,22 @@ final class KitCheckboxView: NSButton {
     let box = NSRect(x: (bounds.width - Self.boxSize) / 2,
                      y: (bounds.height - Self.boxSize) / 2,
                      width: Self.boxSize, height: Self.boxSize)
+    if isDone {
+      let path = NSBezierPath(roundedRect: box, xRadius: Self.corner, yRadius: Self.corner)
+      SeptaskKitTheme.checkboxFill.setFill()
+      path.fill()
+
+      let check = NSBezierPath()
+      check.lineWidth = 1.75
+      check.lineCapStyle = .round
+      check.lineJoinStyle = .round
+      check.move(to: NSPoint(x: box.minX + box.width * 0.23, y: box.minY + box.height * 0.53))
+      check.line(to: NSPoint(x: box.minX + box.width * 0.43, y: box.minY + box.height * 0.72))
+      check.line(to: NSPoint(x: box.minX + box.width * 0.78, y: box.minY + box.height * 0.30))
+      SeptaskKitTheme.checkboxCheck.setStroke()
+      check.stroke()
+      return
+    }
     let inset = box.insetBy(dx: Self.stroke / 2, dy: Self.stroke / 2)
     let path = NSBezierPath(roundedRect: inset, xRadius: Self.corner, yRadius: Self.corner)
     path.lineWidth = Self.stroke
@@ -864,13 +885,31 @@ final class KitCardRowView: NSTableRowView {
     }
     NSGraphicsContext.saveGraphicsState()
     NSBezierPath(rect: bounds).setClip()
-    SeptaskKitTheme.cardSurface.setFill()
-    slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup).fill()
+    let slice = slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup)
+    let useGlass = AppearancePreferences.shared.hasActiveTexture
+      && !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+      && !isComposing
+    if useGlass {
+      let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+      SeptaskKitTheme.cardSurface.withAlphaComponent(isDark ? 0.62 : 0.74).setFill()
+      slice.fill()
+      if isFirstInGroup && !isSelected {
+        NSGraphicsContext.saveGraphicsState()
+        slice.addClip()
+        let rim = NSRect(x: bounds.minX, y: bounds.minY, width: bounds.width, height: 0.75)
+        NSColor.white.withAlphaComponent(isDark ? 0.14 : 0.75).setFill()
+        rim.fill()
+        NSGraphicsContext.restoreGraphicsState()
+      }
+    } else {
+      SeptaskKitTheme.cardSurface.setFill()
+      slice.fill()
+    }
     // Selection rides on the card (same clip, selection-run rounding) so it
     // cannot overhang as a second rectangle. Composer owns the surface.
     if isSelected && !isComposing && !isEditingTitle {
       SeptaskKitTheme.listSelectionFill(emphasized: septaskSelectionIsActive).setFill()
-      slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup).fill()
+      slice.fill()
     }
     // Promote wash — SwiftUI's `playPromoteWash()`, same gold at the same
     // 0.22 peak, fading to nothing. It is NOT a second selection language:
@@ -878,7 +917,7 @@ final class KitCardRowView: NSTableRowView {
     // rather than the selection token, and it never persists on a row.
     if promoteWash > 0 {
       SeptaskKitTheme.todayAccent.withAlphaComponent(promoteWash).setFill()
-      slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup).fill()
+      slice.fill()
     }
     NSGraphicsContext.restoreGraphicsState()
     drawDropLine()
