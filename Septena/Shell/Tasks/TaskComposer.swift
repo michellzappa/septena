@@ -229,13 +229,6 @@ struct TaskComposerCard: View {
     return nil
   }
 
-  /// Whether the notes field is present. It starts collapsed so the composer
-  /// opens as a single title line (create *and* edit) and only appears once the
-  /// task actually has notes or the user reveals it via the Notes pill. When
-  /// hidden, the rail shows an elective "Notes" pill instead (see
-  /// `TaskAttributeBar`).
-  private var showsNotesField: Bool { !draft.notes.isEmpty || focus == .notes }
-
   private var headerTitle: String { isEditing ? "Edit To-Do" : "New Task" }
   private var saveTitle: String { isEditing ? "Save" : "Add" }
 
@@ -401,10 +394,7 @@ struct TaskComposerCard: View {
       titleNotesCard
 
       Group {
-        if showsNotesField {
-          notesField
-            .transition(.opacity.combined(with: .move(edge: .top)))
-        }
+        notesField
 
         quickEntryChips
 
@@ -451,16 +441,13 @@ struct TaskComposerCard: View {
     // composer — it fires a pill the user tabbed to, and nothing otherwise.
     .onKeyPress(.space) { activateFocused() }  // septena-lint:allow task-space-binding
     .onKeyPress(.return) { activateFocused() }
-    .a11yAnimation(.snappy(duration: 0.22), value: showsNotesField)
   }
 
   // MARK: - Title / notes
 
   @ViewBuilder
   private var titleNotesCard: some View {
-    // Title only — notes moved to an elective pill in the attribute bar so the
-    // card stays a single clean line; tapping the Notes pill expands an inline
-    // editor like the When / Deadline / Repeat controls.
+    // Title sits at the top; the notes field always sits directly below it.
     if presentation == .inline {
       // Mirror the static row: a baseline-aligned checkbox + the title as a
       // plain field, no boxed background — so the expanded row reads as the same
@@ -562,11 +549,9 @@ struct TaskComposerCard: View {
   }
 
   /// Notes — a multi-line field sitting directly under the title (Things-style),
-  /// no box and no Clear button. It's collapsed by default (`showsNotesField`)
-  /// so the composer opens on a single title line; it appears once the task has
-  /// notes or the Notes pill reveals it. Return inserts a newline here (it's
-  /// prose), so — unlike the title — there's no Return-to-save; Tab still
-  /// cycles focus.
+  /// always visible (no Notes pill) with a quiet "Notes" placeholder when empty.
+  /// Return inserts a newline here (it's prose), so — unlike the title — there's
+  /// no Return-to-save; Tab still cycles focus.
   private var notesField: some View {
     TaskMarkdownNotesEditor(
       text: $draft.notes, focus: $focus,
@@ -925,12 +910,9 @@ struct TaskComposerCard: View {
 
   // MARK: - Keyboard focus traversal
 
-  /// Tab order: title → every pill (including Discuss when edit mode offers it).
+  /// Tab order: title → notes → every pill (including Discuss when edit mode offers it).
   private var focusOrder: [TaskEditFocus] {
-    // Notes is either the revealed field (`.notes`) or, when collapsed, the
-    // rail's elective pill (`.pill(.notes)`) — never both.
-    var order: [TaskEditFocus] = [.title]
-    order.append(showsNotesField ? .notes : .pill(.notes))
+    var order: [TaskEditFocus] = [.title, .notes]
     order += TaskAttributeBar.Attribute.draftCases.map { .pill($0) }
     if isEditing { order.append(.pill(.attachments)) }
     if discussKickoffVisible {

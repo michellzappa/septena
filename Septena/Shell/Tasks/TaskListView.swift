@@ -702,7 +702,7 @@ struct TaskListView: View {
     .environment(\.rowVInset, Theme.rowVPaddingTight)
     .scrollDismissesKeyboard(.interactively)
     .modifier(TaskListToolbarChrome(showsEmbeddedNewTask: showsEmbeddedNewTaskToolbar,
-                                    onNew: { openContextualQuickAdd() }))
+                                    onNew: { handleExternalCreateTrigger() }))
     // Unified chrome (docs/PAGE_CHROME_SPEC.md): standalone task lists get the
     // constant gear (→ Settings) and a contextual "+" (new task). On iPad
     // regular the "+" merges with the sidebar's "···" in the tab bar; on iPhone
@@ -710,7 +710,7 @@ struct TaskListView: View {
     .modifier(TaskListStandaloneChrome(embedded: embedded,
                                        recentlyDeleted: filter == .recentlyDeleted || filter == .faded,
                                        showsViewOptions: filter == .today,
-                                       onNew: { openContextualQuickAdd() }))
+                                       onNew: { handleExternalCreateTrigger() }))
     // (Keyboard navigation — ↑↓ traversal, Return/Esc, focus reclaim —
     // is owned by `SelectableScrollList`; the `+` toolbar button and ⌘N still
     // open the composer via `shouldStartCreating` → `openContextualQuickAdd()`.)
@@ -1025,6 +1025,15 @@ struct TaskListView: View {
     }
   }
 
+  /// External "+" / ⌘N trigger. On iOS, tapping "+" while an inline editor is
+  /// already open closes that editor instead of jumping into a new editor mode.
+  private func handleExternalCreateTrigger() {
+    #if os(iOS)
+    if closeActiveEditIfNeeded() { return }
+    #endif
+    openContextualQuickAdd()
+  }
+
   /// Consume the app-global create request from both first appearance and
   /// subsequent command deliveries. Keeping this imperative work outside the
   /// already-large SwiftUI modifier expression also gives every target the
@@ -1035,7 +1044,7 @@ struct TaskListView: View {
     // An unanswered request expires on its own (`NavigationState.requestNewTask`).
     guard isOnScreen, nav.shouldStartCreating else { return }
     nav.shouldStartCreating = false
-    openContextualQuickAdd()
+    handleExternalCreateTrigger()
   }
 
   // MARK: - Inline editing
@@ -1244,8 +1253,6 @@ struct TaskListView: View {
       inputActive: listInputActive,
       selectable: usesSelectionModel,
       onActivate: activateRow,
-      // While an editor is open, one tap on another row moves it there (iPad).
-      activatesOnTap: expandedEditId != nil,
       onClear: { closeEditOrClearSelection() },
       onMoveShortcut: openMoveForSelected,
       scrollToTick: scrollToTargetTick,
@@ -1329,6 +1336,9 @@ struct TaskListView: View {
     .background(.bar)
   }
 
+  /// True while an inline task editor is expanded in this list.
+  private var isInlineEditing: Bool { expandedEditId != nil }
+
   /// True while a field/editor owns the keyboard — the composer drawer or an
   /// expanded inline editor. Drives the `SelectableScrollList`'s key-suppression
   /// + focus-reclaim.
@@ -1381,6 +1391,14 @@ struct TaskListView: View {
   /// twin of clicking the row, so keyboard (Return) and pointer (double-click /
   /// tap) share one path.
   private func activateRow(_ id: String) {
+    #if os(iOS)
+    // On iOS, tapping outside an open inline editor only closes it — never
+    // transitions into another task editor or quick-add editor.
+    if expandedEditId != nil {
+      collapseEdit()
+      return
+    }
+    #endif
     if suppressActivationAfterSelectionCloseId == id {
       suppressActivationAfterSelectionCloseId = nil
       return
@@ -1478,6 +1496,7 @@ struct TaskListView: View {
       inboxCollapsed.toggle()
     }
     .modifier(todayMoveDrop(.inbox))
+    .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
   }
 
   /// A foldable section header — same anatomy as the area `groupHeader` (icon
@@ -1595,6 +1614,7 @@ struct TaskListView: View {
       .padding(.horizontal, TaskCardMetrics.headerLeading)
       .padding(.vertical, 12)
       .asListRow()
+      .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
 
     Color.clear
@@ -1629,9 +1649,11 @@ struct TaskListView: View {
         Spacer(minLength: 0)
       }
       .plainListChrome()
+      .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     } else {
       embeddedHeader()
         .plainListChrome()
+        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
   }
 
@@ -1653,6 +1675,7 @@ struct TaskListView: View {
         }
         .transition(.opacity.combined(with: .move(edge: .top)))
         .plainListChrome()
+        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
         noticeStepRows(notice.steps)
       }
     } else if filter == .faded, !visibleItems.isEmpty {
@@ -1672,6 +1695,7 @@ struct TaskListView: View {
         .controlSize(.small)
       }
       .plainListChrome()
+      .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
   }
 
@@ -1704,6 +1728,7 @@ struct TaskListView: View {
         .taskCardChrome(position, isSelected: isSelected)
         .taskCardContextMenu(position) { noticeStepMenu(step) }
         .transition(.opacity.combined(with: .move(edge: .top)))
+        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
   }
 
@@ -1804,6 +1829,7 @@ struct TaskListView: View {
       // (no setup CTAs here, so an unconfigured user sees nothing).
       RemindersInboxSection(onImported: { Task { await load() } }, showsSetupCTAs: false)
         .plainListChrome()
+        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
   }
 
@@ -1928,12 +1954,18 @@ struct TaskListView: View {
       let position = TaskCardPosition(index: idx, count: rows.count)
       if expandedEditId == task.id {
         taskRow(task, quickMenu: false)
-          .taskCardChrome(position, isSelected: true)
+          .taskCardChrome(position, isSelected: false, isEditing: true)
+          .zIndex(1)
       } else {
         ReviewTaskRow(
           task: task,
           isSelected: selection.contains(task.id),
-          onOpen: { beginEdit(task) },
+          onOpen: {
+            #if os(iOS)
+            if closeActiveEditIfNeeded() { return }
+            #endif
+            beginEdit(task)
+          },
           onAccept: { toggle(task) },
           onSendBack: { note in
             Haptics.tick()
@@ -1944,6 +1976,7 @@ struct TaskListView: View {
         .asListRow()
         .taskCardChrome(position, isSelected: selection.contains(task.id))
         .taskCardContextMenu(position) { taskContextMenu(for: task) }
+        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
       }
     }
   }
@@ -2107,6 +2140,7 @@ struct TaskListView: View {
       handleHeadingDrop(ids: ids, targetHeading: heading, before: before)
     }))
     .contextMenu { headingContextMenu(heading) }
+    .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
   }
 
   @ViewBuilder
@@ -2144,6 +2178,7 @@ struct TaskListView: View {
     }
     .buttonStyle(PlainHoverRowButtonStyle())
     .asListRow()
+    .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
   }
 
   /// A reorder drop inside a project's grouped list. The drop target is a task
@@ -2276,6 +2311,7 @@ struct TaskListView: View {
     .buttonStyle(PlainHoverRowButtonStyle())
     .padding(.top, loggedFooterGap)
     .asListRow()
+    .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
   }
 
   /// completed tasks for this list. Reuses `row(_:)` so checkboxes and context
@@ -2324,6 +2360,7 @@ struct TaskListView: View {
     // the button, so the gap isn't a tap target.
     .padding(.top, loggedFooterGap)
     .asListRow()
+    .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
   }
 
   /// Active project ids belonging to `areaId` — filing scope on area pages.
@@ -3145,10 +3182,14 @@ struct TaskListView: View {
   @ViewBuilder
   private var quickAddFootCard: some View {
     if allowsInlineCreate {
+      let isEditingHere = quickAddCaptureTask.map { expandedEditId == $0.id } == true
       quickAddLine()
         .asListRow()
         .taskCardChrome(.solo,
-                        isSelected: selection.contains(Self.quickAddScrollID))
+                        isSelected: isEditingHere ? false : selection.contains(Self.quickAddScrollID),
+                        isEditing: isEditingHere)
+        .zIndex(isEditingHere ? 1 : 0)
+        .inlineEditDimmed(isInlineEditing && !isEditingHere, onDismiss: collapseEdit)
     }
   }
 
@@ -3156,13 +3197,19 @@ struct TaskListView: View {
   @ViewBuilder
   private var quickAddTopRow: some View {
     if allowsInlineCreate {
-      if usesSingleOpenTaskCard {
+      let isEditingHere = quickAddCaptureTask.map { expandedEditId == $0.id } == true
+      if usesSingleOpenTaskCard || isEditingHere {
         quickAddLine()
           .asListRow()
           .taskCardChrome(.solo,
-                          isSelected: selection.contains(Self.quickAddScrollID))
+                          isSelected: isEditingHere ? false : selection.contains(Self.quickAddScrollID),
+                          isEditing: isEditingHere)
+          .zIndex(isEditingHere ? 1 : 0)
+          .inlineEditDimmed(isInlineEditing && !isEditingHere, onDismiss: collapseEdit)
       } else {
-        quickAddLine().asListRow()
+        quickAddLine()
+          .asListRow()
+          .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
       }
     }
   }
@@ -3625,16 +3672,16 @@ struct TaskListView: View {
     let todayReorder = filter == .today
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
       let position = TaskCardPosition(index: idx, count: cardCount)
+      let isExpanded = expandedEditId == task.id
       taskRow(task, quickMenu: quickMenu?(task) ?? false)
         .modifier(todayMoveDrop(todayReorder ? nil : moveDropTarget))
         .taskCardChrome(position,
-                        // The "active" row — the selected row OR the one open in
-                        // the inline editor — carries the neutral selection fill,
-                        // so opening a task to edit it keeps (rather than strips)
-                        // the "this is the row you're on" anchor. Subtle by design:
-                        // it's the same unemphasized gray as a plain selection,
-                        // Things/Reminders-style, never the section accent.
-                        isSelected: selection.contains(task.id) || expandedEditId == task.id)
+                        // An open inline editor keeps the clean card surface
+                        // instead of painting the whole editor in selection blue;
+                        // on iOS it lifts as a rounded focus card while siblings
+                        // fade back. Closed selected rows keep the selection fill.
+                        isSelected: isExpanded ? false : selection.contains(task.id),
+                        isEditing: isExpanded)
         // After the chrome, so the iOS lift preview includes the card
         // background, clipped to this row's slice of the card.
         .taskCardContextMenu(position) { taskContextMenu(for: task) }
@@ -3649,8 +3696,12 @@ struct TaskListView: View {
                 : handleReorderDrop(ids: ids, target: task, before: before,
                                     refileTo: todayReorder ? moveDropTarget : nil) }
           : nil))
+        .zIndex(isExpanded ? 1 : 0)
+        .inlineEditDimmed(isInlineEditing && !isExpanded, onDismiss: collapseEdit)
     }
     if appendQuickAdd {
+      let isEditingQuickAdd = quickAddShowsEditor
+        && quickAddCaptureTask.map { expandedEditId == $0.id } == true
       quickAddLine(showsEditor: quickAddShowsEditor)
         .asListRow()
         // The quick-add trigger is a selectable row (it carries the sentinel id
@@ -3660,7 +3711,10 @@ struct TaskListView: View {
         // invisible for one row, which reads as "the New task line can't be
         // selected by keyboard" even though Return would have opened it.
         .taskCardChrome(TaskCardPosition(index: rows.count, count: cardCount),
-                        isSelected: selection.contains(Self.quickAddScrollID))
+                        isSelected: isEditingQuickAdd ? false : selection.contains(Self.quickAddScrollID),
+                        isEditing: isEditingQuickAdd)
+        .zIndex(isEditingQuickAdd ? 1 : 0)
+        .inlineEditDimmed(isInlineEditing && !isEditingQuickAdd, onDismiss: collapseEdit)
     }
   }
 
@@ -3710,6 +3764,7 @@ struct TaskListView: View {
       .textCase(nil)
       .selectionDisabled()
       .modifier(todayMoveDrop(moveDropTarget))
+      .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
   }
 
   private func groupHeaderBody(icon: String?, title: String,
@@ -3846,6 +3901,7 @@ struct TaskListView: View {
         .padding(.horizontal, TaskCardMetrics.margin)
         .padding(.bottom, 8)
         .plainListChrome()
+        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
   }
 
@@ -3861,7 +3917,9 @@ struct TaskListView: View {
         // The day's calendar events frame it first (the agenda), then the tasks
         // scheduled for that day — matching Today, where the agenda sits on top.
         if !bucket.events.isEmpty {
-          calendarEventsBlock(bucket.events).taskCardChrome(.solo)
+          calendarEventsBlock(bucket.events)
+            .taskCardChrome(.solo)
+            .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
         }
         cardedRows(bucket.tasks)
       } header: {

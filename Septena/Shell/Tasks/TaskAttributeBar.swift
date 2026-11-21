@@ -1,8 +1,8 @@
 import SwiftUI
 
-// The composer's elective-pill rail — the row of Today / When / Deadline /
-// Repeat / List / Notes capsules under the title — and the inline panels a
-// pill expands into. Split out of TaskComposer.swift.
+// The composer's elective-pill rail — the row of When / Deadline / Repeat /
+// List / Attachments / Discuss capsules under the title & notes — and the
+// inline panels a pill expands into. Split out of TaskComposer.swift.
 //
 // `TaskAttributeBar` is the entry point; the pill and the three inline panels
 // are private to this file.
@@ -40,12 +40,7 @@ struct TaskAttributeBar: View {
   /// every pill is wired identically — one `ForEach`, one `select(_:)` — and the
   /// rail grows by adding a case, not another hand-written call.
   enum Attribute: Identifiable {
-    // Notes IS an elective, but a special one: its pill only shows while notes
-    // are empty/unrevealed; selecting it reveals the multi-line notes field
-    // above the rail (see `TaskComposerCard.showsNotesField`) rather than
-    // expanding an inline panel. Not part of `draftCases` — it's rendered
-    // conditionally, like `.attachments`.
-    case notes, when, deadline, repeatRule, list, attachments
+    case when, deadline, repeatRule, list, attachments
     /// Edit-mode AI kickoff — rendered separately, not part of `draftCases`.
     case discuss
     var id: Self { self }
@@ -55,7 +50,6 @@ struct TaskAttributeBar: View {
 
     var icon: String {
       switch self {
-      case .notes:      "text.alignleft"
       case .when:       "calendar"
       case .deadline:   "flag"
       case .repeatRule: "repeat"
@@ -66,7 +60,6 @@ struct TaskAttributeBar: View {
     }
     var label: String {
       switch self {
-      case .notes:      "Notes"
       case .when:       "When"
       case .deadline:   "Deadline"
       case .repeatRule: "Repeat"
@@ -110,16 +103,6 @@ struct TaskAttributeBar: View {
       // When control (quick chip) instead of duplicating the rail. Flat
       // capsule fills (no floating glass) — these sit inline on the form card.
       FlowLayout(spacing: 8) {
-        // Notes lead the rail, but only while collapsed — once the field is
-        // revealed (notes present or focused) it hosts the notes instead, so
-        // the pill and the field are never both on screen.
-        if draft.notes.isEmpty, focus != .notes {
-          AttributePill(icon: Attribute.notes.icon, label: Attribute.notes.label,
-                        value: nil, isSet: false, isActive: false,
-                        isFocused: focus == .pill(.notes),
-                        accent: accent, neutral: neutral) { revealNotes() }
-            .focused($focus, equals: .pill(.notes))
-        }
         ForEach(Attribute.draftCases) { attr in
           AttributePill(icon: attr.icon, label: attr.label,
                         value: value(for: attr), isSet: isSet(attr),
@@ -179,7 +162,6 @@ struct TaskAttributeBar: View {
   /// values are derived from the draft — the single read-side of the rail.
   private func value(for attr: Attribute) -> String? {
     switch attr {
-    case .notes: return nil
     case .discuss: return nil
     case .attachments: return nil
     // "When" folds in Today: a task pinned to today (no date) reads "Today", a
@@ -201,7 +183,6 @@ struct TaskAttributeBar: View {
   /// Whether a pill counts as "filled" — drives the accent tint.
   private func isSet(_ attr: Attribute) -> Bool {
     switch attr {
-    case .notes:      !draft.notes.isEmpty
     case .discuss:    discussWorking
     case .attachments: discussTask.map { SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: $0.id) > 0 } ?? false
     case .when:       draft.scheduled != nil || draft.onToday
@@ -211,22 +192,29 @@ struct TaskAttributeBar: View {
     }
   }
 
+  /// Inline cards already sit on `Theme.cardSurface` (`secondaryGroupedBackground`),
+  /// so expanded picker panels inside them step down to `Theme.mutedSurface` to
+  /// keep a distinct surface; the drawer sits on `groupedBackground`.
+  private var panelFill: Color {
+    neutral ? Theme.mutedSurface : Theme.secondaryGroupedBackground
+  }
+
   @ViewBuilder
   private var inlineEditor: some View {
     // One transition for every inline panel — they all slide down from the rail.
     Group {
       switch expanded {
-      case .when:       InlineWhenPanel(draft: $draft)
-      case .deadline:   InlineDatePanel(date: $draft.deadline)
+      case .when:       InlineWhenPanel(draft: $draft, fill: panelFill)
+      case .deadline:   InlineDatePanel(date: $draft.deadline, fill: panelFill)
       case .repeatRule: InlineRepeatPanel(recurrence: $draft.recurrence,
                                           hasScheduledDate: draft.scheduled != nil,
-                                          accent: accent) {
+                                          accent: accent,
+                                          fill: panelFill) {
         a11yAnimate(.snappy(duration: 0.22)) { expanded = nil }
       }
       case .attachments:
         if let task = discussTask { TaskAttachmentsPanel(taskID: task.id) }
-      // Notes reveals a field above the rail, not an inline panel here.
-      case .notes, .discuss, .list, .none: EmptyView()
+      case .discuss, .list, .none: EmptyView()
       }
     }
     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -234,8 +222,7 @@ struct TaskAttributeBar: View {
 
   /// The single dispatch for every pill: sheet-backed pills open their sheet,
   /// inline pills toggle the expanded panel. Per-attribute setup (Repeat seeding
-  /// a default, Notes autofocusing) lives in each panel's `onAppear`, so this
-  /// stays uniform.
+  /// a default) lives in each panel's `onAppear`, so this stays uniform.
   private func select(_ attr: Attribute) {
     if attr == .discuss {
       startDiscuss()
@@ -252,13 +239,6 @@ struct TaskAttributeBar: View {
         expanded = (expanded == attr) ? nil : attr
       }
     }
-  }
-
-  /// Reveal the notes field above the rail and drop the keyboard cursor into
-  /// it. `showsNotesField` keys off `focus == .notes`, so this both shows the
-  /// field and focuses it in one move.
-  private func revealNotes() {
-    a11yAnimate(.snappy(duration: 0.22)) { focus = .notes }
   }
 
   private func startDiscuss() {
@@ -357,6 +337,7 @@ private struct AttributePill: View {
 /// keeps the task in Anytime.
 private struct InlineWhenPanel: View {
   @Binding var draft: TaskDraft
+  let fill: Color
 
   var body: some View {
     TaskDateBoard(
@@ -367,7 +348,7 @@ private struct InlineWhenPanel: View {
       onPick: { d in a11yAnimate(.snappy(duration: 0.2)) { draft.setScheduled(d) } },
       onClear: { a11yAnimate(.snappy(duration: 0.2)) { draft.clearWhen() } })
     .padding(12)
-    .background(Theme.secondaryGroupedBackground,
+    .background(fill,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
   }
 }
@@ -380,6 +361,7 @@ private struct InlineWhenPanel: View {
 /// It used to be a bare month calendar with no relative choices at all.
 private struct InlineDatePanel: View {
   @Binding var date: Date?
+  let fill: Color
   @Environment(DayClock.self) private var clock
 
   private var cal: Calendar { Calendar.current }
@@ -396,7 +378,7 @@ private struct InlineDatePanel: View {
       onPick: { d in a11yAnimate(.snappy(duration: 0.2)) { date = cal.startOfDay(for: d) } },
       onClear: { a11yAnimate(.snappy(duration: 0.2)) { date = nil } })
     .padding(12)
-    .background(Theme.secondaryGroupedBackground,
+    .background(fill,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
   }
 }
@@ -413,6 +395,7 @@ private struct InlineRepeatPanel: View {
   /// offering a choice that doesn't do what it says.
   let hasScheduledDate: Bool
   let accent: Color
+  let fill: Color
   /// Collapse the rail's expanded panel. "Don't Repeat" calls it (clear + close);
   /// owned by `TaskAttributeBar.expanded`.
   var onStop: () -> Void = {}
@@ -485,7 +468,7 @@ private struct InlineRepeatPanel: View {
       .foregroundStyle(Theme.overdueRed)
     }
     .padding(12)
-    .background(Theme.secondaryGroupedBackground,
+    .background(fill,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     // Opening shows a weekly preview so the controls have something to bind, but
     // it's only a peek: `confirmed` stays false until a real edit, and an
@@ -509,10 +492,3 @@ private struct InlineRepeatPanel: View {
     }
   }
 }
-
-// MARK: - Inline notes editor
-
-/// A multi-line notes field that writes `draft.notes`, expanded under the Notes
-/// pill. Autofocuses on appear (you tapped the pill to write), and offers a
-/// "Clear" when there's text — the same shape as the When / Deadline panels.
-// MARK: - Presentation

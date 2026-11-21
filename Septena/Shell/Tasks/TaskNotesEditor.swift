@@ -72,7 +72,7 @@ struct TaskMarkdownNotesEditor: View {
       if text.isEmpty {
         Text("Notes")
           .font(.septenaTaskTitle)
-          .foregroundStyle(Theme.inkSecondary)
+          .foregroundStyle(.tertiary)
           .allowsHitTesting(false)
       }
     }

@@ -131,22 +131,48 @@ private struct TaskMoveDropDelegate: DropDelegate {
 private struct TaskCardChrome: ViewModifier {
   let position: TaskCardPosition
   var isSelected: Bool = false
+  var isEditing: Bool = false
   @State private var hovered = false
 
+  private var effectiveShape: UnevenRoundedRectangle {
+    #if os(iOS)
+    isEditing ? TaskCardPosition.solo.cardShape : position.cardShape
+    #else
+    position.cardShape
+    #endif
+  }
+
   func body(content: Content) -> some View {
-    let shape = position.cardShape
+    let shape = effectiveShape
     content
       .environment(\.rowHInset, TaskCardMetrics.contentInset)
       .background(alignment: .bottom) {
         ZStack(alignment: .bottom) {
-          shape.fill(isSelected ? Theme.listSelectionFill : Theme.cardSurface)
-          if hovered && !isSelected {
+          shape.fill((isSelected && !isEditing) ? Theme.listSelectionFill : Theme.cardSurface)
+          #if os(iOS)
+          if isEditing {
+            shape.strokeBorder(Theme.border, lineWidth: 0.5)
+          }
+          #endif
+          if hovered && !isSelected && !isEditing {
             shape.fill(Color.primary.opacity(Theme.pointerHoverOpacity))
           }
-          if (position == .top || position == .middle) && !isSelected {
+          if (position == .top || position == .middle) && !isSelected && !isEditing {
             Rectangle().fill(Theme.border).frame(height: 0.5)
           }
         }
+        #if os(iOS)
+        .shadow(color: isEditing ? Color.black.opacity(0.10) : .clear, radius: 12, y: 4)
+        .overlay {
+          if isEditing {
+            // Absorb stray taps on empty space inside the open editor card so
+            // they never fall through to the scroll list's dismiss backdrop.
+            Color.clear
+              .contentShape(shape)
+              .onTapGesture {}
+          }
+        }
+        #endif
       }
       .padding(.horizontal, TaskCardMetrics.margin)
       .padding(.bottom, position.trailingGap)
@@ -154,9 +180,41 @@ private struct TaskCardChrome: ViewModifier {
   }
 }
 
+/// iOS focus treatment while an inline task editor is open: every other row,
+/// header, and surface in the list fades back and intercepts taps to close the
+/// open editor instead of running its own action or opening another editor.
+private struct InlineEditDimmedModifier: ViewModifier {
+  let isDimmed: Bool
+  let onDismiss: () -> Void
+
+  func body(content: Content) -> some View {
+    #if os(iOS)
+    content
+      .opacity(isDimmed ? 0.32 : 1)
+      .allowsHitTesting(!isDimmed)
+      .overlay {
+        if isDimmed {
+          Color.clear
+            .contentShape(Rectangle())
+            .onTapGesture { onDismiss() }
+        }
+      }
+      .a11yAnimation(.easeOut(duration: 0.18), value: isDimmed)
+    #else
+    content
+    #endif
+  }
+}
+
 extension View {
-  func taskCardChrome(_ position: TaskCardPosition, isSelected: Bool = false) -> some View {
-    modifier(TaskCardChrome(position: position, isSelected: isSelected))
+  func taskCardChrome(_ position: TaskCardPosition,
+                      isSelected: Bool = false,
+                      isEditing: Bool = false) -> some View {
+    modifier(TaskCardChrome(position: position, isSelected: isSelected, isEditing: isEditing))
+  }
+
+  func inlineEditDimmed(_ isDimmed: Bool, onDismiss: @escaping () -> Void) -> some View {
+    modifier(InlineEditDimmedModifier(isDimmed: isDimmed, onDismiss: onDismiss))
   }
 
   /// The row's context menu. Attach it AFTER `taskCardChrome`: the system

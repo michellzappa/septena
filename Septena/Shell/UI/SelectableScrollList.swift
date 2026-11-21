@@ -47,11 +47,6 @@ struct SelectableRowActions {
   /// Whether rows should wire click-selection at all (false on iPhone compact,
   /// which has no multi-select chrome — there a tap just activates).
   var selectable: Bool = true
-  /// iOS: a plain tap on an UNselected row activates it directly instead of
-  /// selecting first. The host sets this while an inline editor is open, so one
-  /// tap on another row moves the editor there. Ignored on macOS, where a
-  /// click must keep meaning "select" (double-click opens).
-  var activatesOnTap: Bool = false
 }
 
 private struct SelectableRowActionsKey: EnvironmentKey {
@@ -191,8 +186,7 @@ private struct SelectableRowGestures: ViewModifier {
 /// iPad tap model. Select-first (first tap selects, second opens) is a pointer
 /// and keyboard idiom; on glass it reads as "my tap was ignored". So:
 ///   • touch tap → opens the row (like iPhone),
-///   • trackpad / mouse click → selects first, as on the Mac,
-///   • any tap while an editor is open (`activatesOnTap`) → opens that row.
+///   • trackpad / mouse click → selects first, as on the Mac.
 ///
 /// SwiftUI's tap gesture does not say which device produced it. The standard
 /// signal that a pointer is present is hover: `onContinuousHover` reports
@@ -215,7 +209,7 @@ private struct TouchOrPointerTap: ViewModifier {
       .onTapGesture {
         // Compact iPhone passes `selectable: false`: a tap always opens.
         guard actions.selectable else { actions.activate(id); return }
-        if isSelected || actions.activatesOnTap || !pointerOver {
+        if isSelected || !pointerOver {
           actions.activate(id)
         } else {
           actions.click(id, [])
@@ -249,9 +243,6 @@ struct SelectableScrollList<Content: View>: View {
   var selectable: Bool = true
   /// Return / double-click / single-tap(iOS) on a row.
   var onActivate: (String) -> Void = { _ in }
-  /// iOS: a plain tap on an unselected row activates it (see
-  /// `SelectableRowActions.activatesOnTap`).
-  var activatesOnTap: Bool = false
   /// Esc with a selection, or a click on the empty paper behind the rows.
   var onClear: () -> Void = {}
   /// ⌘M / ⌘⇧M — task-surface alias for the Move command. This is optional so
@@ -290,7 +281,18 @@ struct SelectableScrollList<Content: View>: View {
         LazyVStack(alignment: .leading, spacing: 0) {
           content()
         }
+        #if os(iOS)
+        .frame(maxWidth: .infinity,
+               minHeight: inputActive && viewportHeight > 0 ? viewportHeight : nil,
+               alignment: .topLeading)
+        .background {
+          Color.clear
+            .contentShape(Rectangle())
+            .onTapGesture { onClear() }
+        }
+        #else
         .frame(maxWidth: .infinity, alignment: .leading)
+        #endif
       }
       #if os(iOS)
       .septenaTabScrollInsets(
@@ -349,8 +351,7 @@ struct SelectableScrollList<Content: View>: View {
       .environment(\.selectableRowActions, SelectableRowActions(
         click: handleClick,
         activate: onActivate,
-        selectable: selectable,
-        activatesOnTap: activatesOnTap
+        selectable: selectable
       ))
       // Focusable for native key delivery; the blue focus ring is suppressed —
       // the selection capsule is indicator enough (same call the List makes).
