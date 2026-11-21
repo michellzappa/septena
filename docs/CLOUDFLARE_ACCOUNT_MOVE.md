@@ -29,6 +29,34 @@ Not moving: `reports-worker/` (template only, not deployed), Starlings
 | Secrets | Set again with `wrangler secret put`. | Reuse the old values if mz has them. A new `SESSION_SIGNING_KEY` only expires access tokens (clients refresh). New hash salts would break the community data's user links, so those must be the old values. |
 | DNS records | Export a BIND file from the old zone, import into the new one. | Keep the Gandi MX and SPF records, or septena.app mail stops. |
 
+## 2a. New account resources (created 2026-11-21)
+
+Resource ids are not secrets; the old ones are already in `wrangler.toml`.
+They replace the old ids at cutover (step 5).
+
+| Worker | Binding | New id |
+|---|---|---|
+| `septena-mcp-gateway` | KV `STATE` | `4066d642849946a5bcdb5523b52a35d5` |
+| `septena-mcp-gateway` | KV `TOKENS` | `1b8f0af54763424190a01dcb85109852` |
+| `septena-mcp-gateway` | KV `CLIENTS` | `c6550511896e493aa5abd8685e9dd6a1` |
+| `septena-mcp-gateway` | R2 `septena-attachments` | not created: R2 must be enabled on the account first |
+| `septena-community` | KV `ATTEST` | `1d3f2d0925804c01bb23b2d56e71e4d3` |
+| `septena-community` | KV `CHALLENGES` | `14504cb083914ff58cb7224649addb09` |
+| `septena-community` | KV `RL` | `4b24aa6a1dbf4b568a69b204286a1248` |
+| `septena-community` | D1 `septena-community` | `186de353-d169-48df-b3fa-dcdde28d1916` |
+
+Trap: `wrangler` takes `account_id` from `wrangler.toml` over the
+`CLOUDFLARE_ACCOUNT_ID` environment variable for some commands (seen with
+`r2 bucket create` and `kv namespace create`). Run account-level commands
+for the new account from a folder with no `wrangler.toml`. A first attempt
+left three empty namespaces named `septena-STATE`, `septena-TOKENS` and
+`septena-CLIENTS` on the old account; remove them in step 12.
+
+For the copy (step 7) the new backend runs on its `workers.dev` address,
+where the `/v1/admin/*` host check would answer 404. Deploy it with
+`API_PUBLIC_URL` set to that address for the copy, and set it back to
+`https://api.septena.app` in step 9.
+
 ## 3. Steps
 
 Each step names who does it. "Agent" steps run from this repo on mz's laptop
@@ -37,7 +65,8 @@ with wrangler logged in as the new account's owner.
 1. **mz:** create the Cloudflare account "Septena" under the owner login of
    the Starlings account, and buy Workers Paid on it.
 2. **Agent:** build the admin export and import routes in `backend/`, with
-   tests, and deploy them to the old account.
+   tests (done: `/v1/admin/copy/*`, `MAINTENANCE`), and deploy them to the
+   old account. Set `ADMIN_TOKEN` on both accounts.
 3. **Agent:** create the KV namespaces, R2 bucket and D1 database on the new
    account. Put their ids in each `wrangler.toml` on a branch, with the new
    `account_id`.
