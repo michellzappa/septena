@@ -14,7 +14,7 @@
 Give Septena tactile, unmistakable warmth and personal ownership—the part people loved about Wunderlist, Superlist, and Todoist—without importing their failure modes (clashing stock photos, dark-mode legibility breaks, bloated asset bundles, or per-platform drift).
 
 1. **Zero-asset & local-first:** Every surface texture is mathematically generated on-device from a tiny seed descriptor. Works 100% offline, adds ~0 KB to app binaries, and syncs in a few bytes.
-2. **Legibility first:** Task rows always sit on crisp, lifted paper cards (`Theme.cardSurface` / `--task-color-paper`). Textures live on the recessed canvas behind cards (or as a faded top atmospheric band), never fighting row copy.
+2. **Legibility first:** Textures live exclusively as a soft **header wash** at the top of the list surface (~180–220pt fading cleanly to 0% into the grouped canvas below), keeping scrolling task rows calm and uncluttered.
 3. **Appearance-native:** Every accent and texture adapts automatically to Light Mode, Dark Mode, High Contrast, Reduce Transparency, and Reduce Motion.
 4. **One source of truth (ADR 0015):** The accent palette, Light/Dark hex pairs, texture catalog, defaults, and setting keys live in `registry/tokens.json` and `registry/settings.json` and generate code for Swift, TypeScript, Kotlin, and the website's canonical `components/task-ui/tokens.css`.
 
@@ -49,9 +49,8 @@ Selecting any fruit overrides `selectionAccent`, `listSelectionFill`, `checkboxF
 
 > Note on contrast: bright Dark-mode accents (`yuzu`, `carambola`, `jabuticaba`) switch the check glyph inside a filled checkbox to `#141518` so the checkmark always clears WCAG AA against its fill.
 
-### 2.3 Accent Reach
-- **`restrained`** *(default)*: Accent applies to selection wash (`emphasizedAlphaLight: 0.22`, `emphasizedAlphaDark: 0.34`), done checkboxes, active chips/pills, active iOS tab, primary modal CTA, unread context dot, and optional texture tint. Today's gold sun, overdue red, and quiet gray filing-list icons remain untouched.
-- **`expressive`** *(optional future toggle — deferred out of v1 by default)*: Also tints Today's glyph, project progress rings, screen title, and adds a subtle 4–6% canvas/sidebar warmth tint. Filing-list icons (*Upcoming, Repeating, Anytime, Logbook*) still remain quiet gray.
+### 2.3 Accent Reach (Restrained Only — locked 2026-11-21)
+- Accent applies **strictly in restrained scope** (no expressive/chrome-tinting mode): row selection wash (`emphasizedAlphaLight: 0.22`, `emphasizedAlphaDark: 0.34`), done checkboxes, active chips/pills, active iOS tab, primary modal CTA, unread context dot, and optional header-wash tint. Overdue red, quiet gray filing-list icons, page headers, and canvas neutrality remain untouched.
 
 ### 2.4 Relationship to macOS System Accent
 - `registry/tokens.json` evolves `accentPolicy` from fixed `"platformSystemAccent"` to `"userAccentWithColorfulDefault"`.
@@ -75,12 +74,13 @@ Selected by mz (2026-11-21); `relief`, `isoFlow`, and `terrainMesh` were dropped
 | `ridges` | **Ridge Lines** | Horizontal elevation cross-sections smoothly displaced by 3D noise, vertically tapered | Rhythmic terrain profiles |
 | `washiPaper` | **Washi Paper** | Low-frequency tonal clouding + sparse deterministic micro-fibers | Fine tactile stationery, near-subliminal |
 
-### 3.2 Texture Parameters & Placement
+### 3.2 Texture Placement & Parameters (Header Wash Only — locked 2026-11-21)
+
+Textures render **exclusively as a faded top header wash** (~180–220pt tall, smoothly masked to transparent into the grouped canvas below). There is no placement setting (`behindCards`, `railAndCanvas`, and `full` were dropped to keep reading panes calm and settings minimal).
 
 | Parameter | Type / Range | Default | Notes |
 |---|---|---|---|
 | `canvasTexture` | enum (`none`, `topography`, `fieldMatrix`, `stippleDrift`, `causticGlass`, `ridges`, `washiPaper`) | `"none"` *(default; could preview `"topography"` in onboarding)* | |
-| `texturePlacement` | enum (`behindCards`, `headerWash`, `railAndCanvas`) | `"behindCards"` | `behindCards` keeps cards crisp paper; `headerWash` fades softly over the top ~180–200pt like a modern list cover |
 | `textureIntensity` | int `15…100` (exposed as 3 presets in UI: `Subtle` 35 / `Balanced` 55 / `Bold` 80, or continuous slider) | `55` | Clamped so high values never hurt contrast |
 | `textureSeed` | int `1…9999` | `42` | User can tap **Shuffle** to pick a new terrain; deterministic everywhere |
 | `textureTintWithAccent` | bool | `true` | Blends texture ink ~58% toward active accent + subtle radial glow; `false` uses pure neutral ink |
@@ -116,7 +116,6 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 | `syncTheme` | `device` | `bool` | `true` | `septena.appearance.syncTheme` |
 | `accentColor` | `synced` *(honored locally if `syncTheme == false`)* | `enum` (8 IDs from `tokens.json`) | `"colorful"` | `septena.appearance.accentColor` |
 | `canvasTexture` | `synced` *(honored locally if `syncTheme == false`)* | `enum` (texture IDs from `tokens.json`) | `"none"` | `septena.appearance.canvasTexture` |
-| `texturePlacement` | `synced` *(honored locally if `syncTheme == false`)* | `enum: ["behindCards", "headerWash", "railAndCanvas"]` | `"behindCards"` | `septena.appearance.texturePlacement` |
 | `textureIntensity` | `synced` *(honored locally if `syncTheme == false`)* | `int` (`15…100`) | `55` | `septena.appearance.textureIntensity` |
 | `textureSeed` | `synced` *(honored locally if `syncTheme == false`)* | `int` (`1…9999`) | `42` | `septena.appearance.textureSeed` |
 | `textureTintWithAccent` | `synced` *(honored locally if `syncTheme == false`)* | `bool` | `true` | `septena.appearance.textureTint` |
@@ -126,7 +125,7 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 - **`accent_color` customSurface** in `docs/SETTINGS_UX_SPEC.md` evolves into the unified **Appearance** picker surface:
   - Mode segmented control (`Light` / `Dark` / `System`) + `Sync across devices` toggle
   - Mini-app preview card grid for `Colorful` + 7 exotic fruits (live-tinted sidebar + checkbox preview inside each card)
-  - Live-rendered procedural texture card strip + placement segmented pill + intensity presets + Shuffle seed button
+  - Live-rendered procedural header-wash texture strip + intensity presets + Shuffle seed button + optional Slow Drift toggle
 
 ---
 
@@ -153,7 +152,7 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 |---|---|---|
 | **C0 — Registry & Sync Keys** | Add `fruitAccents` and `textures` to `registry/tokens.json`, add appearance keys to `registry/settings.json`, regenerate Swift/TS constants, update backend `SETTING_VALUES` allowlist, add `registry/capabilities.json` entry (`appearance.customization`). | ADR 0015 (shipped) |
 | **C1 — Exotic-Fruit Accents & Appearance Picker (Apple)** | Route `Theme.selectionAccent`, `Theme.listSelectionFill`, `Theme.checkboxFill`, `Theme.checkboxCheck`, and `SeptaskKitTheme` through the resolved fruit accent (`colorful` default). Replace legacy swatch row in Settings ▸ Appearance with mini-app fruit cards + `Light/Dark/System` + `Sync across devices`. | C0 |
-| **C2 — Procedural Canvas Textures (Apple)** | Implement deterministic PRNG + 2D fBm + the confirmed v1 procedural renderers in SwiftUI (`Canvas`/Metal) and AppKit (`SeptaskKit` backdrop layer). Wire `behindCards`, `headerWash`, and `railAndCanvas` placements + accessibility guards (`Increase Contrast`, `Reduce Transparency`). | C1 |
+| **C2 — Procedural Header-Wash Textures (Apple)** | Implement deterministic PRNG + 3D fBm + the 6 locked v1 procedural renderers as a top header wash in SwiftUI (`Canvas`/Metal) and AppKit (`SeptaskKit` backdrop layer) + optional `slowDrift` + accessibility/battery guards. | C1 |
 | **C3 — Per-Project Deterministic Header Textures** | Derive per-project `headerWash` seed from `FNV-1a(project.id)` with opt-in toggle and optional per-project seed shuffle. | C2 |
 | **C4 — Cross-Platform & Website Parity** | Port accent tokens + procedural Canvas2D/AGSL renderers to Web (`#21`), Android (`#20`), Windows (`#136`), and sync `septena-site/components/task-ui/tokens.css` from `registry/tokens.json`. | C0, `#21`, `#20`, `#136` |
 
@@ -184,6 +183,5 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 | **List card glass over texture** | Keep cards solid paper (`DesignSpec.md` §5.5), or allow frosted/Liquid Glass translucency (`5–8px` blur) when a canvas texture is active (auto-solid under Reduce Transparency)? | Frosted veil when textured; solid when `none` *(default)* |
 | **Today sidebar icon** | Keep Today's sidebar sun quiet gray (subdued), follow the chosen accent, or keep gold (`#F5C721`) under `Colorful` only? | Gray everywhere or Gold under `Colorful` only *(needs mz call)* |
 | **Default texture for new installs** | Start on `none` (pure canvas) or a whisper-subtle `washiPaper` / `topography`? | `none` — opt-in in Appearance *(default)* |
-| **Accent reach toggle** | Ship `restrained` only in v1, or expose `restrained` vs. `expressive` toggle in Settings? | `restrained` only in v1 *(default)* |
 | **Intensity control in UI** | 3 tactile presets (`Subtle` / `Balanced` / `Bold`) vs. continuous slider? | 3 presets (`35 / 55 / 80`) *(default)* |
 | **Milestone placement** | Keep in `M5 Breadth` (post-Launch/M2), or pull C0–C1 (exotic-fruit accents) forward into M3 polish? | `M5 Breadth` *(default)* |
