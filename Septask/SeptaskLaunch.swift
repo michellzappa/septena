@@ -30,6 +30,7 @@ enum SeptaskLaunch {
       SeptaskLegacyClaudeCleanup.runOnce()
       SeptaskDiagnosticsCoordinator.shared.start()
       BadgeManager.shared.start(context: localStore.container.mainContext)
+      TaskReminderScheduler.shared.start(context: localStore.container.mainContext)
       #if os(iOS)
       // The next cold launch draws Today from this file (#82). macOS draws
       // its AppKit list without `TaskListView`, so it has no reader.
@@ -68,6 +69,7 @@ enum SeptaskLaunch {
     // keep in parity with Septena's `.active` branch in App.swift.
     services.taskMutator.catchUpFixedSchedules()
     services.runFadePassIfDue()
+    TaskReminderScheduler.shared.scheduleReconcile()
   }
 
   /// iOS: hold deferred launch work until the first Today frame is drawn.
