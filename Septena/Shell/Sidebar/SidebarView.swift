@@ -418,7 +418,6 @@ struct SidebarRootView: View {
   private func smartListRow(for spec: SmartListSpec) -> some View {
     let row = navRow(spec.route) {
       SmartListRow(icon: spec.icon,
-                   iconColor: spec.color,
                    title: spec.title,
                    count: spec.count)
     }
@@ -771,7 +770,6 @@ struct SidebarRootView: View {
           compactRow(route: .filter(.starred)) {
             navRow(.filter(.starred)) {
               SmartListRow(icon: "star.fill",
-                           iconColor: Theme.todayAccent,
                            title: "Starred",
                            count: starredCount)
             }
@@ -781,7 +779,6 @@ struct SidebarRootView: View {
           compactRow(route: .filter(.faded)) {
             navRow(.filter(.faded)) {
               SmartListRow(icon: "circle.dashed",
-                           iconColor: .secondary,
                            title: "Faded",
                            count: fadedCount)
             }
@@ -791,7 +788,6 @@ struct SidebarRootView: View {
           compactRow(route: .filter(.recentlyDeleted)) {
             navRow(.filter(.recentlyDeleted)) {
               SmartListRow(icon: "trash",
-                           iconColor: .secondary,
                            title: "Recently Deleted",
                            count: recentlyDeletedCount)
             }
@@ -1230,16 +1226,19 @@ struct SidebarCount: View {
 
 struct SmartListRow: View {
   let icon: String
-  /// The list's color — fills the rounded-square icon container behind a
-  /// white SF Symbol (Reminders pattern).
-  let iconColor: Color
   let title: String
   /// Muted gray count — neutral signal for total rows on this list.
   var count: Int? = nil
 
   var body: some View {
     HStack(spacing: Theme.sidebarRowSpacing) {
-      ColoredGlyph(icon: icon, color: iconColor, size: Theme.sidebarIconSize + 4)
+      // Platform sidebar standard (Mail, Files, Notes): a bare SF Symbol in
+      // the accent color, no filled tile. The fixed frame keeps titles
+      // aligned across symbols of different widths.
+      Image(systemName: icon)
+        .scaledFont(size: Theme.sidebarIconSize, weight: .regular)
+        .foregroundStyle(Color.accentColor)
+        .frame(width: Theme.sidebarIconSize + 4, height: Theme.sidebarIconSize + 4)
       Text(title)
         .scaledFont(size: Theme.sidebarAreaTitleSize)
         // `.primary` (not a fixed Theme ink) so the native `.sidebar`
