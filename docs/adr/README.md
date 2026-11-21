@@ -25,6 +25,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0017](0017-move-septena-life-out-of-repo.md) | Move Septena Life out of the Septena repo | accepted |
 | [0018](0018-septena-on-its-own-cloudflare-account.md) | Run Septena on its own Cloudflare account | accepted |
 | [0019](0019-generative-textures-and-fruit-accents.md) | Use procedural canvas textures and exotic-fruit accents over a Colorful default | accepted |
+| [0020](0020-registry-owns-copy-and-translations.md) | The registry owns shared copy and its translations; shells render it | accepted |
 
 ## Template
 

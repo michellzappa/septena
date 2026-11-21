@@ -105,6 +105,13 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [SEPTASK_APPKIT_PARITY.md](SEPTASK_APPKIT_PARITY.md), [SEPTASK_APPKIT_SURFACES.md](SEPTASK_APPKIT_SURFACES.md), [SEPTASK_APPKIT_LOCALIZATION_HANDOFF.md](SEPTASK_APPKIT_LOCALIZATION_HANDOFF.md) | AppKit shell notes |
 | [APPSTORE-SEPTASK.md](APPSTORE-SEPTASK.md), [RELEASING-MAC.md](RELEASING-MAC.md) | current |
 
+### Registries
+
+| Doc | Status |
+|---|---|
+| [REGISTRY_PLAN.md](REGISTRY_PLAN.md) | accepted (ADR 0020): P0 translation pipeline → P4 reach |
+| [REGISTRY_AUDIT.md](REGISTRY_AUDIT.md) | audit 2026-11-21 |
+
 ### AI and MCP
 
 | Doc | Status |
