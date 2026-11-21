@@ -416,6 +416,7 @@ struct TaskListView: View {
   // Repeat picker
   @State private var showingRepeatSheet = false
   @State private var repeatTargetId: String?
+  @State private var reminderTargetId: String?
 
   /// Pending Things-style choice when a fixed-schedule repeating task is
   /// moved. The date picker dismisses before this appears, so the decision is
@@ -551,6 +552,7 @@ struct TaskListView: View {
         moveTargetIds: $moveTargetIds,
         showingRepeatSheet: $showingRepeatSheet,
         repeatTargetId: $repeatTargetId,
+        reminderTargetId: $reminderTargetId,
         areas: areas,
         projects: projects,
         currentTask: currentTask,
@@ -564,7 +566,8 @@ struct TaskListView: View {
           Haptics.tick()
           mutator.setRecurrencePaused(id: id, paused: paused)
           Task { await load() }
-        }
+        },
+        applyReminder: applyReminder
       ))
       .sheet(isPresented: Binding(
         get: { sweepSheetTasks != nil },
@@ -2871,6 +2874,15 @@ struct TaskListView: View {
     Task { await load() }
   }
 
+  private func applyReminder(id: String, reminder: TaskReminder?) {
+    Haptics.tick()
+    recordingSchedule(String(localized: "Change Reminder", comment: "Undo action name"),
+                      [id]) {
+      mutator.setReminder(id: id, reminder: reminder)
+    }
+    Task { await load() }
+  }
+
   private func applyCancel(_ id: String) {
     Haptics.warning()
     // Cancellation settles exactly like completion: the row lingers in place
@@ -3482,6 +3494,9 @@ struct TaskListView: View {
         },
         onOpenDeadline: { target in
           whenSheet = WhenSheet(taskIds: target.ids, kind: .deadline)
+        },
+        onOpenReminder: { task in
+          reminderTargetId = task.id
         },
         onClearSchedule: { ids in
           for id in ids { applyWhen(id: id, kind: .scheduled, date: nil) }

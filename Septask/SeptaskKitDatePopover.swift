@@ -1067,6 +1067,296 @@ private final class KitRepeatBoard: NSView {
   }
 }
 
+// MARK: - Reminder editor (TR2)
+
+/// Progressive-disclosure Reminder popover — the fourth TIER 1 anchored
+/// popover in the date-board family (`When`, `Deadline`, `Repeat`, `Reminder`).
+@MainActor
+enum SeptaskKitReminderPopover {
+  static func present(initial: TaskReminder?,
+                      anyHasReminder: Bool? = nil,
+                      relativeTo rect: NSRect,
+                      of view: NSView,
+                      onCommit: @escaping (TaskReminder?) -> Void) {
+    let board = KitReminderBoard(initial: initial,
+                                 anyHasReminder: anyHasReminder ?? (initial != nil))
+    let handle = KitPopoverHandle()
+    board.onCommit = { reminder in
+      onCommit(reminder)
+      handle.close()
+    }
+    board.onCancel = { handle.close() }
+    KitPopover.present(board, relativeTo: rect, of: view, focus: board, handle: handle)
+  }
+}
+
+@MainActor
+private final class KitReminderBoard: NSView {
+
+  var onCommit: ((TaskReminder?) -> Void)?
+  var onCancel: (() -> Void)?
+
+  private let initial: TaskReminder?
+  private let anyHasReminder: Bool
+  private var mode: TaskReminderMode
+  private var optionsExpanded: Bool
+
+  private let datePicker = NSDatePicker()
+  private var optionsToggleCell: KitDateCell?
+  private var modeToggleCell: KitDateCell?
+  private var deniedNoticeCell: KitDateCell?
+  private var setCell: KitDateCell?
+  private var clearCell: KitDateCell?
+  private var presetCells: [KitDateCell] = []
+
+  private var cells: [KitDateCell] = []
+  private var focusIndex = 0
+
+  private static let width: CGFloat = 360
+  private static let padding: CGFloat = 8
+  private static let rowHeight: CGFloat = 32
+
+  init(initial: TaskReminder?, anyHasReminder: Bool) {
+    self.initial = initial
+    self.anyHasReminder = anyHasReminder
+    self.mode = initial?.mode ?? .floating
+    self.optionsExpanded = (initial?.mode == .fixed)
+    super.init(frame: .zero)
+    build()
+    checkNotificationAuth()
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitReminderBoard is code-only") }
+
+  override var acceptsFirstResponder: Bool { true }
+  override func becomeFirstResponder() -> Bool { true }
+
+  private func build() {
+    var views: [NSView] = []
+
+    // Non-blocking denied-permission notice (hidden unless OS auth == .denied).
+    let denied = KitDateCell(radius: 8, height: Self.rowHeight) {
+      TaskReminderScheduler.openNotificationSettings()
+    }
+    denied.fillRow(
+      symbol: "bell.slash",
+      tint: SeptaskKitTheme.overdueRed,
+      title: String(localized: "Notifications are off — Open Settings",
+                    comment: "Reminder denied permission notice"),
+      titleColor: SeptaskKitTheme.overdueRed
+    )
+    denied.isHidden = true
+    deniedNoticeCell = denied
+    views.append(denied)
+
+    // Quick presets — one click sets & closes.
+    for preset in TaskReminder.quickPresets() {
+      let cell = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+        guard let self else { return }
+        self.commit(TaskReminder.make(date: preset.date, mode: self.mode))
+      }
+      cell.fillRow(symbol: "bell", tint: SeptaskKitTheme.inkSecondary, title: preset.title)
+      presetCells.append(cell)
+      views.append(cell)
+    }
+
+    views.append(KitSurface.separator())
+
+    // Custom date & time picker row
+    let customLabel = NSTextField(labelWithString: String(localized: "Custom",
+                                                          comment: "Custom reminder time label"))
+    customLabel.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+    customLabel.textColor = SeptaskKitTheme.inkSecondary
+    customLabel.setContentHuggingPriority(.required, for: .horizontal)
+
+    datePicker.datePickerStyle = .textFieldAndStepper
+    datePicker.datePickerElements = [.yearMonthDay, .hourMinute]
+    datePicker.font = .systemFont(ofSize: SeptenaTypeScale.size(.body))
+    datePicker.dateValue = initial?.effectiveFireDate()
+      ?? TaskReminder.quickPresets().first?.date
+      ?? DayClock.appNow.addingTimeInterval(3600)
+
+    let spacer = NSView()
+    spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    let customRow = NSStackView(views: [customLabel, datePicker, spacer])
+    customRow.orientation = .horizontal
+    customRow.alignment = .centerY
+    customRow.spacing = 8
+    customRow.edgeInsets = NSEdgeInsets(top: 2, left: 6, bottom: 2, right: 6)
+    views.append(customRow)
+
+    let setButton = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+      guard let self else { return }
+      self.window?.endEditing(for: nil)
+      self.commit(TaskReminder.make(date: self.datePicker.dateValue, mode: self.mode))
+    }
+    setButton.fillRow(
+      symbol: "checkmark.circle",
+      tint: SeptaskKitTheme.inkPrimary,
+      title: String(localized: "Set Custom Reminder", comment: "Commit custom reminder date/time")
+    )
+    setCell = setButton
+    views.append(setButton)
+
+    // Progressive-disclosure timezone mode option (floating default, fixed opt-in).
+    let toggle = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+      self?.toggleOptions()
+    }
+    toggle.fillRow(
+      symbol: optionsExpanded ? "chevron.down" : "chevron.right",
+      tint: SeptaskKitTheme.inkSecondary,
+      title: String(localized: "Time zone options…", comment: "Reminder options disclosure")
+    )
+    optionsToggleCell = toggle
+    views.append(toggle)
+
+    let modeCell = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+      self?.toggleMode()
+    }
+    modeCell.fillRow(
+      symbol: "globe",
+      tint: SeptaskKitTheme.inkSecondary,
+      title: modeTitle
+    )
+    modeCell.isHidden = !optionsExpanded
+    modeToggleCell = modeCell
+    views.append(modeCell)
+
+    if anyHasReminder {
+      views.append(KitSurface.separator())
+      let clear = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+        self?.commit(nil)
+      }
+      clear.fillRow(
+        symbol: "xmark.circle",
+        tint: SeptaskKitTheme.iconMuted,
+        title: String(localized: "Clear Reminder", comment: "Remove task reminder")
+      )
+      clearCell = clear
+      views.append(clear)
+    }
+
+    let stack = NSStackView(views: views)
+    stack.orientation = .vertical
+    stack.alignment = .leading
+    stack.spacing = 6
+    stack.detachesHiddenViews = true
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(stack)
+
+    let pad = Self.padding
+    NSLayoutConstraint.activate([
+      widthAnchor.constraint(equalToConstant: Self.width),
+      stack.topAnchor.constraint(equalTo: topAnchor, constant: pad),
+      stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: pad),
+      stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -pad),
+      stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -pad),
+    ])
+    for view in views {
+      view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+    }
+
+    updateUI()
+  }
+
+  private var modeTitle: String {
+    mode == .fixed
+      ? String(localized: "Fixed time zone (fires at exact instant)", comment: "Reminder fixed timezone mode")
+      : String(localized: "Floating local time (follows device time zone)", comment: "Reminder floating timezone mode")
+  }
+
+  private func checkNotificationAuth() {
+    Task { @MainActor [weak self] in
+      let status = await TaskReminderScheduler.shared.authorizationStatus()
+      guard let self else { return }
+      self.deniedNoticeCell?.isHidden = (status != .denied)
+      self.rebuildWalkableCells()
+      self.applyFocus()
+    }
+  }
+
+  private func toggleOptions() {
+    optionsExpanded.toggle()
+    updateUI()
+  }
+
+  private func toggleMode() {
+    mode = (mode == .floating) ? .fixed : .floating
+    updateUI()
+  }
+
+  private func updateUI() {
+    optionsToggleCell?.updateRow(
+      symbol: optionsExpanded ? "chevron.down" : "chevron.right",
+      title: optionsExpanded
+        ? String(localized: "Hide time zone options", comment: "Reminder options collapse")
+        : String(localized: "Time zone options…", comment: "Reminder options expand")
+    )
+    modeToggleCell?.isHidden = !optionsExpanded
+    modeToggleCell?.updateRow(symbol: "globe", title: modeTitle)
+    modeToggleCell?.isCurrentValue = (mode == .fixed)
+    rebuildWalkableCells()
+    applyFocus()
+  }
+
+  private func rebuildWalkableCells() {
+    var walkable: [KitDateCell] = []
+    if let denied = deniedNoticeCell, !denied.isHidden { walkable.append(denied) }
+    walkable.append(contentsOf: presetCells)
+    if let setCell { walkable.append(setCell) }
+    if let toggle = optionsToggleCell { walkable.append(toggle) }
+    if let modeCell = modeToggleCell, !modeCell.isHidden { walkable.append(modeCell) }
+    if let clearCell { walkable.append(clearCell) }
+    cells = walkable
+    for cell in cells {
+      cell.onHover = { [weak self] hovered in self?.focus(cell: hovered) }
+    }
+    if !cells.isEmpty {
+      focusIndex = min(cells.count - 1, max(0, focusIndex))
+    } else {
+      focusIndex = 0
+    }
+  }
+
+  private func commit(_ reminder: TaskReminder?) {
+    if reminder != nil {
+      Task { await TaskReminderScheduler.shared.requestAuthorizationIfNeeded() }
+    }
+    onCommit?(reminder)
+  }
+
+  private func focus(cell: KitDateCell) {
+    guard let index = cells.firstIndex(where: { $0 === cell }) else { return }
+    focusIndex = index
+    applyFocus()
+  }
+
+  private func step(_ delta: Int) {
+    guard !cells.isEmpty else { return }
+    focusIndex = min(cells.count - 1, max(0, focusIndex + delta))
+    applyFocus()
+  }
+
+  private func applyFocus() {
+    for (index, cell) in cells.enumerated() { cell.isFocused = index == focusIndex }
+  }
+
+  override func keyDown(with event: NSEvent) {
+    switch event.keyCode {
+    case 126, 123: step(-1)
+    case 125, 124: step(1)
+    case 36, 76:
+      guard cells.indices.contains(focusIndex) else { return }
+      cells[focusIndex].activate()
+    default: super.keyDown(with: event)
+    }
+  }
+
+  override func cancelOperation(_ sender: Any?) {
+    onCancel?()
+  }
+}
+
 // MARK: - Board
 
 /// The popover's body: a seven-day strip starting today, "Pick another date",

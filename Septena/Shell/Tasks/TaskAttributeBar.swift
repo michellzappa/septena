@@ -41,18 +41,19 @@ struct TaskAttributeBar: View {
   /// every pill is wired identically — one `ForEach`, one `select(_:)` — and the
   /// rail grows by adding a case, not another hand-written call.
   enum Attribute: Identifiable {
-    case when, deadline, repeatRule, list, attachments
+    case when, deadline, reminder, repeatRule, list, attachments
     /// Edit-mode AI kickoff — rendered separately, not part of `draftCases`.
     case discuss
     var id: Self { self }
 
     /// Scheduling / filing electives — the `ForEach` rail.
-    static let draftCases: [Attribute] = [.when, .deadline, .repeatRule, .list]
+    static let draftCases: [Attribute] = [.when, .deadline, .reminder, .repeatRule, .list]
 
     var icon: String {
       switch self {
       case .when:       "calendar"
       case .deadline:   "flag"
+      case .reminder:   "bell"
       case .repeatRule: "repeat"
       case .list:       "folder"
       case .attachments:"paperclip"
@@ -63,6 +64,7 @@ struct TaskAttributeBar: View {
       switch self {
       case .when:       "When"
       case .deadline:   "Deadline"
+      case .reminder:   "Remind"
       case .repeatRule: "Repeat"
       case .list:       "List"
       case .attachments:"Attachments"
@@ -171,6 +173,8 @@ struct TaskAttributeBar: View {
       return draft.onToday ? "Today" : nil
     case .deadline:
       return draft.deadline.map(Self.dateLabel)
+    case .reminder:
+      return draft.reminder?.badgeText()?.text
     case .repeatRule:
       return draft.recurrence?.shortLabel
     // The List pill always names its destination — "Inbox" by default, the area
@@ -187,6 +191,7 @@ struct TaskAttributeBar: View {
     case .attachments: discussTask.map { SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: $0.id) > 0 } ?? false
     case .when:       draft.scheduled != nil || draft.onToday
     case .deadline:   draft.deadline != nil
+    case .reminder:   draft.reminder != nil
     case .repeatRule: draft.recurrence != nil
     case .list:       draft.areaId != nil || draft.projectId != nil
     }
@@ -206,6 +211,11 @@ struct TaskAttributeBar: View {
       switch expanded {
       case .when:       InlineWhenPanel(draft: $draft, fill: panelFill)
       case .deadline:   InlineDatePanel(date: $draft.deadline, fill: panelFill)
+      case .reminder:   InlineReminderPanel(reminder: $draft.reminder,
+                                            accent: accent,
+                                            fill: panelFill) {
+        a11yAnimate(.snappy(duration: 0.22)) { expanded = nil }
+      }
       case .repeatRule: InlineRepeatPanel(recurrence: $draft.recurrence,
                                           hasScheduledDate: draft.scheduled != nil,
                                           scheduledDate: SeptenaDate.format(draft.scheduled),
@@ -423,6 +433,134 @@ private struct InlineDatePanel: View {
     .padding(12)
     .background(fill,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+  }
+}
+
+// MARK: - Inline reminder editor (TR2)
+
+private struct InlineReminderPanel: View {
+  @Binding var reminder: TaskReminder?
+  let accent: Color
+  let fill: Color
+  var onStop: () -> Void = {}
+
+  @State private var pickedDate: Date = DayClock.appNow.addingTimeInterval(3600)
+  @State private var mode: TaskReminderMode = .floating
+  @State private var showOptions = false
+  @State private var notificationsDenied = false
+
+  private func apply(date: Date, mode: TaskReminderMode) {
+    pickedDate = date
+    self.mode = mode
+    reminder = TaskReminder.make(date: date, mode: mode)
+    Task {
+      let granted = await TaskReminderScheduler.shared.requestAuthorizationIfNeeded()
+      notificationsDenied = !granted
+    }
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      if notificationsDenied {
+        Button {
+          TaskReminderScheduler.openNotificationSettings()
+        } label: {
+          HStack(spacing: 6) {
+            Image(systemName: "bell.slash")
+              .font(.caption.weight(.semibold))
+            Text("Notifications are off — Open Settings")
+              .font(.caption.weight(.medium))
+            Spacer(minLength: 0)
+          }
+          .foregroundStyle(Theme.overdueRed)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+      }
+
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 6) {
+          ForEach(TaskReminder.quickPresets(), id: \.title) { preset in
+            SelectableChip(preset.title, isSelected: false, tint: accent) {
+              apply(date: preset.date, mode: mode)
+            }
+          }
+        }
+      }
+
+      DatePicker(
+        "Remind at",
+        selection: Binding(
+          get: { pickedDate },
+          set: { apply(date: $0, mode: mode) }
+        ),
+        displayedComponents: [.date, .hourAndMinute]
+      )
+      .datePickerStyle(.compact)
+      .font(.septenaSidebarRow)
+
+      Button {
+        a11yAnimate(.snappy(duration: 0.2)) { showOptions.toggle() }
+      } label: {
+        HStack(spacing: 6) {
+          Image(systemName: showOptions ? "chevron.down" : "chevron.right")
+            .font(.caption.weight(.semibold))
+          Text(showOptions ? "Hide time zone options" : "Time zone options…")
+            .font(.caption.weight(.medium))
+          Spacer(minLength: 0)
+        }
+        .foregroundStyle(Theme.inkSecondary)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+
+      if showOptions {
+        Toggle(
+          "Fixed time zone",
+          isOn: Binding(
+            get: { mode == .fixed },
+            set: { isFixed in
+              let next: TaskReminderMode = isFixed ? .fixed : .floating
+              mode = next
+              if reminder != nil {
+                apply(date: pickedDate, mode: next)
+              }
+            }
+          )
+        )
+        .font(.septenaSidebarRow)
+        .tint(accent)
+      }
+
+      if reminder != nil {
+        Button(role: .destructive) {
+          reminder = nil
+          onStop()
+        } label: {
+          Label("Clear Reminder", systemImage: "xmark.circle")
+            .font(.septenaLabel)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Theme.overdueRed)
+      }
+    }
+    .padding(12)
+    .background(fill,
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .onAppear {
+      if let existing = reminder {
+        pickedDate = existing.effectiveFireDate() ?? DayClock.appNow.addingTimeInterval(3600)
+        mode = existing.mode
+        showOptions = existing.mode == .fixed
+      } else {
+        pickedDate = TaskReminder.quickPresets().first?.date ?? DayClock.appNow.addingTimeInterval(3600)
+        mode = .floating
+        showOptions = false
+      }
+    }
+    .task {
+      notificationsDenied = await TaskReminderScheduler.shared.authorizationStatus() == .denied
+    }
   }
 }
 

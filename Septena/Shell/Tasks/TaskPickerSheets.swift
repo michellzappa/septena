@@ -68,6 +68,148 @@ struct DatePickerSheet: View {
   }
 }
 
+// MARK: - Reminder picker sheet (TR2)
+
+/// Progressive-disclosure Reminder sheet for iOS/iPadOS row context menus.
+struct ReminderPickerSheet: View {
+  @Environment(SectionTheme.self) private var theme
+  let initial: TaskReminder?
+  let onPick: (TaskReminder?) -> Void
+  @Environment(\.dismiss) private var dismiss
+
+  @State private var pickedDate: Date
+  @State private var mode: TaskReminderMode
+  @State private var showOptions: Bool
+  @State private var notificationsDenied = false
+
+  init(initial: TaskReminder?, onPick: @escaping (TaskReminder?) -> Void) {
+    self.initial = initial
+    self.onPick = onPick
+    let defaultDate = initial?.effectiveFireDate()
+      ?? TaskReminder.quickPresets().first?.date
+      ?? DayClock.appNow.addingTimeInterval(3600)
+    _pickedDate = State(initialValue: defaultDate)
+    _mode = State(initialValue: initial?.mode ?? .floating)
+    _showOptions = State(initialValue: initial?.mode == .fixed)
+  }
+
+  private func save(_ reminder: TaskReminder?) {
+    if reminder != nil {
+      Task { await TaskReminderScheduler.shared.requestAuthorizationIfNeeded() }
+    }
+    onPick(reminder)
+    dismiss()
+  }
+
+  var body: some View {
+    NavigationStack {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 14) {
+          if notificationsDenied {
+            Button {
+              TaskReminderScheduler.openNotificationSettings()
+            } label: {
+              HStack(spacing: 8) {
+                Image(systemName: "bell.slash")
+                Text("Notifications are off — Open Settings")
+                  .font(.subheadline.weight(.medium))
+                Spacer(minLength: 0)
+              }
+              .foregroundStyle(Theme.overdueRed)
+              .padding(12)
+              .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: 12))
+              .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+          }
+
+          ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+              ForEach(TaskReminder.quickPresets(), id: \.title) { preset in
+                SelectableChip(preset.title, isSelected: false, tint: theme.accent) {
+                  save(TaskReminder.make(date: preset.date, mode: mode))
+                }
+              }
+            }
+          }
+
+          VStack(alignment: .leading, spacing: 12) {
+            DatePicker(
+              "Remind at",
+              selection: $pickedDate,
+              displayedComponents: [.date, .hourAndMinute]
+            )
+            .datePickerStyle(.compact)
+
+            Button {
+              a11yAnimate(.snappy(duration: 0.2)) { showOptions.toggle() }
+            } label: {
+              HStack(spacing: 6) {
+                Image(systemName: showOptions ? "chevron.down" : "chevron.right")
+                  .font(.caption.weight(.semibold))
+                Text(showOptions ? "Hide time zone options" : "Time zone options…")
+                  .font(.subheadline.weight(.medium))
+                Spacer(minLength: 0)
+              }
+              .foregroundStyle(Theme.inkSecondary)
+              .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if showOptions {
+              Toggle(
+                "Fixed time zone",
+                isOn: Binding(
+                  get: { mode == .fixed },
+                  set: { mode = $0 ? .fixed : .floating }
+                )
+              )
+              .tint(theme.accent)
+            }
+          }
+          .padding(16)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+        }
+        .padding(.horizontal, Theme.hPadding)
+        .padding(.top, 12)
+      }
+
+      HStack(spacing: 10) {
+        if initial != nil {
+          Button {
+            Haptics.warning()
+            save(nil)
+          } label: {
+            Text("Clear Reminder")
+          }
+          .buttonStyle(.bordered)
+          .tint(Theme.inkPrimary)
+        }
+
+        Spacer(minLength: 0)
+
+        Button("Cancel") { dismiss() }
+          .buttonStyle(.bordered)
+
+        Button("Save") {
+          save(TaskReminder.make(date: pickedDate, mode: mode))
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(theme.accent)
+      }
+      .padding(.horizontal, Theme.hPadding)
+      .padding(.vertical, 14)
+      .navigationTitle("Reminder")
+      .septenaInlineTitle()
+    }
+    .macSheetFrame(width: 440, height: 340)
+    .task {
+      notificationsDenied = await TaskReminderScheduler.shared.authorizationStatus() == .denied
+    }
+  }
+}
+
 // MARK: - Recurrence picker sheet
 
 /// "Repeat" — set or clear a recurrence rule. The iOS and AppKit editors use

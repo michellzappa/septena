@@ -71,6 +71,9 @@ private struct SeptaskKitRowCommands: View {
       Button("Deadline…") { SeptaskKitCommands.row(.deadline) }
         .keyboardShortcut("d", modifiers: [.command, .shift])
         .disabled(!SeptaskKitCommands.canRun(.deadline))
+      Button("Reminder…") { SeptaskKitCommands.row(.reminder) }
+        .keyboardShortcut("r", modifiers: [.command, .option])
+        .disabled(!SeptaskKitCommands.canRun(.reminder))
       Button("Move…") { SeptaskKitCommands.row(.move) }
         .keyboardShortcut("m", modifiers: [.command, .shift])
         .disabled(!SeptaskKitCommands.canRun(.move))

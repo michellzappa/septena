@@ -13,6 +13,7 @@ struct TaskListModalPresenter: ViewModifier {
   @Binding var moveTargetIds: [String]
   @Binding var showingRepeatSheet: Bool
   @Binding var repeatTargetId: String?
+  var reminderTargetId: Binding<String?> = .constant(nil)
 
   let areas: [Area]
   let projects: [Project]
@@ -24,6 +25,7 @@ struct TaskListModalPresenter: ViewModifier {
   let applyMove: ([String], String?, String?) -> Void
   let applyRecurrence: (String, Recurrence?) -> Void
   let applyRecurrencePaused: (String, Bool) -> Void
+  var applyReminder: ((String, TaskReminder?) -> Void)? = nil
 
   func body(content: Content) -> some View {
     content
@@ -96,6 +98,20 @@ struct TaskListModalPresenter: ViewModifier {
         .presentationBackground(.thinMaterial)
         .presentationCornerRadius(Theme.cornerRadius)
       }
+      .sheet(isPresented: Binding(
+        get: { reminderTargetId.wrappedValue != nil },
+        set: { if !$0 { reminderTargetId.wrappedValue = nil } }
+      )) {
+        if let id = reminderTargetId.wrappedValue {
+          ReminderPickerSheet(initial: currentTask(id)?.reminder) { reminder in
+            applyReminder?(id, reminder)
+            reminderTargetId.wrappedValue = nil
+          }
+          .presentationDetents([.medium, .large])
+          .presentationBackground(.thinMaterial)
+          .presentationCornerRadius(Theme.cornerRadius)
+        }
+      }
   }
 }
 
@@ -111,6 +127,7 @@ struct TaskListRowContextMenu: View {
   let onMoveToToday: ([String], Bool) -> Void
   let onOpenWhen: (TaskListView.ActionTarget) -> Void
   let onOpenDeadline: (TaskListView.ActionTarget) -> Void
+  var onOpenReminder: ((SeptenaTask) -> Void)? = nil
   var onClearSchedule: (([String]) -> Void)? = nil
   let onOpenMove: (TaskListView.ActionTarget) -> Void
   /// Move a task straight to a destination from the inline submenu, skipping the
@@ -177,6 +194,14 @@ struct TaskListRowContextMenu: View {
         Label(deadlineLabel, systemImage: "flag")
       }
       .keyboardShortcut(TaskRowShortcuts.deadline)
+
+      if case let .single(task) = target, let onOpenReminder {
+        Button {
+          onOpenReminder(task)
+        } label: {
+          Label(task.reminder != nil ? "Edit Reminder…" : "Reminder…", systemImage: "bell")
+        }
+      }
 
       if let onClearSchedule,
          target.tasks.contains(where: { $0.isOnToday || $0.scheduled != nil || $0.deadline != nil }) {

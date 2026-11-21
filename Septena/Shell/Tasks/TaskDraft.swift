@@ -14,6 +14,7 @@ struct TaskDraft: Equatable {
   var onToday: Bool = false
   var scheduled: Date? = nil
   var deadline: Date? = nil
+  var reminder: TaskReminder? = nil
   var recurrence: Recurrence? = nil
   var areaId: String? = nil
   var projectId: String? = nil
@@ -47,6 +48,7 @@ struct TaskDraft: Equatable {
     onToday = task.today
     scheduled = SeptenaDate.parse(task.scheduled)
     deadline = SeptenaDate.parse(task.deadline)
+    reminder = task.reminder
     recurrence = task.recurrence
     areaId = task.area
     projectId = task.project
@@ -92,6 +94,10 @@ struct TaskDraft: Equatable {
       atBottom: atBottom
     )
     if let recurrence { mutator.setRecurrence(id: task.id, recurrence: recurrence) }
+    if let reminder {
+      mutator.setReminder(id: task.id, reminder: reminder)
+      Task { await TaskReminderScheduler.shared.requestAuthorizationIfNeeded() }
+    }
     return task
   }
 
@@ -157,6 +163,7 @@ struct TaskDraft: Equatable {
     let scheduleChanged = storedScheduled != prior.storedScheduled
       || pinToday != prior.pinToday
       || deadline != prior.deadline
+      || reminder != prior.reminder
       || recurrence != prior.recurrence
     let filingChanged = projectId != prior.projectId
       || (projectId == nil && areaId != prior.areaId)
@@ -170,6 +177,12 @@ struct TaskDraft: Equatable {
     }
     if deadline != prior.deadline {
       mutator.setDeadline(id: id, date: deadline)
+    }
+    if reminder != prior.reminder {
+      mutator.setReminder(id: id, reminder: reminder)
+      if reminder != nil {
+        Task { await TaskReminderScheduler.shared.requestAuthorizationIfNeeded() }
+      }
     }
     if recurrence != prior.recurrence {
       mutator.setRecurrence(id: id, recurrence: recurrence)

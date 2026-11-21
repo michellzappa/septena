@@ -42,6 +42,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     case toggleToday
     case when(NSView)
     case deadline(NSView)
+    case reminder(NSView)
     case list(NSView)
     case repeatRule(NSView)
     case toggleComplete
@@ -78,6 +79,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private let todayPill = KitPillButton()
   private let whenPill = KitPillButton()
   private let deadlinePill = KitPillButton()
+  private let reminderPill = KitPillButton()
   private let listPill = KitPillButton()
   private let repeatPill = KitPillButton()
   private let discussPill = KitPillButton()
@@ -219,13 +221,14 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     todayPill.onPress = { [weak self] _ in self?.onAction?(.toggleToday) }
     whenPill.onPress = { [weak self] view in self?.onAction?(.when(view)) }
     deadlinePill.onPress = { [weak self] view in self?.onAction?(.deadline(view)) }
+    reminderPill.onPress = { [weak self] view in self?.onAction?(.reminder(view)) }
     listPill.onPress = { [weak self] view in self?.onAction?(.list(view)) }
     repeatPill.onPress = { [weak self] view in self?.onAction?(.repeatRule(view)) }
     notesPill.title = String(localized: "Notes", comment: "SeptaskKit: composer pill")
     notesPill.onPress = { [weak self] _ in self?.focusNotes() }
     discussPill.title = String(localized: "Discuss", comment: "SeptaskKit: composer pill")
     discussPill.onPress = { [weak self] _ in self?.onAction?(.discuss) }
-    for pill in [todayPill, whenPill, deadlinePill, listPill, repeatPill, notesPill,
+    for pill in [todayPill, whenPill, deadlinePill, reminderPill, listPill, repeatPill, notesPill,
                  discussPill] {
       pillRow.addArrangedSubview(pill)
     }
@@ -280,7 +283,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     notesView.nextKeyView = todayPill
     todayPill.nextKeyView = whenPill
     whenPill.nextKeyView = deadlinePill
-    deadlinePill.nextKeyView = listPill
+    deadlinePill.nextKeyView = reminderPill
+    reminderPill.nextKeyView = listPill
     listPill.nextKeyView = repeatPill
     repeatPill.nextKeyView = notesPill
     notesPill.nextKeyView = discussPill
@@ -428,6 +432,14 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
       return String(localized: "Repeat", comment: "SeptaskKit: composer pill")
     }()
     repeatPill.isOn = task.recurrence != nil
+
+    if let badge = task.reminder?.badgeText() {
+      reminderPill.title = badge.text
+      reminderPill.isOn = true
+    } else {
+      reminderPill.title = String(localized: "Remind", comment: "SeptaskKit: composer pill")
+      reminderPill.isOn = false
+    }
 
     // Same gate as SwiftUI's `showsDiscuss`: only before a conversation
     // exists, and only when a local model can actually answer. A pill that

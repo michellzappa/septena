@@ -676,6 +676,17 @@ struct TaskRow: View {
                      title: String(localized: "Today", comment: "Task row trailing pill when task is on Today"))
     }
     trailingDate
+    if task.status == .open, task.deletedAt == nil,
+       let badge = task.reminder?.badgeText() {
+      HStack(spacing: 3) {
+        Image(systemName: "bell.fill")
+          .scaledFont(size: 11)
+        Text(badge.text)
+          .font(.septenaMeta)
+      }
+      .foregroundStyle(badge.isPastDue ? Theme.overdueRed : Theme.inkSecondary)
+      .accessibilityLabel(String(localized: "Reminder \(badge.text)", comment: "Task row reminder a11y"))
+    }
     if task.recurrence != nil {
       Image(systemName: "arrow.clockwise")
         .scaledFont(size: 12)

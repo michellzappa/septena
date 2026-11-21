@@ -463,6 +463,7 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.onDuplicate = { [weak self] in self?.duplicateSelection() }
     tableView.onMove = { [weak self] in self?.presentMoveMenu() }
     tableView.onFileSuggested = { [weak self] in self?.fileSuggestedSelection() }
+    tableView.onReminder = { [weak self] in self?.presentReminderPopover() }
     tableView.onFocusSidebar = { [weak self] in self?.onFocusSidebar?() }
     tableView.onMoveSelection = { [weak self] up in self?.moveSelectionOneSlot(up: up) }
     tableView.isComposing = { [weak self] in self?.composingTaskId != nil }
@@ -2326,6 +2327,39 @@ final class SeptaskKitTaskListController: NSViewController {
     return .rect(tableView.rect(ofRow: tableView.selectedRow), tableView)
   }
 
+  /// Open the Reminder popover (⌥⌘R) for the current selection, anchored to
+  /// the row or composer pill. Progressive disclosure — only sets/clears the
+  /// reminder without altering the task's `scheduled` date.
+  func presentReminderPopover(anchor: KitSurfaceAnchor? = nil) {
+    commitComposerTextIfOpen()
+    let selection = actionableSelection
+    guard !selection.isEmpty else { NSSound.beep(); return }
+    guard case .rect(let rect, let host)? = anchor ?? selectedRowAnchor else {
+      NSSound.beep()
+      return
+    }
+    let initial = selection.count == 1 ? selection[0].reminder : nil
+    let anyHasReminder = selection.contains { $0.reminder != nil }
+    SeptaskKitReminderPopover.present(
+      initial: initial,
+      anyHasReminder: anyHasReminder,
+      relativeTo: rect,
+      of: host
+    ) { [weak self] reminder in
+      guard let self else { return }
+      let before = selection.map(self.scheduleSnapshot)
+      for task in selection {
+        self.mutator.setReminder(id: task.id, reminder: reminder)
+        self.refreshComposerRow(taskId: task.id)
+      }
+      self.reload()
+      self.recordScheduleUndo(name: String(localized: "Change Reminder",
+                                           comment: "SeptaskKit: undo action"),
+                              before: before)
+      self.onStoreChanged?()
+    }
+  }
+
   /// Open the Repeat editor for the current selection, anchored to the row it
   /// edits like When and Deadline. It is intentionally the only AppKit rule
   /// picker: no preset submenu can silently flatten a fixed schedule into an
@@ -3719,6 +3753,10 @@ final class SeptaskKitTaskListController: NSViewController {
             before: before)
         }
 
+      case .reminder(let anchor):
+        self.presentReminderPopover(anchor: .rect(anchor.bounds, anchor))
+        self.refreshComposerRow(taskId: task.id)
+
       case .list(let anchor):
         // Reuses the exact destination list ⌘M / ⌘⇧M pops up — one picker, not a
         // second to keep in sync — anchored to the pill the user clicked. It
@@ -3791,6 +3829,8 @@ final class SeptaskKitTaskListController: NSViewController {
                               #selector(menuWhen), "s", [.command]))
     scheduleMenu.addItem(item(String(localized: "Deadline…", comment: "SeptaskKit: context menu"),
                               #selector(menuDeadline), "d", [.command, .shift]))
+    scheduleMenu.addItem(item(String(localized: "Reminder…", comment: "SeptaskKit: context menu"),
+                              #selector(menuReminder), "r", [.command, .option]))
     scheduleItem.submenu = scheduleMenu
     menu.addItem(scheduleItem)
 
@@ -4102,6 +4142,7 @@ final class SeptaskKitTaskListController: NSViewController {
   @objc private func menuClearSchedule() { clearScheduleSelection() }
 
   @objc private func menuRepeat() { presentRecurrencePanel() }
+  @objc private func menuReminder() { presentReminderPopover() }
 
   @objc private func menuPauseResumeRepeat() {
     let selection = actionableSelection.filter { $0.recurrence != nil }
@@ -5133,6 +5174,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let suggestionChip = KitSuggestionChipView()
   private let scheduleGlyph = NSImageView()
   private let detail = NSTextField(labelWithString: "")
+  private let reminderGlyph = NSImageView()
+  private let reminderLabel = NSTextField(labelWithString: "")
   private let repeatGlyph = NSImageView()
   private var taskId = ""
   private var plainTitle = ""
@@ -5197,6 +5240,25 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     scheduleGlyph.setContentHuggingPriority(.required, for: .horizontal)
     scheduleGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
 
+    reminderGlyph.translatesAutoresizingMaskIntoConstraints = false
+    reminderGlyph.image = NSImage(systemSymbolName: "bell.fill", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+    reminderGlyph.contentTintColor = SeptaskKitTheme.inkSecondary
+    reminderGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    reminderGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
+    reminderGlyph.kitA11yIgnore()
+    reminderGlyph.isHidden = true
+
+    reminderLabel.font = SeptaskKitTheme.meta
+    reminderLabel.textColor = SeptaskKitTheme.inkSecondary
+    reminderLabel.lineBreakMode = .byClipping
+    reminderLabel.isEditable = false
+    reminderLabel.isSelectable = false
+    reminderLabel.setContentHuggingPriority(.required, for: .horizontal)
+    reminderLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+    reminderLabel.kitA11yIgnore()
+    reminderLabel.isHidden = true
+
     // The repeat marker is the SAME SF Symbol the SwiftUI row uses, in its own
     // glyph view rather than a "↻" concatenated onto the date string — per the
     // DesignSpec, a glyph is a view, never baked into a formatted label.
@@ -5219,7 +5281,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
     trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
     let trailing = NSStackView(views: [trailingShove, suggestionChip, issueChip, chip, statusChip,
-                                      scheduleGlyph, detail, repeatGlyph, notesGlyph])
+                                      reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, notesGlyph])
     trailing.orientation = .horizontal
     trailing.alignment = .centerY
     trailing.distribution = .fill
@@ -5380,7 +5442,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     }
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
-    for view in [checkbox, title, notesGlyph, chip, statusChip, issueChip, suggestionChip, scheduleGlyph, detail, repeatGlyph] as [NSView] {
+    for view in [checkbox, title, notesGlyph, chip, statusChip, issueChip, suggestionChip,
+                 reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph] as [NSView] {
       view.alphaValue = fade
     }
     checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted
@@ -5470,6 +5533,22 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // a weekly task is in on its own day — hit the branch that hides the date
     // and lost its repeat marker entirely.
     repeatGlyph.isHidden = task.recurrence == nil
+
+    // Quiet trailing bell + time badge only when an open task has an active
+    // reminder (progressive disclosure: zero chrome otherwise).
+    if !done && task.status == .open && task.deletedAt == nil,
+       let badge = task.reminder?.badgeText() {
+      let tint = badge.isPastDue ? SeptaskKitTheme.overdueRed : SeptaskKitTheme.inkSecondary
+      reminderGlyph.contentTintColor = tint
+      reminderLabel.textColor = tint
+      reminderLabel.stringValue = badge.text
+      reminderGlyph.isHidden = false
+      reminderLabel.isHidden = false
+    } else {
+      reminderGlyph.isHidden = true
+      reminderLabel.isHidden = true
+      reminderLabel.stringValue = ""
+    }
 
     if task.status == .done, let completedAt = task.completedAt {
       let day = String(completedAt.prefix(10))
@@ -6977,6 +7056,7 @@ final class SeptaskKitTableView: NSTableView {
   var onMove: (() -> Void)?
   /// ⌥⌘M — file the selection into its suggested list (the row capsule's pick).
   var onFileSuggested: (() -> Void)?
+  var onReminder: (() -> Void)?
   var onCopy: (() -> Void)?
   var canCopy: (() -> Bool)?
   var onPaste: (() -> Void)?
@@ -7086,7 +7166,8 @@ final class SeptaskKitTableView: NSTableView {
       } else if (commandShift && key == "f") || (commandOption && key == "i") {
         allowed = true            // Quick Find, inspector: window-level, no row write
       } else if (command && ["k", "t", "s", "m"].contains(key))
-                  || (commandShift && ["m", "d"].contains(key)) {
+                  || (commandShift && ["m", "d"].contains(key))
+                  || (commandOption && key == "r") {
         allowed = composer        // act on the composing row (text saved first)
       } else {
         allowed = false
@@ -7113,6 +7194,8 @@ final class SeptaskKitTableView: NSTableView {
       // suggested one commits without a picker, so it must be impossible to
       // hit by accident. Same relationship ⌥⌘K has to ⌘K.
       case "m": onFileSuggested?(); return true
+      // ⌥⌘R — set/edit timed reminder (docs/TIMED_REMINDERS_SPEC.md §5).
+      case "r": onReminder?(); return true
       default: return super.performKeyEquivalent(with: event)
       }
     }
