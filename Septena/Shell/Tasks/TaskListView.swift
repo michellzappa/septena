@@ -1747,13 +1747,10 @@ struct TaskListView: View {
       startCreate()
     case .connectAI, .importTasks:
       #if SEPTASK
-      #if os(macOS)
-      let dest: SeptaskSettingsView.Destination =
-        (id == .connectAI && TaskSyncEngine.shared.signedIn) ? .taskBackend : .connectionsAI
-      #else
-      let dest: SeptaskSettingsView.Destination = id == .connectAI ? .taskBackend : .connectionsAI
-      #endif
-      SeptaskSettingsLink.request(dest)
+      let pageID = id == .connectAI
+        ? RegistrySettings.PageID.claudePairing
+        : RegistrySettings.PageID.importExport
+      SeptaskSettingsLink.request(pageID)
       nav.showSettings = true
       #endif
     }
