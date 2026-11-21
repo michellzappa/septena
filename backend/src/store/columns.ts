@@ -111,6 +111,15 @@ export const ENTITIES = {
       recurrencePaused: bool(),
       recurrenceSeriesID: text(128),
       recurrenceAnchorDate: day(),
+      recurrenceWeekdays: json(z.array(z.number().int().min(1).max(7)).max(7)),
+      recurrenceMonthDay: {
+        kind: "int",
+        zod: z.number().int().refine((n) => n === -1 || (n >= 1 && n <= 31), "expected 1..31 or -1").nullable(),
+      },
+      recurrenceOrdinalWeekday: json(z.object({
+        ordinal: z.number().int().refine((n) => n === -1 || (n >= 1 && n <= 4), "expected 1..4 or -1"),
+        weekday: z.number().int().min(1).max(7),
+      })),
       source: text(64),
       sourceClient: text(64),
       acknowledgedAt: stamp(),

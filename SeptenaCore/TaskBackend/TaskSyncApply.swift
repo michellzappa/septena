@@ -483,6 +483,32 @@ extension TaskSyncEngine {
     take("recurrencePaused") { t.recurrencePaused = Self.bool($0) ?? false }
     take("recurrenceSeriesID") { t.recurrenceSeriesID = $0.stringValue }
     take("recurrenceAnchorDate") { t.recurrenceAnchorDate = $0.stringValue }
+    take("recurrenceWeekdays") { v in
+      if case .array(let list) = v {
+        let nums = list.compactMap(Self.int).filter { (1...7).contains($0) }
+        if !nums.isEmpty,
+           let data = try? JSONEncoder().encode(Array(Set(nums)).sorted()),
+           let s = String(data: data, encoding: .utf8) {
+          t.recurrenceWeekdaysJSON = s
+        } else {
+          t.recurrenceWeekdaysJSON = nil
+        }
+      } else {
+        t.recurrenceWeekdaysJSON = nil
+      }
+    }
+    take("recurrenceMonthDay") { t.recurrenceMonthDay = Self.int($0) }
+    take("recurrenceOrdinalWeekday") { v in
+      if case .object(let o) = v,
+         let ord = o["ordinal"].flatMap(Self.int),
+         let wd = o["weekday"].flatMap(Self.int),
+         let data = try? JSONEncoder().encode(RecurrenceOrdinalWeekday(ordinal: ord, weekday: wd)),
+         let s = String(data: data, encoding: .utf8) {
+        t.recurrenceOrdinalWeekdayJSON = s
+      } else {
+        t.recurrenceOrdinalWeekdayJSON = nil
+      }
+    }
     take("source") { t.source = $0.stringValue }
     take("sourceClient") { t.sourceClient = $0.stringValue }
     take("acknowledgedAt") { t.acknowledgedAt = Self.parseStamp($0.stringValue) }

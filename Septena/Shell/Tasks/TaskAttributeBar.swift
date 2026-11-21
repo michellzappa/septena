@@ -451,6 +451,7 @@ private struct InlineRepeatPanel: View {
         Text("Day").tag(Recurrence.Unit.day)
         Text("Week").tag(Recurrence.Unit.week)
         Text("Month").tag(Recurrence.Unit.month)
+        Text("Year").tag(Recurrence.Unit.year)
       }
       .pickerStyle(.segmented)
 
@@ -504,6 +505,7 @@ private struct InlineRepeatPanel: View {
     case .day:   return String(localized: "\(n) days")
     case .week:  return String(localized: "\(n) weeks")
     case .month: return String(localized: "\(n) months")
+    case .year:  return String(localized: "\(n) years")
     }
   }
 }

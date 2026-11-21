@@ -169,6 +169,7 @@ struct RecurrencePickerSheet: View {
               Text("day").tag(Recurrence.Unit.day)
               Text("week").tag(Recurrence.Unit.week)
               Text("month").tag(Recurrence.Unit.month)
+              Text("year").tag(Recurrence.Unit.year)
             }
             .pickerStyle(.menu)
             .tint(Theme.inkPrimary)
@@ -249,6 +250,7 @@ struct RecurrencePickerSheet: View {
     case .day: unitName = interval == 1 ? "day" : "days"
     case .week: unitName = interval == 1 ? "week" : "weeks"
     case .month: unitName = interval == 1 ? "month" : "months"
+    case .year: unitName = interval == 1 ? "year" : "years"
     }
     return afterCompletion
       ? "\(unitName) after previous item is checked off."

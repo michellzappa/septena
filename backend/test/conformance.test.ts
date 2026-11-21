@@ -80,6 +80,9 @@ describe("Conformance: recurrence.json", () => {
           unit: c.input.unit,
           interval: c.input.interval,
           afterCompletion: c.input.afterCompletion,
+          weekdays: c.input.weekdays ?? null,
+          monthDay: c.input.monthDay ?? null,
+          ordinalWeekday: c.input.ordinalWeekday ?? null,
         },
       });
       assert.equal(actual, c.expected);

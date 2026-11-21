@@ -60,6 +60,12 @@ final class TaskEntity {
   /// The occurrence's logical slot on a fixed schedule. This deliberately
   /// differs from `scheduled` when the user makes a one-off exception.
   var recurrenceAnchorDate: String?
+  /// JSON-encoded `[Int]` (1=Sun..7=Sat) for fixed weekly multi-day rules (RV0).
+  var recurrenceWeekdaysJSON: String?
+  /// Explicit day of month (1..31 or -1 for last day) for fixed monthly/yearly rules (RV0).
+  var recurrenceMonthDay: Int?
+  /// JSON-encoded `RecurrenceOrdinalWeekday` for fixed monthly/yearly ordinal rules (RV0).
+  var recurrenceOrdinalWeekdayJSON: String?
   /// Bumped every time we apply a server payload. Lets the syncer detect
   /// rows that the latest pull didn't touch (= server-side deletions).
   var lastSyncedAt: Date
@@ -175,6 +181,9 @@ final class TaskEntity {
        recurrencePaused: Bool = false,
        recurrenceSeriesID: String? = nil,
        recurrenceAnchorDate: String? = nil,
+       recurrenceWeekdaysJSON: String? = nil,
+       recurrenceMonthDay: Int? = nil,
+       recurrenceOrdinalWeekdayJSON: String? = nil,
        lastSyncedAt: Date = .distantPast,
        sortIndex: Int = 0,
        position: Double = 0,
@@ -209,6 +218,9 @@ final class TaskEntity {
     self.recurrencePaused = recurrencePaused
     self.recurrenceSeriesID = recurrenceSeriesID
     self.recurrenceAnchorDate = recurrenceAnchorDate
+    self.recurrenceWeekdaysJSON = recurrenceWeekdaysJSON
+    self.recurrenceMonthDay = recurrenceMonthDay
+    self.recurrenceOrdinalWeekdayJSON = recurrenceOrdinalWeekdayJSON
     self.lastSyncedAt = lastSyncedAt
     self.sortIndex = sortIndex
     self.position = position
@@ -296,14 +308,40 @@ final class TaskEntity {
   var recurrence: Recurrence? {
     get {
       guard let unit = recurrenceUnit.flatMap(Recurrence.Unit.init(rawValue:)) else { return nil }
+      let weekdays: [Int]? = recurrenceWeekdaysJSON.flatMap { s in
+        guard let d = s.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode([Int].self, from: d)
+      }
+      let ordinalWeekday: RecurrenceOrdinalWeekday? = recurrenceOrdinalWeekdayJSON.flatMap { s in
+        guard let d = s.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(RecurrenceOrdinalWeekday.self, from: d)
+      }
       return Recurrence(unit: unit,
                         interval: recurrenceInterval,
-                        afterCompletion: recurrenceAfterCompletion)
+                        afterCompletion: recurrenceAfterCompletion,
+                        weekdays: weekdays,
+                        monthDay: recurrenceMonthDay,
+                        ordinalWeekday: ordinalWeekday)
     }
     set {
       recurrenceUnit = newValue?.unit.rawValue
       recurrenceInterval = newValue?.interval ?? 1
       recurrenceAfterCompletion = newValue?.afterCompletion ?? true
+      if let w = newValue?.weekdays, !w.isEmpty,
+         let data = try? JSONEncoder().encode(w),
+         let s = String(data: data, encoding: .utf8) {
+        recurrenceWeekdaysJSON = s
+      } else {
+        recurrenceWeekdaysJSON = nil
+      }
+      recurrenceMonthDay = newValue?.monthDay
+      if let ow = newValue?.ordinalWeekday,
+         let data = try? JSONEncoder().encode(ow),
+         let s = String(data: data, encoding: .utf8) {
+        recurrenceOrdinalWeekdayJSON = s
+      } else {
+        recurrenceOrdinalWeekdayJSON = nil
+      }
     }
   }
 }

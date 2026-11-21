@@ -53,15 +53,33 @@ export function newTaskId(): string {
 export const recurrenceJsonSchema = {
   type: ["object", "null"],
   description:
-    "Repeat rule. Completing the task generates the next occurrence. after_completion=true counts the interval from the day you tick it off (\"every 3 days after completion\"); false counts from the previous scheduled date, which is what keeps a weekly task on its weekday (\"every Monday\") and REQUIRES the task to have a scheduled date. Pass null to clear an existing rule.",
+    "Repeat rule. Completing the task generates the next occurrence. after_completion=true counts the interval from the day you tick it off (\"every 3 days after completion\"); false counts from the previous scheduled date, which is what keeps a weekly/monthly/yearly task on schedule (\"every Mon/Wed/Fri\", \"last Friday of month\") and REQUIRES the task to have a scheduled date. Pass null to clear an existing rule.",
   required: ["unit"],
   properties: {
-    unit: { type: "string", enum: ["day", "week", "month"] },
-    interval: { type: "integer", minimum: 1, default: 1, description: "Every N units. 1 = daily/weekly/monthly." },
+    unit: { type: "string", enum: ["day", "week", "month", "year"] },
+    interval: { type: "integer", minimum: 1, default: 1, description: "Every N units. 1 = daily/weekly/monthly/yearly." },
     after_completion: {
       type: "boolean",
       default: true,
       description: "Anchor: true = from completion, false = from the previous scheduled date.",
+    },
+    weekdays: {
+      type: "array",
+      items: { type: "integer", minimum: 1, maximum: 7 },
+      description: "Optional specific weekdays for fixed weekly rules (1 = Sunday .. 7 = Saturday; e.g. [2,3,4,5,6] = weekdays).",
+    },
+    month_day: {
+      type: "integer",
+      description: "Optional day of month for fixed monthly/yearly rules (1..31, or -1 for last day of month). Mutually exclusive with ordinal_weekday.",
+    },
+    ordinal_weekday: {
+      type: "object",
+      required: ["ordinal", "weekday"],
+      properties: {
+        ordinal: { type: "integer", enum: [-1, 1, 2, 3, 4] },
+        weekday: { type: "integer", minimum: 1, maximum: 7 },
+      },
+      description: "Optional ordinal weekday for fixed monthly/yearly rules (e.g. { ordinal: -1, weekday: 6 } = last Friday). Mutually exclusive with month_day.",
     },
   },
 } as const;
@@ -164,6 +182,11 @@ export interface RecurrenceInput {
   interval?: number;
   after_completion?: boolean;
   afterCompletion?: boolean;
+  weekdays?: number[] | null;
+  month_day?: number | null;
+  monthDay?: number | null;
+  ordinal_weekday?: { ordinal: number; weekday: number } | null;
+  ordinalWeekday?: { ordinal: number; weekday: number } | null;
 }
 
 /**
@@ -180,12 +203,12 @@ export interface RecurrenceInput {
 export function parseRecurrenceInput(
   raw: RecurrenceInput | null | undefined,
   scheduled: string | null | undefined,
-): { unit: string; interval: number; afterCompletion: boolean } | null {
+): RecurrenceRuleInput | null {
   if (raw === null) return null;          // explicit clear
   if (raw === undefined) return null;
   const unit = String(raw.unit ?? "");
-  if (unit !== "day" && unit !== "week" && unit !== "month") {
-    throw new Error("recurrence.unit must be one of: day, week, month");
+  if (unit !== "day" && unit !== "week" && unit !== "month" && unit !== "year") {
+    throw new Error("recurrence.unit must be one of: day, week, month, year");
   }
   const interval = raw.interval === undefined ? 1 : Number(raw.interval);
   if (!Number.isInteger(interval) || interval < 1) {
@@ -199,14 +222,67 @@ export function parseRecurrenceInput(
         "after_completion=true to count from the completion day instead.",
     );
   }
-  return { unit, interval, afterCompletion };
+  let weekdays: number[] | undefined;
+  if (raw.weekdays && raw.weekdays.length > 0) {
+    const clean = [...new Set(raw.weekdays.map(Number))];
+    if (clean.some((w) => !Number.isInteger(w) || w < 1 || w > 7)) {
+      throw new Error("recurrence.weekdays entries must be integers 1 (Sun) .. 7 (Sat)");
+    }
+    if (!afterCompletion && unit === "week") weekdays = clean.sort((a, b) => a - b);
+  }
+  const rawMonthDay = raw.month_day ?? raw.monthDay;
+  const rawOrdinal = raw.ordinal_weekday ?? raw.ordinalWeekday;
+  if (rawMonthDay != null && rawOrdinal != null) {
+    throw new Error("recurrence.month_day and recurrence.ordinal_weekday are mutually exclusive");
+  }
+  let monthDay: number | undefined;
+  if (rawMonthDay != null) {
+    const md = Number(rawMonthDay);
+    if (!Number.isInteger(md) || (md !== -1 && (md < 1 || md > 31))) {
+      throw new Error("recurrence.month_day must be 1..31 or -1 (last day of month)");
+    }
+    if (!afterCompletion && (unit === "month" || unit === "year")) monthDay = md;
+  }
+  let ordinalWeekday: { ordinal: number; weekday: number } | undefined;
+  if (rawOrdinal != null) {
+    const ordinal = Number(rawOrdinal.ordinal);
+    const weekday = Number(rawOrdinal.weekday);
+    if (!Number.isInteger(ordinal) || (ordinal !== -1 && (ordinal < 1 || ordinal > 4))) {
+      throw new Error("recurrence.ordinal_weekday.ordinal must be 1..4 or -1 (last)");
+    }
+    if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) {
+      throw new Error("recurrence.ordinal_weekday.weekday must be 1 (Sun) .. 7 (Sat)");
+    }
+    if (!afterCompletion && (unit === "month" || unit === "year")) {
+      ordinalWeekday = { ordinal, weekday };
+    }
+  }
+  return { unit, interval, afterCompletion, weekdays, monthDay, ordinalWeekday };
 }
 
-export type RecurrenceRuleInput = { unit: string; interval: number; afterCompletion: boolean };
+export type RecurrenceRuleInput = {
+  unit: string;
+  interval: number;
+  afterCompletion: boolean;
+  weekdays?: number[];
+  monthDay?: number;
+  ordinalWeekday?: { ordinal: number; weekday: number };
+};
 
 /** The `recurrence` block a write echoes back: the same shape it accepts. */
 export function recurrenceEcho(rule: RecurrenceRuleInput) {
-  return { unit: rule.unit, interval: rule.interval, after_completion: rule.afterCompletion };
+  const out: {
+    unit: string;
+    interval: number;
+    after_completion: boolean;
+    weekdays?: number[];
+    month_day?: number;
+    ordinal_weekday?: { ordinal: number; weekday: number };
+  } = { unit: rule.unit, interval: rule.interval, after_completion: rule.afterCompletion };
+  if (rule.weekdays && rule.weekdays.length > 0) out.weekdays = rule.weekdays;
+  if (rule.monthDay !== undefined) out.month_day = rule.monthDay;
+  if (rule.ordinalWeekday) out.ordinal_weekday = rule.ordinalWeekday;
+  return out;
 }
 
 /**

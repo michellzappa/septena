@@ -31,6 +31,9 @@ import Testing
         let unit: String
         let interval: Int
         let afterCompletion: Bool
+        let weekdays: [Int]?
+        let monthDay: Int?
+        let ordinalWeekday: RecurrenceOrdinalWeekday?
       }
       let name: String
       let input: Input
@@ -54,7 +57,10 @@ import Testing
         logicalScheduled: c.input.logicalScheduled,
         unit: c.input.unit,
         interval: c.input.interval,
-        afterCompletion: c.input.afterCompletion
+        afterCompletion: c.input.afterCompletion,
+        weekdays: c.input.weekdays,
+        monthDay: c.input.monthDay,
+        ordinalWeekday: c.input.ordinalWeekday
       )
       #expect(actual == c.expected, "nextScheduledDate failed for: \(c.name)")
     }

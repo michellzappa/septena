@@ -208,89 +208,212 @@ struct SeptenaDateParser {
   }
 }
 
+/// Ordinal weekday rule for fixed monthly/yearly recurrences (e.g. last Friday:
+/// `ordinal = -1, weekday = 6`). `weekday` uses `1 = Sunday ... 7 = Saturday`,
+/// matching Foundation `Calendar.component(.weekday)` and JS `getUTCDay() + 1`.
+struct RecurrenceOrdinalWeekday: Codable, Hashable, Sendable {
+  var ordinal: Int   // 1..4 or -1 (last)
+  var weekday: Int   // 1 = Sunday ... 7 = Saturday
+}
+
 /// Pure date arithmetic for task recurrence. Kept beside the date utilities
 /// because the lightweight core test target includes this file without the
 /// full SwiftData-backed task model.
+/// LOCKSTEP with `backend/src/recurrence.ts` and `registry/conformance/recurrence.json`.
 enum RecurrenceDateCalculator {
-  private static let formatter: DateFormatter = {
-    let f = DateFormatter()
-    f.dateFormat = "yyyy-MM-dd"
-    f.locale = Locale(identifier: "en_US_POSIX")
-    f.timeZone = TimeZone.current
-    return f
+  private struct CivilDate: Comparable {
+    let y: Int
+    let m: Int // 1..12
+    let d: Int // 1..31
+
+    static func < (lhs: CivilDate, rhs: CivilDate) -> Bool {
+      if lhs.y != rhs.y { return lhs.y < rhs.y }
+      if lhs.m != rhs.m { return lhs.m < rhs.m }
+      return lhs.d < rhs.d
+    }
+  }
+
+  private static let utcCalendar: Calendar = {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = TimeZone(secondsFromGMT: 0)!
+    return cal
   }()
+
+  private static func parseYMD(_ ymd: String) -> CivilDate? {
+    let prefix = String(ymd.prefix(10))
+    let parts = prefix.split(separator: "-")
+    guard parts.count == 3,
+          let y = Int(parts[0]),
+          let m = Int(parts[1]),
+          let d = Int(parts[2]),
+          (1...12).contains(m),
+          (1...31).contains(d) else { return nil }
+    return CivilDate(y: y, m: m, d: d)
+  }
+
+  private static func formatYMD(_ p: CivilDate) -> String {
+    String(format: "%04d-%02d-%02d", p.y, p.m, p.d)
+  }
+
+  private static func toUTCDate(_ p: CivilDate) -> Date? {
+    utcCalendar.date(from: DateComponents(year: p.y, month: p.m, day: p.d))
+  }
+
+  private static func fromUTCDate(_ date: Date) -> CivilDate {
+    let c = utcCalendar.dateComponents([.year, .month, .day], from: date)
+    return CivilDate(y: c.year ?? 1970, m: c.month ?? 1, d: c.day ?? 1)
+  }
+
+  private static func daysInMonth(year: Int, month: Int) -> Int {
+    guard let d = utcCalendar.date(from: DateComponents(year: year, month: month, day: 1)),
+          let range = utcCalendar.range(of: .day, in: .month, for: d) else { return 30 }
+    return range.upperBound - 1
+  }
+
+  private static func addDays(_ p: CivilDate, _ n: Int) -> CivilDate? {
+    guard let d = toUTCDate(p),
+          let next = utcCalendar.date(byAdding: .day, value: n, to: d) else { return nil }
+    return fromUTCDate(next)
+  }
+
+  /// 1 = Sunday ... 7 = Saturday.
+  private static func weekdayOf(_ p: CivilDate) -> Int {
+    guard let d = toUTCDate(p) else { return 1 }
+    return utcCalendar.component(.weekday, from: d)
+  }
+
+  /// ISO Monday-first offset: Mon=0, Tue=1, ..., Sat=5, Sun=6.
+  private static func isoOffset(_ weekday: Int) -> Int {
+    (weekday + 5) % 7
+  }
+
+  private static func addMonthsRaw(year: Int, month: Int, delta: Int) -> (Int, Int) {
+    let total = year * 12 + (month - 1) + delta
+    let y = Int(floor(Double(total) / 12.0))
+    let m = ((total % 12) + 12) % 12 + 1
+    return (y, m)
+  }
+
+  private static func addMonths(_ p: CivilDate, _ delta: Int, keepMonthEnd: Bool) -> CivilDate {
+    let (y, m) = addMonthsRaw(year: p.y, month: p.m, delta: delta)
+    let dim = daysInMonth(year: y, month: m)
+    if keepMonthEnd && p.d == daysInMonth(year: p.y, month: p.m) {
+      return CivilDate(y: y, m: m, d: dim)
+    }
+    return CivilDate(y: y, m: m, d: min(p.d, dim))
+  }
+
+  private static func resolveMonthDay(year: Int, month: Int, monthDay: Int) -> CivilDate? {
+    let dim = daysInMonth(year: year, month: month)
+    if monthDay == -1 { return CivilDate(y: year, m: month, d: dim) }
+    if (1...31).contains(monthDay) { return CivilDate(y: year, m: month, d: min(monthDay, dim)) }
+    return nil
+  }
+
+  private static func resolveOrdinalWeekday(year: Int, month: Int, ow: RecurrenceOrdinalWeekday) -> CivilDate? {
+    guard (1...7).contains(ow.weekday),
+          ow.ordinal == -1 || (1...4).contains(ow.ordinal) else { return nil }
+    let dim = daysInMonth(year: year, month: month)
+    if ow.ordinal == -1 {
+      let lastWd = weekdayOf(CivilDate(y: year, m: month, d: dim))
+      let back = (lastWd - ow.weekday + 7) % 7
+      return CivilDate(y: year, m: month, d: dim - back)
+    }
+    let firstWd = weekdayOf(CivilDate(y: year, m: month, d: 1))
+    let delta = (ow.weekday - firstWd + 7) % 7
+    let day = 1 + delta + (ow.ordinal - 1) * 7
+    guard day <= dim else { return nil }
+    return CivilDate(y: year, m: month, d: day)
+  }
+
+  private static func normalizeIsoWeekdays(_ weekdays: [Int]?) -> [Int] {
+    guard let weekdays, !weekdays.isEmpty else { return [] }
+    let unique = Set(weekdays.filter { (1...7).contains($0) })
+    return unique.sorted { isoOffset($0) < isoOffset($1) }
+  }
+
+  private static func advanceWeeklyByWeekdays(_ p: CivilDate, step: Int, isoOrderedWeekdays: [Int]) -> CivilDate? {
+    let curOffset = isoOffset(weekdayOf(p))
+    for w in isoOrderedWeekdays {
+      let off = isoOffset(w)
+      if off > curOffset {
+        return addDays(p, off - curOffset)
+      }
+    }
+    guard let weekMonday = addDays(p, -curOffset),
+          let nextWeekMonday = addDays(weekMonday, step * 7),
+          let first = isoOrderedWeekdays.first else { return nil }
+    return addDays(nextWeekMonday, isoOffset(first))
+  }
 
   static func nextDate(completedOn: String,
                        scheduled: String?,
                        logicalScheduled: String? = nil,
                        unit: String,
                        interval: Int,
-                       afterCompletion: Bool) -> String? {
-    guard let completedDate = formatter.date(from: String(completedOn.prefix(10))) else {
-      return nil
-    }
-    let anchor = afterCompletion
-      ? completedDate
-      : ((logicalScheduled ?? scheduled).flatMap {
-          formatter.date(from: String($0.prefix(10)))
-        } ?? completedDate)
-    let component: Calendar.Component
-    switch unit {
-    case "day": component = .day
-    case "week": component = .weekOfYear
-    case "month": component = .month
-    default: return nil
+                       afterCompletion: Bool,
+                       weekdays: [Int]? = nil,
+                       monthDay: Int? = nil,
+                       ordinalWeekday: RecurrenceOrdinalWeekday? = nil) -> String? {
+    guard let completed = parseYMD(completedOn) else { return nil }
+    let anchor: CivilDate
+    if afterCompletion {
+      anchor = completed
+    } else {
+      anchor = (logicalScheduled ?? scheduled).flatMap(parseYMD) ?? completed
     }
     let step = max(1, interval)
-    let calendar = Calendar.current
-    // Month-end is only preserved on a FIXED schedule, where the anchor is the
-    // previous scheduled date and the error compounds. An after-completion rule
-    // anchors on whatever day you happened to tick the box, so snapping there
-    // would invent a month-end intent the user never expressed.
-    let keepMonthEnd = !afterCompletion
-    guard var next = advance(anchor, by: step, component, calendar, keepMonthEnd: keepMonthEnd) else {
-      return nil
-    }
-    if !afterCompletion {
-      // A task scheduled long ago (or a corrupt date) must not spin here.
-      var guardRail = 0
-      while next <= completedDate {
-        guardRail += 1
-        guard guardRail <= 10_000,
-              let advanced = advance(next, by: step, component, calendar, keepMonthEnd: keepMonthEnd) else {
-          return nil
+    let isFixed = !afterCompletion
+    let isoWeekdays = isFixed ? normalizeIsoWeekdays(weekdays) : []
+    let fixedMonthDay = isFixed ? monthDay : nil
+    let fixedOrdinal = isFixed ? ordinalWeekday : nil
+    let keepMonthEnd = isFixed && fixedMonthDay == nil && fixedOrdinal == nil
+
+    func advance(_ p: CivilDate) -> CivilDate? {
+      switch unit {
+      case "day":
+        return addDays(p, step)
+      case "week":
+        if !isoWeekdays.isEmpty {
+          return advanceWeeklyByWeekdays(p, step: step, isoOrderedWeekdays: isoWeekdays)
         }
+        return addDays(p, step * 7)
+      case "month":
+        if let ow = fixedOrdinal {
+          let (y, m) = addMonthsRaw(year: p.y, month: p.m, delta: step)
+          return resolveOrdinalWeekday(year: y, month: m, ow: ow)
+        }
+        if let md = fixedMonthDay {
+          let (y, m) = addMonthsRaw(year: p.y, month: p.m, delta: step)
+          return resolveMonthDay(year: y, month: m, monthDay: md)
+        }
+        return addMonths(p, step, keepMonthEnd: keepMonthEnd)
+      case "year":
+        let y = p.y + step
+        let m = p.m
+        if let ow = fixedOrdinal {
+          return resolveOrdinalWeekday(year: y, month: m, ow: ow)
+        }
+        if let md = fixedMonthDay {
+          return resolveMonthDay(year: y, month: m, monthDay: md)
+        }
+        let dim = daysInMonth(year: y, month: m)
+        return CivilDate(y: y, m: m, d: min(p.d, dim))
+      default:
+        return nil
+      }
+    }
+
+    guard var next = advance(anchor) else { return nil }
+    if !afterCompletion {
+      var guardRail = 0
+      while next <= completed {
+        guardRail += 1
+        guard guardRail <= 10_000, let advanced = advance(next) else { return nil }
         next = advanced
       }
     }
-    return formatter.string(from: next)
-  }
-
-  /// Adds `step` units to `date`.
-  ///
-  /// For month steps this preserves a month-end anchor: `byAdding: .month`
-  /// alone clamps Jan 31 → Feb 28, and because the next occurrence re-anchors
-  /// on that stored date the rule then walks Mar 28 → Apr 28 and never returns
-  /// to month-end. Snapping a last-day-of-month anchor to the last day of the
-  /// target month makes the chain stable (Jan 31 → Feb 28 → Mar 31 → Apr 30).
-  /// The trade-off is deliberate: a fixed monthly rule anchored on Feb 28 is
-  /// read as "month-end", because the repeat picker offers no day-of-month.
-  private static func advance(_ date: Date,
-                              by step: Int,
-                              _ component: Calendar.Component,
-                              _ calendar: Calendar,
-                              keepMonthEnd: Bool) -> Date? {
-    guard let next = calendar.date(byAdding: component, value: step, to: date) else { return nil }
-    guard component == .month, keepMonthEnd, isLastDayOfMonth(date, calendar),
-          let range = calendar.range(of: .day, in: .month, for: next) else { return next }
-    var parts = calendar.dateComponents([.year, .month, .day], from: next)
-    parts.day = range.upperBound - 1
-    return calendar.date(from: parts) ?? next
-  }
-
-  private static func isLastDayOfMonth(_ date: Date, _ calendar: Calendar) -> Bool {
-    guard let range = calendar.range(of: .day, in: .month, for: date) else { return false }
-    return calendar.component(.day, from: date) == range.upperBound - 1
+    return formatYMD(next)
   }
 
   static func occurrenceID(sourceTaskID: String, scheduled: String) -> String {

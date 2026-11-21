@@ -38,7 +38,7 @@ enum RegistryEntityEnums {
   static let taskStatus: [String] = ["open", "done", "cancelled"]
   static let projectStatus: [String] = ["active", "done", "cancelled"]
   static let taskKind: [String] = ["heading"]
-  static let recurrenceUnit: [String] = ["day", "week", "month"]
+  static let recurrenceUnit: [String] = ["day", "week", "month", "year"]
   static let convoAssignee: [String] = ["me", "local", "claude"]
   static let convoEndState: [String] = ["agent_done", "human_done", "agent_assisted_done", "needs_verify", "decomposed", "reminder_set", "promoted_to_today", "wont_do", "open"]
   static let convoHandoffActionType: [String] = ["open_url", "compose", "call", "none"]

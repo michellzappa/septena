@@ -181,6 +181,7 @@ final class CloudKitTasksBackend {
       kind: entity.kind,
       heading: entity.heading
     )
+    next.recurrence = recurrence
     context.insert(next)
     spawnedPositions[id] = next.position
     commitAndPush(next, op: "recurrence.create")

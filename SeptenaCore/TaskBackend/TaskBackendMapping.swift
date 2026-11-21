@@ -183,6 +183,15 @@ enum TaskBackendMapping {
       "recurrencePaused": .bool(t.recurrencePaused),
       "recurrenceSeriesID": c.text("recurrenceSeriesID", t.recurrenceSeriesID, max: 128),
       "recurrenceAnchorDate": c.day("recurrenceAnchorDate", t.recurrenceAnchorDate),
+      "recurrenceWeekdays": {
+        guard let w = t.recurrence?.weekdays, !w.isEmpty else { return .null }
+        return .array(w.map { .int(Int64($0)) })
+      }(),
+      "recurrenceMonthDay": t.recurrenceMonthDay.map { .int(Int64($0)) } ?? .null,
+      "recurrenceOrdinalWeekday": {
+        guard let ow = t.recurrence?.ordinalWeekday else { return .null }
+        return .object(["ordinal": .int(Int64(ow.ordinal)), "weekday": .int(Int64(ow.weekday))])
+      }(),
       "source": c.text("source", t.source, max: 64),
       "sourceClient": c.text("sourceClient", t.sourceClient, max: 64),
       "acknowledgedAt": t.acknowledgedAt.map { .string(stamp($0)) } ?? .null,

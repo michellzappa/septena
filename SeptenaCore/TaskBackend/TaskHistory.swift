@@ -132,7 +132,9 @@ enum TaskHistory {
                    : has ? String(localized: "Notes edited", comment: "Task history")
                    : String(localized: "Notes cleared", comment: "Task history"))
     }
-    if diff["recurrenceUnit"] != nil || diff["recurrenceInterval"] != nil {
+    if diff["recurrenceUnit"] != nil || diff["recurrenceInterval"] != nil ||
+       diff["recurrenceWeekdays"] != nil || diff["recurrenceMonthDay"] != nil ||
+       diff["recurrenceOrdinalWeekday"] != nil {
       lines.append(diff["recurrenceUnit"] != nil && after("recurrenceUnit").isNull
         ? String(localized: "Repeat removed", comment: "Task history")
         : String(localized: "Repeat changed", comment: "Task history"))

@@ -260,6 +260,7 @@ private final class KitRepeatBoard: NSView {
     (.day, String(localized: "day", comment: "Repeat unit")),
     (.week, String(localized: "week", comment: "Repeat unit")),
     (.month, String(localized: "month", comment: "Repeat unit")),
+    (.year, String(localized: "year", comment: "Repeat unit")),
   ]
 
   init(selection: SeptaskKitRepeatSelection) {
@@ -539,6 +540,10 @@ private final class KitRepeatBoard: NSView {
       unitName = count == 1
         ? String(localized: "month", comment: "Repeat cadence unit")
         : String(localized: "months", comment: "Repeat cadence unit, plural")
+    case .year:
+      unitName = count == 1
+        ? String(localized: "year", comment: "Repeat cadence unit")
+        : String(localized: "years", comment: "Repeat cadence unit, plural")
     }
     let sentence = afterCompletion
       ? String(localized: "A new copy \(count) \(unitName) after this one is checked off.",

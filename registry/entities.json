@@ -29,7 +29,7 @@
     "taskStatus": ["open", "done", "cancelled"],
     "projectStatus": ["active", "done", "cancelled"],
     "taskKind": ["heading"],
-    "recurrenceUnit": ["day", "week", "month"],
+    "recurrenceUnit": ["day", "week", "month", "year"],
     "convoAssignee": ["me", "local", "claude"],
     "convoEndState": [
       "agent_done",
@@ -74,6 +74,9 @@
         "recurrencePaused": { "kind": "bool", "default": 0 },
         "recurrenceSeriesID": { "kind": "text", "max": 128, "nullable": true },
         "recurrenceAnchorDate": { "kind": "text", "format": "day", "nullable": true },
+        "recurrenceWeekdays": { "kind": "json", "nullable": true },
+        "recurrenceMonthDay": { "kind": "int", "min": -1, "max": 31, "nullable": true },
+        "recurrenceOrdinalWeekday": { "kind": "json", "nullable": true },
         "source": { "kind": "text", "max": 64, "nullable": true },
         "sourceClient": { "kind": "text", "max": 64, "nullable": true },
         "acknowledgedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
