@@ -4,7 +4,43 @@
 - Scope: Septena the task app (`Septask/`, `Septena/Shell/`, `SeptenaCore/`)
 - Rests on: ADR 0015 (`docs/adr/0015-shared-registries-for-cross-platform-clients.md`),
   `registry/README.md`, `scripts/gen-registries.mjs`
-- Base commit: `dd7813f7`
+- Base commit: `dd7813f7`, rechecked against `origin/main` at `85764c4f`
+
+## Relation to earlier work
+
+This audit builds on the 2026-11-21 audit in ADR 0015 ("Context") and on the
+work since: R0 to R4 (#141 to #145, done), Settings S0 to S2 (#187 to #189,
+done; `docs/SETTINGS_UX_SPEC.md`), the registry-driven first run (`dd8dd204`),
+ST0/TR0/RV0/CL0 registry additions. It lists only what is still hard-coded
+after that work.
+
+"ADR 0015" in the table means the ADR's audit already named the item; "New"
+means this audit found it. "Issue" is where the work is tracked. Issues that
+existed before this audit were not re-filed.
+
+| Item | Section | ADR 0015 or new | Issue |
+|---|---|---|---|
+| Smart lists and Go menu read their own lists | D | ADR 0015 | #179 (existing) |
+| `TaskNotices.swift` copy duplicates `surfaces.json` | A | ADR 0015 | #179 (existing) |
+| Prompts and `SeptenaToastCopy` duplicate `surfaces.json` | B, C | ADR 0015 | #179 (existing) |
+| SwiftUI and AppKit menus build items by hand | E | ADR 0015 | #177 (existing) |
+| Settings taxonomy hard-coded in SwiftUI | F | ADR 0015 | done by S0 to S2 (#187 to #189) |
+| Web/Android/Windows Settings filter on `capabilities.json` | L6 | ADR 0015 | #190 (existing, non-Apple only) |
+| Site parity page from `capabilities.json` | — | ADR 0015 | #181 (existing) |
+| Registry copy not localized; Settings and first run render English only | L1 | New (ADR 0015 "Consequences" states the rule, no issue implemented it) | #214 |
+| `SeptenaToastCopy` returns unlocalized strings on iOS | C | New | #179 comment, #214 |
+| Registry delete area/project copy older than `ContainerDeleteCopy` | B | New | #215 |
+| Get started step details changed in Swift (`b9374fdb`-era copy pass, now "Connect an assistant to your tasks", "Import from another app"); registry still holds the old wording | A | New | #215 |
+| `weeklySweep` notice, `rolledIn` title, `signIn` device detail missing | A | New | #215 |
+| Bulk-move toast missing | C | New | #215 |
+| `inbox` destination missing; empty states differ across registry, iOS, Mac | D | New | #215 |
+| Text prompts (New/Rename Section, Area, Project) not in registry | B | New | #215 |
+| Missing actions (Star, Reminder…, Rename, View/Window items, text size) and no `menuBar` composition | E | New (ADR 0015 lists the menu bar as in scope; the file has none) | #216 |
+| Menu wording drift ("Delete Area…" vs "Delete Area") | E | New (ADR 0015 named other drifts, fixed in R2) | #216 |
+| About pane literals; `customSurface` items without `label` | F | New | #217 |
+| `TaskSettingsPane` dead code | F | New | #217 |
+| Composer pills, inspector, date pickers hard-coded; `taskAttributeOrder` unused | G | ADR 0015 lists `TaskAttributeBar` / `KitComposerCell` for R3; R3 added the data, no consumer | #218 (coordinate with #203, #205) |
+| `RegistryCapabilities` has no Apple consumer; no lint against new literals | L6 | New for Apple shells | #219 |
 
 ## Summary
 
@@ -65,7 +101,7 @@ Five findings matter more than the per-file list:
 |---|---|---|---|
 | `signIn` | title, button, detail with three device variants (Mac, iPad, iPhone) | title, button | registry has no detail and no per-platform variant |
 | `rolledIn` | "1 task rolled into Today" / "N tasks rolled into Today" | no title | registry needs a plural title |
-| `getStarted` | title + 3 steps; Mac-only detail "Or press ⌃⌥Space anywhere on your Mac" | title + 3 steps | registry has no platform variant for the `addTask` detail |
+| `getStarted` | title + 3 steps; Mac-only detail "Or press ⌃⌥Space anywhere on your Mac"; step details reworded on main ("Connect an assistant to your tasks", "Import from another app") | title + 3 steps with the old details | registry has no platform variant for the `addTask` detail, and two details now differ |
 | `fadeIntro` | title + detail | title + detail | same copy, duplicated |
 | `weeklySweep` | plural title, "Review" button | **missing** | add the notice |
 | Symbols | literal SF Symbols (`"arrow.down.circle"`, `"circle.dashed"`) | `icon` IDs | Swift ignores `RegistryIcons` |
