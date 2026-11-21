@@ -16,6 +16,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0008](0008-agent-loop-rules-live-in-the-store.md) | Agent loop rules live in the store; the human holds the stop | accepted |
 | [0009](0009-trustable-private-ai.md) | Run AI on tasks with checkable privacy guarantees | proposed |
 | [0010](0010-free-server-tier-with-limits.md) | Offer a free server tier with limits; paid lifts them | accepted |
+| [0011](0011-self-hostable-backend.md) | Keep the backend self-hostable on the user's own Cloudflare account | proposed |
 
 ## Template
 
