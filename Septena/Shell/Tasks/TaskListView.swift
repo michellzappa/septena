@@ -749,7 +749,7 @@ struct TaskListView: View {
     #endif
   }
 
-  private var taskList: some View {
+  private var taskListChromed: some View {
     taskListContent
     // Deep task-list rhythm runs denser than the drawer's: task rows read
     // `rowVInset` for their top/bottom padding, tightened here to Things-3
@@ -775,6 +775,13 @@ struct TaskListView: View {
     // Embedded uses (Project / Area detail wraps) inherit chrome from parent
     // — adding modifiers here would create duplicate back buttons.
     .modifier(TopLevelChromeModifier(showChrome: !embedded))
+  }
+
+  // The modifier chain is split across `taskListChromed`, `taskListDialogs`
+  // and `taskList` so each one type-checks in reasonable time (one chain hit
+  // the compiler's limit on iOS).
+  private var taskListDialogs: some View {
+    taskListChromed
     .alert("Error", isPresented: Binding(
       get: { errorMessage != nil },
       set: { if !$0 { errorMessage = nil } }
@@ -840,6 +847,10 @@ struct TaskListView: View {
     } message: {
       Text("This task will be permanently deleted and cannot be undone.")
     }
+  }
+
+  private var taskList: some View {
+    taskListDialogs
     // Re-load on every appearance so completed tasks (kept visible in-place
     // while the user is on the screen) drop off when they return.
     .onAppear {
