@@ -42,6 +42,9 @@ export interface TaskOut {
     month_day?: number;
     ordinal_weekday?: { ordinal: number; weekday: number };
   };
+  reminderAt?: string;
+  reminderMode?: "floating" | "fixed";
+  reminderSnoozedUntil?: string;
   // Derived on output by `annotate` (absent = false / 0):
   // `inbox` = the row sits in Today's Inbox section in the app.
   // `daysOnToday` = days the row has carried over on Today undone; the app

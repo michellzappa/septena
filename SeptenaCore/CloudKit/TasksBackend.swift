@@ -182,6 +182,14 @@ final class CloudKitTasksBackend {
       heading: entity.heading
     )
     next.recurrence = recurrence
+    if let shifted = TaskReminderRules.shiftForRecurrence(
+      sourceReminderAt: entity.reminderAt,
+      sourceScheduled: entity.recurrenceAnchorDate ?? entity.scheduled,
+      nextScheduled: scheduled
+    ) {
+      next.reminderAt = shifted
+      next.reminderMode = entity.reminderMode ?? TaskReminderMode.floating.rawValue
+    }
     context.insert(next)
     spawnedPositions[id] = next.position
     commitAndPush(next, op: "recurrence.create")
@@ -700,24 +708,38 @@ final class CloudKitTasksBackend {
   /// watch editing paths converge on the same state transition.
   func reschedule(id: String, date: Date?, mode: RecurrenceRescheduleMode) {
     guard let entity = fetch(id: id) else { return }
+    let oldScheduled = entity.scheduled
+    let displayed = SeptenaDate.format(date)
+    func shiftSameDayReminder(_ target: TaskEntity, from oldDay: String?, to newDay: String?) {
+      let shifted = TaskReminderRules.shiftOnReschedule(
+        reminderAt: target.reminderAt, oldScheduled: oldDay, newScheduled: newDay
+      )
+      if shifted != target.reminderAt {
+        target.reminderAt = shifted
+        target.reminderSnoozedUntil = nil
+        target.reminderDismissedAt = nil
+      }
+    }
     guard let rule = entity.recurrence, !rule.afterCompletion else {
-      entity.scheduled = SeptenaDate.format(date)
+      entity.scheduled = displayed
+      shiftSameDayReminder(entity, from: oldScheduled, to: displayed)
       entity.pendingSync = true
       commitAndPush(entity, op: "reschedule(completion)")
       return
     }
 
-    let displayed = SeptenaDate.format(date)
     guard mode == .updateRule else {
       // Keep recurrenceAnchorDate untouched. That is the entire exception
       // invariant: the row moves, but its next completion still advances from
       // the original series slot.
       entity.scheduled = displayed
+      shiftSameDayReminder(entity, from: oldScheduled, to: displayed)
       entity.pendingSync = true
       commitAndPush(entity, op: "reschedule(exception)")
       return
     }
 
+    shiftSameDayReminder(entity, from: oldScheduled, to: displayed)
     updateFixedSeries(from: entity, rule: rule, newDisplayedDate: displayed)
   }
 
@@ -914,6 +936,29 @@ final class CloudKitTasksBackend {
     entity.deadline = SeptenaDate.format(date)
     entity.pendingSync = true
     commitAndPush(entity, op: "setDeadline")
+  }
+
+  func setReminder(id: String, reminder: TaskReminder?) {
+    guard let entity = fetch(id: id) else { return }
+    entity.reminder = reminder
+    entity.pendingSync = true
+    commitAndPush(entity, op: reminder == nil ? "setReminder(nil)" : "setReminder")
+  }
+
+  func snoozeReminder(id: String, until: Date) {
+    guard let entity = fetch(id: id), entity.reminderAt != nil else { return }
+    entity.reminderSnoozedUntil = TaskBackendMapping.stamp(until)
+    entity.reminderDismissedAt = nil
+    entity.pendingSync = true
+    commitAndPush(entity, op: "snoozeReminder")
+  }
+
+  func dismissReminder(id: String, at date: Date = Date()) {
+    guard let entity = fetch(id: id), entity.reminderAt != nil else { return }
+    entity.reminderDismissedAt = TaskBackendMapping.stamp(date)
+    entity.reminderSnoozedUntil = nil
+    entity.pendingSync = true
+    commitAndPush(entity, op: "dismissReminder")
   }
 
   func setRecurrence(id: String, recurrence: Recurrence?) {

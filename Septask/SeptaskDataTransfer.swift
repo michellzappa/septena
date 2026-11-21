@@ -147,6 +147,10 @@ enum TaskJSONTransfer {
       "recurrenceWeekdays": e.recurrence?.weekdays,
       "recurrenceMonthDay": e.recurrence?.monthDay,
       "recurrenceOrdinalWeekday": e.recurrence?.ordinalWeekday.map { ["ordinal": $0.ordinal, "weekday": $0.weekday] },
+      "reminderAt": e.reminderAt,
+      "reminderMode": e.reminderMode,
+      "reminderSnoozedUntil": e.reminderSnoozedUntil,
+      "reminderDismissedAt": e.reminderDismissedAt,
       "position": e.position, "todayPosition": e.todayPosition,
       "kind": e.kind.isEmpty ? nil : e.kind,
       "heading": e.heading,
@@ -355,6 +359,10 @@ enum TaskJSONTransfer {
     } else {
       entity.recurrenceOrdinalWeekdayJSON = nil
     }
+    entity.reminderAt = nonEmptyString(r["reminderAt"])
+    entity.reminderMode = nonEmptyString(r["reminderMode"])
+    entity.reminderSnoozedUntil = nonEmptyString(r["reminderSnoozedUntil"])
+    entity.reminderDismissedAt = nonEmptyString(r["reminderDismissedAt"])
     if let pos = doubleValue(r["position"]) { entity.position = pos }
     entity.todayPosition = doubleValue(r["todayPosition"])
     if let sort = intValue(r["sortIndex"]) { entity.sortIndex = sort }

@@ -30,6 +30,7 @@
     "projectStatus": ["active", "done", "cancelled"],
     "taskKind": ["heading"],
     "recurrenceUnit": ["day", "week", "month", "year"],
+    "reminderMode": ["floating", "fixed"],
     "convoAssignee": ["me", "local", "claude"],
     "convoEndState": [
       "agent_done",
@@ -77,6 +78,10 @@
         "recurrenceWeekdays": { "kind": "json", "nullable": true },
         "recurrenceMonthDay": { "kind": "int", "min": -1, "max": 31, "nullable": true },
         "recurrenceOrdinalWeekday": { "kind": "json", "nullable": true },
+        "reminderAt": { "kind": "text", "max": 32, "nullable": true },
+        "reminderMode": { "kind": "text", "enum": "reminderMode", "nullable": true },
+        "reminderSnoozedUntil": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "reminderDismissedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
         "source": { "kind": "text", "max": 64, "nullable": true },
         "sourceClient": { "kind": "text", "max": 64, "nullable": true },
         "acknowledgedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },

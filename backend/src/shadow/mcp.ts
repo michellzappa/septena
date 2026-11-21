@@ -375,6 +375,9 @@ function taskOut(r: Row): TaskOut {
             : {}),
         }
       : undefined,
+    reminderAt: str(r.reminderAt),
+    reminderMode: (str(r.reminderMode) as "floating" | "fixed" | undefined),
+    reminderSnoozedUntil: str(r.reminderSnoozedUntil),
   };
 }
 

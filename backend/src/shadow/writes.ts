@@ -3,6 +3,7 @@ import type { Env } from "../env.js";
 import { randomId } from "../util.js";
 import { localServerTimestamp, todayYMD } from "../tz.js";
 import { nextScheduledDate, occurrenceID } from "../recurrence.js";
+import { shiftReminderForRecurrence, shiftReminderOnReschedule } from "../reminders.js";
 import { storeFor } from "../api/session.js";
 import { zId } from "../store/columns.js";
 import { zPushBody, type Op, type OpResult } from "../store/ops.js";
@@ -95,6 +96,10 @@ export const zWriteArgs = {
     project: z.string().optional(),
     notes: z.string().optional(),
     recurrence: zRecurrence.optional(),
+    reminder_at: z.string().nullable().optional(),
+    reminderAt: z.string().nullable().optional(),
+    reminder_mode: z.enum(["floating", "fixed"]).nullable().optional(),
+    reminderMode: z.enum(["floating", "fixed"]).nullable().optional(),
     origin: z.enum(["user_request", "agent_suggestion"]).optional(),
   }),
   tasks_complete: z.object({ id: zId }),
@@ -110,6 +115,10 @@ export const zWriteArgs = {
     status: z.enum(["open", "cancelled"]).optional(),
     notes: z.string().nullable().optional(),
     recurrence: zRecurrence.optional(),
+    reminder_at: z.string().nullable().optional(),
+    reminderAt: z.string().nullable().optional(),
+    reminder_mode: z.enum(["floating", "fixed"]).nullable().optional(),
+    reminderMode: z.enum(["floating", "fixed"]).nullable().optional(),
   }),
   tasks_defer: z.object({ id: zId, until: zDay }),
   tasks_move_to_today: z.object({ id: zId }),
@@ -324,6 +333,10 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     fields.recurrenceSeriesID = id;
     if (!plan.rule.afterCompletion && input.scheduled) fields.recurrenceAnchorDate = input.scheduled;
   }
+  if (plan.reminder?.reminderAt) {
+    fields.reminderAt = plan.reminder.reminderAt;
+    fields.reminderMode = plan.reminder.reminderMode;
+  }
   if (onToday(fields, today)) fields.todayPosition = position;
 
   const [r] = await push(store, [{ op: "upsert", entity: "task", id, fields }]);
@@ -350,7 +363,28 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
     fields.today = p.today;
     fields.todaySetOn = p.today ? today : null;
   }
-  if (p.scheduled !== undefined) fields.scheduled = clear(p.scheduled);
+  if (p.scheduled !== undefined) {
+    const nextSched = clear(p.scheduled);
+    fields.scheduled = nextSched;
+    if (p.reminderAt === undefined) {
+      const shifted = shiftReminderOnReschedule({
+        reminderAt: str(old.reminderAt),
+        oldScheduled: str(old.scheduled),
+        newScheduled: nextSched,
+      });
+      if (shifted !== str(old.reminderAt)) {
+        fields.reminderAt = shifted;
+        fields.reminderSnoozedUntil = null;
+        fields.reminderDismissedAt = null;
+      }
+    }
+  }
+  if (p.reminderAt !== undefined) {
+    fields.reminderAt = p.reminderAt;
+    fields.reminderMode = p.reminderMode ?? null;
+    fields.reminderSnoozedUntil = null;
+    fields.reminderDismissedAt = null;
+  }
   if (p.deadline !== undefined) fields.deadline = clear(p.deadline);
   if (p.area !== undefined) fields.area = clear(p.area);
   if (p.project !== undefined) fields.project = clear(p.project);
@@ -451,6 +485,15 @@ async function completeTask(ctx: WriteContext, id: string) {
         };
         for (const k of ["area", "project", "heading", "kind", "notes", "sourceClient"] as const) {
           if (str(src[k])) fields[k] = src[k];
+        }
+        const shiftedReminder = shiftReminderForRecurrence({
+          sourceReminderAt: str(src.reminderAt),
+          sourceScheduled: str(src.recurrenceAnchorDate) ?? str(src.scheduled),
+          nextScheduled: next,
+        });
+        if (shiftedReminder) {
+          fields.reminderAt = shiftedReminder;
+          fields.reminderMode = str(src.reminderMode) ?? "floating";
         }
         if (str(src.source)) fields.source = src.source;
         // Completing an agent-authored row is engagement with the series, so

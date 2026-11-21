@@ -73,6 +73,78 @@ import Testing
     }
   }
 
+  // MARK: - Reminders
+
+  private struct RemindersFixture: Decodable {
+    struct RecurrenceShiftCase: Decodable {
+      struct Input: Decodable {
+        let sourceReminderAt: String?
+        let sourceScheduled: String?
+        let nextScheduled: String?
+      }
+      let name: String
+      let input: Input
+      let expected: String?
+    }
+    struct RescheduleShiftCase: Decodable {
+      struct Input: Decodable {
+        let reminderAt: String?
+        let oldScheduled: String?
+        let newScheduled: String?
+      }
+      let name: String
+      let input: Input
+      let expected: String?
+    }
+    struct ArmCase: Decodable {
+      struct Input: Decodable {
+        let status: String
+        let isDeleted: Bool
+        let isHeading: Bool
+        let isUnratifiedProposal: Bool
+        let reminderAt: String?
+        let reminderDismissedAt: String?
+      }
+      let name: String
+      let input: Input
+      let expected: Bool
+    }
+    let shiftReminderForRecurrence: [RecurrenceShiftCase]
+    let shiftReminderOnReschedule: [RescheduleShiftCase]
+    let shouldArmReminder: [ArmCase]
+  }
+
+  @Test func remindersConformance() throws {
+    let fixture = try Self.load("reminders.json", as: RemindersFixture.self)
+    for c in fixture.shiftReminderForRecurrence {
+      let actual = TaskReminderRules.shiftForRecurrence(
+        sourceReminderAt: c.input.sourceReminderAt,
+        sourceScheduled: c.input.sourceScheduled,
+        nextScheduled: c.input.nextScheduled
+      )
+      #expect(actual == c.expected, "shiftForRecurrence failed for: \(c.name)")
+    }
+    for c in fixture.shiftReminderOnReschedule {
+      let actual = TaskReminderRules.shiftOnReschedule(
+        reminderAt: c.input.reminderAt,
+        oldScheduled: c.input.oldScheduled,
+        newScheduled: c.input.newScheduled
+      )
+      #expect(actual == c.expected, "shiftOnReschedule failed for: \(c.name)")
+    }
+    for c in fixture.shouldArmReminder {
+      let actual = TaskReminderRules.shouldArm(
+        status: c.input.status,
+        isDeleted: c.input.isDeleted,
+        isHeading: c.input.isHeading,
+        isUnratifiedProposal: c.input.isUnratifiedProposal,
+        reminderAt: c.input.reminderAt,
+        reminderDismissedAt: c.input.reminderDismissedAt
+      )
+      #expect(actual == c.expected, "shouldArm failed for: \(c.name)")
+    }
+  }
+
   // MARK: - TaskFade
 
   private struct FadeFixture: Decodable {

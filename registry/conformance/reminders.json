@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "description": "Golden conformance vectors for timed task reminders (shiftReminderForRecurrence, shiftReminderOnReschedule, shouldArmReminder) across Swift, TypeScript, and Kotlin (docs/TIMED_REMINDERS_SPEC.md).",
+  "shiftReminderForRecurrence": [
+    {
+      "name": "same-day floating reminder shifts to next scheduled date keeping HH:MM",
+      "input": { "sourceReminderAt": "2026-11-21T09:30", "sourceScheduled": "2026-11-21", "nextScheduled": "2026-11-28" },
+      "expected": "2026-11-28T09:30"
+    },
+    {
+      "name": "offset floating reminder (1 day before) preserves -1 day offset",
+      "input": { "sourceReminderAt": "2026-11-20T09:00", "sourceScheduled": "2026-11-21", "nextScheduled": "2026-12-21" },
+      "expected": "2026-12-20T09:00"
+    },
+    {
+      "name": "offset floating reminder crosses month boundary cleanly",
+      "input": { "sourceReminderAt": "2026-11-29T18:15", "sourceScheduled": "2026-12-01", "nextScheduled": "2027-01-01" },
+      "expected": "2026-12-30T18:15"
+    },
+    {
+      "name": "fixed UTC reminder preserves time-of-day and Z suffix",
+      "input": { "sourceReminderAt": "2026-11-21T14:00:00Z", "sourceScheduled": "2026-11-21", "nextScheduled": "2026-11-28" },
+      "expected": "2026-11-28T14:00:00Z"
+    },
+    {
+      "name": "nil sourceScheduled defaults to 0-day offset on nextScheduled",
+      "input": { "sourceReminderAt": "2026-11-21T08:00", "sourceScheduled": null, "nextScheduled": "2026-11-24" },
+      "expected": "2026-11-24T08:00"
+    },
+    {
+      "name": "nil sourceReminderAt returns null",
+      "input": { "sourceReminderAt": null, "sourceScheduled": "2026-11-21", "nextScheduled": "2026-11-28" },
+      "expected": null
+    }
+  ],
+  "shiftReminderOnReschedule": [
+    {
+      "name": "same-day reminder moves with rescheduled date keeping time",
+      "input": { "reminderAt": "2026-11-21T10:15", "oldScheduled": "2026-11-21", "newScheduled": "2026-11-25" },
+      "expected": "2026-11-25T10:15"
+    },
+    {
+      "name": "same-day fixed UTC reminder moves with rescheduled date keeping UTC suffix",
+      "input": { "reminderAt": "2026-11-21T14:30:00Z", "oldScheduled": "2026-11-21", "newScheduled": "2026-11-25" },
+      "expected": "2026-11-25T14:30:00Z"
+    },
+    {
+      "name": "different-day reminder stays untouched on reschedule",
+      "input": { "reminderAt": "2026-11-20T09:00", "oldScheduled": "2026-11-21", "newScheduled": "2026-11-25" },
+      "expected": "2026-11-20T09:00"
+    },
+    {
+      "name": "clearing scheduled date leaves reminder untouched",
+      "input": { "reminderAt": "2026-11-21T10:15", "oldScheduled": "2026-11-21", "newScheduled": null },
+      "expected": "2026-11-21T10:15"
+    },
+    {
+      "name": "nil reminderAt stays null",
+      "input": { "reminderAt": null, "oldScheduled": "2026-11-21", "newScheduled": "2026-11-25" },
+      "expected": null
+    }
+  ],
+  "shouldArmReminder": [
+    {
+      "name": "open human task with reminderAt arms",
+      "input": { "status": "open", "isDeleted": false, "isHeading": false, "isUnratifiedProposal": false, "reminderAt": "2026-11-22T09:00", "reminderDismissedAt": null },
+      "expected": true
+    },
+    {
+      "name": "unacknowledged agent proposal NEVER arms OS notification (ADR 0008)",
+      "input": { "status": "open", "isDeleted": false, "isHeading": false, "isUnratifiedProposal": true, "reminderAt": "2026-11-22T09:00", "reminderDismissedAt": null },
+      "expected": false
+    },
+    {
+      "name": "completed task does not arm",
+      "input": { "status": "done", "isDeleted": false, "isHeading": false, "isUnratifiedProposal": false, "reminderAt": "2026-11-22T09:00", "reminderDismissedAt": null },
+      "expected": false
+    },
+    {
+      "name": "cancelled task does not arm",
+      "input": { "status": "cancelled", "isDeleted": false, "isHeading": false, "isUnratifiedProposal": false, "reminderAt": "2026-11-22T09:00", "reminderDismissedAt": null },
+      "expected": false
+    },
+    {
+      "name": "soft-deleted task does not arm",
+      "input": { "status": "open", "isDeleted": true, "isHeading": false, "isUnratifiedProposal": false, "reminderAt": "2026-11-22T09:00", "reminderDismissedAt": null },
+      "expected": false
+    },
+    {
+      "name": "heading does not arm",
+      "input": { "status": "open", "isDeleted": false, "isHeading": true, "isUnratifiedProposal": false, "reminderAt": "2026-11-22T09:00", "reminderDismissedAt": null },
+      "expected": false
+    },
+    {
+      "name": "dismissed reminder does not arm",
+      "input": { "status": "open", "isDeleted": false, "isHeading": false, "isUnratifiedProposal": false, "reminderAt": "2026-11-22T09:00", "reminderDismissedAt": "2026-11-22T09:01:00Z" },
+      "expected": false
+    },
+    {
+      "name": "task without reminderAt does not arm",
+      "input": { "status": "open", "isDeleted": false, "isHeading": false, "isUnratifiedProposal": false, "reminderAt": null, "reminderDismissedAt": null },
+      "expected": false
+    }
+  ]
+}
