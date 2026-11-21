@@ -36,7 +36,7 @@ enum TaskFilingSuggestions {
     guard task.project == nil else { return nil }
 
     // Inbox → area or project. BOTH populations that share the Today Inbox
-    // card get the capsule: agent proposals (the triage band) AND loose manual
+    // card get suggestions: agent proposals (the triage band) AND loose manual
     // captures the user quick-added (project/area-less, `today == true`, so
     // *not* in the band — but still unfiled work that wants a folding hint).
     if task.isInTriageBand || isLooseTodayInboxCapture(task, filter: filter) {
@@ -48,7 +48,8 @@ enum TaskFilingSuggestions {
       return alreadyMatches(task, s) ? nil : [s]
     }
 
-    // Area page: area-direct → child project only.
+    // Area page: area-direct → child project only (context menu Move submenu;
+    // inline row capsules stay strictly on Inbox — see `showsInlineCapsule`).
     if case .area(let areaId) = filter, task.area == areaId {
       let scope = SuggestionEngine.SuggestionScope.projects(childProjectIds(areaId))
       let ranked = engine.rankedSuggestions(forText: task.title, scope: scope)
@@ -59,7 +60,35 @@ enum TaskFilingSuggestions {
     return nil
   }
 
-  /// The single top pick — what the one-tap row capsule shows.
+  /// Whether `task` on `filter` should render the inline "→ Suggested" row
+  /// pill. Strictly Inbox surfaces only — standalone Inbox (`.triage`) and
+  /// Today's Inbox card (`.today`). Area pages and other lists keep their
+  /// filing suggestion in the context menu's Move submenu instead.
+  static func showsInlineCapsule(for task: SeptenaTask, filter: TaskFilter) -> Bool {
+    switch filter {
+    case .triage:
+      return task.isInTriageBand
+    case .today:
+      return task.isInTriageBand || isLooseTodayInboxCapture(task, filter: filter)
+    default:
+      return false
+    }
+  }
+
+  /// The single top pick for the one-tap inline row capsule, or `nil` when
+  /// this surface must not draw suggestion pills.
+  static func capsuleTop(for task: SeptenaTask,
+                         filter: TaskFilter,
+                         engine: SuggestionEngine,
+                         childProjectIds: (String) -> Set<String>)
+    -> SuggestionEngine.Suggestion? {
+    guard showsInlineCapsule(for: task, filter: filter) else { return nil }
+    return top(for: task, filter: filter, engine: engine,
+               childProjectIds: childProjectIds)
+  }
+
+  /// The single top ranked pick — used by the Move submenu and (via
+  /// `capsuleTop`) by Inbox row capsules.
   static func top(for task: SeptenaTask,
                   filter: TaskFilter,
                   engine: SuggestionEngine,
@@ -85,11 +114,10 @@ enum TaskFilingSuggestions {
       || (suggestion.kind == .project && task.project == suggestion.id)
   }
 
-  /// Prime the engine for `filter`. Today's Inbox gets the richer per-id
-  /// ranked picks; every other creatable list just primes the general model so
-  /// area-direct rows can be ranked on demand. Mirrors
-  /// `TaskListModel.refreshFilingSuggestions`, which calls the same two engine
-  /// entry points.
+  /// Prime the engine for `filter`. Inbox surfaces (`.today` and `.triage`)
+  /// get the richer per-id ranked picks; every other creatable list just
+  /// primes the general model so area-direct rows can be ranked on demand in
+  /// the Move submenu.
   static func prime(filter: TaskFilter,
                     context: ModelContext,
                     engine: SuggestionEngine,
@@ -97,7 +125,7 @@ enum TaskFilingSuggestions {
                     areas: [Area]) {
     guard TaskRowFlags.filingSuggestionsEnabled,
           filter != .logbook, filter != .faded, filter != .recentlyDeleted else { return }
-    if filter == .today {
+    if filter == .today || filter == .triage {
       engine.refresh(inbox: LocalCache.tasks(in: context, filter: .triage),
                      allTasks: LocalCache.trainingTasks(in: context),
                      projects: projects,

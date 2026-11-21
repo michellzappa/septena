@@ -4633,10 +4633,10 @@ struct TaskListView: View {
     model.refreshCalendarEvents(filter: filter, enabled: showCalendarEvents)
   }
 
-  /// Rebuild the per-row filing-suggestion snapshot (the "→ Suggested"
-  /// capsule). Owned by `TaskListModel`; the candidate set and the ranking
-  /// closure come from here so the snapshot and the on-demand context-menu
-  /// path stay one code path.
+  /// Rebuild the per-row filing-suggestion snapshot (the Inbox "→ Suggested"
+  /// capsule). Owned by `TaskListModel`; primes the engine for every creatable
+  /// list (so Area context menus still rank child projects on demand) while
+  /// snapshotting inline capsules strictly on Inbox via `capsuleTop`.
   private func refreshFilingSuggestions() {
     var seen = Set<String>()
     let candidates = (triageItems + items).filter {
@@ -4649,7 +4649,12 @@ struct TaskListView: View {
       projects: projects,
       areas: areas,
       candidates: candidates,
-      rankedTop: { filingRankedSuggestions(for: $0)?.first }
+      rankedTop: {
+        TaskFilingSuggestions.capsuleTop(
+          for: $0, filter: filter, engine: suggestionEngine,
+          childProjectIds: { childProjectIds(in: $0) }
+        )
+      }
     )
   }
 

@@ -1638,8 +1638,8 @@ final class SeptaskKitTaskListController: NSViewController {
   /// rows are exactly why loose lists still need this — they can carry a
   /// project while sitting in the band.
   /// A row with no list-membership chip — scoped pages already name their
-  /// context. It still carries a filing capsule where the gate allows one
-  /// (an area page ranks area-direct rows against that area's projects).
+  /// context. Inline filing capsules live strictly on Inbox (never on Area or
+  /// Project pages — those keep their suggestion inside the Move submenu).
   private func unchipped(_ task: SeptenaTask) -> Row {
     .task(task, chip: nil, suggestion: filingSuggestions[task.id])
   }
@@ -1648,9 +1648,11 @@ final class SeptaskKitTaskListController: NSViewController {
     .task(task, chip: chip(for: task), suggestion: filingSuggestions[task.id])
   }
 
-  /// Per-row top filing pick, snapshotted each reload so the capsule paints on
-  /// the same frame as the row. The GATE is `TaskFilingSuggestions`, shared
-  /// with the SwiftUI list — this only decides when to ask.
+  /// Per-row top filing pick for the inline capsule, snapshotted each reload
+  /// so the capsule paints on the same frame as the row. The GATE is
+  /// `TaskFilingSuggestions.capsuleTop`, shared with the SwiftUI list — inline
+  /// pills appear strictly on Inbox while `prime` keeps the model warm for the
+  /// context menu's Move submenu on Area pages too.
   private func refreshFilingSuggestions(pool: [SeptenaTask]) {
     guard TaskRowFlags.filingSuggestionsEnabled else {
       if !filingSuggestions.isEmpty { filingSuggestions = [:] }
@@ -1663,9 +1665,9 @@ final class SeptaskKitTaskListController: NSViewController {
     let childIds = Self.childProjectIds(in: structure.projects)
     var fresh: [String: SuggestionEngine.Suggestion] = [:]
     for task in pool {
-      if let top = TaskFilingSuggestions.top(for: task, filter: filter,
-                                             engine: SuggestionEngine.shared,
-                                             childProjectIds: childIds) {
+      if let top = TaskFilingSuggestions.capsuleTop(for: task, filter: filter,
+                                                    engine: SuggestionEngine.shared,
+                                                    childProjectIds: childIds) {
         fresh[task.id] = top
       }
     }
@@ -4169,9 +4171,11 @@ extension SeptaskKitTaskListController: NSMenuDelegate {
     menuSuggestions = []
     let selection = actionableSelection
     guard selection.count == 1, let task = selection.first else { return }
-    // The capsule's snapshot first; else the same GATE live
-    // (`TaskFilingSuggestions`), so the two can never disagree.
-    guard let suggestion = filingSuggestions[task.id]
+    // The capsule's snapshot first (Inbox); else the same GATE live
+    // (`TaskFilingSuggestions.top`) so Area pages still offer a suggested
+    // child project inside the Move submenu even without a row capsule.
+    let capsulePick = filingSuggestions[task.id]
+    guard let suggestion = capsulePick
       ?? TaskFilingSuggestions.top(
         for: task, filter: filter, engine: SuggestionEngine.shared,
         childProjectIds: Self.childProjectIds(in: projects))
@@ -4183,11 +4187,13 @@ extension SeptaskKitTaskListController: NSMenuDelegate {
                           action: #selector(menuApplySuggestion(_:)), keyEquivalent: "")
     item.target = self
     item.tag = 0
-    // ⌥⌘M files into this pick, so the item wears the binding: the menu is
-    // where a shortcut with no button of its own gets discovered. The table
-    // handles the key itself; this only advertises it.
-    item.keyEquivalent = "m"
-    item.keyEquivalentModifierMask = [.command, .option]
+    // ⌥⌘M files into the row's visible capsule pick; only advertise the
+    // binding when the row actually carries a capsule (Inbox), so the menu
+    // never promises a shortcut that is a deliberate no-op on Area pages.
+    if capsulePick != nil {
+      item.keyEquivalent = "m"
+      item.keyEquivalentModifierMask = [.command, .option]
+    }
     // Same glyph as the capsule.
     item.image = NSImage(systemSymbolName: "arrow.turn.down.right", accessibilityDescription: nil)
     moveMenu.insertItem(item, at: 0)
