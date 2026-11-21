@@ -6,11 +6,31 @@
 #        else abort the merge and leave main untouched. Then remove the worktree
 #        and delete the branch.
 #
-# Usage:  scripts/wt-done <name>
+# Usage:  scripts/wt-done [--prebuilt] [--no-push] <name>
+#
+# The gate builds the Mac schemes (WT_GATE, default "SeptenaMac SeptaskMac",
+# each on platform=macOS). Not the iOS schemes: they embed a watch app and stop
+# on the watchOS runtime gap (CLAUDE.md), which aborted every merge.
+#   --prebuilt  the branch head already passed the gate. When the merged tree
+#               is byte-identical to the branch tree (main had not moved), the
+#               gate is skipped; otherwise it runs as usual.
+#   --no-push   finalize the merge but do not push (the factory pushes once,
+#               after merging origin/main, at the end of its run).
 set -euo pipefail
 
-name="${1:?usage: wt-done <name>}"
+prebuilt=0
+push=1
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --prebuilt) prebuilt=1; shift ;;
+    --no-push) push=0; shift ;;
+    -*) echo "wt-done: unknown option $1"; exit 1 ;;
+    *) break ;;
+  esac
+done
+name="${1:?usage: wt-done [--prebuilt] [--no-push] <name>}"
 branch="wt/$name"
+gate="${WT_GATE:-SeptenaMac SeptaskMac}"
 
 main=$(git worktree list --porcelain | awk '/^worktree /{w=$2} /^branch refs\/heads\/main$/{print w; exit}')
 [ -n "$main" ] || { echo "wt-done: no worktree is on 'main'"; exit 1; }
@@ -30,22 +50,30 @@ echo "merging $branch → main (staged, not finalized)…"
 if ! git -C "$main" merge --no-ff --no-commit "$branch"; then
   echo "✗ merge conflict. Resolve in $main (hotspot files — xcstrings/pbxproj/CloudKitSchema.md"
   echo "  — are usually union merges: keep both additions). Then:"
-  echo "    git -C \"$main\" commit && scripts/build.sh && git -C \"$main\" push"
+  echo "    git -C \"$main\" commit && scripts/build.sh SeptenaMac 'platform=macOS' && git -C \"$main\" push"
   echo "    git -C \"$main\" worktree remove \"$path\" && git -C \"$main\" branch -d \"$branch\""
   exit 1
 fi
 
-echo "building merged main before finalizing…"
-if ! "$main/scripts/build.sh"; then
-  echo "✗ merged tree is RED — aborting merge, main left untouched"
-  git -C "$main" merge --abort
-  exit 1
+merged_tree=$(git -C "$main" write-tree)
+branch_tree=$(git -C "$main" rev-parse "$branch^{tree}")
+if [ "$prebuilt" = 1 ] && [ "$merged_tree" = "$branch_tree" ]; then
+  echo "merged tree = $branch tree, already gated (--prebuilt): skipping the build"
+else
+  for scheme in $gate; do
+    echo "building merged main ($scheme) before finalizing…"
+    if ! "$main/scripts/build.sh" "$scheme" 'platform=macOS'; then
+      echo "✗ merged tree is RED ($scheme) — aborting merge, main left untouched"
+      git -C "$main" merge --abort
+      exit 1
+    fi
+  done
 fi
 
 git -C "$main" commit --no-edit
 echo "✓ merged $branch into main (green)"
 
-if git -C "$main" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+if [ "$push" = 1 ] && git -C "$main" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
   git -C "$main" push && echo "✓ pushed main"
 fi
 
