@@ -774,3 +774,414 @@ struct MovePickerSheet: View {
     }
   }
 }
+
+// MARK: - Tag colors, picker & Manage Tags sheet (docs/TAGS_SPEC.md)
+
+enum TagColorPalette {
+  struct Swatch: Identifiable, Hashable {
+    let id: String
+    let label: String
+    let token: String?
+    let color: Color
+  }
+
+  static let swatches: [Swatch] = [
+    Swatch(id: "neutral", label: "Default", token: nil, color: Theme.inkSecondary),
+    Swatch(id: "blue", label: "Blue", token: "blue", color: .blue),
+    Swatch(id: "amber", label: "Amber", token: "amber", color: .orange),
+    Swatch(id: "green", label: "Green", token: "green", color: .green),
+    Swatch(id: "red", label: "Red", token: "red", color: .red),
+    Swatch(id: "purple", label: "Purple", token: "purple", color: .purple),
+    Swatch(id: "teal", label: "Teal", token: "teal", color: .teal),
+    Swatch(id: "pink", label: "Pink", token: "pink", color: .pink),
+  ]
+
+  static func color(for token: String?) -> Color {
+    swatches.first { $0.token == token }?.color ?? Theme.inkSecondary
+  }
+
+  #if os(macOS)
+  static func nsColor(for token: String?) -> NSColor {
+    switch token {
+    case "blue":   return .systemBlue
+    case "amber":  return .systemOrange
+    case "green":  return .systemGreen
+    case "red":    return .systemRed
+    case "purple": return .systemPurple
+    case "teal":   return .systemTeal
+    case "pink":   return .systemPink
+    default:       return .secondaryLabelColor
+    }
+  }
+  #endif
+}
+
+/// Modal tag picker for assigning tags to one or more tasks (iOS/SwiftUI
+/// context menu & batch bar). Supports tap-to-toggle chips, inline create on
+/// Return, and quick access to Manage Tags.
+struct TagPickerSheet: View {
+  let taskIDs: [String]
+  let onDone: (() -> Void)?
+
+  @Environment(\.dismiss) private var dismiss
+  @Environment(\.modelContext) private var modelContext
+
+  @State private var allTags: [TaskTag] = []
+  @State private var newTagName: String = ""
+  @State private var showingManageTags = false
+  @FocusState private var fieldFocused: Bool
+
+  private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
+
+  init(taskIDs: [String], onDone: (() -> Void)? = nil) {
+    self.taskIDs = taskIDs
+    self.onDone = onDone
+  }
+
+  private var filteredTags: [TaskTag] {
+    let q = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !q.isEmpty else { return allTags }
+    return allTags.filter { $0.name.localizedCaseInsensitiveContains(q) }
+  }
+
+  private func currentTagSets() -> [String: [String]] {
+    let all = LocalCache.allTasks(in: modelContext)
+    var out: [String: [String]] = [:]
+    for id in taskIDs {
+      if let t = all.first(where: { $0.id == id }) { out[id] = t.tags }
+    }
+    return out
+  }
+
+  private func assignmentState(for tagID: String) -> AssignmentState {
+    let sets = currentTagSets()
+    guard !sets.isEmpty else { return .none }
+    let count = sets.values.filter { $0.contains(tagID) }.count
+    if count == 0 { return .none }
+    if count == sets.count { return .all }
+    return .some
+  }
+
+  private enum AssignmentState { case none, some, all }
+
+  var body: some View {
+    NavigationStack {
+      VStack(alignment: .leading, spacing: 12) {
+        HStack(spacing: 8) {
+          Image(systemName: "tag")
+            .foregroundStyle(Theme.inkSecondary)
+          TextField("Filter or create tag…", text: $newTagName)
+            .textFieldStyle(.plain)
+            .focused($fieldFocused)
+            .onSubmit { createOrToggleFromField() }
+          if !newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            Button("Add") { createOrToggleFromField() }
+              .buttonStyle(.plain)
+              .font(.septenaLabel)
+              .foregroundStyle(Theme.inkPrimary)
+              .contentShape(Rectangle())
+          }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(Theme.mutedSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(.horizontal, Theme.hPadding)
+
+        if filteredTags.isEmpty && newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+          VStack(spacing: 6) {
+            Text("No tags yet")
+              .font(.septenaLabel)
+              .foregroundStyle(Theme.inkSecondary)
+            Text("Type a name above and press Return to create your first tag.")
+              .font(.septenaCaption)
+              .foregroundStyle(Theme.inkSecondary)
+              .multilineTextAlignment(.center)
+          }
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 28)
+          .padding(.horizontal, Theme.hPadding)
+        } else {
+          ScrollView {
+            VStack(spacing: 2) {
+              ForEach(filteredTags) { tag in
+                let state = assignmentState(for: tag.id)
+                Button {
+                  toggle(tag)
+                } label: {
+                  HStack(spacing: 10) {
+                    Circle()
+                      .fill(TagColorPalette.color(for: tag.color))
+                      .frame(width: 8, height: 8)
+                    Text(tag.name)
+                      .font(.septenaLabel)
+                      .foregroundStyle(Theme.inkPrimary)
+                    Spacer()
+                    if state == .all {
+                      Image(systemName: "checkmark")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.inkPrimary)
+                    } else if state == .some {
+                      Image(systemName: "minus")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.inkSecondary)
+                    }
+                  }
+                  .padding(.horizontal, Theme.hPadding)
+                  .padding(.vertical, 9)
+                  .contentShape(Rectangle())
+                }
+                .buttonStyle(PlainHoverRowButtonStyle())
+              }
+            }
+          }
+        }
+
+        Spacer(minLength: 0)
+      }
+      .padding(.top, 12)
+      .navigationTitle(Text("Tags"))
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Manage…") { showingManageTags = true }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Done") {
+            onDone?()
+            dismiss()
+          }
+        }
+      }
+      .sheet(isPresented: $showingManageTags, onDismiss: reload) {
+        ManageTagsSheet()
+      }
+      .onAppear { reload() }
+      .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in reload() }
+    }
+  }
+
+  private func reload() {
+    allTags = LocalCache.allTags(in: modelContext)
+  }
+
+  private func createOrToggleFromField() {
+    let trimmed = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    if let exact = allTags.first(where: { $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame }) {
+      toggle(exact)
+      newTagName = ""
+      return
+    }
+    guard let created = mutator.createTag(name: trimmed) else { return }
+    TaskUndo.recordTagCreate(created, mutator: mutator)
+    toggle(created)
+    newTagName = ""
+    reload()
+  }
+
+  private func toggle(_ tag: TaskTag) {
+    let before = currentTagSets()
+    guard !before.isEmpty else { return }
+    let removing = assignmentState(for: tag.id) == .all
+    var after: [String: [String]] = [:]
+    Haptics.tick()
+    for (id, tags) in before {
+      let next: [String]
+      if removing {
+        next = tags.filter { $0 != tag.id }
+      } else {
+        next = tags.contains(tag.id) ? tags : tags + [tag.id]
+      }
+      after[id] = next
+      mutator.setTaskTags(id: id, tagIDs: next)
+    }
+    TaskUndo.recordTaskTags(before: before, after: after, mutator: mutator)
+    reload()
+  }
+}
+
+/// Lightweight "Manage Tags" sheet reachable from Settings ▸ Tasks and every
+/// tag popover/picker. Supports create, rename, color, merge (Tag A → Tag B),
+/// and delete (`docs/TAGS_SPEC.md` §4).
+struct ManageTagsSheet: View {
+  @Environment(\.dismiss) private var dismiss
+  @Environment(\.modelContext) private var modelContext
+
+  @State private var tags: [TaskTag] = []
+  @State private var openCounts: [String: Int] = [:]
+  @State private var newTagName: String = ""
+  @State private var renameTarget: TaskTag? = nil
+  @State private var renameDraft: String = ""
+
+  private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        Section {
+          HStack(spacing: 8) {
+            TextField("New tag…", text: $newTagName)
+              .onSubmit { addNewTag() }
+            Button("Add") { addNewTag() }
+              .disabled(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          }
+        }
+
+        Section {
+          if tags.isEmpty {
+            Text("No tags yet. Tags stay hidden across Septena until you create one.")
+              .font(.septenaCaption)
+              .foregroundStyle(Theme.inkSecondary)
+          } else {
+            ForEach(tags) { tag in
+              HStack(spacing: 10) {
+                Circle()
+                  .fill(TagColorPalette.color(for: tag.color))
+                  .frame(width: 9, height: 9)
+                Text(tag.name)
+                  .foregroundStyle(Theme.inkPrimary)
+                Spacer()
+                let count = openCounts[tag.id] ?? 0
+                if count > 0 {
+                  Text("\(count)")
+                    .font(.septenaCaption)
+                    .foregroundStyle(Theme.inkSecondary)
+                }
+                Menu {
+                  Button {
+                    renameDraft = tag.name
+                    renameTarget = tag
+                  } label: {
+                    Label("Rename…", systemImage: "pencil")
+                  }
+                  Menu {
+                    ForEach(TagColorPalette.swatches) { swatch in
+                      Button {
+                        changeColor(tag, token: swatch.token)
+                      } label: {
+                        HStack {
+                          Text(swatch.label)
+                          if tag.color == swatch.token {
+                            Image(systemName: "checkmark")
+                          }
+                        }
+                      }
+                    }
+                  } label: {
+                    Label("Color", systemImage: "paintpalette")
+                  }
+                  let others = tags.filter { $0.id != tag.id }
+                  if !others.isEmpty {
+                    Menu {
+                      ForEach(others) { target in
+                        Button(target.name) {
+                          mutator.mergeTag(sourceID: tag.id, into: target.id)
+                          reload()
+                        }
+                      }
+                    } label: {
+                      Label("Merge into…", systemImage: "arrow.triangle.merge")
+                    }
+                  }
+                  Divider()
+                  Button(role: .destructive) {
+                    delete(tag)
+                  } label: {
+                    Label("Delete Tag", systemImage: "trash")
+                  }
+                } label: {
+                  Image(systemName: "ellipsis.circle")
+                    .foregroundStyle(Theme.inkSecondary)
+                    .contentShape(Rectangle())
+                }
+                #if os(macOS)
+                .menuStyle(.borderlessButton)
+                #endif
+                .fixedSize()
+                .accessibilityLabel(Text("Actions for \(tag.name)"))
+              }
+            }
+          }
+        } header: {
+          Text("Tags")
+        } footer: {
+          Text("Renaming a tag updates every task immediately. Deleting a tag removes the tag without touching your tasks.")
+        }
+      }
+      .formStyle(.grouped)
+      .navigationTitle(Text("Manage Tags"))
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .toolbar {
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Done") { dismiss() }
+        }
+      }
+      .alert("Rename Tag", isPresented: Binding(
+        get: { renameTarget != nil },
+        set: { if !$0 { renameTarget = nil } }
+      )) {
+        TextField("Tag name", text: $renameDraft)
+        Button("Rename") {
+          if let t = renameTarget { commitRename(t, newName: renameDraft) }
+          renameTarget = nil
+        }
+        Button("Cancel", role: .cancel) { renameTarget = nil }
+      }
+      .onAppear { reload() }
+      .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in reload() }
+    }
+    #if os(macOS)
+    .frame(minWidth: 380, minHeight: 360)
+    #endif
+  }
+
+  private func reload() {
+    tags = LocalCache.allTags(in: modelContext)
+    var counts: [String: Int] = [:]
+    for t in LocalCache.allTasks(in: modelContext) where t.status == .open && !t.isHeading {
+      for tid in t.tags { counts[tid, default: 0] += 1 }
+    }
+    openCounts = counts
+  }
+
+  private func addNewTag() {
+    let trimmed = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    if let created = mutator.createTag(name: trimmed) {
+      TaskUndo.recordTagCreate(created, mutator: mutator)
+    }
+    newTagName = ""
+    reload()
+  }
+
+  private func commitRename(_ tag: TaskTag, newName: String) {
+    let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, trimmed != tag.name else { return }
+    var after = tag
+    after.name = trimmed
+    if mutator.updateTag(id: tag.id, name: trimmed) {
+      TaskUndo.recordTagUpdate(before: tag, after: after, mutator: mutator)
+    }
+    reload()
+  }
+
+  private func changeColor(_ tag: TaskTag, token: String?) {
+    guard tag.color != token else { return }
+    var after = tag
+    after.color = token
+    if mutator.updateTag(id: tag.id, color: .some(token)) {
+      TaskUndo.recordTagUpdate(before: tag, after: after, mutator: mutator)
+    }
+    reload()
+  }
+
+  private func delete(_ tag: TaskTag) {
+    mutator.deleteTag(id: tag.id)
+    TaskUndo.recordTagDelete(tag, mutator: mutator)
+    reload()
+  }
+}

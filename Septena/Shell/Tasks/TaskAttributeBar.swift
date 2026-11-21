@@ -41,7 +41,7 @@ struct TaskAttributeBar: View {
   /// every pill is wired identically — one `ForEach`, one `select(_:)` — and the
   /// rail grows by adding a case, not another hand-written call.
   enum Attribute: Identifiable {
-    case when, deadline, reminder, repeatRule, star, list, checklist, attachments
+    case when, deadline, reminder, repeatRule, star, list, tags, checklist, attachments
     /// Edit-mode AI kickoff — rendered separately, not part of `draftCases`.
     case discuss
     var id: Self { self }
@@ -57,6 +57,7 @@ struct TaskAttributeBar: View {
       case .repeatRule: "repeat"
       case .star:       "star"
       case .list:       "folder"
+      case .tags:       "tag"
       case .checklist:  "checklist"
       case .attachments:"paperclip"
       case .discuss:    "bubble.left.and.bubble.right"
@@ -70,6 +71,7 @@ struct TaskAttributeBar: View {
       case .repeatRule: "Repeat"
       case .star:       "Star"
       case .list:       "List"
+      case .tags:       "Tags"
       case .checklist:  "Checklist"
       case .attachments:"Attachments"
       case .discuss:    "Discuss"
@@ -116,7 +118,21 @@ struct TaskAttributeBar: View {
             .focused($focus, equals: .pill(attr))
         }
         if let task = discussTask {
-          let steps = LocalCache.checklistItems(forTaskID: task.id, in: LocalStore.shared.container.mainContext)
+          let ctx = LocalStore.shared.container.mainContext
+          let liveTask = LocalCache.allTasks(in: ctx).first(where: { $0.id == task.id }) ?? task
+          let taskTags = LocalCache.resolvedTags(for: liveTask, tagsByID: LocalCache.tagsByID(in: ctx))
+          let tagValue: String? = taskTags.isEmpty
+            ? nil
+            : (taskTags.count == 1 ? taskTags[0].name : "\(taskTags.count) tags")
+          AttributePill(icon: Attribute.tags.icon, label: Attribute.tags.label,
+                        value: tagValue,
+                        isSet: !taskTags.isEmpty, isActive: expanded == .tags,
+                        isFocused: focus == .pill(.tags), accent: accent, neutral: neutral) {
+            select(.tags)
+          }
+          .focused($focus, equals: .pill(.tags))
+
+          let steps = LocalCache.checklistItems(forTaskID: task.id, in: ctx)
           let doneSteps = steps.filter(\.checked).count
           AttributePill(icon: Attribute.checklist.icon, label: Attribute.checklist.label,
                         value: steps.isEmpty ? nil : "\(doneSteps)/\(steps.count)",
@@ -179,6 +195,7 @@ struct TaskAttributeBar: View {
   private func value(for attr: Attribute) -> String? {
     switch attr {
     case .discuss: return nil
+    case .tags: return nil
     case .checklist: return nil
     case .attachments: return nil
     // "When" folds in Today: a task pinned to today (no date) reads "Today", a
@@ -205,6 +222,12 @@ struct TaskAttributeBar: View {
   private func isSet(_ attr: Attribute) -> Bool {
     switch attr {
     case .discuss:    discussWorking
+    case .tags:
+      discussTask.map { task in
+        let ctx = LocalStore.shared.container.mainContext
+        let live = LocalCache.allTasks(in: ctx).first(where: { $0.id == task.id }) ?? task
+        return !LocalCache.resolvedTags(for: live, tagsByID: LocalCache.tagsByID(in: ctx)).isEmpty
+      } ?? false
     case .checklist:  discussTask.map { !LocalCache.checklistItems(forTaskID: $0.id, in: LocalStore.shared.container.mainContext).isEmpty } ?? false
     case .attachments: discussTask.map { SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: $0.id) > 0 } ?? false
     case .when:       draft.scheduled != nil || draft.onToday
@@ -242,6 +265,10 @@ struct TaskAttributeBar: View {
                                           fill: panelFill) {
         a11yAnimate(.snappy(duration: 0.22)) { expanded = nil }
       }
+      case .tags:
+        if let task = discussTask {
+          TaskTagsPanel(taskID: task.id, accent: accent, fill: panelFill)
+        }
       case .checklist:
         if let task = discussTask {
           TaskChecklistPanel(taskID: task.id, accent: accent, fill: panelFill)
@@ -1167,5 +1194,116 @@ private struct TaskChecklistPanel: View {
     }
     reload()
     focusedItemID = lastID
+  }
+}
+
+// MARK: - Inline Tags panel
+
+/// Progressive-disclosure inline tags editor inside the SwiftUI task editor
+/// (iOS/iPadOS & SwiftUI sheets). Shows tap-to-toggle chips, an inline
+/// "New tag…" field, and a quiet "Manage…" sheet trigger.
+private struct TaskTagsPanel: View {
+  let taskID: String
+  let accent: Color
+  let fill: Color
+
+  @State private var allTags: [TaskTag] = []
+  @State private var assignedIDs: [String] = []
+  @State private var newTagName: String = ""
+  @State private var showingManageTags = false
+
+  private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      if !allTags.isEmpty {
+        ScrollView(.horizontal, showsIndicators: false) {
+          HStack(spacing: 6) {
+            ForEach(allTags) { tag in
+              let assigned = assignedIDs.contains(tag.id)
+              SelectableChip(isSelected: assigned,
+                             tint: tag.color != nil ? TagColorPalette.color(for: tag.color) : accent) {
+                toggle(tag)
+              } label: {
+                HStack(spacing: 4) {
+                  if tag.color != nil {
+                    Circle()
+                      .fill(TagColorPalette.color(for: tag.color))
+                      .frame(width: 6, height: 6)
+                  }
+                  Text(tag.name)
+                }
+              }
+            }
+          }
+        }
+      }
+
+      HStack(spacing: 8) {
+        Image(systemName: "plus")
+          .font(.system(size: 11, weight: .semibold))
+          .foregroundStyle(Theme.inkSecondary)
+        TextField("New tag…", text: $newTagName)
+          .textFieldStyle(.plain)
+          .font(.septenaLabel)
+          .onSubmit { createAndAssign() }
+        if !newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+          Button("Add") { createAndAssign() }
+            .buttonStyle(.plain)
+            .font(.septenaLabel)
+            .foregroundStyle(Theme.inkPrimary)
+            .contentShape(Rectangle())
+        } else if !allTags.isEmpty {
+          Button("Manage…") { showingManageTags = true }
+            .buttonStyle(.plain)
+            .font(.septenaCaption)
+            .foregroundStyle(Theme.inkSecondary)
+            .contentShape(Rectangle())
+        }
+      }
+      .padding(.top, allTags.isEmpty ? 0 : 2)
+    }
+    .padding(12)
+    .background(fill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .sheet(isPresented: $showingManageTags, onDismiss: reload) {
+      ManageTagsSheet()
+    }
+    .onAppear { reload() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in reload() }
+  }
+
+  private func reload() {
+    let ctx = LocalStore.shared.container.mainContext
+    allTags = LocalCache.allTags(in: ctx)
+    assignedIDs = LocalCache.allTasks(in: ctx).first(where: { $0.id == taskID })?.tags ?? []
+  }
+
+  private func toggle(_ tag: TaskTag) {
+    let before = assignedIDs
+    let after = before.contains(tag.id)
+      ? before.filter { $0 != tag.id }
+      : before + [tag.id]
+    Haptics.tick()
+    mutator.setTaskTags(id: taskID, tagIDs: after)
+    TaskUndo.recordTaskTags(before: [taskID: before], after: [taskID: after], mutator: mutator)
+    a11yAnimate(.snappy(duration: 0.18)) { reload() }
+  }
+
+  private func createAndAssign() {
+    let trimmed = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    if let existing = allTags.first(where: { $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame }) {
+      if !assignedIDs.contains(existing.id) { toggle(existing) }
+      newTagName = ""
+      return
+    }
+    guard let created = mutator.createTag(name: trimmed) else { return }
+    TaskUndo.recordTagCreate(created, mutator: mutator)
+    let before = assignedIDs
+    let after = before + [created.id]
+    mutator.setTaskTags(id: taskID, tagIDs: after)
+    TaskUndo.recordTaskTags(before: [taskID: before], after: [taskID: after], mutator: mutator)
+    newTagName = ""
+    reload()
   }
 }

@@ -580,6 +580,8 @@ struct TaskRow: View {
   /// Optional 1-level checklist progress summary (`done/total`). Zero extra
   /// chrome when nil or `total == 0` (docs/CHECKLISTS_SPEC.md §4).
   var checklistSummary: (done: Int, total: Int)? = nil
+  /// Resolved live tags on this task (empty when untagged -> zero chrome).
+  var tagChips: [TaskTag] = []
   /// Hero-animation anchors forwarded to `CheckableRow` so the closed row's
   /// title + checkbox glide into the inline editor. See `CheckableRow`.
   var titleMatchID: String? = nil
@@ -689,6 +691,37 @@ struct TaskRow: View {
       .foregroundStyle(Theme.inkSecondary)
       .accessibilityLabel(String(localized: "\(summary.done) of \(summary.total) checklist items complete",
                                  comment: "Task row checklist progress a11y"))
+    }
+    if !tagChips.isEmpty {
+      let visibleLimit = 2
+      let shown = Array(tagChips.prefix(visibleLimit))
+      let overflow = max(0, tagChips.count - visibleLimit)
+      HStack(spacing: 4) {
+        ForEach(shown) { tag in
+          HStack(spacing: 3) {
+            if tag.color != nil {
+              Circle()
+                .fill(TagColorPalette.color(for: tag.color))
+                .frame(width: 5, height: 5)
+            }
+            Text(tag.name)
+              .font(.septenaCaption)
+              .lineLimit(1)
+          }
+          .foregroundStyle(Theme.inkSecondary)
+          .padding(.horizontal, 6)
+          .padding(.vertical, 2)
+          .overlay(
+            Capsule().strokeBorder(Theme.inkSecondary.opacity(0.28), lineWidth: 0.75)
+          )
+        }
+        if overflow > 0 {
+          Text("+\(overflow)")
+            .font(.septenaCaption)
+            .foregroundStyle(Theme.inkSecondary)
+        }
+      }
+      .accessibilityLabel(Text(tagChips.map(\.name).joined(separator: ", ")))
     }
     if task.status == .open, task.deletedAt == nil,
        let badge = task.reminder?.badgeText() {

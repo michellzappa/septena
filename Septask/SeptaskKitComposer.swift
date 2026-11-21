@@ -47,6 +47,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     case reminder(NSView)
     case list(NSView)
     case repeatRule(NSView)
+    case tags(NSView)
     case toggleComplete
     /// AI kickoff — starts a conversation on this task. Shown only when there
     /// is none yet and on-device AI is available, mirroring SwiftUI's
@@ -86,6 +87,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private let listPill = KitPillButton()
   private let repeatPill = KitPillButton()
   private let starPill = KitPillButton()
+  private let tagPill = KitPillButton()
   private let checklistPill = KitPillButton()
   private let discussPill = KitPillButton()
   private let notesPill = KitPillButton()
@@ -235,6 +237,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     listPill.onPress = { [weak self] view in self?.onAction?(.list(view)) }
     repeatPill.onPress = { [weak self] view in self?.onAction?(.repeatRule(view)) }
     starPill.onPress = { [weak self] _ in self?.onAction?(.toggleStar) }
+    tagPill.title = String(localized: "Tags", comment: "SeptaskKit: composer pill")
+    tagPill.onPress = { [weak self] view in self?.onAction?(.tags(view)) }
     checklistPill.title = String(localized: "Checklist", comment: "SeptaskKit: composer pill")
     checklistPill.onPress = { [weak self] _ in self?.addChecklistItemAndFocus() }
     notesPill.title = String(localized: "Notes", comment: "SeptaskKit: composer pill")
@@ -242,7 +246,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     discussPill.title = String(localized: "Discuss", comment: "SeptaskKit: composer pill")
     discussPill.onPress = { [weak self] _ in self?.onAction?(.discuss) }
     for pill in [todayPill, whenPill, deadlinePill, reminderPill, listPill, repeatPill, starPill,
-                 checklistPill, notesPill, discussPill] {
+                 tagPill, checklistPill, notesPill, discussPill] {
       pillRow.addArrangedSubview(pill)
     }
 
@@ -501,6 +505,20 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
       ? String(localized: "Starred", comment: "SeptaskKit: composer star pill active")
       : String(localized: "Star", comment: "SeptaskKit: composer star pill")
     starPill.isOn = task.starred
+    let resolvedTags = LocalCache.resolvedTags(
+      for: task,
+      tagsByID: LocalCache.tagsByID(in: LocalStore.shared.container.mainContext)
+    )
+    if resolvedTags.isEmpty {
+      tagPill.title = String(localized: "Tags", comment: "SeptaskKit: composer pill")
+      tagPill.isOn = false
+    } else if resolvedTags.count == 1 {
+      tagPill.title = resolvedTags[0].name
+      tagPill.isOn = true
+    } else {
+      tagPill.title = String(localized: "\(resolvedTags.count) tags", comment: "SeptaskKit: composer tag count pill")
+      tagPill.isOn = true
+    }
     updateChecklistPill()
 
     // Same gate as SwiftUI's `showsDiscuss`: only before a conversation

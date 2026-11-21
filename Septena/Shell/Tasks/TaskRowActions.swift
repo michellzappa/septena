@@ -38,6 +38,7 @@ struct TaskRowActions: ViewModifier {
   @State private var showingRepeatSheet = false
   @State private var repeatTargetId: String?
   @State private var reminderTargetId: String?
+  @State private var tagsTargetIds: [String] = []
 
   @Environment(PromoteFlashStore.self) private var promoteFlash
   @Environment(\.septenaToast) private var toastStore
@@ -126,6 +127,9 @@ struct TaskRowActions: ViewModifier {
           onOpenReminder: { t in
             reminderTargetId = t.id
           },
+          onOpenTags: { target in
+            tagsTargetIds = target.ids
+          },
           onClearSchedule: { ids in
             Haptics.tick()
             recordingSchedule(String(localized: "Clear Schedule", comment: "Undo action name"), ids) {
@@ -184,6 +188,7 @@ struct TaskRowActions: ViewModifier {
         showingRepeatSheet: $showingRepeatSheet,
         repeatTargetId: $repeatTargetId,
         reminderTargetId: $reminderTargetId,
+        tagsTargetIds: $tagsTargetIds,
         areas: areas,
         projects: projects,
         currentTask: { _ in task },

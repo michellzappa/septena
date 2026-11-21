@@ -1,5 +1,7 @@
 #if os(macOS)
 import AppKit
+import SwiftData
+import SwiftUI
 
 // The AppKit shell's date pickers: ⌘S "When" and ⌘⇧D "Deadline". TIER 1
 // surfaces (SeptaskKitSurface.swift): each edits one attribute of one row, so
@@ -1995,5 +1997,357 @@ private final class KitDateCell: NSView {
     formatter.setLocalizedDateFormatFromTemplate("EEEEMMMd")
     return formatter
   }()
+}
+
+// MARK: - Tag popover (⇧⌘T, docs/TAGS_SPEC.md §4)
+
+/// Lightweight AppKit type-to-filter/assign/create tag popover anchored to a
+/// task row, composer pill, or inspector button. Supports single & multi-select
+/// with shared `TaskUndo`, plus a "Manage Tags…" modal sheet.
+@MainActor
+enum SeptaskKitTagPopover {
+  static func present(taskIDs: [String],
+                      relativeTo rect: NSRect,
+                      of positioningView: NSView,
+                      onChanged: @escaping () -> Void) {
+    guard !taskIDs.isEmpty else { return }
+    let handle = KitPopoverHandle()
+    let board = KitTagBoard(taskIDs: taskIDs,
+                            hostWindow: positioningView.window,
+                            onChanged: onChanged,
+                            onClose: { handle.close() })
+    KitPopover.present(board, relativeTo: rect, of: positioningView,
+                       focus: board.searchField, handle: handle)
+  }
+}
+
+@MainActor
+private final class KitTagBoard: NSView, NSTextFieldDelegate {
+  private let taskIDs: [String]
+  private weak var hostWindow: NSWindow?
+  private let onChanged: () -> Void
+  private let onClose: () -> Void
+
+  let searchField = NSTextField()
+  private let listStack = NSStackView()
+  private let emptyLabel = NSTextField(labelWithString: "")
+  private let manageButton = NSButton()
+  private var allTags: [TaskTag] = []
+
+  private var context: ModelContext { LocalStore.shared.container.mainContext }
+  private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
+
+  init(taskIDs: [String],
+       hostWindow: NSWindow?,
+       onChanged: @escaping () -> Void,
+       onClose: @escaping () -> Void) {
+    self.taskIDs = taskIDs
+    self.hostWindow = hostWindow
+    self.onChanged = onChanged
+    self.onClose = onClose
+    super.init(frame: NSRect(x: 0, y: 0, width: 256, height: 268))
+    translatesAutoresizingMaskIntoConstraints = false
+
+    searchField.placeholderString = String(localized: "Filter or create tag…",
+                                           comment: "SeptaskKit: tag popover search/create field")
+    searchField.font = .systemFont(ofSize: SeptenaTypeScale.size(.callout))
+    searchField.isBordered = true
+    searchField.bezelStyle = .roundedBezel
+    searchField.delegate = self
+    searchField.translatesAutoresizingMaskIntoConstraints = false
+
+    let scroll = NSScrollView()
+    scroll.drawsBackground = false
+    scroll.borderType = .noBorder
+    scroll.hasVerticalScroller = true
+    scroll.autohidesScrollers = true
+    scroll.translatesAutoresizingMaskIntoConstraints = false
+
+    let doc = KitTagFlippedView()
+    doc.translatesAutoresizingMaskIntoConstraints = false
+    listStack.orientation = .vertical
+    listStack.alignment = .leading
+    listStack.spacing = 2
+    listStack.translatesAutoresizingMaskIntoConstraints = false
+    doc.addSubview(listStack)
+    scroll.documentView = doc
+
+    emptyLabel.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+    emptyLabel.textColor = SeptaskKitTheme.inkSecondary
+    emptyLabel.alignment = .center
+    emptyLabel.lineBreakMode = .byWordWrapping
+    emptyLabel.maximumNumberOfLines = 2
+    emptyLabel.translatesAutoresizingMaskIntoConstraints = false
+
+    manageButton.isBordered = false
+    manageButton.bezelStyle = .inline
+    manageButton.title = String(localized: "Manage Tags…", comment: "SeptaskKit: manage tags button")
+    manageButton.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+    manageButton.contentTintColor = SeptaskKitTheme.inkSecondary
+    manageButton.target = self
+    manageButton.action = #selector(openManageTags)
+    manageButton.translatesAutoresizingMaskIntoConstraints = false
+
+    let divider = NSBox()
+    divider.boxType = .separator
+    divider.translatesAutoresizingMaskIntoConstraints = false
+
+    addSubview(searchField)
+    addSubview(scroll)
+    addSubview(emptyLabel)
+    addSubview(divider)
+    addSubview(manageButton)
+
+    let clip = scroll.contentView
+    NSLayoutConstraint.activate([
+      widthAnchor.constraint(equalToConstant: 256),
+      heightAnchor.constraint(equalToConstant: 268),
+      searchField.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+      searchField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+      searchField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+      scroll.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 8),
+      scroll.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+      scroll.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+      scroll.bottomAnchor.constraint(equalTo: divider.topAnchor, constant: -6),
+      doc.topAnchor.constraint(equalTo: clip.topAnchor),
+      doc.leadingAnchor.constraint(equalTo: clip.leadingAnchor),
+      doc.widthAnchor.constraint(equalTo: clip.widthAnchor),
+      listStack.topAnchor.constraint(equalTo: doc.topAnchor),
+      listStack.leadingAnchor.constraint(equalTo: doc.leadingAnchor),
+      listStack.trailingAnchor.constraint(equalTo: doc.trailingAnchor),
+      listStack.bottomAnchor.constraint(equalTo: doc.bottomAnchor),
+      emptyLabel.centerXAnchor.constraint(equalTo: scroll.centerXAnchor),
+      emptyLabel.centerYAnchor.constraint(equalTo: scroll.centerYAnchor),
+      emptyLabel.widthAnchor.constraint(lessThanOrEqualTo: scroll.widthAnchor, constant: -16),
+      divider.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+      divider.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+      divider.bottomAnchor.constraint(equalTo: manageButton.topAnchor, constant: -6),
+      manageButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+      manageButton.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
+    ])
+
+    reload()
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitTagBoard is code-only") }
+
+  private func currentTagSets() -> [String: [String]] {
+    let tasks = LocalCache.allTasks(in: context)
+    var out: [String: [String]] = [:]
+    for id in taskIDs {
+      if let t = tasks.first(where: { $0.id == id }) { out[id] = t.tags }
+    }
+    return out
+  }
+
+  private func filteredTags() -> [TaskTag] {
+    let q = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !q.isEmpty else { return allTags }
+    return allTags.filter { $0.name.localizedCaseInsensitiveContains(q) }
+  }
+
+  private func reload() {
+    allTags = LocalCache.allTags(in: context)
+    for v in listStack.arrangedSubviews {
+      listStack.removeArrangedSubview(v)
+      v.removeFromSuperview()
+    }
+    let query = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    let matches = filteredTags()
+    let sets = currentTagSets()
+
+    for tag in matches {
+      let count = sets.values.filter { $0.contains(tag.id) }.count
+      let state: Int = count == 0 ? 0 : (count == sets.count ? 2 : 1)
+      let row = makeRowButton(tag: tag, state: state)
+      listStack.addArrangedSubview(row)
+      row.widthAnchor.constraint(equalTo: listStack.widthAnchor).isActive = true
+    }
+
+    let exactExists = allTags.contains { $0.name.localizedCaseInsensitiveCompare(query) == .orderedSame }
+    if !query.isEmpty, !exactExists {
+      let createBtn = NSButton()
+      createBtn.isBordered = false
+      createBtn.bezelStyle = .inline
+      createBtn.alignment = .left
+      createBtn.font = .systemFont(ofSize: SeptenaTypeScale.size(.callout), weight: .medium)
+      createBtn.title = String(localized: "Create \"\(query)\"", comment: "SeptaskKit: create tag option")
+      createBtn.contentTintColor = NSColor.labelColor
+      createBtn.target = self
+      createBtn.action = #selector(createFromSearch)
+      createBtn.translatesAutoresizingMaskIntoConstraints = false
+      createBtn.heightAnchor.constraint(equalToConstant: 26).isActive = true
+      listStack.addArrangedSubview(createBtn)
+      createBtn.widthAnchor.constraint(equalTo: listStack.widthAnchor).isActive = true
+    }
+
+    if matches.isEmpty && query.isEmpty {
+      emptyLabel.stringValue = String(localized: "Type a name and press Return to create a tag.",
+                                      comment: "SeptaskKit: empty tag popover hint")
+      emptyLabel.isHidden = false
+    } else {
+      emptyLabel.isHidden = true
+    }
+  }
+
+  private func makeRowButton(tag: TaskTag, state: Int) -> NSView {
+    let row = KitTagPopoverRow(tag: tag, state: state) { [weak self] in
+      self?.toggle(tag)
+    }
+    row.heightAnchor.constraint(equalToConstant: 26).isActive = true
+    return row
+  }
+
+  private func toggle(_ tag: TaskTag) {
+    let before = currentTagSets()
+    guard !before.isEmpty else { return }
+    let allHave = before.values.allSatisfy { $0.contains(tag.id) }
+    var after: [String: [String]] = [:]
+    for (id, tags) in before {
+      let next = allHave ? tags.filter { $0 != tag.id } : (tags.contains(tag.id) ? tags : tags + [tag.id])
+      after[id] = next
+      mutator.setTaskTags(id: id, tagIDs: next)
+    }
+    TaskUndo.recordTaskTags(before: before, after: after, mutator: mutator)
+    reload()
+    onChanged()
+  }
+
+  @objc private func createFromSearch() {
+    commitSearchReturn()
+  }
+
+  private func commitSearchReturn() {
+    let query = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !query.isEmpty else { onClose(); return }
+    if let exact = allTags.first(where: { $0.name.localizedCaseInsensitiveCompare(query) == .orderedSame }) {
+      toggle(exact)
+      searchField.stringValue = ""
+      reload()
+      return
+    }
+    let matches = filteredTags()
+    if matches.count == 1 {
+      toggle(matches[0])
+      searchField.stringValue = ""
+      reload()
+      return
+    }
+    guard let created = mutator.createTag(name: query) else { return }
+    TaskUndo.recordTagCreate(created, mutator: mutator)
+    toggle(created)
+    searchField.stringValue = ""
+    reload()
+  }
+
+  @objc private func openManageTags() {
+    let window = hostWindow ?? self.window?.parent
+    let notify = onChanged
+    onClose()
+    guard let window else { return }
+    let hosting = NSHostingController(
+      rootView: ManageTagsSheet()
+        .modelContainer(LocalStore.shared.container)
+    )
+    let sheetWindow = NSWindow(contentViewController: hosting)
+    sheetWindow.title = String(localized: "Manage Tags", comment: "Manage tags sheet title")
+    sheetWindow.styleMask = [.titled, .closable]
+    window.beginSheet(sheetWindow) { _ in notify() }
+  }
+
+  func controlTextDidChange(_ obj: Notification) {
+    reload()
+  }
+
+  func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+    if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+      commitSearchReturn()
+      return true
+    }
+    if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+      onClose()
+      return true
+    }
+    return false
+  }
+}
+
+@MainActor
+private final class KitTagFlippedView: NSView {
+  override var isFlipped: Bool { true }
+}
+
+@MainActor
+private final class KitTagPopoverRow: NSView {
+  private let onTap: () -> Void
+  private var hovered = false
+  private var tracking: NSTrackingArea?
+
+  init(tag: TaskTag, state: Int, onTap: @escaping () -> Void) {
+    self.onTap = onTap
+    super.init(frame: .zero)
+    translatesAutoresizingMaskIntoConstraints = false
+
+    let dot = NSView()
+    dot.wantsLayer = true
+    dot.layer?.cornerRadius = 3.5
+    dot.layer?.backgroundColor = TagColorPalette.nsColor(for: tag.color).cgColor
+    dot.translatesAutoresizingMaskIntoConstraints = false
+
+    let label = NSTextField(labelWithString: tag.name)
+    label.font = .systemFont(ofSize: SeptenaTypeScale.size(.callout))
+    label.textColor = .labelColor
+    label.lineBreakMode = .byTruncatingTail
+    label.translatesAutoresizingMaskIntoConstraints = false
+
+    let mark = NSImageView()
+    mark.translatesAutoresizingMaskIntoConstraints = false
+    if state == 2 {
+      mark.image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: nil)?
+        .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
+      mark.contentTintColor = .labelColor
+    } else if state == 1 {
+      mark.image = NSImage(systemSymbolName: "minus", accessibilityDescription: nil)?
+        .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
+      mark.contentTintColor = SeptaskKitTheme.inkSecondary
+    }
+
+    addSubview(dot)
+    addSubview(label)
+    addSubview(mark)
+    NSLayoutConstraint.activate([
+      dot.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+      dot.centerYAnchor.constraint(equalTo: centerYAnchor),
+      dot.widthAnchor.constraint(equalToConstant: 7),
+      dot.heightAnchor.constraint(equalToConstant: 7),
+      label.leadingAnchor.constraint(equalTo: dot.trailingAnchor, constant: 8),
+      label.centerYAnchor.constraint(equalTo: centerYAnchor),
+      mark.leadingAnchor.constraint(greaterThanOrEqualTo: label.trailingAnchor, constant: 8),
+      mark.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+      mark.centerYAnchor.constraint(equalTo: centerYAnchor),
+      mark.widthAnchor.constraint(equalToConstant: 14),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitTagPopoverRow is code-only") }
+
+  override func draw(_ dirtyRect: NSRect) {
+    guard hovered else { return }
+    SeptaskKitTheme.listSelectionFill(emphasized: true).setFill()
+    NSBezierPath(roundedRect: bounds, xRadius: 5, yRadius: 5).fill()
+  }
+
+  override func updateTrackingAreas() {
+    super.updateTrackingAreas()
+    if let tracking { removeTrackingArea(tracking) }
+    let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow],
+                              owner: self, userInfo: nil)
+    addTrackingArea(area)
+    tracking = area
+  }
+
+  override func mouseEntered(with event: NSEvent) { hovered = true; needsDisplay = true }
+  override func mouseExited(with event: NSEvent) { hovered = false; needsDisplay = true }
+  override func mouseUp(with event: NSEvent) { onTap() }
 }
 #endif

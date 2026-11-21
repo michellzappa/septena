@@ -20,6 +20,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let reminderButton = NSButton()
   private let repeatButton = NSButton()
   private let starButton = NSButton()
+  private let tagsButton = NSButton()
   private let addChecklistButton = NSButton()
   private let checklistLabel = NSTextField(labelWithString:
     String(localized: "Checklist", comment: "SeptaskKit: inspector section"))
@@ -105,6 +106,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
                              (deadlineButton, #selector(editDeadline)),
                              (reminderButton, #selector(editReminder)),
                              (starButton, #selector(toggleStar)),
+                             (tagsButton, #selector(editTags)),
                              (addChecklistButton, #selector(addChecklistStep))] {
       button.bezelStyle = .rounded
       button.target = self
@@ -131,6 +133,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     form.addArrangedSubview(reminderButton)
     form.addArrangedSubview(repeatButton)
     form.addArrangedSubview(starButton)
+    form.addArrangedSubview(tagsButton)
     form.addArrangedSubview(addChecklistButton)
     form.addArrangedSubview(notesLabel)
     form.addArrangedSubview(notesScroll)
@@ -253,7 +256,8 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     deadlineButton.nextKeyView = reminderButton
     reminderButton.nextKeyView = repeatButton
     repeatButton.nextKeyView = starButton
-    starButton.nextKeyView = titleField
+    starButton.nextKeyView = tagsButton
+    tagsButton.nextKeyView = titleField
     show(nil)
   }
 
@@ -441,6 +445,11 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     starButton.title = next.starred
       ? String(localized: "Starred ★", comment: "SeptaskKit: inspector starred active")
       : String(localized: "Star", comment: "SeptaskKit: inspector star button")
+    let resolvedTags = LocalCache.resolvedTags(for: next, tagsByID: LocalCache.tagsByID(in: context))
+    tagsButton.title = resolvedTags.isEmpty
+      ? String(localized: "Add Tags…", comment: "SeptaskKit: inspector add tags")
+      : String(localized: "Tags: \(resolvedTags.map(\.name).joined(separator: ", "))",
+               comment: "SeptaskKit: inspector tags field")
   }
 
   /// Show or hide the conversation section. Hiding the LABEL too is the point:
@@ -611,6 +620,18 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   }
 
   // MARK: - Dates
+
+  @objc private func editTags() {
+    guard let current = task else { return }
+    SeptaskKitTagPopover.present(
+      taskIDs: [current.id],
+      relativeTo: tagsButton.bounds,
+      of: tagsButton
+    ) { [weak self] in
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+      self?.refresh()
+    }
+  }
 
   @objc private func editRepeat() {
     guard let current = task else { return }

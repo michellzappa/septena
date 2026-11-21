@@ -428,7 +428,10 @@ struct TaskListView: View {
   @State private var showingRepeatSheet = false
   @State private var repeatTargetId: String?
   @State private var reminderTargetId: String?
+  @State private var tagsTargetIds: [String] = []
   @State private var starredOnlyFilter = false
+  @State private var selectedTagIDs: Set<String> = []
+  @State private var tagsByID: [String: TaskTag] = [:]
   @State private var checklistCounts: [String: (done: Int, total: Int)] = [:]
 
   /// Pending Things-style choice when a fixed-schedule repeating task is
@@ -566,6 +569,7 @@ struct TaskListView: View {
         showingRepeatSheet: $showingRepeatSheet,
         repeatTargetId: $repeatTargetId,
         reminderTargetId: $reminderTargetId,
+        tagsTargetIds: $tagsTargetIds,
         areas: areas,
         projects: projects,
         currentTask: currentTask,
@@ -1650,23 +1654,92 @@ struct TaskListView: View {
     }
   }
 
+  /// Tags actually present on tasks in the current list — progressive
+  /// disclosure: zero tags on tasks in this list => zero tag bar chrome
+  /// (`docs/TAGS_SPEC.md` §3).
+  private var availableTagsInList: [TaskTag] {
+    guard filter != .recentlyDeleted else { return [] }
+    var presentIDs = Set<String>()
+    for task in items {
+      for tid in task.tags { presentIDs.insert(tid) }
+    }
+    if filter == .today {
+      for task in triageItems {
+        for tid in task.tags { presentIDs.insert(tid) }
+      }
+    }
+    guard !presentIDs.isEmpty else { return [] }
+    return presentIDs
+      .compactMap { tagsByID[$0] }
+      .sorted { lhs, rhs in
+        let lp = lhs.position ?? Int.max
+        let rp = rhs.position ?? Int.max
+        if lp != rp { return lp < rp }
+        let cmp = lhs.name.localizedCaseInsensitiveCompare(rhs.name)
+        if cmp != .orderedSame { return cmp == .orderedAscending }
+        return lhs.id < rhs.id
+      }
+  }
+
   @ViewBuilder
   private var starFilterBar: some View {
-    if showsStarFilterPill {
-      HStack {
-        SelectableChip(isSelected: starredOnlyFilter, tint: Theme.todayAccent) {
-          Haptics.tick()
-          a11yAnimate(.snappy(duration: 0.18)) { starredOnlyFilter.toggle() }
-        } label: {
-          HStack(spacing: 4) {
-            Image(systemName: "star.fill")
-              .scaledFont(size: 11)
-            Text("Starred")
+    let listTags = availableTagsInList
+    let hasActiveFilter = (starredOnlyFilter && showsStarFilterPill) || !selectedTagIDs.isEmpty
+    if showsStarFilterPill || !listTags.isEmpty {
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 6) {
+          if showsStarFilterPill {
+            SelectableChip(isSelected: starredOnlyFilter, tint: Theme.todayAccent) {
+              Haptics.tick()
+              a11yAnimate(.snappy(duration: 0.18)) { starredOnlyFilter.toggle() }
+            } label: {
+              HStack(spacing: 4) {
+                Image(systemName: "star.fill")
+                  .scaledFont(size: 11)
+                Text("Starred")
+              }
+            }
+          }
+          ForEach(listTags) { tag in
+            let isOn = selectedTagIDs.contains(tag.id)
+            SelectableChip(isSelected: isOn,
+                           tint: tag.color != nil ? TagColorPalette.color(for: tag.color) : theme.color(for: "tasks")) {
+              Haptics.tick()
+              a11yAnimate(.snappy(duration: 0.18)) {
+                if isOn { selectedTagIDs.remove(tag.id) }
+                else { selectedTagIDs.insert(tag.id) }
+              }
+            } label: {
+              HStack(spacing: 4) {
+                if tag.color != nil {
+                  Circle()
+                    .fill(TagColorPalette.color(for: tag.color))
+                    .frame(width: 6, height: 6)
+                }
+                Text(tag.name)
+              }
+            }
+          }
+          if hasActiveFilter {
+            Button {
+              Haptics.tick()
+              a11yAnimate(.snappy(duration: 0.18)) {
+                starredOnlyFilter = false
+                selectedTagIDs.removeAll()
+              }
+            } label: {
+              Text("Clear")
+                .font(.septenaCaption)
+                .foregroundStyle(Theme.inkSecondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
           }
         }
-        Spacer(minLength: 0)
+        .padding(.horizontal, TaskCardMetrics.margin)
       }
-      .padding(.horizontal, TaskCardMetrics.margin)
       .padding(.top, 4)
       .padding(.bottom, 6)
     }
@@ -3436,6 +3509,7 @@ struct TaskListView: View {
       isListSelected: selection.contains(task.id),
       accessory: accessory,
       checklistSummary: checklistCounts[task.id],
+      tagChips: LocalCache.resolvedTags(for: task, tagsByID: tagsByID),
       titleMatchID: "edit-title-\(task.id)",
       checkboxMatchID: "edit-checkbox-\(task.id)",
       heroMatchNS: nil, // hero-glide removed — see note by former `editTitleNS`
@@ -3615,6 +3689,9 @@ struct TaskListView: View {
         },
         onOpenReminder: { task in
           reminderTargetId = task.id
+        },
+        onOpenTags: { target in
+          tagsTargetIds = target.ids
         },
         onClearSchedule: { ids in
           for id in ids { applyWhen(id: id, kind: .scheduled, date: nil) }
@@ -4218,6 +4295,9 @@ struct TaskListView: View {
     if starredOnlyFilter && showsStarFilterPill {
       result = result.filter(\.starred)
     }
+    if !selectedTagIDs.isEmpty {
+      result = result.filter { selectedTagIDs.isSubset(of: Set($0.tags)) }
+    }
     return result
   }
 
@@ -4780,6 +4860,12 @@ struct TaskListView: View {
     // we have literally nothing to render (first ever launch, cache miss).
     if items.isEmpty { isLoading = true }
     checklistCounts = LocalCache.checklistSummaryByTask(in: modelContext)
+    tagsByID = LocalCache.tagsByID(in: modelContext)
+    // Prune any selected tag filter whose tag was deleted or left this list.
+    if !selectedTagIDs.isEmpty {
+      let valid = Set(availableTagsInList.map(\.id))
+      selectedTagIDs = selectedTagIDs.intersection(valid)
+    }
     defer { isLoading = false }
 
     // CloudKit is the only backend. Pull fresh from CK via the engine

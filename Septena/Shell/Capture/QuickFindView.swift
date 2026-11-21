@@ -141,9 +141,11 @@ struct QuickFindView: View {
     guard !tokens.isEmpty else { return [] }
 
     var out: [QuickFindHit] = []
+    let tagsByID = LocalCache.tagsByID(in: LocalStore.shared.container.mainContext)
 
     for t in tasks where t.deletedAt == nil && !t.isHeading {   // Recently-Deleted rows + project headings aren't searchable
-      let s = score(title: t.title, body: t.notes, tokens: tokens)
+      let tagText = t.tagIDs.compactMap { tagsByID[$0]?.name }.map { "\($0) #\($0)" }.joined(separator: " ")
+      let s = score(title: t.title, body: [t.notes, tagText].compactMap { $0 }.joined(separator: " "), tokens: tokens)
       guard s > 0 else { continue }
       out.append(QuickFindHit(
         id: "t:\(t.id)",

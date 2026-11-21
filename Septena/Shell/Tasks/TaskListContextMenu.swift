@@ -14,6 +14,7 @@ struct TaskListModalPresenter: ViewModifier {
   @Binding var showingRepeatSheet: Bool
   @Binding var repeatTargetId: String?
   var reminderTargetId: Binding<String?> = .constant(nil)
+  var tagsTargetIds: Binding<[String]> = .constant([])
 
   let areas: [Area]
   let projects: [Project]
@@ -112,6 +113,19 @@ struct TaskListModalPresenter: ViewModifier {
           .presentationCornerRadius(Theme.cornerRadius)
         }
       }
+      .sheet(isPresented: Binding(
+        get: { !tagsTargetIds.wrappedValue.isEmpty },
+        set: { if !$0 { tagsTargetIds.wrappedValue = [] } }
+      )) {
+        TagPickerSheet(taskIDs: tagsTargetIds.wrappedValue) {
+          tagsTargetIds.wrappedValue = []
+        }
+        #if os(iOS)
+        .presentationDetents([.medium, .large])
+        .presentationBackground(.thinMaterial)
+        .presentationCornerRadius(Theme.cornerRadius)
+        #endif
+      }
   }
 }
 
@@ -129,6 +143,7 @@ struct TaskListRowContextMenu: View {
   let onOpenWhen: (TaskListView.ActionTarget) -> Void
   let onOpenDeadline: (TaskListView.ActionTarget) -> Void
   var onOpenReminder: ((SeptenaTask) -> Void)? = nil
+  var onOpenTags: ((TaskListView.ActionTarget) -> Void)? = nil
   var onClearSchedule: (([String]) -> Void)? = nil
   let onOpenMove: (TaskListView.ActionTarget) -> Void
   /// Move a task straight to a destination from the inline submenu, skipping the
@@ -186,6 +201,14 @@ struct TaskListRowContextMenu: View {
               ? String(localized: "Remove Star", comment: "Context menu unstar")
               : String(localized: "Star", comment: "Context menu star"),
               systemImage: allStarred ? "star.slash" : "star.fill")
+      }
+    }
+
+    if let onOpenTags {
+      Button {
+        onOpenTags(target)
+      } label: {
+        Label("Tags…", systemImage: "tag")
       }
     }
 

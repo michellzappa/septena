@@ -87,6 +87,7 @@ final class SeptaskKitTaskListController: NSViewController {
   private enum Row: Equatable {
     case header(id: String, title: String, icon: GroupIcon, count: Int)
     case screenTitle(title: String, icon: GroupIcon)
+    case tagFilterBar(tags: [TaskTag], active: [String])
     case projectTarget(id: String, title: String, progress: Double)
     case task(SeptenaTask, chip: Chip?, suggestion: SuggestionEngine.Suggestion?)
     case event(Event)
@@ -125,6 +126,7 @@ final class SeptaskKitTaskListController: NSViewController {
       switch self {
       case .header(let id, _, _, _): return "h:" + id
       case .screenTitle: return "screen-title"
+      case .tagFilterBar: return "tag-filter-bar"
       case .projectTarget(let id, _, _): return "project-target:" + id
       case .task(let task, _, _): return task.id
       case .event(let event): return "e:" + event.id
@@ -155,7 +157,7 @@ final class SeptaskKitTaskListController: NSViewController {
     /// so they break the card run the same way a Today area/project header does.
     var isCardRow: Bool {
       switch self {
-      case .header, .screenTitle, .fadedFooter, .loggedFooter, .addSection, .containerNotes: return false
+      case .header, .screenTitle, .tagFilterBar, .fadedFooter, .loggedFooter, .addSection, .containerNotes: return false
       // A standalone notice sits on the page with its own card fill. A notice
       // with checklist steps (`Get started`) heads its steps' card so the
       // header and rows share one seamless frosted surface (matching iOS).
@@ -261,6 +263,8 @@ final class SeptaskKitTaskListController: NSViewController {
   private let todayMenuItem = NSMenuItem()
   private let starMenuItem = NSMenuItem()
   private var checklistCounts: [String: (done: Int, total: Int)] = [:]
+  private var tagsByID: [String: TaskTag] = [:]
+  private var activeTagFilterIDs: Set<String> = []
   /// Titled in `refreshPlacementMenuItems` — Show / Hide, so the row menu says
   /// what ⌥⌘I will actually do next.
   private let infoMenuItem = NSMenuItem()
@@ -467,7 +471,9 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.onFileSuggested = { [weak self] in self?.fileSuggestedSelection() }
     tableView.onReminder = { [weak self] in self?.presentReminderPopover() }
     tableView.onToggleStar = { [weak self] in self?.toggleStarSelection() }
+    tableView.onEditTags = { [weak self] in self?.presentTagPopover() }
     tableView.onAddChecklistItem = { [weak self] in self?.addChecklistItemToSelection() }
+    tableView.onClearTagFilter = { [weak self] in self?.clearTagFilterIfActive() ?? false }
     tableView.onFocusSidebar = { [weak self] in self?.onFocusSidebar?() }
     tableView.onMoveSelection = { [weak self] up in self?.moveSelectionOneSlot(up: up) }
     tableView.isComposing = { [weak self] in self?.composingTaskId != nil }
@@ -783,6 +789,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // composer can never ride along (pinned) into a different list.
     commitOpenEdits()
     cancelSettle()
+    activeTagFilterIDs.removeAll()
     self.filter = filter
     if case .project(let id) = filter {
       headerWashView.projectID = id
@@ -970,6 +977,7 @@ final class SeptaskKitTaskListController: NSViewController {
     }
     heldReload = false
     checklistCounts = LocalCache.checklistSummaryByTask(in: context)
+    tagsByID = LocalCache.tagsByID(in: context)
 
     let locallyChanged = locallyChanged.union(takePendingReloadIDs())
     renderedDay = SeptenaDate.today
@@ -985,15 +993,44 @@ final class SeptaskKitTaskListController: NSViewController {
     // falls to the next task by id instead of to nothing.
     let lastSelectedIndex = tableView.selectedRowIndexes.last
 
-    let pool = LocalCache.tasks(in: context, filter: filter)
+    let rawPool = LocalCache.tasks(in: context, filter: filter)
+    let rawTriage = filter == .today ? LocalCache.tasks(in: context, filter: .triage) : []
+    // Progressive disclosure: discover ONLY tags actually present in this list;
+    // when none exist, no tag filter bar appears (docs/TAGS_SPEC.md §3).
+    let listTags: [TaskTag] = {
+      guard filter != .recentlyDeleted else { return [] }
+      var ids = Set<String>()
+      for t in rawPool { for tid in t.tags { ids.insert(tid) } }
+      for t in rawTriage { for tid in t.tags { ids.insert(tid) } }
+      guard !ids.isEmpty else { return [] }
+      return ids
+        .compactMap { tagsByID[$0] }
+        .sorted { lhs, rhs in
+          let lp = lhs.position ?? Int.max
+          let rp = rhs.position ?? Int.max
+          if lp != rp { return lp < rp }
+          let cmp = lhs.name.localizedCaseInsensitiveCompare(rhs.name)
+          if cmp != .orderedSame { return cmp == .orderedAscending }
+          return lhs.id < rhs.id
+        }
+    }()
+    if !activeTagFilterIDs.isEmpty {
+      activeTagFilterIDs = activeTagFilterIDs.intersection(Set(listTags.map(\.id)))
+    }
+    let pool = activeTagFilterIDs.isEmpty
+      ? rawPool
+      : rawPool.filter { $0.isHeading || activeTagFilterIDs.isSubset(of: Set($0.tags)) }
     // Capsules first: `chipped()` reads the snapshot, so it has to be current
     // before any row is built. Includes the triage band, which `pool` omits on
     // Today — the band is exactly where most suggestions land.
-    refreshFilingSuggestions(
-      pool: pool + (filter == .today ? LocalCache.tasks(in: context, filter: .triage) : []))
+    refreshFilingSuggestions(pool: pool + rawTriage)
     // One standard title row, on every page — computed once here rather than
-    // duplicated into each branch below.
-    let titleRows: [Row] = screenTitleRow().map { [$0] } ?? []
+    // duplicated into each branch below, followed by the progressive-disclosure
+    // tag filter bar when tagged tasks exist in this list.
+    let tagBarRows: [Row] = listTags.isEmpty
+      ? []
+      : [.tagFilterBar(tags: listTags, active: Array(activeTagFilterIDs).sorted())]
+    let titleRows: [Row] = (screenTitleRow().map { [$0] } ?? []) + tagBarRows
     var newRows: [Row]
     switch filter {
     case .today where todayGroupsByList:
@@ -1596,7 +1633,10 @@ final class SeptaskKitTaskListController: NSViewController {
   /// `TaskListView.triageSection`, which shows the section whenever
   /// `allowsInlineCreate` regardless of row count.
   private func triageBand() -> [Row] {
-    let band = LocalCache.tasks(in: context, filter: .triage)
+    let rawBand = LocalCache.tasks(in: context, filter: .triage)
+    let band = activeTagFilterIDs.isEmpty
+      ? rawBand
+      : rawBand.filter { activeTagFilterIDs.isSubset(of: Set($0.tags)) }
     let reminders = reminderRows()
     // The count includes pending reminders — they ARE Inbox items now, and a
     // header that excluded them would be lying about what sits below it. The
@@ -2366,6 +2406,46 @@ final class SeptaskKitTaskListController: NSViewController {
                               before: before)
       self.onStoreChanged?()
     }
+  }
+
+  /// Open the type-to-filter/assign/create Tag popover (`⇧⌘T`) for the current
+  /// selection (single or multi-select), anchored to the row or composer pill.
+  func presentTagPopover(anchor: KitSurfaceAnchor? = nil) {
+    commitComposerTextIfOpen()
+    let selection = actionableSelection
+    guard !selection.isEmpty else { NSSound.beep(); return }
+    guard case .rect(let rect, let host)? = anchor ?? selectedRowAnchor else {
+      NSSound.beep()
+      return
+    }
+    let ids = selection.map(\.id)
+    SeptaskKitTagPopover.present(
+      taskIDs: ids,
+      relativeTo: rect,
+      of: host
+    ) { [weak self] in
+      guard let self else { return }
+      for id in ids { self.refreshComposerRow(taskId: id) }
+      self.reload()
+      self.onStoreChanged?()
+    }
+  }
+
+  private func toggleTagFilter(_ tagID: String) {
+    if activeTagFilterIDs.contains(tagID) {
+      activeTagFilterIDs.remove(tagID)
+    } else {
+      activeTagFilterIDs.insert(tagID)
+    }
+    reload(animated: true)
+  }
+
+  @discardableResult
+  private func clearTagFilterIfActive() -> Bool {
+    guard !activeTagFilterIDs.isEmpty else { return false }
+    activeTagFilterIDs.removeAll()
+    reload(animated: true)
+    return true
   }
 
   /// Open the Repeat editor for the current selection, anchored to the row it
@@ -3813,6 +3893,10 @@ final class SeptaskKitTaskListController: NSViewController {
       case .toggleStar:
         self.toggleStarSelection()
 
+      case .tags(let anchor):
+        self.presentTagPopover(anchor: .rect(anchor.bounds, anchor))
+        self.refreshComposerRow(taskId: task.id)
+
       case .list(let anchor):
         // Reuses the exact destination list ⌘M / ⌘⇧M pops up — one picker, not a
         // second to keep in sync — anchored to the pill the user clicked. It
@@ -3878,6 +3962,9 @@ final class SeptaskKitTaskListController: NSViewController {
     starMenuItem.keyEquivalent = "s"
     starMenuItem.keyEquivalentModifierMask = [.command, .option]
     menu.addItem(starMenuItem)
+
+    menu.addItem(item(String(localized: "Tags…", comment: "SeptaskKit: context menu"),
+                      #selector(menuTags), "t", [.command, .shift]))
 
     // When and Deadline share one submenu, as in the SwiftUI menu. They open
     // separate popovers (one date each), so a submenu is the native way to
@@ -4182,6 +4269,7 @@ final class SeptaskKitTaskListController: NSViewController {
   @objc private func menuCancel() { cancelSelection() }
   @objc private func menuToggleToday() { toggleTodaySelection() }
   @objc private func menuToggleStar() { toggleStarSelection() }
+  @objc private func menuTags() { presentTagPopover() }
   @objc private func menuRename() { beginEditSelectedRow() }
   @objc private func menuInspector() { onToggleInspector?() }
   @objc private func menuDuplicate() { duplicateSelection() }
@@ -4433,6 +4521,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // The page's own title — noticeably taller than an in-list header, the
     // same visual weight a big navigation title would carry.
     case .screenTitle: return SeptenaTypeScale.size(.title2) + 40
+    case .tagFilterBar: return 34
     case .projectTarget: return SeptaskKitTheme.rowHeight
     case .task(let task, _, _):
       if task.isHeading {
@@ -5013,6 +5102,15 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.onOpenNavMenu = { [weak self] in self?.buildNavMenu() }
       return cell
 
+    case .tagFilterBar(let tags, let active):
+      let identifier = NSUserInterfaceItemIdentifier("tagFilterBarCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitTagFilterBarCell
+        ?? KitTagFilterBarCell(identifier: identifier)
+      cell.configure(tags: tags, activeIDs: Set(active))
+      cell.onToggleTag = { [weak self] id in self?.toggleTagFilter(id) }
+      cell.onClear = { [weak self] in _ = self?.clearTagFilterIfActive() }
+      return cell
+
     case .projectTarget(let id, let title, let progress):
       let identifier = NSUserInterfaceItemIdentifier("projectTargetCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil)
@@ -5129,7 +5227,8 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         ?? SeptaskKitTaskCell(identifier: identifier)
       cell.configure(with: task, filter: filter, chip: chip,
                      contextText: taskContextText(for: task),
-                     checklistSummary: checklistCounts[task.id])
+                     checklistSummary: checklistCounts[task.id],
+                     tags: LocalCache.resolvedTags(for: task, tagsByID: tagsByID))
       cell.configureSuggestion(suggestion) { [weak self] in
         self?.applyFilingSuggestion(taskID: task.id)
       }
@@ -5252,6 +5351,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let reminderLabel = NSTextField(labelWithString: "")
   private let checklistGlyph = NSImageView()
   private let checklistLabel = NSTextField(labelWithString: "")
+  private let tagStack = NSStackView()
   private let repeatGlyph = NSImageView()
   private let starGlyph = NSImageView()
   private var taskId = ""
@@ -5376,6 +5476,14 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     starGlyph.kitA11yIgnore()
     starGlyph.isHidden = true
 
+    tagStack.orientation = .horizontal
+    tagStack.alignment = .centerY
+    tagStack.spacing = 4
+    tagStack.translatesAutoresizingMaskIntoConstraints = false
+    tagStack.setContentHuggingPriority(.required, for: .horizontal)
+    tagStack.setContentCompressionResistancePriority(.required, for: .horizontal)
+    tagStack.isHidden = true
+
     // Trailing cluster hugs the row's right edge. Order matches the row language
     // spec: variable meta inboard, micro-glyphs outboard
     // (chip · date · recurrence · notes). A leading spacer absorbs any extra
@@ -5386,7 +5494,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
     trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
     let trailing = NSStackView(views: [trailingShove, suggestionChip, issueChip, chip, statusChip,
-                                      checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
+                                      tagStack, checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
                                       scheduleGlyph, detail, repeatGlyph, starGlyph, notesGlyph])
     trailing.orientation = .horizontal
     trailing.alignment = .centerY
@@ -5492,7 +5600,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   func configure(with task: SeptenaTask, filter: TaskFilter,
                  chip chipValue: SeptaskKitTaskListController.Chip?,
                  contextText: String?,
-                 checklistSummary: (done: Int, total: Int)? = nil) {
+                 checklistSummary: (done: Int, total: Int)? = nil,
+                 tags: [TaskTag] = []) {
     taskId = task.id
     plainTitle = task.title
     editing = false
@@ -5505,6 +5614,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       chip.isHidden = true
       statusChip.isHidden = true
       issueChip.isHidden = true
+      tagStack.isHidden = true
       checklistGlyph.isHidden = true
       checklistLabel.isHidden = true
       reminderGlyph.isHidden = true
@@ -5556,7 +5666,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
     for view in [checkbox, title, notesGlyph, chip, statusChip, issueChip, suggestionChip,
-                 checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
+                 tagStack, checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
                  scheduleGlyph, detail, repeatGlyph, starGlyph] as [NSView] {
       view.alphaValue = fade
     }
@@ -5631,6 +5741,27 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       checklistLabel.stringValue = ""
       checklistGlyph.isHidden = true
       checklistLabel.isHidden = true
+    }
+
+    for v in tagStack.arrangedSubviews {
+      tagStack.removeArrangedSubview(v)
+      v.removeFromSuperview()
+    }
+    if !tags.isEmpty {
+      let shown = Array(tags.prefix(3))
+      let overflow = max(0, tags.count - shown.count)
+      for tag in shown {
+        tagStack.addArrangedSubview(KitTagChipView(name: tag.name, colorToken: tag.color))
+      }
+      if overflow > 0 {
+        let more = NSTextField(labelWithString: "+\(overflow)")
+        more.font = .systemFont(ofSize: SeptenaTypeScale.size(.caption1))
+        more.textColor = SeptaskKitTheme.inkSecondary
+        tagStack.addArrangedSubview(more)
+      }
+      tagStack.isHidden = false
+    } else {
+      tagStack.isHidden = true
     }
 
     configureDetail(with: task, filter: filter, done: done)
@@ -7183,7 +7314,9 @@ final class SeptaskKitTableView: NSTableView {
   var onFileSuggested: (() -> Void)?
   var onReminder: (() -> Void)?
   var onToggleStar: (() -> Void)?
+  var onEditTags: (() -> Void)?
   var onAddChecklistItem: (() -> Void)?
+  var onClearTagFilter: (() -> Bool)?
   var onCopy: (() -> Void)?
   var canCopy: (() -> Bool)?
   var onPaste: (() -> Void)?
@@ -7340,6 +7473,8 @@ final class SeptaskKitTableView: NSTableView {
       case "m": onMove?(); return true
       // ⇧⌘C — reveal checklist & insert a step (docs/CHECKLISTS_SPEC.md §4).
       case "c": onAddChecklistItem?(); return true
+      // ⇧⌘T — open type-to-assign/create Tag popover (docs/TAGS_SPEC.md §4).
+      case "t": onEditTags?(); return true
       default: return super.performKeyEquivalent(with: event)
       }
     }
@@ -7397,6 +7532,7 @@ final class SeptaskKitTableView: NSTableView {
   /// Editing takes priority: while a field editor is live it owns Escape (it
   /// cancels the edit) and this never fires.
   override func cancelOperation(_ sender: Any?) {
+    if onClearTagFilter?() == true { return }
     guard !selectedRowIndexes.isEmpty else { return }
     deselectAll(nil)
   }
@@ -7421,6 +7557,124 @@ final class SeptaskKitTableView: NSTableView {
   override func draggingEnded(_ sender: any NSDraggingInfo) {
     super.draggingEnded(sender)
     onDragEnded?()
+  }
+}
+
+// MARK: - Quiet hairline tag capsule & visual in-list tag filter bar (docs/TAGS_SPEC.md)
+
+@MainActor
+private final class KitTagChipView: NSView {
+  init(name: String, colorToken: String?) {
+    super.init(frame: .zero)
+    translatesAutoresizingMaskIntoConstraints = false
+    wantsLayer = true
+    layer?.cornerRadius = 8
+    layer?.borderWidth = 0.75
+    layer?.borderColor = NSColor.secondaryLabelColor.withAlphaComponent(0.28).cgColor
+
+    let stack = NSStackView()
+    stack.orientation = .horizontal
+    stack.alignment = .centerY
+    stack.spacing = 4
+    stack.translatesAutoresizingMaskIntoConstraints = false
+
+    if colorToken != nil {
+      let dot = NSView()
+      dot.wantsLayer = true
+      dot.layer?.cornerRadius = 2.5
+      dot.layer?.backgroundColor = TagColorPalette.nsColor(for: colorToken).cgColor
+      dot.translatesAutoresizingMaskIntoConstraints = false
+      dot.widthAnchor.constraint(equalToConstant: 5).isActive = true
+      dot.heightAnchor.constraint(equalToConstant: 5).isActive = true
+      stack.addArrangedSubview(dot)
+    }
+
+    let label = NSTextField(labelWithString: name)
+    label.font = .systemFont(ofSize: SeptenaTypeScale.size(.caption1))
+    label.textColor = SeptaskKitTheme.inkSecondary
+    label.lineBreakMode = .byTruncatingTail
+    label.maximumNumberOfLines = 1
+    stack.addArrangedSubview(label)
+
+    addSubview(stack)
+    NSLayoutConstraint.activate([
+      stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+      stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+      stack.topAnchor.constraint(equalTo: topAnchor, constant: 1.5),
+      stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -1.5),
+    ])
+    setContentHuggingPriority(.required, for: .horizontal)
+    setContentCompressionResistancePriority(.required, for: .horizontal)
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitTagChipView is code-only") }
+}
+
+@MainActor
+private final class KitTagFilterBarCell: NSTableCellView {
+  var onToggleTag: ((String) -> Void)?
+  var onClear: (() -> Void)?
+
+  private let stack = NSStackView()
+  private var leadingConstraint: NSLayoutConstraint!
+  private var trailingConstraint: NSLayoutConstraint!
+
+  init(identifier: NSUserInterfaceItemIdentifier) {
+    super.init(frame: .zero)
+    self.identifier = identifier
+
+    stack.orientation = .horizontal
+    stack.alignment = .centerY
+    stack.spacing = 6
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(stack)
+
+    leadingConstraint = stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: SeptaskKitLayout.rowLeadingPad)
+    trailingConstraint = stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -8)
+    NSLayoutConstraint.activate([
+      leadingConstraint,
+      trailingConstraint,
+      stack.centerYAnchor.constraint(equalTo: centerYAnchor),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitTagFilterBarCell is code-only") }
+
+  override func layout() {
+    let inset = SeptaskKitLayout.inset(for: bounds.width)
+    leadingConstraint.constant = inset + SeptaskKitLayout.rowLeadingPad
+    trailingConstraint.constant = -(inset + 8)
+    super.layout()
+  }
+
+  func configure(tags: [TaskTag], activeIDs: Set<String>) {
+    for v in stack.arrangedSubviews {
+      stack.removeArrangedSubview(v)
+      v.removeFromSuperview()
+    }
+    for tag in tags {
+      let isOn = activeIDs.contains(tag.id)
+      let pill = KitPillButton()
+      pill.title = tag.name
+      pill.isOn = isOn
+      pill.onPress = { [weak self] _ in self?.onToggleTag?(tag.id) }
+      stack.addArrangedSubview(pill)
+    }
+    if !activeIDs.isEmpty {
+      let clear = NSButton()
+      clear.isBordered = false
+      clear.bezelStyle = .inline
+      clear.title = String(localized: "Clear", comment: "SeptaskKit: clear tag filter")
+      clear.font = .systemFont(ofSize: SeptenaTypeScale.size(.caption1))
+      clear.contentTintColor = SeptaskKitTheme.inkSecondary
+      clear.target = self
+      clear.action = #selector(clearPressed)
+      stack.addArrangedSubview(clear)
+    }
+  }
+
+  @objc private func clearPressed() {
+    onClear?()
   }
 }
 #endif

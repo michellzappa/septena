@@ -44,6 +44,8 @@ struct TaskSettingsPane<Destination: Hashable>: View {
   @AppStorage(SettingsKey.tasksShowFaded) private var showFaded: Bool = RegistrySettings.Defaults.tasksShowFaded
   @AppStorage(SettingsKey.tasksFilingSuggestions) private var filingSuggestions: Bool = RegistrySettings.Defaults.tasksFilingSuggestions
   @AppStorage(SettingsKey.tasksTitleLines) private var titleLines: Int = RegistrySettings.Defaults.tasksTitleLines
+  @State private var showingManageTags = false
+  @State private var tagCount = 0
 
   #if SEPTASK
   @Environment(\.modelContext) private var modelContext
@@ -59,6 +61,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
       rowsSection
       #endif
       addingSection
+      tagsSection
       calendarSection
       remindersSection
       badgeSection
@@ -70,6 +73,38 @@ struct TaskSettingsPane<Destination: Hashable>: View {
       appearanceSection
     }
     .formStyle(.grouped)
+    .sheet(isPresented: $showingManageTags, onDismiss: refreshTagCount) {
+      ManageTagsSheet()
+    }
+    .onAppear { refreshTagCount() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in refreshTagCount() }
+  }
+
+  private var tagsSection: some View {
+    Section {
+      Button {
+        showingManageTags = true
+      } label: {
+        HStack {
+          Label("Manage Tags…", systemImage: "tag")
+          Spacer()
+          if tagCount > 0 {
+            Text("\(tagCount)")
+              .foregroundStyle(.secondary)
+          }
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+    } header: {
+      Text("Tags")
+    } footer: {
+      Text("Organize tasks with lightweight flat tags. Rename, color, merge, or delete tags here.")
+    }
+  }
+
+  private func refreshTagCount() {
+    tagCount = LocalCache.allTags(in: LocalStore.shared.container.mainContext).count
   }
 
   // MARK: Lists & Today
