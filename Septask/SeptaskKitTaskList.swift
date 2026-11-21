@@ -265,6 +265,7 @@ final class SeptaskKitTaskListController: NSViewController {
   private let todayMenuItem = NSMenuItem()
   private let starMenuItem = NSMenuItem()
   private var checklistCounts: [String: (done: Int, total: Int)] = [:]
+  private var attachmentCounts: [String: Int] = [:]
   private var tagsByID: [String: TaskTag] = [:]
   private var activeTagFilterIDs: Set<String> = []
   /// Titled in `refreshPlacementMenuItems` — Show / Hide, so the row menu says
@@ -484,6 +485,7 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.onEditTags = { [weak self] in self?.presentTagPopover() }
     tableView.onAddChecklistItem = { [weak self] in self?.addChecklistItemToSelection() }
     tableView.onClearTagFilter = { [weak self] in self?.clearTagFilterIfActive() ?? false }
+    tableView.onPasteAttachment = { [weak self] in self?.pasteAttachmentToSelection() ?? false }
     tableView.onFocusSidebar = { [weak self] in self?.onFocusSidebar?() }
     tableView.onMoveSelection = { [weak self] up in self?.moveSelectionOneSlot(up: up) }
     tableView.isComposing = { [weak self] in self?.composingTaskId != nil }
@@ -541,7 +543,7 @@ final class SeptaskKitTaskListController: NSViewController {
       }
       menu.popUp(positioning: nil, at: point, in: tableView)
     }
-    tableView.registerForDraggedTypes([.septaskTask])
+    tableView.registerForDraggedTypes([.septaskTask, .fileURL])
     tableView.setDraggingSourceOperationMask(.move, forLocal: true)
     tableView.onDragEnded = { [weak self] in self?.endDragHold() }
 
@@ -1002,6 +1004,7 @@ final class SeptaskKitTaskListController: NSViewController {
     }
     heldReload = false
     checklistCounts = LocalCache.checklistSummaryByTask(in: context)
+    attachmentCounts = SeptenaServices.shared.taskAttachmentStore.attachmentCountsByTask()
     tagsByID = LocalCache.tagsByID(in: context)
 
     let locallyChanged = locallyChanged.union(takePendingReloadIDs())
@@ -2474,6 +2477,19 @@ final class SeptaskKitTaskListController: NSViewController {
     guard !activeTagFilterIDs.isEmpty else { return false }
     activeTagFilterIDs.removeAll()
     reload(animated: true)
+    return true
+  }
+
+  /// ⌘V on a selected task row (when not editing text): attach file(s) or a
+  /// clipboard image directly to the selected task (`docs/ATTACHMENTS_MAC_PARITY_SPEC.md` §3).
+  private func pasteAttachmentToSelection() -> Bool {
+    guard !isEditingText, let target = actionableSelection.first else { return false }
+    guard KitAttachmentPasteHelper.attachFromPasteboard(to: target.id, presentErrorIn: view.window) else {
+      return false
+    }
+    refreshComposerRow(taskId: target.id)
+    reload()
+    onStoreChanged?()
     return true
   }
 
@@ -4769,7 +4785,22 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
                  proposedRow row: Int,
                  proposedDropOperation operation: NSTableView.DropOperation)
     -> NSDragOperation {
-    guard allowsReorder, !KitDrag.ids(from: info).isEmpty else {
+    if KitDrag.ids(from: info).isEmpty {
+      // External Finder file drop onto a task row (`docs/ATTACHMENTS_MAC_PARITY_SPEC.md` §3).
+      if rows.indices.contains(row),
+         let targetTask = rows[row].task, !targetTask.isHeading,
+         let urls = info.draggingPasteboard.readObjects(
+           forClasses: [NSURL.self],
+           options: [.urlReadingFileURLsOnly: true]
+         ) as? [URL], !urls.isEmpty {
+        dropAboveRow = nil
+        tableView.setDropRow(row, dropOperation: .on)
+        return .copy
+      }
+      dropAboveRow = nil
+      return []
+    }
+    guard allowsReorder else {
       dropAboveRow = nil
       return []
     }
@@ -4798,7 +4829,21 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // Every exit (a refused drop included) lets a held sync reload through.
     defer { flushHeldReload() }
     let ids = KitDrag.ids(from: info)
-    guard !ids.isEmpty else { return false }
+    if ids.isEmpty {
+      guard rows.indices.contains(row),
+            let targetTask = rows[row].task, !targetTask.isHeading,
+            let urls = info.draggingPasteboard.readObjects(
+              forClasses: [NSURL.self],
+              options: [.urlReadingFileURLsOnly: true]
+            ) as? [URL], !urls.isEmpty else { return false }
+      let added = KitAttachmentPasteHelper.attachFiles(urls, to: targetTask.id, presentErrorIn: view.window)
+      if added > 0 {
+        refreshComposerRow(taskId: targetTask.id)
+        reload()
+        onStoreChanged?()
+      }
+      return added > 0
+    }
     let insertAt = clampDropRow(row) ?? row
 
     // Project pages: group-aware drop (file under a heading + reorder
@@ -5257,6 +5302,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.configure(with: task, filter: filter, chip: chip,
                      contextText: taskContextText(for: task),
                      checklistSummary: checklistCounts[task.id],
+                     attachmentCount: attachmentCounts[task.id] ?? 0,
                      tags: LocalCache.resolvedTags(for: task, tagsByID: tagsByID))
       cell.configureSuggestion(suggestion) { [weak self] in
         self?.applyFilingSuggestion(taskID: task.id)
@@ -5387,6 +5433,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let reminderLabel = NSTextField(labelWithString: "")
   private let checklistGlyph = NSImageView()
   private let checklistLabel = NSTextField(labelWithString: "")
+  private let attachmentGlyph = NSImageView()
+  private let attachmentLabel = NSTextField(labelWithString: "")
   private let tagStack = NSStackView()
   private let repeatGlyph = NSImageView()
   private let starGlyph = NSImageView()
@@ -5520,6 +5568,23 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     tagStack.setContentCompressionResistancePriority(.required, for: .horizontal)
     tagStack.isHidden = true
 
+    attachmentGlyph.translatesAutoresizingMaskIntoConstraints = false
+    attachmentGlyph.image = NSImage(systemSymbolName: "paperclip", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+    attachmentGlyph.contentTintColor = SeptaskKitTheme.inkSecondary
+    attachmentGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    attachmentGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
+    attachmentGlyph.kitA11yIgnore()
+    attachmentGlyph.isHidden = true
+
+    attachmentLabel.translatesAutoresizingMaskIntoConstraints = false
+    attachmentLabel.font = SeptaskKitTheme.meta
+    attachmentLabel.textColor = SeptaskKitTheme.inkSecondary
+    attachmentLabel.setContentHuggingPriority(.required, for: .horizontal)
+    attachmentLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+    attachmentLabel.kitA11yIgnore()
+    attachmentLabel.isHidden = true
+
     // Trailing cluster hugs the row's right edge. Order matches the row language
     // spec: variable meta inboard, micro-glyphs outboard
     // (chip · date · recurrence · notes). A leading spacer absorbs any extra
@@ -5530,7 +5595,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
     trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
     let trailing = NSStackView(views: [trailingShove, suggestionChip, issueChip, chip, statusChip,
-                                      tagStack, checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
+                                      tagStack, attachmentGlyph, attachmentLabel,
+                                      checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
                                       scheduleGlyph, detail, repeatGlyph, starGlyph, notesGlyph])
     trailing.orientation = .horizontal
     trailing.alignment = .centerY
@@ -5637,6 +5703,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
                  chip chipValue: SeptaskKitTaskListController.Chip?,
                  contextText: String?,
                  checklistSummary: (done: Int, total: Int)? = nil,
+                 attachmentCount: Int = 0,
                  tags: [TaskTag] = []) {
     taskId = task.id
     plainTitle = task.title
@@ -5651,6 +5718,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       statusChip.isHidden = true
       issueChip.isHidden = true
       tagStack.isHidden = true
+      attachmentGlyph.isHidden = true
+      attachmentLabel.isHidden = true
       checklistGlyph.isHidden = true
       checklistLabel.isHidden = true
       reminderGlyph.isHidden = true
@@ -5702,8 +5771,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
     for view in [checkbox, title, notesGlyph, chip, statusChip, issueChip, suggestionChip,
-                 tagStack, checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
-                 scheduleGlyph, detail, repeatGlyph, starGlyph] as [NSView] {
+                 tagStack, attachmentGlyph, attachmentLabel, checklistGlyph, checklistLabel,
+                 reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, starGlyph] as [NSView] {
       view.alphaValue = fade
     }
     checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted
@@ -5767,6 +5836,21 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
                            title: String(localized: "Today", comment: "Task row trailing pill when task is on Today"))
     } else {
       statusChip.isHidden = true
+    }
+
+    if attachmentCount > 0 {
+      attachmentGlyph.isHidden = false
+      if attachmentCount > 1 {
+        attachmentLabel.stringValue = "\(attachmentCount)"
+        attachmentLabel.isHidden = false
+      } else {
+        attachmentLabel.stringValue = ""
+        attachmentLabel.isHidden = true
+      }
+    } else {
+      attachmentGlyph.isHidden = true
+      attachmentLabel.stringValue = ""
+      attachmentLabel.isHidden = true
     }
 
     if let summary = checklistSummary, summary.total > 0 {
@@ -7353,6 +7437,7 @@ final class SeptaskKitTableView: NSTableView {
   var onEditTags: (() -> Void)?
   var onAddChecklistItem: (() -> Void)?
   var onClearTagFilter: (() -> Bool)?
+  var onPasteAttachment: (() -> Bool)?
   var onCopy: (() -> Void)?
   var canCopy: (() -> Bool)?
   var onPaste: (() -> Void)?
@@ -7536,6 +7621,7 @@ final class SeptaskKitTableView: NSTableView {
     case "s": onWhen?(); return true
     case "d": onDuplicate?(); return true
     case "m": onMove?(); return true
+    case "v": if onPasteAttachment?() == true { return true }; return super.performKeyEquivalent(with: event)
     case ",": SeptaskKitSettingsWindow.show(); return true
     case "\u{7f}": onDelete?(); return true   // ⌘⌫, matching TaskRowShortcuts.delete
     default: return super.performKeyEquivalent(with: event)

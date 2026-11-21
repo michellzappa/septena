@@ -25,6 +25,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let checklistLabel = NSTextField(labelWithString:
     String(localized: "Checklist", comment: "SeptaskKit: inspector section"))
   private let checklistView = KitChecklistView()
+  private let attachFileButton = NSButton()
+  private let attachmentsLabel = NSTextField(labelWithString:
+    String(localized: "Attachments", comment: "SeptaskKit: inspector attachments section"))
+  private let attachmentsView = KitAttachmentsView()
   private let listLabel = NSTextField(labelWithString: "")
   private let placeholder = NSTextField(labelWithString: String(localized: "No Selection",
                                                                  comment: "SeptaskKit: inspector empty"))
@@ -107,13 +111,15 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
                              (reminderButton, #selector(editReminder)),
                              (starButton, #selector(toggleStar)),
                              (tagsButton, #selector(editTags)),
-                             (addChecklistButton, #selector(addChecklistStep))] {
+                             (addChecklistButton, #selector(addChecklistStep)),
+                             (attachFileButton, #selector(attachFile))] {
       button.bezelStyle = .rounded
       button.target = self
       button.action = action
       button.alignment = .left
     }
     addChecklistButton.title = String(localized: "Add Checklist…", comment: "SeptaskKit: inspector add checklist")
+    attachFileButton.title = String(localized: "Attach File…", comment: "SeptaskKit: inspector attach file")
     repeatButton.bezelStyle = .rounded
     repeatButton.target = self
     repeatButton.action = #selector(editRepeat)
@@ -135,6 +141,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     form.addArrangedSubview(starButton)
     form.addArrangedSubview(tagsButton)
     form.addArrangedSubview(addChecklistButton)
+    form.addArrangedSubview(attachFileButton)
     form.addArrangedSubview(notesLabel)
     form.addArrangedSubview(notesScroll)
     checklistLabel.font = SeptaskKitTheme.chip
@@ -147,6 +154,16 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     }
     form.addArrangedSubview(checklistLabel)
     form.addArrangedSubview(checklistView)
+    attachmentsLabel.font = SeptaskKitTheme.chip
+    attachmentsLabel.textColor = SeptaskKitTheme.iconMuted
+    attachmentsView.translatesAutoresizingMaskIntoConstraints = false
+    attachmentsView.onChanged = { [weak self] in
+      guard let self else { return }
+      self.updateAttachmentsVisibility()
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    }
+    form.addArrangedSubview(attachmentsLabel)
+    form.addArrangedSubview(attachmentsView)
     conversationLabel.font = SeptaskKitTheme.chip
     conversationLabel.textColor = SeptaskKitTheme.iconMuted
     conversationView.translatesAutoresizingMaskIntoConstraints = false
@@ -162,9 +179,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       return snapshot.projects.first { $0.id == id }?.title ?? snapshot.areas.first { $0.id == id }?.title
     }
     form.addArrangedSubview(historyView)
-    form.setCustomSpacing(14, after: addChecklistButton)
+    form.setCustomSpacing(14, after: attachFileButton)
     form.setCustomSpacing(14, after: notesScroll)
     form.setCustomSpacing(14, after: checklistView)
+    form.setCustomSpacing(14, after: attachmentsView)
     form.setCustomSpacing(14, after: conversationView)
 
     placeholder.textColor = SeptaskKitTheme.iconMuted
@@ -239,6 +257,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       closeButton.heightAnchor.constraint(equalToConstant: 20),
       notesScroll.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
       checklistView.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
+      attachmentsView.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
       conversationView.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
       historyView.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
       notesScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 120),
@@ -352,6 +371,8 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     loadNotes(next.notes ?? "")
     checklistView.configure(taskID: next.id)
     updateChecklistVisibility()
+    attachmentsView.configure(taskID: next.id)
+    updateAttachmentsVisibility()
     refreshReadOnlyFields(next)
     refreshConversation(next)
     historyView.configure(taskID: next.id)
@@ -687,6 +708,18 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     let hasItems = checklistView.summary.total > 0
     checklistLabel.isHidden = !hasItems
     addChecklistButton.isHidden = hasItems
+  }
+
+  @objc private func attachFile() {
+    attachmentsView.pickFilesToAttach()
+  }
+
+  private func updateAttachmentsVisibility() {
+    let count = attachmentsView.attachmentCount
+    attachmentsLabel.isHidden = count == 0
+    attachFileButton.title = count == 0
+      ? String(localized: "Attach File…", comment: "SeptaskKit: inspector attach file")
+      : String(localized: "Attach Another File…", comment: "SeptaskKit: inspector attach another file")
   }
 
   @objc private func editReminder() {

@@ -750,6 +750,22 @@ enum TaskUndo {
            },
            redo: { mutator.deleteTag(id: live.id) })
   }
+
+  // MARK: - Attachments (docs/ATTACHMENTS_MAC_PARITY_SPEC.md)
+
+  static func recordAttachmentDelete(_ snapshot: TaskAttachmentSnapshot,
+                                     store: TaskAttachmentStore,
+                                     mutator: TaskMutator) {
+    mutator.touch(ids: [snapshot.taskID])
+    var live = snapshot
+    record(name: String(localized: "Delete Attachment", comment: "Undo action name"),
+           undo: {
+             if let restored = store.restore(live) { live = restored }
+           },
+           redo: {
+             if let next = store.removeForUndo(id: live.id) { live = next }
+           })
+  }
 }
 
 // MARK: - Delete confirmation copy

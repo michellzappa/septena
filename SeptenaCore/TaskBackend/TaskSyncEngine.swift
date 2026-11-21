@@ -518,7 +518,7 @@ final class TaskSyncEngine {
     guard let plan else {
       if let shadow, !shadow.gone {
         queueDeleteIfNeeded(entity, id,
-                            hold: entity == .project || entity == .area || entity == .checklistItem || entity == .tag,
+                            hold: entity == .project || entity == .area || entity == .checklistItem || entity == .tag || entity == .attachment,
                             store: store)
         shadow.gone = true
         store.saveSoon()

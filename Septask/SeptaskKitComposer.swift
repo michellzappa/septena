@@ -1,6 +1,8 @@
 #if os(macOS)
 import AppKit
+import Quartz
 import SwiftData
+import UniformTypeIdentifiers
 
 // The inline composer: a task row that expands in place into an editor —
 // title, then notes (when the task has any, or the Notes pill reveals them),
@@ -75,8 +77,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private let notesView = KitComposerTextView()
   private let notesScroll = NSScrollView()
   private let checklistView = KitChecklistView()
-  /// Title, notes, checklist (when shown), pills — stacked. A hidden subview
-  /// detaches from the stack, so the rail closes up cleanly.
+  private let attachmentsView = KitAttachmentsView()
+  /// Title, notes, checklist (when shown), attachments (when shown), pills — stacked.
   private let column = NSStackView()
   private let pillRow = NSStackView()
 
@@ -89,6 +91,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private let starPill = KitPillButton()
   private let tagPill = KitPillButton()
   private let checklistPill = KitPillButton()
+  private let attachPill = KitPillButton()
   private let discussPill = KitPillButton()
   private let notesPill = KitPillButton()
 
@@ -97,6 +100,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private var titleHeightConstraint: NSLayoutConstraint!
   private var notesHeightConstraint: NSLayoutConstraint!
   private var checklistHeightConstraint: NSLayoutConstraint!
+  private var attachmentsHeightConstraint: NSLayoutConstraint!
   /// False only before `configure(with:)` has run — an open row always shows
   /// its notes. Kept as a guard so a cell the table measures before it is
   /// configured doesn't reserve notes height it isn't drawing yet.
@@ -150,29 +154,30 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
   /// Row height for a one-line title with no notes — the controller's answer
   /// until the live cell has measured itself (`expandedHeight`).
-  static var baseHeight: CGFloat { height(titleHeight: titleLineHeight, notesHeight: nil, checklistHeight: 0) }
+  static var baseHeight: CGFloat {
+    height(titleHeight: titleLineHeight, notesHeight: nil, checklistHeight: 0, attachmentsHeight: 0)
+  }
 
   /// Layout: a closed-row-height band at the top (checkbox + first title line
   /// centered exactly as `SeptaskKitTaskCell`), any extra title lines, then
-  /// notes, optional checklist, and pills hanging below. Enter only grows the
-  /// row downward.
-  private static func height(titleHeight: CGFloat, notesHeight: CGFloat?, checklistHeight: CGFloat) -> CGFloat {
+  /// notes, optional checklist, optional attachments, and pills hanging below.
+  private static func height(titleHeight: CGFloat, notesHeight: CGFloat?,
+                             checklistHeight: CGFloat, attachmentsHeight: CGFloat) -> CGFloat {
     var height = SeptaskKitTheme.rowHeight + max(0, titleHeight - titleLineHeight) + interRowGap
     if let notesHeight { height += notesHeight + interRowGap }
     if checklistHeight > 0 { height += checklistHeight + interRowGap }
+    if attachmentsHeight > 0 { height += attachmentsHeight + interRowGap }
     return height + pillRowHeight + bottomPadding
   }
 
-  /// The row height the controller must return for this expanded row, from
-  /// the live title/notes/checklist measurements. Re-measures first when the cell
-  /// has a real width, so a caller that reads it right after the table sized the
-  /// cell gets the wrapped-title answer without waiting for a layout pass.
   var expandedHeight: CGFloat {
     recomputeContentHeights(notify: false)
     let checklistH = checklistView.isHidden ? 0 : checklistView.preferredHeight
+    let attachH = attachmentsView.isHidden ? 0 : attachmentsView.preferredHeight
     return Self.height(titleHeight: measuredTitleHeight,
                        notesHeight: notesShown ? measuredNotesHeight : nil,
-                       checklistHeight: checklistH)
+                       checklistHeight: checklistH,
+                       attachmentsHeight: attachH)
   }
 
   init(identifier: NSUserInterfaceItemIdentifier) {
@@ -241,12 +246,14 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     tagPill.onPress = { [weak self] view in self?.onAction?(.tags(view)) }
     checklistPill.title = String(localized: "Checklist", comment: "SeptaskKit: composer pill")
     checklistPill.onPress = { [weak self] _ in self?.addChecklistItemAndFocus() }
+    attachPill.title = String(localized: "Attach", comment: "SeptaskKit: composer attach pill")
+    attachPill.onPress = { [weak self] _ in self?.attachmentsView.pickFilesToAttach() }
     notesPill.title = String(localized: "Notes", comment: "SeptaskKit: composer pill")
     notesPill.onPress = { [weak self] _ in self?.focusNotes() }
     discussPill.title = String(localized: "Discuss", comment: "SeptaskKit: composer pill")
     discussPill.onPress = { [weak self] _ in self?.onAction?(.discuss) }
     for pill in [todayPill, whenPill, deadlinePill, reminderPill, listPill, repeatPill, starPill,
-                 tagPill, checklistPill, notesPill, discussPill] {
+                 tagPill, checklistPill, attachPill, notesPill, discussPill] {
       pillRow.addArrangedSubview(pill)
     }
 
@@ -257,6 +264,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
       self.updateChecklistPill()
     }
 
+    attachmentsView.translatesAutoresizingMaskIntoConstraints = false
+    attachmentsView.onChanged = { [weak self] in
+      guard let self else { return }
+      self.syncAttachmentsHeight(notify: true)
+      self.updateAttachPill()
+    }
+
     column.orientation = .vertical
     column.alignment = .leading
     column.spacing = Self.interRowGap
@@ -265,6 +279,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     column.addArrangedSubview(titleScroll)
     column.addArrangedSubview(notesScroll)
     column.addArrangedSubview(checklistView)
+    column.addArrangedSubview(attachmentsView)
     column.addArrangedSubview(pillRow)
     // The one-line title ends `titleTop` short of the closed-row band's
     // bottom; add that back so the rail hangs `interRowGap` under the BAND
@@ -283,6 +298,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     notesHeightConstraint = notesScroll.heightAnchor.constraint(
       equalToConstant: Self.notesMinHeight)
     checklistHeightConstraint = checklistView.heightAnchor.constraint(equalToConstant: 0)
+    attachmentsHeightConstraint = attachmentsView.heightAnchor.constraint(equalToConstant: 0)
     NSLayoutConstraint.activate([
       leadingConstraint,
       // Match `SeptaskKitTaskCell`: checkbox on the vertical center of a
@@ -302,6 +318,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
       notesHeightConstraint,
       checklistView.widthAnchor.constraint(equalTo: column.widthAnchor),
       checklistHeightConstraint,
+      attachmentsView.widthAnchor.constraint(equalTo: column.widthAnchor),
+      attachmentsHeightConstraint,
       pillRow.heightAnchor.constraint(equalToConstant: Self.pillRowHeight),
       pillRow.widthAnchor.constraint(lessThanOrEqualTo: column.widthAnchor),
     ])
@@ -408,6 +426,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     notesView.needsDisplay = true
     checklistView.configure(taskID: task.id)
     syncChecklistHeight(notify: false)
+    attachmentsView.configure(taskID: task.id)
+    syncAttachmentsHeight(notify: false)
     updateKeyChain()
     recomputeContentHeights(notify: false)
     refreshPills(with: task, listName: listName)
@@ -419,6 +439,9 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     checklistView.appendItemAndFocus()
     syncChecklistHeight(notify: true)
     updateChecklistPill()
+    attachmentsView.reload()
+    syncAttachmentsHeight(notify: true)
+    updateAttachPill()
   }
 
   private func syncChecklistHeight(notify: Bool) {
@@ -426,6 +449,27 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     if abs(checklistHeightConstraint.constant - h) > 0.5 {
       checklistHeightConstraint.constant = h
       if notify { onContentHeightChanged?() }
+    }
+  }
+
+  private func syncAttachmentsHeight(notify: Bool) {
+    let h = attachmentsView.isHidden ? 0 : attachmentsView.preferredHeight
+    if abs(attachmentsHeightConstraint.constant - h) > 0.5 {
+      attachmentsHeightConstraint.constant = h
+      if notify { onContentHeightChanged?() }
+    }
+  }
+
+  private func updateAttachPill() {
+    let count = attachmentsView.attachmentCount
+    if count > 0 {
+      attachPill.title = count == 1
+        ? String(localized: "1 file", comment: "SeptaskKit: composer attachment pill single")
+        : String(localized: "\(count) files", comment: "SeptaskKit: composer attachment pill plural")
+      attachPill.isOn = true
+    } else {
+      attachPill.title = String(localized: "Attach", comment: "SeptaskKit: composer attach pill")
+      attachPill.isOn = false
     }
   }
 
@@ -520,6 +564,9 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
       tagPill.isOn = true
     }
     updateChecklistPill()
+    attachmentsView.reload()
+    syncAttachmentsHeight(notify: true)
+    updateAttachPill()
 
     // Same gate as SwiftUI's `showsDiscuss`: only before a conversation
     // exists, and only when a local model can actually answer. A pill that
@@ -1415,5 +1462,403 @@ private final class KitChecklistItemRow: NSView, NSTextFieldDelegate {
       return false
     }
   }
+}
+
+// MARK: - Mac Task Attachments (Quick Look, Drag & Drop, Paste, Undo — docs/ATTACHMENTS_MAC_PARITY_SPEC.md)
+
+/// Shared Quick Look panel coordinator for Mac task attachment chips.
+@MainActor
+final class KitQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelegate {
+  static let shared = KitQuickLookCoordinator()
+  private var urls: [URL] = []
+
+  func preview(urls: [URL], startingAt index: Int = 0) {
+    guard !urls.isEmpty else { return }
+    self.urls = urls
+    guard let panel = QLPreviewPanel.shared() else { return }
+    panel.dataSource = self
+    panel.delegate = self
+    panel.reloadData()
+    panel.currentPreviewItemIndex = min(max(0, index), urls.count - 1)
+    if panel.isVisible {
+      panel.orderFront(nil)
+    } else {
+      panel.makeKeyAndOrderFront(nil)
+    }
+  }
+
+  nonisolated func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
+    MainActor.assumeIsolated { urls.count }
+  }
+
+  nonisolated func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> (any QLPreviewItem)! {
+    MainActor.assumeIsolated {
+      guard urls.indices.contains(index) else { return nil }
+      return urls[index] as NSURL
+    }
+  }
+}
+
+/// Helper for attaching files or clipboard images onto a task via
+/// `TaskAttachmentStore`. Returns how many attachments were added.
+@MainActor
+enum KitAttachmentPasteHelper {
+  @discardableResult
+  static func attachFiles(_ urls: [URL], to taskID: String, presentErrorIn window: NSWindow? = nil) -> Int {
+    let store = SeptenaServices.shared.taskAttachmentStore
+    var added = 0
+    var lastError: Error?
+    for url in urls {
+      do {
+        try store.add(taskID: taskID, sourceURL: url)
+        added += 1
+      } catch {
+        lastError = error
+      }
+    }
+    if let lastError, added == 0 {
+      presentError(lastError, in: window)
+    }
+    return added
+  }
+
+  /// Attaches file URLs or an image (e.g. screenshot) from `NSPasteboard.general`.
+  /// Returns `true` if the pasteboard contained attachable file(s) or image data.
+  @discardableResult
+  static func attachFromPasteboard(to taskID: String, presentErrorIn window: NSWindow? = nil) -> Bool {
+    let pb = NSPasteboard.general
+    if let urls = pb.readObjects(forClasses: [NSURL.self],
+                                 options: [.urlReadingFileURLsOnly: true]) as? [URL],
+       !urls.isEmpty {
+      let fileURLs = urls.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true }
+      if !fileURLs.isEmpty {
+        _ = attachFiles(fileURLs, to: taskID, presentErrorIn: window)
+        return true
+      }
+    }
+    if let pngData = pb.data(forType: .png) {
+      return attachImageData(pngData, ext: "png", uti: UTType.png.identifier, to: taskID, window: window)
+    }
+    if let tiffData = pb.data(forType: .tiff),
+       let rep = NSBitmapImageRep(data: tiffData),
+       let pngData = rep.representation(using: .png, properties: [:]) {
+      return attachImageData(pngData, ext: "png", uti: UTType.png.identifier, to: taskID, window: window)
+    }
+    return false
+  }
+
+  private static func attachImageData(_ data: Data, ext: String, uti: String,
+                                      to taskID: String, window: NSWindow?) -> Bool {
+    let df = DateFormatter()
+    df.dateFormat = "yyyy-MM-dd-HHmmss"
+    let filename = "Image-\(df.string(from: DayClock.appNow)).\(ext)"
+    do {
+      try SeptenaServices.shared.taskAttachmentStore.add(
+        taskID: taskID, data: data, filename: filename, contentType: uti)
+      return true
+    } catch {
+      presentError(error, in: window)
+      return true
+    }
+  }
+
+  static func presentError(_ error: Error, in window: NSWindow?) {
+    let alert = NSAlert()
+    alert.alertStyle = .warning
+    alert.messageText = String(localized: "Couldn't attach file", comment: "Attachment error title")
+    alert.informativeText = error.localizedDescription
+    if let window {
+      alert.beginSheetModal(for: window)
+    } else {
+      alert.runModal()
+    }
+  }
+}
+
+/// Progressive-disclosure attachment strip shared by `KitComposerCell` and
+/// `SeptaskKitInspectorController`. Hidden (height 0) when the task has no
+/// attachments; supports Quick Look on click, right-click Save/Reveal/Delete
+/// with `TaskUndo`, `NSOpenPanel`, and Finder drag-and-drop.
+@MainActor
+final class KitAttachmentsView: NSView {
+  static let chipHeight: CGFloat = 24
+  private static let rowSpacing: CGFloat = 4
+
+  var onChanged: (() -> Void)?
+
+  private let stack = NSStackView()
+  private var taskID: String?
+  private var items: [TaskAttachmentEntity] = []
+
+  private var store: TaskAttachmentStore { SeptenaServices.shared.taskAttachmentStore }
+  private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
+
+  var attachmentCount: Int { items.count }
+
+  var preferredHeight: CGFloat {
+    guard !items.isEmpty else { return 0 }
+    return CGFloat(items.count) * Self.chipHeight
+      + CGFloat(max(0, items.count - 1)) * Self.rowSpacing
+  }
+
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    translatesAutoresizingMaskIntoConstraints = false
+    registerForDraggedTypes([.fileURL])
+
+    stack.orientation = .vertical
+    stack.alignment = .leading
+    stack.spacing = Self.rowSpacing
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(stack)
+    NSLayoutConstraint.activate([
+      stack.topAnchor.constraint(equalTo: topAnchor),
+      stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+      stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+      stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+    ])
+    isHidden = true
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitAttachmentsView is code-only") }
+
+  func configure(taskID: String) {
+    self.taskID = taskID
+    reload()
+  }
+
+  func reload() {
+    guard let taskID else {
+      items = []
+      isHidden = true
+      rebuild()
+      return
+    }
+    items = store.attachments(taskID: taskID)
+    isHidden = items.isEmpty
+    rebuild()
+  }
+
+  func pickFilesToAttach() {
+    guard let taskID else { return }
+    let panel = NSOpenPanel()
+    panel.allowsMultipleSelection = true
+    panel.canChooseDirectories = false
+    panel.canChooseFiles = true
+    panel.prompt = String(localized: "Attach", comment: "NSOpenPanel attach prompt")
+    let handle: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+      guard let self, response == .OK else { return }
+      let added = KitAttachmentPasteHelper.attachFiles(panel.urls, to: taskID, presentErrorIn: self.window)
+      if added > 0 {
+        self.reload()
+        self.onChanged?()
+      }
+    }
+    if let window {
+      panel.beginSheetModal(for: window, completionHandler: handle)
+    } else {
+      handle(panel.runModal())
+    }
+  }
+
+  private func rebuild() {
+    for v in stack.arrangedSubviews {
+      stack.removeArrangedSubview(v)
+      v.removeFromSuperview()
+    }
+    for (idx, item) in items.enumerated() {
+      let chip = KitAttachmentChipView(
+        filename: item.filename,
+        sizeText: ByteCountFormatter.string(fromByteCount: item.byteCount, countStyle: .file),
+        hasLocalFile: TaskAttachmentFiles.url(for: item).map { FileManager.default.fileExists(atPath: $0.path) } ?? false
+      )
+      chip.onQuickLook = { [weak self] in self?.quickLook(at: idx) }
+      chip.onReveal = { [weak self] in self?.reveal(item) }
+      chip.onSaveCopy = { [weak self] in self?.saveCopy(item) }
+      chip.onDelete = { [weak self] in self?.delete(item) }
+      stack.addArrangedSubview(chip)
+      chip.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor).isActive = true
+      chip.heightAnchor.constraint(equalToConstant: Self.chipHeight).isActive = true
+    }
+  }
+
+  private func quickLook(at index: Int) {
+    let urls = items.compactMap { entity -> URL? in
+      guard let url = TaskAttachmentFiles.url(for: entity),
+            FileManager.default.fileExists(atPath: url.path) else { return nil }
+      return url
+    }
+    guard !urls.isEmpty else { return }
+    let targetURL = items.indices.contains(index) ? TaskAttachmentFiles.url(for: items[index]) : nil
+    let startIdx = targetURL.flatMap { urls.firstIndex(of: $0) } ?? 0
+    KitQuickLookCoordinator.shared.preview(urls: urls, startingAt: startIdx)
+  }
+
+  private func reveal(_ entity: TaskAttachmentEntity) {
+    guard let url = TaskAttachmentFiles.url(for: entity),
+          FileManager.default.fileExists(atPath: url.path) else { return }
+    NSWorkspace.shared.activateFileViewerSelecting([url])
+  }
+
+  private func saveCopy(_ entity: TaskAttachmentEntity) {
+    guard let src = TaskAttachmentFiles.url(for: entity),
+          FileManager.default.fileExists(atPath: src.path) else { return }
+    let panel = NSSavePanel()
+    panel.nameFieldStringValue = entity.filename
+    let finish: (NSApplication.ModalResponse) -> Void = { response in
+      guard response == .OK, let dest = panel.url else { return }
+      try? FileManager.default.removeItem(at: dest)
+      try? FileManager.default.copyItem(at: src, to: dest)
+    }
+    if let window {
+      panel.beginSheetModal(for: window, completionHandler: finish)
+    } else {
+      finish(panel.runModal())
+    }
+  }
+
+  private func delete(_ entity: TaskAttachmentEntity) {
+    let snap = store.removeForUndo(entity)
+    TaskUndo.recordAttachmentDelete(snap, store: store, mutator: mutator)
+    reload()
+    onChanged?()
+  }
+
+  // MARK: Drag & Drop
+
+  override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+    guard taskID != nil,
+          let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self],
+                                                           options: [.urlReadingFileURLsOnly: true]) as? [URL],
+          !urls.isEmpty else { return [] }
+    return .copy
+  }
+
+  override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+    guard let taskID,
+          let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self],
+                                                           options: [.urlReadingFileURLsOnly: true]) as? [URL],
+          !urls.isEmpty else { return false }
+    let added = KitAttachmentPasteHelper.attachFiles(urls, to: taskID, presentErrorIn: window)
+    if added > 0 {
+      reload()
+      onChanged?()
+    }
+    return added > 0
+  }
+}
+
+@MainActor
+private final class KitAttachmentChipView: NSView {
+  var onQuickLook: (() -> Void)?
+  var onReveal: (() -> Void)?
+  var onSaveCopy: (() -> Void)?
+  var onDelete: (() -> Void)?
+
+  private let deleteButton = NSButton()
+  private var hovered = false
+  private var tracking: NSTrackingArea?
+
+  init(filename: String, sizeText: String, hasLocalFile: Bool) {
+    super.init(frame: .zero)
+    translatesAutoresizingMaskIntoConstraints = false
+    wantsLayer = true
+    layer?.cornerRadius = 6
+    layer?.borderWidth = 0.75
+    layer?.borderColor = NSColor.secondaryLabelColor.withAlphaComponent(0.25).cgColor
+
+    let icon = NSImageView()
+    icon.image = NSImage(systemSymbolName: hasLocalFile ? "paperclip" : "icloud.and.arrow.down",
+                         accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 10, weight: .medium))
+    icon.contentTintColor = SeptaskKitTheme.inkSecondary
+    icon.translatesAutoresizingMaskIntoConstraints = false
+
+    let nameLabel = NSTextField(labelWithString: filename)
+    nameLabel.font = .systemFont(ofSize: SeptenaTypeScale.size(.caption1), weight: .medium)
+    nameLabel.textColor = .labelColor
+    nameLabel.lineBreakMode = .byTruncatingMiddle
+    nameLabel.maximumNumberOfLines = 1
+    nameLabel.translatesAutoresizingMaskIntoConstraints = false
+
+    let sizeLabel = NSTextField(labelWithString: sizeText)
+    sizeLabel.font = .systemFont(ofSize: SeptenaTypeScale.size(.caption2))
+    sizeLabel.textColor = SeptaskKitTheme.inkSecondary
+    sizeLabel.setContentHuggingPriority(.required, for: .horizontal)
+    sizeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+    sizeLabel.translatesAutoresizingMaskIntoConstraints = false
+
+    deleteButton.isBordered = false
+    deleteButton.bezelStyle = .inline
+    deleteButton.imagePosition = .imageOnly
+    deleteButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Delete attachment")?
+      .withSymbolConfiguration(.init(pointSize: 9, weight: .semibold))
+    deleteButton.contentTintColor = SeptaskKitTheme.inkSecondary
+    deleteButton.target = self
+    deleteButton.action = #selector(deletePressed)
+    deleteButton.translatesAutoresizingMaskIntoConstraints = false
+    deleteButton.alphaValue = 0.65
+
+    addSubview(icon)
+    addSubview(nameLabel)
+    addSubview(sizeLabel)
+    addSubview(deleteButton)
+
+    NSLayoutConstraint.activate([
+      icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+      icon.centerYAnchor.constraint(equalTo: centerYAnchor),
+      icon.widthAnchor.constraint(equalToConstant: 12),
+      nameLabel.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 4),
+      nameLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
+      sizeLabel.leadingAnchor.constraint(equalTo: nameLabel.trailingAnchor, constant: 6),
+      sizeLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
+      deleteButton.leadingAnchor.constraint(equalTo: sizeLabel.trailingAnchor, constant: 4),
+      deleteButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -5),
+      deleteButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+      deleteButton.widthAnchor.constraint(equalToConstant: 14),
+      deleteButton.heightAnchor.constraint(equalToConstant: 14),
+    ])
+
+    let menu = NSMenu()
+    menu.addItem(withTitle: String(localized: "Quick Look", comment: "Attachment menu"),
+                 action: #selector(quickLookPressed), keyEquivalent: "").target = self
+    menu.addItem(withTitle: String(localized: "Save Copy…", comment: "Attachment menu"),
+                 action: #selector(saveCopyPressed), keyEquivalent: "").target = self
+    menu.addItem(withTitle: String(localized: "Reveal in Finder", comment: "Attachment menu"),
+                 action: #selector(revealPressed), keyEquivalent: "").target = self
+    menu.addItem(.separator())
+    menu.addItem(withTitle: String(localized: "Delete", comment: "Attachment menu"),
+                 action: #selector(deletePressed), keyEquivalent: "").target = self
+    self.menu = menu
+    setAccessibilityRole(.button)
+    setAccessibilityLabel("\(filename), \(sizeText)")
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitAttachmentChipView is code-only") }
+
+  override func draw(_ dirtyRect: NSRect) {
+    if hovered {
+      NSColor.secondaryLabelColor.withAlphaComponent(0.08).setFill()
+      NSBezierPath(roundedRect: bounds, xRadius: 6, yRadius: 6).fill()
+    }
+  }
+
+  override func updateTrackingAreas() {
+    super.updateTrackingAreas()
+    if let tracking { removeTrackingArea(tracking) }
+    let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow],
+                              owner: self, userInfo: nil)
+    addTrackingArea(area)
+    tracking = area
+  }
+
+  override func mouseEntered(with event: NSEvent) { hovered = true; deleteButton.alphaValue = 1.0; needsDisplay = true }
+  override func mouseExited(with event: NSEvent) { hovered = false; deleteButton.alphaValue = 0.65; needsDisplay = true }
+  override func mouseUp(with event: NSEvent) { onQuickLook?() }
+
+  @objc private func quickLookPressed() { onQuickLook?() }
+  @objc private func saveCopyPressed() { onSaveCopy?() }
+  @objc private func revealPressed() { onReveal?() }
+  @objc private func deletePressed() { onDelete?() }
 }
 #endif
