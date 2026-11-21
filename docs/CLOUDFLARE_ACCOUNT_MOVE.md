@@ -117,6 +117,27 @@ then.
   old account revoked it.
 - Remove the `_rehearsal` store with the old-account cleanup in step 12.
 
+## 3b. Cutover log (2026-11-21)
+
+- Old backend frozen (`MAINTENANCE=true`). Copied: KV (203 TOKENS, 72
+  CLIENTS, 5 ATTEST keys), mz's TaskStore (all table counts match), D1
+  (counts match). No attachments.
+- Trap: the live backend had been deployed from local main with unpushed
+  backend work (ST0 star, TR1 reminders, onboarding prompt). The copy failed
+  on `tasks.starred` until both backends ran origin/main plus that work.
+  Deploy from a tree that matches what is live, or columns go missing.
+- Gandi nameservers switched to `henrik` and `jasmine` at 15:44 (registry
+  updated within minutes). `api`, `community`, apex and `www` were attached
+  to the new workers while the zone was still pending; traffic through the
+  new nameservers reached them at once.
+- Not moved: `septena-reports` (`reports.septena.app`), an unconfigured
+  template no app calls; its `REPORTS` namespace (7 keys) stays on the old
+  account.
+- Left: step 10 (mz signs in on devices), step 11 (Email Sending), the
+  community re-link if mz signs in to the community again, step 12 after
+  14 days (old workers, KV, R2, D1, the three stray namespaces and the
+  `_rehearsal` store on the new account).
+
 ## 4. Checks before the old account is cleaned
 
 - Every user's task, area, project, convo and turn counts match.
