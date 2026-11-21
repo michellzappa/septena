@@ -3,11 +3,11 @@ import SwiftUI
 /// Septask's top-level tabs (iPhone). Tasks hosts the full sidebar module —
 /// same label and checkmark as Septena's Tasks tab, so the ✓ means "the task
 /// module" in both apps; Today and Upcoming are first-class destinations.
-/// Quick capture lives in the native iOS 26 `.tabViewBottomAccessory` (collapses
-/// inline beside the minimized tab circle on scroll): tap opens the create quick
-/// menu, and hold-and-drag drops a new inline task onto any row gap, heading,
-/// group, or Upcoming day — or creates a Project/Area on the Tasks page.
-/// Search lives in the trailing nav bar.
+/// Quick capture lives in the separate floating circular Magic Plus orb
+/// (`MagicPlusOrb`) anchored just above the bottom-right edge of the tab bar:
+/// tap opens the create quick menu, and hold-and-drag drops a new inline task
+/// onto any row gap, heading, group, or Upcoming day — or creates a Project/Area
+/// on the Tasks page. Search lives in the trailing nav bar.
 ///
 /// Septask has no Next page (removed 2026-11-19: it showed life-OS content,
 /// not tasks; Today covers "what's next" for tasks).
@@ -258,25 +258,28 @@ struct SeptaskRootView: View {
     nav.requestNewTask()
   }
 
-  /// Real iOS 26 `TabView` (`Tasks`, `Today`, `Upcoming`) with system scroll
-  /// minimization and native `.tabViewBottomAccessory` hosting Magic Plus.
+  /// Real iOS 26 3-tab `TabView` (`Tasks`, `Today`, `Upcoming`) with system
+  /// scroll minimization, paired with a separate floating circular Magic Plus
+  /// orb anchored just above the bottom-right edge of the tab bar (Things 3
+  /// style) so it stays behind the keyboard when typing inline.
   private var systemTabView: some View {
-    TabView(selection: tabSelection) {
-      // Septask has no section colors: the bar, the tabs and their content
-      // all take the platform accent (no `.tint` on the TabView).
-      Tab("Tasks", systemImage: "checkmark", value: SeptaskTab.tasks) {
-        ContentView()
+    ZStack(alignment: .bottomTrailing) {
+      TabView(selection: tabSelection) {
+        // Septask has no section colors: the bar, the tabs and their content
+        // all take the platform accent (no `.tint` on the TabView).
+        Tab("Tasks", systemImage: "checkmark", value: SeptaskTab.tasks) {
+          ContentView()
+        }
+        Tab("Today", systemImage: "sun.max.fill", value: SeptaskTab.today) {
+          NavigationStack { TaskListView(filter: .today) }.tint(theme.accent)
+        }
+        Tab("Upcoming", systemImage: "calendar", value: SeptaskTab.upcoming) {
+          NavigationStack { TaskListView(filter: .upcoming) }.tint(theme.accent)
+        }
       }
-      Tab("Today", systemImage: "sun.max.fill", value: SeptaskTab.today) {
-        NavigationStack { TaskListView(filter: .today) }.tint(theme.accent)
-      }
-      Tab("Upcoming", systemImage: "calendar", value: SeptaskTab.upcoming) {
-        NavigationStack { TaskListView(filter: .upcoming) }.tint(theme.accent)
-      }
-    }
-    .tabBarMinimizeBehavior(.onScrollDown)
-    .tabViewBottomAccessory {
-      MagicPlusTabAccessory(
+      .tabBarMinimizeBehavior(.onScrollDown)
+
+      MagicPlusOrb(
         isViewingProject: isViewingProject,
         onNewTask: { triggerInlineNewTask() },
         onNewSection: { nav.shouldCreateHeading = true },
@@ -289,6 +292,9 @@ struct SeptaskRootView: View {
           showingNewAreaAlert = true
         }
       )
+      .padding(.trailing, 16)
+      .padding(.bottom, 92)
+      .ignoresSafeArea(.all, edges: .bottom)
     }
   }
 
@@ -322,16 +328,16 @@ struct SeptaskRootView: View {
 }
 
 #if os(iOS)
-/// Native iOS 26 `tabViewBottomAccessory` hosting Magic Plus:
-/// - Automatically adapts between `.expanded` (above the 3-tab bar) and
-///   `.inline` (tucked beside the minimized tab circle on scroll down).
-/// - Tap opens a quick menu (`New Task` inline, `New Section` in projects,
-///   `New Project`, `New Area`).
+/// Separate floating circular Magic Plus orb anchored above bottom-right of
+/// the real iOS 26 `TabView`:
+/// - Solid accent circle + subtle 6-dot grip beneath `+` communicates a
+///   grabbable object rather than a flat tap-only tab icon.
+/// - Tap opens a native popover quick menu (`New Task` inline, `New Section`
+///   in projects, `New Project`, `New Area`).
 /// - Hold & drag carries `TaskDragIDs.newTask` through native iOS drag and
 ///   drop into any row gap, heading, Today/Anytime group, Upcoming day, or
 ///   Tasks index Project/Area drop target.
-private struct MagicPlusTabAccessory: View {
-  @Environment(\.tabViewBottomAccessoryPlacement) private var placement
+private struct MagicPlusOrb: View {
   @State private var showingMenu = false
 
   let isViewingProject: Bool
@@ -340,40 +346,32 @@ private struct MagicPlusTabAccessory: View {
   let onNewProject: () -> Void
   let onNewArea: () -> Void
 
-  private var isInline: Bool { placement == .inline }
-
   var body: some View {
     Button {
       Haptics.tap()
       showingMenu = true
     } label: {
-      HStack(spacing: isInline ? 8 : 10) {
-        ZStack {
-          Circle()
-            .fill(Color.accentColor.gradient)
+      ZStack {
+        Circle()
+          .fill(Color.accentColor.gradient)
+          .overlay(
+            Circle()
+              .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.75)
+          )
+          .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
+        VStack(spacing: 4) {
           Image(systemName: "plus")
-            .scaledFont(size: isInline ? 13 : 14, weight: .bold)
+            .scaledFont(size: 21, weight: .bold)
             .foregroundStyle(Color.white)
+          gripDots
         }
-        .frame(width: isInline ? 26 : 30, height: isInline ? 26 : 30)
-
-        Text(isInline ? "New" : "New…")
-          .font(.septenaButton)
-          .foregroundStyle(.primary)
-          .lineLimit(1)
-
-        if !isInline {
-          Spacer(minLength: 0)
-        }
-
-        gripDots
+        .offset(y: 2)
       }
-      .padding(.horizontal, isInline ? 12 : 14)
-      .frame(maxWidth: isInline ? nil : .infinity, maxHeight: .infinity)
-      .contentShape(Capsule())
+      .frame(width: 58, height: 58)
+      .contentShape(Circle())
     }
     .buttonStyle(.plain)
-    .contentShape(.dragPreview, Capsule())
+    .contentShape(.dragPreview, Circle())
     .accessibilityLabel("New")
     .accessibilityHint("Tap for create options, or hold and drag onto a list position.")
     .popover(isPresented: $showingMenu, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
@@ -394,15 +392,15 @@ private struct MagicPlusTabAccessory: View {
     }
   }
 
-  /// Subtle 3×2 tactile grip dots signaling the accessory can be held & dragged.
+  /// Subtle 3×2 tactile grip dots beneath `+` signaling the orb can be dragged.
   private var gripDots: some View {
-    VStack(spacing: 3) {
+    VStack(spacing: 2.5) {
       ForEach(0..<2, id: \.self) { _ in
         HStack(spacing: 3) {
           ForEach(0..<3, id: \.self) { _ in
             Circle()
-              .fill(Color.secondary.opacity(0.5))
-              .frame(width: 3, height: 3)
+              .fill(Color.white.opacity(0.55))
+              .frame(width: 2.5, height: 2.5)
           }
         }
       }
