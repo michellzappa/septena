@@ -72,7 +72,7 @@ Selected by mz (2026-11-21); `relief`, `isoFlow`, and `terrainMesh` were dropped
 | `stippleDrift` | **Stipple Drift** | Deterministic elevation-gated stipple dither (fixed dot anchors, evolving height wave — zero flicker) | Risograph print / e-ink texture |
 | `causticGlass` | **Caustic Glass** | Domain-warped Voronoi edge filaments (`(1 - k·(d₂ - d₁))³`) simulating soft refraction through Liquid Glass | Subtle optical glass filaments |
 | `ridges` | **Ridge Lines** | Horizontal elevation cross-sections smoothly displaced by 3D noise, vertically tapered | Rhythmic terrain profiles |
-| `washiPaper` | **Washi Paper** | Low-frequency tonal clouding + sparse deterministic micro-fibers | Fine tactile stationery, near-subliminal |
+| `washiPaper` | **Washi Paper** | Fine laid-paper screen lines (`sugeta`) + long curved kozo/unryu mulberry fibers + short pulp micro-fibers (pure vector fiber geometry, zero tonal blobs) | Tactile handmade Japanese stationery |
 
 ### 3.2 Texture Placement & Parameters (Header Wash Only — locked 2026-11-21)
 
