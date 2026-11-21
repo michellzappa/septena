@@ -2,16 +2,18 @@ import SwiftUI
 
 /// Septask's top-level tabs (iPhone). Tasks hosts the full sidebar module —
 /// same label and checkmark as Septena's Tasks tab, so the ✓ means "the task
-/// module" in both apps; Today and Upcoming are first-class destinations.
-/// Quick capture lives in the floating Magic Plus button (`magicPlusButton`)
-/// overlaid bottom-trailing so it supports both tap (Quick Add) and native
-/// press-and-drag onto any list position, heading, group, or Upcoming day.
-/// Search lives in the trailing navigation bar (`QuickFindToolbarButton`).
+/// module" in both apps; Today and Upcoming are first-class destinations; the
+/// trailing `newTask` slot uses `role: .search` so iOS 26 renders the native
+/// detached circular `+` button in the exact tab-bar baseline (both expanded
+/// and minimized on scroll). A transparent drag overlay directly on top of that
+/// circle adds native `.draggable(TaskDragIDs.newTask)` so you can press-and-
+/// drag `+` onto any row gap, heading, group, Upcoming day, or Tasks destination,
+/// while tap opens `SeptaskQuickAdd`. Search lives in the trailing nav bar.
 ///
 /// Septask has no Next page (removed 2026-11-19: it showed life-OS content,
 /// not tasks; Today covers "what's next" for tasks).
 enum SeptaskTab: Hashable {
-  case tasks, today, upcoming
+  case tasks, today, upcoming, newTask
 }
 
 /// Septask's root, mirroring `RootTabView`'s shell shape: the standard
@@ -171,6 +173,8 @@ struct SeptaskRootView: View {
         nav.path = [.filter(.upcoming)]
       case .tasks:
         if nav.path.isEmpty { nav.path = [.filter(.today)] }
+      case .newTask:
+        if nav.path.isEmpty { nav.path = [.filter(.today)] }
       }
     } else {
       switch nav.path.last {
@@ -191,6 +195,9 @@ struct SeptaskRootView: View {
 
   #if os(iOS)
   /// User tab-bar selection bridge:
+  /// - Tapping the detached `+` (`newTask`) presents `SeptaskQuickAdd` without
+  ///   switching away from the active list (fallback if a tap hits the native
+  ///   tab directly, e.g. via VoiceOver or at the very outer edge).
   /// - Tapping `Tasks` (whether switching from Today/Upcoming or re-tapping
   ///   Tasks) always clears `nav.path` so the Tasks tab lands at its top-level
   ///   index rather than staying trapped inside a previously pushed folder.
@@ -204,6 +211,9 @@ struct SeptaskRootView: View {
       get: { selection },
       set: { tapped in
         switch tapped {
+        case .newTask:
+          Haptics.tap()
+          nav.presentAddInfo(section: .tasks)
         case .tasks:
           if !nav.path.isEmpty {
             nav.path = []
@@ -219,10 +229,11 @@ struct SeptaskRootView: View {
     )
   }
 
-  /// Standard iOS 26 `TabView` paired with the floating Magic Plus button.
-  /// Keeping `+` as our own Liquid Glass overlay (instead of a system `Tab`)
-  /// allows native `.draggable(TaskDragIDs.newTask)` so the user can drop it
-  /// into any list slot, heading, Today group, Upcoming date, or Tasks destination.
+  /// Standard iOS 26 `TabView` with the native detached `+` slot (`role: .search`)
+  /// so the 3-tab pill narrows cleanly alongside `+` when expanded and collapses
+  /// symmetrically opposite `+` when minimized on scroll. Because SwiftUI does
+  /// not expose `.draggable` on a system `Tab`, a transparent circular hit-target
+  /// sits directly over the detached `+` slot to provide native drag-and-drop.
   private var systemTabView: some View {
     ZStack(alignment: .bottomTrailing) {
       TabView(selection: tabSelection) {
@@ -237,41 +248,45 @@ struct SeptaskRootView: View {
         Tab("Upcoming", systemImage: "calendar", value: SeptaskTab.upcoming) {
           NavigationStack { TaskListView(filter: .upcoming) }.tint(theme.accent)
         }
+        Tab("New Task", systemImage: "plus",
+            value: SeptaskTab.newTask, role: .search) {
+          Color.clear
+        }
       }
       .tabBarMinimizeBehavior(.onScrollDown)
 
-      magicPlusButton
-        .padding(.trailing, 20)
-        .padding(.bottom, 76)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
+      magicPlusDragOverlay
+        .padding(.trailing, 18)
+        .padding(.bottom, 18)
+        .ignoresSafeArea(.all, edges: .bottom)
     }
   }
 
-  /// Floating Magic Plus circle (iPhone compact):
+  /// Transparent Magic Plus hit-target aligned over the system `TabView`'s
+  /// detached trailing `+` circle:
   /// - Tap: opens `SeptaskQuickAdd` without leaving the active tab.
   /// - Press-and-drag: carries `TaskDragIDs.newTask` through native iOS drag
   ///   and drop into any `TaskReorderDrop`, `TaskMoveDrop`, or `SidebarTaskDrop`.
-  private var magicPlusButton: some View {
+  /// Uses a 0.001-opacity fill so UIKit's `UIDragInteraction` always hit-tests
+  /// it reliably while the underlying system Liquid Glass circle renders the UI.
+  private var magicPlusDragOverlay: some View {
     Button {
       Haptics.tap()
       nav.presentAddInfo(section: .tasks)
     } label: {
-      Image(systemName: "plus")
-        .scaledFont(size: 22, weight: .semibold)
-        .foregroundStyle(Color.accentColor)
-        .frame(width: 54, height: 54)
+      Circle()
+        .fill(Color.primary.opacity(0.001))
+        .frame(width: 64, height: 64)
         .contentShape(Circle())
-        .glassCircle()
     }
     .buttonStyle(.plain)
     .contentShape(.dragPreview, Circle())
-    .accessibilityLabel("New Task")
-    .accessibilityHint("Tap to add a task, or press and drag onto a list position.")
+    .accessibilityHidden(true)
     .draggable(TaskDragIDs.newTask) {
       Image(systemName: "plus")
         .scaledFont(size: 20, weight: .semibold)
         .foregroundStyle(Color.accentColor)
-        .frame(width: 48, height: 48)
+        .frame(width: 52, height: 52)
         .background(.regularMaterial, in: Circle())
         .contentShape(.dragPreview, Circle())
     }
