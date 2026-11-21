@@ -116,6 +116,9 @@ enum TaskUndo {
   struct ScheduleSnapshot {
     let id: String
     let scheduled: Date?
+    let startTime: String?
+    let durationMinutes: Int?
+    let timeZone: String?
     let today: Bool
     let starred: Bool
     let deadline: Date?
@@ -126,6 +129,9 @@ enum TaskUndo {
     init(_ task: SeptenaTask) {
       id = task.id
       scheduled = SeptenaDate.parse(task.scheduled)
+      startTime = task.startTime
+      durationMinutes = task.durationMinutes
+      timeZone = task.timeZone
       today = task.today
       starred = task.starred
       deadline = SeptenaDate.parse(task.deadline)
@@ -153,6 +159,10 @@ enum TaskUndo {
                       using mutator: TaskMutator) {
     for snapshot in snapshots {
       mutator.schedule(id: snapshot.id, date: snapshot.scheduled)
+      mutator.setTimeSlot(id: snapshot.id,
+                          startTime: snapshot.startTime,
+                          durationMinutes: snapshot.durationMinutes,
+                          timeZone: snapshot.timeZone)
       mutator.setDeadline(id: snapshot.id, date: snapshot.deadline)
       mutator.setRecurrence(id: snapshot.id, recurrence: snapshot.recurrence)
       if snapshot.recurrence != nil {
@@ -176,8 +186,7 @@ enum TaskUndo {
                                    mutator: TaskMutator) {
     guard !before.isEmpty else { return }
     let wanted = Set(before.map(\.id))
-    let after = LocalCache.allTasks(in: context)
-      .filter { wanted.contains($0.id) }
+    let after = LocalCache.liveTasks(ids: wanted, in: context)
       .map(ScheduleSnapshot.init)
     guard !after.isEmpty else { return }
     let beforeByID = Dictionary(before.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
@@ -486,7 +495,7 @@ enum TaskUndo {
                                            _ field: KeyPath<SeptenaTask, Value>) -> [String: Value] {
     let wanted = Set(ids)
     var result: [String: Value] = [:]
-    for task in LocalCache.allTasks(in: context) where wanted.contains(task.id) {
+    for task in LocalCache.liveTasks(ids: wanted, in: context) {
       result[task.id] = task[keyPath: field]
     }
     return result
@@ -510,8 +519,7 @@ enum TaskUndo {
                          mutator: TaskMutator) {
     guard !before.isEmpty else { return }
     let wanted = Set(before.map(\.id))
-    let after = LocalCache.allTasks(in: context)
-      .filter { wanted.contains($0.id) }
+    let after = LocalCache.liveTasks(ids: wanted, in: context)
       .map(FilingSnapshot.init)
     guard !after.isEmpty else { return }
     // A move into the list the task already lives in changed nothing, so it

@@ -57,10 +57,18 @@ enum SeptaskKitDatePopover {
   /// Anchor to `rect` in `view` and show. The handler fires on choice, and the
   /// popover closes itself. Chrome, material and radius come from
   /// `KitPopover` — this type owns the board, not the glass.
-  static func present(kind: Kind, initial: Date?, relativeTo rect: NSRect,
-                      of view: NSView, handler: @escaping Handler) {
+  static func present(kind: Kind, initial: Date?,
+                      initialStartTime: String? = nil,
+                      initialDurationMinutes: Int? = nil,
+                      relativeTo rect: NSRect,
+                      of view: NSView,
+                      onTimeSlotChange: ((String?, Int?) -> Void)? = nil,
+                      handler: @escaping Handler) {
     let handle = KitPopoverHandle()
-    let board = KitDateBoard(kind: kind, initial: initial) { date, today in
+    let board = KitDateBoard(kind: kind, initial: initial,
+                             initialStartTime: initialStartTime,
+                             initialDurationMinutes: initialDurationMinutes,
+                             onTimeSlotChange: onTimeSlotChange) { date, today in
       handler(date, today)
       handle.close()
     } onCancel: {
@@ -1375,6 +1383,13 @@ private final class KitDateBoard: NSView {
   private let kind: SeptaskKitDatePopover.Kind
   private let onPick: (Date?, Bool) -> Void
   private let onCancel: () -> Void
+  private let onTimeSlotChange: ((String?, Int?) -> Void)?
+  private var startTime: String?
+  private var durationMinutes: Int?
+  private let timeDisclosureButton = NSButton()
+  private let timeControlsContainer = NSStackView()
+  private let startTimePicker = NSDatePicker()
+  private var durationPills: [(minutes: Int, pill: KitPillButton)] = []
 
   /// Every focusable cell in time order: the seven days, then Pick another
   /// date, then Clear.
@@ -1419,8 +1434,14 @@ private final class KitDateBoard: NSView {
   }
 
   init(kind: SeptaskKitDatePopover.Kind, initial: Date?,
+       initialStartTime: String? = nil,
+       initialDurationMinutes: Int? = nil,
+       onTimeSlotChange: ((String?, Int?) -> Void)? = nil,
        onPick: @escaping (Date?, Bool) -> Void, onCancel: @escaping () -> Void) {
     self.kind = kind
+    self.startTime = initialStartTime
+    self.durationMinutes = initialDurationMinutes
+    self.onTimeSlotChange = onTimeSlotChange
     self.onPick = onPick
     self.onCancel = onCancel
     super.init(frame: .zero)
@@ -1522,11 +1543,89 @@ private final class KitDateBoard: NSView {
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.spacing = 6
+    stack.detachesHiddenViews = true
     stack.setCustomSpacing(8, after: typedLabel)
     stack.setCustomSpacing(8, after: strip)
     stack.setCustomSpacing(4, after: topSeparator)
     stack.setCustomSpacing(8, after: calendarCell)
     stack.setCustomSpacing(4, after: bottomSeparator)
+
+    // Progressive-disclosure optional start/end time section (`.when` only,
+    // docs/TASK_TIMES_AND_ICAL_SPEC.md §2).
+    if kind == .when, onTimeSlotChange != nil {
+      let timeSep = NSBox()
+      timeSep.boxType = .separator
+      stack.addArrangedSubview(timeSep)
+      timeSep.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
+
+      timeDisclosureButton.isBordered = false
+      timeDisclosureButton.bezelStyle = .inline
+      timeDisclosureButton.imagePosition = .imageLeading
+      timeDisclosureButton.image = NSImage(systemSymbolName: "clock", accessibilityDescription: nil)?
+        .withSymbolConfiguration(.init(pointSize: 11, weight: .regular))
+      timeDisclosureButton.title = String(localized: "Add time", comment: "SeptaskKit: add start time disclosure")
+      timeDisclosureButton.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+      timeDisclosureButton.contentTintColor = SeptaskKitTheme.inkSecondary
+      timeDisclosureButton.target = self
+      timeDisclosureButton.action = #selector(revealTimeControls)
+      stack.addArrangedSubview(timeDisclosureButton)
+
+      timeControlsContainer.orientation = .vertical
+      timeControlsContainer.alignment = .leading
+      timeControlsContainer.spacing = 6
+      timeControlsContainer.translatesAutoresizingMaskIntoConstraints = false
+
+      let topRow = NSStackView()
+      topRow.orientation = .horizontal
+      topRow.alignment = .centerY
+      topRow.spacing = 8
+
+      let lbl = NSTextField(labelWithString: String(localized: "Time", comment: "SeptaskKit: start time label"))
+      lbl.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote), weight: .medium)
+      lbl.textColor = .labelColor
+
+      startTimePicker.datePickerStyle = .textFieldAndStepper
+      startTimePicker.datePickerElements = .hourMinute
+      startTimePicker.dateValue = TaskTimeSlot.pickerDate(from: startTime)
+      startTimePicker.target = self
+      startTimePicker.action = #selector(startTimeChanged)
+
+      let clearTimeBtn = NSButton()
+      clearTimeBtn.isBordered = false
+      clearTimeBtn.bezelStyle = .inline
+      clearTimeBtn.title = String(localized: "Clear", comment: "SeptaskKit: clear start time")
+      clearTimeBtn.font = .systemFont(ofSize: SeptenaTypeScale.size(.caption1))
+      clearTimeBtn.contentTintColor = SeptaskKitTheme.inkSecondary
+      clearTimeBtn.target = self
+      clearTimeBtn.action = #selector(clearTimePressed)
+
+      topRow.addArrangedSubview(lbl)
+      topRow.addArrangedSubview(startTimePicker)
+      topRow.addArrangedSubview(clearTimeBtn)
+
+      let durRow = NSStackView()
+      durRow.orientation = .horizontal
+      durRow.alignment = .centerY
+      durRow.spacing = 6
+      durationPills = []
+      for preset in TaskTimeSlot.quickDurations {
+        let pill = KitPillButton()
+        pill.title = preset.label
+        pill.isOn = durationMinutes == preset.minutes
+        pill.onPress = { [weak self] _ in self?.toggleDuration(preset.minutes) }
+        durRow.addArrangedSubview(pill)
+        durationPills.append((preset.minutes, pill))
+      }
+
+      timeControlsContainer.addArrangedSubview(topRow)
+      timeControlsContainer.addArrangedSubview(durRow)
+      stack.addArrangedSubview(timeControlsContainer)
+      timeControlsContainer.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
+
+      let hasTime = startTime != nil
+      timeDisclosureButton.isHidden = hasTime
+      timeControlsContainer.isHidden = !hasTime
+    }
 
     // The strip sets the width; the single-cell rows match it so every
     // highlight spans the same column.
@@ -1672,6 +1771,39 @@ private final class KitDateBoard: NSView {
     } else {
       onPick(date, false)
     }
+  }
+
+  @objc private func revealTimeControls() {
+    if startTime == nil {
+      startTime = "09:00"
+      startTimePicker.dateValue = TaskTimeSlot.pickerDate(from: startTime)
+      onTimeSlotChange?(startTime, durationMinutes)
+    }
+    timeDisclosureButton.isHidden = true
+    timeControlsContainer.isHidden = false
+  }
+
+  @objc private func startTimeChanged() {
+    startTime = TaskTimeSlot.hhmm(from: startTimePicker.dateValue)
+    onTimeSlotChange?(startTime, durationMinutes)
+  }
+
+  private func toggleDuration(_ minutes: Int) {
+    if startTime == nil {
+      startTime = TaskTimeSlot.hhmm(from: startTimePicker.dateValue)
+    }
+    durationMinutes = durationMinutes == minutes ? nil : minutes
+    for entry in durationPills { entry.pill.isOn = entry.minutes == durationMinutes }
+    onTimeSlotChange?(startTime, durationMinutes)
+  }
+
+  @objc private func clearTimePressed() {
+    startTime = nil
+    durationMinutes = nil
+    for entry in durationPills { entry.pill.isOn = false }
+    timeControlsContainer.isHidden = true
+    timeDisclosureButton.isHidden = false
+    onTimeSlotChange?(nil, nil)
   }
 
   // MARK: Focus

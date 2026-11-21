@@ -1,6 +1,6 @@
 # Optional start/end times, iCal feed & CalDAV exploration — spec
 
-**Status:** proposal (2026-11-21). Defaults in §7 stand unless mz overrules.
+**Status:** proposal (2026-11-21). Defaults in §8 stand unless mz overrules.
 **Decisions:** [ADR 0002](adr/0002-own-backend-replaces-icloud.md), [ADR 0007](adr/0007-septena-is-the-task-app.md), [ADR 0011](adr/0011-self-hostable-backend.md), [ADR 0015](adr/0015-shared-registries-for-cross-platform-clients.md).
 **Builds on:** `registry/entities.json`, `docs/TIMED_REMINDERS_SPEC.md` (#97), `docs/RECURRENCE_V2_SPEC.md` (#126), `backend/src/`, `Septask/SeptaskKitDatePopover.swift`, `Septena/Shell/Tasks/CalendarEventRow.swift`.
 **Tracking issue:** [#128](https://github.com/michellzappa/septena/issues/128).
@@ -55,20 +55,77 @@ Before building CalDAV write-back, here is the realistic engineering trade-off o
 1. Ship **Phase 0 (optional `startTime` / `durationMinutes`)** and **Phase 1 (private `.ics` feed)** first — tiny footprint, works in Apple, Google, and Outlook Calendar immediately, zero data-loss risk.
 2. Only greenlight **Phase 2 (CalDAV write-back)** as a **narrow, scoped VEVENT-only calendar** ("Septena Tasks" calendar where `PUT` creates/updates `title`, `scheduled`, `startTime`, `durationMinutes`, `notes` only, ignores unsupported `RRULE` rewrites, and maps `DELETE` to clearing `startTime`/`scheduled` rather than deleting the task!) **after mz confirms Phase 1 feels valuable enough to warrant CalDAV maintenance**.
 
-## 5. Phases
+## 5. Calendar events inside Septena on Android, web and Windows
+
+Today the Apple clients read the device calendar through EventKit
+(`SeptenaCore/CalendarBridge.swift`) and weave events into Today (the
+"Agenda" strip, events not yet ended) and Upcoming (next 30 days, by day).
+The feed in §3 covers the other direction (tasks into calendar apps) on
+every platform. This section covers events INTO Septena on the clients
+that have no EventKit.
+
+### 5.1 Android: on-device, parity with iOS
+
+Android has a device calendar store, `CalendarContract`, that holds every
+account synced to the phone (Google, Exchange, Samsung). The client asks for
+`READ_CALENDAR` and queries `CalendarContract.Instances` for the same two
+windows as `CalendarBridge` (rest of today, next 30 days). Hidden calendars
+use the same synced `calendarHiddenTitles` setting, matched by title. A
+`ContentObserver` on the calendar URI replaces `.EKEventStoreChanged`.
+No backend work. Already listed in `docs/SEPTASK_ANDROID_PLAN.md`
+("Today calendar strip", late).
+
+### 5.2 Web and Windows: backend calendar sources
+
+A browser cannot read a device calendar. A native Windows app can read only
+the Windows Calendar store (`Windows.ApplicationModel.Appointments`), which
+most users do not use. So web and Windows get events from the backend,
+through one shared layer: **calendar sources**.
+
+- **Source kind A: subscribed `.ics` URL** *(default, first)*. The user pastes
+  the private calendar address from iCloud, Google or Outlook into Settings ▸
+  Calendar. The Worker fetches it (server side, browsers block it by CORS),
+  parses `VEVENT`s, expands `RRULE`s for the requested window, and returns
+  the same event shape for both clients. Read-only, no OAuth, and the only
+  route that covers iCloud (iCloud has no API except CalDAV).
+- **Source kind B: OAuth** (later, only if live data matters). Google Calendar
+  API (`calendar.readonly`) and Microsoft Graph (`Calendars.Read`). Gives
+  near-live events and per-calendar lists. Costs: Google app verification for
+  a sensitive scope, a Microsoft app registration with publisher verification,
+  and token storage per user.
+
+**Endpoint:** `GET /v1/calendar/events?from=&to=` returns events from all of
+the user's sources, minus hidden calendars, in one wire shape (`id`, `title`,
+`start`, `end`, `allDay`, `calendarTitle`, `color`). Add the shape to the
+shared registries (ADR 0015) so web, Windows and Android-without-permission
+render it the same way as `CalendarEventRow`.
+
+**Privacy rule** *(default)*: the backend fetches on request and caches
+events in memory for at most 5 minutes. It never writes events to D1 or the
+Durable Object. It stores only the source URL or OAuth token, encrypted at
+rest, and the user can delete a source in one tap. Settings copy must say
+plainly that Septena's server reads this calendar.
+
+**Windows:** if the Windows client is a wrapper around the web client, it
+needs nothing extra. A native Windows client calls the same endpoint.
+
+## 6. Phases
 
 | Phase | Scope | Depends on |
 |---|---|---|
 | **IC0 — Optional `startTime` / `durationMinutes` schema & UI** | Add `startTime`, `durationMinutes`, `timeZone` to `registry/entities.json`, backend, MCP, SwiftData, and progressive-disclosure `"Add time"` controls on Mac & iOS. | `#97` TR0 (shares time-zone contract) |
 | **IC1 — Private read-only `.ics` feed on `api.septena.app`** | Add token generation/rotation, RFC 5545 `.ics` generator with `ETag` caching on the Worker, and Settings ▸ Connections `"Calendar Feed"` UI. | IC0 |
 | **IC2 — Scoped writable CalDAV endpoint (gated on mz decision)** | Narrow CalDAV server (`PROPFIND`/`REPORT`/`PUT`/`DELETE` with App Password) scoped strictly to `scheduled`/`startTime`/`durationMinutes`/`title`/`notes`. **Do not start until mz approves after IC1.** | IC1 + mz go-ahead |
+| **IC3 — Android calendar strip** | `CalendarContract` read with `READ_CALENDAR`, same windows and hidden-calendar setting as `CalendarBridge` (§5.1). | Android client |
+| **IC4 — Calendar sources: `.ics` URL** | Settings UI to add/remove a source URL, Worker fetch + parse + `RRULE` expansion, `GET /v1/calendar/events`, registry wire shape, web Agenda strip (§5.2). | Web client |
+| **IC5 — Calendar sources: Google + Microsoft OAuth** | OAuth flows, encrypted token storage, Google verification and Microsoft app registration. **Do not start until mz approves after IC4.** | IC4 + mz go-ahead |
 
-## 6. Verification
+## 7. Verification
 
 - RFC 5545 validator test on generated `.ics` output (folding 75-octet lines, CRLF, escaping `,`/`;`/`\n`, timezone & all-day dates).
 - `node scripts/gen-registries.mjs --check`, `backend` tests, `SeptenaMac` + `SeptaskMac` builds green.
 
-## 7. Open questions
+## 8. Open questions
 
 | Question | Default |
 |---|---|
@@ -76,3 +133,6 @@ Before building CalDAV write-back, here is the realistic engineering trade-off o
 | Default `.ics` duration when only `startTime` is set | 30 minutes *(default)* |
 | Writable CalDAV server (IC2) | Hold behind mz decision gate after IC1 `.ics` feed ships *(default)* |
 | Plan gating for `.ics` feed | Free account includes read-only `.ics` feed (server cost is negligible with ETag caching) *(default)* |
+| Backend reads user calendars (web/Windows) | Allowed for sources the user adds, fetch on request, no stored events *(default)* |
+| First web/Windows source kind | Pasted `.ics` URL; OAuth (IC5) behind mz decision gate *(default)* |
+| Calendar sources plan gating | Free, same as the `.ics` feed *(default)* |

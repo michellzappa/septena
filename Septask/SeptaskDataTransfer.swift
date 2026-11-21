@@ -141,7 +141,9 @@ enum TaskJSONTransfer {
     let iso = ISO8601DateFormatter()
     return compact([
       "id": e.id, "title": e.title, "status": e.statusRaw,
-      "created": e.created, "scheduled": e.scheduled, "deadline": e.deadline,
+      "created": e.created, "scheduled": e.scheduled,
+      "startTime": e.startTime, "durationMinutes": e.durationMinutes, "timeZone": e.timeZone,
+      "deadline": e.deadline,
       "today": e.today, "starred": e.starred ? true : nil,
       "tags": e.tagIDs.isEmpty ? nil : e.tagIDs,
       "todaySetOn": e.todaySetOn, "completedAt": e.completedAt,
@@ -379,6 +381,9 @@ enum TaskJSONTransfer {
     entity.statusRaw = statusRaw
     entity.created = r["created"] as? String
     entity.scheduled = nonEmptyString(r["scheduled"])
+    entity.startTime = nonEmptyString(r["startTime"])
+    entity.durationMinutes = intValue(r["durationMinutes"]).map { min(1440, max(5, $0)) }
+    entity.timeZone = nonEmptyString(r["timeZone"])
     entity.deadline = nonEmptyString(r["deadline"])
     entity.today = (r["today"] as? Bool) ?? false
     entity.starred = (r["starred"] as? Bool) ?? false
@@ -669,7 +674,15 @@ enum TaskJSONTransfer {
         let token = tagName.contains(" ") ? "#\"\(tagName)\"" : "#\(tagName)"
         meta.append(token)
       }
-      if let s = t.scheduled { meta.append("when: \(s)") }
+      if let s = t.scheduled {
+        if let slot = TaskTimeSlot.format(startTime: t.startTime, durationMinutes: t.durationMinutes) {
+          meta.append("when: \(s) \(slot)")
+        } else {
+          meta.append("when: \(s)")
+        }
+      } else if let slot = TaskTimeSlot.format(startTime: t.startTime, durationMinutes: t.durationMinutes) {
+        meta.append("time: \(slot)")
+      }
       if let d = t.deadline { meta.append("deadline: \(d)") }
       if let r = t.recurrence { meta.append("repeat: \(r.shortLabel)") }
       if let rem = t.reminderAt { meta.append("reminder: \(rem)") }
@@ -759,7 +772,7 @@ enum TaskJSONTransfer {
     let rows = allTasks.filter { !$0.isHeading && (includeCompleted || $0.status == .open) }
 
     var out: [String] = [
-      "\u{FEFF}id,title,status,area,project,section,today,starred,tags,scheduled,deadline,reminder_at,recurrence,notes,created,completed_at"
+      "\u{FEFF}id,title,status,area,project,section,today,starred,tags,scheduled,start_time,duration_minutes,deadline,reminder_at,recurrence,notes,created,completed_at"
     ]
     for t in rows {
       let projectEntity = t.project.flatMap { projects[$0] }
@@ -778,6 +791,8 @@ enum TaskJSONTransfer {
         t.starred ? "true" : "false",
         tagList,
         t.scheduled ?? "",
+        t.startTime ?? "",
+        t.durationMinutes.map(String.init) ?? "",
         t.deadline ?? "",
         t.reminderAt ?? "",
         t.recurrence?.shortLabel ?? "",

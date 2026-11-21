@@ -72,7 +72,7 @@ struct TaskAttributeBar: View {
 
     @MainActor init(task: SeptenaTask) {
       let ctx = LocalStore.shared.container.mainContext
-      let live = LocalCache.allTasks(in: ctx).first(where: { $0.id == task.id }) ?? task
+      let live = LocalCache.liveTasks(ids: [task.id], in: ctx).first ?? task
       tagNames = LocalCache.resolvedTags(for: live, tagsByID: LocalCache.tagsByID(in: ctx)).map(\.name)
       let steps = LocalCache.checklistItems(forTaskID: task.id, in: ctx)
       stepsDone = steps.filter(\.checked).count
@@ -176,8 +176,16 @@ struct TaskAttributeBar: View {
     // "When" folds in Today: a task pinned to today (no date) reads "Today", a
     // future planning date reads its date, nothing set reads as Anytime (nil).
     case .when:
-      if let s = draft.scheduled { return Self.dateLabel(s) }
-      return draft.onToday ? String(localized: "Today", comment: "Relative date") : nil
+      let slot = TaskTimeSlot.format(startTime: draft.startTime, durationMinutes: draft.durationMinutes)
+      if let s = draft.scheduled {
+        let base = Self.dateLabel(s)
+        return slot.map { "\(base) · \($0)" } ?? base
+      }
+      if draft.onToday {
+        let today = String(localized: "Today", comment: "Relative date")
+        return slot.map { "\(today) · \($0)" } ?? today
+      }
+      return slot
     case .deadline:
       return draft.deadline.map(Self.dateLabel)
     case .reminder:
@@ -222,7 +230,7 @@ struct TaskAttributeBar: View {
     // One transition for every inline panel — they all slide down from the rail.
     Group {
       switch expanded {
-      case .when:       InlineWhenPanel(draft: $draft, fill: panelFill)
+      case .when:       InlineWhenPanel(draft: $draft, accent: accent, fill: panelFill)
       case .deadline:   InlineDatePanel(date: $draft.deadline, fill: panelFill)
       case .reminder:   InlineReminderPanel(reminder: $draft.reminder,
                                             accent: accent,
@@ -305,9 +313,7 @@ struct TaskAttributeBar: View {
     let cal = Calendar.current
     if cal.isDateInToday(d) { return String(localized: "Today", comment: "Relative date") }
     if cal.isDateInTomorrow(d) { return String(localized: "Tomorrow", comment: "Relative date") }
-    let f = DateFormatter()
-    f.setLocalizedDateFormatFromTemplate("MMMd")
-    return f.string(from: d)
+    return SeptenaDate.monthDay(d)
   }
 }
 
@@ -417,19 +423,98 @@ private struct AttributePillGlassBackground: ViewModifier {
 /// keeps the task in Anytime.
 private struct InlineWhenPanel: View {
   @Binding var draft: TaskDraft
+  let accent: Color
   let fill: Color
+  @State private var showTimeControls = false
 
   var body: some View {
-    TaskDateBoard(
-      selected: draft.scheduled,
-      todayActive: draft.onToday && draft.scheduled == nil,
-      clearLabel: (draft.scheduled != nil || draft.onToday) ? "No Date" : nil,
-      onToday: { a11yAnimate(.snappy(duration: 0.2)) { draft.setToday() } },
-      onPick: { d in a11yAnimate(.snappy(duration: 0.2)) { draft.setScheduled(d) } },
-      onClear: { a11yAnimate(.snappy(duration: 0.2)) { draft.clearWhen() } })
+    VStack(alignment: .leading, spacing: 10) {
+      TaskDateBoard(
+        selected: draft.scheduled,
+        todayActive: draft.onToday && draft.scheduled == nil,
+        clearLabel: (draft.scheduled != nil || draft.onToday || draft.startTime != nil) ? "No Date" : nil,
+        onToday: { a11yAnimate(.snappy(duration: 0.2)) { draft.setToday() } },
+        onPick: { d in a11yAnimate(.snappy(duration: 0.2)) { draft.setScheduled(d) } },
+        onClear: { a11yAnimate(.snappy(duration: 0.2)) { draft.clearWhen(); showTimeControls = false } })
+
+      Divider()
+
+      if showTimeControls || draft.startTime != nil {
+        VStack(alignment: .leading, spacing: 8) {
+          HStack {
+            Label("Time", systemImage: "clock")
+              .font(.septenaLabel)
+              .foregroundStyle(Theme.inkPrimary)
+            Spacer()
+            DatePicker(
+              "Start time",
+              selection: Binding(
+                get: { TaskTimeSlot.pickerDate(from: draft.startTime) },
+                set: { newDate in
+                  draft.startTime = TaskTimeSlot.hhmm(from: newDate)
+                  if !draft.onToday && draft.scheduled == nil { draft.setToday() }
+                }
+              ),
+              displayedComponents: .hourAndMinute
+            )
+            .labelsHidden()
+            Button("Clear") {
+              a11yAnimate(.snappy(duration: 0.18)) {
+                draft.startTime = nil
+                draft.durationMinutes = nil
+                showTimeControls = false
+              }
+            }
+            .buttonStyle(.plain)
+            .font(.septenaCaption)
+            .foregroundStyle(Theme.inkSecondary)
+            .contentShape(Rectangle())
+          }
+
+          HStack(spacing: 6) {
+            ForEach(TaskTimeSlot.quickDurations, id: \.minutes) { preset in
+              SelectableChip(preset.label,
+                             isSelected: draft.durationMinutes == preset.minutes,
+                             tint: accent) {
+                Haptics.tick()
+                a11yAnimate(.snappy(duration: 0.18)) {
+                  if draft.startTime == nil { draft.startTime = "09:00" }
+                  if !draft.onToday && draft.scheduled == nil { draft.setToday() }
+                  draft.durationMinutes = draft.durationMinutes == preset.minutes ? nil : preset.minutes
+                }
+              }
+            }
+            Spacer(minLength: 0)
+          }
+        }
+      } else {
+        Button {
+          a11yAnimate(.snappy(duration: 0.2)) {
+            showTimeControls = true
+            if draft.startTime == nil { draft.startTime = "09:00" }
+            if !draft.onToday && draft.scheduled == nil { draft.setToday() }
+          }
+        } label: {
+          HStack(spacing: 6) {
+            Image(systemName: "clock")
+              .scaledFont(size: 12)
+            Text("Add time")
+              .font(.septenaLabel)
+            Spacer(minLength: 0)
+          }
+          .foregroundStyle(Theme.inkSecondary)
+          .padding(.vertical, 2)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+      }
+    }
     .padding(12)
     .background(fill,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .onAppear {
+      showTimeControls = draft.startTime != nil
+    }
   }
 }
 
@@ -1246,7 +1331,7 @@ private struct TaskTagsPanel: View {
   private func reload() {
     let ctx = LocalStore.shared.container.mainContext
     allTags = LocalCache.allTags(in: ctx)
-    assignedIDs = LocalCache.allTasks(in: ctx).first(where: { $0.id == taskID })?.tags ?? []
+    assignedIDs = LocalCache.liveTasks(ids: [taskID], in: ctx).first?.tags ?? []
   }
 
   private func toggle(_ tag: TaskTag) {

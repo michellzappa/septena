@@ -432,13 +432,14 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// The dates/list/repeat controls — safe to resync on every re-show,
   /// same-task or not, since nothing here is a live text edit in progress.
   private func refreshReadOnlyFields(_ next: SeptenaTask) {
-    let when: String = if next.today {
+    let whenBase: String = if next.today {
       String(localized: "Today", comment: "Smart list title")
     } else if let scheduled = next.scheduled {
       KitDayFormat.display(scheduled)
     } else {
       String(localized: "Anytime", comment: "Smart list title")
     }
+    let when = next.timeSlotLabel.map { "\(whenBase) · \($0)" } ?? whenBase
     whenButton.title = Self.field("when", when)
     let deadlineValue = next.deadline.map(KitDayFormat.display)
       ?? String(localized: "None", comment: "No deadline")
@@ -749,8 +750,28 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     case .deadline: KitDayFormat.date(fromWire: current.deadline)
     }
 
-    SeptaskKitDatePopover.present(kind: kind, initial: initial,
-                                  relativeTo: button.bounds, of: button) { [weak self] date, today in
+    SeptaskKitDatePopover.present(
+      kind: kind,
+      initial: initial,
+      initialStartTime: kind == .when ? current.startTime : nil,
+      initialDurationMinutes: kind == .when ? current.durationMinutes : nil,
+      relativeTo: button.bounds,
+      of: button,
+      onTimeSlotChange: kind == .when ? { [weak self] start, duration in
+        guard let self else { return }
+        let live = LocalCache.task(id: current.id, in: self.context) ?? current
+        let before = [TaskUndo.ScheduleSnapshot(live)]
+        self.mutator.setTimeSlot(id: current.id, startTime: start, durationMinutes: duration)
+        if start != nil, !live.today, live.scheduled == nil {
+          self.mutator.moveToToday(id: current.id)
+        }
+        TaskUndo.recordScheduleChange(
+          name: String(localized: "Change Time", comment: "SeptaskKit: undo action"),
+          before: before, context: self.context, mutator: self.mutator)
+        NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+        self.refresh()
+      } : nil
+    ) { [weak self] date, today in
       guard let self else { return }
       // Same shared stack as the list's own date popover — an inspector edit
       // has to be as undoable as the ⌘S one, or ⌘Z means different things on

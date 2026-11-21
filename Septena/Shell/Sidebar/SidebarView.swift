@@ -37,6 +37,9 @@ struct SidebarRootView: View {
   @State private var starredCount: Int = 0
   @State private var fadedCount: Int = 0
   @State private var recentlyDeletedCount: Int = 0
+  /// Repeating badge. Filled by `load()` from the roll-up pass; `body` used
+  /// to fetch the list on every render.
+  @State private var repeatingCount: Int = 0
 
   // Sidebar order is now the synced `position` field (docs/DRAG_AND_DROP.md §5):
   // Move Up/Down renumbers via areas/projects mutators; the legacy device-local
@@ -67,7 +70,7 @@ struct SidebarRootView: View {
       let stats = TaskReads.dashboardStats(today: SeptenaDate.today,
                                            now: Date(),
                                            context: ctx)
-      var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: ctx), today: SeptenaDate.today)
+      var agg = Self.aggregate(tasks: LocalCache.liveAggregateEntities(in: ctx), today: SeptenaDate.today)
       agg.counts = stats.counts
       agg.doneTodayCount = stats.history.daily.last?.done ?? 0
       // Only memoize a pass in which every read succeeded — see `load()`. A
@@ -79,6 +82,10 @@ struct SidebarRootView: View {
     _counts = State(initialValue: agg.counts)
     _doneTodayCount = State(initialValue: agg.doneTodayCount)
     _projectProgress = State(initialValue: agg.projectProgress)
+    _starredCount = State(initialValue: agg.starredCount)
+    _fadedCount = State(initialValue: agg.fadedCount)
+    _reviewCount = State(initialValue: agg.reviewCount)
+    _repeatingCount = State(initialValue: agg.repeatingCount)
     _projectOpenCount = State(initialValue: agg.projectOpenCount)
     _areaOpenCount = State(initialValue: agg.areaOpenCount)
   }
@@ -629,7 +636,7 @@ struct SidebarRootView: View {
     case .filter(.today):       return counts.map { $0.todayCount + $0.reviewCount }
     case .filter(.review):      return reviewCount > 0 ? reviewCount : nil
     case .filter(.upcoming):    return counts?.upcomingCount
-    case .filter(.repeating):   return LocalCache.tasks(in: modelContext, filter: .repeating).count
+    case .filter(.repeating):   return repeatingCount
     case .filter(.unscheduled): return counts?.unscheduledCount
     case .filter(.logbook):     return doneTodayCount > 0 ? doneTodayCount : nil
     default:                    return nil
@@ -1121,13 +1128,10 @@ struct SidebarRootView: View {
     let stats = TaskReads.dashboardStats(today: clock.today,
                                          now: clock.now,
                                          context: modelContext)
-    var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: modelContext), today: clock.today)
+    var agg = Self.aggregate(tasks: LocalCache.liveAggregateEntities(in: modelContext), today: clock.today)
     agg.counts = stats.counts
     agg.doneTodayCount = stats.history.daily.last?.done ?? 0
-    let review = LocalCache.tasks(in: modelContext, filter: .review).count
-    let starred = LocalCache.tasks(in: modelContext, filter: .starred).count
-    let faded = LocalCache.tasks(in: modelContext, filter: .faded).count
-    let deleted = LocalCache.tasks(in: modelContext, filter: .recentlyDeleted).count
+    let deleted = LocalCache.recentlyDeletedCount(in: modelContext)
     guard !StoreHealth.readsFailed(since: token) else {
       SeptenaLog.error("[Sidebar] load aborted — a store read failed; keeping the last good counts")
       return
@@ -1136,9 +1140,6 @@ struct SidebarRootView: View {
     projects = structure.projects
     apply(aggregate: agg)
     SidebarSeed.aggregate = agg
-    reviewCount = review
-    starredCount = starred
-    fadedCount = faded
     recentlyDeletedCount = deleted
     reconcileSidebarSelection()
   }
@@ -1149,11 +1150,17 @@ struct SidebarRootView: View {
     var projectProgress: [String: Double]
     var projectOpenCount: [String: Int]
     var areaOpenCount: [String: Int]
+    var starredCount: Int = 0
+    var fadedCount: Int = 0
+    var reviewCount: Int = 0
+    var repeatingCount: Int = 0
   }
 
-  /// Single-pass roll-up over a task list. Called once per load (and once
-  /// per process by init, when the SidebarSeed memo is still empty).
-  private static func aggregate(tasks: [SeptenaTask], today: String) -> Aggregate {
+  /// Single-pass roll-up over the live tasks. Called once per load (and once
+  /// per process by init, when the SidebarSeed memo is still empty). Reads
+  /// entities (`LocalCache.liveAggregateEntities`), not row objects: a count
+  /// never needs the conversation or recurrence JSON a row object decodes.
+  private static func aggregate(tasks: [TaskEntity], today: String) -> Aggregate {
     // Project progress = done / (done + open). Cancelled doesn't count
     // toward either side of the ratio.
     var done: [String: Int] = [:]
@@ -1163,9 +1170,10 @@ struct SidebarRootView: View {
     // their own rows, so rolling them up would double-count.
     var areaDirectOpen: [String: Int] = [:]
     var inbox = 0, triage = 0, todayN = 0, upcoming = 0, unscheduled = 0, open = 0
+    var starred = 0, faded = 0, review = 0, repeating = 0
     for t in tasks {
       // Faded open tasks leave every count and project ratio (docs/TASK_FADE_SPEC.md §4).
-      if t.isFaded { continue }
+      if t.isFaded { faded += 1; continue }
       if t.status == .open { open += 1 }
       if let pid = t.project {
         switch t.status {
@@ -1178,6 +1186,10 @@ struct SidebarRootView: View {
       }
       guard t.status == .open else { continue }
       // Smart-list buckets — mirror LocalCache.tasks(in:filter:) semantics.
+      if t.starred { starred += 1 }
+      // Check the raw columns first so only rows that carry JSON decode it.
+      if t.recurrenceUnit != nil, t.recurrence != nil { repeating += 1 }
+      if t.conversationJSON != nil, t.conversation.needsHumanReview { review += 1 }
       if t.isInInbox { inbox += 1 }
       // The triage band (unratified) sits above Today and is excluded from it.
       if t.isInTriageBand { triage += 1 }
@@ -1207,7 +1219,11 @@ struct SidebarRootView: View {
                           openCount: open),
       projectProgress: progress,
       projectOpenCount: projOpen,
-      areaOpenCount: areaDirectOpen)
+      areaOpenCount: areaDirectOpen,
+      starredCount: starred,
+      fadedCount: faded,
+      reviewCount: review,
+      repeatingCount: repeating)
   }
 
   private func apply(aggregate agg: Aggregate) {
@@ -1216,6 +1232,10 @@ struct SidebarRootView: View {
     projectProgress = agg.projectProgress
     projectOpenCount = agg.projectOpenCount
     areaOpenCount = agg.areaOpenCount
+    starredCount = agg.starredCount
+    fadedCount = agg.fadedCount
+    reviewCount = agg.reviewCount
+    repeatingCount = agg.repeatingCount
   }
 
 }

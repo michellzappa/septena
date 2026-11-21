@@ -484,10 +484,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
     // A pill shows its registry label when empty and its value when set; the
     // icon carries the attribute, as on the SwiftUI rail. "When" folds in
-    // Today: a task pinned to today with no date reads "Today".
-    whenPill.show(value: task.scheduled.map(KitDayFormat.display)
-      ?? (task.today ? String(localized: "Today", comment: "Relative date") : nil))
-    whenPill.isOn = task.scheduled != nil || task.today
+    // Today: a task pinned to today with no date reads "Today", and a time
+    // slot rides after the day.
+    let slot = task.timeSlotLabel
+    let whenDay = task.scheduled.map(KitDayFormat.display)
+      ?? (task.today ? String(localized: "Today", comment: "Relative date") : nil)
+    whenPill.show(value: whenDay.map { day in slot.map { "\(day) · \($0)" } ?? day } ?? slot)
+    whenPill.isOn = task.scheduled != nil || task.today || task.startTime != nil
     deadlinePill.show(value: task.deadline.map(KitDayFormat.display))
     deadlinePill.isOn = task.deadline != nil
     listPill.show(value: listName)

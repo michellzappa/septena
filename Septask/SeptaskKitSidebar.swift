@@ -454,8 +454,10 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
 
     // Counts come from one live-task pass. The filter semantics below mirror
     // `LocalCache.convert`, but sharing this snapshot avoids refetching the
-    // entire open table for every smart-list badge on every task edit.
-    let all = LocalCache.allTasks(in: context).filter { !$0.isHeading }
+    // entire open table for every smart-list badge on every task edit. The
+    // pass reads entities, not row objects: a badge never needs the
+    // conversation or recurrence JSON that building a row object decodes.
+    let all = LocalCache.liveAggregateEntities(in: context)
     // Faded open tasks leave every list count and project ratio (docs/TASK_FADE_SPEC.md §4).
     let open = all.filter { $0.status == .open && !$0.isFaded }
     let fadedCount = all.filter(\.isFaded).count
@@ -463,7 +465,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let today = SeptenaDate.today
     let inboxCount = open.filter { $0.isInTriageBand }.count
     let todayCount = open.filter { $0.isOnToday && !$0.isInTriageBand }.count
-    let reviewCount = open.filter { $0.conversation.needsHumanReview }.count
+    let reviewCount = open.filter {
+      $0.conversationJSON != nil && $0.conversation.needsHumanReview
+    }.count
     let smartCounts: [TaskFilter: Int] = [
       .review: reviewCount,
       .upcoming: open.filter { task in
@@ -471,7 +475,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         return task.scheduled.map { $0 > today } == true
           || task.deadline.map { $0 > today } == true
       }.count,
-      .repeating: open.filter { $0.recurrence != nil }.count,
+      .repeating: open.filter { $0.recurrenceUnit != nil && $0.recurrence != nil }.count,
       .unscheduled: open.filter {
         !$0.today && $0.scheduled == nil && $0.deadline == nil
       }.count,
@@ -540,7 +544,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
                                                title: TaskFilter.faded.title)
       views.append(Node(faded.nodeContent, count: fadedCount))
     }
-    let recentlyDeletedCount = LocalCache.tasks(in: context, filter: .recentlyDeleted).count
+    let recentlyDeletedCount = LocalCache.recentlyDeletedCount(in: context)
     if recentlyDeletedCount > 0 {
       let deleted = KitSidebarDestination.filter(.recentlyDeleted,
                                                  title: TaskFilter.recentlyDeleted.title)
@@ -708,7 +712,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // shared undo stack (`TaskUndo`). Which kind of snapshot depends on what
     // the drop changed: the three smart lists move DATES, an area / project
     // row moves FILING.
-    let dropped = LocalCache.allTasks(in: context).filter { ids.contains($0.id) }
+    let dropped = LocalCache.liveTasks(ids: ids, in: context)
     let scheduleBefore = dropped.map(TaskUndo.ScheduleSnapshot.init)
     let filingBefore = dropped.map(TaskUndo.FilingSnapshot.init)
     switch action {

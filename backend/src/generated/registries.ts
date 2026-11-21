@@ -6,6 +6,7 @@ export const ENTITY_PATTERNS = {
   id: "^[A-Za-z0-9._:-]{1,128}$",
   clientOpId: "^[A-Za-z0-9_-]{8,64}$",
   day: "^\\d{4}-\\d{2}-\\d{2}$",
+  time24: "^([01]\\d|2[0-3]):[0-5]\\d$",
   stamp: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}",
 } as const;
 

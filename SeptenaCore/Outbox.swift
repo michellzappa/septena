@@ -237,6 +237,14 @@ final class TaskMutator {
     cloudBackend.setReminder(id: id, reminder: reminder)
   }
 
+  func setTimeSlot(id: String, startTime: String?, durationMinutes: Int?, timeZone: String? = nil) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setTimeSlot called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.setTimeSlot(id: id, startTime: startTime, durationMinutes: durationMinutes, timeZone: timeZone)
+  }
+
   func snoozeReminder(id: String, until: Date) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] snoozeReminder called before CK bound — dropping", nil)
@@ -510,6 +518,9 @@ final class TaskMutator {
     if let heading = task.heading { setHeading(id: copy.id, heading: heading) }
     if task.starred { setStarred(id: copy.id, starred: true) }
     if !task.tags.isEmpty { setTaskTags(id: copy.id, tagIDs: task.tags) }
+    if let start = task.startTime {
+      setTimeSlot(id: copy.id, startTime: start, durationMinutes: task.durationMinutes, timeZone: task.timeZone)
+    }
     if let rule = task.recurrence {
       setRecurrence(id: copy.id, recurrence: rule)
       // `setRecurrence` resets the pause across the series it writes, so a

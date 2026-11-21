@@ -31,6 +31,12 @@ final class TaskEntity {
   var statusRaw: String
   var created: String?
   var scheduled: String?
+  /// Optional 24-hour wall-clock start time (`HH:MM`, docs/TASK_TIMES_AND_ICAL_SPEC.md).
+  var startTime: String? = nil
+  /// Optional duration in minutes (`5..1440`).
+  var durationMinutes: Int? = nil
+  /// Optional IANA time zone (nil = floating local time).
+  var timeZone: String? = nil
   @Attribute(originalName: "due") var deadline: String?
   var today: Bool
   /// Simple boolean Important / Star marker (docs/STAR_PRIORITY_SPEC.md, ST0).
@@ -177,6 +183,9 @@ final class TaskEntity {
        statusRaw: String = TaskStatus.open.rawValue,
        created: String? = nil,
        scheduled: String? = nil,
+       startTime: String? = nil,
+       durationMinutes: Int? = nil,
+       timeZone: String? = nil,
        deadline: String? = nil,
        today: Bool = false,
        starred: Bool = false,
@@ -220,6 +229,9 @@ final class TaskEntity {
     self.statusRaw = statusRaw
     self.created = created
     self.scheduled = scheduled
+    self.startTime = startTime
+    self.durationMinutes = durationMinutes
+    self.timeZone = timeZone
     self.deadline = deadline
     self.today = today
     self.starred = starred
@@ -275,11 +287,8 @@ final class TaskEntity {
   /// accessor only (de)serializes.
   var conversation: TaskConvo {
     get {
-      guard let json = conversationJSON,
-            let data = json.data(using: .utf8),
-            let convo = try? JSONDecoder.taskConvo.decode(TaskConvo.self, from: data)
-      else { return TaskConvo() }
-      return convo
+      guard let json = conversationJSON else { return TaskConvo() }
+      return TaskConvoDecodeCache.decode(json)
     }
     set {
       conversationJSON = (try? JSONEncoder.taskConvo.encode(newValue))
@@ -560,12 +569,20 @@ final class SectionEntity {
 
 extension SeptenaTask {
   init(_ e: TaskEntity) {
+    // Each of these getters decodes JSON. Read each one once: `recurrence`
+    // was read twice per row, and both go through the row-object build on
+    // every list repaint.
+    let recurrence = e.recurrenceUnit == nil ? nil : e.recurrence
+    let conversation = e.conversationJSON == nil ? TaskConvo() : e.conversation
     self.init(
       id: e.id,
       title: e.title,
       status: e.status,
       created: e.created,
       scheduled: e.scheduled,
+      startTime: e.startTime,
+      durationMinutes: e.durationMinutes,
+      timeZone: e.timeZone,
       deadline: e.deadline,
       today: e.today,
       starred: e.starred,
@@ -575,7 +592,7 @@ extension SeptenaTask {
       area: e.area,
       project: e.project,
       notes: e.notes,
-      recurrence: e.recurrence,
+      recurrence: recurrence,
       recurrencePaused: e.recurrencePaused,
       reminder: e.reminder,
       // Pass the series' LOGICAL slot, the way `complete` does — without it
@@ -584,7 +601,7 @@ extension SeptenaTask {
       // would match `complete` exactly, but this initializer is nonisolated;
       // the two differ only under time travel.)
       nextOccurrence: e.status == .open
-        ? e.recurrence?.nextDate(completedOn: SeptenaDate.today,
+        ? recurrence?.nextDate(completedOn: SeptenaDate.today,
                                  scheduled: e.scheduled,
                                  logicalScheduled: e.recurrenceAnchorDate)
         : nil,
@@ -603,7 +620,7 @@ extension SeptenaTask {
       effort: e.effort,
       kind: e.kind,
       heading: e.heading,
-      conversation: e.conversation
+      conversation: conversation
     )
   }
 
@@ -1074,6 +1091,47 @@ enum LocalCache {
     ))
   }
 
+  /// The same rows as `liveTasks`, left as entities. For counters and roll-ups
+  /// (sidebar badges, project rings) that read a few fields: building a row
+  /// object per task decodes its conversation and recurrence JSON, which a
+  /// count never needs.
+  @MainActor
+  static func liveAggregateEntities(in context: ModelContext) -> [TaskEntity] {
+    let dead = DeletedContainerLedger.snapshot()
+    return liveEntities(in: context)
+      .filter { !$0.pendingDeletion && !$0.isHeading
+        && !DeletedContainerLedger.hides(area: $0.area, project: $0.project, in: dead) }
+  }
+
+  /// Row count of the Recently Deleted list (`tasks(filter: .recentlyDeleted)`)
+  /// for the sidebar badge, without building a row object per deleted task.
+  /// Goes through `StoreHealth.fetch` so a failed read still counts as one.
+  @MainActor
+  static func recentlyDeletedCount(in context: ModelContext) -> Int {
+    var descriptor = FetchDescriptor<TaskEntity>(predicate: #Predicate { e in
+      e.deletedAt != nil && !e.pendingDeletion && e.kind != "heading"
+    })
+    descriptor.propertiesToFetch = [\.id]
+    return StoreHealth.fetch(context, descriptor).count
+  }
+
+  /// The `liveTasks` rows whose id is in `ids`, in store order. Use this, not
+  /// `liveTasks().filter { ids.contains($0.id) }`: undo snapshots run at every
+  /// gesture, and building a row object for each task in the store there put
+  /// the whole table on the tap path.
+  @MainActor
+  static func liveTasks(ids: some Collection<String>, in context: ModelContext) -> [SeptenaTask] {
+    guard !ids.isEmpty else { return [] }
+    let wanted = Array(Set(ids))
+    let dead = DeletedContainerLedger.snapshot()
+    return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { e in e.deletedAt == nil && wanted.contains(e.id) }
+    ))
+      .filter { !$0.pendingDeletion && !$0.isHeading
+        && !DeletedContainerLedger.hides(area: $0.area, project: $0.project, in: dead) }
+      .map(SeptenaTask.init)
+  }
+
   /// Every non-trashed task as a wire DTO — sidebar roll-ups, aggregates.
   /// Headings are dividers, not to-dos: excluded so they never inflate any
   /// count or aggregate (see `TaskEntity.isHeading`).
@@ -1130,14 +1188,29 @@ enum LocalCache {
   /// Completion ratios for project headers. Keep this as an entity aggregate
   /// so a normal task-list refresh does not allocate one DTO per historical
   /// task merely to compute two integer counters.
+  ///
+  /// The aggregate reads every project task, the logbook included, and three
+  /// surfaces ask for it after each change (the task list, the areas sidebar
+  /// and the area page, whose init SwiftUI re-runs on every parent render).
+  /// `ProjectProgressCache` makes the repeat reads free until the next task
+  /// change.
   @MainActor
   static func projectCompletionRatios(in context: ModelContext) -> [String: Double] {
-    let rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
+    ProjectProgressCache.ratios { computeProjectCompletionRatios(in: context) }
+  }
+
+  @MainActor
+  private static func computeProjectCompletionRatios(in context: ModelContext) -> [String: Double] {
+    var descriptor = FetchDescriptor<TaskEntity>(
       predicate: #Predicate { e in
         e.deletedAt == nil && !e.pendingDeletion
           && e.project != nil && e.kind != "heading"
       }
-    ))
+    )
+    // Only the three columns the counters read: the rest of each row
+    // (notes, conversation JSON, recurrence) stays a fault.
+    descriptor.propertiesToFetch = [\.project, \.statusRaw, \.fadedAt]
+    let rows = StoreHealth.fetch(context, descriptor)
     var done: [String: Int] = [:]
     var total: [String: Int] = [:]
     for row in rows {
@@ -1243,6 +1316,23 @@ enum LocalCache {
     // macOS click latency came from. Filtering first sorts only the rows
     // the view keeps, over plain tuple fields.
     let rows = fetchEntities(for: filter, limit: limit, in: context)
+    return sortedTasks(rows, filter: filter)
+  }
+
+  /// Today and its triage band (`.triage`) from ONE fetch of the open rows.
+  /// Both filters start from the same open-row fetch, and the Today repaint
+  /// (iOS and Mac) needs both lists, so reading them apart fetched and
+  /// faulted the whole open table twice.
+  @MainActor
+  static func todayAndTriage(in context: ModelContext) -> (today: [SeptenaTask], triage: [SeptenaTask]) {
+    let rows = fetchEntities(for: .today, in: context)
+    return (sortedTasks(rows, filter: .today), sortedTasks(rows, filter: .triage))
+  }
+
+  /// The filter, row-object build and manual-order sort `tasks(in:filter:)`
+  /// applies to fetched rows.
+  @MainActor
+  private static func sortedTasks(_ rows: [TaskEntity], filter: TaskFilter) -> [SeptenaTask] {
     let today = SeptenaDate.today
     let dead = DeletedContainerLedger.snapshot()
     let result = rows
@@ -1267,6 +1357,28 @@ enum LocalCache {
       }
     }
     return result
+  }
+
+  /// Logbook rows finished (or cancelled) on `day` (`YYYY-MM-DD`), newest
+  /// first. Same rows as filtering the whole `.logbook` read on
+  /// `completedAt.hasPrefix(day)`, but it pages the logbook newest-first and
+  /// stops at the first row older than `day`. So a Today repaint reads
+  /// today's completions, not the whole archive.
+  @MainActor
+  static func tasksCompleted(onDay day: String, in context: ModelContext) -> [SeptenaTask] {
+    var limit = 64
+    while true {
+      let rows = fetchEntities(for: .logbook, limit: limit, in: context)
+      let reachedOlder = rows.last.map { ($0.completedAt ?? "") < day } ?? true
+      if reachedOlder || rows.count < limit {
+        let today = SeptenaDate.today
+        let dead = DeletedContainerLedger.snapshot()
+        return rows
+          .filter { ($0.completedAt ?? "").hasPrefix(day) }
+          .compactMap { convert($0, filter: .logbook, today: today, dead: dead) }
+      }
+      limit *= 4
+    }
   }
 
   /// One task by id, straight from the store. The by-id read a view needs when
@@ -1751,6 +1863,70 @@ enum StructureCache {
       forName: .septenaStructureChanged, object: nil, queue: .main
     ) { _ in
       MainActor.assumeIsolated { cached = nil }
+    }
+  }
+}
+
+// MARK: - TaskConvoDecodeCache
+
+/// Decoded conversations by their JSON text. Every list repaint builds a row
+/// object per task, and each one with a conversation decoded its JSON again
+/// although the text had not changed. A hit costs one string hash. The JSON
+/// text is the key, so an edited conversation is a new key and can never
+/// return a stale decode. Bounded: the cache empties when it grows past
+/// `limit`. The lock makes it safe from the sync threads too.
+enum TaskConvoDecodeCache {
+  private static let limit = 512
+  private static let store = OSAllocatedUnfairLock(uncheckedState: [String: TaskConvo]())
+
+  static func decode(_ json: String) -> TaskConvo {
+    if let hit = store.withLockUnchecked({ $0[json] }) { return hit }
+    guard let data = json.data(using: .utf8),
+          let convo = try? JSONDecoder.taskConvo.decode(TaskConvo.self, from: data)
+    else { return TaskConvo() }
+    store.withLockUnchecked { cache in
+      if cache.count >= limit { cache.removeAll(keepingCapacity: true) }
+      cache[json] = convo
+    }
+    return convo
+  }
+}
+
+// MARK: - ProjectProgressCache (process-wide project ring memo)
+
+/// Memo for `LocalCache.projectCompletionRatios`. Any task, structure or
+/// unscoped data change bumps a generation, and the next read recomputes.
+///
+/// The observer runs on the posting thread (`queue: nil`), so the generation
+/// moves inside the `post` call itself. Every reader reloads after a coalesce
+/// delay, so no reader can see the old ratios after a change was posted. The
+/// generation sits behind a lock because a few posts come from sync threads.
+@MainActor
+enum ProjectProgressCache {
+  private static var cached: (generation: Int, ratios: [String: Double])?
+  private static var observersInstalled = false
+  nonisolated private static let generation = OSAllocatedUnfairLock(initialState: 0)
+
+  static func ratios(compute: () -> [String: Double]) -> [String: Double] {
+    installObserversIfNeeded()
+    let current = generation.withLock { $0 }
+    if let cached, cached.generation == current { return cached.ratios }
+    let token = StoreHealth.readToken()
+    let fresh = compute()
+    // Same rule as `StructureCache`: never memoize a failed (empty) read.
+    guard !StoreHealth.readsFailed(since: token) else { return fresh }
+    cached = (current, fresh)
+    return fresh
+  }
+
+  private static func installObserversIfNeeded() {
+    guard !observersInstalled else { return }
+    observersInstalled = true
+    for name in [Notification.Name.septenaTasksChanged, .septenaStructureChanged,
+                 .septenaDataChanged] {
+      NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { _ in
+        generation.withLock { $0 &+= 1 }
+      }
     }
   }
 }

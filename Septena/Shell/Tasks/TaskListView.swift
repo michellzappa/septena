@@ -5167,8 +5167,10 @@ struct TaskListView: View {
     // we're still inside applyDidFinishBatch — CKSyncEngine asserts.
     // The mirror is already up to date by the time the notification
     // fires, so a plain re-read is correct.
+    // Today and its triage band share one fetch of the open rows.
+    let todayLists = filter == .today ? LocalCache.todayAndTriage(in: modelContext) : nil
     let outcome = model.merge(prior: items,
-                             fresh: localTasks(),
+                             fresh: todayLists?.today ?? localTasks(),
                              context: modelContext,
                              animateArrivals: loadedFilters.contains(filter),
                              ownCreations: ownCreateExclusions(),
@@ -5191,7 +5193,7 @@ struct TaskListView: View {
       // completed row — same preservation `items` gets above.
       let triageOutcome = model.merge(
         prior: triageStorage,
-        fresh: LocalCache.tasks(in: modelContext, filter: .triage),
+        fresh: todayLists?.triage ?? LocalCache.tasks(in: modelContext, filter: .triage),
         context: modelContext,
         animateArrivals: loadedFilters.contains(filter),
         ownCreations: ownCreateExclusions(),
