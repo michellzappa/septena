@@ -18,9 +18,6 @@ import SwiftData
 final class SettingsStore {
   var serverSettings: AppSettings? = nil
   var sections: [SectionConfig] = []
-  var macros: MacrosConfig? = nil
-  var sessionTypes: [SessionTypeConfig] = []
-  var chores: [ChoreItem] = []
   var serverLoading: Bool = false
 
   /// True once the onboarded-state is *known* — set synchronously at init when
@@ -78,10 +75,8 @@ final class SettingsStore {
     let context = LocalStore.shared.container.mainContext
     if let v = SettingsMirror.loadSettings(context: context) {
       serverSettings = v
-      HealthKitBridge.shared.syncSettings = v.hkSync ?? HKSyncSettings()
     } else if let v = ResponseCache.load(AppSettings.self, forKey: CacheKey.serverSettings) {
       serverSettings = v
-      HealthKitBridge.shared.syncSettings = v.hkSync ?? HKSyncSettings()
     }
     let mirroredSections = SettingsMirror.loadSections(context: context)
     if !mirroredSections.isEmpty {
@@ -90,9 +85,6 @@ final class SettingsStore {
     } else if let v = ResponseCache.load([SectionConfig].self, forKey: CacheKey.sections) {
       sections = v.map { $0.maskingRetired() }
     }
-    if let v = ResponseCache.load(MacrosConfig.self, forKey: CacheKey.macros) { macros = v }
-    if let v = ResponseCache.load([SessionTypeConfig].self, forKey: CacheKey.sessionTypes) { sessionTypes = v }
-    if let v = ResponseCache.load([ChoreItem].self, forKey: CacheKey.chores) { chores = v }
     // Adopt a CloudKit-synced welcome name cached in the local mirror so the
     // first frame's greeting is right. No engine here (init context), so the
     // local→cloud migration leg is deferred to the launch reconcile.
@@ -160,7 +152,6 @@ final class SettingsStore {
     if let v = SettingsMirror.loadSettings(context: context) {
       serverSettings = v
       ResponseCache.save(v, forKey: CacheKey.serverSettings)
-      HealthKitBridge.shared.syncSettings = v.hkSync ?? HKSyncSettings()
     }
     let mirroredSections = SettingsMirror.loadSections(context: context)
     guard mirroredSections != sections else { return }
@@ -443,17 +434,6 @@ final class SettingsStore {
     SettingsMirror.upsert(settings: s, context: context, engine: engine)
   }
 
-  /// Persist the saved practitioner-report definitions into the synced
-  /// settings blob so the same reports show on every device.
-  func setReports(_ reports: [ReportBundle], context: ModelContext, engine: CKEngine?) {
-    var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
-                                          time: nil, theme: nil, eink: nil,
-                                          nutrition: nil, hkSync: nil)
-    s.reports = reports
-    serverSettings = s
-    SettingsMirror.upsert(settings: s, context: context, engine: engine)
-  }
-
   /// Reconcile the CloudKit-synced welcome name with the local @AppStorage
   /// key that `WelcomeHeader` reads for instant, offline-safe display.
   ///
@@ -646,12 +626,5 @@ final class SettingsStore {
     // strains / session-types ride on their own CK entities; macros
     // live in NSUbiquitousKeyValueStore.
     reloadFromMirror(context: context)
-
-    let macs: MacrosConfig? = NutritionPrefs.loadMacrosConfig()
-    let st: [SessionTypeConfig]? = ChecklistMirror.loadSessionTypes(context: context)
-    let ch: [ChoreItem]? = ChecklistMirror.loadChores(context: context, today: today)
-    if let macs { macros = macs; ResponseCache.save(macs, forKey: CacheKey.macros) }
-    if let st { sessionTypes = st; ResponseCache.save(st, forKey: CacheKey.sessionTypes) }
-    if let ch { chores = ch; ResponseCache.save(ch, forKey: CacheKey.chores) }
   }
 }

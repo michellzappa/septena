@@ -141,10 +141,10 @@ final class TaskSyncStore {
 
   /// Septask-only, next to (never inside) the main store. On the Mac that is
   /// `~/Library/Septena/`, the one place the App Data privacy prompt does not
-  /// guard (see `MacStoreLocation`).
+  /// guard (see `TaskStoreLocation`).
   static var url: URL {
     #if os(macOS)
-    if let main = MacStoreLocation.url {
+    if let main = TaskStoreLocation.url {
       let dir = main.deletingLastPathComponent()
       try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
       return dir.appendingPathComponent("TaskSync-Septask-v\(version).store")

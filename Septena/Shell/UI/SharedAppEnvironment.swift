@@ -38,7 +38,6 @@ extension View {
       .environment(dayClock)
       .environment(logCommit)
       .environment(services.taskMutator)
-      .environment(services.checklistMutator)
       .environment(services.areasMutator)
       .environment(services.projectsMutator)
       .environment(services.ckEngine)
