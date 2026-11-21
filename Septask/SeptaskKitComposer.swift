@@ -82,7 +82,6 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private let column = NSStackView()
   private let pillRow = NSStackView()
 
-  private let todayPill = KitPillButton()
   private let whenPill = KitPillButton()
   private let deadlinePill = KitPillButton()
   private let reminderPill = KitPillButton()
@@ -93,7 +92,19 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private let checklistPill = KitPillButton()
   private let attachPill = KitPillButton()
   private let discussPill = KitPillButton()
-  private let notesPill = KitPillButton()
+  /// Registry id → pill. The rail's order, labels and icons come from
+  /// `RegistrySurfaces.taskAttributePills` (ADR 0020), the same list the
+  /// SwiftUI `TaskAttributeBar` renders. Notes is a field, not a pill (#203),
+  /// and Today folds into When, as on SwiftUI.
+  private lazy var pillsByID: [String: KitPillButton] = [
+    "when": whenPill, "deadline": deadlinePill, "reminder": reminderPill,
+    "repeat": repeatPill, "star": starPill, "list": listPill, "tags": tagPill,
+    "checklist": checklistPill, "attachments": attachPill, "discuss": discussPill,
+  ]
+  /// The pills in registry rail order.
+  private var orderedPills: [KitPillButton] {
+    RegistrySurfaces.taskAttributePills.compactMap { pillsByID[$0.id] }
+  }
 
   private var leadingConstraint: NSLayoutConstraint!
   private var trailingConstraint: NSLayoutConstraint!
@@ -212,8 +223,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     notesView.typingAttributes = MarkdownNotesStyle.baseAttributes(
       fontSize: SeptaskKitTheme.notesFontSize)
     notesView.font = .systemFont(ofSize: SeptaskKitTheme.notesFontSize)
-    notesView.placeholder = String(localized: "Notes",
-                                   comment: "SeptaskKit: composer notes placeholder")
+    notesView.placeholder = RegistrySurfaces.taskAttribute("notes").label
     Self.styleTextView(notesView, in: notesScroll)
     notesScroll.isHidden = true
 
@@ -234,26 +244,19 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     pillRow.alignment = .centerY
     pillRow.translatesAutoresizingMaskIntoConstraints = false
 
-    todayPill.title = String(localized: "Today", comment: "Smart list title")
-    todayPill.onPress = { [weak self] _ in self?.onAction?(.toggleToday) }
     whenPill.onPress = { [weak self] view in self?.onAction?(.when(view)) }
     deadlinePill.onPress = { [weak self] view in self?.onAction?(.deadline(view)) }
     reminderPill.onPress = { [weak self] view in self?.onAction?(.reminder(view)) }
     listPill.onPress = { [weak self] view in self?.onAction?(.list(view)) }
     repeatPill.onPress = { [weak self] view in self?.onAction?(.repeatRule(view)) }
     starPill.onPress = { [weak self] _ in self?.onAction?(.toggleStar) }
-    tagPill.title = String(localized: "Tags", comment: "SeptaskKit: composer pill")
     tagPill.onPress = { [weak self] view in self?.onAction?(.tags(view)) }
-    checklistPill.title = String(localized: "Checklist", comment: "SeptaskKit: composer pill")
     checklistPill.onPress = { [weak self] _ in self?.addChecklistItemAndFocus() }
-    attachPill.title = String(localized: "Attach", comment: "SeptaskKit: composer attach pill")
     attachPill.onPress = { [weak self] _ in self?.attachmentsView.pickFilesToAttach() }
-    notesPill.title = String(localized: "Notes", comment: "SeptaskKit: composer pill")
-    notesPill.onPress = { [weak self] _ in self?.focusNotes() }
-    discussPill.title = String(localized: "Discuss", comment: "SeptaskKit: composer pill")
     discussPill.onPress = { [weak self] _ in self?.onAction?(.discuss) }
-    for pill in [todayPill, whenPill, deadlinePill, reminderPill, listPill, repeatPill, starPill,
-                 tagPill, checklistPill, attachPill, notesPill, discussPill] {
+    for attribute in RegistrySurfaces.taskAttributePills {
+      guard let pill = pillsByID[attribute.id] else { continue }
+      pill.attribute = attribute
       pillRow.addArrangedSubview(pill)
     }
 
@@ -327,16 +330,10 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     // Tab walks title → notes (when shown) → pills, which is the composer's
     // keyboard cursor (the SwiftUI form's `focusOrder`). The title's link is
     // re-pointed as notes show/hide (`updateKeyChain`).
-    notesView.nextKeyView = todayPill
-    todayPill.nextKeyView = whenPill
-    whenPill.nextKeyView = deadlinePill
-    deadlinePill.nextKeyView = reminderPill
-    reminderPill.nextKeyView = listPill
-    listPill.nextKeyView = repeatPill
-    repeatPill.nextKeyView = starPill
-    starPill.nextKeyView = notesPill
-    notesPill.nextKeyView = discussPill
-    discussPill.nextKeyView = titleView
+    let pills = orderedPills
+    notesView.nextKeyView = pills.first ?? titleView
+    for (pill, next) in zip(pills, pills.dropFirst()) { pill.nextKeyView = next }
+    pills.last?.nextKeyView = titleView
     updateKeyChain()
   }
 
@@ -417,11 +414,9 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     // An open row ALWAYS shows its notes field, empty or not: the open row is
     // the task's whole document, and a field that appears only once it has
     // content hides the fact that notes exist at all. The empty field's
-    // "Notes" placeholder is the affordance. `notesPill.isOn` now reports
-    // whether there ARE notes, not whether the field is on screen.
+    // "Notes" placeholder is the affordance.
     notesShown = true
     notesScroll.isHidden = false
-    notesPill.isOn = !notes.isEmpty
     titleView.needsDisplay = true
     notesView.needsDisplay = true
     checklistView.configure(taskID: task.id)
@@ -462,27 +457,14 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
   private func updateAttachPill() {
     let count = attachmentsView.attachmentCount
-    if count > 0 {
-      attachPill.title = count == 1
-        ? String(localized: "1 file", comment: "SeptaskKit: composer attachment pill single")
-        : String(localized: "\(count) files", comment: "SeptaskKit: composer attachment pill plural")
-      attachPill.isOn = true
-    } else {
-      attachPill.title = String(localized: "Attach", comment: "SeptaskKit: composer attach pill")
-      attachPill.isOn = false
-    }
+    attachPill.show(value: count > 0 ? RegistrySurfaces.taskAttributeCount("attachments", count: count) : nil)
+    attachPill.isOn = count > 0
   }
 
   private func updateChecklistPill() {
     let summary = checklistView.summary
-    if summary.total > 0 {
-      checklistPill.title = String(localized: "Checklist \(summary.done)/\(summary.total)",
-                                   comment: "SeptaskKit: composer checklist pill progress")
-      checklistPill.isOn = true
-    } else {
-      checklistPill.title = String(localized: "Checklist", comment: "SeptaskKit: composer pill")
-      checklistPill.isOn = false
-    }
+    checklistPill.show(value: summary.total > 0 ? "\(summary.done)/\(summary.total)" : nil)
+    checklistPill.isOn = summary.total > 0
   }
 
   /// Pills + checkbox cues only — deliberately does NOT touch `titleView` or
@@ -500,69 +482,31 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     checkbox.cornerDot = task.conversation.hasStarted && !task.isInTriageBand
     checkbox.agentCue = task.showsAgentCue()
 
-    todayPill.isOn = task.today
-    whenPill.title = {
-      if let scheduled = task.scheduled {
-        let display = KitDayFormat.display(scheduled)
-        return String(localized: "When: \(display)",
-                      comment: "SeptaskKit: composer pill with date")
-      }
-      return String(localized: "When", comment: "SeptaskKit: composer pill")
-    }()
-    whenPill.isOn = task.scheduled != nil
-    deadlinePill.title = {
-      if let deadline = task.deadline {
-        let display = KitDayFormat.display(deadline)
-        return String(localized: "Due: \(display)",
-                      comment: "SeptaskKit: composer pill with date")
-      }
-      return String(localized: "Deadline", comment: "SeptaskKit: composer pill")
-    }()
+    // A pill shows its registry label when empty and its value when set; the
+    // icon carries the attribute, as on the SwiftUI rail. "When" folds in
+    // Today: a task pinned to today with no date reads "Today".
+    whenPill.show(value: task.scheduled.map(KitDayFormat.display)
+      ?? (task.today ? String(localized: "Today", comment: "Relative date") : nil))
+    whenPill.isOn = task.scheduled != nil || task.today
+    deadlinePill.show(value: task.deadline.map(KitDayFormat.display))
     deadlinePill.isOn = task.deadline != nil
-    listPill.title = {
-      if let listName {
-        return String(localized: "List: \(listName)",
-                      comment: "SeptaskKit: composer pill with list name")
-      }
-      return String(localized: "List", comment: "SeptaskKit: composer pill")
-    }()
+    listPill.show(value: listName)
     listPill.isOn = listName != nil
-    repeatPill.title = {
-      if let recurrence = task.recurrence {
-        let label = recurrence.shortLabel
-        return String(localized: "Repeat: \(label)",
-                      comment: "SeptaskKit: composer pill with cadence")
-      }
-      return String(localized: "Repeat", comment: "SeptaskKit: composer pill")
-    }()
+    repeatPill.show(value: task.recurrence?.shortLabel)
     repeatPill.isOn = task.recurrence != nil
-
-    if let badge = task.reminder?.badgeText() {
-      reminderPill.title = badge.text
-      reminderPill.isOn = true
-    } else {
-      reminderPill.title = String(localized: "Remind", comment: "SeptaskKit: composer pill")
-      reminderPill.isOn = false
-    }
-
-    starPill.title = task.starred
-      ? String(localized: "Starred", comment: "SeptaskKit: composer star pill active")
-      : String(localized: "Star", comment: "SeptaskKit: composer star pill")
+    let reminderBadge = task.reminder?.badgeText()?.text
+    reminderPill.show(value: reminderBadge)
+    reminderPill.isOn = reminderBadge != nil
+    starPill.show(value: nil)
     starPill.isOn = task.starred
     let resolvedTags = LocalCache.resolvedTags(
       for: task,
       tagsByID: LocalCache.tagsByID(in: LocalStore.shared.container.mainContext)
     )
-    if resolvedTags.isEmpty {
-      tagPill.title = String(localized: "Tags", comment: "SeptaskKit: composer pill")
-      tagPill.isOn = false
-    } else if resolvedTags.count == 1 {
-      tagPill.title = resolvedTags[0].name
-      tagPill.isOn = true
-    } else {
-      tagPill.title = String(localized: "\(resolvedTags.count) tags", comment: "SeptaskKit: composer tag count pill")
-      tagPill.isOn = true
-    }
+    tagPill.show(value: resolvedTags.isEmpty ? nil
+      : resolvedTags.count == 1 ? resolvedTags[0].name
+      : RegistrySurfaces.taskAttributeCount("tags", count: resolvedTags.count))
+    tagPill.isOn = !resolvedTags.isEmpty
     updateChecklistPill()
     attachmentsView.reload()
     syncAttachmentsHeight(notify: true)
@@ -573,9 +517,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     // starts nothing would be worse than no pill.
     discussPill.isHidden = task.conversation.hasStarted || !OnDeviceAI.isAvailable
     discussPill.isEnabled = !discussWorking
-    discussPill.title = discussWorking
-      ? String(localized: "Thinking…", comment: "SeptaskKit: discuss pill working")
-      : String(localized: "Discuss", comment: "SeptaskKit: composer pill")
+    discussPill.show(value: discussWorking ? discussPill.attribute?.workingLabel : nil)
   }
 
   /// True while `ConversationEngine.advance` is in flight — the pill says so
@@ -585,9 +527,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   func setDiscussWorking(_ working: Bool) {
     discussWorking = working
     discussPill.isEnabled = !working
-    discussPill.title = working
-      ? String(localized: "Thinking…", comment: "SeptaskKit: discuss pill working")
-      : String(localized: "Discuss", comment: "SeptaskKit: composer pill")
+    discussPill.show(value: working ? discussPill.attribute?.workingLabel : nil)
   }
 
   // MARK: - Focus
@@ -960,6 +900,29 @@ final class KitComposerTextView: NSTextView {
 @MainActor
 final class KitPillButton: NSButton {
   var onPress: ((NSView) -> Void)?
+
+  /// The registry attribute this pill stands for (`taskAttributes`). Sets the
+  /// label and the leading icon. Nil for free-text pills (conversation).
+  var attribute: RegistryTaskAttribute? {
+    didSet {
+      guard let attribute else { return }
+      image = NSImage(systemSymbolName: attribute.sfSymbol, accessibilityDescription: nil)?
+        .withSymbolConfiguration(.init(pointSize: 11, weight: .medium))
+      imagePosition = .imageLeading
+      imageHugsTitle = true
+      show(value: nil)
+    }
+  }
+
+  /// The attribute's value (`nil` falls back to the registry label). The full
+  /// "label: value" goes to the tooltip and VoiceOver.
+  func show(value: String?) {
+    guard let label = attribute?.label else { return }
+    title = value ?? label
+    let summary = value.map { "\(label): \($0)" } ?? label
+    toolTip = summary
+    setAccessibilityLabel(summary)
+  }
   private let glass = KitPassthroughGlassView()
 
   var isOn: Bool {
@@ -1017,7 +980,8 @@ final class KitPillButton: NSButton {
 
   override var intrinsicContentSize: NSSize {
     let text = attributedTitle.size()
-    return NSSize(width: ceil(text.width) + Self.horizontalPadding * 2,
+    let icon = image.map { $0.size.width + Self.iconGap } ?? 0
+    return NSSize(width: ceil(text.width + icon) + Self.horizontalPadding * 2,
                   height: KitComposerCell.pillRowHeight)
   }
 
@@ -1047,6 +1011,7 @@ final class KitPillButton: NSButton {
         .font: SeptaskKitTheme.chip,
         .foregroundColor: isOn ? SeptaskKitTheme.inkPrimary : SeptaskKitTheme.inkSecondary,
       ])
+    contentTintColor = isOn ? SeptaskKitTheme.inkPrimary : SeptaskKitTheme.inkSecondary
     isRestyling = false
     applyCapsule()
   }
@@ -1070,6 +1035,7 @@ final class KitPillButton: NSButton {
   @objc private func pressed() { onPress?(self) }
 
   private static let horizontalPadding: CGFloat = 12
+  private static let iconGap: CGFloat = 4
 }
 
 // MARK: - 1-level Checklist editor (CL1, docs/CHECKLISTS_SPEC.md)

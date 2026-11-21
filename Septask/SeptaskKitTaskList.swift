@@ -3204,17 +3204,11 @@ final class SeptaskKitTaskListController: NSViewController {
     guard let row = rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
     tableView.selectRowIndexes([row], byExtendingSelection: false)
     tableView.scrollRowToVisible(row)
-    if inInbox {
-      // The foot-of-Inbox line is a deliberately light capture affordance —
-      // click, type, done. A pill rail there would be heavier than the
-      // gesture that opened it.
-      beginEditingRow(row)
-    } else {
-      // ⌘N opens the full composer, so a new task can be given its When /
-      // Deadline / List / Repeat without a second gesture. The bare field
-      // editor is still one keystroke away as ⌘R.
-      beginComposing(id: task.id)
-    }
+    // Every new task opens the full composer, the "New task" line included
+    // (#205), so it can be given its When / Deadline / List / Repeat without a
+    // second gesture, the same as SwiftUI's inline create. The bare field
+    // editor is still one keystroke away as ⌘R.
+    beginComposing(id: task.id)
   }
 
   /// Move a just-created task to sit directly below `anchor`, when it landed
@@ -3334,7 +3328,7 @@ final class SeptaskKitTaskListController: NSViewController {
     guard let row = rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
     tableView.selectRowIndexes([row], byExtendingSelection: false)
     tableView.scrollRowToVisible(row)
-    beginEditingRow(row)
+    beginComposing(id: task.id)
   }
 
   /// The task that should seed ⌘N's area/project — the table's focused row,

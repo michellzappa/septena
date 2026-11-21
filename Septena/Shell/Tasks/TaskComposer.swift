@@ -913,10 +913,13 @@ struct TaskComposerCard: View {
   /// Tab order: title → notes → every pill (including Discuss when edit mode offers it).
   private var focusOrder: [TaskEditFocus] {
     var order: [TaskEditFocus] = [.title, .notes]
-    order += TaskAttributeBar.Attribute.draftCases.map { .pill($0) }
-    if isEditing { order.append(.pill(.attachments)) }
-    if discussKickoffVisible {
-      order.append(.pill(.discuss))
+    // Rail order from the registry; edit-only pills join once a task exists.
+    for attr in TaskAttributeBar.Attribute.rail {
+      if attr == .discuss {
+        if discussKickoffVisible { order.append(.pill(.discuss)) }
+      } else if !attr.editOnly || isEditing {
+        order.append(.pill(attr))
+      }
     }
     return order
   }

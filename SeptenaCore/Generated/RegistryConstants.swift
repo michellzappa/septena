@@ -1066,18 +1066,54 @@ enum RegistryToasts {
   static func movedBulk(count: Int, destination: String) -> String { RegistryL10n.plural("Moved %lld tasks to %@", count: count, one: "Moved to %2$@", other: "Moved %lld tasks to %@", args: [count, destination]) }
 }
 
+/// One task attribute (`registry/surfaces.json` `taskAttributes`): a composer
+/// pill, an inspector row and a picker title. `surfaceTier` `field` is an
+/// always-visible field (notes), not a pill. `editOnly` needs a saved task.
+struct RegistryTaskAttribute: Sendable, Hashable, Identifiable {
+  let id: String
+  let label: String
+  let iconId: String
+  let sfSymbol: String
+  let commitContract: String
+  let surfaceTier: String
+  let featureId: String
+  let editOnly: Bool
+  /// Pill text while the attribute's work runs (Discuss).
+  let workingLabel: String?
+  var isPill: Bool { surfaceTier != "field" }
+}
+
 enum RegistrySurfaces {
-  static let taskAttributeOrder: [String] = ["today", "when", "deadline", "list", "repeat", "notes", "discuss", "attachments"]
-  static let taskAttributeLabels: [String: String] = [
-    "today": RegistryL10n.t("Today"),
-    "when": RegistryL10n.t("When"),
-    "deadline": RegistryL10n.t("Deadline"),
-    "list": RegistryL10n.t("List"),
-    "repeat": RegistryL10n.t("Repeat"),
-    "notes": RegistryL10n.t("Notes"),
-    "discuss": RegistryL10n.t("Discuss"),
-    "attachments": RegistryL10n.t("Attachments"),
+  static let taskAttributeOrder: [String] = ["notes", "when", "deadline", "reminder", "repeat", "star", "list", "tags", "checklist", "attachments", "discuss"]
+  static let taskAttributes: [RegistryTaskAttribute] = [
+    RegistryTaskAttribute(id: "notes", label: RegistryL10n.t("Notes"), iconId: "action.notes", sfSymbol: "text.alignleft", commitContract: "closeCommits", surfaceTier: "field", featureId: "task.notes", editOnly: false, workingLabel: nil),
+    RegistryTaskAttribute(id: "when", label: RegistryL10n.t("When"), iconId: "action.when", sfSymbol: "calendar", commitContract: "pickCommits", surfaceTier: "popover", featureId: "task.when-deadline", editOnly: false, workingLabel: nil),
+    RegistryTaskAttribute(id: "deadline", label: RegistryL10n.t("Deadline"), iconId: "action.deadline", sfSymbol: "flag", commitContract: "pickCommits", surfaceTier: "popover", featureId: "task.when-deadline", editOnly: false, workingLabel: nil),
+    RegistryTaskAttribute(id: "reminder", label: RegistryL10n.t("Remind"), iconId: "action.reminder", sfSymbol: "bell", commitContract: "pickCommits", surfaceTier: "popover", featureId: "task.alerts", editOnly: false, workingLabel: nil),
+    RegistryTaskAttribute(id: "repeat", label: RegistryL10n.t("Repeat"), iconId: "action.repeat", sfSymbol: "arrow.clockwise", commitContract: "closeCommits", surfaceTier: "popover", featureId: "task.repeat", editOnly: false, workingLabel: nil),
+    RegistryTaskAttribute(id: "star", label: RegistryL10n.t("Star"), iconId: "action.star", sfSymbol: "star", commitContract: "pickCommits", surfaceTier: "inline", featureId: "lists.starred", editOnly: false, workingLabel: nil),
+    RegistryTaskAttribute(id: "list", label: RegistryL10n.t("List"), iconId: "action.move", sfSymbol: "folder", commitContract: "pickCommits", surfaceTier: "popover", featureId: "places.projects", editOnly: false, workingLabel: nil),
+    RegistryTaskAttribute(id: "tags", label: RegistryL10n.t("Tags"), iconId: "action.tag", sfSymbol: "tag", commitContract: "pickCommits", surfaceTier: "popover", featureId: "task.tags", editOnly: true, workingLabel: nil),
+    RegistryTaskAttribute(id: "checklist", label: RegistryL10n.t("Checklist"), iconId: "action.checklist", sfSymbol: "checklist", commitContract: "pickCommits", surfaceTier: "inline", featureId: "task.checklists", editOnly: true, workingLabel: nil),
+    RegistryTaskAttribute(id: "attachments", label: RegistryL10n.t("Attachments"), iconId: "action.attachment", sfSymbol: "paperclip", commitContract: "pickCommits", surfaceTier: "inline", featureId: "task.attachments", editOnly: true, workingLabel: nil),
+    RegistryTaskAttribute(id: "discuss", label: RegistryL10n.t("Discuss"), iconId: "action.discuss", sfSymbol: "bubble.left.and.bubble.right", commitContract: "closeCommits", surfaceTier: "inline", featureId: "ai.discuss", editOnly: true, workingLabel: RegistryL10n.t("Thinking…")),
   ]
+  /// The pills, in rail order (every attribute except fields).
+  static let taskAttributePills: [RegistryTaskAttribute] = taskAttributes.filter(\.isPill)
+  static let taskAttributeLabels: [String: String] = Dictionary(uniqueKeysWithValues: taskAttributes.map { ($0.id, $0.label) })
+  /// The attribute with `id`. Traps on an unknown id: the ids are a closed set.
+  static func taskAttribute(_ id: String) -> RegistryTaskAttribute {
+    guard let a = taskAttributes.first(where: { $0.id == id }) else { preconditionFailure("unknown task attribute \(id)") }
+    return a
+  }
+  /// Count text for a pill value (`countLabel`), or nil when the attribute has none.
+  static func taskAttributeCount(_ id: String, count: Int) -> String? {
+    switch id {
+    case "tags": return RegistryL10n.plural("%lld tags", count: count, one: "%lld tag", other: "%lld tags", args: [count])
+    case "attachments": return RegistryL10n.plural("%lld files", count: count, one: "%lld file", other: "%lld files", args: [count])
+    default: return nil
+    }
+  }
 }
 
 /// One button in the first run. `action` is one of a closed set the client implements.

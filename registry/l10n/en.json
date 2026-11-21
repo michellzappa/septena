@@ -227,6 +227,12 @@
       "tokens.textures.causticGlass.name"
     ]
   },
+  "Checklist": {
+    "text": "Checklist",
+    "paths": [
+      "surfaces.taskAttributes.checklist.label"
+    ]
+  },
   "Classic Window": {
     "text": "Classic Window",
     "paths": [
@@ -1213,6 +1219,12 @@
       "destinations.destinations.recentlyDeleted.title"
     ]
   },
+  "Remind": {
+    "text": "Remind",
+    "paths": [
+      "surfaces.taskAttributes.reminder.label"
+    ]
+  },
   "Reminders": {
     "text": "Reminders",
     "paths": [
@@ -1464,7 +1476,8 @@
   "Star": {
     "text": "Star",
     "paths": [
-      "actions.actions.task.toggleStar.addTitle"
+      "actions.actions.task.toggleStar.addTitle",
+      "surfaces.taskAttributes.star.label"
     ]
   },
   "Star important tasks to keep them one tap away.": {
@@ -1527,6 +1540,12 @@
       "tokens.textures.washiPaper.tag"
     ]
   },
+  "Tags": {
+    "text": "Tags",
+    "paths": [
+      "surfaces.taskAttributes.tags.label"
+    ]
+  },
   "Tamarillo": {
     "text": "Tamarillo",
     "paths": [
@@ -1584,6 +1603,12 @@
       "surfaces.prompts.items.deleteProject.variants.withTasks.message"
     ]
   },
+  "Thinking…": {
+    "text": "Thinking…",
+    "paths": [
+      "surfaces.taskAttributes.discuss.workingLabel"
+    ]
+  },
   "This account is already set up. Your tasks are syncing to this device.": {
     "text": "This account is already set up. Your tasks are syncing to this device.",
     "paths": [
@@ -1611,8 +1636,7 @@
   "Today": {
     "text": "Today",
     "paths": [
-      "destinations.destinations.today.title",
-      "surfaces.taskAttributes.today.label"
+      "destinations.destinations.today.title"
     ]
   },
   "Today shows what to do now. Anything you skipped stays on the Get started list.": {
@@ -1827,6 +1851,18 @@
       "tokens.fruitAccents.yuzu.name"
     ]
   },
+  "{count} files": {
+    "forms": {
+      "one": "{count} file",
+      "other": "{count} files"
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.taskAttributes.attachments.countLabel"
+    ]
+  },
   "{count} projects": {
     "forms": {
       "one": "1 project",
@@ -1837,6 +1873,18 @@
     ],
     "paths": [
       "surfaces.prompts.countPhrases.projects.label"
+    ]
+  },
+  "{count} tags": {
+    "forms": {
+      "one": "{count} tag",
+      "other": "{count} tags"
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.taskAttributes.tags.countLabel"
     ]
   },
   "{count} tasks": {
