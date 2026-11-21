@@ -1,7 +1,7 @@
 # Docs — index and rules
 
 This file is the entry point to `docs/`. Read it before you add or change a
-doc. Code always wins over any doc (`CLAUDE.md`, "Where truth lives").
+doc. Code always wins over any doc (`AGENTS.md`, "Where truth lives").
 
 ## How we plan
 
