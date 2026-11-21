@@ -80,16 +80,23 @@ enum MCPDispatch {
       // MUST be implemented by every modern server. Pure identity — no store
       // access, no user data — so it is the same for every caller and caches
       // publicly.
-      return result([
-        "supportedVersions": MCPRevision.supportedVersions,
-        "capabilities": ["tools": [:] as [String: Any]],
-        "instructions": """
+      let instructions = RuntimeProfile.current.isTasksOnly
+        ? """
+          Septena is a local-first task app. These tools read and write tasks, \
+          projects and areas stored on this Mac — no account or network is \
+          required. Call tools/list to see the available task tools.
+          """
+        : """
           Septena is a private life-tracking app. These tools read and write \
           this Mac's signed-in user's own data (tasks, goals, habits, \
           nutrition, training, and the other sections they have enabled). The \
           advertised tool set reflects which sections that user turned on, so \
           call tools/list before assuming a section is available.
-          """,
+          """
+      return result([
+        "supportedVersions": MCPRevision.supportedVersions,
+        "capabilities": ["tools": [:] as [String: Any]],
+        "instructions": instructions,
         "ttlMs": MCPRevision.discoverTTLms,
         "cacheScope": "public",
       ])
@@ -201,13 +208,21 @@ enum MCPDispatch {
       return first
     }
     if !started {
-      throw MCPError.rejected("\(AppDisplayName.current) is still starting up (CloudKit sync in progress) — retry in a moment.")
+      let detail = RuntimeProfile.current.isTasksOnly
+        ? "\(AppDisplayName.current) is still starting up — retry in a moment."
+        : "\(AppDisplayName.current) is still starting up (CloudKit sync in progress) — retry in a moment."
+      throw MCPError.rejected(detail)
     }
   }
 
   // MARK: - Tool routing
 
   private static func callTool(name: String, args: MCPArgs) async throws -> Any {
+    // Task app (Septask): refuse non-task tools cleanly instead of reaching
+    // unbound life-OS mutators.
+    if RuntimeProfile.current.isTasksOnly && !MCPToolCatalog.isTaskTool(name) {
+      throw MCPError.rejected("Only task tools are available in \(AppDisplayName.current).")
+    }
     // Septena Life retired Tasks (ADR 0007): refuse task tools even when a
     // client calls one it was never offered.
     if SectionManifest.isRetired("tasks") && MCPToolCatalog.isTaskTool(name) {

@@ -1673,10 +1673,14 @@ struct TaskListView: View {
     }
   }
 
-  /// Backend-only Septask asks for the sign-in while it has no session.
+  /// Only prompt to sign back in when this device previously held a backend
+  /// account and its session ended. A fresh install with no account is a
+  /// first-class free mode (docs/SYNC_SUBSCRIPTION_SPEC.md §3, §7) and never
+  /// shows a sign-in banner on Today.
   private var requiresSignIn: Bool {
     #if SEPTASK
-    !TaskSyncEngine.shared.signedIn
+    let sync = TaskSyncEngine.shared
+    return !sync.signedIn && sync.hadAccount
     #else
     false
     #endif
@@ -1704,7 +1708,13 @@ struct TaskListView: View {
       startCreate()
     case .connectAI, .importTasks:
       #if SEPTASK
-      SeptaskSettingsLink.request(id == .connectAI ? .taskBackend : .connectionsAI)
+      #if os(macOS)
+      let dest: SeptaskSettingsView.Destination =
+        (id == .connectAI && TaskSyncEngine.shared.signedIn) ? .taskBackend : .connectionsAI
+      #else
+      let dest: SeptaskSettingsView.Destination = id == .connectAI ? .taskBackend : .connectionsAI
+      #endif
+      SeptaskSettingsLink.request(dest)
       nav.showSettings = true
       #endif
     }
@@ -1730,6 +1740,9 @@ struct TaskListView: View {
 
   @ViewBuilder
   private var emptyStateRow: some View {
+    #if SEPTASK
+    settledEmptyStateRow
+    #else
     // A first sync on a new device pulls the whole account down. Until it
     // lands the list is empty for a reason that has nothing to do with the
     // user, so say that instead of "Nothing here yet" — and say it even where
@@ -1759,6 +1772,7 @@ struct TaskListView: View {
     } else {
       settledEmptyStateRow
     }
+    #endif
   }
 
   /// No usable iCloud account on this device (signed out, or blocked by a

@@ -210,11 +210,6 @@ final class TodaySnapshotWriter {
 
   private func writeNow() {
     guard let url = TodaySnapshotStore.fileURL else { return }
-    #if SEPTASK
-    // Signed out: nothing to show for an account, and sign-out removed the
-    // file. Do not write it back.
-    guard TaskSyncEngine.shared.signedIn else { return }
-    #endif
     let context = LocalStore.shared.container.mainContext
     let today = LocalCache.tasks(in: context, filter: .today)
     let inbox = LocalCache.tasks(in: context, filter: .triage)

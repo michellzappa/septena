@@ -40,6 +40,7 @@ enum SeptaskSignIn {
       }
       do {
         try await TaskSyncEngine.shared.signIn(identityToken: token, rawNonce: rawNonce)
+        TaskNotices.clearSignInDismissal()
         return nil
       } catch {
         return (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -118,11 +119,12 @@ struct SeptaskSyncAccountSection: View {
   }
 
   private var signedOutLine: String {
-    sync.pendingOps > 0
-      ? String(localized: "Not signed in. \(sync.pendingOps) changes are waiting on this device and sync when you sign in.",
-               comment: "Septask sync: signed out with queued edits")
-      : String(localized: "Not signed in. Your tasks stay on this device until you sign in.",
-               comment: "Septask sync: signed out, nothing queued")
+    if sync.hadAccount, sync.pendingOps > 0 {
+      return String(localized: "Not signed in. \(sync.pendingOps) changes are waiting on this device and sync when you sign in.",
+                    comment: "Septask sync: signed out with queued edits")
+    }
+    return String(localized: "Your tasks stay on this device. Sign in with Apple when you want to sync across devices.",
+                  comment: "Septask sync: free no-account mode")
   }
 
   private var statusLine: String {

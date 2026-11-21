@@ -91,7 +91,7 @@ enum TaskNotices {
   static func today(pool: [SeptenaTask], requiresSignIn: Bool,
                     today: String, context: ModelContext) -> [TaskNotice] {
     var out: [TaskNotice] = []
-    if requiresSignIn { out.append(signIn) }
+    if requiresSignIn, !hasSeen(.signIn) { out.append(signIn) }
     if let rolled = rolledIn(pool: pool, today: today, context: context) { out.append(rolled) }
     // Onboarding counts as the one explainer slot: never a tip and a
     // checklist at once.
@@ -108,7 +108,7 @@ enum TaskNotices {
   static func dismiss(_ id: TaskNotice.ID, today: String, context: ModelContext) {
     switch id {
     case .signIn:
-      return
+      markSeen(id)
     case .rolledIn:
       SettingsMirror.dismissRolledIn(on: today, context: context,
                                      engine: SeptenaServices.shared.ckEngine)
@@ -119,6 +119,14 @@ enum TaskNotices {
     case .fadeIntro:
       markSeen(id)
     }
+  }
+
+  /// Re-arms the sign-in notice after a successful sign-in so a future
+  /// sign-out can surface it once again.
+  static func clearSignInDismissal() {
+    var seen = Set(UserDefaults.standard.stringArray(forKey: seenKey) ?? [])
+    guard seen.remove(TaskNotice.ID.signIn.rawValue) != nil else { return }
+    UserDefaults.standard.set(seen.sorted(), forKey: seenKey)
   }
 
   /// Shows Get started again from the start (Settings ▸ About, and after an
@@ -184,7 +192,7 @@ enum TaskNotices {
       detail: signInDetail,
       primaryTitle: String(localized: "Sign in…",
                            comment: "Task list notice button that starts Sign in with Apple"),
-      dismissible: false)
+      dismissible: true)
   }
 
   private static var signInDetail: String {

@@ -421,6 +421,13 @@ struct SeptaskCommandMenus: Commands {
       .disabled(!SeptaskUpdater.isConfigured)
       #endif
     }
+
+    CommandGroup(after: .appTermination) {
+      Button("Quit Completely") {
+        SeptaskMacAppDelegate.quitCompletely()
+      }
+      .keyboardShortcut("q", modifiers: [.command, .option])
+    }
     #endif
   }
 }

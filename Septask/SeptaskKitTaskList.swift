@@ -355,14 +355,12 @@ final class SeptaskKitTaskListController: NSViewController {
   private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
 
   /// "No Tasks" is a lie while the first pull from the task backend is still
-  /// running, or while this device is not signed in — the list is empty
-  /// because the data hasn't arrived, not because there is none.
+  /// running for a signed-in account — the list is empty because the data
+  /// hasn't arrived yet. Signed out (free no-account mode) is a real empty
+  /// local list, never a sign-in gate (docs/SYNC_SUBSCRIPTION_SPEC.md §3, §7).
   private func refreshEmptyLabel() {
     let sync = TaskSyncEngine.shared
-    if !sync.signedIn {
-      emptyLabel.stringValue = String(localized: "Sign in to see your tasks",
-                                      comment: "SeptaskKit: empty list while signed out of the task backend")
-    } else if sync.isSyncing && sync.lastPull == nil {
+    if sync.signedIn && sync.isSyncing && sync.lastPull == nil {
       emptyLabel.stringValue = String(localized: "Syncing…",
                                       comment: "SeptaskKit: empty list during the first task-backend pull")
     } else {
@@ -376,16 +374,21 @@ final class SeptaskKitTaskListController: NSViewController {
   /// sign-out reloads the list (Today's sign-in notice comes and goes).
   private func observeBootstrapState() {
     let wasSignedIn = TaskSyncEngine.shared.signedIn
+    let hadAccount = TaskSyncEngine.shared.hadAccount
     withObservationTracking {
       let sync = TaskSyncEngine.shared
       _ = sync.signedIn
+      _ = sync.hadAccount
       _ = sync.isSyncing
       _ = sync.lastPull
     } onChange: { [weak self] in
       Task { @MainActor [weak self] in
         guard let self else { return }
         self.refreshEmptyLabel()
-        if TaskSyncEngine.shared.signedIn != wasSignedIn { self.reload() }
+        if TaskSyncEngine.shared.signedIn != wasSignedIn
+          || TaskSyncEngine.shared.hadAccount != hadAccount {
+          self.reload()
+        }
         self.observeBootstrapState()
       }
     }
@@ -1225,8 +1228,9 @@ final class SeptaskKitTaskListController: NSViewController {
   /// the same function). Sign-in state changes reload through
   /// `observeBootstrapState`.
   private func noticeRows(_ pool: [SeptenaTask]) -> [Row] {
-    TaskNotices.today(pool: pool, requiresSignIn: !TaskSyncEngine.shared.signedIn,
-                      today: SeptenaDate.today, context: context)
+    let sync = TaskSyncEngine.shared
+    return TaskNotices.today(pool: pool, requiresSignIn: !sync.signedIn && sync.hadAccount,
+                             today: SeptenaDate.today, context: context)
       .flatMap { [Row.notice($0)] + $0.steps.map(Row.noticeStep) }
   }
 
@@ -1247,7 +1251,9 @@ final class SeptaskKitTaskListController: NSViewController {
     case .addTask:
       SeptaskKitQuickEntry.show()
     case .connectAI, .importTasks:
-      SeptaskSettingsLink.request(id == .connectAI ? .taskBackend : .connectionsAI)
+      let dest: SeptaskSettingsView.Destination =
+        (id == .connectAI && TaskSyncEngine.shared.signedIn) ? .taskBackend : .connectionsAI
+      SeptaskSettingsLink.request(dest)
       SeptaskKitSettingsWindow.show()
     }
   }

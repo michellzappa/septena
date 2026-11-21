@@ -46,6 +46,11 @@ final class TaskSyncEngine {
   // MARK: Status (observable, for the settings pane)
 
   private(set) var signedIn: Bool = TaskBackendClient.hasSession
+  /// True when an account has previously signed in on this device (and was not
+  /// deleted). Lets free no-account installs stay quiet without "Not signed in"
+  /// banners while still surfacing a dismissible prompt if an existing session
+  /// ends.
+  private(set) var hadAccount: Bool = UserDefaults.standard.string(forKey: TaskSyncEngine.lastUserKey) != nil
   /// Ops in the outbox, uploads included.
   private(set) var pendingOps = 0
   var lastPull: Date?
@@ -139,6 +144,14 @@ final class TaskSyncEngine {
     isRunning = true
     signedIn = TaskBackendClient.hasSession
     refreshPendingCount()
+    guard signedIn else {
+      // Free no-account mode (docs/SYNC_SUBSCRIPTION_SPEC.md §3, §7): local
+      // writes still land in the outbox so signing in later syncs them, but do
+      // not spin up the network sync loop, poll timer or WebSocket.
+      lastError = nil
+      SeptenaLog.info("[TaskSync] started offline (no account) pending=\(pendingOps)")
+      return
+    }
     SeptenaLog.info("[TaskSync] started since=\(since) pending=\(pendingOps)")
     Task { @MainActor in
       await self.runSync(reconcileFirst: true)
@@ -163,6 +176,10 @@ final class TaskSyncEngine {
     appActive = true
     guard isRunning else { return }
     signedIn = TaskBackendClient.hasSession
+    guard signedIn else {
+      lastError = nil
+      return
+    }
     Task { @MainActor in
       await self.runSync(reconcileFirst: true)
       self.connectSocket()
@@ -185,7 +202,7 @@ final class TaskSyncEngine {
     pollTask?.cancel()
     pollTask = nil
     #endif
-    if pendingOps > 0 { scheduleSync(after: 0) }
+    if signedIn, pendingOps > 0 { scheduleSync(after: 0) }
   }
 
   // MARK: - Fallback poll
@@ -252,7 +269,7 @@ final class TaskSyncEngine {
     case .convo, .turn, .setting: break
     }
     refreshPendingCount()
-    if isRunning { scheduleSync(after: 0.8) }
+    if isRunning, signedIn { scheduleSync(after: 0.8) }
     #endif
   }
 
@@ -658,7 +675,8 @@ final class TaskSyncEngine {
     defer { isSyncing = false; refreshPendingCount() }
     signedIn = TaskBackendClient.hasSession
     guard signedIn else {
-      lastError = TaskBackendError.notSignedIn.errorDescription
+      // Signed out is a first-class free mode, not an error.
+      lastError = nil
       return
     }
     // Reconcile needs the shadow: on a first run (since == 0) the pull fills
@@ -1033,9 +1051,15 @@ final class TaskSyncEngine {
   /// made while signed out are sent after the next sign-in, when the same
   /// account signs in again (`signIn` wipes them for another account).
   func signOut() async {
+    syncTimer?.cancel()
+    syncTimer = nil
+    syncTimerDeadline = nil
+    pollTask?.cancel()
+    pollTask = nil
     disconnectSocket()
     await client.signOut()
     signedIn = TaskBackendClient.hasSession
+    lastError = nil
     // The launch snapshot shows this account's Today (#82).
     TodaySnapshotStore.invalidate()
   }
@@ -1043,7 +1067,10 @@ final class TaskSyncEngine {
   /// Backend user id of the last sign-in on this device.
   private var lastUserID: String? {
     get { UserDefaults.standard.string(forKey: Self.lastUserKey) }
-    set { UserDefaults.standard.set(newValue, forKey: Self.lastUserKey) }
+    set {
+      UserDefaults.standard.set(newValue, forKey: Self.lastUserKey)
+      hadAccount = newValue != nil
+    }
   }
 
   /// Stops the engine and waits (up to 10 s) for a run that started before
@@ -1119,7 +1146,7 @@ final class TaskSyncEngine {
   func captureSettings() {
     #if SEPTASK
     guard !DemoSeedMode.isOn, settingsReady, let store = store() else { return }
-    if reconcileSettings(store: store), isRunning { scheduleSync(after: 0.8) }
+    if reconcileSettings(store: store), isRunning, signedIn { scheduleSync(after: 0.8) }
     refreshPendingCount()
     #endif
   }

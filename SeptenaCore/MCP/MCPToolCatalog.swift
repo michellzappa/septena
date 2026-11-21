@@ -80,10 +80,14 @@ enum MCPToolCatalog {
 
   // MARK: - Global tools (always exposed)
 
-  /// The globals this app serves. Septena Life retired Tasks (ADR 0007), so
-  /// it advertises no task tools; the task app serves them. `allGlobal`
+  /// The globals this app serves. Septena (the task app, `isTasksOnly`) serves
+  /// task tools only — life-OS mutators stay unbound there. Septena Life
+  /// retired Tasks (ADR 0007), so it advertises no task tools. `allGlobal`
   /// keeps the full list for the drift tripwire.
   static var global: [MCPTool] {
+    if RuntimeProfile.current.isTasksOnly {
+      return allGlobal.filter { isTaskTool($0.name) }
+    }
     guard SectionManifest.isRetired("tasks") else { return allGlobal }
     return allGlobal.filter { !isTaskTool($0.name) }
   }
@@ -711,6 +715,7 @@ enum MCPToolCatalog {
   /// globals always, plus the tools of each enabled section (gateway parity).
   static func manifest(enabledSections: Set<String>) -> [MCPTool] {
     var tools = global
+    guard !RuntimeProfile.current.isTasksOnly else { return tools }
     for (key, sectionTools) in section where enabledSections.contains(key) {
       tools += sectionTools
     }

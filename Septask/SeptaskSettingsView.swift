@@ -32,6 +32,7 @@ struct SeptaskSettingsView: View {
     // About. Claude pairs through the task backend (About ▸ Advanced).
     case tasks
     case connectionsAI
+    case data
     case privacy
     case about
     // Focused task-app sub-pages. These are intentionally not root entries.
@@ -124,9 +125,10 @@ struct SeptaskSettingsView: View {
             Text(welcomeName.isEmpty ? "Your Profile" : welcomeName)
               .font(.title3.weight(.semibold))
               .foregroundStyle(.primary)
-            if plusUnlocked { SeptenaPlusBadge() } else { FreeAccountBadge() }
-            if !TaskSyncEngine.shared.signedIn {
-              Label("Not signed in", systemImage: "exclamationmark.circle")
+            if TaskSyncEngine.shared.signedIn {
+              if plusUnlocked { SeptenaPlusBadge() } else { FreeAccountBadge() }
+            } else {
+              Text("On this device")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
@@ -157,14 +159,14 @@ struct SeptaskSettingsView: View {
   /// Root rows, in the same relative order as the life app's
   /// `SettingsView.staticDestinations`.
   private var rootDestinations: [Destination] {
-    [.tasks, .connectionsAI, .privacy]
+    [.tasks, .connectionsAI, .data, .privacy]
   }
 
   /// Septena's full root order, with `nil` where Septena shows Sections, so
   /// each row takes the same palette color it has in Septena.
   private static let septenaPaletteOrder: [Destination?] = [
     .tasks, nil, nil, nil, .connectionsAI,
-    nil, .privacy, nil,
+    .data, .privacy, nil,
   ]
 
   /// One list row, as either a selectable tag (macOS split view) or a
@@ -210,6 +212,7 @@ struct SeptaskSettingsView: View {
     switch destination {
     case .account:       return "Account"
     case .connectionsAI: return "Connections & AI"
+    case .data:          return "Import & Export"
     case .privacy:       return "Privacy"
     case .about:         return "About"
     case .tasks:         return "Tasks"
@@ -225,6 +228,7 @@ struct SeptaskSettingsView: View {
     switch destination {
     case .account:       return "person.crop.circle"
     case .connectionsAI: return "brain.head.profile"
+    case .data:          return "square.and.arrow.up"
     case .privacy:       return "hand.raised"
     case .about:         return "info.circle"
     case .tasks:         return "checklist"
@@ -258,6 +262,7 @@ struct SeptaskSettingsView: View {
     switch destination {
     case .account:       SeptaskAccountPane()
     case .connectionsAI: SeptaskConnectionsAISettingsPane()
+    case .data:          SeptaskImportExportPane()
     case .privacy:       SeptaskPrivacyPane()
     case .about:         SeptaskAboutPane()
     case .tasks:         TaskSettingsPane(destination: Self.taskSettingsDestination)
@@ -300,16 +305,22 @@ private struct SeptaskAccountPane: View {
               .onChange(of: welcomeName) { _, newValue in
                 store.setWelcomeName(newValue, context: modelContext, engine: ckEngine)
               }
-            if plusUnlocked {
-              SeptenaPlusBadge()
+            if TaskSyncEngine.shared.signedIn {
+              if plusUnlocked {
+                SeptenaPlusBadge()
+              } else {
+                FreeAccountBadge()
+              }
             } else {
-              FreeAccountBadge()
+              Text("On this device")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
           }
         }
         .padding(.vertical, 6)
       } footer: {
-        Text("Your name syncs across your devices.")
+        Text("Your name stays on this device, and syncs when you sign in.")
       }
 
       SeptaskSyncAccountSection()
@@ -554,7 +565,11 @@ private struct SeptaskAboutPane: View {
       }
 
       Section {
-        Text("Deleting the app from a device does not delete your tasks. They stay in your sync and come back when you install it again.")
+        if TaskSyncEngine.shared.signedIn {
+          Text("Deleting the app from a device does not delete your tasks. They stay in your sync and come back when you install it again.")
+        } else {
+          Text("Your tasks stay on this device until you sign in to sync. You can export a JSON backup anytime under Import & Export.")
+        }
       } header: {
         Text("Always your choice")
       }
