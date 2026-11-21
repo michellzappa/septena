@@ -257,6 +257,9 @@ struct ConversationCard: View {
 
   private func append(_ turn: ConvoTurn) {
     SeptenaServices.shared.taskMutator.appendConvoTurn(id: taskID, turn)
+    // Answering a card is a user gesture: it stamps the fade clock
+    // (docs/TASK_FADE_SPEC.md §3).
+    SeptenaServices.shared.taskMutator.touch(id: taskID)
     reload()
   }
 }

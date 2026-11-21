@@ -102,6 +102,21 @@ Tasks are content, not labels. Keep `id` only.
   UUIDs — both are opaque from now on).
 - New tasks get base32-6 shortids for compactness.
 
+**Fade fields** (docs/TASK_FADE_SPEC.md §3). Wire names, the same in the
+app, both MCP servers and the task backend:
+
+| Field | Wire type | Meaning |
+|---|---|---|
+| `touchedAt` | ISO-8601 instant or absent | Last user gesture. Absent = never touched; readers use `createdAt`. MCP `tasks_get` already returns `createdAt` in its place. |
+| `deferCount` | int, default 0 | Times the user pushed the task to a later day. |
+| `fadedAt` | ISO-8601 instant or absent | When the task faded. |
+| `dropReason` | `"faded"` / `"user"` or absent | Why a cancelled task was dropped. |
+| `effort` | `"light"` / `"heavy"` or absent | Absent = unknown. |
+
+All are read-only over MCP: only the app writes them. Today they live on the
+local model and in the in-app MCP server; the task backend and its connector
+get them with the backend columns (docs/SEPTASK_BACKEND.md §5.2).
+
 ## Foreign keys
 
 Cross-type references store the **target id**, never the title. So
