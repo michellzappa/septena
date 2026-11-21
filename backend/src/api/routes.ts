@@ -397,6 +397,60 @@ api.delete("/admin/grants/:userId/:name", async (c) => {
   return removed ? c.body(null, 204) : c.json({ error: "not_found" }, 404);
 });
 
+// ---- admin: account move copy (docs/CLOUDFLARE_ACCOUNT_MOVE.md) ----
+// Same gate as the grant routes. Export runs on the old account, import on
+// the new one; import refuses a store that already holds data.
+
+const zCopyTable = z.string().regex(/^[a-z_][a-z0-9_]{0,63}$/);
+
+async function copyStore(c: Ctx) {
+  if (!c.env.ADMIN_TOKEN) return c.notFound();
+  if (!(await adminAllowed(c))) return c.json({ error: "forbidden" }, 403);
+  const userId = zUserId.safeParse(c.req.param("userId"));
+  if (!userId.success) return c.json({ error: "invalid_request" }, 400);
+  return storeFor(c.env, userId.data);
+}
+
+api.get("/admin/copy/:userId/snapshot", async (c) => {
+  const store = await copyStore(c);
+  if (store instanceof Response) return store;
+  return c.json({ tables: await store.copySnapshot() });
+});
+
+api.get("/admin/copy/:userId/export", async (c) => {
+  const store = await copyStore(c);
+  if (store instanceof Response) return store;
+  const table = zCopyTable.safeParse(c.req.query("table"));
+  const after = z.coerce.number().int().min(0).safeParse(c.req.query("after") ?? "0");
+  const limit = z.coerce.number().int().min(1).max(1000).safeParse(c.req.query("limit") ?? "500");
+  if (!table.success || !after.success || !limit.success) return c.json({ error: "invalid_request" }, 400);
+  return c.json(await store.copyExport(table.data, after.data, limit.data));
+});
+
+api.post("/admin/copy/:userId/import/begin", async (c) => {
+  const store = await copyStore(c);
+  if (store instanceof Response) return store;
+  const result = await store.copyImportBegin();
+  return result.ok ? c.json(result) : c.json({ error: result.reason }, 409);
+});
+
+api.post("/admin/copy/:userId/import", async (c) => {
+  const store = await copyStore(c);
+  if (store instanceof Response) return store;
+  const body = await parse(c, z.object({
+    table: zCopyTable,
+    rows: z.array(z.record(z.union([z.string(), z.number(), z.null()]))).max(1000),
+  }).strict());
+  if (body instanceof Response) return body;
+  return c.json({ written: await store.copyImport(body.table, body.rows) });
+});
+
+api.post("/admin/copy/:userId/import/end", async (c) => {
+  const store = await copyStore(c);
+  if (store instanceof Response) return store;
+  return c.json({ tables: await store.copyImportEnd() });
+});
+
 // ---- account deletion (§10) ----
 
 api.delete("/account", async (c) => {

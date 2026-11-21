@@ -12,6 +12,10 @@ export interface Env {
   ENTITLEMENT_ENFORCE: string;
   APPLE_IAP_BUNDLE_IDS: string;    // comma-separated bundle ids whose purchases count
   APPLE_IAP_ENVIRONMENTS: string;  // comma-separated: Production, Sandbox
+  /// Optional. "true" answers every request except /health and /v1/admin/*
+  /// with 503, for the account move's copy window (docs/CLOUDFLARE_ACCOUNT_MOVE.md).
+  /// The apps keep their changes in the outbox and retry.
+  MAINTENANCE?: string;
 
   // Secrets (set via `wrangler secret put`)
   SESSION_SIGNING_KEY: string; // 32-byte base64; signs task-backend access tokens

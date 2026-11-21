@@ -996,6 +996,92 @@ export class TaskStore extends DurableObject<Env> {
     return this.sql.exec("DELETE FROM entitlements WHERE id = ?", id).rowsWritten > 0;
   }
 
+  // ---- account move: copy (docs/CLOUDFLARE_ACCOUNT_MOVE.md, ADR 0018) ----
+  // Cloudflare cannot move Durable Object data between accounts. These
+  // methods copy every table row for row, so rev, ids and the change log keep
+  // their values and client cursors stay valid. Admin routes only.
+
+  /// The store's own tables. Names come from sqlite_master, never from input.
+  private copyTables(): string[] {
+    return this.sql.exec<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name",
+    ).toArray().map((r) => r.name);
+  }
+
+  /// Row count per table. The move compares this before and after the copy.
+  copySnapshot(): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const t of this.copyTables()) {
+      out[t] = this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM "${t}"`).one().n;
+    }
+    return out;
+  }
+
+  /// One page of rows in rowid order. `after` is the last rowid of the
+  /// previous page (0 for the first). Fails on a BLOB value: no table stores
+  /// one, and silently dropping bytes would corrupt the copy.
+  copyExport(table: string, after: number, limit: number): { rows: Record<string, unknown>[]; next: number | null } {
+    if (!this.copyTables().includes(table)) throw new Error(`unknown table ${table}`);
+    const n = Math.max(1, Math.min(limit, 1000));
+    const raw = this.sql.exec<Record<string, SqlStorageValue>>(
+      `SELECT rowid AS _rowid, * FROM "${table}" WHERE rowid > ? ORDER BY rowid LIMIT ?`, after, n,
+    ).toArray();
+    let last = after;
+    const rows = raw.map((r) => {
+      const { _rowid, ...row } = r;
+      last = Number(_rowid);
+      for (const [k, v] of Object.entries(row)) {
+        if (v !== null && typeof v === "object") throw new Error(`binary value in ${table}.${k}`);
+      }
+      return row;
+    });
+    return { rows, next: raw.length === n ? last : null };
+  }
+
+  /// Starts an import. Refuses a store that already holds data, so an import
+  /// can never overwrite a live account.
+  copyImportBegin(): { ok: true } | { ok: false; reason: "not_empty" } {
+    for (const t of this.copyTables()) {
+      if (t === "meta") continue;
+      if (this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM "${t}"`).one().n > 0) return { ok: false, reason: "not_empty" };
+    }
+    if (this.meta("rev") !== 0) return { ok: false, reason: "not_empty" };
+    this.setMeta("copyImporting", 1);
+    return { ok: true };
+  }
+
+  /// Writes one page of rows. Column names must exist in the table.
+  copyImport(table: string, rows: Record<string, unknown>[]): number {
+    if (this.meta("copyImporting") !== 1) throw new Error("import not started");
+    if (!this.copyTables().includes(table)) throw new Error(`unknown table ${table}`);
+    const cols = new Set(
+      this.sql.exec<{ name: string }>(`PRAGMA table_info("${table}")`).toArray().map((r) => r.name),
+    );
+    this.ctx.storage.transactionSync(() => {
+      for (const row of rows) {
+        const keys = Object.keys(row);
+        if (keys.length === 0) throw new Error("empty row");
+        for (const k of keys) if (!cols.has(k)) throw new Error(`unknown column ${table}.${k}`);
+        const values = keys.map((k) => {
+          const v = row[k];
+          if (v === null || typeof v === "string" || typeof v === "number") return v;
+          throw new Error(`unsupported value in ${table}.${k}`);
+        });
+        this.sql.exec(
+          `INSERT OR REPLACE INTO "${table}" (${keys.map((k) => `"${k}"`).join(", ")}) VALUES (${keys.map(() => "?").join(", ")})`,
+          ...values,
+        );
+      }
+    });
+    return rows.length;
+  }
+
+  /// Ends the import. The copied meta table brings the rev counter with it.
+  copyImportEnd(): Record<string, number> {
+    this.sql.exec("DELETE FROM meta WHERE key = 'copyImporting'");
+    return this.copySnapshot();
+  }
+
   /// Account deletion (§10). The Worker empties the user's R2 prefix.
   async deleteAccount(): Promise<void> {
     for (const ws of this.ctx.getWebSockets()) ws.close(1000, "account deleted");

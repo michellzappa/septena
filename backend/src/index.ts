@@ -23,6 +23,15 @@ app.use("*", async (c, next) => {
   );
 });
 
+// Copy window of the account move: nothing may write to the old stores while
+// they are copied. Admin routes stay open for the copy itself.
+app.use("*", async (c, next) => {
+  if (c.env.MAINTENANCE !== "true") return next();
+  const path = new URL(c.req.url).pathname;
+  if (path === "/health" || path.startsWith("/v1/admin/")) return next();
+  return c.json({ error: "maintenance" }, 503, { "Retry-After": "300" });
+});
+
 app.get("/health", (c) => c.json({ ok: true }));
 
 // The agent brief for the task tools, as markdown.
