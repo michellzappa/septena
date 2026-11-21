@@ -733,20 +733,22 @@ struct SeptaskImportExportPane: View {
   @State private var exportError: String?
 
   @State private var showingFilePicker = false
-  @State private var showingPaste = false
-  @State private var pasteBuffer = ""
   @State private var importDoc: TaskJSONTransfer.Envelope?
   @State private var importMessage: String?
   @State private var importIsError = false
 
   var body: some View {
     Form {
+      moveInSection
       storageSection
       exportSection
       importSection
     }
     .formStyle(.grouped)
     .navigationTitle("Import & Export")
+    #if os(iOS)
+    .navigationBarTitleDisplayMode(.inline)
+    #endif
     .fileExporter(
       isPresented: $showingFileExporter,
       document: exportDocument,
@@ -765,7 +767,21 @@ struct SeptaskImportExportPane: View {
       allowedContentTypes: [.json],
       allowsMultipleSelection: false
     ) { handleFileImport($0) }
-    .sheet(isPresented: $showingPaste) { pasteSheet }
+  }
+
+  private var moveInSection: some View {
+    Section {
+      NavigationLink {
+        ThingsImportView()
+          .navigationTitle("Import from Things")
+      } label: {
+        Label("Import from Things", systemImage: RegistryIcons.sfSymbols["settings.import"] ?? "square.and.arrow.down")
+      }
+    } header: {
+      Text("Move from another app")
+    } footer: {
+      Text("Move a Things database into Septena once. Things is not changed.")
+    }
   }
 
   private var storageSection: some View {
@@ -845,13 +861,6 @@ struct SeptaskImportExportPane: View {
       } label: {
         Label("Choose JSON File…", systemImage: "doc.badge.plus")
       }
-      Button {
-        pasteBuffer = ""
-        importMessage = nil
-        showingPaste = true
-      } label: {
-        Label("Paste JSON…", systemImage: "doc.on.clipboard")
-      }
 
       if let doc = importDoc {
         importPreview(doc)
@@ -863,7 +872,7 @@ struct SeptaskImportExportPane: View {
           .foregroundStyle(importIsError ? .red : .secondary)
       }
     } header: {
-      Text("Import")
+      Text("Restore backup")
     } footer: {
       Text("Imports a Septena JSON backup into this device. Matching IDs update in place; non-task records are skipped.")
     }
@@ -891,6 +900,96 @@ struct SeptaskImportExportPane: View {
       .padding(.top, 2)
     }
     .padding(.vertical, 4)
+  }
+
+  private func handleFileImport(_ result: Result<[URL], Error>) {
+    do {
+      guard let url = try result.get().first else { return }
+      let access = url.startAccessingSecurityScopedResource()
+      defer { if access { url.stopAccessingSecurityScopedResource() } }
+      let data = try Data(contentsOf: url)
+      importDoc = try TaskJSONTransfer.parseEnvelope(data)
+      importMessage = nil
+      importIsError = false
+    } catch {
+      importDoc = nil
+      importMessage = error.localizedDescription
+      importIsError = true
+    }
+  }
+
+  private func applyImport(_ doc: TaskJSONTransfer.Envelope) {
+    do {
+      let result = try TaskJSONTransfer.apply(doc, context: modelContext)
+      importDoc = nil
+      importIsError = false
+      if result.skipped > 0 {
+        importMessage = "Imported \(result.applied) records (\(result.skipped) non-task rows skipped)."
+      } else {
+        importMessage = "Imported \(result.applied) records."
+      }
+      TaskNotices.completeStep(.importTasks, context: modelContext)
+    } catch {
+      importIsError = true
+      importMessage = error.localizedDescription
+    }
+  }
+}
+
+/// Raw JSON paste utility, hosted in Settings ▸ About ▸ Advanced (`paste_json_import`,
+/// docs/SETTINGS_UX_SPEC.md) so everyday Import & Export stays focused on files.
+struct SeptaskPasteJSONSection: View {
+  @Environment(\.modelContext) private var modelContext
+  @State private var showingPaste = false
+  @State private var pasteBuffer = ""
+  @State private var importDoc: TaskJSONTransfer.Envelope?
+  @State private var importMessage: String?
+  @State private var importIsError = false
+
+  var body: some View {
+    Section {
+      Button {
+        pasteBuffer = ""
+        importMessage = nil
+        showingPaste = true
+      } label: {
+        Label("Paste JSON Backup…", systemImage: "doc.on.clipboard")
+      }
+      .sheet(isPresented: $showingPaste) { pasteSheet }
+
+      if let doc = importDoc {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Ready to import")
+            .font(.septenaLabel)
+          Text("\(doc.taskCount) tasks · \(doc.projectCount) projects · \(doc.areaCount) areas · \(doc.attachmentCount) attachments")
+            .font(.septenaCaption)
+            .foregroundStyle(.secondary)
+          if doc.skippedRowCount > 0 {
+            Text("\(doc.skippedRowCount) non-task rows will be skipped.")
+              .font(.septenaCaption)
+              .foregroundStyle(.secondary)
+          }
+          HStack(spacing: 12) {
+            Button("Import") { applyImport(doc) }
+              .buttonStyle(.borderedProminent)
+              .disabled(doc.supportedRowCount == 0)
+            Button("Cancel", role: .cancel) { importDoc = nil }
+          }
+          .padding(.top, 2)
+        }
+        .padding(.vertical, 4)
+      }
+
+      if let importMessage {
+        Text(importMessage)
+          .font(.septenaCaption)
+          .foregroundStyle(importIsError ? .red : .secondary)
+      }
+    } header: {
+      Text("Data tools")
+    } footer: {
+      Text("Paste raw Septena JSON directly from the clipboard to restore or merge records.")
+    }
   }
 
   private var pasteSheet: some View {
@@ -936,22 +1035,6 @@ struct SeptaskImportExportPane: View {
     #if os(macOS)
     .frame(width: 480, height: 340)
     #endif
-  }
-
-  private func handleFileImport(_ result: Result<[URL], Error>) {
-    do {
-      guard let url = try result.get().first else { return }
-      let access = url.startAccessingSecurityScopedResource()
-      defer { if access { url.stopAccessingSecurityScopedResource() } }
-      let data = try Data(contentsOf: url)
-      importDoc = try TaskJSONTransfer.parseEnvelope(data)
-      importMessage = nil
-      importIsError = false
-    } catch {
-      importDoc = nil
-      importMessage = error.localizedDescription
-      importIsError = true
-    }
   }
 
   private func applyImport(_ doc: TaskJSONTransfer.Envelope) {

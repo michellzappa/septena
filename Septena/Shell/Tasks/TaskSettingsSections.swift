@@ -231,7 +231,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
     } header: {
       Text("Appearance")
     } footer: {
-      Text("The accent is shared with Septena Life. Changing it here recolors Tasks there too.")
+      Text("Sets the accent color used across Septena.")
     }
 
     // Text size and completion motion sit here, inline, instead of on a

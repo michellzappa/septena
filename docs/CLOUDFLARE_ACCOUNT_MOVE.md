@@ -29,6 +29,34 @@ Not moving: `reports-worker/` (template only, not deployed), Starlings
 | Secrets | Set again with `wrangler secret put`. | Reuse the old values if mz has them. A new `SESSION_SIGNING_KEY` only expires access tokens (clients refresh). New hash salts would break the community data's user links, so those must be the old values. |
 | DNS records | Export a BIND file from the old zone, import into the new one. | Keep the Gandi MX and SPF records, or septena.app mail stops. |
 
+## 2a. New account resources (created 2026-11-21)
+
+Resource ids are not secrets; the old ones are already in `wrangler.toml`.
+They replace the old ids at cutover (step 5).
+
+| Worker | Binding | New id |
+|---|---|---|
+| `septena-mcp-gateway` | KV `STATE` | `4066d642849946a5bcdb5523b52a35d5` |
+| `septena-mcp-gateway` | KV `TOKENS` | `1b8f0af54763424190a01dcb85109852` |
+| `septena-mcp-gateway` | KV `CLIENTS` | `c6550511896e493aa5abd8685e9dd6a1` |
+| `septena-mcp-gateway` | R2 `septena-attachments` | same name, created on the new account |
+| `septena-community` | KV `ATTEST` | `1d3f2d0925804c01bb23b2d56e71e4d3` |
+| `septena-community` | KV `CHALLENGES` | `14504cb083914ff58cb7224649addb09` |
+| `septena-community` | KV `RL` | `4b24aa6a1dbf4b568a69b204286a1248` |
+| `septena-community` | D1 `septena-community` | `186de353-d169-48df-b3fa-dcdde28d1916` |
+
+Trap: `wrangler` takes `account_id` from `wrangler.toml` over the
+`CLOUDFLARE_ACCOUNT_ID` environment variable for some commands (seen with
+`r2 bucket create` and `kv namespace create`). Run account-level commands
+for the new account from a folder with no `wrangler.toml`. A first attempt
+left three empty namespaces named `septena-STATE`, `septena-TOKENS` and
+`septena-CLIENTS` on the old account; remove them in step 12.
+
+For the copy (step 7) the new backend runs on its `workers.dev` address,
+where the `/v1/admin/*` host check would answer 404. Deploy it with
+`API_PUBLIC_URL` set to that address for the copy, and set it back to
+`https://api.septena.app` in step 9.
+
 ## 3. Steps
 
 Each step names who does it. "Agent" steps run from this repo on mz's laptop
@@ -37,13 +65,19 @@ with wrangler logged in as the new account's owner.
 1. **mz:** create the Cloudflare account "Septena" under the owner login of
    the Starlings account, and buy Workers Paid on it.
 2. **Agent:** build the admin export and import routes in `backend/`, with
-   tests, and deploy them to the old account.
+   tests (done: `/v1/admin/copy/*`, `MAINTENANCE`), and deploy them to the
+   old account. Set `ADMIN_TOKEN` on both accounts.
 3. **Agent:** create the KV namespaces, R2 bucket and D1 database on the new
    account. Put their ids in each `wrangler.toml` on a branch, with the new
    `account_id`.
-4. **mz:** give the old secret values, or confirm new ones for
-   `SESSION_SIGNING_KEY` and `ADMIN_DASHBOARD_TOKEN`. The two salts must be
-   the old values.
+4. **Agent:** set fresh secrets on the new account. Decided 2026-11-21: the
+   old salts were not saved anywhere, and the community database held 1 user
+   identity (mz), 2 support tickets, 2 feature requests, 2 votes, 1
+   testimonial and 6 telemetry installs. After mz signs in to the community
+   on the new account, one SQL update points mz's old rows at the new user
+   hash. Telemetry installs get new anonymous ids; daily rollups do not
+   depend on the salt. Back up the new salts: rotating `USER_HASH_SALT`
+   later disconnects every community identity.
 5. **Agent:** deploy all three workers to the new account on `workers.dev`
    addresses only (no custom domains yet).
 6. **Agent, write freeze:** deploy the old backend with writes answering 503.
@@ -65,6 +99,50 @@ with wrangler logged in as the new account's owner.
 The outage is the time between step 8 and step 9. While the new zone is
 pending, it serves no worker traffic. The old workers stay in freeze until
 then.
+
+## 3a. Progress (2026-11-21)
+
+- Done: steps 1 to 5. Both backends run the copy routes; the new backend,
+  community worker and site run on the new account's `workers.dev`
+  subdomain (`septena-mcp-gateway`, the name wrangler registered). New
+  secrets are in the macOS keychain under `septena-cf/*`.
+- Copy tool: `backend/scripts/account-move.mjs` (`users`, `kv`, `stores`,
+  `r2`). It reads `ADMIN_TOKEN` from the keychain.
+- Rehearsal: `stores --suffix _rehearsal` copied the only user (mz) into a
+  separate id on the new account; every table count matched (2,090 tasks,
+  2,903 change rows). No attachments exist. The D1 export produced 19
+  tables and 519 rows.
+- KV is copied once, in the freeze window, into empty namespaces. A copy
+  before the freeze could keep a token alive on the new account after the
+  old account revoked it.
+- Remove the `_rehearsal` store with the old-account cleanup in step 12.
+
+## 3b. Cutover log (2026-11-21)
+
+- Old backend frozen (`MAINTENANCE=true`). Copied: KV (203 TOKENS, 72
+  CLIENTS, 5 ATTEST keys), mz's TaskStore (all table counts match), D1
+  (counts match). No attachments.
+- Trap: the live backend had been deployed from local main with unpushed
+  backend work (ST0 star, TR1 reminders, onboarding prompt). The copy failed
+  on `tasks.starred` until both backends ran origin/main plus that work.
+  Deploy from a tree that matches what is live, or columns go missing.
+- Gandi nameservers switched to `henrik` and `jasmine` at 15:44 (registry
+  updated within minutes). `api`, `community`, apex and `www` were attached
+  to the new workers while the zone was still pending; traffic through the
+  new nameservers reached them at once.
+- Not moved: `septena-reports` (`reports.septena.app`), an unconfigured
+  template no app calls; its `REPORTS` namespace (7 keys) stays on the old
+  account.
+- Step 10 passed: mz's iPhone loads tasks against the new backend.
+- Step 11 done: Email Sending enabled for `septena.app` (records on
+  `cf-bounce`, DKIM `cf-bounce._domainkey`). Cloudflare set `_dmarc` to
+  `p=reject`; mz set it to `p=none` because the Gandi mailbox has no DKIM
+  record in the zone, so forwarded Gandi mail could be rejected. Add Gandi
+  DKIM, then return `_dmarc` to `p=reject`.
+- Left: ~~step 10~~ ~~step 11~~, step 11 (Email Sending), the
+  community re-link if mz signs in to the community again, step 12 after
+  14 days (old workers, KV, R2, D1, the three stray namespaces and the
+  `_rehearsal` store on the new account).
 
 ## 4. Checks before the old account is cleaned
 

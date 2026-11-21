@@ -71,7 +71,7 @@ enum PCCModel {
 /// Claude & AI). Default false = safe: on-device is used and nothing ever
 /// touches a PCC symbol at runtime.
 enum PCCConfig {
-  static let routingEnabledKey = "septena.ai.pccRoutingEnabled"
+  static let routingEnabledKey = RegistrySettings.StorageKey.pccRoutingEnabled
   static var routingEnabled: Bool {
     UserDefaults.standard.bool(forKey: routingEnabledKey)   // default false
   }
@@ -81,7 +81,7 @@ enum PCCConfig {
   /// better but is slower and spends the daily allowance faster). Stored as a
   /// plain string here (SeptenaCore compiles on the 26 floor); the PCC code
   /// maps it to `ContextOptions.ReasoningLevel` behind `#available`.
-  static let reasoningKey = "septena.ai.pccReasoning"
+  static let reasoningKey = RegistrySettings.StorageKey.pccReasoning
   enum Reasoning: String, CaseIterable, Sendable {
     case light, balanced, thorough   // → .light / .moderate / .deep
     var title: String {
