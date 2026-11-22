@@ -26,7 +26,7 @@ refs: [septena#66]
 - `id` is the file name without `.md`.
 - `kind` is `new` (a person could not do it before), `improved` (it works or
   reads better), `fixed` (it was broken), or `removed`.
-- `platforms` lists `ios`, `ipad`, `mac`, one or more.
+- `platforms` lists `ios`, `ipad`, `mac`, `watch`, one or more.
 - `refs` lists issues and pull requests (`septena#87`), or `[]`.
 - `feature` (optional) is a feature ID from the task app's feature map.
 - No `version`: the release step assigns it.
