@@ -79,6 +79,9 @@ export const SETTING_VALUES = {
   getStartedDismissed: z.boolean(),
   /// "Get started" checklist steps completed (step raw IDs).
   getStartedSteps: z.array(z.string().max(64)).max(32),
+  /// Upsell moments (registry/plans.json `upsells` ids) this account has seen.
+  /// Each one shows once per account (docs/SYNC_SUBSCRIPTION_SPEC.md §7.1).
+  upsellsSeen: z.array(z.string().max(64)).max(32),
   /// When the first run (registry/surfaces.json `firstRun`) finished on any
   /// device. Set once; a second device that signs in skips the first run.
   onboardedAt: z.string().regex(new RegExp(ENTITY_PATTERNS.stamp), "expected ISO time").max(ENTITY_LIMITS.stampMax),

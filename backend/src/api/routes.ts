@@ -24,6 +24,7 @@ import {
   attachmentQuotaBytes,
   decide,
   historyCutoff,
+  historyEdgeUpsell,
   isEnforcing,
   isRowActive,
   planCheckFailed,
@@ -291,7 +292,9 @@ api.get("/changes", async (c) => {
     return c.json({ changes });
   }
   const hidden = changes.length < q.data.limit ? await store.historyHidden(entity, id, since) : null;
-  return c.json({ changes, windowDays: plan!.limits.changeLogDays, hiddenOlder: hidden });
+  // `upsell` names the moment the app shows at the end of the list: set
+  // only on the free plan when older changes were hidden.
+  return c.json({ changes, windowDays: plan!.limits.changeLogDays, hiddenOlder: hidden, upsell: historyEdgeUpsell(plan ?? null, hidden) });
 });
 
 // ---- attachments (bytes proxied through the Worker; §10 limits) ----

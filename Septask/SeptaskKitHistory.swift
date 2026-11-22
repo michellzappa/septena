@@ -94,11 +94,13 @@ final class KitHistoryView: NSStackView {
     status.stringValue = String(localized: "Loading…", comment: "SeptaskKit: history loading")
     status.isHidden = false
     loadTask = Task { [weak self] in
-      let result: Result<[BackendChange], Error>
+      let result: Result<BackendChangesResponse, Error>
       do { result = .success(try await TaskBackendClient.shared.history(taskID: id)) } catch { result = .failure(error) }
       guard let self, !Task.isCancelled, self.taskID == id, self.expanded else { return }
       switch result {
-      case .success(let changes): self.render(TaskHistory.rows(changes, listTitle: self.listTitle))
+      case .success(let page):
+        self.render(TaskHistory.rows(page.changes, listTitle: self.listTitle),
+                    edge: TaskHistory.edgeUpsell(page))
       case .failure:
         self.render([])
         self.status.stringValue = String(localized: "Couldn’t load history.", comment: "SeptaskKit: history error")
@@ -107,13 +109,14 @@ final class KitHistoryView: NSStackView {
     }
   }
 
-  /// nil clears the rows (collapsed, or a load in flight).
-  private func render(_ items: [TaskHistoryRow]?) {
+  /// nil clears the rows (collapsed, or a load in flight). `edge` is the
+  /// `history_edge` upsell the server sent for the free plan (spec §3.2).
+  private func render(_ items: [TaskHistoryRow]?, edge: RegistryPlanNote? = nil) {
     rows.arrangedSubviews.forEach { $0.removeFromSuperview() }
     status.isHidden = !expanded || items == nil
     rows.isHidden = !expanded
     guard let items else { return }
-    if items.isEmpty {
+    if items.isEmpty, edge == nil {
       status.stringValue = String(localized: "No changes yet.", comment: "SeptaskKit: history empty")
       return
     }
@@ -124,6 +127,40 @@ final class KitHistoryView: NSStackView {
       rows.addArrangedSubview(row)
       row.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
     }
+    if let edge {
+      let line = edgeView(edge)
+      rows.addArrangedSubview(line)
+      line.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
+    }
+  }
+
+  /// A quiet last line: older changes are hidden, one click to Plus. The
+  /// detail shows until the account has seen this moment; after that only
+  /// the title and the button stay (spec §7.1).
+  private func edgeView(_ moment: RegistryPlanNote) -> NSView {
+    let stack = NSStackView()
+    stack.orientation = .vertical
+    stack.alignment = .leading
+    stack.spacing = 2
+    let seen = SettingsMirror.upsellsSeen(context: LocalStore.shared.container.mainContext).contains(moment.id)
+    for text in seen ? [moment.title] : [moment.title, moment.detail] {
+      let label = NSTextField(wrappingLabelWithString: text)
+      label.font = SeptaskKitTheme.meta
+      label.textColor = SeptaskKitTheme.inkSecondary
+      stack.addArrangedSubview(label)
+      label.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+    }
+    let button = NSButton(title: RegistryPlans.Paywall.seePlus, target: self, action: #selector(seePlus))
+    button.bezelStyle = .inline
+    button.font = SeptaskKitTheme.meta
+    button.refusesFirstResponder = true
+    stack.addArrangedSubview(button)
+    return stack
+  }
+
+  @objc private func seePlus() {
+    guard let presenter = window?.contentViewController else { return }
+    SeptaskPlusSheet.present(upsellID: "history_edge", from: presenter)
   }
 
   private static func rowView(_ item: TaskHistoryRow, now: Date) -> NSView {

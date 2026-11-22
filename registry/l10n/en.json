@@ -1953,6 +1953,8 @@
   "See Plus": {
     "text": "See Plus",
     "paths": [
+      "surfaces.notices.items.trialEnd.primaryTitle",
+      "surfaces.notices.items.secondDevice.primaryTitle",
       "plans.paywall.seePlus"
     ]
   },
@@ -2011,6 +2013,12 @@
     "text": "Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import.",
     "paths": [
       "settings.pages.import_export.sections.move_in.footer"
+    ]
+  },
+  "Septena could not reach the server. Try again in a moment.": {
+    "text": "Septena could not reach the server. Try again in a moment.",
+    "paths": [
+      "plans.paywall.syncThisDeviceFailed"
     ]
   },
   "Septena keeps deleted tasks here for 30 days, then deletes them for good.": {
@@ -2261,6 +2269,12 @@
     "text": "Sync & storage diagnostics",
     "paths": [
       "settings.pages.advanced.sections.diagnostics.items.0.label"
+    ]
+  },
+  "Sync This Device": {
+    "text": "Sync This Device",
+    "paths": [
+      "plans.actions.syncThisDevice"
     ]
   },
   "Sync speed": {

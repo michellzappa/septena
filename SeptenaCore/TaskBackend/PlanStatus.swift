@@ -26,6 +26,19 @@ struct BackendEntitlement: Decodable, Sendable {
   let appAccountToken: String?
   /// ms since 1970: the reverse trial's end while it is the only active row.
   let trialEndsAt: Double?
+  /// True when the server refuses calls past a limit. In log-only mode it
+  /// reports limits (a device as not syncing) but still serves the call.
+  /// Optional so an older server answer still decodes.
+  let enforced: Bool?
+  /// The calling device's sync slot (spec §6.3). Optional for an older server.
+  let device: Device?
+
+  struct Device: Decodable, Sendable {
+    /// This device holds a sync slot.
+    let syncing: Bool
+    let syncingDevices: Int
+    let knownDevices: Int
+  }
 }
 
 @MainActor
@@ -54,6 +67,14 @@ final class PlanStatus {
   private(set) var lastError: String?
   /// From the last answer. Purchases need it; nil until the first read.
   private(set) var appAccountToken: UUID?
+  /// The server refuses calls past a limit (not log-only mode).
+  private(set) var enforced = false
+  /// This device holds a sync slot. nil until the server says so; true on
+  /// an older server that does not report it.
+  private(set) var deviceSyncing: Bool?
+  /// The reverse trial ran out and the account never paid: a `trial` row
+  /// exists, none is active, and no other row ever existed.
+  private(set) var trialEnded = false
 
   private init() {}
 
@@ -74,6 +95,14 @@ final class PlanStatus {
     }
   }
 
+  /// The server stops sync on this device: the free account's one slot is
+  /// on another device. False in log-only mode, where the server reports
+  /// `syncing: false` but still syncs (spec §6.3). The server judges; this
+  /// only reads its answer.
+  var deviceNotSyncing: Bool {
+    enforced && deviceSyncing == false && !isPlus
+  }
+
   /// One status line for Settings, from the registry copy.
   var statusLine: String? {
     switch plan {
@@ -88,21 +117,68 @@ final class PlanStatus {
 
   /// Reads the plan from the server. Signed out, the plan is `.device`. A
   /// failed read keeps the last known plan and records the error.
+  ///
+  /// When a value Today's notices read changes (the plan, the device slot,
+  /// the trial end), it posts `.septenaTasksChanged` so both task lists
+  /// read their notices again.
   func refresh() async {
+    let before = noticeInputs
+    defer { if noticeInputs != before { NotificationCenter.default.post(name: .septenaTasksChanged, object: nil) } }
     guard TaskBackendClient.hasSession else {
       plan = .device
       appAccountToken = nil
       lastError = nil
+      enforced = false
+      deviceSyncing = nil
+      trialEnded = false
       return
     }
     do {
       let answer = try await TaskBackendClient.shared.entitlement()
       plan = Self.plan(from: answer)
       appAccountToken = answer.appAccountToken.flatMap(UUID.init(uuidString:))
+      enforced = answer.enforced ?? false
+      deviceSyncing = answer.device?.syncing ?? true
+      trialEnded = Self.trialEnded(answer)
       lastError = nil
     } catch {
       lastError = error.localizedDescription
     }
+  }
+
+  /// Moves the free account's sync slot to this device
+  /// (`POST /v1/entitlement/device`). The other device stops syncing and
+  /// keeps its local data. Reads the plan again after, and starts a sync.
+  /// False when the server did not take the move.
+  @discardableResult
+  func syncThisDevice() async -> Bool {
+    do {
+      try await TaskBackendClient.shared.claimSyncDevice()
+    } catch {
+      lastError = error.localizedDescription
+      return false
+    }
+    await refresh()
+    TaskSyncEngine.shared.activate()
+    return true
+  }
+
+  private struct NoticeInputs: Equatable {
+    let plan: Plan?
+    let deviceNotSyncing: Bool
+    let trialEnded: Bool
+  }
+
+  private var noticeInputs: NoticeInputs {
+    NoticeInputs(plan: plan, deviceNotSyncing: deviceNotSyncing, trialEnded: trialEnded)
+  }
+
+  /// The trial ran out and nothing was ever bought or granted.
+  nonisolated static func trialEnded(_ answer: BackendEntitlement) -> Bool {
+    guard !answer.active else { return false }
+    let rows = answer.entitlements
+    return rows.contains { $0.source == "trial" && !$0.active }
+      && !rows.contains { $0.source != "trial" }
   }
 
   nonisolated static func plan(from answer: BackendEntitlement) -> Plan {

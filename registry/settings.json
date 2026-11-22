@@ -73,6 +73,16 @@
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
       "featureId": "lists.today"
     },
+    "upsellsSeen": {
+      "scope": "synced",
+      "type": "string[]",
+      "maxItems": 32,
+      "itemMaxLength": 64,
+      "default": [],
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "sync.backend"
+    },
     "onboardedAt": {
       "scope": "synced",
       "type": "string",

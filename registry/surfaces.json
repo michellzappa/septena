@@ -54,6 +54,28 @@
         ]
       },
       {
+        "id": "trialEnd",
+        "kind": "info",
+        "priority": 1,
+        "icon": "notice.trial_end",
+        "dismissScope": "account",
+        "dismissible": true,
+        "upsell": "trial_end",
+        "primaryTitle": "See Plus",
+        "featureId": "sync.backend"
+      },
+      {
+        "id": "secondDevice",
+        "kind": "info",
+        "priority": 1,
+        "icon": "notice.second_device",
+        "dismissScope": "account",
+        "dismissible": true,
+        "upsell": "second_device",
+        "primaryTitle": "See Plus",
+        "featureId": "sync.backend"
+      },
+      {
         "id": "weeklySweep",
         "kind": "info",
         "priority": 3,

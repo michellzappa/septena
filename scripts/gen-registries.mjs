@@ -455,12 +455,20 @@ function validateFirstRun(surfaces, icons, caps, settings) {
   assert(fr.steps[fr.steps.length - 1].kind === "finish", "surfaces.json: firstRun last step must be kind finish");
 }
 
-function validateSurfaces(surfaces, icons, caps) {
+function validateSurfaces(surfaces, icons, caps, plans) {
   assert(surfaces.version === 1, "surfaces.json: version must be 1");
   assert(surfaces.notices.maxConcurrentExplainers === 1, "surfaces.json: maxConcurrentExplainers must be 1");
+  const upsellIds = new Set(plans.upsells.map((u) => u.id));
   for (const n of surfaces.notices.items) {
     assert(n.icon in icons.icons, `surfaces.json: notice ${n.id} unknown icon "${n.icon}"`);
     assert(n.featureId in caps.capabilities, `surfaces.json: notice ${n.id} unknown featureId "${n.featureId}"`);
+    // An upsell notice takes its title and detail from plans.json `upsells`
+    // (spec §3.2): one copy of the words, never a second one here.
+    if (n.upsell !== undefined) {
+      assert(upsellIds.has(n.upsell), `surfaces.json: notice ${n.id} unknown upsell "${n.upsell}"`);
+      assert(n.title === undefined && n.detail === undefined && n.platformDetails === undefined,
+        `surfaces.json: notice ${n.id} is an upsell; its title and detail come from plans.json`);
+    }
   }
   assert(surfaces.prompts.safetyContract.cancelIsDefaultButton === true, "surfaces.json: cancelIsDefaultButton must be true");
   for (const p of surfaces.prompts.items) {
@@ -1185,6 +1193,9 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  /// Platform key (`ios`, `ipados`, `macos`, …) → detail that replaces `detail` there.");
   lines.push("  let platformDetails: [String: String]");
   lines.push("  let primaryTitle: String?");
+  lines.push("  /// The `registry/plans.json` upsell this notice shows. Its title and detail");
+  lines.push("  /// come from `RegistryPlans.upsell(_:)`, never from this row.");
+  lines.push("  let upsellId: String?");
   lines.push("  let steps: [RegistryNoticeStep]");
   lines.push("  func detail(for platform: String) -> String? { platformDetails[platform] ?? detail }");
   lines.push("}");
@@ -1210,7 +1221,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const n of surfaces.notices.items) {
     const title = n.title === undefined || isTmpl(n.title) ? "nil" : L(n.title, n, "title");
     const steps = (n.steps ?? []).map((st) => `RegistryNoticeStep(id: ${swiftStr(st.id)}, title: ${L(st.title, st, "title")}, detail: ${L(st.detail, st, "detail")}, platformDetails: ${platformMap(st)})`).join(", ");
-    lines.push(`    RegistryNotice(id: ${swiftStr(n.id)}, kind: ${swiftStr(n.kind)}, priority: ${n.priority}, iconId: ${swiftStr(n.icon)}, sfSymbol: ${swiftStr(icons.icons[n.icon].sfSymbol)}, dismissScope: ${swiftStr(n.dismissScope)}, dismissible: ${Boolean(n.dismissible)}, explainerSlot: ${Boolean(n.explainerSlot)}, featureId: ${swiftStr(n.featureId)}, title: ${title}, detail: ${LOpt(n.detail, n, "detail")}, platformDetails: ${platformMap(n)}, primaryTitle: ${LOpt(n.primaryTitle, n, "primaryTitle")}, steps: [${steps}]),`);
+    lines.push(`    RegistryNotice(id: ${swiftStr(n.id)}, kind: ${swiftStr(n.kind)}, priority: ${n.priority}, iconId: ${swiftStr(n.icon)}, sfSymbol: ${swiftStr(icons.icons[n.icon].sfSymbol)}, dismissScope: ${swiftStr(n.dismissScope)}, dismissible: ${Boolean(n.dismissible)}, explainerSlot: ${Boolean(n.explainerSlot)}, featureId: ${swiftStr(n.featureId)}, title: ${title}, detail: ${LOpt(n.detail, n, "detail")}, platformDetails: ${platformMap(n)}, primaryTitle: ${LOpt(n.primaryTitle, n, "primaryTitle")}, upsellId: ${n.upsell === undefined ? "nil" : swiftStr(n.upsell)}, steps: [${steps}]),`);
   }
   lines.push("  ]");
   lines.push("  static let byId: [String: RegistryNotice] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })");
@@ -1965,7 +1976,7 @@ validateCapabilities(caps);
 validateSettings(settings, entities, icons, caps);
 const destIds = validateDestinations(dests, icons, caps);
 validateActions(actions, icons, caps, destIds);
-validateSurfaces(surfaces, icons, caps);
+validateSurfaces(surfaces, icons, caps, plans);
 validateFirstRun(surfaces, icons, caps, settings);
 validatePlans(plans, icons, caps);
 validateConformance();

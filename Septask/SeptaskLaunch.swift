@@ -74,6 +74,9 @@ enum SeptaskLaunch {
     SeptaskDiagnosticsCoordinator.shared.start()
     // Task backend: reconcile, push, pull, reopen the live socket.
     TaskSyncEngine.shared.activate()
+    // The plan, fresh for Today's upsell notices (spec §3.2). The server
+    // judges it; a change posts `.septenaTasksChanged`.
+    Task { @MainActor in await PlanStatus.shared.refresh() }
     // Opened after midnight (or after a few days away): a backgrounded app
     // does not reliably receive `NSCalendarDayChanged`, so the foreground is
     // the reliable place to advance fixed-schedule repeats. Idempotent —

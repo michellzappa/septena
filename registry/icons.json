@@ -99,6 +99,8 @@
     "convo.working": { "sfSymbol": "circle.fill", "material": "circle", "lucide": "circle" },
     "convo.done": { "sfSymbol": "checkmark.circle.fill", "material": "check_circle", "lucide": "check-circle-2" },
     "convo.wont_do": { "sfSymbol": "minus.circle", "material": "do_not_disturb_on", "lucide": "minus-circle" },
+    "notice.second_device": { "sfSymbol": "laptopcomputer.and.iphone", "material": "devices", "lucide": "monitor-smartphone" },
+    "notice.trial_end": { "sfSymbol": "hourglass", "material": "hourglass_bottom", "lucide": "hourglass" },
     "notice.weekly_sweep": { "sfSymbol": "circle.dashed", "material": "blur_circular", "lucide": "circle-dashed" },
     "action.text_size": { "sfSymbol": "textformat.size", "material": "format_size", "lucide": "a-large-small" },
     "action.window": { "sfSymbol": "macwindow", "material": "web_asset", "lucide": "app-window" },

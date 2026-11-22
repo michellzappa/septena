@@ -200,6 +200,15 @@ export function historyCutoff(env: Env, limits: PlanLimits | null, now = Date.no
   return new Date(now - limits.changeLogDays * DAY_MS).toISOString();
 }
 
+/// The `history_edge` upsell for a history read (spec §3.2): only on the free
+/// plan, only when the window hid at least one older change. `hidden` is the
+/// count from the last page, or null while more pages follow. Plus also has
+/// a window (365 days) but no upsell: nothing to sell there.
+export function historyEdgeUpsell(state: PlanState | null, hidden: number | null): UpsellId | null {
+  if (!state || state.plan !== "free" || hidden === null || hidden <= 0) return null;
+  return "history_edge";
+}
+
 export function attachmentQuotaBytes(limits: PlanLimits): number | null {
   return limits.attachmentsGB === null ? null : limits.attachmentsGB * 1024 ** 3;
 }

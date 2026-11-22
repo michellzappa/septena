@@ -29,6 +29,12 @@ struct BackendChange: Decodable, Sendable {
 
 struct BackendChangesResponse: Decodable, Sendable {
   let changes: [BackendChange]
+  /// Changes older than the plan's window that the server did not send.
+  /// Absent outside enforce mode; nil while more pages follow.
+  let hiddenOlder: Int?
+  /// The upsell moment for the end of the list (`history_edge`): set by the
+  /// server only on the free plan when it hid older changes (spec §3.2).
+  let upsell: String?
 }
 
 // MARK: - Rows
@@ -53,6 +59,13 @@ enum TaskHistory {
   /// device holds a session: the log lives there and nowhere else.
   static var isAvailable: Bool {
     TaskStoreMode.current == .backend && TaskBackendClient.hasSession
+  }
+
+  /// The upsell line under the last row, when the server says the free
+  /// plan's window hid older changes. The server judges; nil otherwise.
+  static func edgeUpsell(_ page: BackendChangesResponse) -> RegistryPlanNote? {
+    guard page.upsell == "history_edge" else { return nil }
+    return RegistryPlans.upsell("history_edge")
   }
 
   /// Rows newest first. `listTitle` names an area or project id, nil when

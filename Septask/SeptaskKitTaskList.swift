@@ -1475,8 +1475,17 @@ final class SeptaskKitTaskListController: NSViewController {
     switch id {
     case .signIn: return { SeptaskAppKitSignIn.shared.start() }
     case .weeklySweep: return { [weak self] in self?.presentWeeklySweepSheet() }
+    case .trialEnd, .secondDevice:
+      guard let upsell = RegistryNotices.byId[id.rawValue]?.upsellId else { return nil }
+      return { [weak self] in self?.presentPlusSheet(upsellID: upsell) }
     default: return nil
     }
+  }
+
+  /// The Plus sheet for an upsell moment (spec §3.2, §7.1). Opening it from
+  /// the notice marks the moment seen, so the notice leaves Today.
+  private func presentPlusSheet(upsellID: String) {
+    SeptaskPlusSheet.present(upsellID: upsellID, from: self)
   }
 
   // MARK: - Reminders inbox

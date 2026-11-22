@@ -140,6 +140,16 @@ describe("usage and history", () => {
     assert.equal(store.historyHidden("task", "window-task", since), 1);
   });
 
+  it("offers the history_edge upsell only on the free plan with hidden changes", () => {
+    const free = { plan: "free" as const, limits: ent.PLAN_TABLE.free, rows: [], usage: {} };
+    const plus = { plan: "plus" as const, limits: ent.PLAN_TABLE.plus, rows: [], usage: {} };
+    assert.equal(ent.historyEdgeUpsell(free, 3), "history_edge");
+    assert.equal(ent.historyEdgeUpsell(free, 0), null, "nothing hidden");
+    assert.equal(ent.historyEdgeUpsell(free, null), null, "more pages follow");
+    assert.equal(ent.historyEdgeUpsell(plus, 3), null, "Plus has no upsell");
+    assert.equal(ent.historyEdgeUpsell(null, 3), null, "no plan");
+  });
+
   it("sums stored attachment bytes", async () => {
     const { store } = await createTestTaskStore();
     assert.equal(store.attachmentBytes(), 0);

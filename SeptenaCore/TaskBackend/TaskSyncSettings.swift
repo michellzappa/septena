@@ -71,6 +71,7 @@ enum SeptaskSyncedSettings {
     case "agentsPaused": return s.agentsPaused.map { .bool($0) } ?? .null
     case "getStartedDismissed": return s.getStartedDismissed.map { .bool($0) } ?? .null
     case "getStartedSteps": return s.getStartedSteps.map { .array($0.map { .string($0) }) } ?? .null
+    case "upsellsSeen": return s.upsellsSeen.map { .array($0.map { .string($0) }) } ?? .null
     // A `Date` on device, an ISO instant on the wire (registry format "stamp").
     case "onboardedAt": return s.onboardedAt.map { .string(stampFormatter.string(from: $0)) } ?? .null
     case "accentColor": return .from(s.accentColor)
@@ -135,6 +136,15 @@ enum SeptaskSyncedSettings {
         let steps = list.compactMap(\.stringValue)
         guard steps.count == list.count else { return false }
         s.getStartedSteps = steps
+      default: return false
+      }
+    case "upsellsSeen":
+      switch v {
+      case .null: s.upsellsSeen = nil
+      case .array(let list):
+        let ids = list.compactMap(\.stringValue)
+        guard ids.count == list.count else { return false }
+        s.upsellsSeen = ids
       default: return false
       }
     case "calendarHiddenTitles":

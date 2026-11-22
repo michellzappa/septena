@@ -51,6 +51,10 @@ struct TaskNotice: Identifiable, Equatable {
     /// The first-run checklist (Septask): steps drawn like task rows that
     /// tick off as the user does them.
     case getStarted
+    /// Upsell (spec §3.2): the free account's trial ran out.
+    case trialEnd
+    /// Upsell (spec §3.2): the free account syncs another device, not this one.
+    case secondDevice
   }
 
   let id: ID
@@ -60,6 +64,9 @@ struct TaskNotice: Identifiable, Equatable {
   var detail: String?
   /// Title of the trailing action. The shell wires the action itself by `id`.
   var primaryTitle: String?
+  /// The `registry/plans.json` upsell this notice shows; the shell opens the
+  /// Plus sheet with it. Nil for every other notice.
+  var upsellID: String? = nil
   var dismissible: Bool
   /// Checklist rows under the notice, drawn like task rows. Empty for a
   /// plain notice.
@@ -103,6 +110,7 @@ enum TaskNotices {
                     today: String, context: ModelContext) -> [TaskNotice] {
     var out: [TaskNotice] = []
     if requiresSignIn, !hasSeen(.signIn) { out.append(signIn) }
+    if let upsell = upsell(context: context) { out.append(upsell) }
     if let sweep = weeklySweep(context: context) { out.append(sweep) }
     if let rolled = rolledIn(pool: pool, today: today, context: context) { out.append(rolled) }
     // Onboarding counts as the one explainer slot: never a tip and a
@@ -138,7 +146,20 @@ enum TaskNotices {
       TaskFade.dismissSweepForCurrentWeek(now: DayClock.appNow)
     case .fadeIntro:
       markSeen(id)
+    case .trialEnd, .secondDevice:
+      if let upsell = registry(id).upsellId { markUpsellSeen(upsell, context: context) }
     }
+  }
+
+  /// Marks an upsell moment seen for the whole account (synced setting
+  /// `upsellsSeen`). Opening the Plus sheet from a notice and dismissing it
+  /// both call this, so the moment never shows as a prompt again. Posts
+  /// `.septenaTasksChanged` so both task lists drop the notice.
+  static func markUpsellSeen(_ upsellID: String, context: ModelContext? = nil) {
+    let ctx = context ?? LocalStore.shared.container.mainContext
+    guard !SettingsMirror.upsellsSeen(context: ctx).contains(upsellID) else { return }
+    SettingsMirror.markUpsellSeen(upsellID, context: ctx, engine: SeptenaServices.shared.ckEngine)
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
   }
 
   /// Re-arms the sign-in notice after a successful sign-in so a future
@@ -223,6 +244,33 @@ enum TaskNotices {
       title: title ?? row.title ?? "",
       detail: row.detail(for: RegistryPlatform.current),
       primaryTitle: row.primaryTitle, dismissible: row.dismissible, steps: steps)
+  }
+
+  // MARK: - Upsell moments (docs/SYNC_SUBSCRIPTION_SPEC.md §3.2)
+  //
+  // A moment shows only when the user meets the limit, once per account,
+  // with one tap to the Plus sheet. The server judges the plan
+  // (`PlanStatus`, read from `GET /v1/entitlement`); this only reads its
+  // answer. At most one upsell at a time, so Today never opens under a
+  // stack of them. The words come from `registry/plans.json` `upsells`.
+
+  private static func upsell(context: ModelContext) -> TaskNotice? {
+    guard TaskBackendClient.hasSession else { return nil }
+    let status = PlanStatus.shared
+    let seen = SettingsMirror.upsellsSeen(context: context)
+    var candidates: [TaskNotice.ID] = []
+    if status.trialEnded, !status.isPlus { candidates.append(.trialEnd) }
+    if status.deviceNotSyncing { candidates.append(.secondDevice) }
+    for id in candidates {
+      let row = registry(id)
+      guard let upsellID = row.upsellId, !seen.contains(upsellID),
+            let moment = RegistryPlans.upsell(upsellID) else { continue }
+      return TaskNotice(
+        id: id, kind: TaskNoticeKind(registry: row.kind), symbol: row.sfSymbol,
+        title: moment.title, detail: moment.detail,
+        primaryTitle: row.primaryTitle, upsellID: upsellID, dismissible: row.dismissible)
+    }
+    return nil
   }
 
   private static var signIn: TaskNotice { notice(.signIn) }

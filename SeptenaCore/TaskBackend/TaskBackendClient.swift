@@ -220,7 +220,8 @@ actor TaskBackendClient {
 
   /// One task's change log, newest first (`GET /v1/changes?entity=task&id=`).
   /// Page back with `before`: the smallest `rev` already shown.
-  func history(taskID: String, limit: Int = TaskHistory.pageSize, before: Int? = nil) async throws -> [BackendChange] {
+  /// The page also says when the plan's window hid older changes.
+  func history(taskID: String, limit: Int = TaskHistory.pageSize, before: Int? = nil) async throws -> BackendChangesResponse {
     var parts = URLComponents()
     parts.path = "/v1/changes"
     parts.queryItems = [
@@ -231,7 +232,7 @@ actor TaskBackendClient {
     guard let path = parts.string else { throw TaskBackendError.badResponse("bad path") }
     let (data, status) = try await authed(path: path, method: "GET", body: nil)
     guard status == 200 else { throw Self.httpError(status, data) }
-    return try decode(BackendChangesResponse.self, from: data, what: "history").changes
+    return try decode(BackendChangesResponse.self, from: data, what: "history")
   }
 
   // MARK: - Sign-in approval (a new device, or the Claude connector)
@@ -267,6 +268,13 @@ actor TaskBackendClient {
     let (data, status) = try await authed(path: "/v1/entitlement", method: "GET", body: nil)
     guard status == 200 else { throw Self.httpError(status, data) }
     return try decode(BackendEntitlement.self, from: data, what: "entitlement")
+  }
+
+  /// Moves the free account's sync slot to this device
+  /// (`POST /v1/entitlement/device`, spec §6.3). Free on every plan.
+  func claimSyncDevice() async throws {
+    let (data, status) = try await authed(path: "/v1/entitlement/device", method: "POST", body: Data("{}".utf8))
+    guard status == 200 else { throw Self.httpError(status, data) }
   }
 
   /// Hands one StoreKit 2 transaction to the server

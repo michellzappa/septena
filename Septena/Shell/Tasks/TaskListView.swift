@@ -587,6 +587,8 @@ struct TaskListView: View {
   @State private var cachedTodayNotices: [TaskNotice] = []
   /// Non-nil presents the Weekly Sweep sheet (`docs/TASK_FADE_SPEC.md` §5).
   @State private var sweepSheetTasks: [SeptenaTask]? = nil
+  /// Non-nil presents the Plus sheet for this upsell moment (spec §3.2).
+  @State private var plusSheetUpsell: String? = nil
   /// One group-title line of space above the logged footer (scales with
   /// Dynamic Type like the titles it matches).
   @ScaledMetric(relativeTo: .headline) private var loggedFooterGap: CGFloat = 34
@@ -634,6 +636,14 @@ struct TaskListView: View {
           }
         }
       }
+      #if SEPTASK
+      .sheet(isPresented: Binding(
+        get: { plusSheetUpsell != nil },
+        set: { if !$0 { plusSheetUpsell = nil } }
+      )) {
+        SeptaskPlusSheet(upsellID: plusSheetUpsell)
+      }
+      #endif
       .confirmationDialog(
         RegistryPrompts.prompt("rescheduleFixedRepeat").title,
         isPresented: Binding(
@@ -2288,6 +2298,15 @@ struct TaskListView: View {
     }
     #if SEPTASK
     if notice.id == .signIn { SeptaskSignInButton(compact: true) }
+    if let upsell = notice.upsellID {
+      Button(notice.primaryTitle ?? RegistryPlans.Paywall.seePlus) {
+        // Opening the sheet from the notice marks the moment seen.
+        TaskNotices.markUpsellSeen(upsell, context: modelContext)
+        plusSheetUpsell = upsell
+      }
+      .buttonStyle(.bordered)
+      .controlSize(.small)
+    }
     #endif
   }
 

@@ -14,6 +14,11 @@ struct TaskHistorySection: View {
   @State private var rows: [TaskHistoryRow] = []
   @State private var loadedFor: String?
   @State private var failed = false
+  /// The `history_edge` upsell under the last row (spec §3.2), when the
+  /// server hid older changes for the free plan.
+  @State private var edge: RegistryPlanNote?
+  @State private var edgeSeen = false
+  @State private var showingPlus = false
 
   var body: some View {
     // A VStack, not a Group: `.task` needs a child that always exists
@@ -31,6 +36,9 @@ struct TaskHistorySection: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .task(id: expanded ? taskID : nil) { await load() }
+    #if SEPTASK
+    .sheet(isPresented: $showingPlus) { SeptaskPlusSheet(upsellID: edge?.id) }
+    #endif
   }
 
   private var header: some View {
@@ -49,10 +57,32 @@ struct TaskHistorySection: View {
       ProgressView().controlSize(.small)
     } else if failed {
       Text("Couldn’t load history.").font(.caption).foregroundStyle(.secondary)
-    } else if rows.isEmpty {
+    } else if rows.isEmpty, edge == nil {
       Text("No changes yet.").font(.caption).foregroundStyle(.secondary)
     } else {
       ForEach(rows) { TaskHistoryRowView(row: $0) }
+      if let edge { edgeLine(edge) }
+    }
+  }
+
+  /// A quiet last line: older changes are hidden, one tap to Plus. The
+  /// detail shows until the account has seen this moment; after that only
+  /// the title and the button stay (spec §7.1).
+  private func edgeLine(_ moment: RegistryPlanNote) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(moment.title).font(.caption).foregroundStyle(.secondary)
+      if !edgeSeen {
+        Text(moment.detail).font(.caption2).foregroundStyle(.secondary)
+      }
+      #if SEPTASK
+      Button(RegistryPlans.Paywall.seePlus) {
+        TaskNotices.markUpsellSeen(moment.id, context: modelContext)
+        edgeSeen = true
+        showingPlus = true
+      }
+      .font(.caption)
+      .buttonStyle(.borderless)
+      #endif
     }
   }
 
@@ -60,9 +90,11 @@ struct TaskHistorySection: View {
     guard expanded, loadedFor != taskID else { return }
     let id = taskID
     do {
-      let changes = try await TaskBackendClient.shared.history(taskID: id)
+      let page = try await TaskBackendClient.shared.history(taskID: id)
       let lists = StructureCache.snapshot(in: modelContext)
-      rows = TaskHistory.rows(changes) { listID in
+      edge = TaskHistory.edgeUpsell(page)
+      edgeSeen = SettingsMirror.upsellsSeen(context: modelContext).contains("history_edge")
+      rows = TaskHistory.rows(page.changes) { listID in
         lists.projects.first { $0.id == listID }?.title ?? lists.areas.first { $0.id == listID }?.title
       }
       failed = false
@@ -70,6 +102,7 @@ struct TaskHistorySection: View {
       return
     } catch {
       rows = []
+      edge = nil
       failed = true
     }
     loadedFor = id

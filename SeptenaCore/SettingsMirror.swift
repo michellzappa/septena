@@ -391,6 +391,26 @@ enum SettingsMirror {
     upsert(settings: settings, context: context, engine: engine)
   }
 
+  // MARK: - Upsell moments (docs/SYNC_SUBSCRIPTION_SPEC.md §3.2, §7.1)
+
+  /// The upsell moment ids this account has seen, on any device.
+  static func upsellsSeen(context: ModelContext) -> Set<String> {
+    Set(loadSettings(context: context)?.upsellsSeen ?? [])
+  }
+
+  /// Marks one upsell moment seen account-wide, so no device shows it as a
+  /// prompt again. Idempotent: a repeat write changes no bytes and pushes
+  /// nothing.
+  static func markUpsellSeen(_ id: String, context: ModelContext, engine: CKEngine?) {
+    var settings = loadSettings(context: context)
+      ?? AppSettings(sectionOrder: nil, targets: nil, units: nil, time: nil,
+                     theme: nil, eink: nil, nutrition: nil, hkSync: nil)
+    var seen = Set(settings.upsellsSeen ?? [])
+    guard seen.insert(id).inserted else { return }
+    settings.upsellsSeen = seen.sorted()
+    upsert(settings: settings, context: context, engine: engine)
+  }
+
   static func upsert(settings: AppSettings,
                      context: ModelContext,
                      engine: CKEngine? = nil) {

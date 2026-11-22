@@ -1080,6 +1080,8 @@ final class TaskSyncEngine {
     lastUserID = userID
     signedIn = TaskBackendClient.hasSession
     lastError = nil
+    // Today's upsell notices read the plan (spec §3.2).
+    Task { @MainActor in await PlanStatus.shared.refresh() }
   }
 
   /// Ends the session on this device. Local tasks and the outbox stay: edits
@@ -1095,6 +1097,7 @@ final class TaskSyncEngine {
     await client.signOut()
     signedIn = TaskBackendClient.hasSession
     lastError = nil
+    Task { @MainActor in await PlanStatus.shared.refresh() }
     // The launch snapshot shows this account's Today (#82).
     TodaySnapshotStore.invalidate()
     #if os(iOS) && SEPTASK

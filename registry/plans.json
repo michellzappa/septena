@@ -162,7 +162,8 @@
     "restore": "Restore Purchases",
     "manage": "Manage Subscription",
     "notNow": "Not Now",
-    "learnMore": "See what Plus adds"
+    "learnMore": "See what Plus adds",
+    "syncThisDevice": "Sync This Device"
   },
   "labels": {
     "yourPlan": "Your plan",
@@ -189,6 +190,7 @@
     "ownedWeb": "You have Plus through the web. Manage it at septena.app.",
     "ownedGoogle": "You have Plus through Google Play. Manage it in Google Play.",
     "ownedGrant": "Plus is on for this account.",
+    "syncThisDeviceFailed": "Septena could not reach the server. Try again in a moment.",
     "done": "Done"
   },
   "status": {

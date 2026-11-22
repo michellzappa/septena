@@ -1238,6 +1238,11 @@ struct AppSettings: Codable {
   /// synced across devices so progress carries over. Nil → none recorded.
   var getStartedSteps: [String]? = nil
 
+  /// Upsell moments (`registry/plans.json` `upsells` ids) this account has
+  /// seen. Each one shows once per account; synced so a second device does
+  /// not repeat it (docs/SYNC_SUBSCRIPTION_SPEC.md §7.1). Nil → none seen.
+  var upsellsSeen: [String]? = nil
+
   /// Appearance customization (ADR 0019 / docs/CUSTOMIZATION_SPEC.md). Synced
   /// across devices when device-local `syncTheme` is enabled.
   var accentColor: String? = nil
@@ -1301,6 +1306,7 @@ struct AppSettings: Codable {
     case agentsPaused = "agents_paused"
     case getStartedDismissed = "get_started_dismissed"
     case getStartedSteps = "get_started_steps"
+    case upsellsSeen = "upsells_seen"
     case onboardedAt = "onboarded_at"
     case nextSkips = "next_skips"
     case telemetryLevel = "telemetry_level"

@@ -10180,7 +10180,7 @@
       }
     },
     "See Plus" : {
-      "comment" : "Generated from registry plans.paywall.seePlus. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry surfaces.notices.items.trialEnd.primaryTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "See the wider picture" : {
@@ -10269,6 +10269,10 @@
           }
         }
       }
+    },
+    "Septena could not reach the server. Try again in a moment." : {
+      "comment" : "Generated from registry plans.paywall.syncThisDeviceFailed. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Septena keeps deleted tasks here for 30 days, then deletes them for good." : {
       "comment" : "Generated from registry destinations.destinations.recentlyDeleted.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -11530,6 +11534,10 @@
     },
     "Sync speed" : {
       "comment" : "Generated from registry plans.outcomes.everywhere.rows.live.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Sync This Device" : {
+      "comment" : "Generated from registry plans.actions.syncThisDevice. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Synced, up to 10 GB" : {

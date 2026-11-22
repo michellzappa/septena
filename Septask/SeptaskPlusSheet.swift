@@ -17,10 +17,17 @@ struct SeptaskPlusSheet: View {
   /// The upsell moment that opened the sheet (`RegistryPlans.upsell(_:)`),
   /// shown as the first line so the user sees why it opened.
   var upsellID: String?
+  /// Closes the sheet where SwiftUI's `dismiss` does not reach: the AppKit
+  /// shell presents it from an `NSHostingController`.
+  var onClose: (() -> Void)? = nil
 
   @Environment(\.dismiss) private var dismiss
   private var status: PlanStatus { .shared }
   private var store: PlusStore { .shared }
+
+  private func close() {
+    if let onClose { onClose() } else { dismiss() }
+  }
 
   var body: some View {
     NavigationStack {
@@ -31,7 +38,7 @@ struct SeptaskPlusSheet: View {
         #endif
         .toolbar {
           ToolbarItem(placement: .cancellationAction) {
-            Button(RegistryPlans.Action.notNow) { dismiss() }
+            Button(RegistryPlans.Action.notNow) { close() }
           }
         }
     }
@@ -47,7 +54,7 @@ struct SeptaskPlusSheet: View {
   @ViewBuilder
   private var content: some View {
     if let outcome = store.outcome {
-      PlusOutcomeView(outcome: outcome) { dismiss() }
+      PlusOutcomeView(outcome: outcome) { close() }
     } else {
       switch status.plan {
       case .plus(_, let source):
@@ -56,10 +63,10 @@ struct SeptaskPlusSheet: View {
         if PlusStore.checkoutAvailable, status.canPurchase {
           storeView
         } else {
-          PlusInfoView(upsellID: upsellID)
+          PlusInfoView(upsellID: upsellID, onSynced: close)
         }
       case .device, nil:
-        PlusInfoView(upsellID: upsellID)
+        PlusInfoView(upsellID: upsellID, onSynced: close)
       }
     }
   }
@@ -67,7 +74,7 @@ struct SeptaskPlusSheet: View {
   /// StoreKit's subscription store, with the registry header on top.
   private var storeView: some View {
     SubscriptionStoreView(productIDs: PlusStore.productIDs) {
-      PlusSheetHeader(upsellID: upsellID)
+      PlusSheetHeader(upsellID: upsellID, onSynced: close)
     }
     .subscriptionStoreControlStyle(.picker)
     .subscriptionStoreButtonLabel(.action)
@@ -95,12 +102,19 @@ struct SeptaskPlusSheet: View {
 /// outcomes.
 private struct PlusSheetHeader: View {
   var upsellID: String?
+  /// Runs after this device took the sync slot; the sheet then closes.
+  var onSynced: () -> Void = {}
   private var status: PlanStatus { .shared }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       if let id = upsellID, let moment = RegistryPlans.upsell(id) {
         Text(moment.title).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+      }
+      // The second-device moment also offers the free way out: move the
+      // free account's one sync slot to this device (spec §3.2, §6.3).
+      if upsellID == "second_device", status.deviceNotSyncing {
+        SyncThisDeviceButton(onSynced: onSynced)
       }
       VStack(alignment: .leading, spacing: 4) {
         Text(title).font(.title2.weight(.bold))
@@ -133,12 +147,13 @@ private struct PlusSheetHeader: View {
 /// or before checkout opens.
 private struct PlusInfoView: View {
   var upsellID: String?
+  var onSynced: () -> Void = {}
   private var status: PlanStatus { .shared }
 
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 20) {
-        PlusSheetHeader(upsellID: upsellID)
+        PlusSheetHeader(upsellID: upsellID, onSynced: onSynced)
         VStack(alignment: .leading, spacing: 8) {
           ForEach(RegistryPlans.prices) { price in
             VStack(alignment: .leading, spacing: 2) {
@@ -256,3 +271,56 @@ private struct PlusRestoreButton: View {
     .disabled(PlusStore.shared.restoring || !TaskBackendClient.hasSession)
   }
 }
+
+/// Moves the free account's sync slot to this device
+/// (`POST /v1/entitlement/device`). The other device stops syncing and keeps
+/// its tasks. Shown for the `second_device` moment only: in the Plus sheet
+/// and as the quiet line in Settings ▸ Septena Plus.
+struct SyncThisDeviceButton: View {
+  var onSynced: () -> Void = {}
+  @State private var working = false
+  @State private var failed = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Button(RegistryPlans.Action.syncThisDevice) {
+        working = true
+        failed = false
+        Task {
+          let moved = await PlanStatus.shared.syncThisDevice()
+          working = false
+          failed = !moved
+          if moved { onSynced() }
+        }
+      }
+      .buttonStyle(.bordered)
+      .disabled(working)
+      if failed {
+        Text(RegistryPlans.Paywall.syncThisDeviceFailed)
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+      }
+    }
+  }
+}
+
+#if os(macOS)
+import AppKit
+
+extension SeptaskPlusSheet {
+  /// Presents the sheet from the AppKit shell (an `NSViewController`), for
+  /// an upsell moment. Marks the moment seen first: opening the sheet from
+  /// the moment counts as seeing it (spec §7.1).
+  @MainActor
+  static func present(upsellID: String, from presenter: NSViewController) {
+    TaskNotices.markUpsellSeen(upsellID)
+    var host: NSHostingController<AnyView>?
+    let sheet = SeptaskPlusSheet(upsellID: upsellID, onClose: { [weak presenter] in
+      if let host { presenter?.dismiss(host) }
+    })
+    let controller = NSHostingController(rootView: AnyView(sheet))
+    host = controller
+    presenter.presentAsSheet(controller)
+  }
+}
+#endif

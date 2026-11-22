@@ -29,6 +29,14 @@ struct SeptaskPlusPane: View {
             Label(RegistryPlans.Copy.yourPlan, systemImage: Self.cardSymbol(status.isPlus ? "plus" : "free"))
           }
         }
+        // The second-device moment's quiet line (spec §3.2, §7.1): it stays
+        // here, where the limit is, after the Today notice was seen.
+        if status.deviceNotSyncing, let moment = RegistryPlans.upsell("second_device") {
+          VStack(alignment: .leading, spacing: 8) {
+            Text(moment.title).foregroundStyle(.secondary)
+            SyncThisDeviceButton()
+          }
+        }
         if status.plan != nil {
           Button(sheetButtonTitle) { showingSheet = true }
         }
