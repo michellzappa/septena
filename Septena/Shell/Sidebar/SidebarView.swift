@@ -428,6 +428,7 @@ struct SidebarRootView: View {
   private func smartListRow(for spec: SmartListSpec) -> some View {
     let row = navRow(spec.route) {
       SmartListRow(icon: spec.icon,
+                   iconColor: spec.color,
                    title: spec.title,
                    count: spec.count)
     }
@@ -713,13 +714,10 @@ struct SidebarRootView: View {
   }
 
   private func smartListColor(_ route: Route) -> Color {
-    // Only Today earns an accent — it's the bucket you act on. Upcoming /
-    // Anytime / Logbook are neutral filing locations, not warnings, so they
-    // recede to one quiet gray and let icon + label + count do the signalling.
-    // (Was red/orange/gray — those saturated hues read as urgency the later/
-    // no-date buckets don't actually carry.)
+    // Only Today wears the user's active accent color — it's the bucket you
+    // act on. The other special lists recede to quiet secondary ink.
     switch route {
-    case .filter(.today): return Theme.todayAccent
+    case .filter(.today): return AppearancePreferences.shared.accentSwiftUIColor
     default:              return .secondary
     }
   }
@@ -1315,18 +1313,20 @@ struct SidebarCount: View {
 
 struct SmartListRow: View {
   let icon: String
+  /// Bare symbol tint — active accent on Today, quiet secondary on other special lists.
+  var iconColor: Color = .secondary
   let title: String
   /// Muted gray count — neutral signal for total rows on this list.
   var count: Int? = nil
 
   var body: some View {
     HStack(spacing: Theme.sidebarRowSpacing) {
-      // Platform sidebar standard (Mail, Files, Notes): a bare SF Symbol in
-      // the accent color, no filled tile. The fixed frame keeps titles
-      // aligned across symbols of different widths.
+      // Platform sidebar standard (Mail, Files, Notes): a bare SF Symbol with
+      // no filled background box. Fixed frame keeps titles aligned across
+      // symbols of different widths.
       Image(systemName: icon)
-        .scaledFont(size: Theme.sidebarIconSize, weight: .regular)
-        .foregroundStyle(Color.accentColor)
+        .scaledFont(size: Theme.sidebarIconSize, weight: .semibold)
+        .foregroundStyle(iconColor)
         .frame(width: Theme.sidebarIconSize + 4, height: Theme.sidebarIconSize + 4)
       Text(title)
         .scaledFont(size: Theme.sidebarAreaTitleSize)
@@ -1456,13 +1456,10 @@ struct SmartListTile: View {
     // dominates as a "badge".
     VStack(alignment: .leading, spacing: 0) {
       HStack(alignment: .top) {
-        ZStack {
-          Circle().fill(iconColor)
-          Image(systemName: icon)
-            .scaledFont(size: 14, weight: .semibold)
-            .foregroundStyle(.white)
-        }
-        .frame(width: 26, height: 26)
+        Image(systemName: icon)
+          .scaledFont(size: 20, weight: .semibold)
+          .foregroundStyle(iconColor)
+          .frame(width: 26, height: 26, alignment: .leading)
         Spacer()
         countCluster
       }

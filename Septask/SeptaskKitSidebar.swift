@@ -317,6 +317,8 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         self?.outlineView.enumerateAvailableRowViews { rowView, _ in
           rowView.needsDisplay = true
         }
+        // Recolor the Today sidebar icon immediately when the user switches accent.
+        self?.scheduleRebuild()
       }
     })
   }
@@ -1085,19 +1087,21 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let cell = outlineView.makeView(withIdentifier: identifier, owner: nil) as? SidebarCell
       ?? SidebarCell(identifier: identifier)
 
-    // Glyph vocabulary mirrors the SwiftUI sidebar: smart lists wear the
-    // Reminders-style colored square (only Today earns the accent — the rest
-    // are quiet gray filing locations), areas their emoji or the muted dot,
-    // projects their completion ring.
+    // Glyph vocabulary mirrors the SwiftUI sidebar: smart lists use bare SF
+    // Symbols with no background box (Today wears the user's active accent
+    // color; the rest stay quiet secondary ink), areas their emoji or the
+    // muted dot, projects their completion ring.
     cell.emoji.isHidden = true
     switch node.content {
     case .filter(let filter, let title, let symbol):
       cell.textField?.font = SeptaskKitTheme.sidebarTitle
       cell.textField?.stringValue = title
-      let tint: NSColor = filter == .today
-        ? SeptaskKitTheme.todayAccent
+      let isToday = filter == .today
+      let tint: NSColor = isToday
+        ? AppearancePreferences.shared.accentNSColor
         : SeptaskKitTheme.inkSecondary
-      cell.imageView?.image = KitGlyph.colored(symbol: symbol, color: tint)
+      let tag = isToday ? "accent:\(AppearancePreferences.shared.accentColorID)" : "secondary"
+      cell.imageView?.image = KitGlyph.symbol(symbol, color: tint, cacheTag: tag)
     case .area(let area):
       // Areas share the same semibold navigation weight as smart lists and
       // projects; structure is carried by indentation and the disclosure

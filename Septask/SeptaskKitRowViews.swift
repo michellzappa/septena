@@ -567,6 +567,31 @@ final class KitSearchField: NSSearchField {
 enum KitGlyph {
   private static var cache: [String: NSImage] = [:]
 
+  /// Bare SF Symbol centered in a square canvas — no background box.
+  /// Drawn lazily inside `draw(size:)` so dynamic `NSColor`s re-resolve
+  /// automatically when light/dark appearance flips; `cacheTag` distinguishes
+  /// dynamic accent providers whose `.description` would otherwise collide.
+  static func symbol(_ name: String, color: NSColor, cacheTag: String,
+                     size: CGFloat = 18) -> NSImage? {
+    let key = "s:\(name):\(cacheTag):\(size)"
+    if let hit = cache[key] { return hit }
+    guard NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil else { return nil }
+    let baseConfig = NSImage.SymbolConfiguration(pointSize: size * 0.78, weight: .semibold)
+    let image = draw(size: NSSize(width: size, height: size)) { rect in
+      let config = baseConfig.applying(NSImage.SymbolConfiguration(paletteColors: [color]))
+      guard let glyph = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+        .withSymbolConfiguration(config)
+      else { return }
+      let glyphSize = glyph.size
+      let target = NSRect(x: rect.midX - glyphSize.width / 2,
+                          y: rect.midY - glyphSize.height / 2,
+                          width: glyphSize.width, height: glyphSize.height)
+      glyph.draw(in: target, from: .zero, operation: .sourceOver, fraction: 1)
+    }
+    cache[key] = image
+    return image
+  }
+
   /// `ColoredGlyph` — filled colored rounded square with a white SF Symbol.
   static func colored(symbol: String, color: NSColor, size: CGFloat = 17) -> NSImage? {
     let key = "c:\(symbol):\(color.description):\(size)"
