@@ -1,5 +1,7 @@
 import type { Env } from "../env.js";
-import { randomId, sha256Base64Url } from "../util.js";
+import { logEvent, randomId, sha256Base64Url } from "../util.js";
+import { getClient } from "../storage.js";
+import { storeFor } from "../api/session.js";
 
 // OAuth tokens for the task connector on api.septena.app.
 //
@@ -30,6 +32,10 @@ const ACCESS_PREFIX = "sm1.";
 const REFRESH_PREFIX = "smr1.";
 const ACCESS_TTL_S = 60 * 60;                // 1h
 const REFRESH_TTL_S = 30 * 24 * 60 * 60;     // 30d, slides on rotation (as live)
+/// The refresh lifetime: a connection unused this long has expired.
+export const MCP_REFRESH_TTL_S = REFRESH_TTL_S;
+/// Registrations for this connector live under this KV prefix (oauth.ts).
+export const MCP_CLIENT_PREFIX = "v2:client:";
 
 export interface McpGrant {
   userId: string;
@@ -82,6 +88,7 @@ export async function issueMcpTokens(env: Env, grant: McpGrant, familyId = rando
     env.TOKENS.put(rKey, JSON.stringify(refreshRec), { expirationTtl: REFRESH_TTL_S }),
     env.TOKENS.put(familyKey(familyId), JSON.stringify(fam), { expirationTtl: REFRESH_TTL_S }),
   ]);
+  await noteConnection(env, base, familyId);
   return { access_token: access, refresh_token: refresh, token_type: "Bearer", expires_in: ACCESS_TTL_S, scope: grant.scope };
 }
 
@@ -98,6 +105,35 @@ export async function verifyMcpAccess(env: Env, raw: string): Promise<McpGrant |
   } catch {
     return null;
   }
+}
+
+/// Lists the family in Settings > Devices & Access. The index never blocks a
+/// token: a failure here only logs.
+async function noteConnection(env: Env, grant: McpGrant, familyId: string): Promise<void> {
+  try {
+    const client = await getClient(env, grant.clientId, MCP_CLIENT_PREFIX);
+    const name = client?.name?.trim().slice(0, 60) || "Claude";
+    await storeFor(env, grant.userId).recordConnection(familyId, grant.clientId, name, grant.scope);
+  } catch (e) {
+    logEvent("mcp_connection_index_failed", { error: String(e) });
+  }
+}
+
+/// Drops the list row; never throws (the token work already happened).
+async function forgetConnection(env: Env, userId: string, familyId: string): Promise<void> {
+  try {
+    await storeFor(env, userId).forgetConnection(familyId);
+  } catch (e) {
+    logEvent("mcp_connection_index_failed", { error: String(e) });
+  }
+}
+
+/// Disconnects one app from Settings: kills its tokens and its list row.
+/// False when the family is not in this user's store.
+export async function disconnectFamily(env: Env, userId: string, familyId: string): Promise<boolean> {
+  const had = await storeFor(env, userId).forgetConnection(familyId);
+  if (had) await revokeFamily(env, familyId);
+  return had;
 }
 
 async function revokeFamily(env: Env, familyId: string): Promise<void> {
@@ -123,6 +159,7 @@ export async function redeemMcpRefresh(env: Env, raw: string, clientId: string):
   const rec = JSON.parse(stored) as RefreshRecord;
   if (rec.rotatedAt) {
     await revokeFamily(env, rec.familyId);
+    await forgetConnection(env, rec.userId, rec.familyId);
     await env.TOKENS.delete(key);
     return { ok: false, reason: "replayed" };
   }
@@ -156,7 +193,9 @@ export async function revokeMcpToken(env: Env, raw: string): Promise<"access" | 
     const key = await refreshKey(raw);
     const stored = await env.TOKENS.get(key);
     if (!stored) return "none";
-    await revokeFamily(env, (JSON.parse(stored) as RefreshRecord).familyId);
+    const rec = JSON.parse(stored) as RefreshRecord;
+    await revokeFamily(env, rec.familyId);
+    await forgetConnection(env, rec.userId, rec.familyId);
     await env.TOKENS.delete(key);
     return "refresh";
   }

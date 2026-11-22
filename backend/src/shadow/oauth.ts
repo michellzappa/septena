@@ -7,7 +7,7 @@ import { isValidTz } from "../tz.js";
 import { registerClient } from "../oauth/register.js";
 import { validateRedirectUri } from "../oauth/redirects.js";
 import { storeFor } from "../api/session.js";
-import { MCP_GRANT_SCOPE, MCP_SCOPES, issueMcpTokens, redeemMcpRefresh, revokeMcpToken } from "./tokens.js";
+import { MCP_CLIENT_PREFIX, MCP_GRANT_SCOPE, MCP_SCOPES, issueMcpTokens, redeemMcpRefresh, revokeMcpToken } from "./tokens.js";
 
 // OAuth 2.1 for the MCP task connector on api.septena.app (phase 2,
 // "shadow", of docs/SEPTASK_BACKEND.md in the app repo; read-write since
@@ -27,7 +27,7 @@ import { MCP_GRANT_SCOPE, MCP_SCOPES, issueMcpTokens, redeemMcpRefresh, revokeMc
 //
 // KV keys are under `v2:`.
 
-const CLIENT_PREFIX = "v2:client:";
+const CLIENT_PREFIX = MCP_CLIENT_PREFIX;
 const CODE_PREFIX = "v2:code:";
 const CODE_TTL_S = 300;
 const PAIR_TTL_MS = 10 * 60 * 1000;
