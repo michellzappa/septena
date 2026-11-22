@@ -66,9 +66,8 @@
     "convoTurnStep": ["confirm", "ground", "scope", "decide", "work"],
     "telemetryLevel": ["none", "minimal", "balanced", "full"],
     "appearanceMode": ["system", "light", "dark"],
-    "accentColor": ["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "acai", "pitaya", "jabuticaba"],
+    "accentColor": ["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "haskap", "acai", "pitaya", "jabuticaba"],
     "appIconFinish": ["obsidian", "ceramic", "framed"],
-    "appIconColor": ["auto", "persimmon", "haskap", "tamarillo", "yuzu", "carambola", "acai", "pitaya", "mono"],
     "canvasTexture": ["none", "topography", "fieldMatrix", "stippleDrift", "causticGlass", "ridges", "washiPaper"],
     "textureMotion": ["still", "slowDrift"]
   },

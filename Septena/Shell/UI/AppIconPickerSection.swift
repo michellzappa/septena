@@ -5,8 +5,8 @@ import SwiftUI
 /// Presents:
 ///   • 3 Icon Styles (`Default`, `Light`, `Framed`) with live vector
 ///     previews matching the 23 prebaked `.appiconset` assets.
-///   • Compact Icon Color selector (`Default` = follows Accent above, or choose
-///     any of the 7 exotic fruits + `Mono` independently).
+///   The icon color is not a separate choice: it follows the Accent above
+///   one to one (`AppIconCatalog.resolvedColor(accentColorID:)`).
 struct AppIconPickerSection: View {
   private let appearance = AppearancePreferences.shared
   @Environment(\.colorScheme) private var colorScheme
@@ -37,11 +37,7 @@ struct AppIconPickerSection: View {
         spacing: 8
       ) {
         ForEach(AppIconFinish.allCases) { finish in
-          let previewColor = AppIconCatalog.resolvedColor(
-            finish: finish,
-            colorOverride: appearance.appIconColorOverride,
-            accentColorID: appearance.accentColorID
-          )
+          let previewColor = appearance.resolvedAppIconColor
           let isCurrent = appearance.appIconFinish == finish
           IconStyleTileButton(
             finish: finish,
@@ -54,84 +50,6 @@ struct AppIconPickerSection: View {
               appearance.appIconFinish = finish
             }
           }
-        }
-      }
-
-      // 2. Icon Color selector (Default = Match Accent, or explicit override)
-      VStack(alignment: .leading, spacing: 6) {
-        HStack {
-          Text("Icon Color")
-            .font(.caption.weight(.medium))
-            .foregroundStyle(.secondary)
-          Spacer()
-          Text(appearance.appIconColorOverride == nil ? "Matches Accent" : (appearance.appIconColorOverride?.title ?? ""))
-            .font(.caption2)
-            .foregroundStyle(.tertiary)
-        }
-
-        ScrollView(.horizontal, showsIndicators: false) {
-          HStack(spacing: 8) {
-            // Default / Match Accent pill
-            let isAuto = appearance.appIconColorOverride == nil
-            Button {
-              a11yAnimate(Theme.Motion.quick) {
-                appearance.appIconColorOverride = nil
-              }
-            } label: {
-              Text("Default")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(isAuto ? activeAccentColor : .secondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(
-                  Capsule()
-                    .fill(isAuto ? activeAccentColor.opacity(isDark ? 0.22 : 0.14) : Theme.cardSurface)
-                )
-                .overlay(
-                  Capsule()
-                    .strokeBorder(
-                      isAuto ? activeAccentColor : Theme.border.opacity(0.7),
-                      lineWidth: isAuto ? 1.5 : 0.75
-                    )
-                )
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Default icon color, matches app accent")
-            .accessibilityAddTraits(isAuto ? .isSelected : [])
-
-            // 8 explicit color swatches (7 fruits + Mono)
-            ForEach(AppIconColor.allCases) { iconColor in
-              let isPicked = appearance.appIconColorOverride == iconColor
-              let swatch = RGBTriple.fromHex(isDark ? iconColor.darkHex : iconColor.baseHex).swiftUIColor
-              Button {
-                a11yAnimate(Theme.Motion.quick) {
-                  appearance.appIconColorOverride = iconColor
-                }
-              } label: {
-                ZStack {
-                  Circle()
-                    .fill(swatch)
-                    .frame(width: 22, height: 22)
-                    .overlay(
-                      Circle()
-                        .strokeBorder(Color.primary.opacity(0.18), lineWidth: 0.75)
-                    )
-                  if isPicked {
-                    Circle()
-                      .strokeBorder(activeAccentColor, lineWidth: 2)
-                      .frame(width: 28, height: 28)
-                  }
-                }
-                .frame(width: 28, height: 28)
-                .contentShape(Rectangle())
-              }
-              .buttonStyle(.plain)
-              .accessibilityLabel("\(iconColor.title) icon color")
-              .accessibilityAddTraits(isPicked ? .isSelected : [])
-            }
-          }
-          .padding(.vertical, 2)
         }
       }
     }

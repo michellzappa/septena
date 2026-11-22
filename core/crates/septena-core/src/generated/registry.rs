@@ -138,28 +138,17 @@ pub mod enums {
         pub const PERSIMMON: &str = "persimmon";
         pub const YUZU: &str = "yuzu";
         pub const CARAMBOLA: &str = "carambola";
+        pub const HASKAP: &str = "haskap";
         pub const ACAI: &str = "acai";
         pub const PITAYA: &str = "pitaya";
         pub const JABUTICABA: &str = "jabuticaba";
-        pub const ALL: &[&str] = &["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "acai", "pitaya", "jabuticaba"];
+        pub const ALL: &[&str] = &["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "haskap", "acai", "pitaya", "jabuticaba"];
     }
     pub mod app_icon_finish {
         pub const OBSIDIAN: &str = "obsidian";
         pub const CERAMIC: &str = "ceramic";
         pub const FRAMED: &str = "framed";
         pub const ALL: &[&str] = &["obsidian", "ceramic", "framed"];
-    }
-    pub mod app_icon_color {
-        pub const AUTO: &str = "auto";
-        pub const PERSIMMON: &str = "persimmon";
-        pub const HASKAP: &str = "haskap";
-        pub const TAMARILLO: &str = "tamarillo";
-        pub const YUZU: &str = "yuzu";
-        pub const CARAMBOLA: &str = "carambola";
-        pub const ACAI: &str = "acai";
-        pub const PITAYA: &str = "pitaya";
-        pub const MONO: &str = "mono";
-        pub const ALL: &[&str] = &["auto", "persimmon", "haskap", "tamarillo", "yuzu", "carambola", "acai", "pitaya", "mono"];
     }
     pub mod canvas_texture {
         pub const NONE: &str = "none";

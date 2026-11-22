@@ -5672,6 +5672,18 @@
     "Has notes" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
+    "Haskap" : {
+      "comment" : "Generated from registry tokens.fruitAccents.haskap.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haskap"
+          }
+        }
+      }
+    },
     "Health access denied" : {
       "localizations" : {
         "pt-BR" : {

@@ -904,6 +904,12 @@
       "settings.rootGroups.lists_root.items.1.label"
     ]
   },
+  "Haskap": {
+    "text": "Haskap",
+    "paths": [
+      "tokens.fruitAccents.haskap.name"
+    ]
+  },
   "Height Map": {
     "text": "Height Map",
     "paths": [

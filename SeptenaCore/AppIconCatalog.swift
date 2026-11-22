@@ -57,7 +57,7 @@ enum AppIconColor: String, CaseIterable, Sendable, Identifiable {
   var title: String {
     switch self {
     case .persimmon: return "Persimmon"
-    case .haskap:    return "Cobalt"
+    case .haskap:    return "Haskap"
     case .tamarillo: return "Tamarillo"
     case .yuzu:      return "Yuzu"
     case .carambola: return "Carambola"
@@ -125,38 +125,13 @@ enum AppIconColor: String, CaseIterable, Sendable, Identifiable {
 
 enum AppIconCatalog {
   static let finishStorageKey = RegistrySettings.StorageKey.appIconFinish
-  static let colorStorageKey = RegistrySettings.StorageKey.appIconColor
-  static let autoColorValue = RegistrySettings.Defaults.appIconColor
-
-  /// Maps the user's Accent + Finish + optional color override to a concrete `AppIconColor`.
-  /// In `Colorful` (default blue-leaning accent):
-  ///   • `Default`, `Light` → Persimmon orange north (signature Septena)
-  ///   • `Framed` → Haskap cobalt blue (Things-like blue frame)
-  static func resolvedColor(
-    finish: AppIconFinish,
-    colorOverride: AppIconColor?,
-    accentColorID: String
-  ) -> AppIconColor {
-    if let override = colorOverride { return override }
+  /// Theme = icon: the icon color follows the app accent one to one.
+  /// `Colorful` (the default accent) keeps the primary Persimmon icon, so a
+  /// fresh install never switches icons. `Jabuticaba` maps to `Mono`.
+  static func resolvedColor(accentColorID: String) -> AppIconColor {
     switch accentColorID {
-    case "colorful":
-      return finish == .framed ? .haskap : .persimmon
-    case "tamarillo":
-      return .tamarillo
-    case "persimmon":
-      return .persimmon
-    case "yuzu":
-      return .yuzu
-    case "carambola":
-      return .carambola
-    case "acai":
-      return .acai
-    case "pitaya":
-      return .pitaya
-    case "jabuticaba":
-      return .mono
-    default:
-      return .persimmon
+    case "jabuticaba": return .mono
+    default: return AppIconColor(rawValue: accentColorID) ?? .persimmon
     }
   }
 

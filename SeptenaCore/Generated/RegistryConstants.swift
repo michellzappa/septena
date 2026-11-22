@@ -75,9 +75,8 @@ enum RegistryEntityEnums {
   static let convoTurnStep: [String] = ["confirm", "ground", "scope", "decide", "work"]
   static let telemetryLevel: [String] = ["none", "minimal", "balanced", "full"]
   static let appearanceMode: [String] = ["system", "light", "dark"]
-  static let accentColor: [String] = ["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "acai", "pitaya", "jabuticaba"]
+  static let accentColor: [String] = ["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "haskap", "acai", "pitaya", "jabuticaba"]
   static let appIconFinish: [String] = ["obsidian", "ceramic", "framed"]
-  static let appIconColor: [String] = ["auto", "persimmon", "haskap", "tamarillo", "yuzu", "carambola", "acai", "pitaya", "mono"]
   static let canvasTexture: [String] = ["none", "topography", "fieldMatrix", "stippleDrift", "causticGlass", "ridges", "washiPaper"]
   static let textureMotion: [String] = ["still", "slowDrift"]
   static let entityNames: [String] = ["task", "area", "project", "attachment", "checklistItem", "tag", "convo", "setting"]
@@ -269,6 +268,7 @@ enum RegistryTokens {
     RegistryFruitAccent(id: "persimmon", name: RegistryL10n.t("Persimmon"), origin: "East Asia · Vermilion", lightHex: "#E05212", darkHex: "#FF7738", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: false),
     RegistryFruitAccent(id: "yuzu", name: RegistryL10n.t("Yuzu"), origin: "Japan · Citrus gold", lightHex: "#C28500", darkHex: "#F2BF2C", checkLightHex: "#FFFFFF", checkDarkHex: "#141518", multicolor: false),
     RegistryFruitAccent(id: "carambola", name: RegistryL10n.t("Carambola"), origin: "SE Asia · Starfruit", lightHex: "#5B8C00", darkHex: "#9EE034", checkLightHex: "#FFFFFF", checkDarkHex: "#141518", multicolor: false),
+    RegistryFruitAccent(id: "haskap", name: RegistryL10n.t("Haskap"), origin: "Hokkaido · Honeyberry blue", lightHex: "#1D63DC", darkHex: "#4E94FF", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: false),
     RegistryFruitAccent(id: "acai", name: RegistryL10n.t("Açaí"), origin: "Amazon · Indigo", lightHex: "#6544D6", darkHex: "#9B82FF", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: false),
     RegistryFruitAccent(id: "pitaya", name: RegistryL10n.t("Pitaya"), origin: "Mesoamerica · Dragonfruit", lightHex: "#D4266C", darkHex: "#FF5C9B", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: false),
     RegistryFruitAccent(id: "jabuticaba", name: RegistryL10n.t("Jabuticaba"), origin: "Brazil · Obsidian ink", lightHex: "#27272E", darkHex: "#E4E4EA", checkLightHex: "#FFFFFF", checkDarkHex: "#141518", multicolor: false),
@@ -382,7 +382,6 @@ enum RegistrySettings {
     static let appearanceMode = "septena.appearance.mode"
     static let syncTheme = "septena.appearance.syncTheme"
     static let appIconFinish = "septena.appearance.appIconFinish"
-    static let appIconColor = "septena.appearance.appIconColor"
     static let todayShowCompleted = "septena.today.showCompleted"
     static let todayGroupByList = "septena.today.groupByList"
     static let tasksShowAging = "septena.tasks.showAging"
@@ -414,7 +413,6 @@ enum RegistrySettings {
     static let appearanceMode: String = "system"
     static let syncTheme: Bool = true
     static let appIconFinish: String = "obsidian"
-    static let appIconColor: String = "auto"
     static let todayShowCompleted: Bool = true
     static let todayGroupByList: Bool = true
     static let tasksShowAging: Bool = true

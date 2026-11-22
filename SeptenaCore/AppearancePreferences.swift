@@ -119,7 +119,7 @@ final class AppearancePreferences {
       guard oldValue != accentColorID else { return }
       UserDefaults.standard.set(accentColorID, forKey: RegistrySettings.StorageKey.accentColor)
       pushSyncedIfEnabled()
-      if !isAdoptingSynced, appIconColorOverride == nil {
+      if !isAdoptingSynced {
         applyAppIconIfNeeded()
       }
       notifyChanged()
@@ -130,18 +130,6 @@ final class AppearancePreferences {
     didSet {
       guard oldValue != appIconFinish else { return }
       UserDefaults.standard.set(appIconFinish.rawValue, forKey: AppIconCatalog.finishStorageKey)
-      applyAppIconIfNeeded()
-      notifyChanged()
-    }
-  }
-
-  /// `nil` means "Default" (`"auto"` — follows `accentColorID`). Non-nil
-  /// overrides the App Icon color independently of the in-app accent.
-  var appIconColorOverride: AppIconColor? {
-    didSet {
-      guard oldValue != appIconColorOverride else { return }
-      let stored = appIconColorOverride?.rawValue ?? AppIconCatalog.autoColorValue
-      UserDefaults.standard.set(stored, forKey: AppIconCatalog.colorStorageKey)
       applyAppIconIfNeeded()
       notifyChanged()
     }
@@ -208,13 +196,6 @@ final class AppearancePreferences {
       ?? RegistrySettings.Defaults.appIconFinish
     self.appIconFinish = AppIconFinish(rawValue: iconFinishRaw) ?? .obsidian
 
-    if let iconColorRaw = ud.string(forKey: AppIconCatalog.colorStorageKey),
-       iconColorRaw != AppIconCatalog.autoColorValue {
-      self.appIconColorOverride = AppIconColor(rawValue: iconColorRaw)
-    } else {
-      self.appIconColorOverride = nil
-    }
-
     let texRaw = ud.string(forKey: RegistrySettings.StorageKey.canvasTexture)
       ?? RegistrySettings.Defaults.canvasTexture
     self.canvasTexture = HeaderTextureStyle(rawValue: texRaw) ?? .none
@@ -273,11 +254,7 @@ final class AppearancePreferences {
   // MARK: - Resolved App Icon
 
   var resolvedAppIconColor: AppIconColor {
-    AppIconCatalog.resolvedColor(
-      finish: appIconFinish,
-      colorOverride: appIconColorOverride,
-      accentColorID: accentColorID
-    )
+    AppIconCatalog.resolvedColor(accentColorID: accentColorID)
   }
 
   var resolvedAppIconFinish: AppIconFinish {
