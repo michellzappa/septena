@@ -132,6 +132,7 @@ enum RegistryIcons {
     "action.edit_details": "info.circle",
     "action.rename": "pencil",
     "action.copy": "doc.on.doc",
+    "action.paste": "doc.on.clipboard",
     "action.duplicate": "plus.square.on.square",
     "action.complete": "checkmark.circle",
     "action.cancel": "xmark.circle",
@@ -1186,7 +1187,8 @@ enum RegistryToasts {
 
 /// One task attribute (`registry/surfaces.json` `taskAttributes`): a composer
 /// pill, an inspector row and a picker title. `surfaceTier` `field` is an
-/// always-visible field (notes), not a pill. `editOnly` needs a saved task.
+/// always-visible field (notes), not a pill. `chip` is a transient composer
+/// chip shown only on a blank new task (Paste), not a pill. `editOnly` needs a saved task.
 struct RegistryTaskAttribute: Sendable, Hashable, Identifiable {
   let id: String
   let label: String
@@ -1198,11 +1200,11 @@ struct RegistryTaskAttribute: Sendable, Hashable, Identifiable {
   let editOnly: Bool
   /// Pill text while the attribute's work runs (Discuss).
   let workingLabel: String?
-  var isPill: Bool { surfaceTier != "field" }
+  var isPill: Bool { surfaceTier == "inline" || surfaceTier == "popover" }
 }
 
 enum RegistrySurfaces {
-  static let taskAttributeOrder: [String] = ["notes", "when", "deadline", "reminder", "repeat", "star", "list", "tags", "checklist", "attachments", "discuss"]
+  static let taskAttributeOrder: [String] = ["notes", "when", "deadline", "reminder", "repeat", "star", "list", "tags", "checklist", "attachments", "discuss", "paste"]
   static let taskAttributes: [RegistryTaskAttribute] = [
     RegistryTaskAttribute(id: "notes", label: RegistryL10n.t("Notes"), iconId: "action.notes", sfSymbol: "text.alignleft", commitContract: "closeCommits", surfaceTier: "field", featureId: "task.notes", editOnly: false, workingLabel: nil),
     RegistryTaskAttribute(id: "when", label: RegistryL10n.t("When"), iconId: "action.when", sfSymbol: "calendar", commitContract: "pickCommits", surfaceTier: "popover", featureId: "task.when-deadline", editOnly: false, workingLabel: nil),
@@ -1215,8 +1217,9 @@ enum RegistrySurfaces {
     RegistryTaskAttribute(id: "checklist", label: RegistryL10n.t("Checklist"), iconId: "action.checklist", sfSymbol: "checklist", commitContract: "pickCommits", surfaceTier: "inline", featureId: "task.checklists", editOnly: true, workingLabel: nil),
     RegistryTaskAttribute(id: "attachments", label: RegistryL10n.t("Attachments"), iconId: "action.attachment", sfSymbol: "paperclip", commitContract: "pickCommits", surfaceTier: "inline", featureId: "task.attachments", editOnly: true, workingLabel: nil),
     RegistryTaskAttribute(id: "discuss", label: RegistryL10n.t("Discuss"), iconId: "action.discuss", sfSymbol: "bubble.left.and.bubble.right", commitContract: "closeCommits", surfaceTier: "inline", featureId: "ai.discuss", editOnly: true, workingLabel: RegistryL10n.t("Thinking…")),
+    RegistryTaskAttribute(id: "paste", label: RegistryL10n.t("Paste"), iconId: "action.paste", sfSymbol: "doc.on.clipboard", commitContract: "pickCommits", surfaceTier: "chip", featureId: "capture.quick-entry", editOnly: false, workingLabel: nil),
   ]
-  /// The pills, in rail order (every attribute except fields).
+  /// The pills, in rail order (every attribute except fields and chips).
   static let taskAttributePills: [RegistryTaskAttribute] = taskAttributes.filter(\.isPill)
   static let taskAttributeLabels: [String: String] = Dictionary(uniqueKeysWithValues: taskAttributes.map { ($0.id, $0.label) })
   /// The attribute with `id`. Traps on an unknown id: the ids are a closed set.

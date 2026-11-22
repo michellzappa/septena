@@ -302,6 +302,7 @@
     { "id": "tags", "label": "Tags", "countLabel": { "one": "{count} tag", "other": "{count} tags" }, "icon": "action.tag", "commitContract": "pickCommits", "surfaceTier": "popover", "featureId": "task.tags", "editOnly": true },
     { "id": "checklist", "label": "Checklist", "icon": "action.checklist", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "task.checklists", "editOnly": true },
     { "id": "attachments", "label": "Attachments", "countLabel": { "one": "{count} file", "other": "{count} files" }, "icon": "action.attachment", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "task.attachments", "editOnly": true },
-    { "id": "discuss", "label": "Discuss", "workingLabel": "Thinking…", "icon": "action.discuss", "commitContract": "closeCommits", "surfaceTier": "inline", "featureId": "ai.discuss", "editOnly": true }
+    { "id": "discuss", "label": "Discuss", "workingLabel": "Thinking…", "icon": "action.discuss", "commitContract": "closeCommits", "surfaceTier": "inline", "featureId": "ai.discuss", "editOnly": true },
+    { "id": "paste", "label": "Paste", "icon": "action.paste", "commitContract": "pickCommits", "surfaceTier": "chip", "featureId": "capture.quick-entry" }
   ]
 }

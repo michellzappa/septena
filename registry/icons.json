@@ -27,6 +27,7 @@
     "action.edit_details": { "sfSymbol": "info.circle", "material": "info", "lucide": "info" },
     "action.rename": { "sfSymbol": "pencil", "material": "edit", "lucide": "pencil" },
     "action.copy": { "sfSymbol": "doc.on.doc", "material": "content_copy", "lucide": "copy" },
+    "action.paste": { "sfSymbol": "doc.on.clipboard", "material": "content_paste", "lucide": "clipboard-paste" },
     "action.duplicate": { "sfSymbol": "plus.square.on.square", "material": "library_add", "lucide": "copy-plus" },
     "action.complete": { "sfSymbol": "checkmark.circle", "material": "check_circle", "lucide": "check-circle-2" },
     "action.cancel": { "sfSymbol": "xmark.circle", "material": "cancel", "lucide": "x-circle" },

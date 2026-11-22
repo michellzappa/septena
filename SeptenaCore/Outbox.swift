@@ -665,4 +665,42 @@ enum TaskTitleText {
   static func withoutLineBreaks(_ raw: String) -> String {
     String(raw.filter { !$0.isNewline })
   }
+
+  /// A title longer than this goes to notes in full; the title keeps a
+  /// shortened copy. Rows show one line, so a paragraph is never a title.
+  static let pasteTitleMaxLength = 120
+
+  /// Split clipboard text for the blank new-task composer's Paste chip (#210).
+  /// - One short line: the title.
+  /// - A web URL alone: the host is the title, the full URL is the notes.
+  /// - Several lines: the first non-empty line is the title, the rest is
+  ///   the notes.
+  /// - A long title: shortened at a word break with "…", and the full line
+  ///   also goes to the top of the notes so nothing is lost.
+  /// Nil when the text is only whitespace.
+  static func pasteSplit(_ raw: String) -> (title: String, notes: String?)? {
+    let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return nil }
+
+    if !text.contains(where: { $0.isWhitespace }),
+       let url = URL(string: text),
+       let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
+       let host = url.host(), !host.isEmpty {
+      let title = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+      return (title, text)
+    }
+
+    var lines = text.components(separatedBy: .newlines)
+    let first = lines.removeFirst().trimmingCharacters(in: .whitespaces)
+    var rest = lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+
+    var title = first
+    if first.count > pasteTitleMaxLength {
+      let cut = first.prefix(pasteTitleMaxLength)
+      let atWord = cut.lastIndex(where: { $0.isWhitespace }).map { cut[..<$0] } ?? cut
+      title = atWord.trimmingCharacters(in: .whitespaces) + "…"
+      rest = rest.isEmpty ? first : first + "\n\n" + rest
+    }
+    return (title, rest.isEmpty ? nil : rest)
+  }
 }

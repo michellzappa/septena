@@ -92,6 +92,11 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private let checklistPill = KitPillButton()
   private let attachPill = KitPillButton()
   private let discussPill = KitPillButton()
+  /// "Paste" on a blank new task when the clipboard holds text (#210). A
+  /// text stadium at the front of the rail, NOT a rail attribute: it has
+  /// registry tier `chip`, so it is outside `taskAttributePills`. Hidden by
+  /// a paste or the first keystroke.
+  private let pastePill = KitPillButton()
   /// Registry id → pill. The rail's order, labels and icons come from
   /// `RegistrySurfaces.taskAttributePills` (ADR 0020), the same list the
   /// SwiftUI `TaskAttributeBar` renders. Notes is a field, not a pill (#203),
@@ -255,6 +260,16 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     checklistPill.onPress = { [weak self] _ in self?.addChecklistItemAndFocus() }
     attachPill.onPress = { [weak self] _ in self?.attachmentsView.pickFilesToAttach() }
     discussPill.onPress = { [weak self] _ in self?.onAction?(.discuss) }
+    let pasteChip = RegistrySurfaces.taskAttribute("paste")
+    pastePill.image = NSImage(systemSymbolName: pasteChip.sfSymbol, accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
+    pastePill.imagePosition = .imageLeading
+    pastePill.title = pasteChip.label
+    pastePill.toolTip = pasteChip.label
+    pastePill.setAccessibilityLabel(pasteChip.label)
+    pastePill.isHidden = true
+    pastePill.onPress = { [weak self] _ in self?.pasteFromClipboard() }
+    pillRow.addArrangedSubview(pastePill)
     for attribute in RegistrySurfaces.taskAttributePills {
       guard let pill = pillsByID[attribute.id] else { continue }
       pill.attribute = attribute
@@ -427,6 +442,31 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     updateKeyChain()
     recomputeContentHeights(notify: false)
     refreshPills(with: task, listName: listName)
+    // A blank new task offers Paste when the clipboard holds text (#210).
+    // Read once here, at open; never per keystroke.
+    pastePill.isHidden = !(task.title.isEmpty && committedNotes == nil && SeptenaPasteboard.hasText)
+  }
+
+  /// Fill the blank title and notes from the clipboard
+  /// (`TaskTitleText.pasteSplit`), hide the Paste pill, and put the caret at
+  /// the end of the title. Does not commit: the row autosaves on collapse.
+  private func pasteFromClipboard() {
+    pastePill.isHidden = true
+    guard let text = NSPasteboard.general.string(forType: .string),
+          let split = TaskTitleText.pasteSplit(text) else { return }
+    titleView.textStorage?.setAttributedString(
+      NSAttributedString(string: split.title, attributes: Self.titleAttributes))
+    titleView.typingAttributes = Self.titleAttributes
+    if let notes = split.notes {
+      let fontSize = SeptaskKitTheme.notesFontSize
+      notesView.textStorage?.setAttributedString(
+        MarkdownNotesStyle.attributed(notes, fontSize: fontSize))
+      notesView.typingAttributes = MarkdownNotesStyle.baseAttributes(fontSize: fontSize)
+    }
+    titleView.needsDisplay = true
+    notesView.needsDisplay = true
+    recomputeContentHeights(notify: true)
+    focusTitle()
   }
 
   /// Reveal the checklist (if hidden), append a step, and move focus into it.
@@ -785,6 +825,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
   func textDidChange(_ notification: Notification) {
     guard let textView = notification.object as? NSTextView else { return }
+    // The first keystroke in either field retires the Paste pill (#210).
+    if !pastePill.isHidden { pastePill.isHidden = true }
     if textView === titleView {
       flattenTitleLineBreaks()
     } else if textView === notesView {
