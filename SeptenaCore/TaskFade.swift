@@ -1,20 +1,19 @@
 import Foundation
+import SeptenaSharedCore
 
 // Task fade rules, visual countdown, and weekly sweep schedule
 // (`docs/TASK_FADE_SPEC.md` §4 & §5, ADR 0006).
 //
-// Pure Foundation so `SeptenaCoreTests` can test every boundary directly
-// without a host app or SwiftData store. Both task lists — SwiftUI
+// The fade rule itself (row opacity, eligibility, the window and the grace
+// period) lives in the shared Rust core (ADR 0025), so every client computes
+// the same fade; this enum adapts Swift values to it. The weekly sweep, the
+// Settings keys and the sweep copy stay here. Both task lists — SwiftUI
 // (`CheckableRow` / `TaskCheckboxModel`) and AppKit (`SeptaskKitTaskCell`) —
-// read this single rule so they cannot drift.
+// read this single entry point so they cannot drift.
 
 enum TaskFade {
   /// Default untouched window before an open task fades (days).
   static let windowDays: Int = RegistryRules.fadeWindowDays
-  /// Fade window in seconds.
-  static let windowInterval: TimeInterval = Double(windowDays) * 24 * 60 * 60
-  /// Grace period in seconds — a fresh task stays at full strength for its first day.
-  static let graceInterval: TimeInterval = Double(RegistryRules.fadeGraceDays) * 24 * 60 * 60
 
   /// The faintest a fading row gets. Label ink at 0.55 on the light background
   /// stays above a 4.5:1 contrast ratio, so a faded title is still readable.
@@ -41,49 +40,26 @@ enum TaskFade {
   /// Row content opacity for a fade fill (0…1, nil = not fading): full at
   /// 0, `minOpacity` at 1. Applied to the checkbox too; it stays tappable.
   static func rowOpacity(_ fill: Double?) -> Double {
-    guard let fill, fill.isFinite, fill > 0 else { return 1 }
-    return 1 - min(1, fill) * (1 - minOpacity)
+    SeptenaSharedCore.rowOpacity(fill: fill)
   }
 
   // MARK: - Clock & eligibility (§4)
 
   /// Resolves the fade clock for a task: `touchedAt` when set, else `createdAt`
   /// when real (not the `.distantPast` migration sentinel), else the `YYYY-MM-DD`
-  /// `created` day. Returns `nil` only when no creation date is known at all,
-  /// so legacy rows with unknown age never falsely fade.
+  /// `created` day. Returns `nil` only when no creation date is known at all.
+  /// The core resolves the same clock for the fade itself; the sweep copy
+  /// (`sweepReason`) reads this one.
   static func clockDate(touchedAt: Date?, createdAt: Date, created: String?) -> Date? {
     if let touchedAt { return touchedAt }
     if createdAt != .distantPast { return createdAt }
     return parseDay(created)
   }
 
-  /// Whether a task can fade under §4 (all non-time conditions):
-  /// - open, not a heading, not deleted, not already faded;
-  /// - no hard `deadline`;
-  /// - `scheduled` is nil or strictly in the past (`< today`);
-  /// - no recurrence rule;
-  /// - conversation is not on the agent's turn, `assignee` is not `claude`,
-  ///   and it is not waiting on the human in Review / an open question card.
-  static func isEligible(isOpen: Bool,
-                         isHeading: Bool,
-                         isDeleted: Bool,
-                         isFaded: Bool,
-                         deadline: String?,
-                         scheduled: String?,
-                         hasRecurrence: Bool,
-                         isAgentTurn: Bool,
-                         isAssignedToClaude: Bool,
-                         isAwaitingHuman: Bool = false,
-                         today: String) -> Bool {
-    guard isOpen, !isHeading, !isDeleted, !isFaded else { return false }
-    if let deadline, !deadline.isEmpty { return false }
-    if let scheduled, !scheduled.isEmpty, String(scheduled.prefix(10)) >= today { return false }
-    guard !hasRecurrence else { return false }
-    guard !isAgentTurn, !isAssignedToClaude, !isAwaitingHuman else { return false }
-    return true
-  }
-
   /// Whether the daily fade pass should stamp `fadedAt = now` on this task.
+  /// Eligibility (§4): open, not a heading, not deleted or faded, no
+  /// deadline, `scheduled` nil or before `today`, no recurrence, not the
+  /// agent's turn, not assigned to Claude, not waiting on the human.
   static func shouldFade(isOpen: Bool,
                          isHeading: Bool,
                          isDeleted: Bool,
@@ -99,17 +75,12 @@ enum TaskFade {
                          created: String?,
                          now: Date,
                          today: String) -> Bool {
-    guard isEligible(isOpen: isOpen, isHeading: isHeading, isDeleted: isDeleted,
-                     isFaded: isFaded, deadline: deadline, scheduled: scheduled,
-                     hasRecurrence: hasRecurrence, isAgentTurn: isAgentTurn,
-                     isAssignedToClaude: isAssignedToClaude,
-                     isAwaitingHuman: isAwaitingHuman, today: today) else {
-      return false
-    }
-    guard let clock = clockDate(touchedAt: touchedAt, createdAt: createdAt, created: created) else {
-      return false
-    }
-    return now.timeIntervalSince(clock) >= windowInterval
+    let input = coreInput(isOpen: isOpen, isHeading: isHeading, isDeleted: isDeleted, isFaded: isFaded,
+                          deadline: deadline, scheduled: scheduled, hasRecurrence: hasRecurrence,
+                          isAgentTurn: isAgentTurn, isAssignedToClaude: isAssignedToClaude,
+                          isAwaitingHuman: isAwaitingHuman, showsAgentCue: false,
+                          touchedAt: touchedAt, createdAt: createdAt, created: created, now: now, today: today)
+    return (try? SeptenaSharedCore.shouldFade(input: input)) ?? false
   }
 
   /// Countdown progress (0…1) for the visible row fade in every list (§4).
@@ -131,18 +102,32 @@ enum TaskFade {
                        created: String?,
                        now: Date,
                        today: String) -> Double? {
-    guard !showsAgentCue,
-          isEligible(isOpen: isOpen, isHeading: isHeading, isDeleted: isDeleted,
-                     isFaded: isFaded, deadline: deadline, scheduled: scheduled,
-                     hasRecurrence: hasRecurrence, isAgentTurn: isAgentTurn,
-                     isAssignedToClaude: isAssignedToClaude,
-                     isAwaitingHuman: isAwaitingHuman, today: today),
-          let clock = clockDate(touchedAt: touchedAt, createdAt: createdAt, created: created) else {
-      return nil
-    }
-    let elapsed = now.timeIntervalSince(clock)
-    guard elapsed >= graceInterval else { return nil }
-    return min(1, elapsed / windowInterval)
+    let input = coreInput(isOpen: isOpen, isHeading: isHeading, isDeleted: isDeleted, isFaded: isFaded,
+                          deadline: deadline, scheduled: scheduled, hasRecurrence: hasRecurrence,
+                          isAgentTurn: isAgentTurn, isAssignedToClaude: isAssignedToClaude,
+                          isAwaitingHuman: isAwaitingHuman, showsAgentCue: showsAgentCue,
+                          touchedAt: touchedAt, createdAt: createdAt, created: created, now: now, today: today)
+    return try? SeptenaSharedCore.fadeFill(input: input)
+  }
+
+  private static func coreInput(isOpen: Bool, isHeading: Bool, isDeleted: Bool, isFaded: Bool,
+                                deadline: String?, scheduled: String?, hasRecurrence: Bool,
+                                isAgentTurn: Bool, isAssignedToClaude: Bool, isAwaitingHuman: Bool,
+                                showsAgentCue: Bool, touchedAt: Date?, createdAt: Date, created: String?,
+                                now: Date, today: String) -> FadeInput {
+    FadeInput(
+      isOpen: isOpen, isHeading: isHeading, isDeleted: isDeleted, isFaded: isFaded,
+      deadline: deadline, scheduled: scheduled, hasRecurrence: hasRecurrence,
+      isAgentTurn: isAgentTurn, isAssignedToClaude: isAssignedToClaude,
+      isAwaitingHuman: isAwaitingHuman, showsAgentCue: showsAgentCue,
+      touchedAt: touchedAt.map(SharedCoreValues.instant),
+      // `.distantPast` is the migration sentinel for "creation time unknown".
+      createdAt: createdAt == .distantPast ? nil : SharedCoreValues.instant(createdAt),
+      created: created,
+      now: SharedCoreValues.instant(now),
+      today: today,
+      utcOffsetSeconds: SharedCoreValues.utcOffsetSeconds(at: now)
+    )
   }
 
   // MARK: - Weekly sweep (§5)
