@@ -731,6 +731,7 @@ enum RegistryActions {
     "project.markDone": RegistryL10n.t("Mark Done"),
     "project.cancel": RegistryL10n.t("Cancel Project"),
     "project.delete": RegistryL10n.t("Delete Project"),
+    "logged.clear": RegistryL10n.t("Clear Logged…"),
     "sidebar.newArea": RegistryL10n.t("New Area"),
     "sidebar.newProject": RegistryL10n.t("New Project"),
     "section.new": RegistryL10n.t("New Section"),
@@ -791,6 +792,7 @@ enum RegistryActions {
     "project.markDone": "checkmark.circle",
     "project.cancel": "xmark.circle",
     "project.delete": "trash",
+    "logged.clear": "trash",
     "sidebar.newArea": "plus",
     "sidebar.newProject": "plus",
     "section.new": "plus",
@@ -872,6 +874,7 @@ enum RegistryActions {
     "task.deletePermanently",
     "area.delete",
     "project.delete",
+    "logged.clear",
     "section.delete",
   ]
 
@@ -911,6 +914,7 @@ enum RegistryActions {
     "project.markDone": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
     "project.cancel": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
     "project.delete": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "logged.clear": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
     "sidebar.newArea": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
     "sidebar.newProject": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
     "section.new": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
@@ -1000,6 +1004,9 @@ enum RegistryActions {
     ],
     "project.blankSpace": [
       RegistryMenuItem(kind: "action", id: "section.new", title: RegistryL10n.t("New Section"), sfSymbol: "plus", items: []),
+    ],
+    "scope.loggedFooter": [
+      RegistryMenuItem(kind: "action", id: "logged.clear", title: RegistryL10n.t("Clear Logged…"), sfSymbol: "trash", items: []),
     ],
     "notice.getStartedStep": [
       RegistryMenuItem(kind: "action", id: "notice.openStep", title: RegistryL10n.t("Open"), sfSymbol: "info.circle", items: []),
@@ -1198,6 +1205,9 @@ enum RegistryPrompts {
     let taskPhrase = tasksPhrase(count: tasks)
     if tasks == 0 { return RegistryPromptCopy(id: "deleteProject", title: RegistryL10n.format("Delete “%@”?", english: "Delete “%@”?", args: [name]), message: RegistryL10n.t("You can undo this."), confirmTitle: RegistryL10n.t("Delete"), options: []) }
     return RegistryPromptCopy(id: "deleteProject", title: RegistryL10n.format("Delete “%@” and its %@?", english: "Delete “%@” and its %@?", args: [name, taskPhrase]), message: RegistryL10n.t("The tasks move to Recently Deleted. You can undo this."), confirmTitle: RegistryL10n.t("Delete"), options: [])
+  }
+  static func clearLogged(count: Int, name: String) -> RegistryPromptCopy {
+    RegistryPromptCopy(id: "clearLogged", title: RegistryL10n.plural("Clear %lld logged items from “%@”?", count: count, one: "Clear 1 logged item from “%2$@”?", other: "Clear %lld logged items from “%@”?", args: [count, name]), message: RegistryL10n.t("Cleared items move to Recently Deleted. You can undo this."), confirmTitle: RegistryL10n.t("Clear"), options: [])
   }
 }
 

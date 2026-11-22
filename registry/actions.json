@@ -244,6 +244,13 @@
       "availability": { "selection": "single" },
       "featureId": "places.projects"
     },
+    "logged.clear": {
+      "title": "Clear Logged…",
+      "icon": "action.delete",
+      "role": "destructive",
+      "availability": { "selection": "none" },
+      "featureId": "lists.logbook"
+    },
     "sidebar.newArea": { "title": "New Area", "icon": "action.add", "role": "default", "availability": { "selection": "none" }, "featureId": "places.areas" },
     "sidebar.newProject": { "title": "New Project", "icon": "action.add", "role": "default", "availability": { "selection": "none" }, "featureId": "places.projects" },
     "section.new": { "title": "New Section", "icon": "action.add", "role": "default", "availability": { "selection": "none" }, "featureId": "places.sections" },
@@ -479,6 +486,7 @@
       { "kind": "action", "id": "section.delete" }
     ],
     "project.blankSpace": [{ "kind": "action", "id": "section.new" }],
+    "scope.loggedFooter": [{ "kind": "action", "id": "logged.clear" }],
     "notice.getStartedStep": [
       { "kind": "action", "id": "notice.openStep" },
       { "kind": "action", "id": "notice.toggleStep" },

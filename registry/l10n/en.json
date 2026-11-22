@@ -257,10 +257,41 @@
       "surfaces.firstRun.steps.connectClaude.body"
     ]
   },
+  "Clear": {
+    "text": "Clear",
+    "paths": [
+      "surfaces.prompts.items.clearLogged.confirmTitle"
+    ]
+  },
+  "Clear Logged…": {
+    "text": "Clear Logged…",
+    "paths": [
+      "actions.actions.logged.clear.title"
+    ]
+  },
   "Clear Schedule": {
     "text": "Clear Schedule",
     "paths": [
       "actions.actions.task.clearSchedule.title"
+    ]
+  },
+  "Clear {count} logged items from “{name}”?": {
+    "forms": {
+      "one": "Clear 1 logged item from “{name}”?",
+      "other": "Clear {count} logged items from “{name}”?"
+    },
+    "placeholders": [
+      "count",
+      "name"
+    ],
+    "paths": [
+      "surfaces.prompts.items.clearLogged.title"
+    ]
+  },
+  "Cleared items move to Recently Deleted. You can undo this.": {
+    "text": "Cleared items move to Recently Deleted. You can undo this.",
+    "paths": [
+      "surfaces.prompts.items.clearLogged.message"
     ]
   },
   "Click + or double-click below to add a task.": {

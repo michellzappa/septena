@@ -39,7 +39,14 @@
   "Classic Window": "Janela clássica",
   "Claude can take a task, ask you a question, and hand back the result.": "O Claude pode pegar uma tarefa, fazer uma pergunta e devolver o resultado.",
   "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.": "O Claude lê e altera suas tarefas pela sua conta Septena. Você decide em quais tarefas ele trabalha.",
+  "Clear": "Limpar",
+  "Clear Logged…": "Limpar registrados…",
   "Clear Schedule": "Limpar agendamento",
+  "Clear {count} logged items from “{name}”?": {
+    "one": "Limpar 1 item registrado de “{name}”?",
+    "other": "Limpar {count} itens registrados de “{name}”?"
+  },
+  "Cleared items move to Recently Deleted. You can undo this.": "Os itens limpos vão para Apagadas recentemente. Você pode desfazer isso.",
   "Click + or double-click below to add a task.": "Clique em + ou dê um clique duplo abaixo para adicionar uma tarefa.",
   "Colorful": "Colorido",
   "Complete": "Concluir",

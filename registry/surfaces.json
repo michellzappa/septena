@@ -151,6 +151,14 @@
         "featureId": "places.projects"
       },
       {
+        "id": "clearLogged",
+        "kind": "destructive",
+        "title": { "one": "Clear 1 logged item from “{name}”?", "other": "Clear {count} logged items from “{name}”?" },
+        "message": "Cleared items move to Recently Deleted. You can undo this.",
+        "confirmTitle": "Clear",
+        "featureId": "lists.logbook"
+      },
+      {
         "id": "deleteAccount",
         "kind": "destructive",
         "title": "Delete Account?",
