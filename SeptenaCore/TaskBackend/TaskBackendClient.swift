@@ -234,18 +234,39 @@ actor TaskBackendClient {
     return try decode(BackendChangesResponse.self, from: data, what: "history").changes
   }
 
-  // MARK: - Claude connector pairing (MCP preview)
+  // MARK: - Sign-in approval (a new device, or the Claude connector)
 
-  /// Approves the pairing code that the api.septena.app connector page shows,
-  /// so that Claude connector reads this user's tasks (read-only preview,
-  /// docs/SEPTASK_BACKEND.md §8). Sends the device time zone, which decides
-  /// what "today" means for the connector. Returns the client name.
-  func approvePairing(code: String) async throws -> String {
+  /// What a sign-in code asks for, read before the user approves it
+  /// (`POST /v1/pair/inspect`). A "device" code gives a new device a full app
+  /// session (ADR 0016); a "connector" code gives Claude MCP task access.
+  func inspectPairing(code: String) async throws -> BackendPairingRequest {
+    let body = try JSONEncoder().encode(["code": code])
+    let (data, status) = try await authed(path: "/v1/pair/inspect", method: "POST", body: body)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendPairingRequest.self, from: data, what: "sign-in request")
+  }
+
+  /// Approves a sign-in code. `kind` is the kind the user confirmed; the
+  /// server approves nothing if the code is of another kind. Sends the device
+  /// time zone, which decides what "today" means for the connector. Returns
+  /// the client name.
+  @discardableResult
+  func approvePairing(code: String, kind: BackendPairingRequest.Kind? = nil) async throws -> String {
     struct Approval: Decodable { let client: String }
-    let body = try JSONEncoder().encode(["code": code, "timeZone": TimeZone.current.identifier])
+    var fields = ["code": code, "timeZone": TimeZone.current.identifier]
+    if let kind { fields["kind"] = kind.rawValue }
+    let body = try JSONEncoder().encode(fields)
     let (data, status) = try await authed(path: "/v1/pair/approve", method: "POST", body: body)
     guard status == 200 else { throw Self.httpError(status, data) }
     return try decode(Approval.self, from: data, what: "pairing").client
+  }
+
+  /// The caller's plan (`GET /v1/entitlement`, docs/SYNC_SUBSCRIPTION_SPEC.md
+  /// §6). The server decides; the app only shows what it says.
+  func entitlement() async throws -> BackendEntitlement {
+    let (data, status) = try await authed(path: "/v1/entitlement", method: "GET", body: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendEntitlement.self, from: data, what: "entitlement")
   }
 
   // MARK: - HTTP
@@ -316,4 +337,20 @@ actor TaskBackendClient {
     let code = (try? JSONDecoder().decode(BackendErrorBody.self, from: data))?.error ?? "no detail"
     return .http(status: status, code: code)
   }
+}
+
+/// Wire shape of `POST /v1/pair/inspect` (backend/src/api/routes.ts): what a
+/// sign-in code asks for, shown to the user before they approve it.
+struct BackendPairingRequest: Decodable, Sendable, Equatable {
+  enum Kind: String, Decodable, Sendable {
+    /// A new device asks to sign in to this account (full app session).
+    case device
+    /// The Claude connector asks for task access (MCP tokens only).
+    case connector
+  }
+  let kind: Kind
+  /// The requester's own name: "Android SM-A175F", or "Claude".
+  let client: String
+  /// Seconds until the code expires.
+  let expiresIn: Int?
 }

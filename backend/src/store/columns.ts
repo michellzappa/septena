@@ -29,6 +29,9 @@ const json = (schema: z.ZodTypeAny): Column => ({ kind: "json", zod: schema.null
 const NOTES_MAX = ENTITY_LIMITS.notesMax;
 const zDay = z.string().regex(new RegExp(ENTITY_PATTERNS.day), "expected YYYY-MM-DD").nullable();
 const day = (): Column => ({ kind: "text", zod: zDay });
+const zTime24 = z.string().regex(new RegExp(ENTITY_PATTERNS.time24), "expected HH:MM").nullable();
+const time24 = (): Column => ({ kind: "text", zod: zTime24 });
+const zIanaTz = z.string().max(64).refine(isValidTz, "unknown time zone").nullable();
 // ISO-8601 instant. The app's existing `completedAt` string shape
 // (yyyy-MM-dd'T'HH:mm:ss, no zone) also passes.
 const zStamp = z.string().regex(new RegExp(ENTITY_PATTERNS.stamp), "expected ISO time").max(ENTITY_LIMITS.stampMax).nullable();
@@ -87,6 +90,10 @@ export const SETTING_VALUES = {
   textureIntensity: z.number().int().min(15).max(100),
   /// Header-wash motion mode ("still" | "slowDrift").
   textureMotion: z.enum(ENTITY_ENUMS.textureMotion),
+  /// Per-account sidebar order of special smart lists (registry/destinations.json IDs).
+  smartListOrder: z.array(z.string().max(64)).max(32),
+  /// Per-account hidden special smart lists (registry/destinations.json IDs).
+  smartListHidden: z.array(z.string().max(64)).max(32),
 } satisfies Record<string, z.ZodTypeAny>;
 
 export type SettingKey = keyof typeof SETTING_VALUES;
@@ -119,6 +126,9 @@ export const ENTITIES = {
       project: { kind: "text", zod: zId.nullable() },
       created: day(),
       scheduled: day(),
+      startTime: time24(),
+      durationMinutes: { kind: "int", zod: z.number().int().min(5).max(1440).nullable() },
+      timeZone: { kind: "text", zod: zIanaTz },
       deadline: day(),
       today: bool(),
       starred: bool(),

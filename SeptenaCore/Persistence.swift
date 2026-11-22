@@ -31,6 +31,12 @@ final class TaskEntity {
   var statusRaw: String
   var created: String?
   var scheduled: String?
+  /// Optional 24-hour wall-clock start time (`HH:MM`, docs/TASK_TIMES_AND_ICAL_SPEC.md).
+  var startTime: String? = nil
+  /// Optional duration in minutes (`5..1440`).
+  var durationMinutes: Int? = nil
+  /// Optional IANA time zone (nil = floating local time).
+  var timeZone: String? = nil
   @Attribute(originalName: "due") var deadline: String?
   var today: Bool
   /// Simple boolean Important / Star marker (docs/STAR_PRIORITY_SPEC.md, ST0).
@@ -177,6 +183,9 @@ final class TaskEntity {
        statusRaw: String = TaskStatus.open.rawValue,
        created: String? = nil,
        scheduled: String? = nil,
+       startTime: String? = nil,
+       durationMinutes: Int? = nil,
+       timeZone: String? = nil,
        deadline: String? = nil,
        today: Bool = false,
        starred: Bool = false,
@@ -220,6 +229,9 @@ final class TaskEntity {
     self.statusRaw = statusRaw
     self.created = created
     self.scheduled = scheduled
+    self.startTime = startTime
+    self.durationMinutes = durationMinutes
+    self.timeZone = timeZone
     self.deadline = deadline
     self.today = today
     self.starred = starred
@@ -568,6 +580,9 @@ extension SeptenaTask {
       status: e.status,
       created: e.created,
       scheduled: e.scheduled,
+      startTime: e.startTime,
+      durationMinutes: e.durationMinutes,
+      timeZone: e.timeZone,
       deadline: e.deadline,
       today: e.today,
       starred: e.starred,
@@ -1272,7 +1287,7 @@ enum LocalCache {
           e.deletedAt == nil && !e.pendingDeletion && e.area == areaId
         }
       ))
-    case .today, .triage, .review, .upcoming, .repeating, .unscheduled, .starred, .faded:
+    case .today, .triage, .review, .agent, .upcoming, .repeating, .unscheduled, .starred, .faded:
       return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
         predicate: #Predicate { e in
           e.deletedAt == nil && !e.pendingDeletion && e.statusRaw == "open"
@@ -1449,6 +1464,14 @@ enum LocalCache {
     case .review:
       // Agent-worked tasks awaiting the human's verification and acceptance (#87).
       guard e.status == .open, e.conversation.needsHumanReview else { return nil }
+      return SeptenaTask(e)
+    case .agent:
+      // Agent work by stage (docs/TASK_FACTORY_SPEC.md §3). Only rows that
+      // carry conversation JSON decode it. A claim lease is backend wall-clock
+      // time, not the app's day, so this reads the real clock (as
+      // `deriveConvo` does).
+      guard e.status == .open, e.conversationJSON != nil,
+            e.conversation.agentStage(at: Date()) != nil else { return nil }
       return SeptenaTask(e)
     case .upcoming:
       guard e.status == .open, !e.today else { return nil }
@@ -1711,11 +1734,15 @@ extension LocalCache {
 // MARK: - TagEntity & Tag helpers (docs/TAGS_SPEC.md)
 
 extension TaskEntity {
+  /// One decoder for every row: the row-object build reads `tagIDs` for each
+  /// task on every list repaint, and a new `JSONDecoder` per read is not free.
+  private static let tagIDsDecoder = JSONDecoder()
+
   /// Typed view over `tagIDsJSON` (deduplicated, capped at `RegistryEntityLimits.maxTagsPerTask`).
   var tagIDs: [String] {
     get {
       guard let raw = tagIDsJSON, let data = raw.data(using: .utf8),
-            let decoded = try? JSONDecoder().decode([String].self, from: data)
+            let decoded = try? Self.tagIDsDecoder.decode([String].self, from: data)
       else { return [] }
       return decoded
     }

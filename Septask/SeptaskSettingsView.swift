@@ -37,7 +37,6 @@ struct SeptaskSettingsView: View {
 
   @AppStorage(SettingsKey.welcomeName) private var welcomeName: String =
     RegistrySettings.Defaults.welcomeName
-  @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked: Bool = false
   @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool =
     RegistrySettings.Defaults.todayShowCompleted
   @AppStorage(SettingsKey.todayGroupByList) private var todayGroupByList: Bool =
@@ -54,6 +53,8 @@ struct SeptaskSettingsView: View {
   private var taskBadge: Bool = RegistrySettings.Defaults.badgeShowOverdue
   @AppStorage(SettingsKey.tasksTitleLines) private var titleLines: Int =
     RegistrySettings.Defaults.tasksTitleLines
+  @AppStorage(SettingsKey.tasksSwipeLeadingAction) private var swipeLeadingActionRaw: String =
+    RegistrySettings.Defaults.tasksSwipeLeadingAction
   @AppStorage(SettingsKey.textSizeStep) private var textSizeStep: Int =
     RegistrySettings.Defaults.textSizeStep
   @AppStorage(SettingsKey.loggingAnimationsEnabled) private var completionAnimations: Bool =
@@ -97,6 +98,7 @@ struct SeptaskSettingsView: View {
     .onExitCommand { dismiss() }
     .onAppear(perform: consumeLink)
     .onReceive(NotificationCenter.default.publisher(for: SeptaskSettingsLink.didRequest)) { _ in consumeLink() }
+    .task(id: TaskSyncEngine.shared.signedIn) { await PlanStatus.shared.refresh() }
     #else
     NavigationStack(path: $path) {
       Form {
@@ -108,6 +110,7 @@ struct SeptaskSettingsView: View {
       .navigationTitle("Settings")
       .navigationBarTitleDisplayMode(.inline)
       .navigationDestination(for: String.self) { page($0) }
+      .task(id: TaskSyncEngine.shared.signedIn) { await PlanStatus.shared.refresh() }
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") { dismiss() }
@@ -323,9 +326,9 @@ struct SeptaskSettingsView: View {
   private var profileCardContent: some View {
     HStack(spacing: 14) {
       #if os(macOS)
-      ProfileAvatar(name: welcomeName, isPlus: plusUnlocked, size: 44)
+      ProfileAvatar(name: welcomeName, isPlus: PlanStatus.shared.isPlus, size: 44)
       #else
-      ProfileAvatar(name: welcomeName, isPlus: plusUnlocked, size: 54)
+      ProfileAvatar(name: welcomeName, isPlus: PlanStatus.shared.isPlus, size: 54)
       #endif
       VStack(alignment: .leading, spacing: 3) {
         Text(welcomeName.isEmpty ? "Your Profile" : welcomeName)
@@ -333,7 +336,7 @@ struct SeptaskSettingsView: View {
           .foregroundStyle(.primary)
         HStack(spacing: 6) {
           if TaskSyncEngine.shared.signedIn {
-            if plusUnlocked { SeptenaPlusBadge() } else { FreeAccountBadge() }
+            if PlanStatus.shared.isPlus { SeptenaPlusBadge() } else { FreeAccountBadge() }
             Text("·")
               .font(.caption)
               .foregroundStyle(.tertiary)
@@ -479,6 +482,18 @@ struct SeptaskSettingsView: View {
           }
         }
       }
+    case "tasksSwipeLeadingAction":
+      #if os(iOS)
+      Picker(selection: $swipeLeadingActionRaw) {
+        ForEach(RegistrySettings.optionsByKey["tasksSwipeLeadingAction"] ?? []) { opt in
+          Text(opt.title).tag(opt.value)
+        }
+      } label: {
+        rowLabel(label, detail: item.detail)
+      }
+      #else
+      EmptyView()
+      #endif
     case "textSizeStep":
       inlineTextSizeRow(label: label)
     default:
@@ -557,6 +572,8 @@ struct SeptaskSettingsView: View {
     switch statusKey {
     case "syncStatus":
       return TaskSyncEngine.shared.signedIn ? liveSyncSummary : "On this device"
+    case "planStatus":
+      return PlanStatus.shared.statusLine
     case "claudeStatus":
       guard TaskSyncEngine.shared.signedIn else { return "Sign in" }
       let paired = SeptaskSyncedSettings.current().getStartedSteps?.contains(TaskNoticeStep.ID.connectAI.rawValue) == true
@@ -607,6 +624,10 @@ struct SeptaskSettingsView: View {
       SeptaskAboutPane()
     case RegistrySettings.PageID.advanced:
       SeptaskAdvancedPane()
+    case RegistrySettings.PageID.smartLists:
+      SeptaskSmartListsPane()
+    case RegistrySettings.PageID.plus:
+      SeptaskPlusPane()
     default:
       EmptyView()
     }
@@ -621,13 +642,12 @@ private struct SeptaskAccountPane: View {
   @Environment(SettingsStore.self) private var store
   @AppStorage(SettingsKey.welcomeName) private var welcomeName: String =
     RegistrySettings.Defaults.welcomeName
-  @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked: Bool = false
 
   var body: some View {
     Form {
       Section {
         HStack(spacing: 16) {
-          ProfileAvatar(name: welcomeName, isPlus: plusUnlocked, size: 64)
+          ProfileAvatar(name: welcomeName, isPlus: PlanStatus.shared.isPlus, size: 64)
           VStack(alignment: .leading, spacing: 4) {
             TextField(RegistrySettings.label(surface: "account_profile_editor"), text: $welcomeName)
               .font(.title2.weight(.semibold))
@@ -639,7 +659,7 @@ private struct SeptaskAccountPane: View {
                 store.setWelcomeName(newValue, context: modelContext, engine: ckEngine)
               }
             if TaskSyncEngine.shared.signedIn {
-              if plusUnlocked {
+              if PlanStatus.shared.isPlus {
                 SeptenaPlusBadge()
               } else {
                 FreeAccountBadge()
@@ -658,10 +678,23 @@ private struct SeptaskAccountPane: View {
         }
       }
 
+      Section {
+        NavigationLink(value: RegistrySettings.PageID.plus) {
+          LabeledContent {
+            if let line = PlanStatus.shared.statusLine { Text(line) }
+          } label: {
+            Label(RegistrySettings.pageById[RegistrySettings.PageID.plus]?.title ?? RegistryPlans.name,
+                  systemImage: RegistryIcons.sfSymbols["settings.plus"] ?? "plus.circle.fill")
+          }
+        }
+      }
+
       SeptaskSyncAccountSection()
+      SeptaskSignInApprovalSection()
       SeptaskDeleteAccountSection()
     }
     .formStyle(.grouped)
+    .task { await PlanStatus.shared.refresh() }
     .navigationTitle(RegistrySettings.pageById[RegistrySettings.PageID.account]?.title ?? "")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
@@ -872,5 +905,65 @@ enum SeptaskAbout {
     let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
     let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
     return "\(short) (\(build))"
+  }
+}
+
+// MARK: - Smart Lists (Depth 1)
+
+private struct SeptaskSmartListsPane: View {
+  @State private var prefs = SmartListPreferences.shared
+
+  var body: some View {
+    List {
+      Section {
+        ForEach(prefs.orderedDestinations) { dest in
+          HStack(spacing: 12) {
+            Image(systemName: dest.sfSymbol)
+              .font(.body.weight(.semibold))
+              .foregroundStyle(dest.id == "today" ? Theme.todayAccent : .secondary)
+              .frame(width: 24, alignment: .center)
+            VStack(alignment: .leading, spacing: 2) {
+              Text(dest.title)
+              if !dest.canHide {
+                Text("Always shown")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              } else if dest.visibility == "whenNonEmpty" {
+                Text("Shown when non-empty")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
+            }
+            Spacer(minLength: 8)
+            Toggle(dest.title, isOn: Binding(
+              get: { !prefs.isHidden(dest.id) },
+              set: { prefs.setHidden(!$0, for: dest.id) }
+            ))
+            .labelsHidden()
+            .disabled(!dest.canHide)
+          }
+        }
+        .onMove { source, destination in
+          prefs.move(fromOffsets: source, toOffset: destination)
+        }
+      } header: {
+        Text("Sidebar Smart Lists")
+      } footer: {
+        Text("Drag to reorder. Smart lists stay in their own section above Areas & Projects and sync across all your devices.")
+      }
+
+      if prefs.isCustomized {
+        Section {
+          Button("Reset to Default Order") {
+            prefs.resetToDefaults()
+          }
+        }
+      }
+    }
+    #if os(iOS)
+    .environment(\.editMode, .constant(.active))
+    .navigationBarTitleDisplayMode(.inline)
+    #endif
+    .navigationTitle("Smart Lists")
   }
 }

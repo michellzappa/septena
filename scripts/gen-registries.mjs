@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Validates all `registry/*.json` files (including cross-file referential
-// integrity) and generates typed Swift + TypeScript bindings.
+// integrity) and generates typed Swift, TypeScript, and Kotlin bindings.
 //
 // Usage:
 //   node scripts/gen-registries.mjs          # validate and write generated files
@@ -57,6 +57,9 @@ function validateEntities(entities) {
       seen.add(v);
     }
   }
+  assert(Array.isArray(entities.turnFields) && entities.turnFields.length > 0, "entities.json: missing turnFields");
+  assert(entities.turnFields.every((field) => typeof field === "string" && field.length > 0), "entities.json: turnFields must contain non-empty strings");
+  assert(new Set(entities.turnFields).size === entities.turnFields.length, "entities.json: turnFields contains duplicates");
   const validKinds = new Set(["text", "int", "real", "bool", "json"]);
   assert(entities.entities && typeof entities.entities === "object", "entities.json: missing entities");
   for (const [name, spec] of Object.entries(entities.entities)) {
@@ -102,6 +105,7 @@ function validateRules(rules) {
     "tombstoneTtlDays",
     "clientOpTtlDays",
     "changeLogTtlDays",
+    "deleteGraceSeconds",
   ];
   for (const k of required) {
     assert(typeof rules[k] === "number" && Number.isFinite(rules[k]) && rules[k] > 0, `rules.json: ${k} must be positive number`);
@@ -303,9 +307,21 @@ function validateDestinations(dests, icons, caps) {
       assert(d.sidebarOrder > lastOrder, `destinations.json: sidebarOrder must strictly increase at "${d.id}"`);
       lastOrder = d.sidebarOrder;
     }
+    assert(typeof d.canHide === "boolean", `destinations.json: ${d.id} missing boolean canHide`);
     assert(typeof d.emptyState?.title === "string" && typeof d.emptyState?.detail === "string", `destinations.json: ${d.id} needs emptyState.title and .detail`);
     assert(d.icon in icons.icons, `destinations.json: ${d.id} unknown icon "${d.icon}"`);
     assert(d.featureId in caps.capabilities, `destinations.json: ${d.id} unknown featureId "${d.featureId}"`);
+    // Optional ordered sections a list groups its rows into (Agent stages).
+    if (d.groups !== undefined) {
+      assert(Array.isArray(d.groups) && d.groups.length > 0, `destinations.json: ${d.id}.groups must be a non-empty array`);
+      const seenGroups = new Set();
+      for (const g of d.groups) {
+        assert(typeof g.id === "string" && !seenGroups.has(g.id), `destinations.json: ${d.id} duplicate or missing group id "${g.id}"`);
+        seenGroups.add(g.id);
+        assert(typeof g.title === "string" && g.title.length > 0, `destinations.json: ${d.id}.groups.${g.id} needs a title`);
+        assert(g.icon in icons.icons, `destinations.json: ${d.id}.groups.${g.id} unknown icon "${g.icon}"`);
+      }
+    }
   }
   for (const f of ["title", "detail", "pointerDetail", "touchDetail", "syncingTitle"]) {
     assert(typeof dests.genericEmptyState?.[f] === "string", `destinations.json: genericEmptyState.${f} missing`);
@@ -446,9 +462,97 @@ function validateSurfaces(surfaces, icons, caps) {
   for (const p of surfaces.prompts.items) {
     assert(p.featureId in caps.capabilities, `surfaces.json: prompt ${p.id} unknown featureId "${p.featureId}"`);
   }
+  const attrIds = new Set();
   for (const attr of surfaces.taskAttributes) {
+    assert(!attrIds.has(attr.id), `surfaces.json: duplicate attribute ${attr.id}`);
+    attrIds.add(attr.id);
+    assert(["field", "inline", "popover", "chip"].includes(attr.surfaceTier), `surfaces.json: attribute ${attr.id} unknown surfaceTier "${attr.surfaceTier}"`);
     assert(attr.icon in icons.icons, `surfaces.json: attribute ${attr.id} unknown icon "${attr.icon}"`);
     assert(attr.featureId in caps.capabilities, `surfaces.json: attribute ${attr.id} unknown featureId "${attr.featureId}"`);
+  }
+}
+
+// ---- plans.json (ADR 0010, ADR 0023) ----
+const PLAN_LEVELS = ["device", "account", "plus"];
+const PLAN_LIMIT_PLANS = ["account", "plus"];
+
+/** Every string in a JSON value, with its path. */
+function stringsOf(node, p, out = []) {
+  if (typeof node === "string") out.push([p, node]);
+  else if (Array.isArray(node)) node.forEach((v, i) => stringsOf(v, `${p}.${i}`, out));
+  else if (node && typeof node === "object") for (const [k, v] of Object.entries(node)) if (k !== "description") stringsOf(v, `${p}.${k}`, out);
+  return out;
+}
+
+function validatePlans(plans, icons, caps) {
+  assert(plans.version === 1, "plans.json: version must be 1");
+  assert(plans.featureId in caps.capabilities, `plans.json: unknown featureId "${plans.featureId}"`);
+  for (const f of ["name", "shortName", "headline", "subhead"]) assert(typeof plans[f] === "string" && plans[f].length > 0, `plans.json: ${f} missing`);
+  // House rule: rendered copy has no em or en dashes.
+  for (const [p, v] of stringsOf(plans, "plans")) assert(!/[–—]/.test(v), `plans.json: ${p} contains an em or en dash`);
+  assert(typeof plans.checkout?.open === "boolean", "plans.json: checkout.open must be a boolean");
+  assert(Number.isInteger(plans.trial?.days) && plans.trial.days > 0, "plans.json: trial.days must be a positive integer");
+  assert(plans.trial.kind === "reverse", "plans.json: trial.kind must be reverse (ADR 0010: one server-side trial, no store offer)");
+  assert(plans.trial.title.includes(String(plans.trial.days)), "plans.json: trial.title must state trial.days");
+
+  const priceIds = new Set();
+  for (const pr of plans.prices) {
+    assert(!priceIds.has(pr.id), `plans.json: duplicate price "${pr.id}"`);
+    priceIds.add(pr.id);
+    assert(/^com\.septena\.tasks\.sync\.[a-z]+$/.test(pr.productId), `plans.json: price ${pr.id} productId must start com.septena.tasks.sync.`);
+    assert(Number.isInteger(pr.amountMinor) && pr.amountMinor > 0, `plans.json: price ${pr.id} amountMinor must be a positive integer`);
+    assert(pr.currency === "EUR", `plans.json: price ${pr.id} currency must be EUR`);
+    assert(["year", "month"].includes(pr.interval), `plans.json: price ${pr.id} unknown interval "${pr.interval}"`);
+    const whole = String(pr.amountMinor / 100);
+    assert(pr.label.includes(whole), `plans.json: price ${pr.id} label must state ${whole}`);
+  }
+  assert(plans.prices.filter((x) => x.highlighted).length === 1, "plans.json: exactly one price must be highlighted");
+
+  assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
+  assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(["free", "plus"]), "plans.json: cards must be free, plus");
+  assert(plans.cards.filter((c) => c.highlighted).length === 1, "plans.json: exactly one card must be highlighted");
+
+  const lim = plans.limits;
+  const keys = Object.keys(lim.account).sort();
+  for (const plan of PLAN_LIMIT_PLANS) {
+    assert(JSON.stringify(Object.keys(lim[plan] ?? {}).sort()) === JSON.stringify(keys), `plans.json: limits.${plan} must have the same keys as limits.account`);
+    for (const [k, v] of Object.entries(lim[plan])) {
+      assert(v === null || typeof v === "boolean" || (Number.isInteger(v) && v >= 0), `plans.json: limits.${plan}.${k} must be null, a boolean or a non-negative integer`);
+    }
+  }
+
+  const rowIds = new Set();
+  for (const o of plans.outcomes) {
+    assert(o.icon in icons.icons, `plans.json: outcome ${o.id} unknown icon "${o.icon}"`);
+    for (const r of o.rows) {
+      assert(!rowIds.has(r.id), `plans.json: duplicate row "${r.id}"`);
+      rowIds.add(r.id);
+      if (r.featureId !== undefined) assert(r.featureId in caps.capabilities, `plans.json: row ${r.id} unknown featureId "${r.featureId}"`);
+      if (r.status !== undefined) assert(r.status === "planned", `plans.json: row ${r.id} status must be planned`);
+      for (const lv of PLAN_LEVELS) {
+        const c = r.cells?.[lv];
+        assert(typeof c === "boolean" || (typeof c === "string" && c.length > 0), `plans.json: row ${r.id} cell ${lv} must be a boolean or text`);
+      }
+      if (r.limit !== undefined) {
+        assert(r.limit in lim.account, `plans.json: row ${r.id} unknown limit "${r.limit}"`);
+        // The copy states the number the server enforces.
+        for (const plan of PLAN_LIMIT_PLANS) {
+          const v = lim[plan][r.limit];
+          const cell = r.cells[plan];
+          if (Number.isInteger(v) && v > 0) {
+            assert(typeof cell === "string" && new RegExp(`(^|\\D)${v}(\\D|$)`).test(cell), `plans.json: row ${r.id} ${plan} cell must state the limit ${v}`);
+          }
+        }
+      }
+    }
+  }
+  for (const list of ["promises", "upsells"]) {
+    const ids = new Set();
+    for (const n of plans[list]) {
+      assert(!ids.has(n.id), `plans.json: duplicate ${list} "${n.id}"`);
+      ids.add(n.id);
+      assert(n.title && n.detail, `plans.json: ${list} ${n.id} needs title and detail`);
+    }
   }
 }
 
@@ -481,10 +585,10 @@ function appleKeycaps(sc) {
   return caps;
 }
 
-function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, actions, surfaces }) {
+function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans }) {
   const lines = [];
   lines.push("// GENERATED FILE — DO NOT EDIT BY HAND.");
-  lines.push("// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces}.json");
+  lines.push("// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces,plans}.json");
   lines.push("// Regenerate: node scripts/gen-registries.mjs");
   lines.push("");
   lines.push("import Foundation");
@@ -516,6 +620,11 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   const deletable = entityNames.filter((n) => entities.entities[n].deletable);
   lines.push(`  static let entityNames: [String] = [${entityNames.map(swiftStr).join(", ")}]`);
   lines.push(`  static let deletableEntities: [String] = [${deletable.map(swiftStr).join(", ")}]`);
+  lines.push("}");
+  lines.push("");
+  lines.push("/// Canonical conversation turn fields shared with the backend (`registry/entities.json`).");
+  lines.push("enum RegistryTurnFields {");
+  lines.push(`  static let all: Set<String> = [${entities.turnFields.map(swiftStr).join(", ")}]`);
   lines.push("}");
   lines.push("");
 
@@ -805,9 +914,18 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let iconId: String");
   lines.push("  let sfSymbol: String");
   lines.push("  let visibility: String");
+  lines.push("  let canHide: Bool");
   lines.push("  let shortcutKeycaps: [String]?");
   lines.push("  let emptyTitle: String");
   lines.push("  let emptyDetail: String");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// One ordered section of a grouped smart list (`groups` in destinations.json).");
+  lines.push("struct RegistryDestinationGroup: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let title: String");
+  lines.push("  let iconId: String");
+  lines.push("  let sfSymbol: String");
   lines.push("}");
   lines.push("");
   lines.push("enum RegistryDestinations {");
@@ -821,12 +939,25 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const d of dests.destinations) {
     const capsList = d.shortcut ? `[${appleKeycaps(d.shortcut).map(swiftStr).join(", ")}]` : "nil";
     lines.push(
-      `    RegistryDestination(id: ${swiftStr(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, visibility: ${swiftStr(d.visibility)}, shortcutKeycaps: ${capsList}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}),`
+      `    RegistryDestination(id: ${swiftStr(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, visibility: ${swiftStr(d.visibility)}, canHide: ${d.canHide ? "true" : "false"}, shortcutKeycaps: ${capsList}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}),`
     );
   }
   lines.push("  ]");
   lines.push("");
+  lines.push("  static let byId: [String: RegistryDestination] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })");
   lines.push("  static let byNavigationKey: [String: RegistryDestination] = Dictionary(uniqueKeysWithValues: all.map { ($0.navigationKey, $0) })");
+  lines.push("");
+  lines.push("  /// Ordered row groups per destination id (`groups` in destinations.json).");
+  lines.push("  static let groups: [String: [RegistryDestinationGroup]] = [");
+  for (const d of dests.destinations) {
+    if (!d.groups) continue;
+    lines.push(`    ${swiftStr(d.id)}: [`);
+    for (const g of d.groups) {
+      lines.push(`      RegistryDestinationGroup(id: ${swiftStr(g.id)}, title: ${L(g.title, g, "title")}, iconId: ${swiftStr(g.icon)}, sfSymbol: ${swiftStr(icons.icons[g.icon].sfSymbol)}),`);
+    }
+    lines.push("    ],");
+  }
+  lines.push("  ]");
   lines.push("");
   lines.push("  /// Empty state for a list with no copy of its own (`genericEmptyState`).");
   lines.push("  enum GenericEmpty {");
@@ -851,6 +982,18 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let modifiers: [String]");
   lines.push("  let keycaps: [String]");
   lines.push("  let excludePlatforms: [String]");
+  lines.push("  /// Extra bindings for the same action (a menu item shows only one).");
+  lines.push("  var alternates: [RegistryShortcut] = []");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// Where an action applies (`availability` in `registry/actions.json`).");
+  lines.push("/// Empty `platforms` means every platform.");
+  lines.push("struct RegistryActionAvailability: Sendable, Hashable {");
+  lines.push("  let selection: String");
+  lines.push("  let platforms: [String]");
+  lines.push("  let excludeDestinations: [String]");
+  lines.push("  let onlyDestinations: [String]");
+  lines.push("  let requiresRecurrence: Bool");
   lines.push("}");
   lines.push("");
   lines.push("/// One item in a context menu or menu-bar menu (`registry/actions.json`).");
@@ -901,8 +1044,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   }
   lines.push("  ]");
   lines.push("");
-  const altFields = ["desktopTitle", "activeTitle", "pluralTitle", "addTitle", "removeTitle"];
-  lines.push("  /// Other titles of an action: `desktopTitle`, `activeTitle` (state on), `pluralTitle`, `addTitle`, `removeTitle`.");
+  const altFields = ["desktopTitle", "activeTitle", "pluralTitle", "addTitle", "removeTitle", "shortTitle"];
+  lines.push("  /// Other titles of an action: `desktopTitle`, `activeTitle` (state on), `pluralTitle`, `addTitle`, `removeTitle`, `shortTitle` (swipe buttons).");
   lines.push("  static let alternateTitles: [String: [String: String]] = [");
   for (const [id, a] of Object.entries(actions.actions)) {
     const pairs = altFields.filter((f) => typeof a[f] === "string").map((f) => `${swiftStr(f)}: ${L(a[f], a, f)}`);
@@ -914,9 +1057,31 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const [id, a] of Object.entries(actions.actions)) {
     if (!a.shortcut) continue;
     const sc = a.shortcut;
-    lines.push(`    ${swiftStr(id)}: RegistryShortcut(key: ${swiftStr(sc.key)}, modifiers: [${sc.modifiers.map(swiftStr).join(", ")}], keycaps: [${appleKeycaps(sc).map(swiftStr).join(", ")}], excludePlatforms: [${(sc.excludePlatforms ?? []).map(swiftStr).join(", ")}]),`);
+    const excl = `[${(sc.excludePlatforms ?? []).map(swiftStr).join(", ")}]`;
+    const one = (k) => `RegistryShortcut(key: ${swiftStr(k.key)}, modifiers: [${k.modifiers.map(swiftStr).join(", ")}], keycaps: [${appleKeycaps(k).map(swiftStr).join(", ")}], excludePlatforms: ${excl}`;
+    const alts = (sc.alternates ?? []).map((k) => `${one(k)})`);
+    lines.push(`    ${swiftStr(id)}: ${one(sc)}${alts.length ? `, alternates: [${alts.join(", ")}]` : ""}),`);
   }
   lines.push("  ]");
+  lines.push("");
+  lines.push("  /// Actions whose `role` is `destructive` (red in menus and swipes).");
+  lines.push("  static let destructive: Set<String> = [");
+  for (const [id, a] of Object.entries(actions.actions)) {
+    if (a.role === "destructive") lines.push(`    ${swiftStr(id)},`);
+  }
+  lines.push("  ]");
+  lines.push("");
+  lines.push("  static let availability: [String: RegistryActionAvailability] = [");
+  for (const [id, a] of Object.entries(actions.actions)) {
+    const av = a.availability ?? {};
+    const arr = (v) => `[${(v ?? []).map(swiftStr).join(", ")}]`;
+    lines.push(`    ${swiftStr(id)}: RegistryActionAvailability(selection: ${swiftStr(av.selection ?? "any")}, platforms: ${arr(av.platforms)}, excludeDestinations: ${arr(av.excludeDestinations)}, onlyDestinations: ${arr(av.onlyDestinations)}, requiresRecurrence: ${av.requiresRecurrence === true}),`);
+  }
+  lines.push("  ]");
+  lines.push("");
+  lines.push("  /// Swipe slots in screen order, left to right (`swipeActions`).");
+  lines.push(`  static let swipeLeading: [String] = [${actions.swipeActions.leading.map(swiftStr).join(", ")}]`);
+  lines.push(`  static let swipeTrailing: [String] = [${actions.swipeActions.trailing.map(swiftStr).join(", ")}]`);
   lines.push("");
   lines.push("  static let contextMenus: [String: [RegistryMenuItem]] = [");
   for (const [name, items] of Object.entries(actions.contextMenus)) {
@@ -1103,11 +1268,49 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  lines.push("/// One task attribute (`registry/surfaces.json` `taskAttributes`): a composer");
+  lines.push("/// pill, an inspector row and a picker title. `surfaceTier` `field` is an");
+  lines.push("/// always-visible field (notes), not a pill. `chip` is a transient composer");
+  lines.push("/// chip shown only on a blank new task (Paste), not a pill. `editOnly` needs a saved task.");
+  lines.push("struct RegistryTaskAttribute: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let label: String");
+  lines.push("  let iconId: String");
+  lines.push("  let sfSymbol: String");
+  lines.push("  let commitContract: String");
+  lines.push("  let surfaceTier: String");
+  lines.push("  let featureId: String");
+  lines.push("  let editOnly: Bool");
+  lines.push("  /// Pill text while the attribute's work runs (Discuss).");
+  lines.push("  let workingLabel: String?");
+  lines.push("  var isPill: Bool { surfaceTier == \"inline\" || surfaceTier == \"popover\" }");
+  lines.push("}");
+  lines.push("");
   lines.push("enum RegistrySurfaces {");
   lines.push(`  static let taskAttributeOrder: [String] = [${surfaces.taskAttributes.map((a) => swiftStr(a.id)).join(", ")}]`);
-  lines.push("  static let taskAttributeLabels: [String: String] = [");
-  for (const a of surfaces.taskAttributes) lines.push(`    ${swiftStr(a.id)}: ${L(a.label, a, "label")},`);
+  lines.push("  static let taskAttributes: [RegistryTaskAttribute] = [");
+  for (const a of surfaces.taskAttributes) {
+    lines.push(`    RegistryTaskAttribute(id: ${swiftStr(a.id)}, label: ${L(a.label, a, "label")}, iconId: ${swiftStr(a.icon)}, sfSymbol: ${swiftStr(icons.icons[a.icon].sfSymbol)}, commitContract: ${swiftStr(a.commitContract)}, surfaceTier: ${swiftStr(a.surfaceTier)}, featureId: ${swiftStr(a.featureId)}, editOnly: ${a.editOnly === true}, workingLabel: ${LOpt(a.workingLabel, a, "workingLabel")}),`);
+  }
   lines.push("  ]");
+  lines.push("  /// The pills, in rail order (every attribute except fields and chips).");
+  lines.push("  static let taskAttributePills: [RegistryTaskAttribute] = taskAttributes.filter(\\.isPill)");
+  lines.push("  static let taskAttributeLabels: [String: String] = Dictionary(uniqueKeysWithValues: taskAttributes.map { ($0.id, $0.label) })");
+  lines.push("  /// The attribute with `id`. Traps on an unknown id: the ids are a closed set.");
+  lines.push("  static func taskAttribute(_ id: String) -> RegistryTaskAttribute {");
+  lines.push("    guard let a = taskAttributes.first(where: { $0.id == id }) else { preconditionFailure(\"unknown task attribute \\(id)\") }");
+  lines.push("    return a");
+  lines.push("  }");
+  lines.push("  /// Count text for a pill value (`countLabel`), or nil when the attribute has none.");
+  lines.push("  static func taskAttributeCount(_ id: String, count: Int) -> String? {");
+  lines.push("    switch id {");
+  for (const a of surfaces.taskAttributes) {
+    if (a.countLabel === undefined) continue;
+    lines.push(`    case ${swiftStr(a.id)}: return ${L10N.swiftTemplate(BY_KEY, tmplKey(a.countLabel, a, "countLabel")).body}`);
+  }
+  lines.push("    default: return nil");
+  lines.push("    }");
+  lines.push("  }");
   lines.push("}");
   lines.push("");
 
@@ -1175,6 +1378,107 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  // 10. Plans and pricing (plans.json, ADR 0010 / ADR 0023). Limits are not
+  // emitted: the app reads its limits from the server's plan table.
+  const P = plans;
+  const cellSwift = (c, row, lv) => (c === true ? ".included" : c === false ? ".notIncluded" : `.text(${L(c, row.cells, lv)})`);
+  lines.push("/// One plan-comparison cell: a check, a dash, or text.");
+  lines.push("enum RegistryPlanCell: Sendable, Hashable {");
+  lines.push("  case included, notIncluded, text(String)");
+  lines.push("}");
+  lines.push("");
+  lines.push("struct RegistryPlanPrice: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let productId: String");
+  lines.push("  let amountMinor: Int");
+  lines.push("  let currency: String");
+  lines.push("  let interval: String");
+  lines.push("  let highlighted: Bool");
+  lines.push("  let label: String");
+  lines.push("  let detail: String");
+  lines.push("}");
+  lines.push("");
+  lines.push("struct RegistryPlanCard: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let title: String");
+  lines.push("  let detail: String");
+  lines.push("  let points: [String]");
+  lines.push("  let footnote: String?");
+  lines.push("  let highlighted: Bool");
+  lines.push("}");
+  lines.push("");
+  lines.push("struct RegistryPlanRow: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let label: String");
+  lines.push("  let planned: Bool");
+  lines.push("  let device: RegistryPlanCell");
+  lines.push("  let account: RegistryPlanCell");
+  lines.push("  let plus: RegistryPlanCell");
+  lines.push("}");
+  lines.push("");
+  lines.push("struct RegistryPlanOutcome: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let icon: String");
+  lines.push("  let title: String");
+  lines.push("  let detail: String");
+  lines.push("  let rows: [RegistryPlanRow]");
+  lines.push("}");
+  lines.push("");
+  lines.push("struct RegistryPlanNote: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let title: String");
+  lines.push("  let detail: String");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// Plans and pricing (`registry/plans.json`). The site's /pricing page reads the same file.");
+  lines.push("enum RegistryPlans {");
+  for (const f of ["name", "shortName", "headline", "subhead"]) lines.push(`  static var ${f}: String { ${L(P[f], P, f)} }`);
+  lines.push(`  static let checkoutOpen = ${P.checkout.open}`);
+  lines.push(`  static var checkoutNotice: String { ${L(P.checkout.notice, P.checkout, "notice")} }`);
+  lines.push(`  static let trialDays = ${P.trial.days}`);
+  lines.push(`  static var trialTitle: String { ${L(P.trial.title, P.trial, "title")} }`);
+  lines.push(`  static var trialDetail: String { ${L(P.trial.detail, P.trial, "detail")} }`);
+  lines.push(`  static var priceFootnote: String { ${L(P.priceFootnote, P, "priceFootnote")} }`);
+  lines.push("  static var prices: [RegistryPlanPrice] { [");
+  for (const pr of P.prices) lines.push(`    RegistryPlanPrice(id: ${swiftStr(pr.id)}, productId: ${swiftStr(pr.productId)}, amountMinor: ${pr.amountMinor}, currency: ${swiftStr(pr.currency)}, interval: ${swiftStr(pr.interval)}, highlighted: ${pr.highlighted}, label: ${L(pr.label, pr, "label")}, detail: ${L(pr.detail, pr, "detail")}),`);
+  lines.push("  ] }");
+  lines.push("  static var cards: [RegistryPlanCard] { [");
+  for (const c of P.cards) lines.push(`    RegistryPlanCard(id: ${swiftStr(c.id)}, title: ${L(c.title, c, "title")}, detail: ${L(c.detail, c, "detail")}, points: [${c.points.map((pt) => L(pt, null, null)).join(", ")}], footnote: ${LOpt(c.footnote, c, "footnote")}, highlighted: ${c.highlighted === true}),`);
+  lines.push("  ] }");
+  lines.push("  static var outcomes: [RegistryPlanOutcome] { [");
+  for (const o of P.outcomes) {
+    const rows = o.rows.map((r) => `RegistryPlanRow(id: ${swiftStr(r.id)}, label: ${L(r.label, r, "label")}, planned: ${r.status === "planned"}, device: ${cellSwift(r.cells.device, r, "device")}, account: ${cellSwift(r.cells.account, r, "account")}, plus: ${cellSwift(r.cells.plus, r, "plus")})`).join(",\n      ");
+    lines.push(`    RegistryPlanOutcome(id: ${swiftStr(o.id)}, icon: ${swiftStr(o.icon)}, title: ${L(o.title, o, "title")}, detail: ${L(o.detail, o, "detail")}, rows: [\n      ${rows},\n    ]),`);
+  }
+  lines.push("  ] }");
+  for (const list of ["promises", "upsells"]) {
+    lines.push(`  static var ${list}: [RegistryPlanNote] { [`);
+    for (const n of P[list]) lines.push(`    RegistryPlanNote(id: ${swiftStr(n.id)}, title: ${L(n.title, n, "title")}, detail: ${L(n.detail, n, "detail")}),`);
+    lines.push("  ] }");
+  }
+  lines.push("  static func upsell(_ id: String) -> RegistryPlanNote? { upsells.first { $0.id == id } }");
+  lines.push("");
+  lines.push("  enum Action {");
+  for (const [k, v] of Object.entries(P.actions)) lines.push(`    static var ${k}: String { ${L(v, P.actions, k)} }`);
+  lines.push("  }");
+  lines.push("");
+  lines.push("  enum Copy {");
+  for (const [k, v] of Object.entries(P.labels)) lines.push(`    static var ${k}: String { ${L(v, P.labels, k)} }`);
+  lines.push("  }");
+  lines.push("");
+  lines.push("  enum Status {");
+  for (const [k, v] of Object.entries(P.status)) {
+    if (/\{[a-zA-Z]/.test(v)) {
+      const t = L10N.swiftTemplate(BY_KEY, P.status.l10nKeys?.[k] ?? v);
+      lines.push(`    static func ${k}(${t.params}) -> String { ${t.body} }`);
+    } else {
+      lines.push(`    static var ${k}: String { ${L(v, P.status, k)} }`);
+    }
+  }
+  lines.push("  }");
+  lines.push("}");
+  lines.push("");
+
   // 9. Capabilities parity ledger
   lines.push("/// Canonical capability parity ledger (`registry/capabilities.json`, ADR 0013 / ADR 0015).");
   lines.push("enum RegistryCapabilities {");
@@ -1194,10 +1498,10 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   return lines.join("\n");
 }
 
-function generateTS({ entities, rules, icons, tokens, caps, settings, dests, actions, surfaces }) {
+function generateTS({ entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans }) {
   const lines = [];
   lines.push("// GENERATED FILE — DO NOT EDIT BY HAND.");
-  lines.push("// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces}.json");
+  lines.push("// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces,plans}.json");
   lines.push("// Regenerate: node scripts/gen-registries.mjs");
   lines.push("");
   lines.push("export const ENTITY_PATTERNS = {");
@@ -1217,6 +1521,8 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
     lines.push(`  ${k}: ${JSON.stringify(vals)} as const,`);
   }
   lines.push("} as const;");
+  lines.push("");
+  lines.push(`export const TURN_FIELDS = ${JSON.stringify(entities.turnFields)} as const;`);
   lines.push("");
   const deletable = Object.keys(entities.entities).filter((n) => entities.entities[n].deletable);
   lines.push(`export const DELETABLE_ENTITIES = ${JSON.stringify(deletable)} as const;`);
@@ -1240,10 +1546,247 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, swipeActions: actions.swipeActions, shortcutsSheet: actions.shortcutsSheet })} as const;`);
   lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
+  lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
+  lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);
+  lines.push(`export const PLAN_TRIAL_DAYS = ${plans.trial.days};`);
+  lines.push(`export const PLAN_PRODUCTS = ${JSON.stringify(plans.prices.map((p) => p.productId))} as const;`);
   lines.push("");
   lines.push("// Localized registry copy (ADR 0020). Keys are the English text.");
   lines.push(L10N.tsTables(BY_KEY, TRANSLATIONS));
   lines.push("");
+  return lines.join("\n");
+}
+
+const kotlinStr = (s) => JSON.stringify(s).replace(/\$/g, "\\$");
+const kotlinName = (s) => camelId(s).replace(/[^A-Za-z0-9_]/g, "_");
+const kotlinConstName = (s) => kotlinName(s)
+  .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+  .replace(/([A-Z])([A-Z][a-z])/g, "$1_$2")
+  .toUpperCase();
+const kotlinTypeName = (s) => {
+  const name = kotlinName(s);
+  return name.charAt(0).toUpperCase() + name.slice(1);
+};
+const kotlinLong = (value) => value === undefined ? "null" : `${value}L`;
+const kotlinDouble = (value) => value === undefined ? "null" : `${Number(value)}${Number.isInteger(Number(value)) ? ".0" : ""}`;
+const kotlinNullableString = (value) => value === undefined ? "null" : kotlinStr(value);
+const kotlinNullableBoolean = (value) => value === undefined ? "null" : String(value);
+
+function generateKotlinCore(bundle) {
+  const { entities, rules, caps, settings, dests, actions, icons } = bundle;
+  const lines = [
+    "// GENERATED FILE — DO NOT EDIT BY HAND.",
+    "// Sources: registry/*.json, registry/conformance/*.json",
+    "// Regenerate: node scripts/gen-registries.mjs",
+    "package app.septena.core.generated",
+    "",
+    "/** Registry-backed wire constraints shared by every client. */",
+    "object RegistryEntityPatterns {",
+  ];
+  for (const [key, value] of Object.entries(entities.patterns)) {
+    lines.push(`    const val ${kotlinName(key)}: String = ${kotlinStr(value)}`);
+  }
+  lines.push("    val all: Map<String, String> = linkedMapOf(");
+  for (const key of Object.keys(entities.patterns)) {
+    lines.push(`        ${kotlinStr(key)} to ${kotlinName(key)},`);
+  }
+  lines.push("    )");
+  lines.push("}");
+  lines.push("");
+
+  lines.push("/** Limits and enum values come directly from `registry/entities.json`. */");
+  lines.push("object RegistryEntityLimits {");
+  for (const [key, value] of Object.entries(entities.limits)) {
+    lines.push(`    const val ${kotlinConstName(key)}: Long = ${value}L`);
+  }
+  lines.push("    val all: Map<String, Long> = linkedMapOf(");
+  for (const [key, value] of Object.entries(entities.limits)) {
+    lines.push(`        ${kotlinStr(key)} to ${kotlinConstName(key)},`);
+  }
+  lines.push("    )");
+  lines.push("}");
+  lines.push("");
+
+  lines.push("object RegistryEntityEnums {");
+  lines.push("    val all: Map<String, List<String>> = linkedMapOf(");
+  for (const [key, values] of Object.entries(entities.enums)) {
+    lines.push(`        ${kotlinStr(key)} to listOf(${values.map(kotlinStr).join(", ")}),`);
+  }
+  lines.push("    )");
+  for (const [key, values] of Object.entries(entities.enums)) {
+    lines.push(`    object ${kotlinTypeName(key)} {`);
+    for (const value of values) {
+      lines.push(`        const val ${kotlinConstName(value)}: String = ${kotlinStr(value)}`);
+    }
+    lines.push("    }");
+  }
+  lines.push("}");
+  lines.push("");
+  lines.push("/** Canonical turn field keys shared with the backend. */");
+  lines.push("object RegistryTurnFields {");
+  lines.push(`    val all: Set<String> = linkedSetOf(${entities.turnFields.map(kotlinStr).join(", ")})`);
+  lines.push("}");
+  lines.push("");
+
+  const entityNames = Object.keys(entities.entities);
+  const deletableNames = entityNames.filter((name) => entities.entities[name].deletable);
+  lines.push("data class RegistryColumnSpec(");
+  lines.push("    val kind: String,");
+  lines.push("    val format: String?,");
+  lines.push("    val enumName: String?,");
+  lines.push("    val nullable: Boolean?,");
+  lines.push("    val min: Double?,");
+  lines.push("    val max: Long?,");
+  lines.push("    val maxJsonLength: Long?,");
+  lines.push("    val defaultJson: String?,");
+  lines.push("    val serverOwned: Boolean,");
+  lines.push(")");
+  lines.push("");
+  lines.push("data class RegistryEntitySpec(");
+  lines.push("    val table: String,");
+  lines.push("    val deletable: Boolean,");
+  lines.push("    val requiredOnInsert: Set<String>,");
+  lines.push("    val updatable: Set<String>?,");
+  lines.push("    val columns: Map<String, RegistryColumnSpec>,");
+  lines.push(")");
+  lines.push("");
+
+  lines.push("/** Full entity and field contract generated from the canonical registry. */");
+  lines.push("object RegistryEntities {");
+  lines.push("    val all: Map<String, RegistryEntitySpec> = linkedMapOf(");
+  for (const [entityName, entity] of Object.entries(entities.entities)) {
+    lines.push(`        ${kotlinStr(entityName)} to RegistryEntitySpec(`);
+    lines.push(`            table = ${kotlinStr(entity.table)},`);
+    lines.push(`            deletable = ${entity.deletable},`);
+    lines.push(`            requiredOnInsert = setOf(${entity.requiredOnInsert.map(kotlinStr).join(", ")}),`);
+    lines.push(`            updatable = ${entity.updatable === undefined ? "null" : `setOf(${entity.updatable.map(kotlinStr).join(", ")})`},`);
+    lines.push("            columns = linkedMapOf(");
+    for (const [columnName, column] of Object.entries(entity.columns)) {
+      lines.push(`                ${kotlinStr(columnName)} to RegistryColumnSpec(`);
+      lines.push(`                    kind = ${kotlinStr(column.kind)},`);
+      lines.push(`                    format = ${kotlinNullableString(column.format)},`);
+      lines.push(`                    enumName = ${kotlinNullableString(column.enum)},`);
+      lines.push(`                    nullable = ${kotlinNullableBoolean(column.nullable)},`);
+      lines.push(`                    min = ${kotlinDouble(column.min)},`);
+      lines.push(`                    max = ${kotlinLong(column.max)},`);
+      lines.push(`                    maxJsonLength = ${kotlinLong(column.maxJsonLength)},`);
+      lines.push(`                    defaultJson = ${column.default === undefined ? "null" : kotlinStr(JSON.stringify(column.default))},`);
+      lines.push(`                    serverOwned = ${column.serverOwned === true},`);
+      lines.push("                ),");
+    }
+    lines.push("            ),");
+    lines.push("        ),");
+  }
+  lines.push("    )");
+  lines.push(`    val names: List<String> = listOf(${entityNames.map(kotlinStr).join(", ")})`);
+  lines.push(`    val deletableNames: Set<String> = setOf(${deletableNames.map(kotlinStr).join(", ")})`);
+  lines.push("}");
+  lines.push("");
+
+  lines.push("/** Generated field keys prevent each client from maintaining its own wire spelling. */");
+  lines.push("object RegistryEntityFields {");
+  for (const [entityName, entity] of Object.entries(entities.entities)) {
+    lines.push(`    object ${kotlinTypeName(entityName)} {`);
+    for (const columnName of Object.keys(entity.columns)) {
+      lines.push(`        const val ${kotlinConstName(columnName)}: String = ${kotlinStr(columnName)}`);
+    }
+    lines.push("    }");
+  }
+  lines.push("}");
+  lines.push("");
+
+  lines.push("object RegistryEntityNames {");
+  for (const entityName of entityNames) {
+    lines.push(`    const val ${kotlinConstName(entityName)}: String = ${kotlinStr(entityName)}`);
+  }
+  lines.push(`    val all: List<String> = listOf(${entityNames.map(kotlinStr).join(", ")})`);
+  lines.push(`    val deletable: Set<String> = setOf(${deletableNames.map(kotlinStr).join(", ")})`);
+  lines.push("}");
+  lines.push("");
+
+  lines.push("/** Numeric domain constants shared with the backend and Apple clients. */");
+  lines.push("object RegistryRules {");
+  for (const [key, value] of Object.entries(rules)) {
+    if (key === "version") continue;
+    const type = Number.isInteger(value) ? "Long" : "Double";
+    const literal = Number.isInteger(value) ? `${value}L` : `${value}`;
+    lines.push(`    const val ${kotlinConstName(key)}: ${type} = ${literal}`);
+  }
+  lines.push("}");
+  lines.push("");
+
+  const emitIdObject = (objectName, ids) => {
+    lines.push(`/** Stable IDs generated from the canonical registry: ${objectName}. */`);
+    lines.push(`object ${objectName} {`);
+    const seen = new Set();
+    for (const id of ids) {
+      const constant = kotlinConstName(id);
+      assert(!seen.has(constant), `${objectName}: IDs collide after Kotlin constant conversion at ${id}`);
+      seen.add(constant);
+      lines.push(`    const val ${constant}: String = ${kotlinStr(id)}`);
+    }
+    lines.push("}");
+    lines.push("");
+  };
+
+  emitIdObject("RegistrySettingKeys", Object.keys(settings.keys));
+  emitIdObject("RegistryDestinationIds", dests.destinations.map((destination) => destination.id));
+  emitIdObject("RegistryActionIds", Object.keys(actions.actions));
+  emitIdObject("RegistryCapabilityIds", Object.keys(caps.capabilities));
+  emitIdObject("RegistryIconIds", Object.keys(icons.icons));
+  emitIdObject("RegistryPlatformIds", caps.platforms);
+
+  lines.push("/** Capability status by canonical feature ID and platform. */");
+  lines.push("object RegistryCapabilities {");
+  lines.push("    val statusByFeatureAndPlatform: Map<String, Map<String, String>> = linkedMapOf(");
+  for (const [featureId, capability] of Object.entries(caps.capabilities)) {
+    lines.push(`        ${kotlinStr(featureId)} to linkedMapOf(`);
+    for (const [platform, status] of Object.entries(capability)) {
+      if (platform === "title") continue;
+      lines.push(`            ${kotlinStr(platform)} to ${kotlinStr(status)},`);
+    }
+    lines.push("        ),");
+  }
+  lines.push("    )");
+  lines.push("    val androidStatusByFeatureId: Map<String, String> = linkedMapOf(");
+  for (const [featureId, capability] of Object.entries(caps.capabilities)) {
+    lines.push(`        ${kotlinStr(featureId)} to ${kotlinStr(capability.android)},`);
+  }
+  lines.push("    )");
+  lines.push("}");
+  lines.push("");
+
+  // The presentation registries are consumed at runtime by every client.
+  // Keep their complete canonical JSON available to Kotlin as generated
+  // resources too; Android must not grow hand-maintained copies of actions,
+  // settings, surfaces, destinations, icons, tokens, or capability metadata.
+  lines.push("/** Complete canonical registry documents for Kotlin/JVM clients. */");
+  lines.push("object RegistryDocuments {");
+  for (const [name, document] of Object.entries({
+    entities: bundle.entities,
+    rules: bundle.rules,
+    icons: bundle.icons,
+    tokens: bundle.tokens,
+    capabilities: bundle.caps,
+    settings: bundle.settings,
+    destinations: bundle.dests,
+    actions: bundle.actions,
+    surfaces: bundle.surfaces,
+    conformance: bundle.conformance,
+    localizations: bundle.translations,
+  })) {
+    const value = JSON.stringify(document);
+    // A JVM string constant cannot exceed the class-file UTF-8 limit. Split
+    // into small pieces so future registry growth cannot make generation
+    // silently produce an invalid class.
+    const chunks = value.match(/[\s\S]{1,12000}/g) ?? [""];
+    lines.push(`    val ${kotlinName(name)}Json: String = listOf(`);
+    for (const chunk of chunks) lines.push(`        ${kotlinStr(chunk)},`);
+    lines.push("    ).joinToString(\"\")");
+  }
+  lines.push("}");
+  lines.push("");
+
   return lines.join("\n");
 }
 
@@ -1271,6 +1814,7 @@ const settings = readJSON("registry/settings.json");
 const dests = readJSON("registry/destinations.json");
 const actions = readJSON("registry/actions.json");
 const surfaces = readJSON("registry/surfaces.json");
+const plans = readJSON("registry/plans.json");
 
 validateEntities(entities);
 validateRules(rules);
@@ -1282,9 +1826,10 @@ const destIds = validateDestinations(dests, icons, caps);
 validateActions(actions, icons, caps, destIds);
 validateSurfaces(surfaces, icons, caps);
 validateFirstRun(surfaces, icons, caps, settings);
+validatePlans(plans, icons, caps);
 validateConformance();
 
-BY_KEY = L10N.collectStrings({ settings, destinations: dests, actions, surfaces, tokens }, assert);
+BY_KEY = L10N.collectStrings({ settings, destinations: dests, actions, surfaces, tokens, plans }, assert);
 
 const CATALOG_PATH = "Septena/Localizable.xcstrings";
 const catalog = readJSON(CATALOG_PATH);
@@ -1301,10 +1846,19 @@ if (SEED_LANG) {
 const TRANSLATIONS = L10N.readTranslations(REPO);
 const l10nReport = L10N.checkTranslations(BY_KEY, TRANSLATIONS, assert);
 
-const bundle = { entities, rules, icons, tokens, caps, settings, dests, actions, surfaces };
+const conformanceDir = path.join(REPO, "registry/conformance");
+const conformance = Object.fromEntries(
+  fs.readdirSync(conformanceDir).filter((name) => name.endsWith(".json")).sort()
+    .map((name) => [name.replace(/\.json$/, ""), readJSON(`registry/conformance/${name}`)]),
+);
+const bundle = {
+  entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans, conformance,
+  translations: { en: JSON.parse(L10N.englishFile(BY_KEY)), ...TRANSLATIONS },
+};
 const outputs = [
   ["SeptenaCore/Generated/RegistryConstants.swift", generateSwift(bundle)],
   ["backend/src/generated/registries.ts", generateTS(bundle)],
+  ["android/core/src/main/kotlin/app/septena/core/generated/RegistryConstants.kt", generateKotlinCore(bundle)],
   ["registry/l10n/en.json", L10N.englishFile(BY_KEY)],
 ];
 // The catalog is shared with Xcode, which rewrites extraction state and
@@ -1332,7 +1886,7 @@ for (const [lang, rep] of Object.entries(l10nReport)) {
 }
 
 if (CHECK) {
-  console.log("registries: ok (all 9 registries valid and generated files up to date)");
+  console.log("registries: ok (all 10 registries valid and generated files up to date)");
 } else if (changed === 0) {
   console.log("registries: already up to date");
 }

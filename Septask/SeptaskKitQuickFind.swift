@@ -103,6 +103,7 @@ final class SeptaskKitQuickFind {
     [
       .list(.today, title: Route.filter(.today).title, symbol: Route.filter(.today).icon),
       .list(.review, title: Route.filter(.review).title, symbol: Route.filter(.review).icon),
+      .list(.agent, title: Route.filter(.agent).title, symbol: Route.filter(.agent).icon),
       .list(.today, title: TaskFilter.triage.title, symbol: Route.filter(.triage).icon),
       .list(.upcoming, title: Route.filter(.upcoming).title,
             symbol: Route.filter(.upcoming).icon),
@@ -153,14 +154,18 @@ final class SeptaskKitQuickFind {
     var titleHits: [SeptenaTask] = []
     var tagHits: [SeptenaTask] = []
     var notesHits: [SeptenaTask] = []
-    for task in LocalCache.allTasks(in: context) where !task.isHeading {
-      if Self.matches(task.title, query) {
-        titleHits.append(task)
-      } else if !strippedTagQuery.isEmpty,
-                task.tags.compactMap({ tagsByID[$0]?.name }).contains(where: { Self.matches($0, strippedTagQuery) }) {
-        tagHits.append(task)
-      } else if let notes = task.notes, Self.matches(notes, query) {
-        notesHits.append(task)
+    // Match on entities and build a row object only for a hit. This runs on
+    // every keystroke, and building one per task (logbook included) decoded
+    // every task's JSON each time. Same rows as `allTasks` (headings and
+    // orphans already excluded).
+    for e in LocalCache.liveAggregateEntities(in: context) {
+      if Self.matches(e.title, query) {
+        titleHits.append(SeptenaTask(e))
+      } else if !strippedTagQuery.isEmpty, e.tagIDsJSON != nil,
+                e.tagIDs.compactMap({ tagsByID[$0]?.name }).contains(where: { Self.matches($0, strippedTagQuery) }) {
+        tagHits.append(SeptenaTask(e))
+      } else if let notes = e.notes, Self.matches(notes, query) {
+        notesHits.append(SeptenaTask(e))
       }
     }
     let openFirst: (SeptenaTask, SeptenaTask) -> Bool = { a, b in

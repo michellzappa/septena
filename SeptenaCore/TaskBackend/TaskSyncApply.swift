@@ -525,6 +525,9 @@ extension TaskSyncEngine {
     take("project") { t.project = $0.stringValue }
     take("created") { t.created = $0.stringValue }
     take("scheduled") { t.scheduled = $0.stringValue }
+    take("startTime") { t.startTime = $0.stringValue }
+    take("durationMinutes") { t.durationMinutes = Self.int($0) }
+    take("timeZone") { t.timeZone = $0.stringValue }
     take("deadline") { t.deadline = $0.stringValue }
     take("today") { t.today = Self.bool($0) ?? false }
     take("starred") { t.starred = Self.bool($0) ?? false }

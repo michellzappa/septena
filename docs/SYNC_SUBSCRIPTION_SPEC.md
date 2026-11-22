@@ -5,7 +5,9 @@ overrules them in §11.
 **Decisions:** [ADR 0007](adr/0007-septena-is-the-task-app.md),
 [ADR 0002](adr/0002-own-backend-replaces-icloud.md),
 [ADR 0010](adr/0010-free-server-tier-with-limits.md) (free account with
-limits; changes §1, §3, §6, §7 on 2026-11-20).
+limits; changes §1, §3, §6, §7 on 2026-11-20),
+[ADR 0023](adr/0023-sync-across-devices-is-plus.md) (free account syncs one
+device; changes §1, §3, §3.2, §4 on 2026-11-22).
 **Builds on:** the backend (`docs/SEPTASK_BACKEND.md`, auth in §7), the
 existing tip jar (`Septena/Shell/Settings/SupportStore.swift`,
 `SeptenaPlus.swift`, `Config/Septena.storekit`).
@@ -15,7 +17,7 @@ repo (`septena-site/docs/PRODUCT_DIRECTION.md`), not here.
 ## 1. Goal
 
 Septena (the task app) is free and complete on one device. A free account
-adds the server with limits. One subscription lifts the limits: live sync on
+adds the server with limits for that one device (ADR 0023). One subscription lifts the limits: live sync on
 every device, full history, synced files, agents, links and sharing
 (ADR 0010). The rule in one line: **the device is free, the server is free
 with limits, paid lifts the limits.**
@@ -51,12 +53,14 @@ with limits, paid lifts the limits.**
 
 ## 3. Free and paid
 
-Three levels (ADR 0010). The earlier rule "the server is paid" is replaced.
+Three levels (ADR 0010, ADR 0023). The earlier rule "the server is paid" is
+replaced. The public rule: **free on one device, Plus on all of them.** The
+paid plan is named **Septena Plus** on every surface.
 
-| Free, no account | Free account | Paid (€5 / €40) |
+| Free, no account | Free account | Septena Plus (€5 / €40) |
 |---|---|---|
 | Every task feature: lists, projects, areas, Today, Next, recurrence, fade, the composer, quick entry, widgets | Everything in the left column | Everything in the left column |
-| Watch app paired to the phone (syncs through the phone) | Server sync on 2 devices | Server sync on all devices, including the watch through the server |
+| Watch app paired to the phone (syncs through the phone) | Server sync for 1 device (backup; moving to a new device is free, the old one stops syncing) | Server sync on all devices, including the watch through the server |
 | The local MCP server on the Mac | Sync every few minutes (no live socket) | Live sync (socket) |
 | Import and export (plain JSON) | Change history: 30 days | Full change history, account restore *(pending a Cloudflare check)* |
 | Attachments on the device that added them | Recently Deleted: 30 days | Recently Deleted: 1 year |
@@ -68,12 +72,17 @@ Three levels (ADR 0010). The earlier rule "the server is paid" is replaced.
 | | Hosted AI: small monthly allowance *(if ADR 0009 is accepted)* | Hosted AI: larger allowance *(if ADR 0009 is accepted)* |
 
 Exact numbers ("a few", allowances) are set in the plan table (§6) and can
-change without a new ADR. Moving a free thing to paid still needs one.
+change without a new ADR. Moving a free thing to paid still needs one. The
+plan table's values and all plan copy live in `registry/plans.json`: the
+backend reads `PLAN_LIMITS`, the app's Septena Plus page and the site's
+/pricing page render the copy, and the generator fails when a stated number
+differs from its limit.
 
 Rules:
 
 - A free user never needs an account. The app works from first launch with
-  no sign-in. The account starts when the user adds a second device.
+  no sign-in. The account starts when the user wants a backup, a shared
+  project or the connector. A second device needs Plus.
 - Nothing free today becomes paid later without a new ADR.
 - No limit touches the core task app. Tasks, lists, projects and areas have
   no caps on any level.
@@ -102,7 +111,7 @@ it names what the user gets. All copy goes through the humanizer skill.
 
 | Moment | What the user sees |
 |---|---|
-| Third device signs in | The device works locally; one line says Plus syncs all devices. |
+| Second device signs in | The device works locally; one line says Plus syncs every device. Moving the slot to this device is offered too. |
 | History reaches the window edge | A count of older changes, with one tap to Plus. |
 | A task with a file opens on another device | "1 file on your iPhone." Plus syncs files to all devices. |
 | An agent runs out of runs | The task says the agent resumes on the 1st, or now with Plus. The work waits. |
@@ -118,7 +127,9 @@ launch.
 - New subscription group on the `com.septena.tasks` record, one level:
   - `com.septena.tasks.sync.monthly`
   - `com.septena.tasks.sync.annual`
-- *(default)* A free trial as a StoreKit introductory offer on both products.
+- No StoreKit introductory offer. The trial is the server-side 14-day reverse
+  trial (§3), with no card. Two trials would confuse the paywall. *(default,
+  2026-11-22)*
 - *(default)* No lifetime product. A lifetime sale pays once for a server
   that costs money every month.
 - *(default)* Family Sharing off at launch (it needs per-member backend
@@ -282,9 +293,9 @@ Run from `~/Dev/septena/backend` after this code is deployed.
   features show one quiet entry point each, never a modal on launch.
 - **Free account:** sync runs within the free limits (§3). At a limit the app
   shows the upsell for that moment (§3.2) and nothing else.
-- **Lapsed:** the account falls back to the free limits. The two most recently
-  used devices keep syncing; the others keep their local data and stop
-  syncing. Local data stays on every device and stays fully editable. The server keeps the data *(default: 12 months)*, then mails a
+- **Lapsed:** the account falls back to the free limits. The most recently
+  used device keeps syncing; the others keep their local data and stop
+  syncing (ADR 0023). Local data stays on every device and stays fully editable. The server keeps the data *(default: 12 months)*, then mails a
   warning before it deletes. Re-subscribing resumes sync with the server
   copy as the base and pushes local edits on top (the normal op queue).
 - The app never deletes local data because a subscription ended.
@@ -313,7 +324,7 @@ to the backend.
 |---|---|---|
 | P0 | Entitlement row, Apple JWS verify, webhook, `grant` rows, middleware on `/v1` and the gateway. mz has a `grant`. | A user without a row gets 402 on sync; mz syncs. |
 | P1 | Products in App Store Connect, StoreKit purchase + restore in the task app, account link, paywall sheet, lapsed state. Remove the tip jar from the task app. | A sandbox purchase turns on sync; a sandbox expiry stops it, and local data stays. |
-| P1.5 | Plan table and free-account limits (ADR 0010): device count, poll-only sync, history windows, local-only attachments, connector and agent caps, reverse trial, upsell moments (§3.2). | A free account syncs 2 devices; a third device stays local and shows the upsell; a paid account lifts every limit. |
+| P1.5 | Plan table and free-account limits (ADR 0010): device count, poll-only sync, history windows, local-only attachments, connector and agent caps, reverse trial, upsell moments (§3.2). | A free account syncs 1 device; a second device stays local and shows the upsell; a paid account lifts every limit. |
 | P2 | Free-mode audit: every free feature works with no account and no network. | Fresh install, airplane mode, every free feature works. |
 | P3 | Stripe for the web client. | A web purchase turns on sync on iPhone. |
 
@@ -336,4 +347,4 @@ before any public release that uses the backend.
 | Does the code stay open source? | Yes; the paid product is the hosted service |
 | Free server tier | Decided 2026-11-20: yes, a free account with limits (ADR 0010) |
 | Attachments on the free account | Decided 2026-11-20: none on the server; files stay on the device that added them |
-| Limit values ("a few" connector writes, agent runs, hosted-AI allowance) | Open: set in the plan table before P1.5 |
+| Limit values ("a few" connector writes, agent runs, hosted-AI allowance) | Decided 2026-11-22: free account gets connector reads plus 25 writes a day and 10 agent runs a month. Hosted-AI allowance still open. The values live in `registry/plans.json` `limits` (generated to `PLAN_LIMITS` for the backend) |

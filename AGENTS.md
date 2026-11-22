@@ -76,6 +76,14 @@ when you need to check exactly what is committed:
 remote-build "xcodegen generate && SEPTENA_NO_SIGNING=1 ./scripts/build.sh SeptaskMac 'platform=macOS'"
 ```
 
+**Android build and device artifact:** Android compiles through
+`.github/workflows/android.yml` on `ubuntu-latest`, using Temurin JDK 17 and
+the checked-in `android/gradlew` wrapper. The workflow uploads a short-lived
+debug APK artifact for the user to install on a connected device with `adb`.
+It does not run tests or launch the app. The mini currently has no Java runtime,
+so do not use `remote-build` for Android or install toolchains unless the user
+explicitly asks for that download.
+
 **Do NOT test — the user tests.** The compile above is the ONLY verification an
 agent runs. Never launch the app, boot a simulator, run UI tests, screenshot, or
 otherwise "verify it works" — when the change is built, report it and **ask the
@@ -269,7 +277,7 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
 - **Septask-specific exceptions, three sizes:** (1) `#if SEPTASK` inside a
   shared file for small branches (the target sets that compilation
   condition); (2) a Septask-only implementation in `Septask/` (settings
-  shell, welcome, tab bar) — composition only, never task business logic;
+  shell, welcome, root navigation) — composition only, never task business logic;
   (3) a `project.yml` exclude when a file shouldn't compile at all.
   **Never copy a task file into `Septask/` to tweak it** — copies drift.
 - **After touching shared code, build all four schemes.** The compiler
@@ -321,7 +329,10 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   menu shortcuts** for every keyboard action on the selected row (rename = `⌘R`,
   complete = `⌘K`, move = `⌘M` / `⌘⇧M`); double-click / right-click for mouse.
   Do NOT bind unmodified Space/Return. The shared shortcut map is
-  `TaskRowShortcuts` in `Septena/Shell/Tasks/TaskCommands.swift` — bare `⌘M`
+  the registry (`registry/actions.json`, `RegistryActions.shortcuts`): every
+  context menu, swipe and menu-bar item on both shells renders from it through
+  `RegistryMenuResolver` (`Septena/Shell/UI/RegistryMenu.swift`); a shell only
+  binds action IDs to handlers. Bare `⌘M`
   is intentionally reclaimed by the focused task list; bare `⌘.` remains the
   system Cancel equivalent and carries a `⇧` here.
   **Two sanctioned exceptions on the task surfaces** (both deliberate,
@@ -443,6 +454,18 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   getter and the setter. Enforced by the `model-reserved-name` lint rule
   (entity, entityName, objectID, description, isDeleted,
   managedObjectContext, isFault, hasChanges).
+- **Never build every task to read a few.** `LocalCache.allTasks` /
+  `liveTasks(in:)` build a row object for each live task, logbook included,
+  and each one decodes JSON. Every task change makes the open list, both
+  sidebars and the area page read the store again on the main actor, so a
+  whole-store read there runs on every tap and grows with the user's
+  history. Pick by id with `liveTasks(ids:in:)`. Count from
+  `liveAggregateEntities`. Read rings through `projectCompletionRatios`
+  (memoized). Fetch Today and its band once with `todayAndTriage`. Never read
+  the store in a view `body` or `init`. The full rules are in
+  `docs/LAUNCH_PERF.md` ("Interaction performance"). The id-lookup form is
+  enforced by the `whole-store-id-lookup` lint rule. The rest is not
+  greppable, so this note is the guardrail.
 - **A deep SwiftUI view type overflows the iOS main-thread stack at launch.**
   The crash is `EXC_BAD_ACCESS` in `swift_getTypeByMangledName`, before any
   view draws. `TaskListView.taskListRows` hit it: a large `@ViewBuilder`
@@ -480,7 +503,9 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
 - `Septena/Shell/` — dashboards, settings, tasks, goals, intelligence, shared UI.
 - `Septena/Sections/` — per-section destination views and sheets.
 - `Septask/` — Septask's composition root only (app entry, welcome, settings
-  shell, tab bar, assets, entitlements). Task behavior never lives here.
+  shell, root navigation, assets, entitlements). Task behavior never lives here.
+  iPhone has NO tab bar: the list is the root of one navigation stack
+  (ADR 0024). Never add one back, in the app or in any mock.
 - `SeptenaWatch/` + `SeptenaWatchComplication/` — watch app & complications
   (**hand-wired per section**, not manifest-driven, except the shared Next feed).
 - `SeptenaWidgets/`, `SeptenaLiveActivitiesExtension/` — extensions.

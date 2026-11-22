@@ -29,6 +29,23 @@ Windows apps beside the shared code. *(default)*
 
 Room is not used because it ties the store to Android. *(default)*
 
+### Parity invariant
+
+The Android goal is functional parity with the iOS and Mac task apps. Android
+may use native, adaptive layouts and system integrations, but feature behavior,
+task fields, action availability, settings meaning, destination IDs, capability
+status and sync semantics must agree across platforms.
+
+`registry/` is the shared source of truth. `scripts/gen-registries.mjs`
+generates Kotlin contracts for entity fields, rules and capabilities, and
+embeds the complete actions, settings, destinations, surfaces, icons, tokens,
+localizations and conformance documents. Android code must consume those
+generated bindings instead of maintaining a second list. A feature moves from
+`planned` to `partial` or `ships` in `registry/capabilities.json` only when the
+matching user-visible behavior is implemented. Domain behavior is checked
+against the same `registry/conformance/*.json` vectors used by Swift and
+TypeScript clients.
+
 ## 3. Sign-in
 
 Per ADR 0016:
@@ -117,9 +134,11 @@ Apple apps today.
 | A3 Distribution (#175) | Play Store internal test track, then production. | A2, mz: Play Console account |
 | A4 Billing (#176) | Google Play subscription writes the entitlement row. | A3, entitlements enforced |
 
-Gate: Android CI builds and tests on the mini (`remote-build`). The laptop
-has no Android SDK. Device checks follow a written check list per build, as
-Bipe does.
+Gate: `.github/workflows/android.yml` builds the debug APK on `ubuntu-latest`
+with Temurin JDK 17 and the checked-in Gradle wrapper, then uploads the APK as
+`septena-android-debug-apk`. Install that artifact on a connected device for
+the manual smoke check. The current workflow compiles only; JVM core/store
+tests remain part of the A0 acceptance criteria and will be added separately.
 
 ## 9. Open questions
 

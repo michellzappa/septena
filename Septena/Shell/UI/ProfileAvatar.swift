@@ -47,11 +47,9 @@ struct ProfileAvatar: View {
   }
 }
 
-/// The quiet counterpart to `SeptenaPlusBadge`, worn by a non-supporter. The
-/// whole app is free, so this is a plain statement of fact, not a nudge — a
-/// muted capsule with no foil, deliberately understated next to the supporter
-/// mark. It only exists so the profile reads the same either way (a labelled
-/// tier) instead of looking empty until you support.
+/// The quiet counterpart to `SeptenaPlusBadge`, worn by a free account. A
+/// plain statement of fact, not a nudge: a muted capsule with no foil, so the
+/// profile names its plan either way (ADR 0023).
 struct FreeAccountBadge: View {
   var body: some View {
     Text("Free")
@@ -63,17 +61,16 @@ struct FreeAccountBadge: View {
   }
 }
 
-/// Compact "Supporter" pill worn on the profile. Ink capsule with a
-/// champagne-foil hairline and a small foil heart, so it reads as a small
-/// pressed-metal plate of thanks rather than a colorful sticker. Marks who
-/// chose to support — it never gates anything.
+/// Compact "Plus" pill worn on the profile of a Septena Plus account. Ink
+/// capsule with a champagne-foil hairline and a small foil mark. The server
+/// decides the plan (`PlanStatus`); this badge only shows it.
 struct SeptenaPlusBadge: View {
   var body: some View {
     HStack(spacing: 3) {
-      Image(systemName: "heart.fill")
+      Image(systemName: "plus")
         .font(.system(size: 8, weight: .bold))
         .foregroundStyle(SeptenaPlus.foil)
-      Text(LocalizedStringKey(SeptenaPlus.badgeWord))
+      Text(RegistryPlans.shortName)
         .foregroundStyle(.white)
     }
     .font(.caption2.weight(.bold))

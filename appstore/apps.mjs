@@ -53,10 +53,15 @@ export const APPS = {
     metadataDir: "metadata-septask",
     metadataMacDir: "metadata-septask-mac",
     bundleIds: { ios: "com.septena.tasks", mac: "com.septena.tasks" },
+    // Screens come from the website's scene builder, not the simulator
+    // (decided 2026-11-22). Export them with the command in
+    // docs/APPSTORE-SEPTASK.md "Workflow"; they land in appstore/scenes/
+    // (gitignored) with a manifest that records the site revision.
+    scenes: { dir: "scenes", layout: { iphone69: "phone" } },
     devices: {
-      // Flip each on once its raw shots land so validate.mjs's parity guard
-      // never lets a placeholder ship. iphone69 captured 2026-07-03
-      // (tasks-today / tasks-anytime / tasks-project); iPad + Mac still pending.
+      // Flip each on once its screens exist so validate.mjs's parity guard
+      // never lets a placeholder ship. iphone69 uses the scene builder's
+      // phone layout; iPad + Mac still pending.
       iphone69: { active: true },
       ipad13: { active: false },
       mac: { active: false },

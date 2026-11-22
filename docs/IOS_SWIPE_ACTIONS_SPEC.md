@@ -1,6 +1,6 @@
 # iOS task-row swipe actions — spec
 
-**Status:** proposal (2026-11-21). Defaults in §7 stand unless mz overrules.
+**Status:** building (2026-11-21 — SW0 + SW1 implemented on `SelectableScrollList` alongside swipe-left Select in [MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md](MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md)). Defaults in §7 stand unless mz overrules.
 **Decisions:** [ADR 0007](adr/0007-septena-is-the-task-app.md), [ADR 0015](adr/0015-shared-registries-for-cross-platform-clients.md).
 **Builds on:** `Septena/Shell/Tasks/TaskListView.swift`, `Septena/Shell/Tasks/TaskRowActions.swift`, `Septena/Shell/Tasks/TaskListContextMenu.swift`, `SeptenaCore/TaskUndo.swift`, `SeptenaCore/Haptics.swift`, `SeptenaCore/SettingsKeys.swift` (and later `registry/actions.json` R2 `#143`).
 **Tracking issue:** [#132](https://github.com/michellzappa/septena/issues/132).

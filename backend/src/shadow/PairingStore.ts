@@ -12,6 +12,12 @@ import type { Env } from "../env.js";
 // one strongly consistent view; the alarm wipes the object at expiry.
 
 export interface PendingAuth {
+  /// "connector" (absent on records written before 2026-11-22) finishes the
+  /// MCP OAuth redirect; "device" mints an app session for a new device
+  /// (ADR 0016, issue #170). Each finish path refuses the other purpose, so a
+  /// connector code never mints an app session and a device code never mints
+  /// MCP tokens.
+  purpose?: "connector" | "device";
   /// Random secret held only in the browser's cookie. Polling and finishing
   /// need it, so knowing the short code alone cannot complete the flow.
   pendingId: string;
@@ -52,27 +58,51 @@ export class PairingStore extends DurableObject<Env> {
     return true;
   }
 
-  /// Binds a user to the pending authorization. A code approves once: a
-  /// second approval (by anyone) is refused so a code cannot be re-pointed.
-  async approve(a: PairApproval): Promise<{ outcome: ApproveOutcome; clientName?: string }> {
+  /// What the code asks for, without approving it, so the approving app can
+  /// show "Sign in on <device>?" or "Connect <client>?" before the user agrees.
+  async peek(): Promise<
+    | { outcome: "ok"; purpose: "connector" | "device"; clientName?: string; expiresAt: number }
+    | { outcome: "not_found" | "already_used" }
+  > {
     const p = await this.live();
     if (!p) return { outcome: "not_found" };
     if (await this.ctx.storage.get<PairApproval>("approved")) return { outcome: "already_used" };
-    await this.ctx.storage.put("approved", a);
-    return { outcome: "ok", clientName: p.clientName };
+    return { outcome: "ok", purpose: p.purpose ?? "connector", clientName: p.clientName, expiresAt: p.expiresAt };
   }
 
-  async status(pendingId: string): Promise<{ status: PairStatus; clientName?: string; redirectUri?: string }> {
+  /// Binds a user to the pending authorization. A code approves once: a
+  /// second approval (by anyone) is refused so a code cannot be re-pointed.
+  /// `expectedPurpose` is what the user confirmed; a mismatch approves nothing.
+  async approve(
+    a: PairApproval,
+    expectedPurpose?: "connector" | "device",
+  ): Promise<{ outcome: ApproveOutcome; clientName?: string; purpose?: "connector" | "device" }> {
     const p = await this.live();
-    if (!p || p.pendingId !== pendingId) return { status: "gone" };
+    if (!p) return { outcome: "not_found" };
+    const purpose = p.purpose ?? "connector";
+    if (expectedPurpose && expectedPurpose !== purpose) return { outcome: "not_found" };
+    if (await this.ctx.storage.get<PairApproval>("approved")) return { outcome: "already_used" };
+    await this.ctx.storage.put("approved", a);
+    return { outcome: "ok", clientName: p.clientName, purpose };
+  }
+
+  async status(
+    pendingId: string,
+    purpose: "connector" | "device" = "connector",
+  ): Promise<{ status: PairStatus; clientName?: string; redirectUri?: string }> {
+    const p = await this.live();
+    if (!p || p.pendingId !== pendingId || (p.purpose ?? "connector") !== purpose) return { status: "gone" };
     const approved = !!(await this.ctx.storage.get<PairApproval>("approved"));
     return { status: approved ? "approved" : "pending", clientName: p.clientName, redirectUri: p.redirectUri };
   }
 
   /// One-shot: returns the approved authorization and wipes the object.
-  async take(pendingId: string): Promise<{ pending: PendingAuth; approval: PairApproval } | null> {
+  async take(
+    pendingId: string,
+    purpose: "connector" | "device" = "connector",
+  ): Promise<{ pending: PendingAuth; approval: PairApproval } | null> {
     const p = await this.live();
-    if (!p || p.pendingId !== pendingId) return null;
+    if (!p || p.pendingId !== pendingId || (p.purpose ?? "connector") !== purpose) return null;
     const approval = await this.ctx.storage.get<PairApproval>("approved");
     if (!approval) return null;
     await this.ctx.storage.deleteAll();

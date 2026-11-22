@@ -845,11 +845,9 @@ struct TagPickerSheet: View {
   }
 
   private func currentTagSets() -> [String: [String]] {
-    let all = LocalCache.allTasks(in: modelContext)
+    // Fetch only the selected tasks, not every task in the store.
     var out: [String: [String]] = [:]
-    for id in taskIDs {
-      if let t = all.first(where: { $0.id == id }) { out[id] = t.tags }
-    }
+    for t in LocalCache.liveTasks(ids: taskIDs, in: modelContext) { out[t.id] = t.tags }
     return out
   }
 

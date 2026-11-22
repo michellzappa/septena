@@ -2,12 +2,13 @@
 // Mirrors the app's real brand sources:
 //   - section accents → SeptenaCore/SectionTheme.swift `defaultPalette`
 //   - app accent      → Assets AccentColor (rgb 0.20, 0.42, 0.82)
-//   - typography      → docs/DesignSpec.md §5 (New York display, SF Pro UI, mono numerics)
+//   - typography      → docs/DesignSpec.md §5 (SF Pro for titles and UI, mono numerics)
 // Edit freely — everything downstream (components, panels) reads from here.
 
 export const theme = {
   // ----- color -----
-  ink: "#1c1917",          // primary text on light washes
+  ink: "#000000",          // iOS label
+  inkSecondary: "rgb(60 60 67 / 0.6)", // iOS secondaryLabel
   inkSoft: "#8a8378",      // secondary text (SectionTheme fallback gray)
   paper: "#faf9f7",        // warm off-white card/page base
   white: "#ffffff",
@@ -29,11 +30,25 @@ export const theme = {
     goals: "#8b5cf6",
   },
 
+  // Task-app panel backgrounds, in panel order. Neutral hues around the
+  // platform accent; the task app has no section colors.
+  tints: ["#336bd1", "#5b5bd6", "#0f9d8f", "#c2410c", "#7c3aed", "#0369a1"],
+
+  // The task app's own canvas and header textures (Settings > Appearance).
+  // Canvas is iOS systemGroupedBackground; accent is the platform accent
+  // (AGENTS.md, decided 2026-11-19). The textures draw with the site's port of
+  // SeptenaCore/HeaderWashEngine.swift (render.mjs loads it).
+  app: {
+    canvas: "#f2f2f7",
+    accent: "#007AFF",
+    textures: ["topography", "fieldMatrix", "stippleDrift", "causticGlass", "ridges", "washiPaper"],
+  },
+
   // ----- typography -----
-  // Display type follows Apple's New York via the system serif stack. App Store
-  // renders inline local New York font files when they are available on macOS.
+  // SF Pro everywhere, as in the app: titles use the screen-title weight
+  // (DesignSpec §5 .septenaScreenTitle, semibold). New York is not app chrome.
   fonts: {
-    display: `"New York Large", "New York", ui-serif, Georgia, serif`,
+    display: `-apple-system, "SF Pro Display", "Helvetica Neue", sans-serif`,
     ui: `-apple-system, "SF Pro Text", "Helvetica Neue", Inter, sans-serif`,
     mono: `"SF Mono", ui-monospace, Menlo, monospace`,
   },

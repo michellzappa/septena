@@ -186,7 +186,7 @@ Shape and motion tokens live alongside the type and color tokens — like color,
 - **Surface geometry** — the four top-level tabs (Week, Next, Tasks sidebar, Coach) share one page geometry, applied through `septenaSurface()` (PlatformShims.swift), never hand-typed per view:
   - `Theme.pageGutter` (12pt) — screen edge → content, identical on every tab.
   - `Theme.pageTop` (12pt) — nav bar → first content block. Exception: the Next feed passes `top: 0` because its sections pad their own tops with `sectionSpacing` (conditionally hidden sections must not leave gaps).
-  - `Theme.pageBottom` (80pt iOS / 24pt macOS) — scroll-past air above the floating tab bar.
+  - `Theme.pageBottom` (80pt iOS / 24pt macOS) — scroll-past air above the floating bottom chrome (Septena Life's tab bar; in Septena the Magic Plus orb, since iPhone has no tab bar, ADR 0024).
   - `Theme.sectionSpacing` (24pt iOS / 16pt macOS) — the one gap between content groups on a surface (Week's banner/timeline/grid, Coach's bands, sidebar grid → area cards).
   - `Theme.tileGap` (12pt) — between tiles in any surface-level grid (Week tiles, Coach bands, Tasks smart lists).
 - **Corner radius** — `Theme.cornerRadius` (22pt, the iOS-26 "soft tile") and `Theme.cornerRadiusSmall` (6pt, chips and pills).

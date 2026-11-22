@@ -136,6 +136,7 @@ export async function authorize(c: Context<{ Bindings: Env }>) {
     const created = await pairingFor(c.env, candidate).create({
       pendingId,
       clientId,
+      purpose: "connector",
       clientName: client.name,
       redirectUri,
       oauthState: state,
@@ -224,16 +225,127 @@ interface StoredCode {
   codeChallenge: string;
 }
 
+// ---- device sign-in by approval (ADR 0016, issue #170) ----
+//
+// A new device (the Android client first) has no Apple identity. It calls
+// POST /v1/auth/device/start, shows the 8-character code, and the user enters
+// it where Septask already takes connector codes (POST /v1/pair/approve, which
+// handles both purposes). The device polls POST /v1/auth/device/poll with the
+// secret only it holds; after approval the poll returns an app session for the
+// approving user. The purpose check in PairingStore keeps the two flows apart.
+
+export const zDeviceStartBody = z.object({
+  clientName: z.string().regex(/^[\w .()-]{1,40}$/),
+}).strict();
+
+export const zDevicePollBody = z.object({
+  code: z.string().min(1).max(32),
+  pollSecret: z.string().regex(/^[A-Za-z0-9_-]{20,64}$/),
+}).strict();
+
+export type DeviceStartResult = { code: string; pollSecret: string; expiresIn: number; interval: number };
+
+export async function startDevicePairing(
+  env: Env,
+  body: z.infer<typeof zDeviceStartBody>,
+): Promise<DeviceStartResult | null> {
+  const pollSecret = randomId(24);
+  const expiresAt = Date.now() + PAIR_TTL_MS;
+  for (let i = 0; i < 4; i++) {
+    const candidate = newPairCode();
+    const created = await pairingFor(env, candidate).create({
+      purpose: "device",
+      pendingId: pollSecret,
+      clientId: "device",
+      clientName: body.clientName,
+      redirectUri: "",
+      oauthState: "",
+      codeChallenge: "",
+      expiresAt,
+    });
+    if (created) {
+      logEvent("device_pair_start", { ok: true, client: body.clientName });
+      return { code: candidate, pollSecret, expiresIn: PAIR_TTL_MS / 1000, interval: 3 };
+    }
+  }
+  logEvent("device_pair_start", { ok: false });
+  return null;
+}
+
+export type DevicePollResult =
+  | { status: "pending" }
+  | { status: "gone" }
+  | { status: "approved"; userId: string };
+
+/// One-shot on approval: the caller issues the session; a second poll is gone.
+export async function pollDevicePairing(env: Env, body: z.infer<typeof zDevicePollBody>): Promise<DevicePollResult> {
+  const code = normalizePairCode(body.code);
+  if (!code) return { status: "gone" };
+  const pairing = pairingFor(env, code);
+  const s = await pairing.status(body.pollSecret, "device");
+  if (s.status !== "approved") return { status: s.status };
+  const taken = await pairing.take(body.pollSecret, "device");
+  if (!taken) return { status: "gone" };
+  logEvent("device_pair_finished", { client: taken.pending.clientName });
+  return { status: "approved", userId: taken.approval.userId };
+}
+
 // ---- POST /v1/pair/approve (called by the app, bearer-authenticated) ----
+
+export const zPairKind = z.enum(["connector", "device"]);
 
 export const zPairApproveBody = z.object({
   code: z.string().min(1).max(32),
   timeZone: z.string().max(64).optional(),
+  /// The kind the user confirmed after /v1/pair/inspect. Optional: app builds
+  /// from before 2026-11-22 approve without the confirm step.
+  kind: zPairKind.optional(),
 }).strict();
 
+export const zPairInspectBody = z.object({
+  code: z.string().min(1).max(32),
+}).strict();
+
+type PairFailure = { ok: false; status: 404 | 409 | 429; error: "invalid_code" | "code_used" | "too_many_attempts" };
+
 export type PairApproveResult =
-  | { ok: true; client: string }
-  | { ok: false; status: 404 | 409 | 429; error: "invalid_code" | "code_used" | "too_many_attempts" };
+  | { ok: true; client: string; kind: "connector" | "device" }
+  | PairFailure;
+
+export type PairInspectResult =
+  | { ok: true; kind: "connector" | "device"; client: string; expiresIn: number }
+  | PairFailure;
+
+/// Shows what a code asks for before the user approves it. A wrong code counts
+/// toward the same failure limit as approve, so inspect cannot be used to
+/// guess codes faster.
+export async function inspectPairing(
+  env: Env,
+  userId: string,
+  body: z.infer<typeof zPairInspectBody>,
+): Promise<PairInspectResult> {
+  const store = storeFor(env, userId);
+  if ((await store.pairFailures()) >= PAIR_MAX_FAILURES) {
+    logEvent("pair_inspect", { ok: false, reason: "rate_limited" });
+    return { ok: false, status: 429, error: "too_many_attempts" };
+  }
+  const code = normalizePairCode(body.code);
+  const res = code ? await pairingFor(env, code).peek() : { outcome: "not_found" as const };
+  if (res.outcome === "ok") {
+    logEvent("pair_inspect", { ok: true, kind: res.purpose });
+    return {
+      ok: true,
+      kind: res.purpose,
+      client: res.clientName ?? (res.purpose === "device" ? "A new device" : "Claude"),
+      expiresIn: Math.max(0, Math.round((res.expiresAt - Date.now()) / 1000)),
+    };
+  }
+  await store.notePairFailure();
+  logEvent("pair_inspect", { ok: false, reason: res.outcome });
+  return res.outcome === "already_used"
+    ? { ok: false, status: 409, error: "code_used" }
+    : { ok: false, status: 404, error: "invalid_code" };
+}
 
 export async function approvePairing(
   env: Env,
@@ -248,11 +360,12 @@ export async function approvePairing(
   const code = normalizePairCode(body.code);
   const timeZone = body.timeZone && isValidTz(body.timeZone) ? body.timeZone : undefined;
   const res = code
-    ? await pairingFor(env, code).approve({ userId, timeZone })
-    : { outcome: "not_found" as const, clientName: undefined };
+    ? await pairingFor(env, code).approve({ userId, timeZone }, body.kind)
+    : { outcome: "not_found" as const, clientName: undefined, purpose: undefined };
   if (res.outcome === "ok") {
-    logEvent("preview_pair_approve", { ok: true });
-    return { ok: true, client: res.clientName ?? "Claude" };
+    const kind = res.purpose ?? "connector";
+    logEvent("preview_pair_approve", { ok: true, kind });
+    return { ok: true, client: res.clientName ?? (kind === "device" ? "A new device" : "Claude"), kind };
   }
   await store.notePairFailure();
   logEvent("preview_pair_approve", { ok: false, reason: res.outcome });

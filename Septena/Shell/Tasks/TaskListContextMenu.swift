@@ -131,6 +131,11 @@ struct TaskListModalPresenter: ViewModifier {
 
 // Internal (shared with `TaskRowActions`) so the Next surface renders the
 // exact same per-row task menu as the Tasks list — single source of truth.
+//
+// Items, order, titles, icons and shortcuts come from the registry menu
+// `task.row` (`registry/actions.json`), the same tree the AppKit shell's row
+// menu renders. This view only binds each action ID to a handler and fills the
+// Move submenu's destination slots.
 struct TaskListRowContextMenu: View {
   let target: TaskListView.ActionTarget
   let filter: TaskFilter
@@ -140,6 +145,8 @@ struct TaskListRowContextMenu: View {
   let onApplySuggestion: (SeptenaTask, SuggestionEngine.Suggestion) -> Void
   let onMoveToToday: ([String], Bool) -> Void
   var onToggleStar: (([String], Bool) -> Void)? = nil
+  /// Toggles done / open on the target rows (Complete ▸ Mark as Complete).
+  var onToggleComplete: (([String]) -> Void)? = nil
   let onOpenWhen: (TaskListView.ActionTarget) -> Void
   let onOpenDeadline: (TaskListView.ActionTarget) -> Void
   var onOpenReminder: ((SeptenaTask) -> Void)? = nil
@@ -151,9 +158,13 @@ struct TaskListRowContextMenu: View {
   /// (both nil = Inbox; area only; or a project under its area).
   let onMoveTo: (TaskListView.ActionTarget, _ areaId: String?, _ projectId: String?) -> Void
   /// Destinations surfaced inline. Areas + top-level (no-area) projects only —
-  /// a bounded set; projects-under-areas stay behind "More…".
+  /// a bounded set; projects-under-areas stay behind "Move…".
   let moveAreas: [Area]
   let moveTopProjects: [Project]
+  /// The project's sections, for Move to Section ▸ (project pages only).
+  var sections: [SeptenaTask] = []
+  /// Files the target under a section (nil = no section).
+  var onMoveToSection: ((String?) -> Void)? = nil
   let onOpenRepeat: (SeptenaTask) -> Void
   let onSetRepeatPaused: ([String], Bool) -> Void
   let onCreateNextCopy: (SeptenaTask) -> Void
@@ -161,208 +172,138 @@ struct TaskListRowContextMenu: View {
   let onDelete: (TaskListView.ActionTarget) -> Void
 
   private var count: Int { target.count }
+  private var single: SeptenaTask? {
+    if case let .single(task) = target { return task }
+    return nil
+  }
 
   var body: some View {
-    // No Copy item: copying titles stays on ⌘C and Edit ▸ Copy, which act on
-    // the selection. The row menu keeps to actions on the task itself.
-    if case let .single(task) = target {
-      Button {
-        onOpenDetail(task)
-      } label: {
-        Label("Edit Details…", systemImage: "info.circle")
-      }
-      .keyboardShortcut(TaskRowShortcuts.editDetails)
+    RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
+      RegistryActions.menu("task.row"), bind: bind, slot: slot))
+  }
 
-      Divider()
+  private func bind(_ id: String) -> RegistryActionBinding? {
+    let tasks = target.tasks
+    let plural: RegistryTitleVariant = count > 1 ? .plural : .base
+    switch id {
+    case "task.editDetails":
+      guard let task = single else { return nil }
+      return .init { onOpenDetail(task) }
+    case "task.duplicate":
+      return .init(variant: plural) { onDuplicate(target) }
+    case "task.toggleComplete":
+      guard let onToggleComplete else { return nil }
+      return .init { onToggleComplete(target.ids) }
+    case "task.cancel":
+      return .init(variant: plural) { onCancel(target.ids) }
+    case "task.delete":
+      return .init(variant: plural) { onDelete(target) }
+    case "task.toggleToday":
+      switch todayAction {
+      case .add: return .init(variant: .add) { onMoveToToday(target.ids, true) }
+      case .remove: return .init(variant: .remove) { onMoveToToday(target.ids, false) }
+      case nil: return nil
+      }
+    case "task.toggleStar":
+      guard let onToggleStar else { return nil }
+      let allStarred = !tasks.isEmpty && tasks.allSatisfy(\.starred)
+      return .init(variant: allStarred ? .remove : .add) { onToggleStar(target.ids, !allStarred) }
+    case "task.tags":
+      guard let onOpenTags else { return nil }
+      return .init { onOpenTags(target) }
+    case "task.when":
+      return .init { onOpenWhen(target) }
+    case "task.deadline":
+      return .init { onOpenDeadline(target) }
+    case "task.reminder":
+      guard let task = single, let onOpenReminder else { return nil }
+      return .init { onOpenReminder(task) }
+    case "task.clearSchedule":
+      guard let onClearSchedule,
+            tasks.contains(where: { $0.isOnToday || $0.scheduled != nil || $0.deadline != nil })
+      else { return nil }
+      return .init { onClearSchedule(target.ids) }
+    case "task.move":
+      return .init { onOpenMove(target) }
+    case "task.repeat":
+      guard let task = single else { return nil }
+      return .init { onOpenRepeat(task) }
+    case "task.pauseResumeRepeat":
+      guard !tasks.isEmpty, tasks.allSatisfy({ $0.recurrence != nil }) else { return nil }
+      let paused = tasks.allSatisfy(\.recurrencePaused)
+      return .init(variant: paused ? .active : .base) { onSetRepeatPaused(target.ids, !paused) }
+    case "task.createNextCopy":
+      guard let task = single, task.recurrence != nil else { return nil }
+      return .init { onCreateNextCopy(task) }
+    default:
+      // `task.toggleInfo` and anything this shell has no handler for.
+      return nil
     }
+  }
 
-    if todayAction == .remove {
-      Button {
-        onMoveToToday(target.ids, false)
-      } label: {
-        Label(todayRemoveLabel, systemImage: "sun.min")
-      }
-      .keyboardShortcut(TaskRowShortcuts.toggleToday)
-    } else if todayAction == .add {
-      Button {
-        onMoveToToday(target.ids, true)
-      } label: {
-        Label(todayAddLabel, systemImage: "sun.max.fill")
-      }
-      .keyboardShortcut(TaskRowShortcuts.toggleToday)
+  private func slot(_ id: String) -> [RegistryMenuNode] {
+    switch id {
+    case "moveDestinations": return moveDestinations
+    case "sectionDestinations": return sectionDestinations
+    default: return []
     }
+  }
 
-    if let onToggleStar {
-      let allStarred = !target.tasks.isEmpty && target.tasks.allSatisfy(\.starred)
-      Button {
-        onToggleStar(target.ids, !allStarred)
-      } label: {
-        Label(allStarred
-              ? String(localized: "Remove Star", comment: "Context menu unstar")
-              : String(localized: "Star", comment: "Context menu star"),
-              systemImage: allStarred ? "star.slash" : "star.fill")
-      }
-    }
-
-    if let onOpenTags {
-      Button {
-        onOpenTags(target)
-      } label: {
-        Label("Tags…", systemImage: "tag")
-      }
-    }
-
-    // When and Deadline share one submenu. The two pickers are separate
-    // sheets (`DatePickerSheet` edits one date), so a native submenu is the
-    // standard way to offer both from one entry. Shortcuts sit on the items,
-    // not the `Menu`, for the same reason as Move's below.
-    Menu {
-      Button {
-        onOpenWhen(target)
-      } label: {
-        Label(whenLabel, systemImage: "calendar")
-      }
-      .keyboardShortcut(TaskRowShortcuts.when)
-
-      Button {
-        onOpenDeadline(target)
-      } label: {
-        Label(deadlineLabel, systemImage: "flag")
-      }
-      .keyboardShortcut(TaskRowShortcuts.deadline)
-
-      if case let .single(task) = target, let onOpenReminder {
-        Button {
-          onOpenReminder(task)
-        } label: {
-          Label(task.reminder != nil ? "Edit Reminder…" : "Reminder…", systemImage: "bell")
-        }
-      }
-
-      if let onClearSchedule,
-         target.tasks.contains(where: { $0.isOnToday || $0.scheduled != nil || $0.deadline != nil }) {
-        Divider()
-        Button {
-          onClearSchedule(target.ids)
-        } label: {
-          Label("Clear Schedule", systemImage: RegistryIcons.sfSymbol(for: "action.clear_schedule"))
-        }
-        .keyboardShortcut(TaskRowShortcuts.clearSchedule)
-      }
-    } label: {
-      Label(scheduleLabel, systemImage: "calendar")
-    }
-
-    Menu {
-      // The filing suggestion comes first: it is the same pick as the row's
-      // suggestion chip, one tap away. Single task only (a pick is ranked for
-      // one title).
-      if let suggestion = rankedSuggestions?.first,
-         case let .single(task) = target {
-        Button {
+  /// The Move submenu's destinations: the filing suggestion first (the same
+  /// pick as the row's chip; single task only, a pick is ranked for one
+  /// title), then Inbox, every area and every top-level project.
+  private var moveDestinations: [RegistryMenuNode] {
+    var nodes: [RegistryMenuNode] = []
+    if let suggestion = rankedSuggestions?.first, let task = single {
+      nodes.append(RegistryMenuEntry.slot(
+        id: "suggested",
+        title: String(localized: "Suggested: \(suggestion.title)"),
+        sfSymbol: suggestion.kind == .project ? "number" : "folder") {
           onApplySuggestion(task, suggestion)
-        } label: {
-          // Same glyph as the chip.
-          Label("Suggested: \(suggestion.title)",
-                systemImage: suggestion.kind == .project ? "number" : "folder")
-        }
-        Divider()
-      }
-
-      if !target.tasks.allSatisfy(\.isInTriageBand) {
-        Button {
+        })
+      nodes.append(.divider(id: "suggested.divider"))
+    }
+    if !target.tasks.allSatisfy(\.isInTriageBand) {
+      nodes.append(RegistryMenuEntry.slot(
+        id: "inbox", title: String(localized: "Inbox"),
+        sfSymbol: RegistryIcons.sfSymbol(for: "list.inbox")) {
           onMoveTo(target, nil, nil)
-        } label: {
-          Label("Inbox", systemImage: "tray")
-        }
+        })
+    }
+    if !moveAreas.isEmpty || !moveTopProjects.isEmpty {
+      nodes.append(.divider(id: "destinations.divider"))
+      for area in moveAreas {
+        let title = (area.emoji?.isEmpty == false) ? "\(area.emoji ?? "")  \(area.title)" : area.title
+        nodes.append(RegistryMenuEntry.slot(id: "area.\(area.id)", title: title) {
+          onMoveTo(target, area.id, nil)
+        })
       }
-      if !moveAreas.isEmpty || !moveTopProjects.isEmpty {
-        Divider()
-        ForEach(moveAreas) { area in
-          Button {
-            onMoveTo(target, area.id, nil)
-          } label: {
-            if let emoji = area.emoji, !emoji.isEmpty {
-              Text("\(emoji)  \(area.title)")
-            } else {
-              Text(area.title)
-            }
-          }
-        }
-        ForEach(moveTopProjects) { project in
-          Button {
+      for project in moveTopProjects {
+        nodes.append(RegistryMenuEntry.slot(
+          id: "project.\(project.id)", title: project.title,
+          sfSymbol: RegistryIcons.sfSymbol(for: "place.project")) {
             onMoveTo(target, nil, project.id)
-          } label: {
-            Label(project.title, systemImage: "folder")
-          }
-        }
-      }
-
-      Divider()
-
-      Button {
-        onOpenMove(target)
-      } label: {
-        Label("More…", systemImage: "ellipsis")
-      }
-      // ⌘⇧M lives on the sheet-opening item, not the parent Menu: a shortcut on
-      // the Menu container propagates to every submenu row (Inbox, each area,
-      // each project, More…), so all of them showed ⌘⇧M. Attaching it here — the
-      // action that mirrors the menu-bar "Move…" — marks only the one item.
-      .keyboardShortcut(TaskRowShortcuts.move)
-    } label: {
-      Label(moveLabel, systemImage: "folder")
-    }
-
-    if case let .single(task) = target {
-      Button {
-        onOpenRepeat(task)
-      } label: {
-        Label("Repeat…", systemImage: "arrow.clockwise")
-      }
-
-      if task.recurrence != nil {
-        Button {
-          onCreateNextCopy(task)
-        } label: {
-          Label("Create Next Copy", systemImage: "plus.circle")
-        }
+          })
       }
     }
+    return nodes
+  }
 
-    if !target.tasks.isEmpty && target.tasks.allSatisfy({ $0.recurrence != nil }) {
-      let paused = target.tasks.allSatisfy(\.recurrencePaused)
-      Button {
-        onSetRepeatPaused(target.ids, !paused)
-      } label: {
-        Label(paused ? "Resume Repeat" : "Pause Repeat",
-              systemImage: paused ? "play.circle" : "pause.circle")
-      }
+  /// Move to Section ▸ — No Section, then every heading of the project.
+  private var sectionDestinations: [RegistryMenuNode] {
+    guard let onMoveToSection, !sections.isEmpty else { return [] }
+    var nodes: [RegistryMenuNode] = [
+      RegistryMenuEntry.slot(id: "section.none", title: String(localized: "No Section")) {
+        onMoveToSection(nil)
+      },
+      .divider(id: "sections.divider"),
+    ]
+    for heading in sections {
+      nodes.append(RegistryMenuEntry.slot(id: "section.\(heading.id)", title: heading.title) {
+        onMoveToSection(heading.id)
+      })
     }
-
-    Button {
-      onDuplicate(target)
-    } label: {
-      Label(duplicateLabel, systemImage: "plus.square.on.square")
-    }
-    .keyboardShortcut(TaskRowShortcuts.duplicate)
-
-    Divider()
-
-    Button {
-      onCancel(target.ids)
-    } label: {
-      Label(cancelLabel, systemImage: "xmark.circle")
-    }
-
-    Divider()
-
-    Button(role: .destructive) {
-      onDelete(target)
-    } label: {
-      Label(deleteLabel, systemImage: "trash")
-    }
-    .keyboardShortcut(TaskRowShortcuts.delete)
+    return nodes
   }
 
   private enum TodayAction { case add, remove }
@@ -378,41 +319,5 @@ struct TaskListRowContextMenu: View {
       if filter != .today, tasks.contains(where: { !$0.isOnToday }) { return .add }
       return nil
     }
-  }
-
-  private var todayAddLabel: String {
-    "Move to Today"
-  }
-
-  private var todayRemoveLabel: String {
-    "Remove from Today"
-  }
-
-  private var whenLabel: String {
-    "When…"
-  }
-
-  private var deadlineLabel: String {
-    "Deadline…"
-  }
-
-  private var scheduleLabel: String {
-    "Schedule"
-  }
-
-  private var moveLabel: String {
-    count > 1 ? "Move Tasks" : "Move"
-  }
-
-  private var duplicateLabel: String {
-    count > 1 ? "Duplicate Tasks" : "Duplicate"
-  }
-
-  private var cancelLabel: String {
-    count > 1 ? "Cancel Tasks" : "Cancel Task"
-  }
-
-  private var deleteLabel: String {
-    count > 1 ? "Delete Tasks" : "Delete"
   }
 }

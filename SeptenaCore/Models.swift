@@ -61,6 +61,17 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   var status: TaskStatus
   var created: String?         // YYYY-MM-DD
   var scheduled: String?       // YYYY-MM-DD
+  /// Optional 24-hour wall-clock start time (`HH:MM`, docs/TASK_TIMES_AND_ICAL_SPEC.md).
+  var startTime: String? = nil
+  /// Optional duration in minutes (`5..1440`).
+  var durationMinutes: Int? = nil
+  /// Optional IANA time zone (nil = floating local time).
+  var timeZone: String? = nil
+
+  /// Quiet human-readable time range (`14:00–15:00` or `14:00`), nil when date-only.
+  var timeSlotLabel: String? {
+    TaskTimeSlot.format(startTime: startTime, durationMinutes: durationMinutes)
+  }
   /// Hard date the task is owed by. Things-style: rendering only — the
   /// server unions deadline-today rows into Today.items at view time, no
   /// mutation. Reschedule the deadline forward and the task drops out of
@@ -335,6 +346,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     status: TaskStatus,
     created: String?,
     scheduled: String?,
+    startTime: String? = nil,
+    durationMinutes: Int? = nil,
+    timeZone: String? = nil,
     deadline: String?,
     today: Bool,
     starred: Bool = false,
@@ -370,6 +384,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     self.status = status
     self.created = created
     self.scheduled = scheduled
+    self.startTime = startTime
+    self.durationMinutes = durationMinutes
+    self.timeZone = timeZone
     self.deadline = deadline
     self.today = today
     self.starred = starred
@@ -402,7 +419,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   }
 
   enum CodingKeys: String, CodingKey {
-    case id, title, status, created, scheduled, deadline, today, starred, tags
+    case id, title, status, created, scheduled, startTime, durationMinutes, timeZone, deadline, today, starred, tags
     case todaySetOn = "today_set_on"
     case completedAt = "completed_at"
     case area, project, notes, recurrence, reminder
@@ -425,6 +442,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     status = (try? c.decode(TaskStatus.self, forKey: .status)) ?? .open
     created = try c.decodeIfPresent(String.self, forKey: .created)
     scheduled = try c.decodeIfPresent(String.self, forKey: .scheduled)
+    startTime = try c.decodeIfPresent(String.self, forKey: .startTime)
+    durationMinutes = try c.decodeIfPresent(Int.self, forKey: .durationMinutes)
+    timeZone = try c.decodeIfPresent(String.self, forKey: .timeZone)
     // Prefer the canonical `deadline`; fall back to legacy `due` for old
     // payloads (cached responses, old server builds).
     if let dl = try c.decodeIfPresent(String.self, forKey: .deadline) {
@@ -446,6 +466,59 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     nextOccurrence = try c.decodeIfPresent(String.self, forKey: .nextOccurrence)
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     deletedAt = try c.decodeIfPresent(String.self, forKey: .deletedAt)
+  }
+}
+
+// MARK: - Optional task start/end time helper (docs/TASK_TIMES_AND_ICAL_SPEC.md)
+
+enum TaskTimeSlot {
+  /// Quick duration presets shown behind progressive disclosure.
+  static let quickDurations: [(minutes: Int, label: String)] = [
+    (15, "15m"),
+    (30, "30m"),
+    (60, "1h"),
+    (120, "2h"),
+  ]
+
+  /// Parse `"HH:MM"` into `(hour, minute)`.
+  static func parse(_ hhmm: String?) -> (hour: Int, minute: Int)? {
+    guard let hhmm, hhmm.count == 5 else { return nil }
+    let parts = hhmm.split(separator: ":")
+    guard parts.count == 2,
+          let h = Int(parts[0]), let m = Int(parts[1]),
+          (0...23).contains(h), (0...59).contains(m) else { return nil }
+    return (h, m)
+  }
+
+  /// Format `(hour, minute)` into canonical 24-hour `"HH:MM"`.
+  static func hhmm(hour: Int, minute: Int) -> String {
+    String(format: "%02d:%02d", max(0, min(23, hour)), max(0, min(59, minute)))
+  }
+
+  /// Format `Date`'s local wall-clock hour/minute into `"HH:MM"`.
+  static func hhmm(from date: Date, calendar: Calendar = .current) -> String {
+    let comps = calendar.dateComponents([.hour, .minute], from: date)
+    return hhmm(hour: comps.hour ?? 9, minute: comps.minute ?? 0)
+  }
+
+  /// Convert `"HH:MM"` to a `Date` on today's calendar day for date pickers.
+  static func pickerDate(from hhmm: String?, calendar: Calendar = .current) -> Date {
+    let parsed = parse(hhmm) ?? (9, 0)
+    var comps = calendar.dateComponents([.year, .month, .day], from: Date())
+    comps.hour = parsed.hour
+    comps.minute = parsed.minute
+    comps.second = 0
+    return calendar.date(from: comps) ?? Date()
+  }
+
+  /// Format quiet display range (`"14:00–15:00"` when duration present, else `"14:00"`).
+  static func format(startTime: String?, durationMinutes: Int?) -> String? {
+    guard let (h, m) = parse(startTime) else { return nil }
+    let start = hhmm(hour: h, minute: m)
+    guard let dur = durationMinutes, dur >= 5 else { return start }
+    let total = (h * 60 + m + dur) % (24 * 60)
+    let end = hhmm(hour: total / 60, minute: total % 60)
+    return "\(start)–\(end)"
   }
 }
 
@@ -876,6 +949,9 @@ enum TaskFilter: Equatable, Hashable {
   case triage
   /// Agent-worked tasks waiting for the human to verify and accept (`endState == .needsVerify`).
   case review
+  /// Every open task an agent owns or worked, grouped by `AgentStage`
+  /// (docs/TASK_FACTORY_SPEC.md §3).
+  case agent
   case upcoming
   case repeating
   case unscheduled
@@ -892,6 +968,7 @@ enum TaskFilter: Equatable, Hashable {
     case .today: return "today"
     case .triage: return "triage"
     case .review: return "all"
+    case .agent: return "all"
     case .upcoming: return "upcoming"
     case .repeating: return "all"
     case .unscheduled: return "unscheduled"
@@ -910,6 +987,7 @@ enum TaskFilter: Equatable, Hashable {
     case .today: return "today"
     case .triage: return "triage"
     case .review: return "review"
+    case .agent: return "agent"
     case .upcoming: return "upcoming"
     case .repeating: return "repeating"
     case .unscheduled: return "unscheduled"
@@ -922,6 +1000,41 @@ enum TaskFilter: Equatable, Hashable {
     }
   }
 
+  /// Canonical `registry/destinations.json` ID for smart-list filters, or nil
+  /// for area/project/triage filters.
+  var destinationID: String? {
+    switch self {
+    case .today: return "today"
+    case .review: return "review"
+    case .agent: return "agent"
+    case .upcoming: return "upcoming"
+    case .repeating: return "repeating"
+    case .unscheduled: return "anytime"
+    case .logbook: return "logbook"
+    case .starred: return "starred"
+    case .faded: return "faded"
+    case .recentlyDeleted: return "recentlyDeleted"
+    case .triage, .project, .area: return nil
+    }
+  }
+
+  /// Maps a canonical `registry/destinations.json` ID back to its `TaskFilter`.
+  init?(destinationID: String) {
+    switch destinationID {
+    case "today": self = .today
+    case "review": self = .review
+    case "agent": self = .agent
+    case "upcoming": self = .upcoming
+    case "repeating": self = .repeating
+    case "anytime", "unscheduled": self = .unscheduled
+    case "logbook": self = .logbook
+    case "starred": self = .starred
+    case "faded": self = .faded
+    case "recentlyDeleted": self = .recentlyDeleted
+    default: return nil
+    }
+  }
+
   // User-facing label. "Anytime" is the single home for open, dateless tasks
   // (it absorbed the former "Someday" bucket). The serverView key stays
   // `unscheduled` so the API contract is unchanged.
@@ -930,6 +1043,7 @@ enum TaskFilter: Equatable, Hashable {
     case .today: return String(localized: "Today", comment: "Task filter")
     case .triage: return String(localized: "Inbox", comment: "Task filter")
     case .review: return String(localized: "Review", comment: "Task filter")
+    case .agent: return RegistryDestinations.byNavigationKey["agent"]?.title ?? "Agent"
     case .upcoming: return String(localized: "Upcoming", comment: "Task filter")
     case .repeating: return String(localized: "Repeating", comment: "Task filter")
     case .unscheduled: return String(localized: "Anytime", comment: "Task filter")
@@ -1117,6 +1231,14 @@ struct AppSettings: Codable {
   var canvasTexture: String? = nil
   var textureIntensity: Int? = nil
   var textureMotion: String? = nil
+
+  /// Per-account special smart-list sidebar customization (registry/destinations.json).
+  /// `smartListOrder` is ORDERING ONLY (never membership): any registry
+  /// destination absent from here appends in canonical `sidebarOrder`.
+  /// `smartListHidden` lists canonical destination IDs explicitly hidden by the
+  /// user (destinations with `canHide == false`, e.g. `today`, are never hidden).
+  var smartListOrder: [String]? = nil
+  var smartListHidden: [String]? = nil
 
   /// When the first-run welcome (section picker + chained onboarding) was
   /// completed. The durable, cross-device "this account has been welcomed"

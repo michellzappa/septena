@@ -1,0 +1,190 @@
+{
+  "version": 1,
+  "description": "Canonical device shapes for marketing visuals: the website scenes (septena-site) and the App Store panels (appstore/). The iPad is drawn in landscape. Units are points (dp on Android) at 1x. A phone case is the screen plus the bezel on every side; screen radius = outerRadius - bezel. A laptop is a lid (a thin rim, a black glass bezel, the screen) on a base that overhangs the lid; outerRadius rounds the lid top, hingeRadius the lid bottom. corner: continuous (Apple) or circular. registry/device-shape.mjs draws these; renderers never redefine them.",
+  "devices": {
+    "iphone": {
+      "label": "iPhone",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "bezel": 6,
+      "outerRadius": 62,
+      "corner": "continuous",
+      "cutout": {
+        "kind": "island",
+        "width": 126,
+        "height": 37,
+        "top": 11
+      },
+      "finish": {
+        "angle": 145,
+        "stops": [
+          [
+            0,
+            "#747479"
+          ],
+          [
+            0.28,
+            "#202023"
+          ],
+          [
+            0.8,
+            "#303034"
+          ],
+          [
+            1,
+            "#737379"
+          ]
+        ],
+        "highlight": "rgb(255 255 255 / .3)"
+      }
+    },
+    "android": {
+      "label": "Android phone",
+      "screen": {
+        "width": 412,
+        "height": 915
+      },
+      "bezel": 7,
+      "outerRadius": 44,
+      "corner": "circular",
+      "cutout": {
+        "kind": "punchHole",
+        "diameter": 12,
+        "top": 12
+      },
+      "finish": {
+        "angle": 145,
+        "stops": [
+          [
+            0,
+            "#5c5d60"
+          ],
+          [
+            0.3,
+            "#1b1c1e"
+          ],
+          [
+            0.8,
+            "#2a2b2e"
+          ],
+          [
+            1,
+            "#5a5b5e"
+          ]
+        ],
+        "highlight": "rgb(255 255 255 / .22)"
+      }
+    },
+    "ipad": {
+      "label": "iPad",
+      "screen": {
+        "width": 1180,
+        "height": 820
+      },
+      "bezel": 20,
+      "outerRadius": 38,
+      "corner": "continuous",
+      "cutout": {
+        "kind": "camera",
+        "diameter": 6,
+        "top": 7
+      },
+      "finish": {
+        "angle": 145,
+        "stops": [
+          [
+            0,
+            "#747479"
+          ],
+          [
+            0.28,
+            "#202023"
+          ],
+          [
+            0.8,
+            "#303034"
+          ],
+          [
+            1,
+            "#737379"
+          ]
+        ],
+        "highlight": "rgb(255 255 255 / .3)"
+      }
+    },
+    "macbook": {
+      "label": "MacBook",
+      "screen": {
+        "width": 1120,
+        "height": 740
+      },
+      "bezel": 16,
+      "outerRadius": 30,
+      "hingeRadius": 6,
+      "corner": "continuous",
+      "cutout": {
+        "kind": "camera",
+        "diameter": 6,
+        "top": 5
+      },
+      "finish": {
+        "angle": 180,
+        "stops": [
+          [
+            0,
+            "#c9cacd"
+          ],
+          [
+            1,
+            "#9c9da1"
+          ]
+        ],
+        "highlight": "rgb(255 255 255 / .35)",
+        "glass": "#0b0b0c"
+      },
+      "base": {
+        "height": 20,
+        "overhang": 60,
+        "gradient": "linear-gradient(180deg,#e4e5e7,#b3b4b8 70%,#8e8f93)"
+      }
+    },
+    "windowsLaptop": {
+      "label": "Windows laptop",
+      "screen": {
+        "width": 1120,
+        "height": 740
+      },
+      "bezel": 14,
+      "outerRadius": 12,
+      "hingeRadius": 4,
+      "corner": "circular",
+      "cutout": {
+        "kind": "camera",
+        "diameter": 6,
+        "top": 4
+      },
+      "finish": {
+        "angle": 180,
+        "stops": [
+          [
+            0,
+            "#3d3e42"
+          ],
+          [
+            1,
+            "#232427"
+          ]
+        ],
+        "highlight": "rgb(255 255 255 / .18)",
+        "glass": "#0b0b0c"
+      },
+      "base": {
+        "height": 18,
+        "overhang": 50,
+        "gradient": "linear-gradient(180deg,#4a4b4f,#2a2b2e 70%,#1c1d1f)"
+      }
+    }
+  }
+}

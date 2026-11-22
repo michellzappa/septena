@@ -123,6 +123,26 @@
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
       "featureId": "settings.display"
     },
+    "smartListOrder": {
+      "scope": "synced",
+      "storageKey": "septena.sidebar.smartListOrder",
+      "type": "string[]",
+      "maxItems": 32,
+      "itemMaxLength": 64,
+      "default": [],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "settings.display"
+    },
+    "smartListHidden": {
+      "scope": "synced",
+      "storageKey": "septena.sidebar.smartListHidden",
+      "type": "string[]",
+      "maxItems": 32,
+      "itemMaxLength": 64,
+      "default": [],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "settings.display"
+    },
     "appearanceMode": {
       "scope": "device",
       "storageKey": "septena.appearance.mode",
@@ -207,6 +227,23 @@
         { "value": "3", "title": "Three" }
       ],
       "platforms": ["ios", "ipados", "android"],
+      "featureId": "settings.display"
+    },
+    "tasksSwipeLeadingAction": {
+      "scope": "device",
+      "storageKey": "septena.tasks.swipeLeadingAction",
+      "type": "enum",
+      "values": ["today", "schedule", "move", "star", "complete", "none"],
+      "default": "today",
+      "options": [
+        { "value": "today", "title": "Today" },
+        { "value": "schedule", "title": "Schedule" },
+        { "value": "move", "title": "Move" },
+        { "value": "star", "title": "Star" },
+        { "value": "complete", "title": "Complete" },
+        { "value": "none", "title": "Off" }
+      ],
+      "platforms": ["ios", "ipados"],
       "featureId": "settings.display"
     },
     "tasksFilingSuggestions": {
@@ -451,6 +488,13 @@
       "desktopTab": "general",
       "items": [
         {
+          "kind": "pageLink",
+          "page": "smart_lists",
+          "label": "Smart Lists",
+          "icon": "list.today",
+          "featureId": "settings.display"
+        },
+        {
           "kind": "setting",
           "key": "todayGroupByList",
           "label": "Group Today by list",
@@ -512,6 +556,13 @@
         },
         {
           "kind": "setting",
+          "key": "tasksSwipeLeadingAction",
+          "label": "Swipe right",
+          "detail": "Swipe left on a task to select multiple tasks. Swipe right runs this quick action.",
+          "platforms": ["ios", "ipados"]
+        },
+        {
+          "kind": "setting",
           "key": "loggingAnimationsEnabled",
           "label": "Completion animations",
           "icon": "settings.animations"
@@ -556,15 +607,42 @@
           ]
         },
         {
+          "id": "plan",
+          "items": [
+            { "kind": "pageLink", "page": "plus", "label": "Septena Plus", "icon": "settings.plus", "statusKey": "planStatus", "featureId": "sync.backend" }
+          ]
+        },
+        {
           "id": "sync",
           "items": [
             { "kind": "customSurface", "surface": "sync_account_status" }
           ]
         },
         {
+          "id": "sign_in_approval",
+          "items": [
+            { "kind": "customSurface", "surface": "sign_in_approval", "visibility": "signedIn", "featureId": "sync.backend" }
+          ]
+        },
+        {
           "id": "delete_account",
           "items": [
             { "kind": "customSurface", "surface": "delete_account", "visibility": "signedIn", "featureId": "account.delete" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "plus",
+      "title": "Septena Plus",
+      "icon": "settings.plus",
+      "depth": 2,
+      "featureId": "sync.backend",
+      "sections": [
+        {
+          "id": "offer",
+          "items": [
+            { "kind": "customSurface", "surface": "plus_offer" }
           ]
         }
       ]
@@ -662,7 +740,7 @@
         {
           "id": "move_in",
           "header": "Move from another app",
-          "footer": "Copy a Things database into Septena once. Nothing in Things is changed.",
+          "footer": "Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import.",
           "platforms": ["ios", "ipados", "macos"],
           "items": [
             { "kind": "customSurface", "surface": "things_import", "label": "Import from Things", "icon": "settings.import", "platforms": ["ios", "ipados", "macos"], "featureId": "import.things" }
@@ -786,6 +864,25 @@
             { "kind": "setting", "key": "showModelLabels", "label": "Show model labels", "detail": "Show which model answered next to each AI reply." },
             { "kind": "setting", "key": "pccRoutingEnabled", "label": "Use Private Cloud Compute", "detail": "Requires the PCC entitlement. Without it, requests fail and fall back on-device.", "visibility": "minAppleOS27" },
             { "kind": "setting", "key": "pccReasoning", "label": "Private Cloud Compute reasoning", "visibility": "minAppleOS27" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "smart_lists",
+      "title": "Smart Lists",
+      "icon": "list.today",
+      "depth": 1,
+      "featureId": "settings.display",
+      "sections": [
+        {
+          "id": "smart_lists",
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "smart_lists_editor",
+              "ownsKeys": ["smartListOrder", "smartListHidden"]
+            }
           ]
         }
       ]

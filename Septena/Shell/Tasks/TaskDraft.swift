@@ -14,6 +14,8 @@ struct TaskDraft: Equatable {
   var onToday: Bool = false
   var starred: Bool = false
   var scheduled: Date? = nil
+  var startTime: String? = nil
+  var durationMinutes: Int? = nil
   var deadline: Date? = nil
   var reminder: TaskReminder? = nil
   var recurrence: Recurrence? = nil
@@ -39,7 +41,7 @@ struct TaskDraft: Equatable {
     case .project(let id): projectId = id
     case .area(let id):    areaId = id
     case .starred:         starred = true
-    case .triage, .review, .unscheduled, .repeating, .logbook, .faded, .recentlyDeleted: break
+    case .triage, .review, .agent, .unscheduled, .repeating, .logbook, .faded, .recentlyDeleted: break
     }
   }
 
@@ -50,6 +52,8 @@ struct TaskDraft: Equatable {
     onToday = task.today
     starred = task.starred
     scheduled = SeptenaDate.parse(task.scheduled)
+    startTime = task.startTime
+    durationMinutes = task.durationMinutes
     deadline = SeptenaDate.parse(task.deadline)
     reminder = task.reminder
     recurrence = task.recurrence
@@ -65,7 +69,12 @@ struct TaskDraft: Equatable {
     if Calendar.current.isDateInToday(day) { setToday() }
     else { onToday = false; scheduled = day }
   }
-  mutating func clearWhen() { onToday = false; scheduled = nil }
+  mutating func clearWhen() {
+    onToday = false
+    scheduled = nil
+    startTime = nil
+    durationMinutes = nil
+  }
 
   // MARK: - Things-style scheduled mapping
 
@@ -103,6 +112,9 @@ struct TaskDraft: Equatable {
     }
     if starred {
       mutator.setStarred(id: task.id, starred: true)
+    }
+    if let startTime {
+      mutator.setTimeSlot(id: task.id, startTime: startTime, durationMinutes: durationMinutes)
     }
     return task
   }
@@ -167,6 +179,8 @@ struct TaskDraft: Equatable {
     let scheduleBefore = TaskUndo.ScheduleSnapshot(original)
     let filingBefore = TaskUndo.FilingSnapshot(original)
     let scheduleChanged = storedScheduled != prior.storedScheduled
+      || startTime != prior.startTime
+      || durationMinutes != prior.durationMinutes
       || pinToday != prior.pinToday
       || starred != prior.starred
       || deadline != prior.deadline
@@ -196,6 +210,9 @@ struct TaskDraft: Equatable {
     }
     if starred != prior.starred {
       mutator.setStarred(id: id, starred: starred)
+    }
+    if startTime != prior.startTime || durationMinutes != prior.durationMinutes {
+      mutator.setTimeSlot(id: id, startTime: startTime, durationMinutes: durationMinutes)
     }
     // Project and area are mutually exclusive: a project owns its area, and the
     // backend's `moveToProject` clears area (create() does the same via

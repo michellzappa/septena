@@ -80,10 +80,11 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [PROJECT_NOTES_SPEC.md](PROJECT_NOTES_SPEC.md) | accepted (ADR 0012) |
 | [TIMED_REMINDERS_SPEC.md](TIMED_REMINDERS_SPEC.md) | proposal (#97) |
 | [RECURRENCE_V2_SPEC.md](RECURRENCE_V2_SPEC.md) | proposal (#126) |
+| [MOVING_IN_SPEC.md](MOVING_IN_SPEC.md) | building (#99, ADR 0021): one import engine, source adapters |
 | [CHECKLISTS_SPEC.md](CHECKLISTS_SPEC.md) | proposal (#76) |
 | [DATA_EXPORT_SPEC.md](DATA_EXPORT_SPEC.md) | proposal (#130) |
-| [IOS_SWIPE_ACTIONS_SPEC.md](IOS_SWIPE_ACTIONS_SPEC.md) | proposal (#132) |
-| [MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md](MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md) | proposal (touch swipe-to-select & multi-task drag to project) |
+| [IOS_SWIPE_ACTIONS_SPEC.md](IOS_SWIPE_ACTIONS_SPEC.md) | building (#132, SW0 + SW1) |
+| [MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md](MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md) | building (M0–M3 implemented) |
 | [TAGS_SPEC.md](TAGS_SPEC.md) | proposal (#96) |
 | [TASK_WIDGETS_SPEC.md](TASK_WIDGETS_SPEC.md) | proposal (#129) |
 | [STAR_PRIORITY_SPEC.md](STAR_PRIORITY_SPEC.md) | proposal (#127) |
@@ -105,6 +106,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [RECENTLY_DELETED_SPEC.md](RECENTLY_DELETED_SPEC.md), [TASK_LIST_OBSERVATION_PLAN.md](TASK_LIST_OBSERVATION_PLAN.md) | proposal |
 | [SEPTASK_APPKIT_PARITY.md](SEPTASK_APPKIT_PARITY.md), [SEPTASK_APPKIT_SURFACES.md](SEPTASK_APPKIT_SURFACES.md), [SEPTASK_APPKIT_LOCALIZATION_HANDOFF.md](SEPTASK_APPKIT_LOCALIZATION_HANDOFF.md) | AppKit shell notes |
 | [APPSTORE-SEPTASK.md](APPSTORE-SEPTASK.md), [RELEASING-MAC.md](RELEASING-MAC.md) | current |
+| [NATIVE_SCENES_SPEC.md](NATIVE_SCENES_SPEC.md) | superseded (ADR 0022 rejected): website scenes draw from the registries |
 
 ### Registries
 

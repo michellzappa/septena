@@ -3,18 +3,20 @@
 //   node render.mjs [--device iphone69] [--appearance light] [--only <panelId>]
 //
 // Pipeline per active device: panels.config.mjs composition → components.mjs
-// HTML (debug copies kept in build/<device>/) → Playwright Chromium screenshot
-// at devices.mjs dimensions → <outDir>/<n>_<device>_<id>.png. Raw captures are
-// read from raw/<device>/<appearance>/ (see sync-shots.sh); missing ones get a
-// branded placeholder so the pipeline never blocks on capture order.
+// HTML (kept in build/<device>/) → installed Chrome (chrome.mjs) screenshot
+// at devices.mjs dimensions → <outDir>/<n>_<device>_<id>.png. Screens come
+// from the scene builder export (appstore/scenes/) for classes that use it,
+// else from raw/<device>/<appearance>/. Missing ones get a branded
+// placeholder, and validate.mjs then refuses the set.
 // If python3+Pillow is available, alpha is flattened (ASC wants RGB, no alpha).
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, unlinkSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
-import { chromium } from "playwright";
-import { activeDevices } from "./devices.mjs";
+import { stripTypeScriptTypes } from "node:module";
+import { openChrome } from "./chrome.mjs";
+import { activeDevices, shotPaths } from "./devices.mjs";
 import { panelsFor } from "./panels.config.mjs";
 import { renderPanelHTML } from "./components.mjs";
 
@@ -48,12 +50,22 @@ const fontFace = [
 ].join("\n");
 
 const shotDataURL = (device, src) => {
-  const p = join(ROOT, device.rawDir, appearance, `${src}.png`);
-  return existsSync(p) ? `data:image/png;base64,${readFileSync(p).toString("base64")}` : null;
+  const { png } = shotPaths(device, src, appearance);
+  return existsSync(png) ? `data:image/png;base64,${readFileSync(png).toString("base64")}` : null;
+};
+// The scene's element list ({ width, height, elements:[{id,label,frame}] }),
+// so a callout can point at real on-screen text. Fails closed: a callout
+// whose element is missing stops the render.
+const shotElements = (device, src) => {
+  const { elements } = shotPaths(device, src, appearance);
+  return elements && existsSync(elements) ? JSON.parse(readFileSync(elements, "utf8")) : null;
 };
 
 let canFlatten = true;
+// Chrome's screenshots of an opaque page are already RGB (PNG colour type 2).
+// Flatten only a file that really carries alpha.
 const flattenAlpha = (file) => {
+  if (readFileSync(file).subarray(25, 26)[0] !== 6) return;
   if (!canFlatten) return;
   try {
     execFileSync("python3", ["-c",
@@ -62,8 +74,24 @@ const flattenAlpha = (file) => {
   } catch { canFlatten = false; } // no python3/Pillow — validate.mjs will warn
 };
 
-const browser = await chromium.launch();
-const page = await browser.newPage();
+// The app's header textures, from the site's port of HeaderWashEngine.swift
+// (components/task-ui/header-wash-canvas.tsx). The drawing part has no React;
+// strip its types and inline it. SEPTENA_SITE overrides the site checkout.
+const SITE = process.env.SEPTENA_SITE ?? join(ROOT, "../../_/septena-site");
+const washCode = (() => {
+  const dir = join(SITE, "components/task-ui");
+  const dataFile = join(dir, "header-wash-data.ts"), file = join(dir, "header-wash-canvas.tsx");
+  if (!existsSync(file) || !existsSync(dataFile)) return null;
+  // header-wash-data.ts holds the accents and texture list; the canvas file
+  // holds the drawing code between its imports and the React component.
+  const data = readFileSync(dataFile, "utf8");
+  const src = readFileSync(file, "utf8");
+  const start = src.indexOf("function hexToRgb"), end = src.indexOf("export function HeaderWashCanvas");
+  if (start < 0 || end < 0) throw new Error(`${file}: header-wash layout changed; update render.mjs`);
+  return stripTypeScriptTypes(`${data}\n${src.slice(start, end)}`.replace(/^export /gm, ""));
+})();
+
+const chrome = await openChrome();
 
 for (const device of activeDevices()) {
   if (onlyDevice && device.key !== onlyDevice) continue;
@@ -83,24 +111,36 @@ for (const device of activeDevices()) {
     catch { console.log(`⚠ could not remove stale ${f} (will overwrite same-named renders)`); }
   }
 
-  await page.setViewportSize({ width: device.width, height: device.height });
+  const exported = [];
   for (const [i, panel] of list.entries()) {
     if (onlyPanel && panel.id !== onlyPanel) continue;
+    const meta = panel.shot?.callout ? shotElements(device, panel.shot.src) : null;
+    if (panel.shot?.callout) {
+      const el = meta?.elements.find((e) => e.id === panel.shot.callout.element);
+      if (!el) throw new Error(`${device.key}/${panel.id}: callout element "${panel.shot.callout.element}" is not on screen ${panel.shot.src}`);
+      panel.shot.callout = { ...panel.shot.callout, frame: el.frame, label: el.label, screenWidth: meta.width };
+    }
     const html = renderPanelHTML(
       { ...panel, shot: panel.shot && { ...panel.shot, img: shotDataURL(device, panel.shot.src) } },
       device,
-      { fontFace, appearance },
+      { fontFace, appearance, washCode },
     );
-    writeFileSync(join(buildDir, `${i}_${panel.id}.html`), html);
-    await page.setContent(html, { waitUntil: "load" });
-    await page.evaluate(() => document.fonts.ready);
+    const htmlFile = join(buildDir, `${i}_${panel.id}.html`);
+    writeFileSync(htmlFile, html);
     const file = join(outDir, `${i}_${device.key}_${panel.id}.png`);
-    await page.screenshot({ path: file });
+    await chrome.screenshot(htmlFile, file, { width: device.width, height: device.height, ready: "window.__layoutCallouts?.()" });
     flattenAlpha(file);
+    exported.push({ order: i, slug: panel.id, file: `${i}_${device.key}_${panel.id}.png`, title: panel.headline.replace(/\*/g, "") });
     const missing = panel.shot && !panel.shot.img && shotDataURL(device, panel.shot.src) === null;
     console.log(`✓ ${device.key} ${i}_${panel.id} ${device.width}×${device.height}${missing ? "  (placeholder shot)" : ""}`);
   }
+  // One manifest per device class, in Bipe's store-set shape. The website's
+  // brand page reads it (septena-site scripts/sync-appstore.mjs).
+  if (!onlyPanel) writeFileSync(join(outDir, `manifest.${device.key}.json`), JSON.stringify({
+    device: device.key, label: device.label, platform: device.landscape ? "macos" : "ios", locale: "en-US",
+    width: device.width, height: device.height, exports: exported,
+  }, null, 2) + "\n");
 }
 
-await browser.close();
+await chrome.close();
 if (!canFlatten) console.log("⚠ alpha not flattened (python3+Pillow unavailable) — validate.mjs will flag it");

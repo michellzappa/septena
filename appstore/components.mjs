@@ -16,7 +16,17 @@
 //   founder    — quote card
 //   footnote   — small print at the bottom
 
+import { readFileSync } from "node:fs";
 import { theme } from "./theme.mjs";
+import { phoneShape } from "../registry/device-shape.mjs";
+
+// The one iPhone shape (registry/device-frames.json), shared with the website scenes.
+const IPHONE = JSON.parse(readFileSync(new URL("../registry/device-frames.json", import.meta.url), "utf8")).devices.iphone;
+const IPHONE_CASE_WIDTH = IPHONE.screen.width + 2 * IPHONE.bezel;
+// Case drawing and screen mask from registry/device-shape.mjs (continuous corners).
+// phoneShape returns CSS url("…") values; they go inside double-quoted style
+// attributes here, so escape the quotes or the attribute ends early.
+const PHONE = Object.fromEntries(Object.entries(phoneShape(IPHONE)).map(([k, v]) => [k, typeof v === "string" ? v.replaceAll('"', "&quot;") : v]));
 
 const esc = (s = "") =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -28,6 +38,15 @@ const rich = (s = "") =>
 // ---------------------------------------------------------------- background
 function background(bg = {}) {
   const tint = bg.tint ?? theme.accent;
+  // The app's own canvas with one of its header textures, drawn in the page
+  // by WASH_SCRIPT (render.mjs passes the drawing code).
+  if (bg.style === "texture") {
+    // bg.fill: a solid accent field with the texture drawn in white on it
+    // (the wash code's dark-appearance ink, mixed with white).
+    const fill = bg.fill ? `linear-gradient(180deg, ${bg.fill} 0%, color-mix(in oklab, ${bg.fill} 82%, black) 100%)` : (bg.canvas ?? theme.app.canvas);
+    const ink = bg.fill ? "#FFFFFF" : (bg.accent ?? theme.app.accent);
+    return `<div class="bg" style="background:${fill};"><canvas class="bg-wash" data-texture="${esc(bg.texture)}" data-accent="${ink}" data-dark="${bg.fill ? 1 : 0}" data-intensity="${bg.intensity ?? 62}" data-seed="${bg.seed ?? 42}" data-fade="${bg.fade ?? 0.62}"></canvas></div>`;
+  }
   const base =
     bg.style === "solid" ? tint :
     bg.style === "split" ? `linear-gradient(180deg, ${theme.wash(tint, bg.pct ?? 16)} 0%, ${theme.wash(tint, 40)} 100%)` :
@@ -51,7 +70,6 @@ function badge(b, tint) {
 // are tuned to real device proportions (~14% of width for iPhone). The frame's
 // `overflow:hidden` guarantees the screenshot is actually clipped to the curve.
 const FRAME = {
-  phone: { pad: 24, radius: 158, island: true },
   pad:   { pad: 30, radius: 92,  island: false },
   mac:   { pad: 0,  radius: 28,  island: false }, // window chrome added separately
   none:  { pad: 0,  radius: 40,  island: false },
@@ -60,26 +78,86 @@ const FRAME = {
 function shot(s, device, tint) {
   if (!s) return "";
   const dw = device.designWidth;
-  const f = FRAME[device.frame] ?? FRAME.phone;
   const w = Math.round(dw * (s.width ?? 0.74));
+  // Phone: the canonical iPhone (registry/device-frames.json), scaled to this width.
+  const k = w / IPHONE_CASE_WIDTH;
+  const f = device.frame === "phone"
+    ? { pad: Math.round(IPHONE.bezel * k), radius: Math.round(IPHONE.outerRadius * k), island: true, bezel: true }
+    : FRAME[device.frame] ?? FRAME.none;
   const screenR = Math.max(0, f.radius - f.pad);
+  const clip = f.bezel
+    ? `-webkit-mask:${PHONE.screen} center/100% 100% no-repeat; mask:${PHONE.screen} center/100% 100% no-repeat;`
+    : `border-radius:${screenR}px;`;
   const screen = s.img
-    ? `<img class="screen" src="${s.img}" alt="" style="border-radius:${screenR}px;">`
-    : placeholderScreen(s.src, tint, device.screenAspect ?? 0.46, screenR);
+    ? `<img class="screen" src="${s.img}" alt="" style="${clip}">`
+    : placeholderScreen(s.src, tint, device.screenAspect ?? 0.46, clip);
   // Real captures already include the device's Dynamic Island/status bar — only
   // draw a synthetic island on the (content-free) placeholder.
-  const island = f.island && !s.img ? `<div class="island"></div>` : "";
+  const c = IPHONE.cutout;
+  const island = f.island && !s.img ? `<div class="island" style="top:${Math.round((IPHONE.bezel + c.top) * k)}px; width:${Math.round(c.width * k)}px; height:${Math.round(c.height * k)}px;"></div>` : "";
   return `
   <div class="shot-zone" style="transform: translateY(${Math.round((s.offsetY ?? 0) * 100)}%);">
-    <div class="frame" style="width:${w}px; padding:${f.pad}px; border-radius:${f.radius}px; transform: rotate(${s.rotate ?? 0}deg);">
-      ${screen}${island}
+    <div class="shot-wrap" style="width:${w}px; transform: rotate(${s.rotate ?? 0}deg);">
+      <div class="frame" style="width:${w}px; padding:${f.pad}px;${f.bezel ? ` background:${PHONE.case} center/100% 100% no-repeat; box-shadow:none; overflow:visible; filter:drop-shadow(0 ${Math.round(20 * k)}px ${Math.round(24 * k)}px rgb(0 0 0 / .28));` : ` border-radius:${f.radius}px;`}">
+        ${screen}${island}
+      </div>
+      ${s.img ? callout(s.callout, { w, pad: f.pad, margin: (dw - w) / 2, tint }) : ""}
     </div>
   </div>`;
 }
 
+// --------------------------------------------------------------- callout
+// Bipe-style callout: a card that repeats an on-screen element's own text,
+// larger, with a curved line down to it and a ring around the element. The
+// element's frame and label come from the scene's .elements.json (render.mjs),
+// so the card can only say what the screen says. Coordinates are in the
+// shot-wrap box (frame width w); the card is placed in the browser after
+// layout (layoutCallouts below) so it never runs off the panel.
+function callout(c, { w, pad, margin, tint }) {
+  if (!c?.frame) return "";
+  const k = (w - 2 * pad) / (c.screenWidth ?? 402);
+  const [x, y, fw, fh] = c.frame;
+  const ex = pad + x * k, ey = pad + y * k, ew = fw * k, eh = fh * k;
+  const text = c.label.split("\n").map((l) => l.trim()).filter(Boolean).join(" · ");
+  const side = c.side ?? "right";
+  const cy = ey + eh / 2 + (c.dy ?? -70) * k;
+  return `
+      <div class="co-ring" style="left:${ex - 10}px; top:${ey - 10}px; width:${ew + 20}px; height:${eh + 20}px; border-color:${tint};"></div>
+      <svg class="co-line" data-co-line width="${w}" height="10" style="color:${tint};"><path fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/><circle r="14" fill="currentColor"/></svg>
+      <div class="co-card" data-callout data-ex="${ex}" data-ew="${ew}" data-top="${ey - 10}" data-bottom="${ey + eh + 10}" data-cy="${cy}" data-side="${side}" data-min="${-margin + 50}" data-max="${w + margin - 50}" style="--tint:${tint}; transform: rotate(${side === "left" ? -1.5 : 1.5}deg);">
+        <span class="co-dot"></span>${esc(text)}
+      </div>`;
+}
+
+// Runs in the page after fonts load (render.mjs calls it): places each card
+// over its anchor, clamped inside the panel, and draws the connector.
+const LAYOUT_CALLOUTS = `window.__layoutCallouts = () => {
+  for (const card of document.querySelectorAll("[data-callout]")) {
+    const d = card.dataset, cy = +d.cy;
+    const cw = card.offsetWidth, ch = card.offsetHeight;
+    // The card sticks out past the phone on its side; the line runs down the
+    // panel margin (outside the screen) and enters the element from the side,
+    // so it never crosses screen content.
+    const left = d.side === "left" ? +d.min : +d.max - cw;
+    card.style.left = left + "px";
+    card.style.top = (cy - ch / 2) + "px";
+    const below = cy > +d.bottom;
+    const sx = d.side === "left" ? left + 44 : left + cw - 44;
+    const sy = below ? cy - ch / 2 : cy + ch / 2;
+    const my = (+d.top + +d.bottom) / 2;
+    const ex = d.side === "left" ? +d.ex - 10 : +d.ex + +d.ew + 10;
+    const r = Math.min(60, Math.abs(my - sy) / 2), dir = ex > sx ? 1 : -1, vy = my > sy ? 1 : -1;
+    const svg = card.parentElement.querySelector("[data-co-line]");
+    svg.style.top = "0px"; svg.setAttribute("height", String(Math.max(my, sy) + 40));
+    svg.querySelector("path").setAttribute("d",
+      "M" + sx + " " + sy + " L" + sx + " " + (my - vy * r) + " Q" + sx + " " + my + " " + (sx + dir * r) + " " + my + " L" + ex + " " + my);
+    const dot = svg.querySelector("circle"); dot.setAttribute("cx", ex); dot.setAttribute("cy", my);
+  }
+};`;
+
 // Quiet, honest placeholder — neutral screen with the expected capture name.
-function placeholderScreen(src, tint, aspect, radius = 0) {
-  return `<div class="screen ph" style="background:${theme.paper}; aspect-ratio:${aspect}; border-radius:${radius}px;">
+function placeholderScreen(src, tint, aspect, clip = "") {
+  return `<div class="screen ph" style="background:${theme.paper}; aspect-ratio:${aspect}; ${clip}">
     <div class="ph-center">
       <svg viewBox="0 0 24 24" width="120" height="120" style="color:${tint};opacity:.5">
         <rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="1.4"/>
@@ -160,15 +238,25 @@ html,body { width:${device.width}px; height:${device.height}px; overflow:hidden;
 .badge { display:inline-block; font:600 34px/1 ${theme.fonts.mono}; letter-spacing:.14em;
   padding:18px 34px; border:3px solid; border-radius:${theme.radius.badge}px; margin-bottom:44px; }
 h1 { font-family:${theme.fonts.display}; font-weight:600; font-size:${panel.headlineSize ?? 168}px;
-  line-height:1.06; letter-spacing:-0.01em; text-wrap:balance; }
-h1 em { font-style:italic; color:${tint}; }
-.sub { font-size:62px; line-height:1.32; color:color-mix(in oklab, ${theme.ink} 64%, transparent);
+  line-height:1.06; letter-spacing:-0.025em; text-wrap:balance; }
+h1 em { font-style:normal; color:${tint}; }
+${panel.background?.fill ? `h1, h1 em { color:#fff; } h1 { font-weight:700; text-shadow:0 2px 24px rgb(0 0 0 / 0.12); }
+.co-line { filter: drop-shadow(0 0 4px rgb(0 0 0 / 0.35)); }` : ""}
+.bg-wash { position:absolute; inset:0; width:100%; height:100%; }
+.sub { font-size:62px; line-height:1.32; color:${theme.inkSecondary};
   margin-top:44px; max-width:1080px; }
 .frame { position:relative; background:#0b0b0c; box-shadow:${theme.shadow.device}; overflow:hidden; }
+.shot-wrap { position:relative; }
+.co-ring { position:absolute; border:6px solid; border-radius:28px; background:color-mix(in oklab, currentColor 0%, transparent); }
+.co-line { position:absolute; left:0; overflow:visible; pointer-events:none; }
+.co-card { position:absolute; white-space:nowrap; display:flex; align-items:center; gap:24px;
+  padding:34px 48px; background:${theme.white}; border-radius:44px; box-shadow:${theme.shadow.card};
+  font:600 54px/1.1 ${theme.fonts.ui}; color:${theme.ink}; }
+.co-dot { width:26px; height:26px; border-radius:50%; background:var(--tint); flex:none; }
 .screen { display:block; width:100%; }
 img.screen { height:auto; }
-.island { position:absolute; top:50px; left:50%; transform:translateX(-50%);
-  width:268px; height:80px; background:#000; border-radius:999px; }
+.island { position:absolute; left:50%; transform:translateX(-50%);
+  background:#000; border-radius:999px; }
 .ph { position:relative; }
 .ph-center { position:absolute; inset:0; display:flex; flex-direction:column;
   align-items:center; justify-content:center; gap:40px; }
@@ -248,8 +336,32 @@ function landscape(panel, device, tint) {
 }
 
 // ---------------------------------------------------------------- the panel
-export function renderPanelHTML(panel, device, { fontFace = "", appearance = "light" } = {}) {
+// Draws each texture canvas with the app's header-wash code (washCode defines
+// drawHeaderWash). The texture is drawn in points: App Store pixels are 3x, so
+// the pattern has the same density as on a phone. drawHeaderWash caps the
+// pixel ratio at 2, so it gets a stand-in canvas that reports the point size
+// and a context that keeps the 3x transform.
+const WASH_SCRIPT = (washCode) => `
+${washCode}
+document.querySelectorAll("canvas.bg-wash").forEach((real) => {
+  const r = real.getBoundingClientRect(), S = 3;
+  real.width = Math.round(r.width); real.height = Math.round(r.height);
+  const ctx = real.getContext("2d");
+  const proxy = new Proxy(ctx, { get(t, p) {
+    if (p === "setTransform") return () => t.setTransform(S, 0, 0, S, 0, 0);
+    const v = t[p]; return typeof v === "function" ? v.bind(t) : v; },
+    set(t, p, v) { t[p] = v; return true; } });
+  const w = r.width / S, h = r.height / S, d = real.dataset;
+  const stand = { getContext: () => proxy, getBoundingClientRect: () => ({ width: w, height: h }),
+    get width() { return Math.round(w * 2); }, set width(_) {}, get height() { return Math.round(h * 2); }, set height(_) {} };
+  drawHeaderWash(stand, { texture: d.texture, accentHex: d.accent, isDark: d.dark === "1",
+    intensity: Number(d.intensity), seed: Number(d.seed), fadeHeight: h * Number(d.fade) });
+});`;
+
+export function renderPanelHTML(panel, device, { fontFace = "", appearance = "light", washCode = null } = {}) {
   const tint = panel.background?.tint ?? theme.accent;
+  if (panel.background?.style === "texture" && !washCode) throw new Error(`${panel.id}: texture background needs the header-wash code (render.mjs)`);
   const body = device.landscape ? landscape(panel, device, tint) : portrait(panel, device, tint);
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${css(panel, device, tint, fontFace)}</style></head><body>${body}</body></html>`;
+  const wash = washCode ? `<script>${WASH_SCRIPT(washCode)}</script>` : "";
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${css(panel, device, tint, fontFace)}</style></head><body>${body}${wash}<script>${LAYOUT_CALLOUTS}</script></body></html>`;
 }

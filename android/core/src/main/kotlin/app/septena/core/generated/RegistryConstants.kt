@@ -1,0 +1,2132 @@
+// GENERATED FILE — DO NOT EDIT BY HAND.
+// Sources: registry/*.json, registry/conformance/*.json
+// Regenerate: node scripts/gen-registries.mjs
+package app.septena.core.generated
+
+/** Registry-backed wire constraints shared by every client. */
+object RegistryEntityPatterns {
+    const val id: String = "^[A-Za-z0-9._:-]{1,128}\$"
+    const val clientOpId: String = "^[A-Za-z0-9_-]{8,64}\$"
+    const val day: String = "^\\d{4}-\\d{2}-\\d{2}\$"
+    const val time24: String = "^([01]\\d|2[0-3]):[0-5]\\d\$"
+    const val stamp: String = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}"
+    val all: Map<String, String> = linkedMapOf(
+        "id" to id,
+        "clientOpId" to clientOpId,
+        "day" to day,
+        "time24" to time24,
+        "stamp" to stamp,
+    )
+}
+
+/** Limits and enum values come directly from `registry/entities.json`. */
+object RegistryEntityLimits {
+    const val TEXT_MAX: Long = 2000L
+    const val NOTES_MAX: Long = 100000L
+    const val ATTACHMENT_POINTER_MAX: Long = 4000L
+    const val STAMP_MAX: Long = 40L
+    const val MAX_ATTACHMENT_BYTES: Long = 26214400L
+    const val MAX_USER_ATTACHMENT_BYTES: Long = 2147483648L
+    const val MAX_OPS_PER_PUSH: Long = 500L
+    const val MAX_PULL: Long = 1000L
+    const val MAX_CHECKLIST_ITEMS_PER_TASK: Long = 200L
+    const val MAX_TAGS_PER_TASK: Long = 20L
+    const val TAG_NAME_MAX: Long = 64L
+    const val MAX_SUBTASKS: Long = 500L
+    const val MAX_ARTIFACT_REFS: Long = 100L
+    const val TURN_PROVIDER_MAX: Long = 32L
+    const val TURN_QUESTION_MAX: Long = 10000L
+    const val TURN_OPTION_MAX: Long = 500L
+    const val TURN_MAX_OPTIONS: Long = 20L
+    const val TURN_CHOSEN_MAX: Long = 500L
+    const val TURN_OTHER_TEXT_MAX: Long = 10000L
+    const val TURN_NOTE_MAX: Long = 100000L
+    val all: Map<String, Long> = linkedMapOf(
+        "textMax" to TEXT_MAX,
+        "notesMax" to NOTES_MAX,
+        "attachmentPointerMax" to ATTACHMENT_POINTER_MAX,
+        "stampMax" to STAMP_MAX,
+        "maxAttachmentBytes" to MAX_ATTACHMENT_BYTES,
+        "maxUserAttachmentBytes" to MAX_USER_ATTACHMENT_BYTES,
+        "maxOpsPerPush" to MAX_OPS_PER_PUSH,
+        "maxPull" to MAX_PULL,
+        "maxChecklistItemsPerTask" to MAX_CHECKLIST_ITEMS_PER_TASK,
+        "maxTagsPerTask" to MAX_TAGS_PER_TASK,
+        "tagNameMax" to TAG_NAME_MAX,
+        "maxSubtasks" to MAX_SUBTASKS,
+        "maxArtifactRefs" to MAX_ARTIFACT_REFS,
+        "turnProviderMax" to TURN_PROVIDER_MAX,
+        "turnQuestionMax" to TURN_QUESTION_MAX,
+        "turnOptionMax" to TURN_OPTION_MAX,
+        "turnMaxOptions" to TURN_MAX_OPTIONS,
+        "turnChosenMax" to TURN_CHOSEN_MAX,
+        "turnOtherTextMax" to TURN_OTHER_TEXT_MAX,
+        "turnNoteMax" to TURN_NOTE_MAX,
+    )
+}
+
+object RegistryEntityEnums {
+    val all: Map<String, List<String>> = linkedMapOf(
+        "taskStatus" to listOf("open", "done", "cancelled"),
+        "taskSource" to listOf("app", "mcp"),
+        "projectStatus" to listOf("active", "done", "cancelled"),
+        "taskKind" to listOf("heading"),
+        "recurrenceUnit" to listOf("day", "week", "month", "year"),
+        "reminderMode" to listOf("floating", "fixed"),
+        "convoAssignee" to listOf("me", "local", "claude"),
+        "convoEndState" to listOf("agent_done", "human_done", "agent_assisted_done", "needs_verify", "decomposed", "reminder_set", "promoted_to_today", "wont_do", "open"),
+        "convoHandoffActionType" to listOf("open_url", "compose", "call", "none"),
+        "convoTurnRole" to listOf("user", "provider"),
+        "convoTurnStep" to listOf("confirm", "ground", "scope", "decide", "work"),
+        "telemetryLevel" to listOf("none", "minimal", "balanced", "full"),
+        "appearanceMode" to listOf("system", "light", "dark"),
+        "accentColor" to listOf("colorful", "tamarillo", "persimmon", "yuzu", "carambola", "acai", "pitaya", "jabuticaba"),
+        "appIconFinish" to listOf("obsidian", "ceramic", "framed", "stealth"),
+        "appIconColor" to listOf("auto", "persimmon", "haskap", "tamarillo", "yuzu", "carambola", "acai", "pitaya", "mono"),
+        "canvasTexture" to listOf("none", "topography", "fieldMatrix", "stippleDrift", "causticGlass", "ridges", "washiPaper"),
+        "textureMotion" to listOf("still", "slowDrift"),
+    )
+    object TaskStatus {
+        const val OPEN: String = "open"
+        const val DONE: String = "done"
+        const val CANCELLED: String = "cancelled"
+    }
+    object TaskSource {
+        const val APP: String = "app"
+        const val MCP: String = "mcp"
+    }
+    object ProjectStatus {
+        const val ACTIVE: String = "active"
+        const val DONE: String = "done"
+        const val CANCELLED: String = "cancelled"
+    }
+    object TaskKind {
+        const val HEADING: String = "heading"
+    }
+    object RecurrenceUnit {
+        const val DAY: String = "day"
+        const val WEEK: String = "week"
+        const val MONTH: String = "month"
+        const val YEAR: String = "year"
+    }
+    object ReminderMode {
+        const val FLOATING: String = "floating"
+        const val FIXED: String = "fixed"
+    }
+    object ConvoAssignee {
+        const val ME: String = "me"
+        const val LOCAL: String = "local"
+        const val CLAUDE: String = "claude"
+    }
+    object ConvoEndState {
+        const val AGENT_DONE: String = "agent_done"
+        const val HUMAN_DONE: String = "human_done"
+        const val AGENT_ASSISTED_DONE: String = "agent_assisted_done"
+        const val NEEDS_VERIFY: String = "needs_verify"
+        const val DECOMPOSED: String = "decomposed"
+        const val REMINDER_SET: String = "reminder_set"
+        const val PROMOTED_TO_TODAY: String = "promoted_to_today"
+        const val WONT_DO: String = "wont_do"
+        const val OPEN: String = "open"
+    }
+    object ConvoHandoffActionType {
+        const val OPEN_URL: String = "open_url"
+        const val COMPOSE: String = "compose"
+        const val CALL: String = "call"
+        const val NONE: String = "none"
+    }
+    object ConvoTurnRole {
+        const val USER: String = "user"
+        const val PROVIDER: String = "provider"
+    }
+    object ConvoTurnStep {
+        const val CONFIRM: String = "confirm"
+        const val GROUND: String = "ground"
+        const val SCOPE: String = "scope"
+        const val DECIDE: String = "decide"
+        const val WORK: String = "work"
+    }
+    object TelemetryLevel {
+        const val NONE: String = "none"
+        const val MINIMAL: String = "minimal"
+        const val BALANCED: String = "balanced"
+        const val FULL: String = "full"
+    }
+    object AppearanceMode {
+        const val SYSTEM: String = "system"
+        const val LIGHT: String = "light"
+        const val DARK: String = "dark"
+    }
+    object AccentColor {
+        const val COLORFUL: String = "colorful"
+        const val TAMARILLO: String = "tamarillo"
+        const val PERSIMMON: String = "persimmon"
+        const val YUZU: String = "yuzu"
+        const val CARAMBOLA: String = "carambola"
+        const val ACAI: String = "acai"
+        const val PITAYA: String = "pitaya"
+        const val JABUTICABA: String = "jabuticaba"
+    }
+    object AppIconFinish {
+        const val OBSIDIAN: String = "obsidian"
+        const val CERAMIC: String = "ceramic"
+        const val FRAMED: String = "framed"
+        const val STEALTH: String = "stealth"
+    }
+    object AppIconColor {
+        const val AUTO: String = "auto"
+        const val PERSIMMON: String = "persimmon"
+        const val HASKAP: String = "haskap"
+        const val TAMARILLO: String = "tamarillo"
+        const val YUZU: String = "yuzu"
+        const val CARAMBOLA: String = "carambola"
+        const val ACAI: String = "acai"
+        const val PITAYA: String = "pitaya"
+        const val MONO: String = "mono"
+    }
+    object CanvasTexture {
+        const val NONE: String = "none"
+        const val TOPOGRAPHY: String = "topography"
+        const val FIELD_MATRIX: String = "fieldMatrix"
+        const val STIPPLE_DRIFT: String = "stippleDrift"
+        const val CAUSTIC_GLASS: String = "causticGlass"
+        const val RIDGES: String = "ridges"
+        const val WASHI_PAPER: String = "washiPaper"
+    }
+    object TextureMotion {
+        const val STILL: String = "still"
+        const val SLOW_DRIFT: String = "slowDrift"
+    }
+}
+
+/** Canonical turn field keys shared with the backend. */
+object RegistryTurnFields {
+    val all: Set<String> = linkedSetOf("role", "step", "provider", "confidence", "question", "options", "chosen", "otherText", "inReplyTo", "note", "ts")
+}
+
+data class RegistryColumnSpec(
+    val kind: String,
+    val format: String?,
+    val enumName: String?,
+    val nullable: Boolean?,
+    val min: Double?,
+    val max: Long?,
+    val maxJsonLength: Long?,
+    val defaultJson: String?,
+    val serverOwned: Boolean,
+)
+
+data class RegistryEntitySpec(
+    val table: String,
+    val deletable: Boolean,
+    val requiredOnInsert: Set<String>,
+    val updatable: Set<String>?,
+    val columns: Map<String, RegistryColumnSpec>,
+)
+
+/** Full entity and field contract generated from the canonical registry. */
+object RegistryEntities {
+    val all: Map<String, RegistryEntitySpec> = linkedMapOf(
+        "task" to RegistryEntitySpec(
+            table = "tasks",
+            deletable = true,
+            requiredOnInsert = setOf("title", "status"),
+            updatable = null,
+            columns = linkedMapOf(
+                "title" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 2000L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "status" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 32L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "kind" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 32L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "heading" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "id",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "area" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "id",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "project" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "id",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "created" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "day",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "scheduled" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "day",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "startTime" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "time24",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 5L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "durationMinutes" to RegistryColumnSpec(
+                    kind = "int",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = 5.0,
+                    max = 1440L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "timeZone" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 64L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "deadline" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "day",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "today" to RegistryColumnSpec(
+                    kind = "bool",
+                    format = null,
+                    enumName = null,
+                    nullable = null,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = "0",
+                    serverOwned = false,
+                ),
+                "starred" to RegistryColumnSpec(
+                    kind = "bool",
+                    format = null,
+                    enumName = null,
+                    nullable = null,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = "0",
+                    serverOwned = false,
+                ),
+                "tags" to RegistryColumnSpec(
+                    kind = "json",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = 4000L,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "todaySetOn" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "day",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "completedAt" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "stamp",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 40L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "notes" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 100000L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "position" to RegistryColumnSpec(
+                    kind = "real",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "todayPosition" to RegistryColumnSpec(
+                    kind = "real",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "recurrenceUnit" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 16L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "recurrenceInterval" to RegistryColumnSpec(
+                    kind = "int",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "recurrenceAfterCompletion" to RegistryColumnSpec(
+                    kind = "bool",
+                    format = null,
+                    enumName = null,
+                    nullable = null,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = "0",
+                    serverOwned = false,
+                ),
+                "recurrencePaused" to RegistryColumnSpec(
+                    kind = "bool",
+                    format = null,
+                    enumName = null,
+                    nullable = null,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = "0",
+                    serverOwned = false,
+                ),
+                "recurrenceSeriesID" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 128L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "recurrenceAnchorDate" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "day",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "recurrenceWeekdays" to RegistryColumnSpec(
+                    kind = "json",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "recurrenceMonthDay" to RegistryColumnSpec(
+                    kind = "int",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = -1.0,
+                    max = 31L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "recurrenceOrdinalWeekday" to RegistryColumnSpec(
+                    kind = "json",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "reminderAt" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 32L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "reminderMode" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = "reminderMode",
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "reminderSnoozedUntil" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "stamp",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 40L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "reminderDismissedAt" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "stamp",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 40L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "source" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 64L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "sourceClient" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 64L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "acknowledgedAt" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "stamp",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 40L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "createdAt" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "stamp",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 40L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+            ),
+        ),
+        "area" to RegistryEntitySpec(
+            table = "areas",
+            deletable = true,
+            requiredOnInsert = setOf("title"),
+            updatable = null,
+            columns = linkedMapOf(
+                "title" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 2000L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "context" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 100000L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "noteRev" to RegistryColumnSpec(
+                    kind = "int",
+                    format = null,
+                    enumName = null,
+                    nullable = null,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = true,
+                ),
+                "notesProposal" to RegistryColumnSpec(
+                    kind = "json",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = 101000L,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "emoji" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 16L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "attachment" to RegistryColumnSpec(
+                    kind = "json",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = 4000L,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "position" to RegistryColumnSpec(
+                    kind = "int",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+            ),
+        ),
+        "project" to RegistryEntitySpec(
+            table = "projects",
+            deletable = true,
+            requiredOnInsert = setOf("title", "status"),
+            updatable = null,
+            columns = linkedMapOf(
+                "title" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 2000L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "status" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 32L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "area" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "id",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "created" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "day",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "completedAt" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "stamp",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 40L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "notes" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 100000L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "context" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 100000L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "noteRev" to RegistryColumnSpec(
+                    kind = "int",
+                    format = null,
+                    enumName = null,
+                    nullable = null,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = true,
+                ),
+                "notesProposal" to RegistryColumnSpec(
+                    kind = "json",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = 101000L,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "githubRepo" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 200L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "attachment" to RegistryColumnSpec(
+                    kind = "json",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = 4000L,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "position" to RegistryColumnSpec(
+                    kind = "int",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+            ),
+        ),
+        "attachment" to RegistryEntitySpec(
+            table = "attachments",
+            deletable = true,
+            requiredOnInsert = setOf("taskId", "filename", "contentType", "byteCount"),
+            updatable = setOf("filename", "position"),
+            columns = linkedMapOf(
+                "taskId" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "id",
+                    enumName = null,
+                    nullable = false,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "filename" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 512L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "contentType" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 200L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "byteCount" to RegistryColumnSpec(
+                    kind = "int",
+                    format = null,
+                    enumName = null,
+                    nullable = false,
+                    min = 0.0,
+                    max = 26214400L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "position" to RegistryColumnSpec(
+                    kind = "real",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "createdAt" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "stamp",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 40L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "uploadedAt" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = null,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = true,
+                ),
+            ),
+        ),
+        "checklistItem" to RegistryEntitySpec(
+            table = "checklist_items",
+            deletable = true,
+            requiredOnInsert = setOf("taskId", "title"),
+            updatable = setOf("title", "checked", "checkedAt", "position"),
+            columns = linkedMapOf(
+                "taskId" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "id",
+                    enumName = null,
+                    nullable = false,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "title" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = false,
+                    min = null,
+                    max = 2000L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "checked" to RegistryColumnSpec(
+                    kind = "bool",
+                    format = null,
+                    enumName = null,
+                    nullable = null,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = "0",
+                    serverOwned = false,
+                ),
+                "checkedAt" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "stamp",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 40L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "position" to RegistryColumnSpec(
+                    kind = "real",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "createdAt" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "stamp",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 40L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+            ),
+        ),
+        "tag" to RegistryEntitySpec(
+            table = "tags",
+            deletable = true,
+            requiredOnInsert = setOf("name"),
+            updatable = setOf("name", "color", "position"),
+            columns = linkedMapOf(
+                "name" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = false,
+                    min = null,
+                    max = 64L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "color" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 32L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "position" to RegistryColumnSpec(
+                    kind = "int",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+            ),
+        ),
+        "convo" to RegistryEntitySpec(
+            table = "convos",
+            deletable = false,
+            requiredOnInsert = setOf(),
+            updatable = null,
+            columns = linkedMapOf(
+                "confirmedIntent" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 100000L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "acceptance" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 100000L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "subtasks" to RegistryColumnSpec(
+                    kind = "json",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "artifact" to RegistryColumnSpec(
+                    kind = "json",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "handoff" to RegistryColumnSpec(
+                    kind = "json",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "endState" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 32L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "endStateNote" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 100000L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "assignee" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = "convoAssignee",
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "stoppedAt" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "stamp",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 40L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "claimedBy" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = null,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = true,
+                ),
+                "claimUntil" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = null,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = true,
+                ),
+                "runsSinceUser" to RegistryColumnSpec(
+                    kind = "int",
+                    format = null,
+                    enumName = null,
+                    nullable = null,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = true,
+                ),
+            ),
+        ),
+        "setting" to RegistryEntitySpec(
+            table = "settings",
+            deletable = false,
+            requiredOnInsert = setOf(),
+            updatable = null,
+            columns = linkedMapOf(
+                "value" to RegistryColumnSpec(
+                    kind = "json",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+            ),
+        ),
+    )
+    val names: List<String> = listOf("task", "area", "project", "attachment", "checklistItem", "tag", "convo", "setting")
+    val deletableNames: Set<String> = setOf("task", "area", "project", "attachment", "checklistItem", "tag")
+}
+
+/** Generated field keys prevent each client from maintaining its own wire spelling. */
+object RegistryEntityFields {
+    object Task {
+        const val TITLE: String = "title"
+        const val STATUS: String = "status"
+        const val KIND: String = "kind"
+        const val HEADING: String = "heading"
+        const val AREA: String = "area"
+        const val PROJECT: String = "project"
+        const val CREATED: String = "created"
+        const val SCHEDULED: String = "scheduled"
+        const val START_TIME: String = "startTime"
+        const val DURATION_MINUTES: String = "durationMinutes"
+        const val TIME_ZONE: String = "timeZone"
+        const val DEADLINE: String = "deadline"
+        const val TODAY: String = "today"
+        const val STARRED: String = "starred"
+        const val TAGS: String = "tags"
+        const val TODAY_SET_ON: String = "todaySetOn"
+        const val COMPLETED_AT: String = "completedAt"
+        const val NOTES: String = "notes"
+        const val POSITION: String = "position"
+        const val TODAY_POSITION: String = "todayPosition"
+        const val RECURRENCE_UNIT: String = "recurrenceUnit"
+        const val RECURRENCE_INTERVAL: String = "recurrenceInterval"
+        const val RECURRENCE_AFTER_COMPLETION: String = "recurrenceAfterCompletion"
+        const val RECURRENCE_PAUSED: String = "recurrencePaused"
+        const val RECURRENCE_SERIES_ID: String = "recurrenceSeriesID"
+        const val RECURRENCE_ANCHOR_DATE: String = "recurrenceAnchorDate"
+        const val RECURRENCE_WEEKDAYS: String = "recurrenceWeekdays"
+        const val RECURRENCE_MONTH_DAY: String = "recurrenceMonthDay"
+        const val RECURRENCE_ORDINAL_WEEKDAY: String = "recurrenceOrdinalWeekday"
+        const val REMINDER_AT: String = "reminderAt"
+        const val REMINDER_MODE: String = "reminderMode"
+        const val REMINDER_SNOOZED_UNTIL: String = "reminderSnoozedUntil"
+        const val REMINDER_DISMISSED_AT: String = "reminderDismissedAt"
+        const val SOURCE: String = "source"
+        const val SOURCE_CLIENT: String = "sourceClient"
+        const val ACKNOWLEDGED_AT: String = "acknowledgedAt"
+        const val CREATED_AT: String = "createdAt"
+    }
+    object Area {
+        const val TITLE: String = "title"
+        const val CONTEXT: String = "context"
+        const val NOTE_REV: String = "noteRev"
+        const val NOTES_PROPOSAL: String = "notesProposal"
+        const val EMOJI: String = "emoji"
+        const val ATTACHMENT: String = "attachment"
+        const val POSITION: String = "position"
+    }
+    object Project {
+        const val TITLE: String = "title"
+        const val STATUS: String = "status"
+        const val AREA: String = "area"
+        const val CREATED: String = "created"
+        const val COMPLETED_AT: String = "completedAt"
+        const val NOTES: String = "notes"
+        const val CONTEXT: String = "context"
+        const val NOTE_REV: String = "noteRev"
+        const val NOTES_PROPOSAL: String = "notesProposal"
+        const val GITHUB_REPO: String = "githubRepo"
+        const val ATTACHMENT: String = "attachment"
+        const val POSITION: String = "position"
+    }
+    object Attachment {
+        const val TASK_ID: String = "taskId"
+        const val FILENAME: String = "filename"
+        const val CONTENT_TYPE: String = "contentType"
+        const val BYTE_COUNT: String = "byteCount"
+        const val POSITION: String = "position"
+        const val CREATED_AT: String = "createdAt"
+        const val UPLOADED_AT: String = "uploadedAt"
+    }
+    object ChecklistItem {
+        const val TASK_ID: String = "taskId"
+        const val TITLE: String = "title"
+        const val CHECKED: String = "checked"
+        const val CHECKED_AT: String = "checkedAt"
+        const val POSITION: String = "position"
+        const val CREATED_AT: String = "createdAt"
+    }
+    object Tag {
+        const val NAME: String = "name"
+        const val COLOR: String = "color"
+        const val POSITION: String = "position"
+    }
+    object Convo {
+        const val CONFIRMED_INTENT: String = "confirmedIntent"
+        const val ACCEPTANCE: String = "acceptance"
+        const val SUBTASKS: String = "subtasks"
+        const val ARTIFACT: String = "artifact"
+        const val HANDOFF: String = "handoff"
+        const val END_STATE: String = "endState"
+        const val END_STATE_NOTE: String = "endStateNote"
+        const val ASSIGNEE: String = "assignee"
+        const val STOPPED_AT: String = "stoppedAt"
+        const val CLAIMED_BY: String = "claimedBy"
+        const val CLAIM_UNTIL: String = "claimUntil"
+        const val RUNS_SINCE_USER: String = "runsSinceUser"
+    }
+    object Setting {
+        const val VALUE: String = "value"
+    }
+}
+
+object RegistryEntityNames {
+    const val TASK: String = "task"
+    const val AREA: String = "area"
+    const val PROJECT: String = "project"
+    const val ATTACHMENT: String = "attachment"
+    const val CHECKLIST_ITEM: String = "checklistItem"
+    const val TAG: String = "tag"
+    const val CONVO: String = "convo"
+    const val SETTING: String = "setting"
+    val all: List<String> = listOf("task", "area", "project", "attachment", "checklistItem", "tag", "convo", "setting")
+    val deletable: Set<String> = setOf("task", "area", "project", "attachment", "checklistItem", "tag")
+}
+
+/** Numeric domain constants shared with the backend and Apple clients. */
+object RegistryRules {
+    const val CUE_DECAY_DAYS: Long = 7L
+    const val FADE_WINDOW_DAYS: Long = 14L
+    const val FADE_GRACE_DAYS: Long = 1L
+    const val FADE_MIN_OPACITY: Double = 0.55
+    const val FADE_SWEEP_WEEKDAY: Long = 1L
+    const val RECENTLY_DELETED_DAYS: Long = 30L
+    const val UPCOMING_CALENDAR_DAYS: Long = 30L
+    const val TOAST_DURATION_SECONDS: Long = 7L
+    const val AGENT_RUN_BUDGET: Long = 5L
+    const val CLAIM_TTL_DEFAULT_SECONDS: Long = 1800L
+    const val CLAIM_TTL_MAX_SECONDS: Long = 14400L
+    const val TOMBSTONE_TTL_DAYS: Long = 90L
+    const val CLIENT_OP_TTL_DAYS: Long = 30L
+    const val CHANGE_LOG_TTL_DAYS: Long = 365L
+    const val DELETE_GRACE_SECONDS: Long = 120L
+}
+
+/** Stable IDs generated from the canonical registry: RegistrySettingKeys. */
+object RegistrySettingKeys {
+    const val WELCOME_NAME: String = "welcomeName"
+    const val TELEMETRY_LEVEL: String = "telemetryLevel"
+    const val CALENDAR_HIDDEN_TITLES: String = "calendarHiddenTitles"
+    const val ROLLED_IN_DISMISSED_ON: String = "rolledInDismissedOn"
+    const val HOME_TIMEZONE: String = "homeTimezone"
+    const val AGENTS_PAUSED: String = "agentsPaused"
+    const val GET_STARTED_DISMISSED: String = "getStartedDismissed"
+    const val GET_STARTED_STEPS: String = "getStartedSteps"
+    const val ONBOARDED_AT: String = "onboardedAt"
+    const val ACCENT_COLOR: String = "accentColor"
+    const val CANVAS_TEXTURE: String = "canvasTexture"
+    const val TEXTURE_INTENSITY: String = "textureIntensity"
+    const val TEXTURE_MOTION: String = "textureMotion"
+    const val SMART_LIST_ORDER: String = "smartListOrder"
+    const val SMART_LIST_HIDDEN: String = "smartListHidden"
+    const val APPEARANCE_MODE: String = "appearanceMode"
+    const val SYNC_THEME: String = "syncTheme"
+    const val APP_ICON_FINISH: String = "appIconFinish"
+    const val APP_ICON_COLOR: String = "appIconColor"
+    const val TODAY_SHOW_COMPLETED: String = "todayShowCompleted"
+    const val TODAY_GROUP_BY_LIST: String = "todayGroupByList"
+    const val TASKS_SHOW_AGING: String = "tasksShowAging"
+    const val TASKS_SHOW_FADED: String = "tasksShowFaded"
+    const val TASKS_TITLE_LINES: String = "tasksTitleLines"
+    const val TASKS_SWIPE_LEADING_ACTION: String = "tasksSwipeLeadingAction"
+    const val TASKS_FILING_SUGGESTIONS: String = "tasksFilingSuggestions"
+    const val TASKS_SHOW_CALENDAR_EVENTS: String = "tasksShowCalendarEvents"
+    const val BADGE_SHOW_OVERDUE: String = "badgeShowOverdue"
+    const val LOGGING_ANIMATIONS_ENABLED: String = "loggingAnimationsEnabled"
+    const val TEXT_SIZE_STEP: String = "textSizeStep"
+    const val SIDEBAR_COUNTS: String = "sidebarCounts"
+    const val AI_MODE: String = "aiMode"
+    const val DIAGNOSTICS_ENABLED: String = "diagnosticsEnabled"
+    const val SHOW_MODEL_LABELS: String = "showModelLabels"
+    const val PCC_ROUTING_ENABLED: String = "pccRoutingEnabled"
+    const val PCC_REASONING: String = "pccReasoning"
+}
+
+/** Stable IDs generated from the canonical registry: RegistryDestinationIds. */
+object RegistryDestinationIds {
+    const val INBOX: String = "inbox"
+    const val TODAY: String = "today"
+    const val REVIEW: String = "review"
+    const val AGENT: String = "agent"
+    const val UPCOMING: String = "upcoming"
+    const val REPEATING: String = "repeating"
+    const val ANYTIME: String = "anytime"
+    const val LOGBOOK: String = "logbook"
+    const val STARRED: String = "starred"
+    const val FADED: String = "faded"
+    const val RECENTLY_DELETED: String = "recentlyDeleted"
+}
+
+/** Stable IDs generated from the canonical registry: RegistryActionIds. */
+object RegistryActionIds {
+    const val TASK_EDIT_DETAILS: String = "task.editDetails"
+    const val TASK_TOGGLE_INFO: String = "task.toggleInfo"
+    const val TASK_COPY: String = "task.copy"
+    const val TASK_DUPLICATE: String = "task.duplicate"
+    const val TASK_TOGGLE_COMPLETE: String = "task.toggleComplete"
+    const val TASK_CANCEL: String = "task.cancel"
+    const val TASK_TOGGLE_TODAY: String = "task.toggleToday"
+    const val TASK_TOGGLE_STAR: String = "task.toggleStar"
+    const val TASK_TAGS: String = "task.tags"
+    const val TASK_ADD_CHECKLIST_ITEM: String = "task.addChecklistItem"
+    const val TASK_WHEN: String = "task.when"
+    const val TASK_DEADLINE: String = "task.deadline"
+    const val TASK_REMINDER: String = "task.reminder"
+    const val TASK_MOVE: String = "task.move"
+    const val TASK_MOVE_SUGGESTED: String = "task.moveSuggested"
+    const val TASK_CLEAR_SCHEDULE: String = "task.clearSchedule"
+    const val TASK_REPEAT: String = "task.repeat"
+    const val TASK_PAUSE_RESUME_REPEAT: String = "task.pauseResumeRepeat"
+    const val TASK_CREATE_NEXT_COPY: String = "task.createNextCopy"
+    const val TASK_DELETE: String = "task.delete"
+    const val TASK_RESTORE: String = "task.restore"
+    const val TASK_DELETE_PERMANENTLY: String = "task.deletePermanently"
+    const val TASK_KEEP_FADED: String = "task.keepFaded"
+    const val TASK_LET_GO_FADED: String = "task.letGoFaded"
+    const val AREA_NEW_PROJECT: String = "area.newProject"
+    const val AREA_RENAME: String = "area.rename"
+    const val AREA_MOVE_UP: String = "area.moveUp"
+    const val AREA_MOVE_DOWN: String = "area.moveDown"
+    const val AREA_DELETE: String = "area.delete"
+    const val PROJECT_RENAME: String = "project.rename"
+    const val PROJECT_MOVE_UP: String = "project.moveUp"
+    const val PROJECT_MOVE_DOWN: String = "project.moveDown"
+    const val PROJECT_MARK_DONE: String = "project.markDone"
+    const val PROJECT_CANCEL: String = "project.cancel"
+    const val PROJECT_DELETE: String = "project.delete"
+    const val LOGGED_CLEAR: String = "logged.clear"
+    const val SIDEBAR_NEW_AREA: String = "sidebar.newArea"
+    const val SIDEBAR_NEW_PROJECT: String = "sidebar.newProject"
+    const val SECTION_NEW: String = "section.new"
+    const val SECTION_NEW_TASK: String = "section.newTask"
+    const val SECTION_RENAME: String = "section.rename"
+    const val SECTION_DELETE: String = "section.delete"
+    const val NOTICE_OPEN_STEP: String = "notice.openStep"
+    const val NOTICE_TOGGLE_STEP: String = "notice.toggleStep"
+    const val NOTICE_HIDE_GET_STARTED: String = "notice.hideGetStarted"
+    const val APP_NEW_TASK: String = "app.newTask"
+    const val APP_QUICK_ADD: String = "app.quickAdd"
+    const val APP_QUICK_ENTRY: String = "app.quickEntry"
+    const val APP_QUICK_FIND: String = "app.quickFind"
+    const val APP_TOGGLE_SIDEBAR: String = "app.toggleSidebar"
+    const val APP_SETTINGS: String = "app.settings"
+    const val APP_KEYBOARD_SHORTCUTS: String = "app.keyboardShortcuts"
+    const val APP_TOGGLE_SIDEBAR_COUNTS: String = "app.toggleSidebarCounts"
+    const val APP_TEXT_SIZE_INCREASE: String = "app.textSizeIncrease"
+    const val APP_TEXT_SIZE_DECREASE: String = "app.textSizeDecrease"
+    const val APP_TEXT_SIZE_RESET: String = "app.textSizeReset"
+    const val APP_SEPTENA_WINDOW: String = "app.septenaWindow"
+    const val APP_CLASSIC_WINDOW: String = "app.classicWindow"
+}
+
+/** Stable IDs generated from the canonical registry: RegistryCapabilityIds. */
+object RegistryCapabilityIds {
+    const val LISTS_INBOX: String = "lists.inbox"
+    const val LISTS_TODAY: String = "lists.today"
+    const val LISTS_REVIEW: String = "lists.review"
+    const val LISTS_AGENT: String = "lists.agent"
+    const val LISTS_UPCOMING: String = "lists.upcoming"
+    const val LISTS_ANYTIME: String = "lists.anytime"
+    const val LISTS_REPEATING: String = "lists.repeating"
+    const val LISTS_LOGBOOK: String = "lists.logbook"
+    const val LISTS_FADED: String = "lists.faded"
+    const val LISTS_STARRED: String = "lists.starred"
+    const val LISTS_RECENTLY_DELETED: String = "lists.recently-deleted"
+    const val PLACES_AREAS: String = "places.areas"
+    const val PLACES_PROJECTS: String = "places.projects"
+    const val PLACES_SECTIONS: String = "places.sections"
+    const val TASK_WHEN_DEADLINE: String = "task.when-deadline"
+    const val TASK_REPEAT: String = "task.repeat"
+    const val TASK_NOTES: String = "task.notes"
+    const val TASK_ATTACHMENTS: String = "task.attachments"
+    const val TASK_HISTORY: String = "task.history"
+    const val TASK_AGING: String = "task.aging"
+    const val TASK_CHECKLISTS: String = "task.checklists"
+    const val TASK_TAGS: String = "task.tags"
+    const val TASK_ALERTS: String = "task.alerts"
+    const val FADE_SWEEP: String = "fade.sweep"
+    const val CAPTURE_QUICK_ADD: String = "capture.quick-add"
+    const val CAPTURE_QUICK_ENTRY: String = "capture.quick-entry"
+    const val EDIT_FILING_SUGGESTION: String = "edit.filing-suggestion"
+    const val EDIT_UNDO: String = "edit.undo"
+    const val EDIT_SWIPE_ACTIONS: String = "edit.swipe-actions"
+    const val FIND_QUICK_FIND: String = "find.quick-find"
+    const val MAC_KEYBOARD: String = "mac.keyboard"
+    const val MAC_UPDATES: String = "mac.updates"
+    const val CALENDAR_EVENTS: String = "calendar.events"
+    const val IMPORT_REMINDERS: String = "import.reminders"
+    const val IMPORT_THINGS: String = "import.things"
+    const val AI_DISCUSS: String = "ai.discuss"
+    const val AI_REACH_DIAL: String = "ai.reach-dial"
+    const val AGENTS_CONNECTOR: String = "agents.connector"
+    const val ONBOARDING_FIRST_RUN: String = "onboarding.first-run"
+    const val AGENTS_STOP_PAUSE: String = "agents.stop-pause"
+    const val SYNC_BACKEND: String = "sync.backend"
+    const val ACCOUNT_DELETE: String = "account.delete"
+    const val SETTINGS_DISPLAY: String = "settings.display"
+}
+
+/** Stable IDs generated from the canonical registry: RegistryIconIds. */
+object RegistryIconIds {
+    const val ONBOARDING_WELCOME: String = "onboarding.welcome"
+    const val ONBOARDING_DEVICES: String = "onboarding.devices"
+    const val ONBOARDING_AGENT: String = "onboarding.agent"
+    const val ONBOARDING_NOTES: String = "onboarding.notes"
+    const val ONBOARDING_ACCOUNT: String = "onboarding.account"
+    const val ONBOARDING_MOVE_IN: String = "onboarding.move_in"
+    const val ONBOARDING_THINGS: String = "onboarding.things"
+    const val ONBOARDING_FRESH: String = "onboarding.fresh"
+    const val ONBOARDING_DONE: String = "onboarding.done"
+    const val LIST_TODAY: String = "list.today"
+    const val LIST_INBOX: String = "list.inbox"
+    const val LIST_REVIEW: String = "list.review"
+    const val LIST_AGENT: String = "list.agent"
+    const val AGENT_QUEUED: String = "agent.queued"
+    const val AGENT_WORKING: String = "agent.working"
+    const val AGENT_YOUR_TURN: String = "agent.your_turn"
+    const val AGENT_DONE: String = "agent.done"
+    const val LIST_UPCOMING: String = "list.upcoming"
+    const val LIST_REPEATING: String = "list.repeating"
+    const val LIST_ANYTIME: String = "list.anytime"
+    const val LIST_LOGBOOK: String = "list.logbook"
+    const val LIST_FADED: String = "list.faded"
+    const val LIST_STARRED: String = "list.starred"
+    const val LIST_RECENTLY_DELETED: String = "list.recently_deleted"
+    const val PLACE_AREA: String = "place.area"
+    const val PLACE_PROJECT: String = "place.project"
+    const val PLACE_SECTION: String = "place.section"
+    const val ACTION_EDIT_DETAILS: String = "action.edit_details"
+    const val ACTION_RENAME: String = "action.rename"
+    const val ACTION_COPY: String = "action.copy"
+    const val ACTION_PASTE: String = "action.paste"
+    const val ACTION_DUPLICATE: String = "action.duplicate"
+    const val ACTION_COMPLETE: String = "action.complete"
+    const val ACTION_CANCEL: String = "action.cancel"
+    const val ACTION_DELETE: String = "action.delete"
+    const val ACTION_LET_GO: String = "action.let_go"
+    const val ACTION_RESTORE: String = "action.restore"
+    const val ACTION_TODAY_ADD: String = "action.today_add"
+    const val ACTION_TODAY_REMOVE: String = "action.today_remove"
+    const val ACTION_SCHEDULE: String = "action.schedule"
+    const val ACTION_WHEN: String = "action.when"
+    const val ACTION_DEADLINE: String = "action.deadline"
+    const val ACTION_CLEAR_SCHEDULE: String = "action.clear_schedule"
+    const val ACTION_MOVE: String = "action.move"
+    const val ACTION_MORE: String = "action.more"
+    const val ACTION_REPEAT: String = "action.repeat"
+    const val ACTION_REPEAT_PAUSE: String = "action.repeat_pause"
+    const val ACTION_REPEAT_RESUME: String = "action.repeat_resume"
+    const val ACTION_REPEAT_NEXT_COPY: String = "action.repeat_next_copy"
+    const val ACTION_MOVE_SECTION: String = "action.move_section"
+    const val ACTION_MOVE_UP: String = "action.move_up"
+    const val ACTION_MOVE_DOWN: String = "action.move_down"
+    const val ACTION_ADD: String = "action.add"
+    const val ACTION_SEARCH: String = "action.search"
+    const val ACTION_SIDEBAR: String = "action.sidebar"
+    const val ACTION_NOTES: String = "action.notes"
+    const val ACTION_DISCUSS: String = "action.discuss"
+    const val ACTION_ATTACHMENT: String = "action.attachment"
+    const val ACTION_CHECKLIST: String = "action.checklist"
+    const val ACTION_TAG: String = "action.tag"
+    const val ACTION_REMINDER: String = "action.reminder"
+    const val ACTION_STAR: String = "action.star"
+    const val SETTINGS_ACCOUNT: String = "settings.account"
+    const val SETTINGS_SIGN_IN_APPROVAL: String = "settings.sign_in_approval"
+    const val AUTH_DEVICE: String = "auth.device"
+    const val SETTINGS_GENERAL: String = "settings.general"
+    const val SETTINGS_TASKS: String = "settings.tasks"
+    const val SETTINGS_AI_AGENTS: String = "settings.ai_agents"
+    const val SETTINGS_CLAUDE: String = "settings.claude"
+    const val SETTINGS_CONNECTIONS_AI: String = "settings.connections_ai"
+    const val SETTINGS_CONNECTIONS: String = "settings.connections"
+    const val SETTINGS_DATA: String = "settings.data"
+    const val SETTINGS_PRIVACY: String = "settings.privacy"
+    const val SETTINGS_ABOUT: String = "settings.about"
+    const val SETTINGS_ADVANCED: String = "settings.advanced"
+    const val SETTINGS_SKILLS: String = "settings.skills"
+    const val SETTINGS_DIAGNOSTICS: String = "settings.diagnostics"
+    const val SETTINGS_APPEARANCE: String = "settings.appearance"
+    const val SETTINGS_CALENDAR: String = "settings.calendar"
+    const val SETTINGS_REMINDERS: String = "settings.reminders"
+    const val SETTINGS_IMPORT: String = "settings.import"
+    const val SETTINGS_BACKEND: String = "settings.backend"
+    const val SETTINGS_ANIMATIONS: String = "settings.animations"
+    const val SETTINGS_FEEDBACK: String = "settings.feedback"
+    const val SETTINGS_PASTE: String = "settings.paste"
+    const val SETTINGS_COMPANION_APP: String = "settings.companion_app"
+    const val SETTINGS_PLUS: String = "settings.plus"
+    const val PLANS_HISTORY: String = "plans.history"
+    const val NOTICE_SIGN_IN: String = "notice.sign_in"
+    const val NOTICE_ROLLED_IN: String = "notice.rolled_in"
+    const val NOTICE_GET_STARTED: String = "notice.get_started"
+    const val NOTICE_FADE_INTRO: String = "notice.fade_intro"
+    const val CONVO_NEEDS_YOU: String = "convo.needs_you"
+    const val CONVO_WORKING: String = "convo.working"
+    const val CONVO_DONE: String = "convo.done"
+    const val CONVO_WONT_DO: String = "convo.wont_do"
+    const val NOTICE_WEEKLY_SWEEP: String = "notice.weekly_sweep"
+    const val ACTION_TEXT_SIZE: String = "action.text_size"
+    const val ACTION_WINDOW: String = "action.window"
+    const val ACTION_SIDEBAR_COUNTS: String = "action.sidebar_counts"
+}
+
+/** Stable IDs generated from the canonical registry: RegistryPlatformIds. */
+object RegistryPlatformIds {
+    const val IOS: String = "ios"
+    const val IPADOS: String = "ipados"
+    const val MACOS: String = "macos"
+    const val WEB: String = "web"
+    const val ANDROID: String = "android"
+    const val WINDOWS: String = "windows"
+    const val WATCHOS: String = "watchos"
+}
+
+/** Capability status by canonical feature ID and platform. */
+object RegistryCapabilities {
+    val statusByFeatureAndPlatform: Map<String, Map<String, String>> = linkedMapOf(
+        "lists.inbox" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "partial",
+        ),
+        "lists.today" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "partial",
+        ),
+        "lists.review" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "lists.agent" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "lists.upcoming" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "lists.anytime" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "lists.repeating" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "lists.logbook" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "lists.faded" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "lists.starred" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "lists.recently-deleted" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "places.areas" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "places.projects" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "places.sections" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "task.when-deadline" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "task.repeat" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "task.notes" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "task.attachments" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "partial",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "task.history" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "task.aging" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "task.checklists" to linkedMapOf(
+            "ios" to "planned",
+            "ipados" to "planned",
+            "macos" to "planned",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "task.tags" to linkedMapOf(
+            "ios" to "planned",
+            "ipados" to "planned",
+            "macos" to "planned",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "task.alerts" to linkedMapOf(
+            "ios" to "planned",
+            "ipados" to "planned",
+            "macos" to "planned",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "fade.sweep" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "capture.quick-add" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "not_applicable",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "not_applicable",
+            "watchos" to "not_applicable",
+        ),
+        "capture.quick-entry" to linkedMapOf(
+            "ios" to "not_applicable",
+            "ipados" to "not_applicable",
+            "macos" to "ships",
+            "web" to "not_applicable",
+            "android" to "not_applicable",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "edit.filing-suggestion" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "not_applicable",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "edit.undo" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "edit.swipe-actions" to linkedMapOf(
+            "ios" to "planned",
+            "ipados" to "planned",
+            "macos" to "not_applicable",
+            "web" to "not_applicable",
+            "android" to "planned",
+            "windows" to "not_applicable",
+            "watchos" to "not_applicable",
+        ),
+        "find.quick-find" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "mac.keyboard" to linkedMapOf(
+            "ios" to "not_applicable",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "mac.updates" to linkedMapOf(
+            "ios" to "not_applicable",
+            "ipados" to "not_applicable",
+            "macos" to "ships",
+            "web" to "not_applicable",
+            "android" to "not_applicable",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "calendar.events" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "import.reminders" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "not_applicable",
+            "android" to "not_applicable",
+            "windows" to "not_applicable",
+            "watchos" to "not_applicable",
+        ),
+        "import.things" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "not_applicable",
+            "android" to "not_applicable",
+            "windows" to "not_applicable",
+            "watchos" to "not_applicable",
+        ),
+        "ai.discuss" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "ai.reach-dial" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "agents.connector" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "onboarding.first-run" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "agents.stop-pause" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "sync.backend" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "planned",
+        ),
+        "account.delete" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+        "settings.display" to linkedMapOf(
+            "ios" to "ships",
+            "ipados" to "ships",
+            "macos" to "ships",
+            "web" to "planned",
+            "android" to "planned",
+            "windows" to "planned",
+            "watchos" to "not_applicable",
+        ),
+    )
+    val androidStatusByFeatureId: Map<String, String> = linkedMapOf(
+        "lists.inbox" to "planned",
+        "lists.today" to "planned",
+        "lists.review" to "planned",
+        "lists.agent" to "planned",
+        "lists.upcoming" to "planned",
+        "lists.anytime" to "planned",
+        "lists.repeating" to "planned",
+        "lists.logbook" to "planned",
+        "lists.faded" to "planned",
+        "lists.starred" to "planned",
+        "lists.recently-deleted" to "planned",
+        "places.areas" to "planned",
+        "places.projects" to "planned",
+        "places.sections" to "planned",
+        "task.when-deadline" to "planned",
+        "task.repeat" to "planned",
+        "task.notes" to "planned",
+        "task.attachments" to "planned",
+        "task.history" to "planned",
+        "task.aging" to "planned",
+        "task.checklists" to "planned",
+        "task.tags" to "planned",
+        "task.alerts" to "planned",
+        "fade.sweep" to "planned",
+        "capture.quick-add" to "planned",
+        "capture.quick-entry" to "not_applicable",
+        "edit.filing-suggestion" to "planned",
+        "edit.undo" to "planned",
+        "edit.swipe-actions" to "planned",
+        "find.quick-find" to "planned",
+        "mac.keyboard" to "planned",
+        "mac.updates" to "not_applicable",
+        "calendar.events" to "planned",
+        "import.reminders" to "not_applicable",
+        "import.things" to "not_applicable",
+        "ai.discuss" to "planned",
+        "ai.reach-dial" to "planned",
+        "agents.connector" to "planned",
+        "onboarding.first-run" to "planned",
+        "agents.stop-pause" to "planned",
+        "sync.backend" to "planned",
+        "account.delete" to "planned",
+        "settings.display" to "planned",
+    )
+}
+
+/** Complete canonical registry documents for Kotlin/JVM clients. */
+object RegistryDocuments {
+    val entitiesJson: String = listOf(
+        "{\"version\":1,\"turnFields\":[\"role\",\"step\",\"provider\",\"confidence\",\"question\",\"options\",\"chosen\",\"otherText\",\"inReplyTo\",\"note\",\"ts\"],\"patterns\":{\"id\":\"^[A-Za-z0-9._:-]{1,128}\$\",\"clientOpId\":\"^[A-Za-z0-9_-]{8,64}\$\",\"day\":\"^\\\\d{4}-\\\\d{2}-\\\\d{2}\$\",\"time24\":\"^([01]\\\\d|2[0-3]):[0-5]\\\\d\$\",\"stamp\":\"^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}\"},\"limits\":{\"textMax\":2000,\"notesMax\":100000,\"attachmentPointerMax\":4000,\"stampMax\":40,\"maxAttachmentBytes\":26214400,\"maxUserAttachmentBytes\":2147483648,\"maxOpsPerPush\":500,\"maxPull\":1000,\"maxChecklistItemsPerTask\":200,\"maxTagsPerTask\":20,\"tagNameMax\":64,\"maxSubtasks\":500,\"maxArtifactRefs\":100,\"turnProviderMax\":32,\"turnQuestionMax\":10000,\"turnOptionMax\":500,\"turnMaxOptions\":20,\"turnChosenMax\":500,\"turnOtherTextMax\":10000,\"turnNoteMax\":100000},\"enums\":{\"taskStatus\":[\"open\",\"done\",\"cancelled\"],\"taskSource\":[\"app\",\"mcp\"],\"projectStatus\":[\"active\",\"done\",\"cancelled\"],\"taskKind\":[\"heading\"],\"recurrenceUnit\":[\"day\",\"week\",\"month\",\"year\"],\"reminderMode\":[\"floating\",\"fixed\"],\"convoAssignee\":[\"me\",\"local\",\"claude\"],\"convoEndState\":[\"agent_done\",\"human_done\",\"agent_assisted_done\",\"needs_verify\",\"decomposed\",\"reminder_set\",\"promoted_to_today\",\"wont_do\",\"open\"],\"convoHandoffActionType\":[\"open_url\",\"compose\",\"call\",\"none\"],\"convoTurnRole\":[\"user\",\"provider\"],\"convoTurnStep\":[\"confirm\",\"ground\",\"scope\",\"decide\",\"work\"],\"telemetryLevel\":[\"none\",\"minimal\",\"balanced\",\"full\"],\"appearanceMode\":[\"system\",\"light\",\"dark\"],\"accentColor\":[\"colorful\",\"tamarillo\",\"persimmon\",\"yuzu\",\"carambola\",\"acai\",\"pitaya\",\"jabuticaba\"],\"appIconFinish\":[\"obsidian\",\"ceramic\",\"framed\",\"stealth\"],\"appIconColor\":[\"auto\",\"persimmon\",\"haskap\",\"tamarillo\",\"yuzu\",\"carambola\",\"acai\",\"pitaya\",\"mono\"],\"canvasTexture\":[\"none\",\"topography\",\"fieldMatrix\",\"stippleDrift\",\"causticGlass\",\"ridges\",\"washiPaper\"],\"textureMotion\":[\"still\",\"slowDrift\"]},\"entities\":{\"task\":{\"table\":\"tasks\",\"deletable\":true,\"requiredOnInsert\":[\"title\",\"status\"],\"columns\":{\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":true},\"status\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"kind\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"heading\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"area\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"project\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"created\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"scheduled\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"startTime\":{\"kind\":\"text\",\"format\":\"time24\",\"max\":5,\"nullable\":true},\"durationMinutes\":{\"kind\":\"int\",\"min\":5,\"max\":1440,\"nullable\":true},\"timeZone\":{\"kind\":\"text\",\"max\":64,\"nullable\":true},\"deadline\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"today\":{\"kind\":\"bool\",\"default\":0},\"starred\":{\"kind\":\"bool\",\"default\":0},\"tags\":{\"kind\":\"json\",\"maxJsonLength\":4000,\"nullable\":true},\"todaySetOn\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"completedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"notes\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"position\":{\"kind\":\"real\",\"nullable\":true},\"todayPosition\":{\"kind\":\"real\",\"nullable\":true},\"recurrenceUnit\":{\"kind\":\"text\",\"max\":16,\"nullable\":true},\"recurrenceInterval\":{\"kind\":\"int\",\"nullable\":true},\"recurrenceAfterCompletion\":{\"kind\":\"bool\",\"default\":0},\"recurrencePaused\":{\"kind\":\"bool\",\"default\":0},\"recurrenceSeriesID\":{\"kind\":\"text\",\"max\":128,\"nullable\":true},\"recurrenceAnchorDate\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"recurrenceWeekdays\":{\"kind\":\"json\",\"nullable\":true},\"recurrenceMonthDay\":{\"kind\":\"int\",\"min\":-1,\"max\":31,\"nullable\":true},\"recurrenceOrdinalWeekday\":{\"kind\":\"json\",\"nullable\":true},\"reminderAt\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"reminderMode\":{\"kind\":\"text\",\"enum\":\"reminderMode\",\"nullable\":true},\"reminderSnoozedUntil\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"reminderDismissedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"source\":{\"kind\":\"text\",\"max\":64,\"nullable\":true},\"sourceClient\":{\"kind\":\"text\",\"max\":64,\"nullable\":true},\"acknowledgedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true}}},\"area\":{\"table\":\"areas\",\"deletable\":true,\"requiredOnInsert\":[\"title\"],\"columns\":{\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":true},\"context\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"noteRev\":{\"kind\":\"int\",\"serverOwned\":true},\"notesProposal\":{\"kind\":\"json\",\"maxJsonLength\":101000,\"nullable\":true},\"emoji\":{\"kind\":\"text\",\"max\":16,\"nullable\":true},\"attachment\":{\"kind\":\"json\",\"maxJsonLength\":4000,\"nullable\":true},\"position\":{\"kind\":\"int\",\"nullable\":true}}},\"project\":{\"table\":\"projects\",\"deletable\":true,\"requiredOnInsert\":[\"title\",\"status\"],\"columns\":{\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":true},\"status\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"area\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"created\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"completedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"notes\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"context\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"noteRev\":{\"kind\":\"int\",\"serverOwned\":true},\"notesProposal\":{\"kind\":\"json\",\"maxJsonLength\":101000,\"nullable\":true},\"githubRepo\":{\"kind\":\"text\",\"max\":200,\"nullable\":true},\"attachment\":{\"kind\":\"json\",\"maxJsonLength\":4000,\"nullable\":true},\"position\":{\"kind\":\"int\",\"nullable\":true}}},\"attachment\":{\"table\":\"attachments\",\"deletable\":true,\"requiredOnInsert\":[\"taskId\",\"filename\",\"contentType\",\"byteCount\"],\"updatable\":[\"filename\",\"position\"],\"columns\":{\"taskId\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":false},\"filename\":{\"kind\":\"text\",\"max\":512,\"nullable\":true},\"contentType\":{\"kind\":\"text\",\"max\":200,\"nullable\":true},\"byteCount\":{\"kind\":\"int\",\"min\":0,\"max\":26214400,\"nullable\":false},\"position\":{\"kind\":\"real\",\"nullable\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"uploadedAt\":{\"kind\":\"text\",\"serverOwned\":true}}},\"checklistItem\":{\"table\":\"checklist_items\",\"deletable\":true,\"requiredOnInsert\":[\"taskId\",\"title\"],\"updatable\":[\"title\",\"checked\",\"checkedAt\",\"position\"],\"columns\":{\"taskId\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":false},\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":false},\"checked\":{\"kind\":\"bool\",\"default\":0},\"checkedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"position\":{\"kind\":\"real\",\"nullable\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true}}},\"tag\":{\"table\":\"tags\",\"deletable\":true,\"requiredOnInsert\":[\"name\"],\"updatable\":[\"name\",\"color\",\"position\"],\"columns\":{\"name\":{\"kind\":\"text\",\"max\":64,\"nullable\":false},\"color\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"position\":{\"kind\":\"int\",\"nullable\":true}}},\"convo\":{\"table\":\"convos\",\"deletable\":false,\"requiredOnInsert\":[],\"columns\":{\"confirmedIntent\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"acceptance\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"subtasks\":{\"kind\":\"json\",\"nullable\":true},\"artifact\":{\"kind\":\"json\",\"nullable\":true},\"handoff\":{\"kind\":\"json\",\"nullable\":true},\"endState\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"endStateNote\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"assignee\":{\"kind\":\"text\",\"enum\":\"convoAssignee\",\"nullable\":true},\"stoppedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"claimedBy\":{\"kind\":\"text\",\"serverOwned\":true},\"claimUntil\":{\"kind\":\"text\",\"serverOwned\":true},\"runsSinceUser\":{\"kind\":\"int\",\"serverOwned\":true}}},\"setting\":{\"table\":\"settings\",\"deletable\":false,\"requiredOnInsert\":[],\"columns\":{\"value\":{\"kind\":\"json\",\"nullable\":true}}}}}",
+    ).joinToString("")
+    val rulesJson: String = listOf(
+        "{\"version\":1,\"cueDecayDays\":7,\"fadeWindowDays\":14,\"fadeGraceDays\":1,\"fadeMinOpacity\":0.55,\"fadeSweepWeekday\":1,\"recentlyDeletedDays\":30,\"upcomingCalendarDays\":30,\"toastDurationSeconds\":7,\"agentRunBudget\":5,\"claimTtlDefaultSeconds\":1800,\"claimTtlMaxSeconds\":14400,\"tombstoneTtlDays\":90,\"clientOpTtlDays\":30,\"changeLogTtlDays\":365,\"deleteGraceSeconds\":120}",
+    ).joinToString("")
+    val iconsJson: String = listOf(
+        "{\"version\":1,\"description\":\"Semantic icon IDs mapped to Apple SF Symbols, Material Symbols (Android / Compose Desktop), and Lucide (Web).\",\"icons\":{\"onboarding.welcome\":{\"sfSymbol\":\"sparkles\",\"material\":\"auto_awesome\",\"lucide\":\"sparkles\"},\"onboarding.devices\":{\"sfSymbol\":\"laptopcomputer.and.iphone\",\"material\":\"devices\",\"lucide\":\"monitor-smartphone\"},\"onboarding.agent\":{\"sfSymbol\":\"bubble.left.and.text.bubble.right\",\"material\":\"forum\",\"lucide\":\"messages-square\"},\"onboarding.notes\":{\"sfSymbol\":\"note.text\",\"material\":\"sticky_note_2\",\"lucide\":\"sticky-note\"},\"onboarding.account\":{\"sfSymbol\":\"person.crop.circle\",\"material\":\"account_circle\",\"lucide\":\"circle-user\"},\"onboarding.move_in\":{\"sfSymbol\":\"tray.and.arrow.down\",\"material\":\"move_to_inbox\",\"lucide\":\"inbox\"},\"onboarding.things\":{\"sfSymbol\":\"checkmark.square\",\"material\":\"check_box\",\"lucide\":\"square-check\"},\"onboarding.fresh\":{\"sfSymbol\":\"plus.circle\",\"material\":\"add_circle\",\"lucide\":\"circle-plus\"},\"onboarding.done\":{\"sfSymbol\":\"checkmark.circle.fill\",\"material\":\"check_circle\",\"lucide\":\"circle-check\"},\"list.today\":{\"sfSymbol\":\"sun.max.fill\",\"material\":\"wb_sunny\",\"lucide\":\"sun\"},\"list.inbox\":{\"sfSymbol\":\"tray.full\",\"material\":\"inbox\",\"lucide\":\"inbox\"},\"list.review\":{\"sfSymbol\":\"eye\",\"material\":\"visibility\",\"lucide\":\"eye\"},\"list.agent\":{\"sfSymbol\":\"sparkles\",\"material\":\"auto_awesome\",\"lucide\":\"sparkles\"},\"agent.queued\":{\"sfSymbol\":\"clock\",\"material\":\"schedule\",\"lucide\":\"clock\"},\"agent.working\":{\"sfSymbol\":\"ellipsis.circle\",\"material\":\"pending\",\"lucide\":\"circle-ellipsis\"},\"agent.your_turn\":{\"sfSymbol\":\"questionmark.bubble\",\"material\":\"contact_support\",\"lucide\":\"message-circle-question\"},\"agent.done\":{\"sfSymbol\":\"checkmark.circle\",\"material\":\"check_circle\",\"lucide\":\"circle-check\"},\"list.upcoming\":{\"sfSymbol\":\"calendar\",\"material\":\"calendar_month\",\"lucide\":\"calendar\"},\"list.repeating\":{\"sfSymbol\":\"arrow.clockwise\",\"material\":\"repeat\",\"lucide\":\"repeat\"},\"list.anytime\":{\"sfSymbol\":\"rectangle.stack.fill\",\"material\":\"layers\",\"lucide\":\"layers\"},\"list.logbook\":{\"sfSymbol\":\"checkmark\",\"material\":\"check\",\"lucide\":\"check\"},\"list.faded\":{\"sfSymbol\":\"circle.dashed\",\"material\":\"blur_circular\",\"lucide\":\"circle-dashed\"},\"list.starred\":{\"sfSymbol\":\"star.fill\",\"material\":\"star\",\"lucide\":\"star\"},\"list.recently_deleted\":{\"sfSymbol\":\"trash\",\"material\":\"delete\",\"lucide\":\"trash-2\"},\"place.area\":{\"sfSymbol\":\"folder\",\"material\":\"folder\",\"lucide\":\"folder\"},\"place.project\":{\"sfSymbol\":\"number\",\"material\":\"tag\",\"lucide\":\"hash\"},\"place.section\":{\"sfSymbol\":\"text.alignleft\",\"material\":\"subject\",\"lucide\":\"heading\"},\"action.edit_details\":{\"sfSymbol\":\"info.circle\",\"material\":\"info\",\"lucide\":\"info\"},\"action.rename\":{\"sfSymbol\":\"pencil\",\"material\":\"edit\",\"lucide\":\"pencil\"},\"action.copy\":{\"sfSymbol\":\"doc.on.doc\",\"material\":\"content_copy\",\"lucide\":\"copy\"},\"action.paste\":{\"sfSymbol\":\"doc.on.clipboard\",\"material\":\"content_paste\",\"lucide\":\"clipboard-paste\"},\"action.duplicate\":{\"sfSymbol\":\"plus.square.on.square\",\"material\":\"library_add\",\"lucide\":\"copy-plus\"},\"action.complete\":{\"sfSymbol\":\"checkmark.circle\",\"material\":\"check_circle\",\"lucide\":\"check-circle-2\"},\"action.cancel\":{\"sfSymbol\":\"xmark.circle\",\"material\":\"cancel\",\"lucide\":\"x-circle\"},\"action.delete\":{\"sfSymbol\":\"trash\",\"material\":\"delete\",\"lucide\":\"trash-2\"},\"action.let_go\":{\"sfSymbol\":\"wind\",\"material\":\"air\",\"lucide\":\"wind\"},\"action.restore\":{\"sfSymbol\":\"arrow.uturn.backward\",\"material\":\"restore_from_trash\",\"lucide\":\"rotate-ccw\"},\"action.today_add\":{\"sfSymbol\":\"sun.max.fill\",\"material\":\"wb_sunny\",\"lucide\":\"sun\"},\"action.today_remove\":{\"sfSymbol\":\"sun.min\",\"material\":\"wb_twilight\",\"lucide\":\"sun-dim\"},\"action.schedule\":{\"sfSymbol\":\"calendar\",\"material\":\"event\",\"lucide\":\"calendar\"},\"action.when\":{\"sfSymbol\":\"calendar\",\"material\":\"event\",\"lucide\":\"calendar\"},\"action.deadline\":{\"sfSymbol\":\"flag\",\"material\":\"flag\",\"lucide\":\"flag\"},\"action.clear_schedule\":{\"sfSymbol\":\"calendar.badge.minus\",\"material\":\"event_busy\",\"lucide\":\"calendar-x\"},\"action.move\":{\"sfSymbol\":\"folder\",\"material\":\"drive_file_move\",\"lucide\":\"folder-input\"},\"action.more\":{\"sfSymbol\":\"ellipsis\",\"material\":\"more_horiz\",\"lucide\":\"more-horizontal\"},\"action.repeat\":{\"sfSymbol\":\"arrow.clockwise\",\"material\":\"repeat\",\"lucide\":\"repeat\"},\"action.repeat_pause\":{\"sfSymbol\":\"pause.circle\",\"material\":\"pause_circle\",\"lucide\":\"pause-circle\"},\"action.repeat_resume\":{\"sfSymbol\":\"play.circle\",\"material\":\"play_circle\",\"lucide\":\"play-circle\"},\"action.repeat_next_copy\":{\"sfSymbol\":\"plus.circle\",\"material\":\"add_circle\",\"lucide\":\"plus-circle\"},\"action.move_section\":{\"sfSymbol\":\"text.append\",\"material\":\"segment\",\"lucide\":\"list-plus\"},\"action.move_up\":{\"sfSymbol\":\"chevron.up\",\"material\":\"keyboard_arrow_up\",\"lucide\":\"chevron-up\"},\"action.move_down\":{\"sfSymbol\":\"chevron.down\",\"material\":\"keyboard_arrow_down\",\"lucide\":\"chevron-down\"},\"action.add\":{\"sfSymbol\":\"plus\",\"material\":\"add\",\"lucide\":\"plus\"},\"action.search\":{\"sfSymbol\":\"magnifyingglass\",\"material\":\"search\",\"lucide\":\"search\"},\"action.sidebar\":{\"sfSymbol\":\"sidebar.leading\",\"material\":\"side_navigation\",\"lucide\":\"panel-left\"},\"action.notes\":{\"sfSymbol\":\"text.alignleft\",\"material\":\"notes\",\"lucide\":\"align-left\"},\"action.discuss\":{\"sfSymbol\":\"bubble.left.and.bubble.right\",\"material\":\"forum\",\"lucide\":\"message-square\"},\"action.attachment\":{\"sfSymbol\":\"paperclip\",\"material\":\"attach_file\",\"lucide\":\"paperclip\"},\"action.checklist\":{\"sfSymbol\":\"checklist\",\"material\":\"checklist\",\"lucide\":\"list-checks\"},\"action.tag\":{\"sfSymbol\":\"tag\",\"material\":\"label\",\"lucide\":\"tag\"},\"action.reminder\":{\"sfSymbol\":\"bell\",\"material\":\"notifications\",\"lucide\":\"bell\"},\"action.star\":{\"sfSymbol\":\"star\",\"material\":\"star\",\"lucide\":\"star\"},\"settings.account\":{\"sfSymbol\":\"person.crop.circle\",\"material\":\"account_circle\",\"lucide\":\"user-circle\"},\"settings.sign_in_approval\":{\"sfSymbol\":\"person.badge.key\",\"material\":\"key\",\"lucide\":\"key-round\"},\"auth.device\":{\"sfSymbol\":\"laptopcomputer.and.iphone\",\"material\":\"devices\",\"lucide\":\"monitor-smartphone\"},\"settings.general\":{\"sfSymbol\":\"slider.horizontal.3\",\"material\":\"tune\",\"lucide\":\"sliders-horizontal\"},\"settings.tasks\":{\"sfSymbol\":\"checklist\",\"material\":\"checklist\",\"lucide\":\"list-todo\"},\"settings.ai_agents\":{\"sfSymbol\":\"sparkles\",\"material\":\"auto_awesome\",\"lucide\":\"sparkles\"},\"settings.claude\":{\"sfSymbol\":\"bubble.left.and.text.bubble.right\",\"material\":\"smart_toy\",\"lucide\":\"bot\"},\"settings.connections_ai\":{\"sfSymbol\":\"brain.head.profile\",\"material\":\"psychology\",\"lucide\":\"sparkles\"},\"settings.connections\":{\"sfSymbol\":\"link\",\"material\":\"link\",\"lucide\":\"link\"},\"settings.data\":{\"sfSymbol\":\"square.and.arrow.up\",\"material\":\"import_export\",\"lucide\":\"arrow-up-down\"},\"settings.privacy\":{\"sfSymbol\":\"hand.raised\",\"material\":\"privacy_tip\",\"lucide\":\"shield\"},\"settings.about\":{\"sfSymbol\":\"info.circle\",\"material\":\"info\",\"lucide\":\"info\"},\"settings.advanced\":{\"sfSymbol\":\"wrench.and.screwdriver\",\"material\":\"build\",\"lucide\":\"wrench\"},\"settings.skills\":{\"sfSymbol\":\"book.closed\",\"material\":\"menu_book\",\"lucide\":\"book-open\"},\"settings.diagnostics\":{\"sfSymbol\":\"stethoscope\",\"material\":\"monitor_heart\",\"lucide\":\"activity\"},\"settings.appearance\":{\"sfSymbol\":\"paintpalette\",\"material\":\"palette\",\"lucide\":\"palette\"},\"settings.calendar\":{\"sfSymbol\":\"calendar\",\"material\":\"calendar_today\",\"lucide\":\"calendar\"},\"settings.reminders\":{\"sfSymbol\":\"checklist\",\"material\":\"checklist\",\"lucide\":\"list-checks\"},\"settings.import\":{\"sfSymbol\":\"square.and.arrow.down\",\"material\":\"download\",\"lucide\":\"download\"},\"settings.backend\":{\"sfSymbol\":\"arrow.up.doc\",\"material\":\"cloud_sync\",\"lucide\":\"cloud\"},\"settings.animations\":{\"sfSymbol\":\"party.popper\",\"material\":\"celebration\",\"lucide\":\"party-popper\"},\"settings.feedback\":{\"sfSymbol\":\"paperplane\",\"material\":\"send\",\"lucide\":\"send\"},\"settings.paste\":{\"sfSymbol\":\"doc.on.clipboard\",\"material\":\"content_paste\",\"lucide\":\"clipboard-paste\"},\"settings.companion_app\":{\"sfSymbol\":\"arrow.up.forward.app\",\"material\":\"open_in_new\",\"lucide\":\"external-link\"},\"settings.plus\":{\"sfSymbol\":\"plus.circle.fill\",\"material\":\"add_circle\",\"lucide\":\"circle-plus\"},\"plans.history\":{\"sfSymbol\":\"clock.arrow.circlepath\",\"material\":\"history\",\"lucide\":\"history\"},\"notice.sign_in\":{\"sfSymbol\":\"person.crop.circle.badge.exclamationmark\",\"material\":\"account_circle\",\"lucide\":\"user-x\"},\"notice.rolled_in\":{\"sfSymbol\":\"arrow.down.circle\",\"material\":\"arrow_circle_down\",\"lucide\":\"arrow-down-circle\"},\"notice.get_started\":{\"sfSymbol\":\"sparkles\",\"material\":\"auto_awesome\",\"lucide\":\"sparkles\"},\"notice.fade_intro\":{\"sfSymbol\":\"circle.lefthalf.filled\",\"material\":\"contrast\",\"lucide\":\"contrast\"},\"convo.needs_you\":{\"sfSymbol\":\"circle.fill\",\"material\":\"circle\",\"lucide\":\"circle\"},\"convo.working\":{\"sfSymbol\":\"circle.fill\",\"material\":\"circle\",\"lucide\":\"circle\"},\"convo.done\":{\"sfSymbol\":\"checkmark.circle.fill\",\"material\":\"check_circle\",\"lucide\":\"check-circle-2\"},\"convo.wont_do\":{\"sfSymbol\":\"minus.circle\",\"material\":\"do_not_disturb_on\",\"lucide\":\"minus-circle\"},\"notice.weekly_sweep\":{\"sfSymbol\":\"circle.dashed\",\"material\":\"blur_circular\",\"lucide\":\"circle-dashed\"},\"action.text_size\":{\"sfSymbol\":\"textformat.size\",\"material\":\"format_size\",\"lucide\":\"a-large-small\"},\"action.window\":{\"sfSymbol\":\"macwindow\",\"material\":\"web_asset\",\"lucide\":\"app-window\"},\"action.sidebar_counts\":{\"sfSymbol\":\"number\",\"material\":\"numbers\",\"lucide\":\"hash\"}}}",
+    ).joinToString("")
+    val tokensJson: String = listOf(
+        "{\"version\":1,\"description\":\"Semantic design tokens shared across Apple, Web, Android, and Windows clients (docs/DesignSpec.md). OS-owned surfaces and accent stay semantic roles so every platform feels native.\",\"accentPolicy\":\"userAccentWithColorfulDefault\",\"fruitAccents\":[{\"id\":\"colorful\",\"name\":\"Colorful\",\"origin\":\"Default · Blue + semantic\",\"light\":\"#007AFF\",\"dark\":\"#0A84FF\",\"checkLight\":\"#FFFFFF\",\"checkDark\":\"#FFFFFF\",\"multicolor\":true},{\"id\":\"tamarillo\",\"name\":\"Tamarillo\",\"origin\":\"Andes · Crimson\",\"light\":\"#D6333F\",\"dark\":\"#FF5C67\",\"checkLight\":\"#FFFFFF\",\"checkDark\":\"#FFFFFF\",\"multicolor\":false},{\"id\":\"persimmon\",\"name\":\"Persimmon\",\"origin\":\"East Asia · Vermilion\",\"light\":\"#E05212\",\"dark\":\"#FF7738\",\"checkLight\":\"#FFFFFF\",\"checkDark\":\"#FFFFFF\",\"multicolor\":false},{\"id\":\"yuzu\",\"name\":\"Yuzu\",\"origin\":\"Japan · Citrus gold\",\"light\":\"#C28500\",\"dark\":\"#F2BF2C\",\"checkLight\":\"#FFFFFF\",\"checkDark\":\"#141518\",\"multicolor\":false},{\"id\":\"carambola\",\"name\":\"Carambola\",\"origin\":\"SE Asia · Starfruit\",\"light\":\"#5B8C00\",\"dark\":\"#9EE034\",\"checkLight\":\"#FFFFFF\",\"checkDark\":\"#141518\",\"multicolor\":false},{\"id\":\"acai\",\"name\":\"Açaí\",\"origin\":\"Amazon · Indigo\",\"light\":\"#6544D6\",\"dark\":\"#9B82FF\",\"checkLight\":\"#FFFFFF\",\"checkDark\":\"#FFFFFF\",\"multicolor\":false},{\"id\":\"pitaya\",\"name\":\"Pitaya\",\"origin\":\"Mesoamerica · Dragonfruit\",\"light\":\"#D4266C\",\"dark\":\"#FF5C9B\",\"checkLight\":\"#FFFFFF\",\"checkDark\":\"#FFFFFF\",\"multicolor\":false},{\"id\":\"jabuticaba\",\"name\":\"Jabuticaba\",\"origin\":\"Brazil · Obsidian ink\",\"light\":\"#27272E\",\"dark\":\"#E4E4EA\",\"checkLight\":\"#FFFFFF\",\"checkDark\":\"#141518\",\"multicolor\":false}],\"textures\":[{\"id\":\"none\",\"name\":\"Pure Canvas\",\"tag\":\"Baseline\"},{\"id\":\"topography\",\"name\":\"Topography\",\"tag\":\"Height Map\"},{\"id\":\"fieldMatrix\",\"name\":\"Field Matrix\",\"tag\":\"Industrial\"},{\"id\":\"stippleDrift\",\"name\":\"Stipple Drift\",\"tag\":\"Print / Ink\"},{\"id\":\"causticGlass\",\"name\":\"Caustic Glass\",\"tag\":\"Optical\"},{\"id\":\"ridges\",\"name\":\"Ridge Lines\",\"tag\":\"Elevation\"},{\"id\":\"washiPaper\",\"name\":\"Washi Paper\",\"tag\":\"Tactile\"}],\"selection\":{\"emphasizedAlphaLight\":0.22,\"emphasizedAlphaDark\":0.34,\"unemphasizedAlphaLight\":0.1,\"unemphasizedAlphaDark\":0.14,\"chipSelectedFillOpacity\":0.22,\"pointerHoverOpacity\":0.012},\"colors\":{\"todayAccent\":\"#F5C721\",\"nextAccent\":\"#7C3AED\",\"overdueRed\":\"systemRed\",\"noticeWarning\":\"systemOrange\",\"convoNeedsYou\":\"systemYellow\",\"convoWorking\":\"systemBlue\",\"convoDone\":\"systemGreen\",\"convoWontDo\":\"secondaryLabel\"},\"accentPalette\":[\"#ef4444\",\"#f97316\",\"#f59e0b\",\"#eab308\",\"#84cc16\",\"#22c55e\",\"#10b981\",\"#14b8a6\",\"#06b6d4\",\"#0ea5e9\",\"#3b82f6\",\"#6366f1\",\"#8b5cf6\",\"#a855f7\",\"#ec4899\",\"#f43f5e\"],\"radii\":{\"card\":22,\"small\":6,\"transientSurface\":12},\"spacing\":{\"xs\":4,\"sm\":8,\"md\":12,\"lg\":16,\"pageGutter\":20,\"pageTop\":12},\"desktopColumn\":{\"marginFraction\":0.1,\"minInset\":10,\"maxInset\":220,\"verticalInset\":48,\"titleBarGap\":20},\"textScale\":{\"defaultStep\":0,\"steps\":[{\"step\":-2,\"id\":\"xSmall\",\"label\":\"Smallest\",\"factor\":0.85},{\"step\":-1,\"id\":\"small\",\"label\":\"Small\",\"factor\":0.92},{\"step\":0,\"id\":\"normal\",\"label\":\"Medium\",\"factor\":1},{\"step\":1,\"id\":\"large\",\"label\":\"Large\",\"factor\":1.1},{\"step\":2,\"id\":\"xLarge\",\"label\":\"Largest\",\"factor\":1.2}]}}",
+    ).joinToString("")
+    val capabilitiesJson: String = listOf(
+        "{\"version\":1,\"description\":\"Canonical capability parity ledger keyed by Feature ID (Starlings /product/feature-map-septena-task-app, ADR 0013, ADR 0015). Every registry entry references an ID here.\",\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\",\"watchos\"],\"statuses\":[\"ships\",\"partial\",\"planned\",\"not_applicable\"],\"capabilities\":{\"lists.inbox\":{\"title\":\"Inbox band on Today\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"partial\"},\"lists.today\":{\"title\":\"Today\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"partial\"},\"lists.review\":{\"title\":\"Review (needs_verify)\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"lists.agent\":{\"title\":\"Agent (claimed and assigned work by stage)\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"lists.upcoming\":{\"title\":\"Upcoming\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"lists.anytime\":{\"title\":\"Anytime\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"lists.repeating\":{\"title\":\"Repeating\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"lists.logbook\":{\"title\":\"Logbook\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"lists.faded\":{\"title\":\"Faded pile\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"lists.starred\":{\"title\":\"Starred list\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"lists.recently-deleted\":{\"title\":\"Recently Deleted (30 days)\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"places.areas\":{\"title\":\"Areas\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"places.projects\":{\"title\":\"Projects\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"places.sections\":{\"title\":\"Sections (headings)\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"task.when-deadline\":{\"title\":\"When and Deadline as separate dates\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"task.repeat\":{\"title\":\"Repeat from schedule or after completion, pause\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"task.notes\":{\"title\":\"Notes\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"task.attachments\":{\"title\":\"Attachments\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"partial\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"task.history\":{\"title\":\"Per-task change history\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"task.aging\":{\"title\":\"Aging fade across open lists\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"task.checklists\":{\"title\":\"Checklists inside a task\",\"ios\":\"planned\",\"ipados\":\"planned\",\"macos\":\"planned\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"task.tags\":{\"title\":\"Tags\",\"ios\":\"planned\",\"ipados\":\"planned\",\"macos\":\"planned\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"task.alerts\":{\"title\":\"Timed reminders\",\"ios\":\"planned\",\"ipados\":\"planned\",\"macos\":\"planned\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"fade.sweep\":{\"title\":\"Fade pass, Faded pile and weekly sweep\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"capture.quick-add\":{\"title\":\"Quick Add sheet\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"not_applicable\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"not_applicable\",\"watchos\":\"not_applicable\"},\"capture.quick-entry\":{\"title\":\"Quick Entry global panel\",\"ios\":\"not_applicable\",\"ipados\":\"not_applicable\",\"macos\":\"ships\",\"web\":\"not_applicable\",\"android\":\"not_applicable\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"edit.filing-suggestion\":{\"title\":\"On-device filing suggestion\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"not_applicable\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"edit.undo\":{\"title\":\"Shared undo history\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"edit.swipe-actions\":{\"title\":\"Row swipe actions\",\"ios\":\"planned\",\"ipados\":\"planned\",\"macos\":\"not_applicable\",\"web\":\"not_applicable\",\"android\":\"planned\",\"windows\":\"not_applicable\",\"watchos\":\"not_applicable\"},\"find.quick-find\":{\"title\":\"Quick Find\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"mac.keyboard\":{\"title\":\"Keyboard-first shortcuts\",\"ios\":\"not_applicable\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"mac.updates\":{\"title\":\"In-app updates (Sparkle)\",\"ios\":\"not_applicable\",\"ipados\":\"not_applicable\",\"macos\":\"ships\",\"web\":\"not_applicable\",\"android\":\"not_applicable\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"calendar.events\":{\"title\":\"Calendar events in Today and Upcoming\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"import.reminders\":{\"title\":\"Apple Reminders into Inbox\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"not_applicable\",\"android\":\"not_applicable\",\"windows\":\"not_applicable\",\"watchos\":\"not_applicable\"},\"import.things\":{\"title\":\"One-time Things import\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"not_applicable\",\"android\":\"not_applicable\",\"windows\":\"not_applicable\",\"watchos\":\"not_applicable\"},\"ai.discuss\":{\"title\":\"Discuss: conversation on one task\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"ai.reach-dial\":{\"title\":\"Where AI runs\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"agents.connector\":{\"title\":\"Official MCP connector at api.septena.app/mcp\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"onboarding.first-run\":{\"title\":\"First run: welcome, account, move in, connect Claude\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"agents.stop-pause\":{\"title\":\"Stop one task, pause all agents\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"sync.backend\":{\"title\":\"Sync through api.septena.app\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"planned\"},\"account.delete\":{\"title\":\"Delete account\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"},\"settings.display\":{\"title\":\"Display, badge and privacy preferences\",\"ios\":\"ships\",\"ipados\":\"ships\",\"macos\":\"ships\",\"web\":\"planned\",\"android\":\"planned\",\"windows\":\"planned\",\"watchos\":\"not_applicable\"}}}",
+    ).joinToString("")
+    val settingsJson: String = listOf(
+        "{\"version\":2,\"description\":\"Canonical Septena task-app settings: synced keys (backend SETTING_VALUES + Swift SeptaskSyncedSettings), device-local keys/defaults, and new-user-first progressive-disclosure taxonomy (docs/SETTINGS_UX_SPEC.md).\",\"keys\":{\"welcomeName\":{\"scope\":\"synced\",\"storageKey\":\"septena.homepage.welcomeName\",\"type\":\"string\",\"maxLength\":200,\"default\":\"\",\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"sync.backend\"},\"telemetryLevel\":{\"scope\":\"synced\",\"storageKey\":\"septena.privacy.telemetryLevel\",\"type\":\"enum\",\"enum\":\"telemetryLevel\",\"default\":\"balanced\",\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"settings.display\"},\"calendarHiddenTitles\":{\"scope\":\"synced\",\"type\":\"string[]\",\"maxItems\":500,\"itemMaxLength\":500,\"default\":[],\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"calendar.events\"},\"rolledInDismissedOn\":{\"scope\":\"synced\",\"storageKey\":\"septena.newTodos.dismissedDate\",\"type\":\"string\",\"format\":\"day\",\"default\":null,\"ui\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"lists.today\"},\"homeTimezone\":{\"scope\":\"synced\",\"type\":\"string\",\"maxLength\":64,\"default\":null,\"ui\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"sync.backend\"},\"agentsPaused\":{\"scope\":\"synced\",\"type\":\"bool\",\"default\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"agents.stop-pause\"},\"getStartedDismissed\":{\"scope\":\"synced\",\"type\":\"bool\",\"default\":false,\"ui\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"lists.today\"},\"getStartedSteps\":{\"scope\":\"synced\",\"type\":\"string[]\",\"maxItems\":32,\"itemMaxLength\":64,\"default\":[],\"ui\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"lists.today\"},\"onboardedAt\":{\"scope\":\"synced\",\"type\":\"string\",\"format\":\"stamp\",\"default\":null,\"ui\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"onboarding.first-run\"},\"accentColor\":{\"scope\":\"synced\",\"storageKey\":\"septena.appearance.accentColor\",\"type\":\"enum\",\"enum\":\"accentColor\",\"default\":\"colorful\",\"ui\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"settings.display\"},\"canvasTexture\":{\"scope\":\"synced\",\"storageKey\":\"septena.appearance.canvasTexture\",\"type\":\"enum\",\"enum\":\"canvasTexture\",\"default\":\"none\",\"ui\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"settings.display\"},\"textureIntensity\":{\"scope\":\"synced\",\"storageKey\":\"septena.appearance.textureIntensity\",\"type\":\"int\",\"min\":15,\"max\":100,\"default\":55,\"ui\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"settings.display\"},\"textureMotion\":{\"scope\":\"synced\",\"storageKey\":\"septena.appearance.textureMotion\",\"type\":\"enum\",\"enum\":\"textureMotion\",\"default\":\"still\",\"ui\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"settings.display\"},\"smartListOrder\":{\"scope\":\"synced\",\"storageKey\":\"septena.sidebar.smartListOrder\",\"type\":\"string[]\",\"maxItems\":32,\"itemMaxLength\":64,\"default\":[],\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"settings.display\"},\"smartListHidden\":{\"scope\":\"synced\",\"storageKey\":\"septena.sidebar.smartListHidden\",\"type\":\"string[]\",\"maxItems\":32,\"itemMaxLength\":64,\"default\":[],\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"settings.display\"},\"appearanceMode\":{\"scope\":\"device\",\"storageKey\":\"septena.appearance.mode\",\"type\":\"enum\",\"enum\":\"appearanceMode\",\"default\":\"system\",\"ui\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"settings.display\"},\"syncTheme\":{\"scope\":\"device\",\"storageKey\":\"septena.appearance.syncTheme\",\"type\":\"bool\",\"default\":true,\"ui\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"settings.display\"},\"appIconFinish\":{\"scope\":\"device\",\"storageKey\":\"septena.appearance.appIconFinish\",\"type\":\"enum\",\"enum\":\"appIconFinish\",\"default\":\"obsidian\",\"ui\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\"],\"featureId\":\"settings.display\"},\"appIconColor\":{\"scope\":\"device\",\"storageKey\":\"septena.appearance.appIconColor\",\"type\":\"enum\",\"enum\":\"appIconColor\",\"default\":\"auto\",\"ui\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\"],\"featureId\":\"settings.display\"},\"todayShowCompleted\":{\"scope\":\"device\",\"storageKey\":\"septena.today.showCompleted\",\"type\":\"bool\",\"default\":true,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"lists.today\"},\"todayGroupByList\":{\"scope\":\"device\",\"storageKey\":\"septena.today.groupByList\",\"type\":\"bool\",\"default\":true,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"lists.today\"},\"tasksShowAging\":{\"scope\":\"device\",\"storageKey\":\"septena.tasks.showAging\",\"type\":\"bool\",\"default\":true,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"task.aging\"},\"tasksShowFaded\":{\"scope\":\"device\",\"storageKey\":\"septena.tasks.showFaded\",\"type\":\"bool\",\"default\":true,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"task.aging\"},\"tasksTitleLines\":{\"scope\":\"device\",\"storageKey\":\"septena.tasks.titleLines\",\"type\":\"int\",\"min\":1,\"max\":3,\"default\":2,\"options\":[{\"value\":\"1\",\"title\":\"One\"},{\"value\":\"2\",\"title\":\"Two\"},{\"value\":\"3\",\"title\":\"Three\"}],\"platforms\":[\"ios\",\"ipados\",\"android\"],\"featureId\":\"settings.display\"},\"tasksSwipeLeadingAction\":{\"scope\":\"device\",\"storageKey\":\"septena.tasks.swipeLeadingAction\",\"type\":\"enum\",\"values\":[\"today\",\"schedule\",\"move\",\"star\",\"complete\",\"none\"],\"default\":\"today\",\"options\":[{\"value\":\"today\",\"title\":\"Today\"},{\"value\":\"schedule\",\"title\":\"Schedule\"},{\"value\":\"move\",\"title\":\"Move\"},{\"value\":\"star\",\"title\":\"Star\"},{\"value\":\"complete\",\"title\":\"Complete\"},{\"value\":\"none\",\"title\":\"Off\"}],\"platforms\":[\"ios\",\"ipados\"],\"featureId\":\"settings.display\"},\"tasksFilingSuggestions\":{\"scope\":\"device\",\"storageKey\":\"septena.tasks.filingSuggestions\",\"type\":\"bool\",\"default\":true,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"android\",\"windows\"],\"featureId\":\"edit.filing-suggestion\"},\"tasksShowCalendarEvents\":{\"scope\":\"device\",\"storageKey\":\"septena.tasks.showCalendarEvents\",\"type\":\"bool\",\"default\":true,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"calendar.events\"},\"badgeShowOverdue\":{\"scope\":\"device\",\"storageKey\":\"septena.badge.showOverdue\",\"sharedAppGroup\":true,\"type\":\"bool\",\"default\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"android\",\"windows\"],\"featureId\":\"settings.display\"},\"loggingAnimationsEnabled\":{\"scope\":\"device\",\"storageKey\":\"septena.ui.loggingAnimations\",\"type\":\"bool\",\"default\":true,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"settings.display\"},\"textSizeStep\":{\"scope\":\"device\",\"storageKey\":\"septena.display.textSizeStep\",\"type\":\"int\",\"min\":-2,\"max\":2,\"default\":0,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"settings.display\"},\"sidebarCounts\":{\"scope\":\"device\",\"storageKey\":\"septena.septask.sidebarCounts\",\"type\":\"bool\",\"default\":true,\"ui\":false,\"platforms\":[\"macos\",\"web\",\"windows\"],\"featureId\":\"settings.display\"},\"aiMode\":{\"scope\":\"device\",\"storageKey\":\"septena.ai.mode\",\"type\":\"enum\",\"values\":[\"onDeviceOnly\",\"auto\",\"useMyClaude\"],\"default\":\"auto\",\"options\":[{\"value\":\"onDeviceOnly\",\"title\":\"On-device only\"},{\"value\":\"auto\",\"title\":\"Automatic\"},{\"value\":\"useMyClaude\",\"title\":\"Use my Claude\"}],\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"ai.reach-dial\"},\"diagnosticsEnabled\":{\"scope\":\"device\",\"storageKey\":\"septask.diagnostics.enabled\",\"type\":\"bool\",\"default\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"],\"featureId\":\"settings.display\"},\"showModelLabels\":{\"scope\":\"device\",\"storageKey\":\"septena.ai.showModelTags\",\"type\":\"bool\",\"default\":true,\"platforms\":[\"ios\",\"ipados\",\"macos\"],\"featureId\":\"ai.reach-dial\"},\"pccRoutingEnabled\":{\"scope\":\"device\",\"storageKey\":\"septena.ai.pccRoutingEnabled\",\"type\":\"bool\",\"default\":false,\"platforms\":[\"ios\",\"ipados\",\"macos\"],\"featureId\":\"ai.reach-dial\"},\"pccReasoning\":{\"scope\":\"device\",\"storageKey\":\"septena.ai.pccReasoning\",\"type\":\"enum\",\"values\":[\"light\",\"balanced\",\"thorough\"],\"default\":\"balanced\",\"options\":[{\"value\":\"light\",\"title\":\"Light\"},{\"value\":\"balanced\",\"title\":\"Balanced\"},{\"value\":\"thorough\",\"title\":\"Thorough\"}],\"platforms\":[\"ios\",\"ipados\",\"macos\"],\"featureId\":\"ai.reach-dial\"}},\"desktopTabs\":[{\"id\":\"account\",\"title\":\"Account\",\"icon\":\"settings.account\",\"group\":\"identity\",\"featureId\":\"sync.backend\"},{\"id\":\"general\",\"title\":\"General\",\"icon\":\"settings.general\",\"group\":\"main\",\"paletteSlot\":0,\"featureId\":\"lists.today\"},{\"id\":\"ai_agents\",\"title\":\"AI & Agents\",\"icon\":\"settings.ai_agents\",\"group\":\"main\",\"paletteSlot\":4,\"featureId\":\"ai.reach-dial\"},{\"id\":\"connections_data\",\"title\":\"Connections & Data\",\"icon\":\"settings.connections\",\"group\":\"main\",\"paletteSlot\":5,\"featureId\":\"sync.backend\"},{\"id\":\"privacy\",\"title\":\"Privacy\",\"icon\":\"settings.privacy\",\"group\":\"main\",\"paletteSlot\":6,\"featureId\":\"settings.display\"},{\"id\":\"about\",\"title\":\"About\",\"icon\":\"settings.about\",\"group\":\"about\",\"featureId\":\"settings.display\"}],\"rootGroups\":[{\"id\":\"account_root\",\"mobilePresentation\":\"card\",\"desktopTab\":\"account\",\"items\":[{\"kind\":\"pageLink\",\"page\":\"account\",\"surface\":\"account_profile_card\",\"label\":\"Account\",\"icon\":\"settings.account\",\"statusKey\":\"syncStatus\",\"featureId\":\"sync.backend\"}]},{\"id\":\"ai_agents_root\",\"header\":\"AI & Agents\",\"mobilePresentation\":\"inline\",\"desktopTab\":\"ai_agents\",\"items\":[{\"kind\":\"pageLink\",\"page\":\"claude_pairing\",\"label\":\"Connect Claude\",\"icon\":\"settings.claude\",\"statusKey\":\"claudeStatus\",\"desktopInline\":true,\"featureId\":\"agents.connector\"},{\"kind\":\"setting\",\"key\":\"agentsPaused\",\"label\":\"Pause all agents\",\"detail\":\"No agent can claim or work on a task while paused.\",\"visibility\":\"signedIn\"},{\"kind\":\"pageLink\",\"page\":\"ai_preferences\",\"label\":\"AI Preferences\",\"icon\":\"settings.ai_agents\",\"statusKey\":\"aiMode\",\"desktopInline\":true,\"featureId\":\"ai.reach-dial\"}]},{\"id\":\"connections_data_root\",\"header\":\"Connections & Data\",\"mobilePresentation\":\"inline\",\"desktopTab\":\"connections_data\",\"items\":[{\"kind\":\"pageLink\",\"page\":\"calendar\",\"label\":\"Calendar\",\"icon\":\"settings.calendar\",\"statusKey\":\"calendarStatus\",\"featureId\":\"calendar.events\"},{\"kind\":\"pageLink\",\"page\":\"reminders\",\"label\":\"Reminders\",\"icon\":\"settings.reminders\",\"statusKey\":\"remindersStatus\",\"platforms\":[\"ios\",\"ipados\",\"macos\"],\"featureId\":\"import.reminders\"},{\"kind\":\"pageLink\",\"page\":\"import_export\",\"label\":\"Import & Export\",\"icon\":\"settings.data\",\"featureId\":\"sync.backend\"}]},{\"id\":\"lists_root\",\"header\":\"Lists\",\"mobilePresentation\":\"inline\",\"desktopTab\":\"general\",\"items\":[{\"kind\":\"pageLink\",\"page\":\"smart_lists\",\"label\":\"Smart Lists\",\"icon\":\"list.today\",\"featureId\":\"settings.display\"},{\"kind\":\"setting\",\"key\":\"todayGroupByList\",\"label\":\"Group Today by list\",\"detail\":\"When off, tasks appear in one list with their project or area underneath.\"},{\"kind\":\"setting\",\"key\":\"todayShowCompleted\",\"label\":\"Show completed tasks\"},{\"kind\":\"setting\",\"key\":\"tasksShowAging\",\"label\":\"Fade inactive tasks\",\"detail\":\"Tasks without activity for 14 days fade out and move to Faded.\"},{\"kind\":\"setting\",\"key\":\"tasksShowFaded\",\"label\":\"Show faded tasks\",\"detail\":\"Show faded tasks in projects and areas.\"},{\"kind\":\"setting\",\"key\":\"tasksFilingSuggestions\",\"label\":\"Suggest where to file\",\"detail\":\"Learn where you usually file similar tasks.\"},{\"kind\":\"setting\",\"key\":\"badgeShowOverdue\",\"label\":\"Overdue app icon badge\"}]},{\"id\":\"appearance_root\",\"header\":\"Appearance\",\"mobilePresentation\":\"inline\",\"desktopTab\":\"general\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"accent_color\",\"label\":\"Accent\",\"icon\":\"settings.appearance\",\"featureId\":\"settings.display\"},{\"kind\":\"setting\",\"key\":\"textSizeStep\",\"label\":\"Text Size\"},{\"kind\":\"setting\",\"key\":\"tasksTitleLines\",\"label\":\"Title lines\",\"platforms\":[\"ios\",\"ipados\",\"android\"]},{\"kind\":\"setting\",\"key\":\"tasksSwipeLeadingAction\",\"label\"",
+        ":\"Swipe right\",\"detail\":\"Swipe left on a task to select multiple tasks. Swipe right runs this quick action.\",\"platforms\":[\"ios\",\"ipados\"]},{\"kind\":\"setting\",\"key\":\"loggingAnimationsEnabled\",\"label\":\"Completion animations\",\"icon\":\"settings.animations\"}]},{\"id\":\"meta_root\",\"mobilePresentation\":\"inline\",\"desktopTab\":null,\"items\":[{\"kind\":\"pageLink\",\"page\":\"privacy\",\"label\":\"Privacy\",\"icon\":\"settings.privacy\",\"featureId\":\"settings.display\"},{\"kind\":\"pageLink\",\"page\":\"about\",\"label\":\"About\",\"icon\":\"settings.about\",\"featureId\":\"settings.display\"}]}],\"pages\":[{\"id\":\"account\",\"title\":\"Account\",\"icon\":\"settings.account\",\"depth\":1,\"featureId\":\"sync.backend\",\"sections\":[{\"id\":\"profile\",\"footer\":\"Your name stays on this device, and syncs when you sign in.\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"account_profile_editor\",\"label\":\"Your name\",\"ownsKeys\":[\"welcomeName\"]}]},{\"id\":\"plan\",\"items\":[{\"kind\":\"pageLink\",\"page\":\"plus\",\"label\":\"Septena Plus\",\"icon\":\"settings.plus\",\"statusKey\":\"planStatus\",\"featureId\":\"sync.backend\"}]},{\"id\":\"sync\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"sync_account_status\"}]},{\"id\":\"sign_in_approval\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"sign_in_approval\",\"visibility\":\"signedIn\",\"featureId\":\"sync.backend\"}]},{\"id\":\"delete_account\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"delete_account\",\"visibility\":\"signedIn\",\"featureId\":\"account.delete\"}]}]},{\"id\":\"plus\",\"title\":\"Septena Plus\",\"icon\":\"settings.plus\",\"depth\":2,\"featureId\":\"sync.backend\",\"sections\":[{\"id\":\"offer\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"plus_offer\"}]}]},{\"id\":\"claude_pairing\",\"title\":\"Connect Claude\",\"icon\":\"settings.claude\",\"depth\":1,\"featureId\":\"agents.connector\",\"sections\":[{\"id\":\"connector\",\"header\":\"Connect Claude\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"claude_connector\",\"featureId\":\"agents.connector\"}]}]},{\"id\":\"ai_preferences\",\"title\":\"AI Preferences\",\"icon\":\"settings.ai_agents\",\"depth\":1,\"featureId\":\"ai.reach-dial\",\"sections\":[{\"id\":\"on_device\",\"header\":\"On-device intelligence\",\"platforms\":[\"ios\",\"ipados\",\"macos\"],\"items\":[{\"kind\":\"customSurface\",\"surface\":\"apple_intelligence_status\",\"label\":\"Apple Intelligence\",\"platforms\":[\"ios\",\"ipados\",\"macos\"],\"featureId\":\"ai.reach-dial\"}]},{\"id\":\"reach\",\"header\":\"Where AI runs\",\"footer\":\"Septena never runs AI on your data and never reads it. The intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets where requests may run.\",\"items\":[{\"kind\":\"setting\",\"key\":\"aiMode\",\"label\":\"AI Mode\"}]},{\"id\":\"explainer\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"ai_explainer\",\"label\":\"How AI helps with your tasks\",\"icon\":\"settings.about\"}]}]},{\"id\":\"calendar\",\"title\":\"Calendar\",\"icon\":\"settings.calendar\",\"depth\":1,\"featureId\":\"calendar.events\",\"sections\":[{\"id\":\"calendars\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"calendar_detail\",\"ownsKeys\":[\"tasksShowCalendarEvents\",\"calendarHiddenTitles\"],\"featureId\":\"calendar.events\"}]}]},{\"id\":\"reminders\",\"title\":\"Reminders\",\"icon\":\"settings.reminders\",\"depth\":1,\"platforms\":[\"ios\",\"ipados\",\"macos\"],\"featureId\":\"import.reminders\",\"sections\":[{\"id\":\"reminders\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"reminders_inbox\",\"platforms\":[\"ios\",\"ipados\",\"macos\"],\"featureId\":\"import.reminders\"}]}]},{\"id\":\"import_export\",\"title\":\"Import & Export\",\"icon\":\"settings.data\",\"depth\":1,\"featureId\":\"sync.backend\",\"sections\":[{\"id\":\"move_in\",\"header\":\"Move from another app\",\"footer\":\"Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import.\",\"platforms\":[\"ios\",\"ipados\",\"macos\"],\"items\":[{\"kind\":\"customSurface\",\"surface\":\"things_import\",\"label\":\"Import from Things\",\"icon\":\"settings.import\",\"platforms\":[\"ios\",\"ipados\",\"macos\"],\"featureId\":\"import.things\"}]},{\"id\":\"transfer\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"import_export\"}]}]},{\"id\":\"privacy\",\"title\":\"Privacy\",\"icon\":\"settings.privacy\",\"depth\":1,\"featureId\":\"settings.display\",\"sections\":[{\"id\":\"data_locality\",\"header\":\"Your data\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"privacy_explainer\",\"detail\":\"Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena's private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). Apple's on-device intelligence runs locally; you can connect Claude under AI & Agents.\"}]},{\"id\":\"telemetry\",\"header\":\"Anonymous usage data\",\"footer\":\"Your task text and titles are never sent through analytics. This setting syncs across your devices.\",\"items\":[{\"kind\":\"setting\",\"key\":\"telemetryLevel\",\"label\":\"Usage data\"}]}]},{\"id\":\"about\",\"title\":\"About\",\"icon\":\"settings.about\",\"depth\":1,\"featureId\":\"settings.display\",\"sections\":[{\"id\":\"version\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"about_header\",\"label\":\"Tasks that think with you\",\"detail\":\"Version {version}\"}]},{\"id\":\"actions\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"check_updates\",\"label\":\"Check for Updates…\",\"platforms\":[\"macos\",\"windows\"],\"featureId\":\"mac.updates\"},{\"kind\":\"customSurface\",\"surface\":\"reset_get_started\",\"label\":\"Show Get Started Again\"},{\"kind\":\"customSurface\",\"surface\":\"reset_first_run\",\"label\":\"Show Welcome Again\",\"featureId\":\"onboarding.first-run\"},{\"kind\":\"customSurface\",\"surface\":\"send_feedback\",\"label\":\"Send feedback\",\"icon\":\"settings.feedback\"}]},{\"id\":\"companion\",\"header\":\"Septena Life\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"septena_life_link\",\"label\":\"Open Septena Life\",\"detail\":\"Septena Life is the companion app for habits, training, food, sleep, mood, and health.\",\"icon\":\"settings.companion_app\"}]},{\"id\":\"advanced_link\",\"items\":[{\"kind\":\"pageLink\",\"page\":\"advanced\",\"label\":\"Advanced\",\"icon\":\"settings.advanced\",\"featureId\":\"settings.display\"}]}]},{\"id\":\"advanced\",\"title\":\"Advanced\",\"icon\":\"settings.advanced\",\"depth\":2,\"featureId\":\"settings.display\",\"sections\":[{\"id\":\"agent_tools\",\"header\":\"Agent tools\",\"footer\":\"The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples).\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"mcp_skills\",\"label\":\"MCP Skills\",\"icon\":\"settings.skills\",\"featureId\":\"agents.connector\"}]},{\"id\":\"diagnostics\",\"header\":\"Diagnostics\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"sync_diagnostics\",\"label\":\"Sync & storage diagnostics\",\"detail\":\"Changes the server refused appear here, newest first. The server kept its own version of each.\",\"icon\":\"settings.diagnostics\",\"featureId\":\"sync.backend\"},{\"kind\":\"customSurface\",\"surface\":\"diagnostics_weekly\",\"label\":\"Optional product diagnostics\",\"detail\":\"An opt-in weekly summary that helps improve Septena. You don't need it for updates, sync, or support.\",\"ownsKeys\":[\"diagnosticsEnabled\"]}]},{\"id\":\"data_tools\",\"header\":\"Data tools\",\"footer\":\"Paste raw Septena JSON directly from the clipboard to restore or merge records.\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"paste_json_import\",\"label\":\"Paste JSON Backup…\",\"icon\":\"settings.paste\",\"featureId\":\"sync.backend\"}]},{\"id\":\"beta_ai\",\"header\":\"AI diagnostics\",\"platforms\":[\"ios\",\"ipados\",\"macos\"],\"items\":[{\"kind\":\"setting\",\"key\":\"showModelLabels\",\"label\":\"Show model labels\",\"detail\":\"Show which model answered next to each AI reply.\"},{\"kind\":\"setting\",\"key\":\"pccRoutingEnabled\",\"label\":\"Use Private Cloud Compute\",\"detail\":\"Requires the PCC entitlement. Without it, requests fail and fall back on-device.\",\"visibility\":\"minAppleOS27\"},{\"kind\":\"setting\",\"key\":\"pccReasoning\",\"label\":\"Private Cloud Compute reasoning\",\"visibility\":\"minAppleOS27\"}]}]},{\"id\":\"smart_lists\",\"title\":\"Smart Lists\",\"icon\":\"list.today\",\"depth\":1,\"featureId\":\"settings.display\",\"sections\":[{\"id\":\"smart_lists\",\"items\":[{\"kind\":\"customSurface\",\"surface\":\"smart_lists_editor\",\"ownsKeys\":[\"smartListOrder\",\"smartListHidden\"]}]}]}]}",
+    ).joinToString("")
+    val destinationsJson: String = listOf(
+        "{\"version\":1,\"description\":\"Canonical smart lists, navigation destinations, aliases, shortcuts, behavior flags, and empty states (ADR 0015).\",\"viewAliases\":{\"someday\":\"anytime\",\"unscheduled\":\"anytime\",\"triage\":\"inbox\"},\"destinations\":[{\"id\":\"inbox\",\"navigationKey\":\"triage\",\"serverView\":\"triage\",\"title\":\"Inbox\",\"icon\":\"list.inbox\",\"visibility\":\"todayBand\",\"canHide\":false,\"countRule\":\"triage\",\"supportsManualOrder\":false,\"supportsGroupByList\":false,\"showsCalendarAgenda\":false,\"showsInboxBand\":false,\"supportsInlineCreate\":true,\"dropBehavior\":\"clearPlace\",\"featureId\":\"lists.inbox\",\"emptyState\":{\"title\":\"Inbox is empty\",\"detail\":\"New tasks wait here until you schedule or file them.\"}},{\"id\":\"today\",\"navigationKey\":\"today\",\"serverView\":\"today\",\"title\":\"Today\",\"icon\":\"list.today\",\"sidebarOrder\":0,\"visibility\":\"always\",\"canHide\":false,\"shortcut\":{\"key\":\"1\",\"modifiers\":[\"primary\"]},\"countRule\":\"openTodayPlusInbox\",\"supportsManualOrder\":true,\"supportsGroupByList\":true,\"showsCalendarAgenda\":true,\"showsInboxBand\":true,\"supportsInlineCreate\":true,\"dropBehavior\":\"setToday\",\"featureId\":\"lists.today\",\"emptyState\":{\"title\":\"Nothing on Today\",\"detail\":\"Add a task or move one here when you want to work on it today.\"}},{\"id\":\"review\",\"navigationKey\":\"review\",\"serverView\":\"all\",\"title\":\"Review\",\"icon\":\"list.review\",\"sidebarOrder\":1,\"visibility\":\"whenNonEmpty\",\"canHide\":true,\"countRule\":\"needsVerify\",\"supportsManualOrder\":false,\"supportsGroupByList\":false,\"showsCalendarAgenda\":false,\"showsInboxBand\":false,\"supportsInlineCreate\":false,\"dropBehavior\":\"none\",\"featureId\":\"lists.review\",\"emptyState\":{\"title\":\"Nothing to review\",\"detail\":\"Work an agent finished appears here so you can check and accept it.\"}},{\"id\":\"agent\",\"navigationKey\":\"agent\",\"serverView\":\"all\",\"title\":\"Agent\",\"icon\":\"list.agent\",\"sidebarOrder\":2,\"visibility\":\"whenNonEmpty\",\"canHide\":true,\"countRule\":\"agentWork\",\"supportsManualOrder\":false,\"supportsGroupByList\":false,\"showsCalendarAgenda\":false,\"showsInboxBand\":false,\"supportsInlineCreate\":false,\"dropBehavior\":\"none\",\"featureId\":\"lists.agent\",\"groups\":[{\"id\":\"queued\",\"title\":\"Queued\",\"icon\":\"agent.queued\"},{\"id\":\"working\",\"title\":\"Working\",\"icon\":\"agent.working\"},{\"id\":\"yourTurn\",\"title\":\"Your turn\",\"icon\":\"agent.your_turn\"},{\"id\":\"review\",\"title\":\"Review\",\"icon\":\"list.review\"},{\"id\":\"done\",\"title\":\"Done\",\"icon\":\"agent.done\"}],\"emptyState\":{\"title\":\"No agent work\",\"detail\":\"Tasks you assign to Claude appear here, grouped by where the work stands.\"}},{\"id\":\"upcoming\",\"navigationKey\":\"upcoming\",\"serverView\":\"upcoming\",\"title\":\"Upcoming\",\"icon\":\"list.upcoming\",\"sidebarOrder\":3,\"visibility\":\"always\",\"canHide\":true,\"shortcut\":{\"key\":\"2\",\"modifiers\":[\"primary\"]},\"countRule\":\"openUpcoming\",\"supportsManualOrder\":false,\"supportsGroupByList\":false,\"showsCalendarAgenda\":true,\"showsInboxBand\":false,\"supportsInlineCreate\":false,\"dropBehavior\":\"scheduleTomorrow\",\"featureId\":\"lists.upcoming\",\"emptyState\":{\"title\":\"Nothing upcoming\",\"detail\":\"Tasks with a future When or Deadline date appear here.\"}},{\"id\":\"repeating\",\"navigationKey\":\"repeating\",\"serverView\":\"all\",\"title\":\"Repeating\",\"icon\":\"list.repeating\",\"sidebarOrder\":4,\"visibility\":\"always\",\"canHide\":true,\"countRule\":\"openRepeating\",\"supportsManualOrder\":false,\"supportsGroupByList\":false,\"showsCalendarAgenda\":false,\"showsInboxBand\":false,\"supportsInlineCreate\":false,\"dropBehavior\":\"none\",\"featureId\":\"lists.repeating\",\"emptyState\":{\"title\":\"No repeating tasks\",\"detail\":\"Give any task a Repeat rule and it will show up here.\"}},{\"id\":\"anytime\",\"navigationKey\":\"unscheduled\",\"serverView\":\"unscheduled\",\"title\":\"Anytime\",\"icon\":\"list.anytime\",\"sidebarOrder\":5,\"visibility\":\"always\",\"canHide\":true,\"shortcut\":{\"key\":\"3\",\"modifiers\":[\"primary\"]},\"countRule\":\"openAnytime\",\"supportsManualOrder\":true,\"supportsGroupByList\":false,\"showsCalendarAgenda\":false,\"showsInboxBand\":false,\"supportsInlineCreate\":true,\"dropBehavior\":\"clearDates\",\"featureId\":\"lists.anytime\",\"emptyState\":{\"title\":\"Nothing in Anytime\",\"detail\":\"Open tasks without a date live here.\"}},{\"id\":\"logbook\",\"navigationKey\":\"logbook\",\"serverView\":\"logbook\",\"title\":\"Logbook\",\"icon\":\"list.logbook\",\"sidebarOrder\":6,\"visibility\":\"always\",\"canHide\":true,\"shortcut\":{\"key\":\"4\",\"modifiers\":[\"primary\"]},\"countRule\":\"doneToday\",\"supportsManualOrder\":false,\"supportsGroupByList\":false,\"showsCalendarAgenda\":false,\"showsInboxBand\":false,\"supportsInlineCreate\":false,\"dropBehavior\":\"complete\",\"featureId\":\"lists.logbook\",\"emptyState\":{\"title\":\"Logbook is empty\",\"detail\":\"Completed and let-go tasks are archived here.\"}},{\"id\":\"starred\",\"navigationKey\":\"starred\",\"serverView\":\"all\",\"title\":\"Starred\",\"icon\":\"list.starred\",\"sidebarOrder\":7,\"visibility\":\"whenNonEmpty\",\"canHide\":true,\"countRule\":\"openStarred\",\"supportsManualOrder\":false,\"supportsGroupByList\":false,\"showsCalendarAgenda\":false,\"showsInboxBand\":false,\"supportsInlineCreate\":true,\"dropBehavior\":\"none\",\"featureId\":\"lists.starred\",\"emptyState\":{\"title\":\"No Starred Tasks\",\"detail\":\"Star important tasks to keep them one tap away.\"}},{\"id\":\"faded\",\"navigationKey\":\"faded\",\"serverView\":\"all\",\"title\":\"Faded\",\"icon\":\"list.faded\",\"sidebarOrder\":8,\"visibility\":\"whenNonEmpty\",\"canHide\":true,\"countRule\":\"openFaded\",\"supportsManualOrder\":false,\"supportsGroupByList\":false,\"showsCalendarAgenda\":false,\"showsInboxBand\":false,\"supportsInlineCreate\":false,\"dropBehavior\":\"none\",\"featureId\":\"lists.faded\",\"emptyState\":{\"title\":\"No Faded Tasks\",\"detail\":\"Undated tasks without activity for 14 days appear here until you keep them or let them go.\"}},{\"id\":\"recentlyDeleted\",\"navigationKey\":\"recentlyDeleted\",\"serverView\":\"all\",\"title\":\"Recently Deleted\",\"icon\":\"list.recently_deleted\",\"sidebarOrder\":9,\"visibility\":\"whenNonEmpty\",\"canHide\":true,\"countRule\":\"deleted\",\"supportsManualOrder\":false,\"supportsGroupByList\":false,\"showsCalendarAgenda\":false,\"showsInboxBand\":false,\"supportsInlineCreate\":false,\"dropBehavior\":\"delete\",\"featureId\":\"lists.recently-deleted\",\"emptyState\":{\"title\":\"No Recently Deleted Tasks\",\"detail\":\"Deleted tasks appear here for 30 days before being permanently removed.\"}}],\"genericEmptyState\":{\"title\":\"Nothing here yet\",\"detail\":\"Type above to add your first task.\",\"pointerDetail\":\"Click + or double-click below to add a task.\",\"touchDetail\":\"Tap + to add a task.\",\"syncingTitle\":\"Syncing…\"}}",
+    ).joinToString("")
+    val actionsJson: String = listOf(
+        "{\"version\":1,\"description\":\"Canonical actions, platform-neutral shortcuts, context menus, menu bar groups, swipe slots, and generated shortcuts catalogue (ADR 0015).\",\"actions\":{\"task.editDetails\":{\"title\":\"Edit Details…\",\"desktopTitle\":\"Rename\",\"icon\":\"action.edit_details\",\"role\":\"default\",\"shortcut\":{\"key\":\"r\",\"modifiers\":[\"primary\"]},\"availability\":{\"selection\":\"single\",\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"lists.today\"},\"task.toggleInfo\":{\"title\":\"Show Info\",\"activeTitle\":\"Hide Info\",\"icon\":\"action.edit_details\",\"role\":\"default\",\"shortcut\":{\"key\":\"i\",\"modifiers\":[\"primary\",\"alt\"]},\"availability\":{\"selection\":\"any\",\"platforms\":[\"macos\",\"web\",\"windows\"]},\"featureId\":\"mac.keyboard\"},\"task.copy\":{\"title\":\"Copy\",\"icon\":\"action.copy\",\"role\":\"default\",\"shortcut\":{\"key\":\"c\",\"modifiers\":[\"primary\"]},\"availability\":{\"selection\":\"any\"},\"featureId\":\"lists.today\"},\"task.duplicate\":{\"title\":\"Duplicate\",\"pluralTitle\":\"Duplicate Tasks\",\"icon\":\"action.duplicate\",\"role\":\"default\",\"shortcut\":{\"key\":\"d\",\"modifiers\":[\"primary\"]},\"availability\":{\"selection\":\"any\",\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"lists.today\"},\"task.toggleComplete\":{\"title\":\"Mark as Complete\",\"icon\":\"action.complete\",\"role\":\"default\",\"shortcut\":{\"key\":\"k\",\"modifiers\":[\"primary\"]},\"availability\":{\"selection\":\"any\",\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"lists.today\"},\"task.cancel\":{\"title\":\"Cancel Task\",\"pluralTitle\":\"Cancel Tasks\",\"icon\":\"action.cancel\",\"role\":\"default\",\"shortcut\":{\"key\":\"k\",\"modifiers\":[\"primary\",\"alt\"]},\"availability\":{\"selection\":\"any\",\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"lists.today\"},\"task.toggleToday\":{\"title\":\"Toggle Today\",\"addTitle\":\"Move to Today\",\"removeTitle\":\"Remove from Today\",\"shortTitle\":\"Today\",\"icon\":\"action.today_add\",\"role\":\"default\",\"shortcut\":{\"key\":\"t\",\"modifiers\":[\"primary\"]},\"availability\":{\"selection\":\"any\",\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"lists.today\"},\"task.toggleStar\":{\"title\":\"Toggle Star\",\"addTitle\":\"Star\",\"removeTitle\":\"Remove Star\",\"icon\":\"action.star\",\"role\":\"default\",\"shortcut\":{\"key\":\"s\",\"modifiers\":[\"primary\",\"alt\"]},\"availability\":{\"selection\":\"any\",\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"lists.starred\"},\"task.tags\":{\"title\":\"Tags…\",\"icon\":\"action.tag\",\"role\":\"default\",\"shortcut\":{\"key\":\"t\",\"modifiers\":[\"primary\",\"shift\"]},\"availability\":{\"selection\":\"any\",\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"task.tags\"},\"task.addChecklistItem\":{\"title\":\"Add Checklist Item\",\"icon\":\"action.checklist\",\"role\":\"default\",\"shortcut\":{\"key\":\"c\",\"modifiers\":[\"primary\",\"shift\"]},\"availability\":{\"selection\":\"single\",\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"task.checklists\"},\"task.when\":{\"title\":\"When…\",\"shortTitle\":\"Schedule\",\"icon\":\"action.when\",\"role\":\"default\",\"shortcut\":{\"key\":\"s\",\"modifiers\":[\"primary\"]},\"availability\":{\"selection\":\"any\",\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"task.when-deadline\"},\"task.deadline\":{\"title\":\"Deadline…\",\"icon\":\"action.deadline\",\"role\":\"default\",\"shortcut\":{\"key\":\"d\",\"modifiers\":[\"primary\",\"shift\"]},\"availability\":{\"selection\":\"any\",\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"task.when-deadline\"},\"task.reminder\":{\"title\":\"Reminder…\",\"addTitle\":\"Add Reminder…\",\"icon\":\"action.reminder\",\"role\":\"default\",\"shortcut\":{\"key\":\"r\",\"modifiers\":[\"primary\",\"alt\"]},\"availability\":{\"selection\":\"single\",\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"task.alerts\"},\"task.move\":{\"title\":\"Move…\",\"pluralTitle\":\"Move Tasks\",\"shortTitle\":\"Move\",\"icon\":\"action.move\",\"role\":\"default\",\"shortcut\":{\"key\":\"m\",\"modifiers\":[\"primary\",\"shift\"],\"alternates\":[{\"key\":\"m\",\"modifiers\":[\"primary\"]}]},\"availability\":{\"selection\":\"any\",\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"places.projects\"},\"task.moveSuggested\":{\"title\":\"Move to Suggested List\",\"icon\":\"action.move\",\"role\":\"default\",\"shortcut\":{\"key\":\"m\",\"modifiers\":[\"primary\",\"alt\"]},\"availability\":{\"selection\":\"single\",\"excludeDestinations\":[\"logbook\",\"recentlyDeleted\"]},\"featureId\":\"edit.filing-suggestion\"},\"task.clearSchedule\":{\"title\":\"Clear Schedule\",\"icon\":\"action.clear_schedule\",\"role\":\"default\",\"shortcut\":{\"key\":\".\",\"modifiers\":[\"primary\",\"shift\"]},\"availability\":{\"selection\":\"any\",\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"task.when-deadline\"},\"task.repeat\":{\"title\":\"Repeat…\",\"icon\":\"action.repeat\",\"role\":\"default\",\"availability\":{\"selection\":\"any\",\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"task.repeat\"},\"task.pauseResumeRepeat\":{\"title\":\"Pause Repeat\",\"activeTitle\":\"Resume Repeat\",\"icon\":\"action.repeat_pause\",\"role\":\"default\",\"availability\":{\"selection\":\"any\",\"requiresRecurrence\":true,\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"task.repeat\"},\"task.createNextCopy\":{\"title\":\"Create Next Copy\",\"icon\":\"action.repeat_next_copy\",\"role\":\"default\",\"availability\":{\"selection\":\"single\",\"requiresRecurrence\":true,\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"task.repeat\"},\"task.delete\":{\"title\":\"Delete\",\"pluralTitle\":\"Delete Tasks\",\"icon\":\"action.delete\",\"role\":\"destructive\",\"shortcut\":{\"key\":\"delete\",\"modifiers\":[\"primary\"]},\"availability\":{\"selection\":\"any\",\"excludeDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"lists.recently-deleted\"},\"task.restore\":{\"title\":\"Restore\",\"icon\":\"action.restore\",\"role\":\"default\",\"availability\":{\"selection\":\"any\",\"onlyDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"lists.recently-deleted\"},\"task.deletePermanently\":{\"title\":\"Delete Permanently\",\"icon\":\"action.delete\",\"role\":\"destructive\",\"shortcut\":{\"key\":\"delete\",\"modifiers\":[\"primary\"]},\"availability\":{\"selection\":\"any\",\"onlyDestinations\":[\"recentlyDeleted\"]},\"featureId\":\"lists.recently-deleted\"},\"task.keepFaded\":{\"title\":\"Keep\",\"icon\":\"action.restore\",\"role\":\"default\",\"availability\":{\"selection\":\"any\",\"onlyDestinations\":[\"faded\"]},\"featureId\":\"fade.sweep\"},\"task.letGoFaded\":{\"title\":\"Let Go\",\"icon\":\"action.let_go\",\"role\":\"default\",\"availability\":{\"selection\":\"any\",\"onlyDestinations\":[\"faded\"]},\"featureId\":\"fade.sweep\"},\"area.newProject\":{\"title\":\"New Project in Area\",\"icon\":\"action.add\",\"role\":\"default\",\"availability\":{\"selection\":\"single\"},\"featureId\":\"places.projects\"},\"area.rename\":{\"title\":\"Rename\",\"icon\":\"action.rename\",\"role\":\"default\",\"availability\":{\"selection\":\"single\"},\"featureId\":\"places.areas\"},\"area.moveUp\":{\"title\":\"Move Up\",\"icon\":\"action.move_up\",\"role\":\"default\",\"availability\":{\"selection\":\"single\",\"platforms\":[\"ios\",\"ipados\",\"android\"]},\"featureId\":\"places.areas\"},\"area.moveDown\":{\"title\":\"Move Down\",\"icon\":\"action.move_down\",\"role\":\"default\",\"availability\":{\"selection\":\"single\",\"platforms\":[\"ios\",\"ipados\",\"android\"]},\"featureId\":\"places.areas\"},\"area.delete\":{\"title\":\"Delete Area\",\"icon\":\"action.delete\",\"role\":\"destructive\",\"availability\":{\"selection\":\"single\"},\"featureId\":\"places.areas\"},\"project.rename\":{\"title\":\"Rename\",\"icon\":\"action.rename\",\"role\":\"default\",\"availability\":{\"selection\":\"single\"},\"featureId\":\"places.projects\"},\"project.moveUp\":{\"title\":\"Move Up\",\"icon\":\"action.move_up\",\"role\":\"default\",\"availability\":{\"selection\":\"single\",\"platforms\":[\"ios\",\"ipados\",\"android\"]},\"featureId\":\"places.projects\"},\"project.moveDown\":{\"title\":\"Move Down\",\"icon\":\"action.move_down\",\"role\":\"default\",\"availability\":{\"selection\":\"single\",\"platforms\":[\"ios\",\"ipados\",\"android\"]},\"featureId\":\"places.projects\"},\"project.markDone\":{\"title\":\"Mark Done\",\"icon\":\"action.complete\",\"role\":\"default\",\"availability\":{\"selection\":\"single\"},\"featureId\":\"places.projects\"},\"project.cancel\":{\"title\":\"Cancel Project\",\"icon\":\"action.cancel\",\"role\":\"default\",\"availability\":{\"selection\":\"single\"},\"featureId\":\"places.projects\"},\"project.delete\":{\"title\":\"Delete Project\",\"icon\":\"action.delete\",\"role\":\"destructive\",\"availability\":{\"selection\":\"single\"},\"featureId\":\"places.projects\"},\"logged.clear\":{\"title\":\"Clear Logged…\",\"icon\":\"action.delete\",\"role\":\"destructive\",\"availability\":{\"selection\":\"none\"},\"featureId\":\"lists.logbook\"},\"sidebar.newArea\":{\"title\":\"New Area\",\"icon\":\"action.add\",\"role\":\"default\",\"availability\":{\"selection\":\"none\"},\"featureId\":\"places.areas\"},\"sidebar.newProject\":{\"title\":\"New Project\",\"icon\":\"action.add\",\"role\":\"default\",\"availability\":{\"selection\":\"none\"},\"featureId\":\"places.projects\"},\"section.new\":{\"title\":\"New Section\",\"icon\":\"action.add\",\"role\":\"default\",\"availability\":{\"selection\":\"none\"},\"featureId\":\"places.sections\"},\"section.newTask\":{\"title\":\"New Task in Section\",\"icon\":\"action.add\",\"role\":\"default\",\"availability\":{\"selection\":\"single\"},\"featureId\":\"places.sections\"},\"section.rename\":{\"title\":\"Rename\",\"icon\":\"action.rename\",\"role\":\"default\",\"shortcut\":{\"key\":\"r\",\"modifiers\":[\"primary\"]},\"availability\":{\"selection\":\"single\"},\"featureId\":\"places.sections\"},\"section.delete\":{\"title\":\"Delete Section\",\"icon\":\"action.delete\",\"role\":\"destructive\",\"availability\":{\"selection\":\"single\"},\"featureId\":\"places.sections\"},\"notice.openStep\":{\"title\":\"Open\",\"icon\":\"action.edit_details\",\"role\":\"default\",\"availability\":{\"selection\":\"single\"},\"featureId\":\"lists.today\"},\"notice.toggleStep\":{\"title\":\"Mark as Done\",\"activeTitle\":\"Mark as Not Done\",\"icon\":\"action.complete\",\"role\":\"default\",\"shortcut\":{\"key\":\"k\",\"modifiers\":[\"primary\"]},\"availability\":{\"selection\":\"any\"},\"featureId\":\"lists.today\"},\"notice.hideGetStarted\":{\"title\":\"Hide Get Started\",\"icon\":\"action.cancel\",\"role\":\"default\",\"availability\":{\"selection\":\"none\"},\"featureId\":\"lists.today\"},\"app.newTask\":{\"title\":\"New To-Do\",\"icon\":\"action.add\",\"role\":\"default\",\"shortcut\":{\"key\":\"n\",\"modifiers\":[\"primary\"]},\"availability\":{\"selection\":\"none\"},\"featureId\":\"lists.today\"},\"app.quickAdd\":{\"title\":\"Quick Add…\",\"icon\":\"action.add\",\"role\":\"default\",\"shortcut\":{\"key\":\"i\",\"modifiers\":[\"primary\"]},\"availability\":{\"selection\":\"none\",\"platforms\":[\"ios\",\"ipados\",\"web\",\"android\"]},\"featureId\":\"capture.quick-add\"},\"app.quickEntry\":{\"title\":\"Quick Entry\",\"icon\":\"action.add\",\"role\":\"default\",\"shortcut\":{\"key\":\"space\",\"modifiers\":[\"ctrl\",\"alt\"],\"globalCapture\":true},\"availability\":{\"selection\":\"none\",\"platforms\":[\"macos\",\"windows\"]},\"featureId\":\"capture.quick-entry\"},\"app.quickFind\":{\"title\":\"Quick Find…\",\"icon\":\"action.search\",\"role\":\"default\",\"shortcut\":{\"key\":\"f\",\"modifiers\":[\"primary\",\"shift\"]},\"availability\":{\"selection\":\"none\"},\"featureId\":\"find.quick-find\"},\"app.toggleSidebar\":{\"title\":\"Show / Hide Sidebar\",\"addTitle\":\"Show Sidebar\",\"removeTitle\":\"Hide Sidebar\",\"icon\":\"action.sidebar\",\"role\":\"default\",\"shortcut\":{\"key\":\"s\",\"modifiers\":[\"ctrl\",\"primary\"],\"excludePlatforms\":[\"ios\",\"ipados\"]},\"availability\":{\"selection\":\"none\"},\"featureId\":\"mac.keyboard\"},\"app.settings\":{\"title\":\"Settings…\",\"icon\":\"settings.tasks\",\"role\":\"default\",\"shortcut\":{\"key\":\",\",\"modifiers\":[\"primary\"]},\"availability\":{\"selection\":\"none\"},\"featureId\":\"settings.display\"},\"app.keyboardShortcuts\":{\"title\":\"Keyboard Shortcuts\",\"icon\":\"settings.about\",\"role\":\"default\",\"shortcut\":{\"key\":\"/\",\"modifiers\":[\"primary\",\"shift\"]},\"availability\":{\"selection\":\"none\"},\"featureId\":\"mac.keyboard\"},\"app.toggleSidebarCounts\":{\"title\":\"Show Sidebar Counts\",\"activeTitle\":\"Hide Sidebar Counts\",\"icon\":\"action.sidebar_counts\",\"role\":\"default\",\"availability\":{\"selection\":\"none\",\"platforms\":[\"macos\",\"ipados\",\"web\",\"windows\"]},\"featureId\":\"settings.display\"},\"app.textSizeIncrease\":{\"title\":\"Increase Text Size\",\"icon\":\"action.text_size\",\"role\":\"default\",\"shortcut\":{\"key\":\"+\",\"modifiers\":[\"primary\"]},\"availability\":{\"selection\":\"none\"},\"featureId\":\"settings.display\"},\"app.textSizeDecrease\":{\"title\":\"Decrease Text Size\",\"icon\":\"action.text_size\",\"role\":\"default\",\"shortcut\":{\"key\":\"-\",\"modifiers\":[\"primary\"]},\"availability\":{\"selection\":\"none\"},\"featureId\":\"settings.display\"},\"app.textSizeReset\":{\"title\":\"Reset Text Size\",\"icon\":\"action.text_size\",\"role\":\"default\",\"shortcut\":{\"key\":\"0\",\"modifiers\":[\"primary\"]},\"availability\":{\"selection\":\"none\"},\"featureId\":\"settings.display\"},\"app.septenaWindow\":{\"title\":\"Septena Window\",\"icon\":\"action.w",
+        "indow\",\"role\":\"default\",\"availability\":{\"selection\":\"none\",\"platforms\":[\"macos\"]},\"featureId\":\"mac.keyboard\"},\"app.classicWindow\":{\"title\":\"Classic Window\",\"icon\":\"action.window\",\"role\":\"default\",\"availability\":{\"selection\":\"none\",\"platforms\":[\"macos\"]},\"featureId\":\"mac.keyboard\"}},\"contextMenus\":{\"task.row\":[{\"kind\":\"action\",\"id\":\"task.editDetails\"},{\"kind\":\"action\",\"id\":\"task.toggleInfo\"},{\"kind\":\"action\",\"id\":\"task.duplicate\"},{\"kind\":\"divider\"},{\"kind\":\"submenu\",\"id\":\"complete\",\"title\":\"Complete\",\"icon\":\"action.complete\",\"items\":[{\"kind\":\"action\",\"id\":\"task.toggleComplete\"},{\"kind\":\"action\",\"id\":\"task.cancel\"},{\"kind\":\"divider\"},{\"kind\":\"action\",\"id\":\"task.delete\"}]},{\"kind\":\"action\",\"id\":\"task.toggleToday\"},{\"kind\":\"action\",\"id\":\"task.toggleStar\"},{\"kind\":\"action\",\"id\":\"task.tags\"},{\"kind\":\"submenu\",\"id\":\"schedule\",\"title\":\"Schedule\",\"icon\":\"action.schedule\",\"items\":[{\"kind\":\"action\",\"id\":\"task.when\"},{\"kind\":\"action\",\"id\":\"task.deadline\"},{\"kind\":\"action\",\"id\":\"task.reminder\"},{\"kind\":\"divider\"},{\"kind\":\"action\",\"id\":\"task.clearSchedule\"}]},{\"kind\":\"submenu\",\"id\":\"move\",\"title\":\"Move\",\"icon\":\"action.move\",\"items\":[{\"kind\":\"slot\",\"slot\":\"moveDestinations\"},{\"kind\":\"divider\"},{\"kind\":\"action\",\"id\":\"task.move\"}]},{\"kind\":\"submenu\",\"id\":\"moveToSection\",\"title\":\"Move to Section\",\"icon\":\"action.move_section\",\"items\":[{\"kind\":\"slot\",\"slot\":\"sectionDestinations\"}]},{\"kind\":\"action\",\"id\":\"task.repeat\"},{\"kind\":\"action\",\"id\":\"task.pauseResumeRepeat\"},{\"kind\":\"action\",\"id\":\"task.createNextCopy\"}],\"task.recentlyDeleted\":[{\"kind\":\"action\",\"id\":\"task.restore\"},{\"kind\":\"divider\"},{\"kind\":\"action\",\"id\":\"task.deletePermanently\"}],\"task.faded\":[{\"kind\":\"action\",\"id\":\"task.keepFaded\"},{\"kind\":\"action\",\"id\":\"task.letGoFaded\"},{\"kind\":\"divider\"},{\"kind\":\"action\",\"id\":\"task.delete\"}],\"sidebar.area\":[{\"kind\":\"action\",\"id\":\"area.newProject\"},{\"kind\":\"divider\"},{\"kind\":\"action\",\"id\":\"area.rename\"},{\"kind\":\"action\",\"id\":\"area.moveUp\"},{\"kind\":\"action\",\"id\":\"area.moveDown\"},{\"kind\":\"divider\"},{\"kind\":\"action\",\"id\":\"area.delete\"}],\"sidebar.project\":[{\"kind\":\"action\",\"id\":\"project.rename\"},{\"kind\":\"action\",\"id\":\"project.moveUp\"},{\"kind\":\"action\",\"id\":\"project.moveDown\"},{\"kind\":\"divider\"},{\"kind\":\"submenu\",\"id\":\"moveToArea\",\"title\":\"Move to Area\",\"icon\":\"action.move\",\"items\":[{\"kind\":\"slot\",\"slot\":\"moveToAreaDestinations\"}]},{\"kind\":\"divider\"},{\"kind\":\"action\",\"id\":\"project.markDone\"},{\"kind\":\"action\",\"id\":\"project.cancel\"},{\"kind\":\"divider\"},{\"kind\":\"action\",\"id\":\"project.delete\"}],\"sidebar.empty\":[{\"kind\":\"action\",\"id\":\"sidebar.newArea\"},{\"kind\":\"action\",\"id\":\"sidebar.newProject\"}],\"project.heading\":[{\"kind\":\"action\",\"id\":\"section.rename\"},{\"kind\":\"action\",\"id\":\"section.newTask\"},{\"kind\":\"divider\"},{\"kind\":\"action\",\"id\":\"section.delete\"}],\"project.blankSpace\":[{\"kind\":\"action\",\"id\":\"section.new\"}],\"scope.loggedFooter\":[{\"kind\":\"action\",\"id\":\"logged.clear\"}],\"notice.getStartedStep\":[{\"kind\":\"action\",\"id\":\"notice.openStep\"},{\"kind\":\"action\",\"id\":\"notice.toggleStep\"},{\"kind\":\"divider\"},{\"kind\":\"action\",\"id\":\"notice.hideGetStarted\"}]},\"menuBar\":[{\"id\":\"app\",\"title\":\"Septena\",\"system\":\"app\",\"items\":[{\"kind\":\"action\",\"id\":\"app.settings\"}]},{\"id\":\"file\",\"title\":\"File\",\"system\":\"file\",\"items\":[{\"kind\":\"action\",\"id\":\"app.newTask\"},{\"kind\":\"action\",\"id\":\"app.quickAdd\"}]},{\"id\":\"view\",\"title\":\"View\",\"system\":\"view\",\"items\":[{\"kind\":\"action\",\"id\":\"app.toggleSidebar\"},{\"kind\":\"action\",\"id\":\"task.toggleInfo\"},{\"kind\":\"action\",\"id\":\"app.toggleSidebarCounts\"},{\"kind\":\"divider\"},{\"kind\":\"submenu\",\"id\":\"textSize\",\"title\":\"Text Size\",\"icon\":\"action.text_size\",\"items\":[{\"kind\":\"slot\",\"slot\":\"textSizeSteps\"},{\"kind\":\"divider\"},{\"kind\":\"action\",\"id\":\"app.textSizeIncrease\"},{\"kind\":\"action\",\"id\":\"app.textSizeDecrease\"},{\"kind\":\"action\",\"id\":\"app.textSizeReset\"}]}]},{\"id\":\"go\",\"title\":\"Go\",\"items\":[{\"kind\":\"destination\",\"id\":\"today\"},{\"kind\":\"destination\",\"id\":\"review\"},{\"kind\":\"destination\",\"id\":\"agent\"},{\"kind\":\"destination\",\"id\":\"upcoming\"},{\"kind\":\"destination\",\"id\":\"repeating\"},{\"kind\":\"destination\",\"id\":\"anytime\"},{\"kind\":\"destination\",\"id\":\"logbook\"},{\"kind\":\"divider\"},{\"kind\":\"action\",\"id\":\"app.quickFind\"},{\"kind\":\"divider\"},{\"kind\":\"action\",\"id\":\"app.septenaWindow\"},{\"kind\":\"action\",\"id\":\"app.classicWindow\"},{\"kind\":\"action\",\"id\":\"app.quickEntry\"}]},{\"id\":\"task\",\"title\":\"Task\",\"items\":[{\"kind\":\"action\",\"id\":\"sidebar.newProject\"},{\"kind\":\"action\",\"id\":\"sidebar.newArea\"},{\"kind\":\"divider\"},{\"kind\":\"action\",\"id\":\"task.editDetails\",\"titleField\":\"desktopTitle\"},{\"kind\":\"action\",\"id\":\"task.duplicate\"},{\"kind\":\"divider\"},{\"kind\":\"submenu\",\"id\":\"complete\",\"title\":\"Complete\",\"icon\":\"action.complete\",\"items\":[{\"kind\":\"action\",\"id\":\"task.toggleComplete\"},{\"kind\":\"action\",\"id\":\"task.cancel\"},{\"kind\":\"divider\"},{\"kind\":\"action\",\"id\":\"task.delete\"}]},{\"kind\":\"action\",\"id\":\"task.toggleToday\"},{\"kind\":\"action\",\"id\":\"task.toggleStar\"},{\"kind\":\"action\",\"id\":\"task.tags\"},{\"kind\":\"action\",\"id\":\"task.addChecklistItem\"},{\"kind\":\"action\",\"id\":\"task.when\"},{\"kind\":\"action\",\"id\":\"task.deadline\"},{\"kind\":\"action\",\"id\":\"task.reminder\"},{\"kind\":\"action\",\"id\":\"task.move\"},{\"kind\":\"action\",\"id\":\"task.clearSchedule\"},{\"kind\":\"action\",\"id\":\"task.repeat\"},{\"kind\":\"action\",\"id\":\"task.createNextCopy\"}]},{\"id\":\"help\",\"title\":\"Help\",\"system\":\"help\",\"items\":[{\"kind\":\"action\",\"id\":\"app.keyboardShortcuts\"}]}],\"swipeActions\":{\"featureId\":\"edit.swipe-actions\",\"leading\":[\"task.toggleToday\",\"task.when\"],\"trailing\":[\"task.move\",\"task.delete\"]},\"shortcutsSheet\":[{\"id\":\"general\",\"title\":\"General\",\"actionIds\":[\"app.newTask\",\"app.quickAdd\",\"app.quickFind\",\"app.toggleSidebar\",\"app.settings\",\"app.keyboardShortcuts\"]},{\"id\":\"taskList\",\"title\":\"Task list\",\"actionIds\":[\"task.editDetails\",\"task.toggleInfo\",\"task.copy\",\"task.duplicate\",\"task.toggleComplete\",\"task.cancel\",\"task.toggleToday\",\"task.toggleStar\",\"task.tags\",\"task.addChecklistItem\",\"task.when\",\"task.deadline\",\"task.reminder\",\"task.move\",\"task.moveSuggested\",\"task.clearSchedule\",\"task.delete\"]}]}",
+    ).joinToString("")
+    val surfacesJson: String = listOf(
+        "{\"version\":1,\"description\":\"Notices, destructive/fork prompts, toast contracts, and task composer/inspector attribute definitions (ADR 0015, docs/SEPTASK_APPKIT_SURFACES.md).\",\"notices\":{\"maxConcurrentExplainers\":1,\"items\":[{\"id\":\"signIn\",\"kind\":\"actionNeeded\",\"priority\":0,\"icon\":\"notice.sign_in\",\"dismissScope\":\"device\",\"dismissible\":true,\"title\":\"Not signed in\",\"primaryTitle\":\"Sign in…\",\"featureId\":\"sync.backend\",\"detail\":\"Your changes stay on this device until you sign in.\",\"platformDetails\":[{\"platforms\":[\"macos\"],\"detail\":\"Your changes stay on this Mac until you sign in.\"},{\"platforms\":[\"ipados\"],\"detail\":\"Your changes stay on this iPad until you sign in.\"},{\"platforms\":[\"ios\"],\"detail\":\"Your changes stay on this iPhone until you sign in.\"}]},{\"id\":\"rolledIn\",\"kind\":\"info\",\"priority\":1,\"icon\":\"notice.rolled_in\",\"dismissScope\":\"accountDay\",\"dismissible\":true,\"featureId\":\"lists.today\",\"title\":{\"one\":\"1 task rolled into Today\",\"other\":\"{count} tasks rolled into Today\"}},{\"id\":\"getStarted\",\"kind\":\"info\",\"priority\":2,\"explainerSlot\":true,\"icon\":\"notice.get_started\",\"dismissScope\":\"account\",\"dismissible\":true,\"title\":\"Get started with Septena\",\"featureId\":\"lists.today\",\"steps\":[{\"id\":\"connectAI\",\"title\":\"Connect your AI\",\"detail\":\"Connect an assistant to your tasks\"},{\"id\":\"importTasks\",\"title\":\"Bring in your tasks\",\"detail\":\"Import from another app\"},{\"id\":\"addTask\",\"title\":\"Add your first task\",\"detail\":\"It lands in your Inbox until you schedule or file it\",\"platformDetails\":[{\"platforms\":[\"macos\"],\"detail\":\"Or press ⌃⌥Space anywhere on your Mac\"}]}]},{\"id\":\"weeklySweep\",\"kind\":\"info\",\"priority\":3,\"icon\":\"notice.weekly_sweep\",\"dismissScope\":\"accountWeek\",\"dismissible\":true,\"title\":{\"one\":\"1 task faded this week\",\"other\":\"{count} tasks faded this week\"},\"primaryTitle\":\"Sweep\",\"featureId\":\"fade.sweep\"},{\"id\":\"fadedPile\",\"kind\":\"info\",\"priority\":5,\"icon\":\"notice.weekly_sweep\",\"dismissScope\":\"none\",\"dismissible\":false,\"title\":\"Tasks without activity for 14 days\",\"detail\":\"Open a task or choose Keep to bring it back, or sweep the list to let the rest go.\",\"primaryTitle\":\"Sweep…\",\"featureId\":\"lists.faded\"},{\"id\":\"fadeIntro\",\"kind\":\"info\",\"priority\":4,\"explainerSlot\":true,\"icon\":\"notice.fade_intro\",\"dismissScope\":\"device\",\"dismissible\":true,\"title\":\"Inactive tasks start to fade\",\"detail\":\"Undated tasks fade after 14 days without activity and move to Faded. Open or edit a task to bring it back. You can turn this off in Settings.\",\"featureId\":\"task.aging\"}]},\"prompts\":{\"safetyContract\":{\"cancelIsDefaultButton\":true,\"confirmCarriesDestructiveRole\":true},\"cancelTitle\":\"Cancel\",\"items\":[{\"id\":\"deletePermanently\",\"kind\":\"destructive\",\"title\":{\"one\":\"Delete this task permanently?\",\"other\":\"Delete {count} tasks permanently?\"},\"message\":\"You can't undo this.\",\"confirmTitle\":\"Delete Permanently\",\"featureId\":\"lists.recently-deleted\"},{\"id\":\"deleteSection\",\"kind\":\"destructive\",\"title\":\"Delete this section?\",\"message\":\"Its tasks stay in the project.\",\"confirmTitle\":\"Delete Section\",\"featureId\":\"places.sections\"},{\"id\":\"deleteArea\",\"kind\":\"destructive\",\"confirmTitle\":\"Delete\",\"untitledName\":\"Area\",\"counts\":[\"projects\",\"tasks\"],\"variants\":[{\"id\":\"empty\",\"when\":{\"projects\":0,\"tasks\":0},\"title\":\"Delete “{name}”?\",\"message\":\"You can undo this.\"},{\"id\":\"tasksOnly\",\"when\":{\"projects\":0},\"title\":\"Delete “{name}” and its {taskPhrase}?\",\"message\":\"The tasks move to Recently Deleted. You can undo this.\"},{\"id\":\"projectsOnly\",\"when\":{\"tasks\":0},\"title\":\"Delete “{name}” and its {projectPhrase}?\",\"message\":\"You can undo this.\",\"l10nKeys\":{\"title\":\"Delete “{name}” and its {projectPhrase}? (projects only)\"}},{\"id\":\"projectsAndTasks\",\"title\":\"Delete “{name}”, its {projectPhrase} and {taskPhrase}?\",\"message\":\"The tasks move to Recently Deleted. You can undo this.\"}],\"featureId\":\"places.areas\"},{\"id\":\"deleteProject\",\"kind\":\"destructive\",\"confirmTitle\":\"Delete\",\"untitledName\":\"Project\",\"counts\":[\"tasks\"],\"variants\":[{\"id\":\"empty\",\"when\":{\"tasks\":0},\"title\":\"Delete “{name}”?\",\"message\":\"You can undo this.\"},{\"id\":\"withTasks\",\"title\":\"Delete “{name}” and its {taskPhrase}?\",\"message\":\"The tasks move to Recently Deleted. You can undo this.\"}],\"featureId\":\"places.projects\"},{\"id\":\"clearLogged\",\"kind\":\"destructive\",\"title\":{\"one\":\"Clear 1 logged item from “{name}”?\",\"other\":\"Clear {count} logged items from “{name}”?\"},\"message\":\"Cleared items move to Recently Deleted. You can undo this.\",\"confirmTitle\":\"Clear\",\"featureId\":\"lists.logbook\"},{\"id\":\"deleteAccount\",\"kind\":\"destructive\",\"title\":\"Delete Account?\",\"message\":\"Your tasks, areas, projects, and conversations are erased from the server and this device.\",\"confirmTitle\":\"Delete Account\",\"featureId\":\"account.delete\"},{\"id\":\"rescheduleFixedRepeat\",\"kind\":\"fork\",\"title\":\"Reschedule repeating task?\",\"message\":\"Move only this task, or update the repeating schedule to the new date?\",\"options\":[{\"id\":\"exception\",\"title\":\"Only This Task\"},{\"id\":\"updateRule\",\"title\":\"Update Schedule\"}],\"featureId\":\"task.repeat\"}],\"countPhrases\":[{\"id\":\"tasks\",\"label\":{\"one\":\"1 task\",\"other\":\"{count} tasks\"}},{\"id\":\"projects\",\"label\":{\"one\":\"1 project\",\"other\":\"{count} projects\"}}],\"text\":[{\"id\":\"newSection\",\"title\":\"New Section\",\"placeholder\":\"Section name\",\"confirmTitle\":\"Add\",\"featureId\":\"places.sections\"},{\"id\":\"renameSection\",\"title\":\"Rename Section\",\"placeholder\":\"Section name\",\"confirmTitle\":\"Rename\",\"featureId\":\"places.sections\"},{\"id\":\"newArea\",\"title\":\"New Area\",\"placeholder\":\"Area name\",\"confirmTitle\":\"Create\",\"featureId\":\"places.areas\"},{\"id\":\"renameArea\",\"title\":\"Rename Area\",\"placeholder\":\"Area name\",\"confirmTitle\":\"Rename\",\"featureId\":\"places.areas\"},{\"id\":\"newProject\",\"title\":\"New Project\",\"placeholder\":\"Project name\",\"confirmTitle\":\"Create\",\"featureId\":\"places.projects\"},{\"id\":\"renameProject\",\"title\":\"Rename Project\",\"placeholder\":\"Project name\",\"confirmTitle\":\"Rename\",\"featureId\":\"places.projects\"}],\"error\":{\"title\":\"Error\",\"confirmTitle\":\"OK\"}},\"toasts\":{\"durationSeconds\":7,\"templates\":{\"deferred\":{\"format\":\"Deferred to {date}\",\"undoable\":false},\"moved\":{\"format\":\"Moved to {destination}\",\"undoable\":true},\"deletedSingle\":{\"format\":\"\\\"{title}\\\" deleted\",\"emptyTitleFormat\":\"Task deleted\",\"undoable\":true},\"deletedBulk\":{\"format\":{\"one\":\"Task deleted\",\"other\":\"{count} tasks deleted\"},\"undoable\":true},\"movedBulk\":{\"format\":{\"one\":\"Moved to {destination}\",\"other\":\"Moved {count} tasks to {destination}\"},\"undoable\":true}}},\"firstRun\":{\"featureId\":\"onboarding.first-run\",\"completionSetting\":\"onboardedAt\",\"prompts\":{\"setup\":\"Set up Septena for me using https://septena.app/agents.md\",\"first\":\"Set up my Septena areas, projects, and tasks by following https://api.septena.app/onboard.md\"},\"steps\":[{\"id\":\"welcome\",\"kind\":\"intro\",\"icon\":\"onboarding.welcome\",\"title\":\"Welcome to Septena\",\"body\":\"A task list you share with your AI.\",\"points\":[{\"icon\":\"onboarding.devices\",\"title\":\"On every device\",\"detail\":\"Your tasks stay in step on iPhone, iPad and Mac.\"},{\"icon\":\"onboarding.agent\",\"title\":\"Work with Claude\",\"detail\":\"Claude can take a task, ask you a question, and hand back the result.\"},{\"icon\":\"onboarding.notes\",\"title\":\"Notes keep the context\",\"detail\":\"Each project has notes, so you and Claude know what it's for.\"}],\"primary\":{\"title\":\"Continue\",\"action\":\"next\"}},{\"id\":\"account\",\"kind\":\"account\",\"icon\":\"onboarding.account\",\"title\":\"Sign in to sync\",\"body\":\"Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.\",\"footnote\":\"If you skip this, your tasks stay on this device until you sign in.\",\"skipWhen\":\"signedIn\",\"primary\":{\"title\":\"Sign in with Apple\",\"action\":\"signIn\"},\"secondary\":{\"title\":\"Not now\",\"action\":\"next\"}},{\"id\":\"moveIn\",\"kind\":\"choices\",\"icon\":\"onboarding.move_in\",\"title\":\"Bring your tasks\",\"body\":\"Start from the list you already have, or start empty.\",\"completesGetStartedStep\":\"importTasks\",\"choices\":[{\"id\":\"things\",\"icon\":\"onboarding.things\",\"title\":\"From Things\",\"detail\":\"Copies your areas, projects and tasks. Nothing in Things changes.\",\"action\":\"importThings\",\"platforms\":[\"ios\",\"ipados\",\"macos\"]},{\"id\":\"reminders\",\"icon\":\"settings.reminders\",\"title\":\"From Reminders\",\"detail\":\"Pick a Reminders list. Its items wait in your Inbox until you bring them in.\",\"action\":\"importReminders\",\"platforms\":[\"ios\",\"ipados\",\"macos\"]},{\"id\":\"fresh\",\"icon\":\"onboarding.fresh\",\"title\":\"Start empty\",\"detail\":\"Add tasks as they come up.\",\"action\":\"next\",\"platforms\":[\"ios\",\"ipados\",\"macos\",\"web\",\"android\",\"windows\"]}]},{\"id\":\"connectClaude\",\"kind\":\"connectAgent\",\"icon\":\"settings.claude\",\"title\":\"Connect Claude\",\"body\":\"Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.\",\"requires\":\"signedIn\",\"completesGetStartedStep\":\"connectAI\",\"instructions\":[\"Copy the setup prompt and paste it into Claude.\",\"When Claude shows a code, enter it below.\",\"Paste the first prompt. Claude sets up your areas and projects with you.\"],\"primary\":{\"title\":\"Copy setup prompt\",\"action\":\"copySetupPrompt\"},\"tertiary\":{\"title\":\"Copy first prompt\",\"action\":\"copyFirstPrompt\"},\"secondary\":{\"title\":\"Later\",\"action\":\"next\"},\"afterDone\":{\"title\":\"Continue\",\"action\":\"next\"}},{\"id\":\"done\",\"kind\":\"finish\",\"icon\":\"onboarding.done\",\"title\":\"You're all set\",\"body\":\"Today shows what to do now. Anything you skipped stays on the Get started list.\",\"returningTitle\":\"Welcome back\",\"returningBody\":\"This account is already set up. Your tasks are syncing to this device.\",\"primary\":{\"title\":\"Open Today\",\"action\":\"finish\"}}]},\"taskAttributes\":[{\"id\":\"notes\",\"label\":\"Notes\",\"icon\":\"action.notes\",\"commitContract\":\"closeCommits\",\"surfaceTier\":\"field\",\"featureId\":\"task.notes\"},{\"id\":\"when\",\"label\":\"When\",\"icon\":\"action.when\",\"commitContract\":\"pickCommits\",\"surfaceTier\":\"popover\",\"featureId\":\"task.when-deadline\"},{\"id\":\"deadline\",\"label\":\"Deadline\",\"icon\":\"action.deadline\",\"commitContract\":\"pickCommits\",\"surfaceTier\":\"popover\",\"featureId\":\"task.when-deadline\"},{\"id\":\"reminder\",\"label\":\"Remind\",\"icon\":\"action.reminder\",\"commitContract\":\"pickCommits\",\"surfaceTier\":\"popover\",\"featureId\":\"task.alerts\"},{\"id\":\"repeat\",\"label\":\"Repeat\",\"icon\":\"action.repeat\",\"commitContract\":\"closeCommits\",\"surfaceTier\":\"popover\",\"featureId\":\"task.repeat\"},{\"id\":\"star\",\"label\":\"Star\",\"icon\":\"action.star\",\"commitContract\":\"pickCommits\",\"surfaceTier\":\"inline\",\"featureId\":\"lists.starred\"},{\"id\":\"list\",\"label\":\"List\",\"icon\":\"action.move\",\"commitContract\":\"pickCommits\",\"surfaceTier\":\"popover\",\"featureId\":\"places.projects\"},{\"id\":\"tags\",\"label\":\"Tags\",\"countLabel\":{\"one\":\"{count} tag\",\"other\":\"{count} tags\"},\"icon\":\"action.tag\",\"commitContract\":\"pickCommits\",\"surfaceTier\":\"popover\",\"featureId\":\"task.tags\",\"editOnly\":true},{\"id\":\"checklist\",\"label\":\"Checklist\",\"icon\":\"action.checklist\",\"commitContract\":\"pickCommits\",\"surfaceTier\":\"inline\",\"featureId\":\"task.checklists\",\"editOnly\":true},{\"id\":\"attachments\",\"label\":\"Attachments\",\"countLabel\":{\"one\":\"{count} file\",\"other\":\"{count} files\"},\"icon\":\"action.attachment\",\"commitContract\":\"pickCommits\",\"surfaceTier\":\"inline\",\"featureId\":\"task.attachments\",\"editOnly\":true},{\"id\":\"discuss\",\"label\":\"Discuss\",\"workingLabel\":\"Thinking…\",\"icon\":\"action.discuss\",\"commitContract\":\"closeCommits\",\"surfaceTier\":\"inline\",\"featureId\":\"ai.discuss\",\"editOnly\":true},{\"id\":\"paste\",\"label\":\"Paste\",\"icon\":\"action.paste\",\"commitContract\":\"pickCommits\",\"surfaceTier\":\"chip\",\"featureId\":\"capture.quick-entry\"}]}",
+    ).joinToString("")
+    val conformanceJson: String = listOf(
+        "{\"convo-derived\":{\"version\":1,\"description\":\"Golden conformance vectors for deriveConvo and awaitsReasoning across Swift, TypeScript, and Kotlin.\",\"cases\":[{\"name\":\"empty conversation with no assignee\",\"convo\":{\"thread\":[]},\"expected\":{\"stage\":\"open\",\"badge\":null,\"pendingReasoning\":false}},{\"name\":\"empty conversation assigned to claude is pending reasoning\",\"convo\":{\"assignee\":\"claude\",\"thread\":[]},\"expected\":{\"stage\":\"open\",\"badge\":null,\"pendingReasoning\":true}},{\"name\":\"provider turn with options awaits human\",\"convo\":{\"assignee\":\"claude\",\"thread\":[{\"seq\":1,\"role\":\"provider\",\"step\":\"decide\",\"question\":\"Which option?\",\"options\":[\"A\",\"B\"],\"ts\":\"2026-11-20T10:00:00Z\"}]},\"expected\":{\"stage\":\"awaitingHuman\",\"badge\":\"needsYou\",\"pendingReasoning\":true}},{\"name\":\"user answered provider question -> clarifying/working\",\"convo\":{\"assignee\":\"claude\",\"thread\":[{\"seq\":1,\"role\":\"provider\",\"step\":\"decide\",\"question\":\"Which option?\",\"options\":[\"A\",\"B\"],\"ts\":\"2026-11-20T10:00:00Z\"},{\"seq\":2,\"role\":\"user\",\"step\":\"decide\",\"chosen\":\"A\",\"inReplyTo\":1,\"ts\":\"2026-11-20T10:05:00Z\"}]},\"expected\":{\"stage\":\"clarifying\",\"badge\":\"working\",\"pendingReasoning\":true}},{\"name\":\"confirmed intent with user reply -> inProgress/working\",\"convo\":{\"assignee\":\"claude\",\"confirmedIntent\":\"Draft and test\",\"thread\":[{\"seq\":1,\"role\":\"user\",\"step\":\"work\",\"note\":\"Go ahead\",\"ts\":\"2026-11-20T10:05:00Z\"}]},\"expected\":{\"stage\":\"inProgress\",\"badge\":\"working\",\"pendingReasoning\":true}},{\"name\":\"low-confidence local provider turn triggers pendingReasoning\",\"convo\":{\"assignee\":\"local\",\"thread\":[{\"seq\":1,\"role\":\"provider\",\"step\":\"ground\",\"provider\":\"onDevice\",\"confidence\":0.3,\"note\":\"Uncertain\",\"ts\":\"2026-11-20T10:00:00Z\"}]},\"expected\":{\"stage\":\"clarifying\",\"badge\":\"working\",\"pendingReasoning\":true}},{\"name\":\"stoppedAt halts pendingReasoning and clears badge\",\"convo\":{\"assignee\":\"claude\",\"stoppedAt\":\"2026-11-20T11:00:00Z\",\"thread\":[{\"seq\":1,\"role\":\"user\",\"step\":\"work\",\"note\":\"Start\",\"ts\":\"2026-11-20T10:00:00Z\"}]},\"expected\":{\"stage\":\"inProgress\",\"badge\":null,\"pendingReasoning\":false}},{\"name\":\"needs_verify awaits human review and stops agent queue\",\"convo\":{\"assignee\":\"claude\",\"endState\":\"needs_verify\",\"endStateNote\":\"Check PR #10\",\"thread\":[]},\"expected\":{\"stage\":\"awaitingHuman\",\"badge\":\"needsYou\",\"pendingReasoning\":false}},{\"name\":\"agent_done is terminal done\",\"convo\":{\"assignee\":\"claude\",\"endState\":\"agent_done\",\"thread\":[]},\"expected\":{\"stage\":\"terminal\",\"badge\":\"done\",\"pendingReasoning\":false}},{\"name\":\"wont_do is terminal wontDo\",\"convo\":{\"assignee\":\"claude\",\"endState\":\"wont_do\",\"thread\":[]},\"expected\":{\"stage\":\"terminal\",\"badge\":\"wontDo\",\"pendingReasoning\":false}}]},\"recurrence\":{\"version\":1,\"description\":\"Golden conformance vectors for recurrence arithmetic (nextScheduledDate, occurrenceID) across Swift, TypeScript, and Kotlin (docs/RECURRENCE_V2_SPEC.md).\",\"nextScheduledDate\":[{\"name\":\"daily after completion advances from completedOn\",\"input\":{\"completedOn\":\"2026-11-21\",\"scheduled\":\"2026-11-18\",\"logicalScheduled\":null,\"unit\":\"day\",\"interval\":3,\"afterCompletion\":true},\"expected\":\"2026-11-24\"},{\"name\":\"weekly fixed schedule catches up strictly past completedOn\",\"input\":{\"completedOn\":\"2026-11-21\",\"scheduled\":\"2026-11-01\",\"logicalScheduled\":null,\"unit\":\"week\",\"interval\":1,\"afterCompletion\":false},\"expected\":\"2026-11-22\"},{\"name\":\"monthly fixed schedule clamps Jan 31 -> Feb 28 (non-leap year)\",\"input\":{\"completedOn\":\"2026-01-31\",\"scheduled\":\"2026-01-31\",\"logicalScheduled\":null,\"unit\":\"month\",\"interval\":1,\"afterCompletion\":false},\"expected\":\"2026-02-28\"},{\"name\":\"monthly fixed schedule snaps Feb 28 -> Mar 31 (legacy keepMonthEnd without monthDay)\",\"input\":{\"completedOn\":\"2026-02-28\",\"scheduled\":\"2026-02-28\",\"logicalScheduled\":null,\"unit\":\"month\",\"interval\":1,\"afterCompletion\":false},\"expected\":\"2026-03-31\"},{\"name\":\"monthly fixed schedule snaps Jan 31 -> Feb 29 (leap year 2028)\",\"input\":{\"completedOn\":\"2028-01-31\",\"scheduled\":\"2028-01-31\",\"logicalScheduled\":null,\"unit\":\"month\",\"interval\":1,\"afterCompletion\":false},\"expected\":\"2028-02-29\"},{\"name\":\"monthly afterCompletion does NOT snap Feb 28 -> Mar 31\",\"input\":{\"completedOn\":\"2026-02-28\",\"scheduled\":\"2026-02-28\",\"logicalScheduled\":null,\"unit\":\"month\",\"interval\":1,\"afterCompletion\":true},\"expected\":\"2026-03-28\"},{\"name\":\"fixed schedule uses logicalScheduled when occurrence was rescheduled as an exception\",\"input\":{\"completedOn\":\"2026-11-22\",\"scheduled\":\"2026-11-22\",\"logicalScheduled\":\"2026-11-20\",\"unit\":\"week\",\"interval\":1,\"afterCompletion\":false},\"expected\":\"2026-11-27\"},{\"name\":\"fixed schedule with nil scheduled falls back to completedOn\",\"input\":{\"completedOn\":\"2026-11-21\",\"scheduled\":null,\"logicalScheduled\":null,\"unit\":\"day\",\"interval\":2,\"afterCompletion\":false},\"expected\":\"2026-11-23\"},{\"name\":\"interval <= 0 clamps to 1\",\"input\":{\"completedOn\":\"2026-11-21\",\"scheduled\":\"2026-11-21\",\"logicalScheduled\":null,\"unit\":\"day\",\"interval\":0,\"afterCompletion\":true},\"expected\":\"2026-11-22\"},{\"name\":\"unknown unit returns null\",\"input\":{\"completedOn\":\"2026-11-21\",\"scheduled\":\"2026-11-21\",\"logicalScheduled\":null,\"unit\":\"decade\",\"interval\":1,\"afterCompletion\":true},\"expected\":null},{\"name\":\"yearly fixed schedule advances 1 year\",\"input\":{\"completedOn\":\"2026-11-21\",\"scheduled\":\"2026-11-21\",\"logicalScheduled\":null,\"unit\":\"year\",\"interval\":1,\"afterCompletion\":false},\"expected\":\"2027-11-21\"},{\"name\":\"yearly fixed schedule every 2 years\",\"input\":{\"completedOn\":\"2026-03-15\",\"scheduled\":\"2026-03-15\",\"logicalScheduled\":null,\"unit\":\"year\",\"interval\":2,\"afterCompletion\":false},\"expected\":\"2028-03-15\"},{\"name\":\"yearly fixed Feb 29 clamps to Feb 28 in non-leap year\",\"input\":{\"completedOn\":\"2028-02-29\",\"scheduled\":\"2028-02-29\",\"logicalScheduled\":null,\"unit\":\"year\",\"interval\":1,\"afterCompletion\":false},\"expected\":\"2029-02-28\"},{\"name\":\"yearly fixed Feb 28 without monthDay does NOT drift to Feb 29 in leap year\",\"input\":{\"completedOn\":\"2027-02-28\",\"scheduled\":\"2027-02-28\",\"logicalScheduled\":null,\"unit\":\"year\",\"interval\":1,\"afterCompletion\":false},\"expected\":\"2028-02-28\"},{\"name\":\"yearly fixed with monthDay 29 returns to Feb 29 in leap year\",\"input\":{\"completedOn\":\"2027-02-28\",\"scheduled\":\"2027-02-28\",\"logicalScheduled\":null,\"unit\":\"year\",\"interval\":1,\"afterCompletion\":false,\"monthDay\":29},\"expected\":\"2028-02-29\"},{\"name\":\"yearly afterCompletion clamps Feb 29 -> Feb 28\",\"input\":{\"completedOn\":\"2028-02-29\",\"scheduled\":\"2028-02-29\",\"logicalScheduled\":null,\"unit\":\"year\",\"interval\":1,\"afterCompletion\":true},\"expected\":\"2029-02-28\"},{\"name\":\"yearly ordinal weekday (4th Thursday of November)\",\"input\":{\"completedOn\":\"2026-11-26\",\"scheduled\":\"2026-11-26\",\"logicalScheduled\":null,\"unit\":\"year\",\"interval\":1,\"afterCompletion\":false,\"ordinalWeekday\":{\"ordinal\":4,\"weekday\":5}},\"expected\":\"2027-11-25\"},{\"name\":\"weekdays (Mon-Fri) Thursday advances to Friday\",\"input\":{\"completedOn\":\"2026-11-19\",\"scheduled\":\"2026-11-19\",\"logicalScheduled\":null,\"unit\":\"week\",\"interval\":1,\"afterCompletion\":false,\"weekdays\":[2,3,4,5,6]},\"expected\":\"2026-11-20\"},{\"name\":\"weekdays (Mon-Fri) Friday advances to Monday\",\"input\":{\"completedOn\":\"2026-11-20\",\"scheduled\":\"2026-11-20\",\"logicalScheduled\":null,\"unit\":\"week\",\"interval\":1,\"afterCompletion\":false,\"weekdays\":[2,3,4,5,6]},\"expected\":\"2026-11-23\"},{\"name\":\"weekly Mon/Wed/Fri Monday advances to Wednesday\",\"input\":{\"completedOn\":\"2026-11-23\",\"scheduled\":\"2026-11-23\",\"logicalScheduled\":null,\"unit\":\"week\",\"interval\":1,\"afterCompletion\":false,\"weekdays\":[2,4,6]},\"expected\":\"2026-11-25\"},{\"name\":\"biweekly Mon/Thu stays in same ISO week Monday -> Thursday\",\"input\":{\"completedOn\":\"2026-11-23\",\"scheduled\":\"2026-11-23\",\"logicalScheduled\":null,\"unit\":\"week\",\"interval\":2,\"afterCompletion\":false,\"weekdays\":[2,5]},\"expected\":\"2026-11-26\"},{\"name\":\"biweekly Mon/Thu jumps 2 ISO weeks Thursday -> Monday\",\"input\":{\"completedOn\":\"2026-11-26\",\"scheduled\":\"2026-11-26\",\"logicalScheduled\":null,\"unit\":\"week\",\"interval\":2,\"afterCompletion\":false,\"weekdays\":[2,5]},\"expected\":\"2026-12-07\"},{\"name\":\"biweekly weekend (Sat/Sun) keeps Saturday -> Sunday in same ISO week\",\"input\":{\"completedOn\":\"2026-11-21\",\"scheduled\":\"2026-11-21\",\"logicalScheduled\":null,\"unit\":\"week\",\"interval\":2,\"afterCompletion\":false,\"weekdays\":[1,7]},\"expected\":\"2026-11-22\"},{\"name\":\"biweekly weekend (Sat/Sun) jumps 2 ISO weeks Sunday -> Saturday\",\"input\":{\"completedOn\":\"2026-11-22\",\"scheduled\":\"2026-11-22\",\"logicalScheduled\":null,\"unit\":\"week\",\"interval\":2,\"afterCompletion\":false,\"weekdays\":[1,7]},\"expected\":\"2026-12-05\"},{\"name\":\"weekly Mon/Wed/Fri catches up past overdue completed date\",\"input\":{\"completedOn\":\"2026-11-21\",\"scheduled\":\"2026-11-02\",\"logicalScheduled\":null,\"unit\":\"week\",\"interval\":1,\"afterCompletion\":false,\"weekdays\":[2,4,6]},\"expected\":\"2026-11-23\"},{\"name\":\"weekly afterCompletion ignores weekdays list\",\"input\":{\"completedOn\":\"2026-11-21\",\"scheduled\":\"2026-11-21\",\"logicalScheduled\":null,\"unit\":\"week\",\"interval\":1,\"afterCompletion\":true,\"weekdays\":[2,4,6]},\"expected\":\"2026-11-28\"},{\"name\":\"monthly explicit monthDay 31 clamps Jan 31 -> Feb 28\",\"input\":{\"completedOn\":\"2026-01-31\",\"scheduled\":\"2026-01-31\",\"logicalScheduled\":null,\"unit\":\"month\",\"interval\":1,\"afterCompletion\":false,\"monthDay\":31},\"expected\":\"2026-02-28\"},{\"name\":\"monthly explicit monthDay 31 recovers Feb 28 -> Mar 31\",\"input\":{\"completedOn\":\"2026-02-28\",\"scheduled\":\"2026-02-28\",\"logicalScheduled\":null,\"unit\":\"month\",\"interval\":1,\"afterCompletion\":false,\"monthDay\":31},\"expected\":\"2026-03-31\"},{\"name\":\"monthly explicit monthDay 28 stays on 28th (Feb 28 -> Mar 28)\",\"input\":{\"completedOn\":\"2026-02-28\",\"scheduled\":\"2026-02-28\",\"logicalScheduled\":null,\"unit\":\"month\",\"interval\":1,\"afterCompletion\":false,\"monthDay\":28},\"expected\":\"2026-03-28\"},{\"name\":\"monthly monthDay -1 (last day) Feb 28 -> Mar 31\",\"input\":{\"completedOn\":\"2026-02-28\",\"scheduled\":\"2026-02-28\",\"logicalScheduled\":null,\"unit\":\"month\",\"interval\":1,\"afterCompletion\":false,\"monthDay\":-1},\"expected\":\"2026-03-31\"},{\"name\":\"monthly monthDay -1 (last day) Jan 31 -> Feb 29 (leap year 2028)\",\"input\":{\"completedOn\":\"2028-01-31\",\"scheduled\":\"2028-01-31\",\"logicalScheduled\":null,\"unit\":\"month\",\"interval\":1,\"afterCompletion\":false,\"monthDay\":-1},\"expected\":\"2028-02-29\"},{\"name\":\"monthly ordinal 1st Monday\",\"input\":{\"completedOn\":\"2026-11-02\",\"scheduled\":\"2026-11-02\",\"logicalScheduled\":null,\"unit\":\"month\",\"interval\":1,\"afterCompletion\":false,\"ordinalWeekday\":{\"ordinal\":1,\"weekday\":2}},\"expected\":\"2026-12-07\"},{\"name\":\"monthly ordinal last Friday\",\"input\":{\"completedOn\":\"2026-11-27\",\"scheduled\":\"2026-11-27\",\"logicalScheduled\":null,\"unit\":\"month\",\"interval\":1,\"afterCompletion\":false,\"ordinalWeekday\":{\"ordinal\":-1,\"weekday\":6}},\"expected\":\"2026-12-25\"},{\"name\":\"monthly ordinal last Friday crosses year boundary\",\"input\":{\"completedOn\":\"2026-12-25\",\"scheduled\":\"2026-12-25\",\"logicalScheduled\":null,\"unit\":\"month\",\"interval\":1,\"afterCompletion\":false,\"ordinalWeekday\":{\"ordinal\":-1,\"weekday\":6}},\"expected\":\"2027-01-29\"},{\"name\":\"monthly ordinal 3rd Wednesday every 2 months\",\"input\":{\"completedOn\":\"2026-11-18\",\"scheduled\":\"2026-11-18\",\"logicalScheduled\":null,\"unit\":\"month\",\"interval\":2,\"afterCompletion\":false,\"ordinalWeekday\":{\"ordinal\":3,\"weekday\":4}},\"expected\":\"2027-01-20\"},{\"name\":\"monthly ordinal last Friday respects logicalScheduled exception\",\"input\":{\"completedOn\":\"2026-11-28\",\"scheduled\":\"2026-11-28\",\"logicalScheduled\":\"2026-11-27\",\"unit\":\"month\",\"interval\":1,\"afterCompletion\":false,\"ordinalWeekday\":{\"ordinal\":-1,\"weekday\":6}},\"expected\":\"2026-12-25\"}],\"occurrenceID\":[{\"sourceTaskID\":\"task-1\",\"scheduled\":\"2026-11-22\",\"expected\":\"recur-27f6e5d56dadf4cc\"},{\"sourceTaskID\":\"abc123\",\"scheduled\":\"2026-02-28\",\"expected\":\"recur-12eaeca9871bdc73\"},{\"sourceTaskID\":\"uuid:550e8400-e29b-41d4-a716-446655440000\",\"scheduled\":\"2028-02-29\",\"expected\":\"recur-ce4e773f079b1d92\"}]},\"reminders\":{\"version\":1,\"description\":\"Golden conformance vectors for timed task reminders (shiftReminderForRecurrence, shiftReminderOnReschedule, shouldArmReminder) acro",
+        "ss Swift, TypeScript, and Kotlin (docs/TIMED_REMINDERS_SPEC.md).\",\"shiftReminderForRecurrence\":[{\"name\":\"same-day floating reminder shifts to next scheduled date keeping HH:MM\",\"input\":{\"sourceReminderAt\":\"2026-11-21T09:30\",\"sourceScheduled\":\"2026-11-21\",\"nextScheduled\":\"2026-11-28\"},\"expected\":\"2026-11-28T09:30\"},{\"name\":\"offset floating reminder (1 day before) preserves -1 day offset\",\"input\":{\"sourceReminderAt\":\"2026-11-20T09:00\",\"sourceScheduled\":\"2026-11-21\",\"nextScheduled\":\"2026-12-21\"},\"expected\":\"2026-12-20T09:00\"},{\"name\":\"offset floating reminder crosses month boundary cleanly\",\"input\":{\"sourceReminderAt\":\"2026-11-29T18:15\",\"sourceScheduled\":\"2026-12-01\",\"nextScheduled\":\"2027-01-01\"},\"expected\":\"2026-12-30T18:15\"},{\"name\":\"fixed UTC reminder preserves time-of-day and Z suffix\",\"input\":{\"sourceReminderAt\":\"2026-11-21T14:00:00Z\",\"sourceScheduled\":\"2026-11-21\",\"nextScheduled\":\"2026-11-28\"},\"expected\":\"2026-11-28T14:00:00Z\"},{\"name\":\"nil sourceScheduled defaults to 0-day offset on nextScheduled\",\"input\":{\"sourceReminderAt\":\"2026-11-21T08:00\",\"sourceScheduled\":null,\"nextScheduled\":\"2026-11-24\"},\"expected\":\"2026-11-24T08:00\"},{\"name\":\"nil sourceReminderAt returns null\",\"input\":{\"sourceReminderAt\":null,\"sourceScheduled\":\"2026-11-21\",\"nextScheduled\":\"2026-11-28\"},\"expected\":null}],\"shiftReminderOnReschedule\":[{\"name\":\"same-day reminder moves with rescheduled date keeping time\",\"input\":{\"reminderAt\":\"2026-11-21T10:15\",\"oldScheduled\":\"2026-11-21\",\"newScheduled\":\"2026-11-25\"},\"expected\":\"2026-11-25T10:15\"},{\"name\":\"same-day fixed UTC reminder moves with rescheduled date keeping UTC suffix\",\"input\":{\"reminderAt\":\"2026-11-21T14:30:00Z\",\"oldScheduled\":\"2026-11-21\",\"newScheduled\":\"2026-11-25\"},\"expected\":\"2026-11-25T14:30:00Z\"},{\"name\":\"different-day reminder stays untouched on reschedule\",\"input\":{\"reminderAt\":\"2026-11-20T09:00\",\"oldScheduled\":\"2026-11-21\",\"newScheduled\":\"2026-11-25\"},\"expected\":\"2026-11-20T09:00\"},{\"name\":\"clearing scheduled date leaves reminder untouched\",\"input\":{\"reminderAt\":\"2026-11-21T10:15\",\"oldScheduled\":\"2026-11-21\",\"newScheduled\":null},\"expected\":\"2026-11-21T10:15\"},{\"name\":\"nil reminderAt stays null\",\"input\":{\"reminderAt\":null,\"oldScheduled\":\"2026-11-21\",\"newScheduled\":\"2026-11-25\"},\"expected\":null}],\"shouldArmReminder\":[{\"name\":\"open human task with reminderAt arms\",\"input\":{\"status\":\"open\",\"isDeleted\":false,\"isHeading\":false,\"isUnratifiedProposal\":false,\"reminderAt\":\"2026-11-22T09:00\",\"reminderDismissedAt\":null},\"expected\":true},{\"name\":\"unacknowledged agent proposal NEVER arms OS notification (ADR 0008)\",\"input\":{\"status\":\"open\",\"isDeleted\":false,\"isHeading\":false,\"isUnratifiedProposal\":true,\"reminderAt\":\"2026-11-22T09:00\",\"reminderDismissedAt\":null},\"expected\":false},{\"name\":\"completed task does not arm\",\"input\":{\"status\":\"done\",\"isDeleted\":false,\"isHeading\":false,\"isUnratifiedProposal\":false,\"reminderAt\":\"2026-11-22T09:00\",\"reminderDismissedAt\":null},\"expected\":false},{\"name\":\"cancelled task does not arm\",\"input\":{\"status\":\"cancelled\",\"isDeleted\":false,\"isHeading\":false,\"isUnratifiedProposal\":false,\"reminderAt\":\"2026-11-22T09:00\",\"reminderDismissedAt\":null},\"expected\":false},{\"name\":\"soft-deleted task does not arm\",\"input\":{\"status\":\"open\",\"isDeleted\":true,\"isHeading\":false,\"isUnratifiedProposal\":false,\"reminderAt\":\"2026-11-22T09:00\",\"reminderDismissedAt\":null},\"expected\":false},{\"name\":\"heading does not arm\",\"input\":{\"status\":\"open\",\"isDeleted\":false,\"isHeading\":true,\"isUnratifiedProposal\":false,\"reminderAt\":\"2026-11-22T09:00\",\"reminderDismissedAt\":null},\"expected\":false},{\"name\":\"dismissed reminder does not arm\",\"input\":{\"status\":\"open\",\"isDeleted\":false,\"isHeading\":false,\"isUnratifiedProposal\":false,\"reminderAt\":\"2026-11-22T09:00\",\"reminderDismissedAt\":\"2026-11-22T09:01:00Z\"},\"expected\":false},{\"name\":\"task without reminderAt does not arm\",\"input\":{\"status\":\"open\",\"isDeleted\":false,\"isHeading\":false,\"isUnratifiedProposal\":false,\"reminderAt\":null,\"reminderDismissedAt\":null},\"expected\":false}]},\"task-fade\":{\"version\":1,\"description\":\"Golden conformance vectors for TaskFade (rowOpacity, shouldFade, fadeFill). Run in Swift, TypeScript, and Kotlin.\",\"rowOpacity\":[{\"name\":\"nil fill stays opaque\",\"fill\":null,\"expected\":1},{\"name\":\"zero fill stays opaque\",\"fill\":0,\"expected\":1},{\"name\":\"negative fill clamps to opaque\",\"fill\":-0.5,\"expected\":1},{\"name\":\"midpoint fill interpolates linearly\",\"fill\":0.5,\"expected\":0.775},{\"name\":\"full fill hits minOpacity\",\"fill\":1,\"expected\":0.55},{\"name\":\"above-one fill clamps at minOpacity\",\"fill\":1.75,\"expected\":0.55}],\"shouldFade\":[{\"name\":\"untouched task under 14 days (13d 23h) does not fade\",\"input\":{\"isOpen\":true,\"isHeading\":false,\"isDeleted\":false,\"isFaded\":false,\"deadline\":null,\"scheduled\":null,\"hasRecurrence\":false,\"isAgentTurn\":false,\"isAssignedToClaude\":false,\"touchedAt\":null,\"createdAt\":\"2026-11-01T10:00:00Z\",\"created\":\"2026-11-01\",\"now\":\"2026-11-15T09:00:00Z\",\"today\":\"2026-11-15\"},\"expected\":false},{\"name\":\"untouched task at exactly 14 days fades\",\"input\":{\"isOpen\":true,\"isHeading\":false,\"isDeleted\":false,\"isFaded\":false,\"deadline\":null,\"scheduled\":null,\"hasRecurrence\":false,\"isAgentTurn\":false,\"isAssignedToClaude\":false,\"touchedAt\":null,\"createdAt\":\"2026-11-01T10:00:00Z\",\"created\":\"2026-11-01\",\"now\":\"2026-11-15T10:00:00Z\",\"today\":\"2026-11-15\"},\"expected\":true},{\"name\":\"touchedAt resets fade clock\",\"input\":{\"isOpen\":true,\"isHeading\":false,\"isDeleted\":false,\"isFaded\":false,\"deadline\":null,\"scheduled\":null,\"hasRecurrence\":false,\"isAgentTurn\":false,\"isAssignedToClaude\":false,\"touchedAt\":\"2026-11-10T12:00:00Z\",\"createdAt\":\"2026-10-01T12:00:00Z\",\"created\":\"2026-10-01\",\"now\":\"2026-11-20T12:00:00Z\",\"today\":\"2026-11-20\"},\"expected\":false},{\"name\":\"task with deadline never fades even if overdue\",\"input\":{\"isOpen\":true,\"isHeading\":false,\"isDeleted\":false,\"isFaded\":false,\"deadline\":\"2026-11-01\",\"scheduled\":null,\"hasRecurrence\":false,\"isAgentTurn\":false,\"isAssignedToClaude\":false,\"touchedAt\":null,\"createdAt\":\"2026-10-01T12:00:00Z\",\"created\":\"2026-10-01\",\"now\":\"2026-11-21T12:00:00Z\",\"today\":\"2026-11-21\"},\"expected\":false},{\"name\":\"task scheduled today or in future does not fade\",\"input\":{\"isOpen\":true,\"isHeading\":false,\"isDeleted\":false,\"isFaded\":false,\"deadline\":null,\"scheduled\":\"2026-11-21\",\"hasRecurrence\":false,\"isAgentTurn\":false,\"isAssignedToClaude\":false,\"touchedAt\":null,\"createdAt\":\"2026-10-01T12:00:00Z\",\"created\":\"2026-10-01\",\"now\":\"2026-11-21T12:00:00Z\",\"today\":\"2026-11-21\"},\"expected\":false},{\"name\":\"task scheduled in the past can fade\",\"input\":{\"isOpen\":true,\"isHeading\":false,\"isDeleted\":false,\"isFaded\":false,\"deadline\":null,\"scheduled\":\"2026-11-10\",\"hasRecurrence\":false,\"isAgentTurn\":false,\"isAssignedToClaude\":false,\"touchedAt\":null,\"createdAt\":\"2026-10-01T12:00:00Z\",\"created\":\"2026-10-01\",\"now\":\"2026-11-21T12:00:00Z\",\"today\":\"2026-11-21\"},\"expected\":true},{\"name\":\"repeating task never fades\",\"input\":{\"isOpen\":true,\"isHeading\":false,\"isDeleted\":false,\"isFaded\":false,\"deadline\":null,\"scheduled\":null,\"hasRecurrence\":true,\"isAgentTurn\":false,\"isAssignedToClaude\":false,\"touchedAt\":null,\"createdAt\":\"2026-10-01T12:00:00Z\",\"created\":\"2026-10-01\",\"now\":\"2026-11-21T12:00:00Z\",\"today\":\"2026-11-21\"},\"expected\":false},{\"name\":\"claude-assigned task never fades\",\"input\":{\"isOpen\":true,\"isHeading\":false,\"isDeleted\":false,\"isFaded\":false,\"deadline\":null,\"scheduled\":null,\"hasRecurrence\":false,\"isAgentTurn\":false,\"isAssignedToClaude\":true,\"touchedAt\":null,\"createdAt\":\"2026-10-01T12:00:00Z\",\"created\":\"2026-10-01\",\"now\":\"2026-11-21T12:00:00Z\",\"today\":\"2026-11-21\"},\"expected\":false}]},\"task-views\":{\"version\":1,\"description\":\"Golden conformance vectors for task view membership (isUnfiled, isInboxMember, inTriageBand, isOnToday, inInbox, daysOnToday, matchesView).\",\"today\":\"2026-11-21\",\"nowIso\":\"2026-11-21T12:00:00Z\",\"cases\":[{\"name\":\"loose human capture with no dates sits in Inbox and Today\",\"task\":{\"id\":\"t1\",\"title\":\"Buy milk\",\"status\":\"open\",\"today\":false,\"source\":\"app\",\"created\":\"2026-11-21\",\"createdAt\":\"2026-11-21T08:00:00Z\"},\"expected\":{\"isUnfiled\":true,\"isInboxMember\":true,\"inTriageBand\":true,\"isOnToday\":false,\"inInbox\":true,\"daysOnToday\":0,\"matchesView\":{\"today\":true,\"inbox\":true,\"upcoming\":false,\"anytime\":true}}},{\"name\":\"filed task pinned to Today 3 days ago\",\"task\":{\"id\":\"t2\",\"title\":\"Review ADR\",\"status\":\"open\",\"today\":true,\"todaySetOn\":\"2026-11-18\",\"area\":\"work\",\"source\":\"app\",\"created\":\"2026-11-15\",\"createdAt\":\"2026-11-15T08:00:00Z\"},\"expected\":{\"isUnfiled\":false,\"isInboxMember\":false,\"inTriageBand\":false,\"isOnToday\":true,\"inInbox\":false,\"daysOnToday\":3,\"matchesView\":{\"today\":true,\"inbox\":false,\"upcoming\":false,\"anytime\":false}}},{\"name\":\"unfiled task pinned to Today shows in Inbox and Today, not triage band\",\"task\":{\"id\":\"t3\",\"title\":\"Call GP\",\"status\":\"open\",\"today\":true,\"todaySetOn\":\"2026-11-20\",\"source\":\"app\",\"created\":\"2026-11-20\",\"createdAt\":\"2026-11-20T09:00:00Z\"},\"expected\":{\"isUnfiled\":true,\"isInboxMember\":true,\"inTriageBand\":false,\"isOnToday\":true,\"inInbox\":true,\"daysOnToday\":1,\"matchesView\":{\"today\":true,\"inbox\":true,\"upcoming\":false,\"anytime\":false}}},{\"name\":\"fresh MCP proposal scheduled for future stays in triage band until acknowledged\",\"task\":{\"id\":\"t4\",\"title\":\"Agent suggestion\",\"status\":\"open\",\"today\":false,\"scheduled\":\"2026-11-25\",\"source\":\"mcp\",\"created\":\"2026-11-20\",\"createdAt\":\"2026-11-20T12:00:00Z\"},\"expected\":{\"isUnfiled\":true,\"isInboxMember\":true,\"inTriageBand\":true,\"isOnToday\":false,\"inInbox\":true,\"daysOnToday\":0,\"matchesView\":{\"today\":true,\"inbox\":true,\"upcoming\":true,\"anytime\":false}}},{\"name\":\"acknowledged MCP proposal scheduled for future leaves triage band\",\"task\":{\"id\":\"t5\",\"title\":\"Acked agent task\",\"status\":\"open\",\"today\":false,\"scheduled\":\"2026-11-25\",\"source\":\"mcp\",\"created\":\"2026-11-20\",\"createdAt\":\"2026-11-20T12:00:00Z\",\"acknowledgedAt\":\"2026-11-20T13:00:00Z\"},\"expected\":{\"isUnfiled\":true,\"isInboxMember\":true,\"inTriageBand\":false,\"isOnToday\":false,\"inInbox\":false,\"daysOnToday\":0,\"matchesView\":{\"today\":false,\"inbox\":false,\"upcoming\":true,\"anytime\":false}}},{\"name\":\"decayed MCP proposal past 7d cue window leaves triage band\",\"task\":{\"id\":\"t6\",\"title\":\"Old MCP proposal\",\"status\":\"open\",\"today\":false,\"source\":\"mcp\",\"created\":\"2026-11-10\",\"createdAt\":\"2026-11-10T12:00:00Z\"},\"expected\":{\"isUnfiled\":true,\"isInboxMember\":true,\"inTriageBand\":false,\"isOnToday\":false,\"inInbox\":false,\"daysOnToday\":0,\"matchesView\":{\"today\":false,\"inbox\":false,\"upcoming\":false,\"anytime\":true}}},{\"name\":\"filed task scheduled in past arrives on Today with daysOnToday floored at created\",\"task\":{\"id\":\"t7\",\"title\":\"Backdated task\",\"status\":\"open\",\"today\":false,\"scheduled\":\"2026-11-10\",\"project\":\"p1\",\"source\":\"app\",\"created\":\"2026-11-19\",\"createdAt\":\"2026-11-19T08:00:00Z\"},\"expected\":{\"isUnfiled\":false,\"isInboxMember\":false,\"inTriageBand\":false,\"isOnToday\":true,\"inInbox\":false,\"daysOnToday\":2,\"matchesView\":{\"today\":true,\"inbox\":false,\"upcoming\":false,\"anytime\":false}}},{\"name\":\"project heading is excluded from every task view\",\"task\":{\"id\":\"h1\",\"title\":\"Phase 1\",\"status\":\"open\",\"kind\":\"heading\",\"today\":true,\"project\":\"p1\"},\"expected\":{\"isUnfiled\":false,\"isInboxMember\":false,\"inTriageBand\":false,\"isOnToday\":false,\"inInbox\":false,\"daysOnToday\":0,\"matchesView\":{\"today\":false,\"inbox\":false,\"upcoming\":false,\"anytime\":false}}},{\"name\":\"completed task is excluded from active views\",\"task\":{\"id\":\"t8\",\"title\":\"Shipped\",\"status\":\"done\",\"today\":true,\"completedAt\":\"2026-11-21T10:00:00Z\"},\"expected\":{\"isUnfiled\":true,\"isInboxMember\":false,\"inTriageBand\":false,\"isOnToday\":false,\"inInbox\":false,\"daysOnToday\":0,\"matchesView\":{\"today\":false,\"inbox\":false,\"upcoming\":false,\"anytime\":false}}}]}}",
+    ).joinToString("")
+    val localizationsJson: String = listOf(
+        "{\"en\":{\"1\":{\"text\":\"1\",\"paths\":[\"plans.outcomes.agents.rows.links.cells.account\"]},\"\\\"{title}\\\" deleted\":{\"text\":\"\\\"{title}\\\" deleted\",\"placeholders\":[\"title\"],\"paths\":[\"surfaces.toasts.templates.deletedSingle.format\"]},\"1, backed up\":{\"text\":\"1, backed up\",\"paths\":[\"plans.outcomes.everywhere.rows.devices.cells.account\"]},\"1, not synced\":{\"text\":\"1, not synced\",\"paths\":[\"plans.outcomes.everywhere.rows.devices.cells.device\"]},\"10 a month\":{\"text\":\"10 a month\",\"paths\":[\"plans.outcomes.agents.rows.runs.cells.account\"]},\"30 days\":{\"text\":\"30 days\",\"paths\":[\"plans.outcomes.nothing_lost.rows.history.cells.account\",\"plans.outcomes.nothing_lost.rows.deleted.cells.device\",\"plans.outcomes.nothing_lost.rows.deleted.cells.account\"]},\"365 days\":{\"text\":\"365 days\",\"paths\":[\"plans.outcomes.nothing_lost.rows.history.cells.plus\",\"plans.outcomes.nothing_lost.rows.deleted.cells.plus\"]},\"A free account allows 25 agent changes a day. Plus has no daily cap.\":{\"text\":\"A free account allows 25 agent changes a day. Plus has no daily cap.\",\"paths\":[\"plans.upsells.connector_cap.detail\"]},\"A free account shows 30 days of history. Plus shows a full year.\":{\"text\":\"A free account shows 30 days of history. Plus shows a full year.\",\"paths\":[\"plans.upsells.history_edge.detail\"]},\"A free account syncs one device. Plus syncs all of them. You can also move your free account to this device.\":{\"text\":\"A free account syncs one device. Plus syncs all of them. You can also move your free account to this device.\",\"paths\":[\"plans.upsells.second_device.detail\"]},\"A task list you share with your AI.\":{\"text\":\"A task list you share with your AI.\",\"paths\":[\"surfaces.firstRun.steps.welcome.body\"]},\"A year of change history, and a year to restore deleted tasks\":{\"text\":\"A year of change history, and a year to restore deleted tasks\",\"paths\":[\"plans.cards.plus.points.1\"]},\"AI & Agents\":{\"text\":\"AI & Agents\",\"paths\":[\"settings.desktopTabs.ai_agents.title\",\"settings.rootGroups.ai_agents_root.header\"]},\"AI Mode\":{\"text\":\"AI Mode\",\"paths\":[\"settings.pages.ai_preferences.sections.reach.items.0.label\"]},\"AI Preferences\":{\"text\":\"AI Preferences\",\"paths\":[\"settings.rootGroups.ai_agents_root.items.2.label\",\"settings.pages.ai_preferences.title\"]},\"AI diagnostics\":{\"text\":\"AI diagnostics\",\"paths\":[\"settings.pages.advanced.sections.beta_ai.header\"]},\"About\":{\"text\":\"About\",\"paths\":[\"settings.desktopTabs.about.title\",\"settings.rootGroups.meta_root.items.1.label\",\"settings.pages.about.title\"]},\"About €3.33 a month. You save €20 against paying monthly.\":{\"text\":\"About €3.33 a month. You save €20 against paying monthly.\",\"paths\":[\"plans.prices.annual.detail\"]},\"Accent\":{\"text\":\"Accent\",\"paths\":[\"settings.rootGroups.appearance_root.items.0.label\"]},\"Account\":{\"text\":\"Account\",\"paths\":[\"settings.desktopTabs.account.title\",\"settings.rootGroups.account_root.items.0.label\",\"settings.pages.account.title\"]},\"Add\":{\"text\":\"Add\",\"paths\":[\"surfaces.prompts.text.newSection.confirmTitle\"]},\"Add Checklist Item\":{\"text\":\"Add Checklist Item\",\"paths\":[\"actions.actions.task.addChecklistItem.title\"]},\"Add Reminder…\":{\"text\":\"Add Reminder…\",\"paths\":[\"actions.actions.task.reminder.addTitle\"]},\"Add a task or move one here when you want to work on it today.\":{\"text\":\"Add a task or move one here when you want to work on it today.\",\"paths\":[\"destinations.destinations.today.emptyState.detail\"]},\"Add tasks as they come up.\":{\"text\":\"Add tasks as they come up.\",\"paths\":[\"surfaces.firstRun.steps.moveIn.choices.fresh.detail\"]},\"Add your first task\":{\"text\":\"Add your first task\",\"paths\":[\"surfaces.notices.items.getStarted.steps.addTask.title\"]},\"Advanced\":{\"text\":\"Advanced\",\"paths\":[\"settings.pages.about.sections.advanced_link.items.0.label\",\"settings.pages.advanced.title\"]},\"Agent\":{\"text\":\"Agent\",\"paths\":[\"destinations.destinations.agent.title\"]},\"Agent runs\":{\"text\":\"Agent runs\",\"paths\":[\"plans.outcomes.agents.rows.runs.label\"]},\"Agent runs resume on the 1st\":{\"text\":\"Agent runs resume on the 1st\",\"paths\":[\"plans.upsells.agent_runs.title\"]},\"Agent tools\":{\"text\":\"Agent tools\",\"paths\":[\"settings.pages.advanced.sections.agent_tools.header\"]},\"All\":{\"text\":\"All\",\"paths\":[\"plans.outcomes.nothing_lost.rows.logbook.cells.device\",\"plans.outcomes.nothing_lost.rows.logbook.cells.plus\"]},\"All your devices\":{\"text\":\"All your devices\",\"paths\":[\"plans.outcomes.everywhere.rows.devices.cells.plus\"]},\"An opt-in weekly summary that helps improve Septena. You don't need it for updates, sync, or support.\":{\"text\":\"An opt-in weekly summary that helps improve Septena. You don't need it for updates, sync, or support.\",\"paths\":[\"settings.pages.advanced.sections.diagnostics.items.1.detail\"]},\"Anonymous usage data\":{\"text\":\"Anonymous usage data\",\"paths\":[\"settings.pages.privacy.sections.telemetry.header\"]},\"Anyone can join a shared project for free. Plus lets you create one and invite people.\":{\"text\":\"Anyone can join a shared project for free. Plus lets you create one and invite people.\",\"paths\":[\"plans.upsells.share_create.detail\"]},\"Anytime\":{\"text\":\"Anytime\",\"paths\":[\"destinations.destinations.anytime.title\"]},\"Appearance\":{\"text\":\"Appearance\",\"paths\":[\"settings.rootGroups.appearance_root.header\"]},\"Apple Intelligence\":{\"text\":\"Apple Intelligence\",\"paths\":[\"settings.pages.ai_preferences.sections.on_device.items.0.label\"]},\"Apple Watch through the server\":{\"text\":\"Apple Watch through the server\",\"paths\":[\"plans.outcomes.everywhere.rows.watch.label\"]},\"Area\":{\"text\":\"Area\",\"paths\":[\"surfaces.prompts.items.deleteArea.untitledName\"]},\"Area name\":{\"text\":\"Area name\",\"paths\":[\"surfaces.prompts.text.newArea.placeholder\",\"surfaces.prompts.text.renameArea.placeholder\"]},\"Areas, projects, sections, notes and attachments\":{\"text\":\"Areas, projects, sections, notes and attachments\",\"paths\":[\"plans.cards.free.points.1\"]},\"Attachments\":{\"text\":\"Attachments\",\"paths\":[\"surfaces.taskAttributes.attachments.label\"]},\"Automatic\":{\"text\":\"Automatic\",\"paths\":[\"settings.keys.aiMode.options.1.title\"]},\"Açaí\":{\"text\":\"Açaí\",\"paths\":[\"tokens.fruitAccents.acai.name\"]},\"Balanced\":{\"text\":\"Balanced\",\"paths\":[\"settings.keys.pccReasoning.options.1.title\"]},\"Baseline\":{\"text\":\"Baseline\",\"paths\":[\"tokens.textures.none.tag\"]},\"Bring in your tasks\":{\"text\":\"Bring in your tasks\",\"paths\":[\"surfaces.notices.items.getStarted.steps.importTasks.title\"]},\"Bring your tasks\":{\"text\":\"Bring your tasks\",\"paths\":[\"surfaces.firstRun.steps.moveIn.title\"]},\"Calendar\":{\"text\":\"Calendar\",\"paths\":[\"settings.rootGroups.connections_data_root.items.0.label\",\"settings.pages.calendar.title\"]},\"Cancel\":{\"text\":\"Cancel\",\"paths\":[\"surfaces.prompts.cancelTitle\"]},\"Cancel Project\":{\"text\":\"Cancel Project\",\"paths\":[\"actions.actions.project.cancel.title\"]},\"Cancel Task\":{\"text\":\"Cancel Task\",\"paths\":[\"actions.actions.task.cancel.title\"]},\"Cancel Tasks\":{\"text\":\"Cancel Tasks\",\"paths\":[\"actions.actions.task.cancel.pluralTitle\"]},\"Cancel at any time\":{\"text\":\"Cancel at any time\",\"paths\":[\"plans.promises.cancel.title\"]},\"Cancel at any time.\":{\"text\":\"Cancel at any time.\",\"paths\":[\"plans.prices.monthly.detail\"]},\"Carambola\":{\"text\":\"Carambola\",\"paths\":[\"tokens.fruitAccents.carambola.name\"]},\"Caustic Glass\":{\"text\":\"Caustic Glass\",\"paths\":[\"tokens.textures.causticGlass.name\"]},\"Change history\":{\"text\":\"Change history\",\"paths\":[\"plans.outcomes.nothing_lost.rows.history.label\"]},\"Changes the server refused appear here, newest first. The server kept its own version of each.\":{\"text\":\"Changes the server refused appear here, newest first. The server kept its own version of each.\",\"paths\":[\"settings.pages.advanced.sections.diagnostics.items.0.detail\"]},\"Check for Updates…\":{\"text\":\"Check for Updates…\",\"paths\":[\"settings.pages.about.sections.actions.items.0.label\"]},\"Checklist\":{\"text\":\"Checklist\",\"paths\":[\"surfaces.taskAttributes.checklist.label\"]},\"Classic Window\":{\"text\":\"Classic Window\",\"paths\":[\"actions.actions.app.classicWindow.title\"]},\"Claude can take a task, ask you a question, and hand back the result.\":{\"text\":\"Claude can take a task, ask you a question, and hand back the result.\",\"paths\":[\"surfaces.firstRun.steps.welcome.points.1.detail\"]},\"Claude connector\":{\"text\":\"Claude connector\",\"paths\":[\"plans.outcomes.agents.rows.connector.label\"]},\"Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.\":{\"text\":\"Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.\",\"paths\":[\"surfaces.firstRun.steps.connectClaude.body\"]},\"Clear\":{\"text\":\"Clear\",\"paths\":[\"surfaces.prompts.items.clearLogged.confirmTitle\"]},\"Clear Logged…\":{\"text\":\"Clear Logged…\",\"paths\":[\"actions.actions.logged.clear.title\"]},\"Clear Schedule\":{\"text\":\"Clear Schedule\",\"paths\":[\"actions.actions.task.clearSchedule.title\"]},\"Clear {count} logged items from “{name}”?\":{\"forms\":{\"one\":\"Clear 1 logged item from “{name}”?\",\"other\":\"Clear {count} logged items from “{name}”?\"},\"placeholders\":[\"count\",\"name\"],\"paths\":[\"surfaces.prompts.items.clearLogged.title\"]},\"Cleared items move to Recently Deleted. You can undo this.\":{\"text\":\"Cleared items move to Recently Deleted. You can undo this.\",\"paths\":[\"surfaces.prompts.items.clearLogged.message\"]},\"Click + or double-click below to add a task.\":{\"text\":\"Click + or double-click below to add a task.\",\"paths\":[\"destinations.genericEmptyState.pointerDetail\"]},\"Colorful\":{\"text\":\"Colorful\",\"paths\":[\"tokens.fruitAccents.colorful.name\"]},\"Complete\":{\"text\":\"Complete\",\"paths\":[\"settings.keys.tasksSwipeLeadingAction.options.4.title\",\"actions.contextMenus.task.row.complete.title\",\"actions.menuBar.task.items.complete.title\"]},\"Completed and let-go tasks are archived here.\":{\"text\":\"Completed and let-go tasks are archived here.\",\"paths\":[\"destinations.destinations.logbook.emptyState.detail\"]},\"Completion animations\":{\"text\":\"Completion animations\",\"paths\":[\"settings.rootGroups.appearance_root.items.4.label\"]},\"Connect Claude\":{\"text\":\"Connect Claude\",\"paths\":[\"settings.rootGroups.ai_agents_root.items.0.label\",\"settings.pages.claude_pairing.title\",\"settings.pages.claude_pairing.sections.connector.header\",\"surfaces.firstRun.steps.connectClaude.title\"]},\"Connect Claude or another agent to your list. It asks before it acts, and you can stop it at any time.\":{\"text\":\"Connect Claude or another agent to your list. It asks before it acts, and you can stop it at any time.\",\"paths\":[\"plans.outcomes.agents.detail\"]},\"Connect an assistant to your tasks\":{\"text\":\"Connect an assistant to your tasks\",\"paths\":[\"surfaces.notices.items.getStarted.steps.connectAI.detail\"]},\"Connect your AI\":{\"text\":\"Connect your AI\",\"paths\":[\"surfaces.notices.items.getStarted.steps.connectAI.title\"]},\"Connections & Data\":{\"text\":\"Connections & Data\",\"paths\":[\"settings.desktopTabs.connections_data.title\",\"settings.rootGroups.connections_data_root.header\"]},\"Continue\":{\"text\":\"Continue\",\"paths\":[\"surfaces.firstRun.steps.welcome.primary.title\",\"surfaces.firstRun.steps.connectClaude.afterDone.title\"]},\"Copies your areas, projects and tasks. Nothing in Things changes.\":{\"text\":\"Copies your areas, projects and tasks. Nothing in Things changes.\",\"paths\":[\"surfaces.firstRun.steps.moveIn.choices.things.detail\"]},\"Copy\":{\"text\":\"Copy\",\"paths\":[\"actions.actions.task.copy.title\"]},\"Copy first prompt\":{\"text\":\"Copy first prompt\",\"paths\":[\"surfaces.firstRun.steps.connectClaude.tertiary.title\"]},\"Copy setup prompt\":{\"text\":\"Copy setup prompt\",\"paths\":[\"surfaces.firstRun.steps.connectClaude.primary.title\"]},\"Copy the setup prompt and paste it into Claude.\":{\"text\":\"Copy the setup prompt and paste it into Claude.\",\"paths\":[\"surfaces.firstRun.steps.connectClaude.instructions.0\"]},\"Create\":{\"text\":\"Create\",\"paths\":[\"surfaces.prompts.text.newArea.confirmTitle\",\"surfaces.prompts.text.newProject.confirmTitle\"]},\"Create Next Copy\":{\"text\":\"Create Next Copy\",\"paths\":[\"actions.actions.task.createNextCopy.title\"]},\"Create and invite\":{\"text\":\"Create and invite\",\"paths\":[\"plans.outcomes.agents.rows.share.cells.plus\"]},\"Daily change limi",
+        "t reached\":{\"text\":\"Daily change limit reached\",\"paths\":[\"plans.upsells.connector_cap.title\"]},\"Data tools\":{\"text\":\"Data tools\",\"paths\":[\"settings.pages.advanced.sections.data_tools.header\"]},\"Deadline\":{\"text\":\"Deadline\",\"paths\":[\"surfaces.taskAttributes.deadline.label\"]},\"Deadline…\":{\"text\":\"Deadline…\",\"paths\":[\"actions.actions.task.deadline.title\"]},\"Decrease Text Size\":{\"text\":\"Decrease Text Size\",\"paths\":[\"actions.actions.app.textSizeDecrease.title\"]},\"Deferred to {date}\":{\"text\":\"Deferred to {date}\",\"placeholders\":[\"date\"],\"paths\":[\"surfaces.toasts.templates.deferred.format\"]},\"Delete\":{\"text\":\"Delete\",\"paths\":[\"actions.actions.task.delete.title\",\"surfaces.prompts.items.deleteArea.confirmTitle\",\"surfaces.prompts.items.deleteProject.confirmTitle\"]},\"Delete Account\":{\"text\":\"Delete Account\",\"paths\":[\"surfaces.prompts.items.deleteAccount.confirmTitle\"]},\"Delete Account?\":{\"text\":\"Delete Account?\",\"paths\":[\"surfaces.prompts.items.deleteAccount.title\"]},\"Delete Area\":{\"text\":\"Delete Area\",\"paths\":[\"actions.actions.area.delete.title\"]},\"Delete Permanently\":{\"text\":\"Delete Permanently\",\"paths\":[\"actions.actions.task.deletePermanently.title\",\"surfaces.prompts.items.deletePermanently.confirmTitle\"]},\"Delete Project\":{\"text\":\"Delete Project\",\"paths\":[\"actions.actions.project.delete.title\"]},\"Delete Section\":{\"text\":\"Delete Section\",\"paths\":[\"actions.actions.section.delete.title\",\"surfaces.prompts.items.deleteSection.confirmTitle\"]},\"Delete Tasks\":{\"text\":\"Delete Tasks\",\"paths\":[\"actions.actions.task.delete.pluralTitle\"]},\"Delete this section?\":{\"text\":\"Delete this section?\",\"paths\":[\"surfaces.prompts.items.deleteSection.title\"]},\"Delete {count} tasks permanently?\":{\"forms\":{\"one\":\"Delete this task permanently?\",\"other\":\"Delete {count} tasks permanently?\"},\"placeholders\":[\"count\"],\"paths\":[\"surfaces.prompts.items.deletePermanently.title\"]},\"Delete “{name}” and its {projectPhrase}? (projects only)\":{\"text\":\"Delete “{name}” and its {projectPhrase}?\",\"placeholders\":[\"name\",\"projectPhrase\"],\"paths\":[\"surfaces.prompts.items.deleteArea.variants.projectsOnly.title\"]},\"Delete “{name}” and its {taskPhrase}?\":{\"text\":\"Delete “{name}” and its {taskPhrase}?\",\"placeholders\":[\"name\",\"taskPhrase\"],\"paths\":[\"surfaces.prompts.items.deleteArea.variants.tasksOnly.title\",\"surfaces.prompts.items.deleteProject.variants.withTasks.title\"]},\"Delete “{name}”, its {projectPhrase} and {taskPhrase}?\":{\"text\":\"Delete “{name}”, its {projectPhrase} and {taskPhrase}?\",\"placeholders\":[\"name\",\"projectPhrase\",\"taskPhrase\"],\"paths\":[\"surfaces.prompts.items.deleteArea.variants.projectsAndTasks.title\"]},\"Delete “{name}”?\":{\"text\":\"Delete “{name}”?\",\"placeholders\":[\"name\"],\"paths\":[\"surfaces.prompts.items.deleteArea.variants.empty.title\",\"surfaces.prompts.items.deleteProject.variants.empty.title\"]},\"Deleted tasks appear here for 30 days before being permanently removed.\":{\"text\":\"Deleted tasks appear here for 30 days before being permanently removed.\",\"paths\":[\"destinations.destinations.recentlyDeleted.emptyState.detail\"]},\"Devices\":{\"text\":\"Devices\",\"paths\":[\"plans.outcomes.everywhere.rows.devices.label\"]},\"Diagnostics\":{\"text\":\"Diagnostics\",\"paths\":[\"settings.pages.advanced.sections.diagnostics.header\"]},\"Discuss\":{\"text\":\"Discuss\",\"paths\":[\"surfaces.taskAttributes.discuss.label\"]},\"Done\":{\"text\":\"Done\",\"paths\":[\"destinations.destinations.agent.groups.done.title\"]},\"Duplicate\":{\"text\":\"Duplicate\",\"paths\":[\"actions.actions.task.duplicate.title\"]},\"Duplicate Tasks\":{\"text\":\"Duplicate Tasks\",\"paths\":[\"actions.actions.task.duplicate.pluralTitle\"]},\"Each project has notes, so you and Claude know what it's for.\":{\"text\":\"Each project has notes, so you and Claude know what it's for.\",\"paths\":[\"surfaces.firstRun.steps.welcome.points.2.detail\"]},\"Early builds on TestFlight\":{\"text\":\"Early builds on TestFlight\",\"paths\":[\"plans.cards.plus.points.4\"]},\"Edit Details…\":{\"text\":\"Edit Details…\",\"paths\":[\"actions.actions.task.editDetails.title\"]},\"Elevation\":{\"text\":\"Elevation\",\"paths\":[\"tokens.textures.ridges.tag\"]},\"Error\":{\"text\":\"Error\",\"paths\":[\"surfaces.prompts.error.title\"]},\"Every few minutes\":{\"text\":\"Every few minutes\",\"paths\":[\"plans.outcomes.everywhere.rows.live.cells.account\"]},\"Every new account starts with 14 days of Plus\":{\"text\":\"Every new account starts with 14 days of Plus\",\"paths\":[\"plans.trial.title\"]},\"Every task feature is free on the device you use. Plus syncs your list to all your devices and keeps its full history and files. It also lets your agents work without a daily cap.\":{\"text\":\"Every task feature is free on the device you use. Plus syncs your list to all your devices and keeps its full history and files. It also lets your agents work without a daily cap.\",\"paths\":[\"plans.subhead\"]},\"Everything in Free is included.\":{\"text\":\"Everything in Free is included.\",\"paths\":[\"plans.cards.plus.footnote\"]},\"Export and import\":{\"text\":\"Export and import\",\"paths\":[\"plans.outcomes.everywhere.rows.new_device.cells.device\"]},\"Export as JSON\":{\"text\":\"Export as JSON\",\"paths\":[\"plans.outcomes.nothing_lost.rows.export.label\"]},\"Export everything as plain JSON\":{\"text\":\"Export everything as plain JSON\",\"paths\":[\"plans.cards.free.points.5\"]},\"Export works on every plan. A limit hides older items. It never deletes them, and Plus shows them again.\":{\"text\":\"Export works on every plan. A limit hides older items. It never deletes them, and Plus shows them again.\",\"paths\":[\"plans.promises.no_hostage.detail\"]},\"Fade inactive tasks\":{\"text\":\"Fade inactive tasks\",\"paths\":[\"settings.rootGroups.lists_root.items.3.label\"]},\"Faded\":{\"text\":\"Faded\",\"paths\":[\"destinations.destinations.faded.title\"]},\"Field Matrix\":{\"text\":\"Field Matrix\",\"paths\":[\"tokens.textures.fieldMatrix.name\"]},\"File\":{\"text\":\"File\",\"paths\":[\"actions.menuBar.file.title\"]},\"Files and images\":{\"text\":\"Files and images\",\"paths\":[\"plans.outcomes.nothing_lost.rows.files.label\"]},\"Files and images synced, up to 10 GB\":{\"text\":\"Files and images synced, up to 10 GB\",\"paths\":[\"plans.cards.plus.points.2\"]},\"Free\":{\"text\":\"Free\",\"paths\":[\"plans.cards.free.title\"]},\"Free account\":{\"text\":\"Free account\",\"paths\":[\"plans.levels.account.title\",\"plans.status.free\"]},\"Free on one device. Plus on all of them.\":{\"text\":\"Free on one device. Plus on all of them.\",\"paths\":[\"plans.headline\"]},\"From Reminders\":{\"text\":\"From Reminders\",\"paths\":[\"surfaces.firstRun.steps.moveIn.choices.reminders.title\"]},\"From Things\":{\"text\":\"From Things\",\"paths\":[\"surfaces.firstRun.steps.moveIn.choices.things.title\"]},\"General\":{\"text\":\"General\",\"paths\":[\"settings.desktopTabs.general.title\",\"actions.shortcutsSheet.general.title\"]},\"Get started with Septena\":{\"text\":\"Get started with Septena\",\"paths\":[\"surfaces.notices.items.getStarted.title\"]},\"Give any task a Repeat rule and it will show up here.\":{\"text\":\"Give any task a Repeat rule and it will show up here.\",\"paths\":[\"destinations.destinations.repeating.emptyState.detail\"]},\"Go\":{\"text\":\"Go\",\"paths\":[\"actions.menuBar.go.title\"]},\"Group Today by list\":{\"text\":\"Group Today by list\",\"paths\":[\"settings.rootGroups.lists_root.items.1.label\"]},\"Height Map\":{\"text\":\"Height Map\",\"paths\":[\"tokens.textures.topography.tag\"]},\"Help\":{\"text\":\"Help\",\"paths\":[\"actions.menuBar.help.title\"]},\"Help that keeps working\":{\"text\":\"Help that keeps working\",\"paths\":[\"plans.outcomes.agents.title\"]},\"Hide Get Started\":{\"text\":\"Hide Get Started\",\"paths\":[\"actions.actions.notice.hideGetStarted.title\"]},\"Hide Info\":{\"text\":\"Hide Info\",\"paths\":[\"actions.actions.task.toggleInfo.activeTitle\"]},\"Hide Sidebar\":{\"text\":\"Hide Sidebar\",\"paths\":[\"actions.actions.app.toggleSidebar.removeTitle\"]},\"Hide Sidebar Counts\":{\"text\":\"Hide Sidebar Counts\",\"paths\":[\"actions.actions.app.toggleSidebarCounts.activeTitle\"]},\"How AI helps with your tasks\":{\"text\":\"How AI helps with your tasks\",\"paths\":[\"settings.pages.ai_preferences.sections.explainer.items.0.label\"]},\"If you skip this, your tasks stay on this device until you sign in.\":{\"text\":\"If you skip this, your tasks stay on this device until you sign in.\",\"paths\":[\"surfaces.firstRun.steps.account.footnote\"]},\"Import & Export\":{\"text\":\"Import & Export\",\"paths\":[\"settings.rootGroups.connections_data_root.items.2.label\",\"settings.pages.import_export.title\"]},\"Import from Things\":{\"text\":\"Import from Things\",\"paths\":[\"settings.pages.import_export.sections.move_in.items.0.label\"]},\"Import from Things and Apple Reminders\":{\"text\":\"Import from Things and Apple Reminders\",\"paths\":[\"plans.cards.free.points.4\"]},\"Import from another app\":{\"text\":\"Import from another app\",\"paths\":[\"surfaces.notices.items.getStarted.steps.importTasks.detail\"]},\"Inactive tasks start to fade\":{\"text\":\"Inactive tasks start to fade\",\"paths\":[\"surfaces.notices.items.fadeIntro.title\"]},\"Inbox\":{\"text\":\"Inbox\",\"paths\":[\"destinations.destinations.inbox.title\"]},\"Inbox is empty\":{\"text\":\"Inbox is empty\",\"paths\":[\"destinations.destinations.inbox.emptyState.title\"]},\"Included\":{\"text\":\"Included\",\"paths\":[\"plans.labels.included\"]},\"Increase Text Size\":{\"text\":\"Increase Text Size\",\"paths\":[\"actions.actions.app.textSizeIncrease.title\"]},\"Industrial\":{\"text\":\"Industrial\",\"paths\":[\"tokens.textures.fieldMatrix.tag\"]},\"It lands in your Inbox until you schedule or file it\":{\"text\":\"It lands in your Inbox until you schedule or file it\",\"paths\":[\"surfaces.notices.items.getStarted.steps.addTask.detail\"]},\"Its tasks stay in the project.\":{\"text\":\"Its tasks stay in the project.\",\"paths\":[\"surfaces.prompts.items.deleteSection.message\"]},\"Jabuticaba\":{\"text\":\"Jabuticaba\",\"paths\":[\"tokens.fruitAccents.jabuticaba.name\"]},\"Join\":{\"text\":\"Join\",\"paths\":[\"plans.outcomes.agents.rows.share.cells.account\"]},\"Keep\":{\"text\":\"Keep\",\"paths\":[\"actions.actions.task.keepFaded.title\"]},\"Keyboard Shortcuts\":{\"text\":\"Keyboard Shortcuts\",\"paths\":[\"actions.actions.app.keyboardShortcuts.title\"]},\"Large\":{\"text\":\"Large\",\"paths\":[\"tokens.textScale.steps.large.label\"]},\"Largest\":{\"text\":\"Largest\",\"paths\":[\"tokens.textScale.steps.xLarge.label\"]},\"Last 90 days\":{\"text\":\"Last 90 days\",\"paths\":[\"plans.outcomes.nothing_lost.rows.logbook.cells.account\"]},\"Later\":{\"text\":\"Later\",\"paths\":[\"surfaces.firstRun.steps.connectClaude.secondary.title\"]},\"Learn where you usually file similar tasks.\":{\"text\":\"Learn where you usually file similar tasks.\",\"paths\":[\"settings.rootGroups.lists_root.items.5.detail\"]},\"Let Go\":{\"text\":\"Let Go\",\"paths\":[\"actions.actions.task.letGoFaded.title\"]},\"Light\":{\"text\":\"Light\",\"paths\":[\"settings.keys.pccReasoning.options.0.title\"]},\"Linked projects (GitHub, Linear)\":{\"text\":\"Linked projects (GitHub, Linear)\",\"paths\":[\"plans.outcomes.agents.rows.links.label\"]},\"List\":{\"text\":\"List\",\"paths\":[\"surfaces.taskAttributes.list.label\"]},\"Lists\":{\"text\":\"Lists\",\"paths\":[\"settings.rootGroups.lists_root.header\"]},\"Live\":{\"text\":\"Live\",\"paths\":[\"plans.outcomes.everywhere.rows.live.cells.plus\"]},\"Live sync on every iPhone, iPad and Mac\":{\"text\":\"Live sync on every iPhone, iPad and Mac\",\"paths\":[\"plans.cards.plus.points.0\"]},\"Local server on the Mac\":{\"text\":\"Local server on the Mac\",\"paths\":[\"plans.outcomes.agents.rows.connector.cells.device\"]},\"Logbook\":{\"text\":\"Logbook\",\"paths\":[\"destinations.destinations.logbook.title\",\"plans.outcomes.nothing_lost.rows.logbook.label\"]},\"Logbook is empty\":{\"text\":\"Logbook is empty\",\"paths\":[\"destinations.destinations.logbook.emptyState.title\"]},\"MCP Skills\":{\"text\":\"MCP Skills\",\"paths\":[\"settings.pages.advanced.sections.agent_tools.items.0.label\"]},\"Manage Subscription\":{\"text\":\"Manage Subscription\",\"paths\":[\"plans.actions.manage\"]},\"Mark Done\":{\"text\":\"Mark Done\",\"paths\":[\"actions.actions.project.markDone.title\"]},\"Mark as Complete\":{\"text\":\"Mark as Complete\",\"paths\":[\"actions.actions.task.toggleComplete.title\"]},\"Mark as Done\":{\"text\":\"Mark as Done\",\"paths\":[\"actions.actions.notice.toggleStep.title\"]},\"Mark as Not Done\":{\"text\":\"Mark as Not Done\",\"paths\":[\"actions.actions.notice.toggleStep.activeTitle\"]},\"Medium\":{\"text\":\"Medium\",\"paths\":[\"tokens.textScale.steps.normal.label\"]},\"Move",
+        "\":{\"text\":\"Move\",\"paths\":[\"settings.keys.tasksSwipeLeadingAction.options.2.title\",\"actions.actions.task.move.shortTitle\",\"actions.contextMenus.task.row.move.title\"]},\"Move Down\":{\"text\":\"Move Down\",\"paths\":[\"actions.actions.area.moveDown.title\",\"actions.actions.project.moveDown.title\"]},\"Move Tasks\":{\"text\":\"Move Tasks\",\"paths\":[\"actions.actions.task.move.pluralTitle\"]},\"Move Up\":{\"text\":\"Move Up\",\"paths\":[\"actions.actions.area.moveUp.title\",\"actions.actions.project.moveUp.title\"]},\"Move from another app\":{\"text\":\"Move from another app\",\"paths\":[\"settings.pages.import_export.sections.move_in.header\"]},\"Move only this task, or update the repeating schedule to the new date?\":{\"text\":\"Move only this task, or update the repeating schedule to the new date?\",\"paths\":[\"surfaces.prompts.items.rescheduleFixedRepeat.message\"]},\"Move to Area\":{\"text\":\"Move to Area\",\"paths\":[\"actions.contextMenus.sidebar.project.moveToArea.title\"]},\"Move to Section\":{\"text\":\"Move to Section\",\"paths\":[\"actions.contextMenus.task.row.moveToSection.title\"]},\"Move to Suggested List\":{\"text\":\"Move to Suggested List\",\"paths\":[\"actions.actions.task.moveSuggested.title\"]},\"Move to Today\":{\"text\":\"Move to Today\",\"paths\":[\"actions.actions.task.toggleToday.addTitle\"]},\"Move to a new device\":{\"text\":\"Move to a new device\",\"paths\":[\"plans.outcomes.everywhere.rows.new_device.label\"]},\"Moved to {destination}\":{\"text\":\"Moved to {destination}\",\"placeholders\":[\"destination\"],\"paths\":[\"surfaces.toasts.templates.moved.format\"]},\"Moved {count} tasks to {destination}\":{\"forms\":{\"one\":\"Moved to {destination}\",\"other\":\"Moved {count} tasks to {destination}\"},\"placeholders\":[\"count\",\"destination\"],\"paths\":[\"surfaces.toasts.templates.movedBulk.format\"]},\"Move…\":{\"text\":\"Move…\",\"paths\":[\"actions.actions.task.move.title\"]},\"New Area\":{\"text\":\"New Area\",\"paths\":[\"actions.actions.sidebar.newArea.title\",\"surfaces.prompts.text.newArea.title\"]},\"New Project\":{\"text\":\"New Project\",\"paths\":[\"actions.actions.sidebar.newProject.title\",\"surfaces.prompts.text.newProject.title\"]},\"New Project in Area\":{\"text\":\"New Project in Area\",\"paths\":[\"actions.actions.area.newProject.title\"]},\"New Section\":{\"text\":\"New Section\",\"paths\":[\"actions.actions.section.new.title\",\"surfaces.prompts.text.newSection.title\"]},\"New Task in Section\":{\"text\":\"New Task in Section\",\"paths\":[\"actions.actions.section.newTask.title\"]},\"New To-Do\":{\"text\":\"New To-Do\",\"paths\":[\"actions.actions.app.newTask.title\"]},\"New tasks wait here until you schedule or file them.\":{\"text\":\"New tasks wait here until you schedule or file them.\",\"paths\":[\"destinations.destinations.inbox.emptyState.detail\"]},\"No Faded Tasks\":{\"text\":\"No Faded Tasks\",\"paths\":[\"destinations.destinations.faded.emptyState.title\"]},\"No Recently Deleted Tasks\":{\"text\":\"No Recently Deleted Tasks\",\"paths\":[\"destinations.destinations.recentlyDeleted.emptyState.title\"]},\"No Starred Tasks\":{\"text\":\"No Starred Tasks\",\"paths\":[\"destinations.destinations.starred.emptyState.title\"]},\"No account\":{\"text\":\"No account\",\"paths\":[\"plans.levels.device.detail\"]},\"No agent can claim or work on a task while paused.\":{\"text\":\"No agent can claim or work on a task while paused.\",\"paths\":[\"settings.rootGroups.ai_agents_root.items.1.detail\"]},\"No agent work\":{\"text\":\"No agent work\",\"paths\":[\"destinations.destinations.agent.emptyState.title\"]},\"No cap\":{\"text\":\"No cap\",\"paths\":[\"plans.outcomes.agents.rows.links.cells.plus\"]},\"No daily cap\":{\"text\":\"No daily cap\",\"paths\":[\"plans.outcomes.agents.rows.connector.cells.plus\"]},\"No repeating tasks\":{\"text\":\"No repeating tasks\",\"paths\":[\"destinations.destinations.repeating.emptyState.title\"]},\"Not Now\":{\"text\":\"Not Now\",\"paths\":[\"plans.actions.notNow\"]},\"Not included\":{\"text\":\"Not included\",\"paths\":[\"plans.labels.notIncluded\"]},\"Not now\":{\"text\":\"Not now\",\"paths\":[\"surfaces.firstRun.steps.account.secondary.title\"]},\"Not signed in\":{\"text\":\"Not signed in\",\"paths\":[\"surfaces.notices.items.signIn.title\"]},\"Notes\":{\"text\":\"Notes\",\"paths\":[\"surfaces.taskAttributes.notes.label\"]},\"Notes keep the context\":{\"text\":\"Notes keep the context\",\"paths\":[\"surfaces.firstRun.steps.welcome.points.2.title\"]},\"Nothing here yet\":{\"text\":\"Nothing here yet\",\"paths\":[\"destinations.genericEmptyState.title\"]},\"Nothing in Anytime\":{\"text\":\"Nothing in Anytime\",\"paths\":[\"destinations.destinations.anytime.emptyState.title\"]},\"Nothing lost\":{\"text\":\"Nothing lost\",\"paths\":[\"plans.outcomes.nothing_lost.title\"]},\"Nothing on Today\":{\"text\":\"Nothing on Today\",\"paths\":[\"destinations.destinations.today.emptyState.title\"]},\"Nothing to review\":{\"text\":\"Nothing to review\",\"paths\":[\"destinations.destinations.review.emptyState.title\"]},\"Nothing upcoming\":{\"text\":\"Nothing upcoming\",\"paths\":[\"destinations.destinations.upcoming.emptyState.title\"]},\"OK\":{\"text\":\"OK\",\"paths\":[\"surfaces.prompts.error.confirmTitle\"]},\"Off\":{\"text\":\"Off\",\"paths\":[\"settings.keys.tasksSwipeLeadingAction.options.5.title\"]},\"Older changes are hidden\":{\"text\":\"Older changes are hidden\",\"paths\":[\"plans.upsells.history_edge.title\"]},\"On every device\":{\"text\":\"On every device\",\"paths\":[\"surfaces.firstRun.steps.welcome.points.0.title\"]},\"On the device that added them\":{\"text\":\"On the device that added them\",\"paths\":[\"plans.outcomes.nothing_lost.rows.files.cells.account\"]},\"On this device\":{\"text\":\"On this device\",\"paths\":[\"plans.outcomes.nothing_lost.rows.history.cells.device\",\"plans.outcomes.nothing_lost.rows.files.cells.device\",\"plans.status.device\"]},\"On-device intelligence\":{\"text\":\"On-device intelligence\",\"paths\":[\"settings.pages.ai_preferences.sections.on_device.header\"]},\"On-device only\":{\"text\":\"On-device only\",\"paths\":[\"settings.keys.aiMode.options.0.title\"]},\"One\":{\"text\":\"One\",\"paths\":[\"settings.keys.tasksTitleLines.options.0.title\"]},\"Only This Task\":{\"text\":\"Only This Task\",\"paths\":[\"surfaces.prompts.items.rescheduleFixedRepeat.options.exception.title\"]},\"Open\":{\"text\":\"Open\",\"paths\":[\"actions.actions.notice.openStep.title\"]},\"Open Septena Life\":{\"text\":\"Open Septena Life\",\"paths\":[\"settings.pages.about.sections.companion.items.0.label\"]},\"Open Today\":{\"text\":\"Open Today\",\"paths\":[\"surfaces.firstRun.steps.done.primary.title\"]},\"Open a task or choose Keep to bring it back, or sweep the list to let the rest go.\":{\"text\":\"Open a task or choose Keep to bring it back, or sweep the list to let the rest go.\",\"paths\":[\"surfaces.notices.items.fadedPile.detail\"]},\"Open tasks without a date live here.\":{\"text\":\"Open tasks without a date live here.\",\"paths\":[\"destinations.destinations.anytime.emptyState.detail\"]},\"Optical\":{\"text\":\"Optical\",\"paths\":[\"tokens.textures.causticGlass.tag\"]},\"Optional product diagnostics\":{\"text\":\"Optional product diagnostics\",\"paths\":[\"settings.pages.advanced.sections.diagnostics.items.1.label\"]},\"Or press ⌃⌥Space anywhere on your Mac\":{\"text\":\"Or press ⌃⌥Space anywhere on your Mac\",\"paths\":[\"surfaces.notices.items.getStarted.steps.addTask.platformDetails.0.detail\"]},\"Overdue app icon badge\":{\"text\":\"Overdue app icon badge\",\"paths\":[\"settings.rootGroups.lists_root.items.6.label\"]},\"Paste\":{\"text\":\"Paste\",\"paths\":[\"surfaces.taskAttributes.paste.label\"]},\"Paste JSON Backup…\":{\"text\":\"Paste JSON Backup…\",\"paths\":[\"settings.pages.advanced.sections.data_tools.items.0.label\"]},\"Paste raw Septena JSON directly from the clipboard to restore or merge records.\":{\"text\":\"Paste raw Septena JSON directly from the clipboard to restore or merge records.\",\"paths\":[\"settings.pages.advanced.sections.data_tools.footer\"]},\"Paste the first prompt. Claude sets up your areas and projects with you.\":{\"text\":\"Paste the first prompt. Claude sets up your areas and projects with you.\",\"paths\":[\"surfaces.firstRun.steps.connectClaude.instructions.2\"]},\"Pause Repeat\":{\"text\":\"Pause Repeat\",\"paths\":[\"actions.actions.task.pauseResumeRepeat.title\"]},\"Pause all agents\":{\"text\":\"Pause all agents\",\"paths\":[\"settings.rootGroups.ai_agents_root.items.1.label\"]},\"Persimmon\":{\"text\":\"Persimmon\",\"paths\":[\"tokens.fruitAccents.persimmon.name\"]},\"Pick a Reminders list. Its items wait in your Inbox until you bring them in.\":{\"text\":\"Pick a Reminders list. Its items wait in your Inbox until you bring them in.\",\"paths\":[\"surfaces.firstRun.steps.moveIn.choices.reminders.detail\"]},\"Pitaya\":{\"text\":\"Pitaya\",\"paths\":[\"tokens.fruitAccents.pitaya.name\"]},\"Planned\":{\"text\":\"Planned\",\"paths\":[\"plans.labels.planned\"]},\"Plus\":{\"text\":\"Plus\",\"paths\":[\"plans.shortName\",\"plans.levels.plus.title\",\"plans.status.plus\"]},\"Plus is the same app on every device, and nothing in it is capped.\":{\"text\":\"Plus is the same app on every device, and nothing in it is capped.\",\"paths\":[\"plans.cards.plus.detail\"]},\"Plus syncs files and images to all your devices.\":{\"text\":\"Plus syncs files and images to all your devices.\",\"paths\":[\"plans.upsells.file_elsewhere.detail\"]},\"Plus through {date}\":{\"text\":\"Plus through {date}\",\"placeholders\":[\"date\"],\"paths\":[\"plans.status.paidThrough\"]},\"Plus trial\":{\"text\":\"Plus trial\",\"paths\":[\"plans.status.trial\"]},\"Plus trial until {date}\":{\"text\":\"Plus trial until {date}\",\"placeholders\":[\"date\"],\"paths\":[\"plans.status.trialEnds\"]},\"Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.\":{\"text\":\"Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.\",\"paths\":[\"plans.priceFootnote\"]},\"Print / Ink\":{\"text\":\"Print / Ink\",\"paths\":[\"tokens.textures.stippleDrift.tag\"]},\"Privacy\":{\"text\":\"Privacy\",\"paths\":[\"settings.desktopTabs.privacy.title\",\"settings.rootGroups.meta_root.items.0.label\",\"settings.pages.privacy.title\"]},\"Private Cloud Compute reasoning\":{\"text\":\"Private Cloud Compute reasoning\",\"paths\":[\"settings.pages.advanced.sections.beta_ai.items.2.label\"]},\"Project\":{\"text\":\"Project\",\"paths\":[\"surfaces.prompts.items.deleteProject.untitledName\"]},\"Project name\":{\"text\":\"Project name\",\"paths\":[\"surfaces.prompts.text.newProject.placeholder\",\"surfaces.prompts.text.renameProject.placeholder\"]},\"Pure Canvas\":{\"text\":\"Pure Canvas\",\"paths\":[\"tokens.textures.none.name\"]},\"Queued\":{\"text\":\"Queued\",\"paths\":[\"destinations.destinations.agent.groups.queued.title\"]},\"Quick Add…\":{\"text\":\"Quick Add…\",\"paths\":[\"actions.actions.app.quickAdd.title\"]},\"Quick Entry\":{\"text\":\"Quick Entry\",\"paths\":[\"actions.actions.app.quickEntry.title\"]},\"Quick Find…\":{\"text\":\"Quick Find…\",\"paths\":[\"actions.actions.app.quickFind.title\"]},\"Reads, and 25 changes a day\":{\"text\":\"Reads, and 25 changes a day\",\"paths\":[\"plans.outcomes.agents.rows.connector.cells.account\"]},\"Recently Deleted\":{\"text\":\"Recently Deleted\",\"paths\":[\"destinations.destinations.recentlyDeleted.title\",\"plans.outcomes.nothing_lost.rows.deleted.label\"]},\"Remind\":{\"text\":\"Remind\",\"paths\":[\"surfaces.taskAttributes.reminder.label\"]},\"Reminders\":{\"text\":\"Reminders\",\"paths\":[\"settings.rootGroups.connections_data_root.items.1.label\",\"settings.pages.reminders.title\"]},\"Reminder…\":{\"text\":\"Reminder…\",\"paths\":[\"actions.actions.task.reminder.title\"]},\"Remove Star\":{\"text\":\"Remove Star\",\"paths\":[\"actions.actions.task.toggleStar.removeTitle\"]},\"Remove from Today\":{\"text\":\"Remove from Today\",\"paths\":[\"actions.actions.task.toggleToday.removeTitle\"]},\"Rename\":{\"text\":\"Rename\",\"paths\":[\"actions.actions.task.editDetails.desktopTitle\",\"actions.actions.area.rename.title\",\"actions.actions.project.rename.title\",\"actions.actions.section.rename.title\",\"surfaces.prompts.text.renameSection.confirmTitle\",\"surfaces.prompts.text.renameArea.confirmTitle\",\"surfaces.prompts.text.renameProject.confirmTitle\"]},\"Rename Area\":{\"text\":\"Rename Area\",\"paths\":[\"surfaces.prompts.text.renameArea.title\"]},\"Rename Project\":{\"text\":\"Rename Project\",\"paths\":[\"surfaces.prompts.text.renameProject.title\"]},\"Rename Section\":{\"text\":\"Rename Section\",\"paths\":[\"surfaces.prompts.text.renameSection.title\"]},\"Repeat\":{\"text\":\"Repeat\",\"paths\":[\"surfaces.taskAttributes.repeat.label\"]},\"Repeating\":{\"text\":\"Repeating\",\"paths\":[\"destinations.destinations.repeating.title\"]},\"Repeat…\":{\"text\":\"Repeat…\",\"paths\":[\"a",
+        "ctions.actions.task.repeat.title\"]},\"Requires the PCC entitlement. Without it, requests fail and fall back on-device.\":{\"text\":\"Requires the PCC entitlement. Without it, requests fail and fall back on-device.\",\"paths\":[\"settings.pages.advanced.sections.beta_ai.items.1.detail\"]},\"Reschedule repeating task?\":{\"text\":\"Reschedule repeating task?\",\"paths\":[\"surfaces.prompts.items.rescheduleFixedRepeat.title\"]},\"Reset Text Size\":{\"text\":\"Reset Text Size\",\"paths\":[\"actions.actions.app.textSizeReset.title\"]},\"Restore\":{\"text\":\"Restore\",\"paths\":[\"actions.actions.task.restore.title\"]},\"Restore Purchases\":{\"text\":\"Restore Purchases\",\"paths\":[\"plans.actions.restore\"]},\"Resume Repeat\":{\"text\":\"Resume Repeat\",\"paths\":[\"actions.actions.task.pauseResumeRepeat.activeTitle\"]},\"Review\":{\"text\":\"Review\",\"paths\":[\"destinations.destinations.review.title\",\"destinations.destinations.agent.groups.review.title\"]},\"Ridge Lines\":{\"text\":\"Ridge Lines\",\"paths\":[\"tokens.textures.ridges.name\"]},\"Schedule\":{\"text\":\"Schedule\",\"paths\":[\"settings.keys.tasksSwipeLeadingAction.options.1.title\",\"actions.actions.task.when.shortTitle\",\"actions.contextMenus.task.row.schedule.title\"]},\"Section name\":{\"text\":\"Section name\",\"paths\":[\"surfaces.prompts.text.newSection.placeholder\",\"surfaces.prompts.text.renameSection.placeholder\"]},\"See what Plus adds\":{\"text\":\"See what Plus adds\",\"paths\":[\"plans.actions.learnMore\"]},\"See who changed what and bring back what you deleted. Your files open on every device.\":{\"text\":\"See who changed what and bring back what you deleted. Your files open on every device.\",\"paths\":[\"plans.outcomes.nothing_lost.detail\"]},\"Send feedback\":{\"text\":\"Send feedback\",\"paths\":[\"settings.pages.about.sections.actions.items.3.label\"]},\"Septena\":{\"text\":\"Septena\",\"paths\":[\"actions.menuBar.app.title\"]},\"Septena Life\":{\"text\":\"Septena Life\",\"paths\":[\"settings.pages.about.sections.companion.header\"]},\"Septena Life is the companion app for habits, training, food, sleep, mood, and health.\":{\"text\":\"Septena Life is the companion app for habits, training, food, sleep, mood, and health.\",\"paths\":[\"settings.pages.about.sections.companion.items.0.detail\"]},\"Septena Plus\":{\"text\":\"Septena Plus\",\"paths\":[\"settings.pages.account.sections.plan.items.0.label\",\"settings.pages.plus.title\",\"plans.name\",\"plans.cards.plus.title\"]},\"Septena Window\":{\"text\":\"Septena Window\",\"paths\":[\"actions.actions.app.septenaWindow.title\"]},\"Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import.\":{\"text\":\"Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import.\",\"paths\":[\"settings.pages.import_export.sections.move_in.footer\"]},\"Septena never runs AI on your data and never reads it. The intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets where requests may run.\":{\"text\":\"Septena never runs AI on your data and never reads it. The intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets where requests may run.\",\"paths\":[\"settings.pages.ai_preferences.sections.reach.footer\"]},\"Septena runs the sync server and the connector. When you connect Claude or another agent, its bill stays with that provider.\":{\"text\":\"Septena runs the sync server and the connector. When you connect Claude or another agent, its bill stays with that provider.\",\"paths\":[\"plans.promises.own_ai.detail\"]},\"Set up Septena for me using https://septena.app/agents.md\":{\"text\":\"Set up Septena for me using https://septena.app/agents.md\",\"paths\":[\"surfaces.firstRun.prompts.setup\"]},\"Set up my Septena areas, projects, and tasks by following https://api.septena.app/onboard.md\":{\"text\":\"Set up my Septena areas, projects, and tasks by following https://api.septena.app/onboard.md\",\"paths\":[\"surfaces.firstRun.prompts.first\"]},\"Settings…\":{\"text\":\"Settings…\",\"paths\":[\"actions.actions.app.settings.title\"]},\"Shared projects\":{\"text\":\"Shared projects\",\"paths\":[\"plans.outcomes.agents.rows.share.label\"]},\"Sharing a project needs Plus\":{\"text\":\"Sharing a project needs Plus\",\"paths\":[\"plans.upsells.share_create.title\"]},\"Show / Hide Sidebar\":{\"text\":\"Show / Hide Sidebar\",\"paths\":[\"actions.actions.app.toggleSidebar.title\"]},\"Show Get Started Again\":{\"text\":\"Show Get Started Again\",\"paths\":[\"settings.pages.about.sections.actions.items.1.label\"]},\"Show Info\":{\"text\":\"Show Info\",\"paths\":[\"actions.actions.task.toggleInfo.title\"]},\"Show Sidebar\":{\"text\":\"Show Sidebar\",\"paths\":[\"actions.actions.app.toggleSidebar.addTitle\"]},\"Show Sidebar Counts\":{\"text\":\"Show Sidebar Counts\",\"paths\":[\"actions.actions.app.toggleSidebarCounts.title\"]},\"Show Welcome Again\":{\"text\":\"Show Welcome Again\",\"paths\":[\"settings.pages.about.sections.actions.items.2.label\"]},\"Show completed tasks\":{\"text\":\"Show completed tasks\",\"paths\":[\"settings.rootGroups.lists_root.items.2.label\"]},\"Show faded tasks\":{\"text\":\"Show faded tasks\",\"paths\":[\"settings.rootGroups.lists_root.items.4.label\"]},\"Show faded tasks in projects and areas.\":{\"text\":\"Show faded tasks in projects and areas.\",\"paths\":[\"settings.rootGroups.lists_root.items.4.detail\"]},\"Show model labels\":{\"text\":\"Show model labels\",\"paths\":[\"settings.pages.advanced.sections.beta_ai.items.0.label\"]},\"Show which model answered next to each AI reply.\":{\"text\":\"Show which model answered next to each AI reply.\",\"paths\":[\"settings.pages.advanced.sections.beta_ai.items.0.detail\"]},\"Sign in for a free account. The server then keeps a backup of that device, and you can try agents on real tasks.\":{\"text\":\"Sign in for a free account. The server then keeps a backup of that device, and you can try agents on real tasks.\",\"paths\":[\"plans.cards.free.footnote\"]},\"Sign in to sync\":{\"text\":\"Sign in to sync\",\"paths\":[\"surfaces.firstRun.steps.account.title\"]},\"Sign in with Apple\":{\"text\":\"Sign in with Apple\",\"paths\":[\"surfaces.firstRun.steps.account.primary.title\",\"plans.levels.account.detail\"]},\"Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.\":{\"text\":\"Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.\",\"paths\":[\"surfaces.firstRun.steps.account.body\"]},\"Sign in…\":{\"text\":\"Sign in…\",\"paths\":[\"surfaces.notices.items.signIn.primaryTitle\"]},\"Small\":{\"text\":\"Small\",\"paths\":[\"tokens.textScale.steps.small.label\"]},\"Smallest\":{\"text\":\"Smallest\",\"paths\":[\"tokens.textScale.steps.xSmall.label\"]},\"Smart Lists\":{\"text\":\"Smart Lists\",\"paths\":[\"settings.rootGroups.lists_root.items.0.label\",\"settings.pages.smart_lists.title\"]},\"Star\":{\"text\":\"Star\",\"paths\":[\"settings.keys.tasksSwipeLeadingAction.options.3.title\",\"actions.actions.task.toggleStar.addTitle\",\"surfaces.taskAttributes.star.label\"]},\"Star important tasks to keep them one tap away.\":{\"text\":\"Star important tasks to keep them one tap away.\",\"paths\":[\"destinations.destinations.starred.emptyState.detail\"]},\"Starred\":{\"text\":\"Starred\",\"paths\":[\"destinations.destinations.starred.title\"]},\"Start dates, deadlines and repeats\":{\"text\":\"Start dates, deadlines and repeats\",\"paths\":[\"plans.cards.free.points.2\"]},\"Start empty\":{\"text\":\"Start empty\",\"paths\":[\"surfaces.firstRun.steps.moveIn.choices.fresh.title\"]},\"Start from the list you already have, or start empty.\":{\"text\":\"Start from the list you already have, or start empty.\",\"paths\":[\"surfaces.firstRun.steps.moveIn.body\"]},\"Stipple Drift\":{\"text\":\"Stipple Drift\",\"paths\":[\"tokens.textures.stippleDrift.name\"]},\"Subscribe\":{\"text\":\"Subscribe\",\"paths\":[\"plans.actions.subscribe\"]},\"Subscriptions open at App Store launch.\":{\"text\":\"Subscriptions open at App Store launch.\",\"paths\":[\"plans.checkout.notice\"]},\"Suggest where to file\":{\"text\":\"Suggest where to file\",\"paths\":[\"settings.rootGroups.lists_root.items.5.label\"]},\"Sweep\":{\"text\":\"Sweep\",\"paths\":[\"surfaces.notices.items.weeklySweep.primaryTitle\"]},\"Sweep…\":{\"text\":\"Sweep…\",\"paths\":[\"surfaces.notices.items.fadedPile.primaryTitle\"]},\"Swipe left on a task to select multiple tasks. Swipe right runs this quick action.\":{\"text\":\"Swipe left on a task to select multiple tasks. Swipe right runs this quick action.\",\"paths\":[\"settings.rootGroups.appearance_root.items.3.detail\"]},\"Swipe right\":{\"text\":\"Swipe right\",\"paths\":[\"settings.rootGroups.appearance_root.items.3.label\"]},\"Sync & storage diagnostics\":{\"text\":\"Sync & storage diagnostics\",\"paths\":[\"settings.pages.advanced.sections.diagnostics.items.0.label\"]},\"Sync speed\":{\"text\":\"Sync speed\",\"paths\":[\"plans.outcomes.everywhere.rows.live.label\"]},\"Synced, up to 10 GB\":{\"text\":\"Synced, up to 10 GB\",\"paths\":[\"plans.outcomes.nothing_lost.rows.files.cells.plus\"]},\"Syncing…\":{\"text\":\"Syncing…\",\"paths\":[\"destinations.genericEmptyState.syncingTitle\"]},\"Tactile\":{\"text\":\"Tactile\",\"paths\":[\"tokens.textures.washiPaper.tag\"]},\"Tags\":{\"text\":\"Tags\",\"paths\":[\"surfaces.taskAttributes.tags.label\"]},\"Tags…\":{\"text\":\"Tags…\",\"paths\":[\"actions.actions.task.tags.title\"]},\"Tamarillo\":{\"text\":\"Tamarillo\",\"paths\":[\"tokens.fruitAccents.tamarillo.name\"]},\"Tap + to add a task.\":{\"text\":\"Tap + to add a task.\",\"paths\":[\"destinations.genericEmptyState.touchDetail\"]},\"Task\":{\"text\":\"Task\",\"paths\":[\"actions.menuBar.task.title\"]},\"Task conversations with the on-device model\":{\"text\":\"Task conversations with the on-device model\",\"paths\":[\"plans.cards.free.points.3\"]},\"Task deleted\":{\"text\":\"Task deleted\",\"paths\":[\"surfaces.toasts.templates.deletedSingle.emptyTitleFormat\"]},\"Task list\":{\"text\":\"Task list\",\"paths\":[\"actions.shortcutsSheet.taskList.title\"]},\"Tasks that think with you\":{\"text\":\"Tasks that think with you\",\"paths\":[\"settings.pages.about.sections.version.items.0.label\"]},\"Tasks with a future When or Deadline date appear here.\":{\"text\":\"Tasks with a future When or Deadline date appear here.\",\"paths\":[\"destinations.destinations.upcoming.emptyState.detail\"]},\"Tasks without activity for 14 days\":{\"text\":\"Tasks without activity for 14 days\",\"paths\":[\"surfaces.notices.items.fadedPile.title\"]},\"Tasks without activity for 14 days fade out and move to Faded.\":{\"text\":\"Tasks without activity for 14 days fade out and move to Faded.\",\"paths\":[\"settings.rootGroups.lists_root.items.3.detail\"]},\"Tasks you assign to Claude appear here, grouped by where the work stands.\":{\"text\":\"Tasks you assign to Claude appear here, grouped by where the work stands.\",\"paths\":[\"destinations.destinations.agent.emptyState.detail\"]},\"Tasks, lists, projects and areas have no caps on any plan.\":{\"text\":\"Tasks, lists, projects and areas have no caps on any plan.\",\"paths\":[\"plans.promises.core_free.detail\"]},\"Text Size\":{\"text\":\"Text Size\",\"paths\":[\"settings.rootGroups.appearance_root.items.1.label\",\"actions.menuBar.view.items.textSize.title\"]},\"The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples).\":{\"text\":\"The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples).\",\"paths\":[\"settings.pages.advanced.sections.agent_tools.footer\"]},\"The full task app on one iPhone, iPad or Mac. You do not need an account.\":{\"text\":\"The full task app on one iPhone, iPad or Mac. You do not need an account.\",\"paths\":[\"plans.cards.free.detail\"]},\"The same tasks on your phone, tablet and Mac, updated as you type.\":{\"text\":\"The same tasks on your phone, tablet and Mac, updated as you type.\",\"paths\":[\"plans.outcomes.everywhere.detail\"]},\"The task app stays free\":{\"text\":\"The task app stays free\",\"paths\":[\"plans.promises.core_free.title\"]},\"The tasks move to Recently Deleted. You can undo this.\":{\"text\":\"The tasks move to Recently Deleted. You can undo this.\",\"paths\":[\"surfaces.prompts.items.deleteArea.variants.tasksOnly.message\",\"surfaces.prompts.items.deleteArea.variants.projectsAndTasks.message\",\"surfaces.prompts.items.deleteProject.variants.withTasks.message\"]},\"Thinking…\":{\"text\":\"Thinking…\",\"paths\":[\"surfaces.taskAttributes.discuss.workingLabel\"]},\"This account is alr",
+        "eady set up. Your tasks are syncing to this device.\":{\"text\":\"This account is already set up. Your tasks are syncing to this device.\",\"paths\":[\"surfaces.firstRun.steps.done.returningBody\"]},\"This device\":{\"text\":\"This device\",\"paths\":[\"plans.levels.device.title\"]},\"This device is not syncing\":{\"text\":\"This device is not syncing\",\"paths\":[\"plans.upsells.second_device.title\"]},\"This file is on another device\":{\"text\":\"This file is on another device\",\"paths\":[\"plans.upsells.file_elsewhere.title\"]},\"Thorough\":{\"text\":\"Thorough\",\"paths\":[\"settings.keys.pccReasoning.options.2.title\"]},\"Three\":{\"text\":\"Three\",\"paths\":[\"settings.keys.tasksTitleLines.options.2.title\"]},\"Title lines\":{\"text\":\"Title lines\",\"paths\":[\"settings.rootGroups.appearance_root.items.2.label\"]},\"Today\":{\"text\":\"Today\",\"paths\":[\"settings.keys.tasksSwipeLeadingAction.options.0.title\",\"destinations.destinations.today.title\",\"actions.actions.task.toggleToday.shortTitle\"]},\"Today shows what to do now. Anything you skipped stays on the Get started list.\":{\"text\":\"Today shows what to do now. Anything you skipped stays on the Get started list.\",\"paths\":[\"surfaces.firstRun.steps.done.body\"]},\"Today, Inbox, Upcoming, Anytime and Logbook\":{\"text\":\"Today, Inbox, Upcoming, Anytime and Logbook\",\"paths\":[\"plans.cards.free.points.0\"]},\"Toggle Star\":{\"text\":\"Toggle Star\",\"paths\":[\"actions.actions.task.toggleStar.title\"]},\"Toggle Today\":{\"text\":\"Toggle Today\",\"paths\":[\"actions.actions.task.toggleToday.title\"]},\"Topography\":{\"text\":\"Topography\",\"paths\":[\"tokens.textures.topography.name\"]},\"Two\":{\"text\":\"Two\",\"paths\":[\"settings.keys.tasksTitleLines.options.1.title\"]},\"Type above to add your first task.\":{\"text\":\"Type above to add your first task.\",\"paths\":[\"destinations.genericEmptyState.detail\"]},\"Undated tasks fade after 14 days without activity and move to Faded. Open or edit a task to bring it back. You can turn this off in Settings.\":{\"text\":\"Undated tasks fade after 14 days without activity and move to Faded. Open or edit a task to bring it back. You can turn this off in Settings.\",\"paths\":[\"surfaces.notices.items.fadeIntro.detail\"]},\"Undated tasks without activity for 14 days appear here until you keep them or let them go.\":{\"text\":\"Undated tasks without activity for 14 days appear here until you keep them or let them go.\",\"paths\":[\"destinations.destinations.faded.emptyState.detail\"]},\"Upcoming\":{\"text\":\"Upcoming\",\"paths\":[\"destinations.destinations.upcoming.title\"]},\"Update Schedule\":{\"text\":\"Update Schedule\",\"paths\":[\"surfaces.prompts.items.rescheduleFixedRepeat.options.updateRule.title\"]},\"Usage data\":{\"text\":\"Usage data\",\"paths\":[\"settings.pages.privacy.sections.telemetry.items.0.label\"]},\"Use Private Cloud Compute\":{\"text\":\"Use Private Cloud Compute\",\"paths\":[\"settings.pages.advanced.sections.beta_ai.items.1.label\"]},\"Use my Claude\":{\"text\":\"Use my Claude\",\"paths\":[\"settings.keys.aiMode.options.2.title\"]},\"Version {version}\":{\"text\":\"Version {version}\",\"placeholders\":[\"version\"],\"paths\":[\"settings.pages.about.sections.version.items.0.detail\"]},\"View\":{\"text\":\"View\",\"paths\":[\"actions.menuBar.view.title\"]},\"Washi Paper\":{\"text\":\"Washi Paper\",\"paths\":[\"tokens.textures.washiPaper.name\"]},\"We never hold your data back\":{\"text\":\"We never hold your data back\",\"paths\":[\"plans.promises.no_hostage.title\"]},\"Welcome back\":{\"text\":\"Welcome back\",\"paths\":[\"surfaces.firstRun.steps.done.returningTitle\"]},\"Welcome to Septena\":{\"text\":\"Welcome to Septena\",\"paths\":[\"surfaces.firstRun.steps.welcome.title\"]},\"When\":{\"text\":\"When\",\"paths\":[\"surfaces.taskAttributes.when.label\"]},\"When Claude shows a code, enter it below.\":{\"text\":\"When Claude shows a code, enter it below.\",\"paths\":[\"surfaces.firstRun.steps.connectClaude.instructions.1\"]},\"When off, tasks appear in one list with their project or area underneath.\":{\"text\":\"When off, tasks appear in one list with their project or area underneath.\",\"paths\":[\"settings.rootGroups.lists_root.items.1.detail\"]},\"When…\":{\"text\":\"When…\",\"paths\":[\"actions.actions.task.when.title\"]},\"Where AI runs\":{\"text\":\"Where AI runs\",\"paths\":[\"settings.pages.ai_preferences.sections.reach.header\"]},\"Within a monthly run budget\":{\"text\":\"Within a monthly run budget\",\"paths\":[\"plans.outcomes.agents.rows.runs.cells.plus\"]},\"Work an agent finished appears here so you can check and accept it.\":{\"text\":\"Work an agent finished appears here so you can check and accept it.\",\"paths\":[\"destinations.destinations.review.emptyState.detail\"]},\"Work with Claude\":{\"text\":\"Work with Claude\",\"paths\":[\"surfaces.firstRun.steps.welcome.points.1.title\"]},\"Working\":{\"text\":\"Working\",\"paths\":[\"destinations.destinations.agent.groups.working.title\"]},\"You can undo this.\":{\"text\":\"You can undo this.\",\"paths\":[\"surfaces.prompts.items.deleteArea.variants.empty.message\",\"surfaces.prompts.items.deleteArea.variants.projectsOnly.message\",\"surfaces.prompts.items.deleteProject.variants.empty.message\"]},\"You can't undo this.\":{\"text\":\"You can't undo this.\",\"paths\":[\"surfaces.prompts.items.deletePermanently.message\"]},\"You do not need a card. After 14 days the account becomes a free account, and your tasks stay where they are.\":{\"text\":\"You do not need a card. After 14 days the account becomes a free account, and your tasks stay where they are.\",\"paths\":[\"plans.trial.detail\"]},\"You pay your AI provider, not us\":{\"text\":\"You pay your AI provider, not us\",\"paths\":[\"plans.promises.own_ai.title\"]},\"You're all set\":{\"text\":\"You're all set\",\"paths\":[\"surfaces.firstRun.steps.done.title\"]},\"Your 14 days of Plus have ended\":{\"text\":\"Your 14 days of Plus have ended\",\"paths\":[\"plans.upsells.trial_end.title\"]},\"Your account becomes a free account. Every device keeps its tasks, and the server keeps your synced copy for 12 months.\":{\"text\":\"Your account becomes a free account. Every device keeps its tasks, and the server keeps your synced copy for 12 months.\",\"paths\":[\"plans.promises.cancel.detail\"]},\"Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are.\":{\"text\":\"Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are.\",\"paths\":[\"plans.upsells.trial_end.detail\"]},\"Your agents work your tasks without a daily cap\":{\"text\":\"Your agents work your tasks without a daily cap\",\"paths\":[\"plans.cards.plus.points.3\"]},\"Your changes stay on this Mac until you sign in.\":{\"text\":\"Your changes stay on this Mac until you sign in.\",\"paths\":[\"surfaces.notices.items.signIn.platformDetails.0.detail\"]},\"Your changes stay on this device until you sign in.\":{\"text\":\"Your changes stay on this device until you sign in.\",\"paths\":[\"surfaces.notices.items.signIn.detail\"]},\"Your changes stay on this iPad until you sign in.\":{\"text\":\"Your changes stay on this iPad until you sign in.\",\"paths\":[\"surfaces.notices.items.signIn.platformDetails.1.detail\"]},\"Your changes stay on this iPhone until you sign in.\":{\"text\":\"Your changes stay on this iPhone until you sign in.\",\"paths\":[\"surfaces.notices.items.signIn.platformDetails.2.detail\"]},\"Your data\":{\"text\":\"Your data\",\"paths\":[\"settings.pages.privacy.sections.data_locality.header\"]},\"Your free account used its 10 runs this month. The work waits for you. Plus runs it now.\":{\"text\":\"Your free account used its 10 runs this month. The work waits for you. Plus runs it now.\",\"paths\":[\"plans.upsells.agent_runs.detail\"]},\"Your list everywhere\":{\"text\":\"Your list everywhere\",\"paths\":[\"plans.outcomes.everywhere.title\"]},\"Your name\":{\"text\":\"Your name\",\"paths\":[\"settings.pages.account.sections.profile.items.0.label\"]},\"Your name stays on this device, and syncs when you sign in.\":{\"text\":\"Your name stays on this device, and syncs when you sign in.\",\"paths\":[\"settings.pages.account.sections.profile.footer\"]},\"Your plan\":{\"text\":\"Your plan\",\"paths\":[\"plans.labels.yourPlan\"]},\"Your task text and titles are never sent through analytics. This setting syncs across your devices.\":{\"text\":\"Your task text and titles are never sent through analytics. This setting syncs across your devices.\",\"paths\":[\"settings.pages.privacy.sections.telemetry.footer\"]},\"Your tasks stay in step on iPhone, iPad and Mac.\":{\"text\":\"Your tasks stay in step on iPhone, iPad and Mac.\",\"paths\":[\"surfaces.firstRun.steps.welcome.points.0.detail\"]},\"Your tasks, areas, projects, and conversations are erased from the server and this device.\":{\"text\":\"Your tasks, areas, projects, and conversations are erased from the server and this device.\",\"paths\":[\"surfaces.prompts.items.deleteAccount.message\"]},\"Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena's private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). Apple's on-device intelligence runs locally; you can connect Claude under AI & Agents.\":{\"text\":\"Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena's private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). Apple's on-device intelligence runs locally; you can connect Claude under AI & Agents.\",\"paths\":[\"settings.pages.privacy.sections.data_locality.items.0.detail\"]},\"Your turn\":{\"text\":\"Your turn\",\"paths\":[\"destinations.destinations.agent.groups.yourTurn.title\"]},\"Yuzu\":{\"text\":\"Yuzu\",\"paths\":[\"tokens.fruitAccents.yuzu.name\"]},\"{count} files\":{\"forms\":{\"one\":\"{count} file\",\"other\":\"{count} files\"},\"placeholders\":[\"count\"],\"paths\":[\"surfaces.taskAttributes.attachments.countLabel\"]},\"{count} projects\":{\"forms\":{\"one\":\"1 project\",\"other\":\"{count} projects\"},\"placeholders\":[\"count\"],\"paths\":[\"surfaces.prompts.countPhrases.projects.label\"]},\"{count} tags\":{\"forms\":{\"one\":\"{count} tag\",\"other\":\"{count} tags\"},\"placeholders\":[\"count\"],\"paths\":[\"surfaces.taskAttributes.tags.countLabel\"]},\"{count} tasks\":{\"forms\":{\"one\":\"1 task\",\"other\":\"{count} tasks\"},\"placeholders\":[\"count\"],\"paths\":[\"surfaces.prompts.countPhrases.tasks.label\"]},\"{count} tasks deleted\":{\"forms\":{\"one\":\"Task deleted\",\"other\":\"{count} tasks deleted\"},\"placeholders\":[\"count\"],\"paths\":[\"surfaces.toasts.templates.deletedBulk.format\"]},\"{count} tasks faded this week\":{\"forms\":{\"one\":\"1 task faded this week\",\"other\":\"{count} tasks faded this week\"},\"placeholders\":[\"count\"],\"paths\":[\"surfaces.notices.items.weeklySweep.title\"]},\"{count} tasks rolled into Today\":{\"forms\":{\"one\":\"1 task rolled into Today\",\"other\":\"{count} tasks rolled into Today\"},\"placeholders\":[\"count\"],\"paths\":[\"surfaces.notices.items.rolledIn.title\"]},\"€0\":{\"text\":\"€0\",\"paths\":[\"plans.cards.free.priceLabel\"]},\"€40 a year\":{\"text\":\"€40 a year\",\"paths\":[\"plans.prices.annual.label\"]},\"€40 a year or €5 a month\":{\"text\":\"€40 a year or €5 a month\",\"paths\":[\"plans.levels.plus.detail\"]},\"€5 a month\":{\"text\":\"€5 a month\",\"paths\":[\"plans.prices.monthly.label\"]}},\"pt-BR\":{\"\\\"{title}\\\" deleted\":\"\\\"{title}\\\" apagada\",\"A task list you share with your AI.\":\"Uma lista de tarefas que você compartilha com sua IA.\",\"AI & Agents\":\"IA e agentes\",\"AI Mode\":\"Modo de IA\",\"AI Preferences\":\"Preferências de IA\",\"AI diagnostics\":\"Diagnóstico de IA\",\"About\":\"Sobre\",\"Accent\":\"Destaque\",\"Account\":\"Conta\",\"Add\":\"Adicionar\",\"Add Checklist Item\":\"Adicionar item à checklist\",\"Add Reminder…\":\"Adicionar lembrete…\",\"Add a task or move one here when you want to work on it today.\":\"Adicione uma tarefa ou mova uma para cá quando quiser trabalhar nela hoje.\",\"Add tasks as they come up.\":\"Adicione tarefas conforme elas surgirem.\",\"Add your first task\":\"Adicione sua primeira tarefa\",\"Advanced\":\"Avançado\",\"Agent tools\":\"Ferramentas de agente\",\"An opt-in weekly summary that helps improve Septena. You don't need it for updates, sync, or support.\":\"Um resumo semanal opcional que ajuda a melhorar o Septena. Você não precisa dele para atualizações, sincronização ou suporte.\",\"Anonymous usage data\":\"Dados de uso anônimos\",\"Anytime\":\"A qualque",
+        "r momento\",\"Appearance\":\"Aparência\",\"Apple Intelligence\":\"Apple Intelligence\",\"Area\":\"Área\",\"Area name\":\"Nome da área\",\"Attachments\":\"Anexos\",\"Automatic\":\"Automático\",\"Açaí\":\"Açaí\",\"Balanced\":\"Equilibrado\",\"Baseline\":\"Linha de base\",\"Bring in your tasks\":\"Traga suas tarefas\",\"Bring your tasks\":\"Traga suas tarefas\",\"Calendar\":\"Calendário\",\"Cancel\":\"Cancelar\",\"Cancel Project\":\"Cancelar projeto\",\"Cancel Task\":\"Cancelar tarefa\",\"Cancel Tasks\":\"Cancelar tarefas\",\"Carambola\":\"Carambola\",\"Caustic Glass\":\"Vidro cáustico\",\"Changes the server refused appear here, newest first. The server kept its own version of each.\":\"As alterações que o servidor recusou aparecem aqui, das mais recentes para as mais antigas. O servidor manteve a própria versão de cada uma.\",\"Check for Updates…\":\"Buscar atualizações…\",\"Checklist\":\"Checklist\",\"Classic Window\":\"Janela clássica\",\"Claude can take a task, ask you a question, and hand back the result.\":\"O Claude pode pegar uma tarefa, fazer uma pergunta e devolver o resultado.\",\"Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.\":\"O Claude lê e altera suas tarefas pela sua conta Septena. Você decide em quais tarefas ele trabalha.\",\"Clear\":\"Limpar\",\"Clear Logged…\":\"Limpar registrados…\",\"Clear Schedule\":\"Limpar agendamento\",\"Clear {count} logged items from “{name}”?\":{\"one\":\"Limpar 1 item registrado de “{name}”?\",\"other\":\"Limpar {count} itens registrados de “{name}”?\"},\"Cleared items move to Recently Deleted. You can undo this.\":\"Os itens limpos vão para Apagadas recentemente. Você pode desfazer isso.\",\"Click + or double-click below to add a task.\":\"Clique em + ou dê um clique duplo abaixo para adicionar uma tarefa.\",\"Colorful\":\"Colorido\",\"Complete\":\"Concluir\",\"Completed and let-go tasks are archived here.\":\"Tarefas concluídas e descartadas ficam arquivadas aqui.\",\"Completion animations\":\"Animações ao concluir\",\"Connect Claude\":\"Conectar o Claude\",\"Connect an assistant to your tasks\":\"Conecte um assistente às suas tarefas\",\"Connect your AI\":\"Conecte sua IA\",\"Connections & Data\":\"Conexões e dados\",\"Continue\":\"Continuar\",\"Copies your areas, projects and tasks. Nothing in Things changes.\":\"Copia suas áreas, projetos e tarefas. Nada muda no Things.\",\"Copy\":\"Copiar\",\"Copy first prompt\":\"Copiar primeiro prompt\",\"Copy setup prompt\":\"Copiar prompt de configuração\",\"Copy the setup prompt and paste it into Claude.\":\"Copie o prompt de configuração e cole no Claude.\",\"Create\":\"Criar\",\"Create Next Copy\":\"Criar próxima cópia\",\"Data tools\":\"Ferramentas de dados\",\"Deadline\":\"Prazo\",\"Deadline…\":\"Prazo…\",\"Decrease Text Size\":\"Diminuir texto\",\"Deferred to {date}\":\"Adiada para {date}\",\"Delete\":\"Apagar\",\"Delete Account\":\"Apagar conta\",\"Delete Account?\":\"Apagar conta?\",\"Delete Area\":\"Apagar área\",\"Delete Permanently\":\"Apagar permanentemente\",\"Delete Project\":\"Apagar projeto\",\"Delete Section\":\"Apagar seção\",\"Delete Tasks\":\"Apagar tarefas\",\"Delete this section?\":\"Apagar esta seção?\",\"Delete {count} tasks permanently?\":{\"one\":\"Apagar esta tarefa permanentemente?\",\"other\":\"Apagar {count} tarefas permanentemente?\"},\"Delete “{name}” and its {projectPhrase}? (projects only)\":\"Apagar “{name}” e seus {projectPhrase}?\",\"Delete “{name}” and its {taskPhrase}?\":\"Apagar “{name}” e suas {taskPhrase}?\",\"Delete “{name}”, its {projectPhrase} and {taskPhrase}?\":\"Apagar “{name}”, seus {projectPhrase} e {taskPhrase}?\",\"Delete “{name}”?\":\"Apagar “{name}”?\",\"Deleted tasks appear here for 30 days before being permanently removed.\":\"Tarefas apagadas ficam aqui por 30 dias antes de serem removidas de vez.\",\"Diagnostics\":\"Diagnóstico\",\"Discuss\":\"Discutir\",\"Duplicate\":\"Duplicar\",\"Duplicate Tasks\":\"Duplicar tarefas\",\"Each project has notes, so you and Claude know what it's for.\":\"Cada projeto tem notas, para você e o Claude saberem para que ele serve.\",\"Edit Details…\":\"Editar detalhes…\",\"Elevation\":\"Elevação\",\"Error\":\"Erro\",\"Fade inactive tasks\":\"Esmaecer tarefas inativas\",\"Faded\":\"Esmaecidas\",\"Field Matrix\":\"Matriz de campo\",\"File\":\"Arquivo\",\"From Reminders\":\"Dos Lembretes\",\"From Things\":\"Do Things\",\"General\":\"Geral\",\"Get started with Septena\":\"Comece a usar o Septena\",\"Give any task a Repeat rule and it will show up here.\":\"Dê uma regra de repetição a qualquer tarefa e ela aparece aqui.\",\"Go\":\"Ir\",\"Group Today by list\":\"Agrupar Hoje por lista\",\"Height Map\":\"Mapa de altura\",\"Help\":\"Ajuda\",\"Hide Get Started\":\"Ocultar Primeiros passos\",\"Hide Info\":\"Ocultar informações\",\"Hide Sidebar\":\"Ocultar barra lateral\",\"Hide Sidebar Counts\":\"Ocultar contagens da barra lateral\",\"How AI helps with your tasks\":\"Como a IA ajuda nas suas tarefas\",\"If you skip this, your tasks stay on this device until you sign in.\":\"Se você pular isto, suas tarefas ficam neste dispositivo até você entrar.\",\"Import & Export\":\"Importar e exportar\",\"Import from Things\":\"Importar do Things\",\"Import from another app\":\"Importe de outro app\",\"Inactive tasks start to fade\":\"Tarefas inativas começam a esmaecer\",\"Inbox\":\"Caixa de entrada\",\"Inbox is empty\":\"A caixa de entrada está vazia\",\"Increase Text Size\":\"Aumentar texto\",\"Industrial\":\"Industrial\",\"It lands in your Inbox until you schedule or file it\":\"Ela fica na caixa de entrada até você agendar ou arquivar\",\"Its tasks stay in the project.\":\"As tarefas dela ficam no projeto.\",\"Jabuticaba\":\"Jabuticaba\",\"Keep\":\"Manter\",\"Keyboard Shortcuts\":\"Atalhos de teclado\",\"Large\":\"Grande\",\"Largest\":\"Maior\",\"Later\":\"Depois\",\"Learn where you usually file similar tasks.\":\"Aprende onde você costuma arquivar tarefas parecidas.\",\"Let Go\":\"Deixar ir\",\"Light\":\"Leve\",\"List\":\"Lista\",\"Lists\":\"Listas\",\"Logbook\":\"Registro\",\"Logbook is empty\":\"O registro está vazio\",\"MCP Skills\":\"Skills MCP\",\"Mark Done\":\"Marcar como feito\",\"Mark as Complete\":\"Marcar como concluída\",\"Mark as Done\":\"Marcar como feito\",\"Mark as Not Done\":\"Marcar como não feito\",\"Medium\":\"Médio\",\"Move\":\"Mover\",\"Move Down\":\"Mover para baixo\",\"Move Tasks\":\"Mover tarefas\",\"Move Up\":\"Mover para cima\",\"Move from another app\":\"Trazer de outro app\",\"Move only this task, or update the repeating schedule to the new date?\":\"Mover só esta tarefa ou atualizar a repetição para a nova data?\",\"Move to Area\":\"Mover para área\",\"Move to Section\":\"Mover para seção\",\"Move to Suggested List\":\"Mover para a lista sugerida\",\"Move to Today\":\"Mover para Hoje\",\"Moved to {destination}\":\"Movida para {destination}\",\"Moved {count} tasks to {destination}\":{\"one\":\"Movida para {destination}\",\"other\":\"{count} tarefas movidas para {destination}\"},\"Move…\":\"Mover…\",\"New Area\":\"Nova área\",\"New Project\":\"Novo projeto\",\"New Project in Area\":\"Novo projeto na área\",\"New Section\":\"Nova seção\",\"New Task in Section\":\"Nova tarefa na seção\",\"New To-Do\":\"Nova tarefa\",\"New tasks wait here until you schedule or file them.\":\"Novas tarefas esperam aqui até você agendar ou arquivar.\",\"No Faded Tasks\":\"Nenhuma tarefa esmaecida\",\"No Recently Deleted Tasks\":\"Nenhuma tarefa apagada recentemente\",\"No Starred Tasks\":\"Nenhuma tarefa com estrela\",\"No agent can claim or work on a task while paused.\":\"Enquanto estiver pausado, nenhum agente pode pegar ou trabalhar numa tarefa.\",\"No repeating tasks\":\"Nenhuma tarefa recorrente\",\"Not now\":\"Agora não\",\"Not signed in\":\"Sem sessão iniciada\",\"Notes\":\"Notas\",\"Notes keep the context\":\"As notas guardam o contexto\",\"Nothing here yet\":\"Nada aqui ainda\",\"Nothing in Anytime\":\"Nada em A qualquer momento\",\"Nothing on Today\":\"Nada em Hoje\",\"Nothing to review\":\"Nada para revisar\",\"Nothing upcoming\":\"Nada em breve\",\"OK\":\"OK\",\"Off\":\"Desligado\",\"On every device\":\"Em todos os dispositivos\",\"On-device intelligence\":\"Inteligência no dispositivo\",\"On-device only\":\"Só no dispositivo\",\"One\":\"Uma\",\"Only This Task\":\"Só esta tarefa\",\"Open\":\"Abrir\",\"Open Septena Life\":\"Abrir Septena Life\",\"Open Today\":\"Abrir Hoje\",\"Open tasks without a date live here.\":\"Tarefas em aberto sem data ficam aqui.\",\"Optical\":\"Óptico\",\"Optional product diagnostics\":\"Diagnóstico opcional do produto\",\"Or press ⌃⌥Space anywhere on your Mac\":\"Ou pressione ⌃⌥Espaço em qualquer lugar do Mac\",\"Overdue app icon badge\":\"Indicador de atrasadas no ícone\",\"Paste\":\"Colar\",\"Paste JSON Backup…\":\"Colar backup JSON…\",\"Paste raw Septena JSON directly from the clipboard to restore or merge records.\":\"Cole o JSON bruto do Septena direto da área de transferência para restaurar ou mesclar registros.\",\"Paste the first prompt. Claude sets up your areas and projects with you.\":\"Cole o primeiro prompt. O Claude monta suas áreas e projetos com você.\",\"Pause Repeat\":\"Pausar repetição\",\"Pause all agents\":\"Pausar todos os agentes\",\"Persimmon\":\"Caqui\",\"Pick a Reminders list. Its items wait in your Inbox until you bring them in.\":\"Escolha uma lista dos Lembretes. Os itens esperam na caixa de entrada até você trazê-los.\",\"Pitaya\":\"Pitaya\",\"Print / Ink\":\"Impressão / Tinta\",\"Privacy\":\"Privacidade\",\"Private Cloud Compute reasoning\":\"Raciocínio no Private Cloud Compute\",\"Project\":\"Projeto\",\"Project name\":\"Nome do projeto\",\"Pure Canvas\":\"Tela pura\",\"Quick Add…\":\"Adição rápida…\",\"Quick Entry\":\"Entrada rápida\",\"Quick Find…\":\"Busca rápida…\",\"Recently Deleted\":\"Apagadas recentemente\",\"Remind\":\"Lembrar\",\"Reminders\":\"Lembretes\",\"Reminder…\":\"Lembrete…\",\"Remove Star\":\"Remover estrela\",\"Remove from Today\":\"Remover de Hoje\",\"Rename\":\"Renomear\",\"Rename Area\":\"Renomear área\",\"Rename Project\":\"Renomear projeto\",\"Rename Section\":\"Renomear seção\",\"Repeat\":\"Repetir\",\"Repeating\":\"Recorrentes\",\"Repeat…\":\"Repetir…\",\"Requires the PCC entitlement. Without it, requests fail and fall back on-device.\":\"Requer a permissão PCC. Sem ela, as solicitações falham e voltam para o dispositivo.\",\"Reschedule repeating task?\":\"Reagendar tarefa recorrente?\",\"Reset Text Size\":\"Redefinir tamanho do texto\",\"Restore\":\"Restaurar\",\"Resume Repeat\":\"Retomar repetição\",\"Review\":\"Revisar\",\"Ridge Lines\":\"Linhas de crista\",\"Schedule\":\"Agendar\",\"Section name\":\"Nome da seção\",\"Send feedback\":\"Enviar feedback\",\"Septena\":\"Septena\",\"Septena Life\":\"Septena Life\",\"Septena Life is the companion app for habits, training, food, sleep, mood, and health.\":\"O Septena Life é o app parceiro para hábitos, treino, alimentação, sono, humor e saúde.\",\"Septena Window\":\"Janela do Septena\",\"Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import.\":\"O Septena copia suas áreas, projetos e tarefas. O outro app não é alterado, e você pode desfazer uma importação.\",\"Septena never runs AI on your data and never reads it. The intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets where requests may run.\":\"O Septena nunca roda IA nos seus dados e nunca os lê. A inteligência é sua (Apple no dispositivo, Private Cloud Compute ou seu Claude). Isto só define onde as solicitações podem rodar.\",\"Set up Septena for me using https://septena.app/agents.md\":\"Configure o Septena para mim usando https://septena.app/agents.md\",\"Set up my Septena areas, projects, and tasks by following https://api.septena.app/onboard.md\":\"Configure minhas áreas, projetos e tarefas no Septena seguindo https://api.septena.app/onboard.md\",\"Settings…\":\"Ajustes…\",\"Show / Hide Sidebar\":\"Mostrar / ocultar barra lateral\",\"Show Get Started Again\":\"Mostrar Primeiros passos de novo\",\"Show Info\":\"Mostrar informações\",\"Show Sidebar\":\"Mostrar barra lateral\",\"Show Sidebar Counts\":\"Mostrar contagens da barra lateral\",\"Show Welcome Again\":\"Mostrar boas-vindas de novo\",\"Show completed tasks\":\"Mostrar tarefas concluídas\",\"Show faded tasks\":\"Mostrar tarefas esmaecidas\",\"Show faded tasks in projects and areas.\":\"Mostra tarefas esmaecidas em projetos e áreas.\",\"Show model labels\":\"Mostrar nomes dos modelos\",\"Show which model answered next to each AI reply.\":\"Mostra qual modelo respondeu ao lado de cada resposta da IA.\",\"Sign in to sync\":\"Entre para sincronizar\",\"Sign in with Apple\":\"Iniciar sessão com a Apple\",\"Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.\":\"Inicie sessão co",
+        "m a Apple para ter suas tarefas em todos os dispositivos e deixar o Claude se conectar. O Septena nunca vê sua senha da Apple.\",\"Sign in…\":\"Entrar…\",\"Small\":\"Pequeno\",\"Smallest\":\"Menor\",\"Star\":\"Marcar com estrela\",\"Star important tasks to keep them one tap away.\":\"Marque tarefas importantes com estrela para tê-las a um toque.\",\"Starred\":\"Com estrela\",\"Start empty\":\"Começar do zero\",\"Start from the list you already have, or start empty.\":\"Comece pela lista que você já tem ou do zero.\",\"Stipple Drift\":\"Pontilhado à deriva\",\"Suggest where to file\":\"Sugerir onde arquivar\",\"Sweep\":\"Varrer\",\"Swipe left on a task to select multiple tasks. Swipe right runs this quick action.\":\"Deslize uma tarefa para a esquerda para selecionar várias tarefas. Deslize para a direita para fazer esta ação rápida.\",\"Swipe right\":\"Deslizar para a direita\",\"Sync & storage diagnostics\":\"Diagnóstico de sincronização e armazenamento\",\"Syncing…\":\"Sincronizando…\",\"Tactile\":\"Tátil\",\"Tags\":\"Tags\",\"Tags…\":\"Tags…\",\"Tamarillo\":\"Tamarilho\",\"Tap + to add a task.\":\"Toque em + para adicionar uma tarefa.\",\"Task\":\"Tarefa\",\"Task deleted\":\"Tarefa apagada\",\"Task list\":\"Lista de tarefas\",\"Tasks that think with you\":\"Tarefas que pensam com você\",\"The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples).\":\"O guia que ensina um modelo a usar suas tarefas pela conexão (ferramentas, convenções e exemplos).\",\"Version {version}\":\"Versão {version}\",\"Tasks with a future When or Deadline date appear here.\":\"Tarefas com data futura em Quando ou Prazo aparecem aqui.\",\"Tasks without activity for 14 days fade out and move to Faded.\":\"Tarefas sem atividade por 14 dias esmaecem e vão para Esmaecidas.\",\"Text Size\":\"Tamanho do texto\",\"The tasks move to Recently Deleted. You can undo this.\":\"As tarefas vão para Apagadas recentemente. Você pode desfazer.\",\"Thinking…\":\"Pensando…\",\"This account is already set up. Your tasks are syncing to this device.\":\"Esta conta já está configurada. Suas tarefas estão sincronizando com este dispositivo.\",\"Thorough\":\"Minucioso\",\"Three\":\"Três\",\"Title lines\":\"Linhas do título\",\"Today\":\"Hoje\",\"Today shows what to do now. Anything you skipped stays on the Get started list.\":\"Hoje mostra o que fazer agora. O que você pulou fica na lista Primeiros passos.\",\"Toggle Star\":\"Alternar estrela\",\"Toggle Today\":\"Alternar Hoje\",\"Topography\":\"Topografia\",\"Two\":\"Duas\",\"Type above to add your first task.\":\"Digite acima para adicionar sua primeira tarefa.\",\"Undated tasks fade after 14 days without activity and move to Faded. Open or edit a task to bring it back. You can turn this off in Settings.\":\"Tarefas sem data esmaecem após 14 dias sem atividade e vão para Esmaecidas. Abra ou edite uma tarefa para trazê-la de volta. Você pode desativar isso nos Ajustes.\",\"Undated tasks without activity for 14 days appear here until you keep them or let them go.\":\"Tarefas sem data e sem atividade por 14 dias aparecem aqui até você mantê-las ou descartá-las.\",\"Upcoming\":\"Em breve\",\"Update Schedule\":\"Atualizar repetição\",\"Usage data\":\"Dados de uso\",\"Use Private Cloud Compute\":\"Usar o Private Cloud Compute\",\"Use my Claude\":\"Usar meu Claude\",\"View\":\"Visualizar\",\"Washi Paper\":\"Papel washi\",\"Welcome back\":\"Bem-vindo de volta\",\"Welcome to Septena\":\"Boas-vindas ao Septena\",\"When\":\"Quando\",\"When Claude shows a code, enter it below.\":\"Quando o Claude mostrar um código, digite-o abaixo.\",\"When off, tasks appear in one list with their project or area underneath.\":\"Desativado, as tarefas aparecem numa só lista com o projeto ou a área embaixo.\",\"When…\":\"Quando…\",\"Where AI runs\":\"Onde a IA roda\",\"Work an agent finished appears here so you can check and accept it.\":\"O trabalho concluído por um agente aparece aqui para você conferir e aceitar.\",\"Work with Claude\":\"Trabalhe com o Claude\",\"You can undo this.\":\"Você pode desfazer.\",\"You can't undo this.\":\"Não é possível desfazer.\",\"You're all set\":\"Tudo pronto\",\"Your changes stay on this Mac until you sign in.\":\"Suas alterações ficam neste Mac até você entrar.\",\"Your changes stay on this device until you sign in.\":\"Suas alterações ficam neste dispositivo até você entrar.\",\"Your changes stay on this iPad until you sign in.\":\"Suas alterações ficam neste iPad até você entrar.\",\"Your changes stay on this iPhone until you sign in.\":\"Suas alterações ficam neste iPhone até você entrar.\",\"Your data\":\"Seus dados\",\"Your name\":\"Seu nome\",\"Your name stays on this device, and syncs when you sign in.\":\"Seu nome fica neste dispositivo e sincroniza quando você entra.\",\"Your task text and titles are never sent through analytics. This setting syncs across your devices.\":\"O texto e os títulos das suas tarefas nunca são enviados pelas análises. Este ajuste sincroniza entre seus dispositivos.\",\"Your tasks stay in step on iPhone, iPad and Mac.\":\"Suas tarefas ficam em sincronia no iPhone, iPad e Mac.\",\"Your tasks, areas, projects, and conversations are erased from the server and this device.\":\"Suas tarefas, áreas, projetos e conversas são apagados do servidor e deste dispositivo.\",\"Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena's private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). Apple's on-device intelligence runs locally; you can connect Claude under AI & Agents.\":\"Suas tarefas, áreas, projetos e conversas ficam neste dispositivo até você entrar. Depois de entrar, elas sincronizam pelo servidor privado do Septena em api.septena.app, criptografadas em repouso (não de ponta a ponta, então agentes conectados podem lê-las quando você escolher). A inteligência no dispositivo da Apple roda localmente; você pode conectar o Claude em IA e agentes.\",\"Yuzu\":\"Yuzu\",\"{count} files\":{\"one\":\"{count} arquivo\",\"other\":\"{count} arquivos\"},\"{count} projects\":{\"one\":\"1 projeto\",\"other\":\"{count} projetos\"},\"{count} tags\":{\"one\":\"{count} tag\",\"other\":\"{count} tags\"},\"{count} tasks\":{\"one\":\"1 tarefa\",\"other\":\"{count} tarefas\"},\"{count} tasks deleted\":{\"one\":\"Tarefa apagada\",\"other\":\"{count} tarefas apagadas\"},\"{count} tasks faded this week\":{\"one\":\"1 tarefa esmaeceu esta semana\",\"other\":\"{count} tarefas esmaeceram esta semana\"},\"{count} tasks rolled into Today\":{\"one\":\"1 tarefa entrou em Hoje\",\"other\":\"{count} tarefas entraram em Hoje\"}}}",
+    ).joinToString("")
+}

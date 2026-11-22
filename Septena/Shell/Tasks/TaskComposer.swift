@@ -100,10 +100,6 @@ struct TaskComposerCard: View {
   /// — but only once the save has definitely had its chance, so a just-typed
   /// title can never be purged out from under the (animation-delayed) autosave.
   var onVanish: (() -> Void)? = nil
-  /// Inline create only: Return on a titled NEW task saves it and asks the host
-  /// to open the next new task below (the Things capture chain). Nil means
-  /// Return saves and closes, the edit-mode behavior.
-  var onSubmitNew: (() -> Void)? = nil
 
   @Environment(TaskMutator.self) private var mutator
   @Environment(\.modelContext) private var modelContext
@@ -179,6 +175,11 @@ struct TaskComposerCard: View {
   @State private var suggestedList: SuggestionEngine.Suggestion?
   /// Mirrors whether the Discuss pill is on the rail (edit mode, no thread yet).
   @State private var discussKickoffVisible = false
+  /// The clipboard held text when this blank new task opened, so the Paste
+  /// chip is on offer (#210). Checked once per seed with `hasText`, which
+  /// never reads the clipboard, so no iOS paste-permission alert appears.
+  /// Cleared by a paste or by the first keystroke.
+  @State private var pasteOffered = false
 
   init(mode: Mode, areas: [Area], projects: [Project], accent: Color,
        presentation: Presentation = .drawer, deferredCreate: Bool = false,
@@ -188,8 +189,7 @@ struct TaskComposerCard: View {
        heroMatchNS: Namespace.ID? = nil, heroMatchIsSource: Bool = true,
        showsTodayIndicator: Bool = true,
        onDone: @escaping () -> Void,
-       onVanish: (() -> Void)? = nil,
-       onSubmitNew: (() -> Void)? = nil) {
+       onVanish: (() -> Void)? = nil) {
     self.mode = mode
     self.areas = areas
     self.projects = projects
@@ -205,7 +205,6 @@ struct TaskComposerCard: View {
     self.showsTodayIndicator = showsTodayIndicator
     self.onDone = onDone
     self.onVanish = onVanish
-    self.onSubmitNew = onSubmitNew
     #if os(iOS)
     // Seed the iPhone sheet height before first presentation so editing opens
     // directly at half height instead of flashing full then snapping down.
@@ -310,12 +309,15 @@ struct TaskComposerCard: View {
         //     so the field never *shows* a break (the row is laid out for one
         //     line), joining the lines with a space so the words don't fuse.
         //     A paste must NOT commit: the user is still editing.
+        // Typing hides the Paste chip (#210). One flag write per editing
+        // session; later keystrokes skip it.
+        if pasteOffered, !newValue.isEmpty { pasteOffered = false }
         guard newValue.contains(where: \.isNewline) else { updateSuggestion(); return }
         if TaskTitleText.withoutLineBreaks(newValue) == oldValue {
           draft.title = TaskTitleText.withoutLineBreaks(newValue)
             .trimmingCharacters(in: .whitespacesAndNewlines)
           if draft.canSave { commit(); return }
-          // Return on an empty NEW task ends the capture chain.
+          // Return on an empty NEW task closes it (its draft is then purged).
           if isCreating { close(); return }
         } else {
           draft.title = TaskTitleText.singleLine(newValue)
@@ -621,8 +623,10 @@ struct TaskComposerCard: View {
   private var quickEntryChips: some View {
     let tokens = detectedTokens
     let suggestion = listSuggestion
-    if !tokens.isEmpty || suggestion != nil {
+    let paste = showsPasteChip
+    if !tokens.isEmpty || suggestion != nil || paste {
       FlowLayout(spacing: 8) {
+        if paste { pasteChip }
         ForEach(tokens) { token in
           chip(icon: token.icon, leading: "plus", text: token.displayText) { apply(token) }
         }
@@ -652,6 +656,62 @@ struct TaskComposerCard: View {
     }
     .buttonStyle(.plain)
     .background(Capsule().fill(accent.opacity(0.28)))
+  }
+
+  // MARK: - Paste chip (#210)
+
+  /// Blank new task, clipboard had text at open, nothing typed yet.
+  private var showsPasteChip: Bool {
+    pasteOffered && isCreating && draft.title.isEmpty && draft.notes.isEmpty
+  }
+
+  /// The Paste chip. Label and icon come from the registry
+  /// (`taskAttributes` `paste`, tier `chip`).
+  @ViewBuilder
+  private var pasteChip: some View {
+    #if os(iOS)
+    // iOS: the system `PasteButton` reads the clipboard with the user's tap
+    // as consent, so no paste-permission alert appears. It draws its own
+    // system "Paste" label and clipboard glyph.
+    PasteButton(payloadType: String.self) { strings in
+      guard let text = strings.first else { return }
+      Task { @MainActor in applyPaste(text) }
+    }
+    .buttonBorderShape(.capsule)
+    .labelStyle(.titleAndIcon)
+    .controlSize(.small)
+    .tint(accent)
+    #else
+    let attr = RegistrySurfaces.taskAttribute("paste")
+    Button {
+      if let text = NSPasteboard.general.string(forType: .string) { applyPaste(text) }
+    } label: {
+      HStack(spacing: 5) {
+        Image(systemName: attr.sfSymbol).font(.system(size: 11, weight: .semibold))
+        Text(verbatim: attr.label).font(.septenaLabel).lineLimit(1)
+      }
+      .foregroundStyle(accent)
+      .padding(.horizontal, 11)
+      .padding(.vertical, 6)
+      .contentShape(Capsule())
+    }
+    .buttonStyle(.plain)
+    .background(Capsule().fill(accent.opacity(0.28)))
+    #endif
+  }
+
+  /// Fill the blank draft from clipboard text (`TaskTitleText.pasteSplit`)
+  /// and retire the chip. Does not commit: the user is still composing.
+  private func applyPaste(_ text: String) {
+    pasteOffered = false
+    guard let split = TaskTitleText.pasteSplit(text) else { return }
+    Haptics.tick()
+    a11yAnimate(.snappy(duration: 0.2)) {
+      draft.title = split.title
+      if let notes = split.notes { draft.notes = notes }
+    }
+    updateSuggestion()
+    focusTitle()
   }
 
   private func applySuggestedList() {
@@ -771,6 +831,8 @@ struct TaskComposerCard: View {
       }
       #endif
     }
+    pasteOffered = isCreating && draft.title.isEmpty && draft.notes.isEmpty
+      && SeptenaPasteboard.hasText
   }
 
   /// Move keyboard focus into the title field and — on macOS — collapse
@@ -899,13 +961,10 @@ struct TaskComposerCard: View {
     guard draft.canSave else { return }
     Haptics.tick()
     persistOnce()
-    // A new inline task chains: the host saves this one (done above) and
-    // opens the next new task below. Edits, and the drawer, just close.
-    if isCreating, presentation == .inline, let onSubmitNew {
-      onSubmitNew()
-    } else {
-      close()
-    }
+    // Return saves and closes, for a new task too. A new task used to chain
+    // into a second blank draft below it (the Things capture chain); that
+    // blank row read as a leftover "New task" ghost, so it is gone.
+    close()
   }
 
   // MARK: - Keyboard focus traversal
@@ -913,10 +972,13 @@ struct TaskComposerCard: View {
   /// Tab order: title → notes → every pill (including Discuss when edit mode offers it).
   private var focusOrder: [TaskEditFocus] {
     var order: [TaskEditFocus] = [.title, .notes]
-    order += TaskAttributeBar.Attribute.draftCases.map { .pill($0) }
-    if isEditing { order.append(.pill(.attachments)) }
-    if discussKickoffVisible {
-      order.append(.pill(.discuss))
+    // Rail order from the registry; edit-only pills join once a task exists.
+    for attr in TaskAttributeBar.Attribute.rail {
+      if attr == .discuss {
+        if discussKickoffVisible { order.append(.pill(.discuss)) }
+      } else if !attr.editOnly || isEditing {
+        order.append(.pill(attr))
+      }
     }
     return order
   }

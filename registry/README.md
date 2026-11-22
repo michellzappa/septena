@@ -17,7 +17,9 @@ iOS, iPadOS, macOS, Backend/MCP, Web, Android, and Windows. See
 | `registry/surfaces.json` | Notices, destructive/fork prompts, toasts, task composer attributes | R3 (`#144`) |
 | `registry/icons.json` | Semantic icon ID → SF Symbol / Material / Lucide map | R4 (`#145`) |
 | `registry/tokens.json` | Semantic design tokens, selection washes, 16-color palette, 5-step text scale | R4 (`#145`) |
+| `registry/plans.json` | Plans and pricing: prices, plan limits (the server plan table), pricing-page cards and comparison rows, promises, upsell copy (ADR 0010, ADR 0023). The site's /pricing page and the app's Septena Plus page render it | — |
 | `registry/capabilities.json` | Capability parity ledger keyed by Feature ID (ADR 0013) | R4 (`#145`) |
+| `registry/device-frames.json` | Canonical iPhone and Android shapes for marketing visuals (website scenes, App Store panels) | — |
 | `registry/l10n/en.json` | Generated: every user-facing registry string, its placeholders and source paths | L1 (`#214`) |
 | `registry/l10n/<lang>.json` | Translations of registry copy, keyed by the English text | L1 (`#214`) |
 
@@ -29,7 +31,7 @@ Edit the JSON source files here, then regenerate the typed native bindings:
 node scripts/gen-registries.mjs
 ```
 
-Verify that all 9 registries pass cross-file referential integrity checks and
+Verify that all 10 registries pass cross-file referential integrity checks and
 generated files are up to date (also run automatically by `scripts/lint-design.sh`):
 
 ```bash

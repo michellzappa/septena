@@ -115,7 +115,7 @@ struct SeptaskFirstRunView: View {
       if signedIn, step?.kind == "account" { Task { await afterSignIn() } }
     }
     .sheet(isPresented: $showingThings, onDismiss: afterImport) {
-      importSheet { ThingsImportView() }
+      importSheet { ImportFlowView(sourceID: ThingsImportSource.id) }
     }
     .sheet(isPresented: $showingReminders, onDismiss: afterImport) {
       importSheet { RemindersInboxDetail() }

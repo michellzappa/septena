@@ -3,7 +3,7 @@
 // registered before this validation existed).
 //
 // This gateway fronts one person's health data, so client origins are
-// PINNED: only Claude's hosted callbacks and loopback (local MCP clients
+// PINNED: only Claude's and ChatGPT's hosted callbacks and loopback (local MCP clients
 // like Claude Code, which listen on a random localhost port) may receive
 // auth codes. Add a host here before pointing any new MCP client at the
 // gateway.
@@ -11,6 +11,7 @@
 const PINNED_REDIRECT_HOSTS = new Set([
   "claude.ai",   // https://claude.ai/api/mcp/auth_callback
   "claude.com",  // https://claude.com/api/mcp/auth_callback
+  "chatgpt.com", // https://chatgpt.com/connector_platform_oauth_redirect
 ]);
 
 const MAX_REDIRECT_URI_LENGTH = 512;

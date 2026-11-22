@@ -81,31 +81,55 @@ enum TaskJSONTransfer {
 
   // MARK: - Export
 
-  static func exportJSON(context: ModelContext? = nil) throws -> Data {
+  /// How `exportJSON` writes attachment bytes.
+  enum AttachmentMode {
+    /// Base64 inside `task_attachment` rows (importable, the default).
+    case inline
+    /// No attachment rows at all.
+    case omit
+    /// File metadata in a top-level `attachment_files` list that points at
+    /// `attachments/...` next to the JSON inside a .zip bundle. The
+    /// `task_attachment` table stays out so an import of the inner JSON
+    /// restores every other row instead of failing on missing bytes.
+    case manifest([[String: Any]])
+  }
+
+  static func exportJSON(context: ModelContext? = nil,
+                         attachments attachmentMode: AttachmentMode = .inline) throws -> Data {
     let context = context ?? LocalStore.shared.container.mainContext
     let areas = try context.fetch(FetchDescriptor<AreaEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
     let projects = try context.fetch(FetchDescriptor<ProjectEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
     let tasks = try context.fetch(FetchDescriptor<TaskEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
-    let attachments = try context.fetch(FetchDescriptor<TaskAttachmentEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
+    let attachments: [TaskAttachmentEntity]
+    if case .inline = attachmentMode {
+      attachments = try context.fetch(FetchDescriptor<TaskAttachmentEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
+    } else {
+      attachments = []
+    }
     let checklistItems = try context.fetch(FetchDescriptor<TaskChecklistItemEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
     let tags = try context.fetch(FetchDescriptor<TagEntity>(sortBy: [SortDescriptor(\.id)]))
 
-    let tables: [String: [[String: Any]]] = [
+    var tables: [String: [[String: Any]]] = [
       "area": areas.map(areaDict),
       "project": projects.map(projectDict),
       "task": tasks.map(taskDict),
-      "task_attachment": attachments.compactMap(attachmentDict),
       "checklist_item": checklistItems.map(checklistItemDict),
       "tag": tags.map(tagDict),
     ]
+    if case .inline = attachmentMode {
+      tables["task_attachment"] = attachments.compactMap(attachmentDict)
+    }
 
-    let envelope: [String: Any] = [
+    var envelope: [String: Any] = [
       "septena_export_version": envelopeVersion,
       "section": "tasks",
       "exported_at": ISO8601DateFormatter().string(from: .now),
       "app_version": appVersion(),
       "tables": tables,
     ]
+    if case .manifest(let files) = attachmentMode {
+      envelope["attachment_files"] = files
+    }
     return try JSONSerialization.data(withJSONObject: envelope,
                                       options: [.prettyPrinted, .sortedKeys])
   }
@@ -141,7 +165,9 @@ enum TaskJSONTransfer {
     let iso = ISO8601DateFormatter()
     return compact([
       "id": e.id, "title": e.title, "status": e.statusRaw,
-      "created": e.created, "scheduled": e.scheduled, "deadline": e.deadline,
+      "created": e.created, "scheduled": e.scheduled,
+      "startTime": e.startTime, "durationMinutes": e.durationMinutes, "timeZone": e.timeZone,
+      "deadline": e.deadline,
       "today": e.today, "starred": e.starred ? true : nil,
       "tags": e.tagIDs.isEmpty ? nil : e.tagIDs,
       "todaySetOn": e.todaySetOn, "completedAt": e.completedAt,
@@ -379,6 +405,9 @@ enum TaskJSONTransfer {
     entity.statusRaw = statusRaw
     entity.created = r["created"] as? String
     entity.scheduled = nonEmptyString(r["scheduled"])
+    entity.startTime = nonEmptyString(r["startTime"])
+    entity.durationMinutes = intValue(r["durationMinutes"]).map { min(1440, max(5, $0)) }
+    entity.timeZone = nonEmptyString(r["timeZone"])
     entity.deadline = nonEmptyString(r["deadline"])
     entity.today = (r["today"] as? Bool) ?? false
     entity.starred = (r["starred"] as? Bool) ?? false
@@ -619,10 +648,11 @@ enum TaskJSONTransfer {
 
   static func exportData(format: ExportFormat,
                          includeCompleted: Bool = true,
+                         jsonAttachments: AttachmentMode = .inline,
                          context: ModelContext? = nil) throws -> Data {
     switch format {
     case .json:
-      return try exportJSON(context: context)
+      return try exportJSON(context: context, attachments: jsonAttachments)
     case .markdown:
       let text = try exportMarkdown(context: context, includeCompleted: includeCompleted)
       return Data(text.utf8)
@@ -669,7 +699,15 @@ enum TaskJSONTransfer {
         let token = tagName.contains(" ") ? "#\"\(tagName)\"" : "#\(tagName)"
         meta.append(token)
       }
-      if let s = t.scheduled { meta.append("when: \(s)") }
+      if let s = t.scheduled {
+        if let slot = TaskTimeSlot.format(startTime: t.startTime, durationMinutes: t.durationMinutes) {
+          meta.append("when: \(s) \(slot)")
+        } else {
+          meta.append("when: \(s)")
+        }
+      } else if let slot = TaskTimeSlot.format(startTime: t.startTime, durationMinutes: t.durationMinutes) {
+        meta.append("time: \(slot)")
+      }
       if let d = t.deadline { meta.append("deadline: \(d)") }
       if let r = t.recurrence { meta.append("repeat: \(r.shortLabel)") }
       if let rem = t.reminderAt { meta.append("reminder: \(rem)") }
@@ -759,7 +797,7 @@ enum TaskJSONTransfer {
     let rows = allTasks.filter { !$0.isHeading && (includeCompleted || $0.status == .open) }
 
     var out: [String] = [
-      "\u{FEFF}id,title,status,area,project,section,today,starred,tags,scheduled,deadline,reminder_at,recurrence,notes,created,completed_at"
+      "\u{FEFF}id,title,status,area,project,section,today,starred,tags,scheduled,start_time,duration_minutes,deadline,reminder_at,recurrence,notes,created,completed_at"
     ]
     for t in rows {
       let projectEntity = t.project.flatMap { projects[$0] }
@@ -778,6 +816,8 @@ enum TaskJSONTransfer {
         t.starred ? "true" : "false",
         tagList,
         t.scheduled ?? "",
+        t.startTime ?? "",
+        t.durationMinutes.map(String.init) ?? "",
         t.deadline ?? "",
         t.reminderAt ?? "",
         t.recurrence?.shortLabel ?? "",
@@ -798,21 +838,213 @@ enum TaskJSONTransfer {
   }
 }
 
+// MARK: - Export bundle (docs/DATA_EXPORT_SPEC.md §2.4, EX1)
+
+/// Builds one export file in a private temporary folder: a plain .json / .md /
+/// .csv file, or a .zip bundle when attachments go out as separate files.
+/// The bundle holds `septena-tasks.<ext>` plus `attachments/<id>-<filename>`.
+/// Works offline with no account. Zips with `NSFileCoordinator`
+/// `.forUploading`, the platform primitive on iOS and macOS.
+@MainActor
+enum TaskExportBundle {
+  /// Inline base64 attachments in JSON up to this total; above it the export
+  /// becomes a .zip so base64 does not inflate memory.
+  static let inlineAttachmentLimit: Int64 = 25 * 1_024 * 1_024
+
+  struct Result {
+    let url: URL
+    let contentType: UTType
+    var filename: String { url.lastPathComponent }
+    /// The temporary folder that holds `url`. Remove it when done.
+    var workDirectory: URL { url.deletingLastPathComponent() }
+  }
+
+  private struct FileCopy: Sendable {
+    let source: URL
+    let relativePath: String
+  }
+
+  /// True when an export with these options saves as a .zip.
+  static func producesZip(format: TaskJSONTransfer.ExportFormat,
+                          includeAttachments: Bool,
+                          attachmentCount: Int,
+                          attachmentBytes: Int64) -> Bool {
+    guard includeAttachments, attachmentCount > 0 else { return false }
+    return format != .json || attachmentBytes > inlineAttachmentLimit
+  }
+
+  static func build(format: TaskJSONTransfer.ExportFormat,
+                    includeCompleted: Bool,
+                    includeAttachments: Bool,
+                    context: ModelContext? = nil,
+                    progress: @escaping @MainActor @Sendable (Double) -> Void = { _ in }) async throws -> Result {
+    let context = context ?? LocalStore.shared.container.mainContext
+    let work = FileManager.default.temporaryDirectory
+      .appendingPathComponent("SeptenaExport-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+    do {
+      let result = try await buildInto(work, format: format, includeCompleted: includeCompleted,
+                                       includeAttachments: includeAttachments,
+                                       context: context, progress: progress)
+      progress(1)
+      return result
+    } catch {
+      try? FileManager.default.removeItem(at: work)
+      throw error
+    }
+  }
+
+  private static func buildInto(_ work: URL,
+                                format: TaskJSONTransfer.ExportFormat,
+                                includeCompleted: Bool,
+                                includeAttachments: Bool,
+                                context: ModelContext,
+                                progress: @escaping @MainActor @Sendable (Double) -> Void) async throws -> Result {
+    progress(0)
+    let rows = includeAttachments
+      ? try attachmentRows(format: format, includeCompleted: includeCompleted, context: context)
+      : []
+    let totalBytes = rows.reduce(Int64(0)) { $0 + $1.byteCount }
+    let zip = producesZip(format: format, includeAttachments: includeAttachments,
+                          attachmentCount: rows.count, attachmentBytes: totalBytes)
+
+    guard zip else {
+      let data = try TaskJSONTransfer.exportData(
+        format: format,
+        includeCompleted: includeCompleted,
+        jsonAttachments: includeAttachments ? .inline : .omit,
+        context: context)
+      try Task.checkCancellation()
+      let url = work.appendingPathComponent(format.suggestedFilename())
+      try data.write(to: url, options: .atomic)
+      return Result(url: url, contentType: format.contentType)
+    }
+
+    let bundleName = "septena-tasks-\(TaskJSONTransfer.todayStamp)"
+    let stage = work.appendingPathComponent(bundleName, isDirectory: true)
+    let attachmentsDir = stage.appendingPathComponent("attachments", isDirectory: true)
+    try FileManager.default.createDirectory(at: attachmentsDir, withIntermediateDirectories: true)
+
+    var copies: [FileCopy] = []
+    var manifest: [[String: Any]] = []
+    let iso = ISO8601DateFormatter()
+    for row in rows {
+      let relative = "attachments/" + bundleFilename(id: row.id, original: row.filename)
+      copies.append(FileCopy(source: row.source, relativePath: relative))
+      manifest.append([
+        "id": row.id, "taskID": row.taskID, "filename": row.filename,
+        "contentType": row.contentType, "byteCount": row.byteCount,
+        "createdAt": iso.string(from: row.createdAt),
+        "position": row.position, "path": relative,
+      ])
+    }
+
+    let data = try TaskJSONTransfer.exportData(
+      format: format,
+      includeCompleted: includeCompleted,
+      jsonAttachments: .manifest(manifest),
+      context: context)
+    try data.write(to: stage.appendingPathComponent("septena-tasks.\(format.fileExtension)"),
+                   options: .atomic)
+    progress(0.05)
+
+    let zipURL = work.appendingPathComponent("\(bundleName).zip")
+    let job = Task.detached(priority: .userInitiated) {
+      for (index, copy) in copies.enumerated() {
+        try Task.checkCancellation()
+        try FileManager.default.copyItem(at: copy.source,
+                                         to: stage.appendingPathComponent(copy.relativePath))
+        await progress(0.05 + 0.85 * Double(index + 1) / Double(copies.count))
+      }
+      try Task.checkCancellation()
+      try zipDirectory(stage, to: zipURL)
+      try? FileManager.default.removeItem(at: stage)
+    }
+    try await withTaskCancellationHandler {
+      try await job.value
+    } onCancel: {
+      job.cancel()
+    }
+    return Result(url: zipURL, contentType: .zip)
+  }
+
+  private struct AttachmentRow {
+    let id: String
+    let taskID: String
+    let filename: String
+    let contentType: String
+    let byteCount: Int64
+    let createdAt: Date
+    let position: Double
+    let source: URL
+  }
+
+  /// Attachments with a local file. JSON takes every row (it is lossless);
+  /// Markdown and CSV take the rows of the tasks they export.
+  private static func attachmentRows(format: TaskJSONTransfer.ExportFormat,
+                                     includeCompleted: Bool,
+                                     context: ModelContext) throws -> [AttachmentRow] {
+    let entities = try context.fetch(FetchDescriptor<TaskAttachmentEntity>(
+      sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
+    var allowedTaskIDs: Set<String>?
+    if format != .json {
+      let tasks = try context.fetch(FetchDescriptor<TaskEntity>())
+      allowedTaskIDs = Set(tasks
+        .filter { $0.deletedAt == nil && !$0.isHeading && (includeCompleted || $0.status == .open) }
+        .map(\.id))
+    }
+    return entities.compactMap { e in
+      if let allowedTaskIDs, !allowedTaskIDs.contains(e.taskID) { return nil }
+      guard let url = TaskAttachmentFiles.url(for: e),
+            FileManager.default.fileExists(atPath: url.path) else { return nil }
+      return AttachmentRow(id: e.id, taskID: e.taskID, filename: e.filename,
+                           contentType: e.contentType, byteCount: e.byteCount,
+                           createdAt: e.createdAt, position: e.position, source: url)
+    }
+  }
+
+  private static func bundleFilename(id: String, original: String) -> String {
+    let safe = original
+      .replacingOccurrences(of: "/", with: "-")
+      .replacingOccurrences(of: ":", with: "-")
+    return safe.isEmpty ? id : "\(id)-\(safe)"
+  }
+
+  /// Zips `directory` into `destination`. The coordinator hands over a
+  /// temporary .zip that is valid only inside the accessor, so copy it out.
+  nonisolated private static func zipDirectory(_ directory: URL, to destination: URL) throws {
+    var coordinatorError: NSError?
+    var copyError: Error?
+    NSFileCoordinator().coordinate(readingItemAt: directory,
+                                   options: .forUploading,
+                                   error: &coordinatorError) { zipped in
+      do {
+        try FileManager.default.copyItem(at: zipped, to: destination)
+      } catch {
+        copyError = error
+      }
+    }
+    if let error = coordinatorError ?? copyError { throw error }
+  }
+}
+
 // MARK: - Transferable & FileDocument
 
-/// Lazily builds the export bytes when the share sheet asks for them.
+/// Builds the export file when the share sheet asks for it.
 struct TaskExportFile: Transferable {
   let format: TaskJSONTransfer.ExportFormat
   let includeCompleted: Bool
-  let suggestedName: String
+  let includeAttachments: Bool
 
   static var transferRepresentation: some TransferRepresentation {
-    DataRepresentation(exportedContentType: .data) { item in
-      try await MainActor.run {
-        try TaskJSONTransfer.exportData(format: item.format, includeCompleted: item.includeCompleted)
-      }
+    FileRepresentation(exportedContentType: .data) { item in
+      let url = try await TaskExportBundle.build(
+        format: item.format,
+        includeCompleted: item.includeCompleted,
+        includeAttachments: item.includeAttachments
+      ).url
+      return SentTransferredFile(url)
     }
-    .suggestedFileName { $0.suggestedName }
   }
 }
 
@@ -828,18 +1060,19 @@ struct TaskJSONExportFile: Transferable {
   }
 }
 
-struct TaskJSONDocument: FileDocument {
-  static var readableContentTypes: [UTType] { [.json, .plainText, .commaSeparatedText] }
-  var data: Data
+/// Hands a finished export file to `fileExporter` without loading it into memory.
+struct TaskExportDocument: FileDocument {
+  static var readableContentTypes: [UTType] { [.data] }
+  let url: URL
 
-  init(data: Data) { self.data = data }
+  init(url: URL) { self.url = url }
 
   init(configuration: ReadConfiguration) throws {
-    self.data = configuration.file.regularFileContents ?? Data()
+    throw CocoaError(.featureUnsupported)
   }
 
   func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-    FileWrapper(regularFileWithContents: data)
+    try FileWrapper(url: url, options: .immediate)
   }
 }
 
@@ -849,9 +1082,13 @@ struct SeptaskImportExportPane: View {
   @Environment(\.modelContext) private var modelContext
   @State private var exportFormat: TaskJSONTransfer.ExportFormat = .json
   @State private var includeCompleted = true
-  @State private var exportDocument: TaskJSONDocument?
+  @State private var includeAttachments = true
+  @State private var exportResult: TaskExportBundle.Result?
+  @State private var exportDocument: TaskExportDocument?
   @State private var showingFileExporter = false
   @State private var exportError: String?
+  @State private var exportTask: Task<Void, Never>?
+  @State private var exportProgress: Double = 0
 
   @State private var showingFilePicker = false
   @State private var importDoc: TaskJSONTransfer.Envelope?
@@ -873,15 +1110,22 @@ struct SeptaskImportExportPane: View {
     .fileExporter(
       isPresented: $showingFileExporter,
       document: exportDocument,
-      contentType: exportFormat.contentType,
-      defaultFilename: exportFormat.suggestedFilename()
+      contentType: exportResult?.contentType ?? exportFormat.contentType,
+      defaultFilename: exportResult?.filename ?? exportFormat.suggestedFilename()
     ) { result in
       if case .failure(let error) = result {
         exportError = error.localizedDescription
       } else {
         exportError = nil
       }
-      exportDocument = nil
+      discardExportFile()
+    }
+    .onChange(of: exportFormat) { _, format in
+      includeAttachments = format == .json
+    }
+    .onDisappear {
+      exportTask?.cancel()
+      if !showingFileExporter { discardExportFile() }
     }
     .fileImporter(
       isPresented: $showingFilePicker,
@@ -890,25 +1134,9 @@ struct SeptaskImportExportPane: View {
     ) { handleFileImport($0) }
   }
 
-  private var moveIn: RegistrySettingsSection? {
-    RegistrySettings.section("move_in", page: RegistrySettings.PageID.importExport)
-  }
-
-  private var thingsItem: RegistrySettingsItem? { RegistrySettings.itemBySurface["things_import"] }
-
+  /// Source picker and past imports, on the import engine (MOVING_IN_SPEC §4).
   private var moveInSection: some View {
-    Section {
-      NavigationLink {
-        ThingsImportView()
-          .navigationTitle(thingsItem?.label ?? "")
-      } label: {
-        Label(thingsItem?.label ?? "", systemImage: thingsItem?.sfSymbol ?? "square.and.arrow.down")
-      }
-    } header: {
-      Text(moveIn?.header ?? "")
-    } footer: {
-      if let footer = moveIn?.footer { Text(footer) }
-    }
+    ImportSourcesSection()
   }
 
   private var storageSection: some View {
@@ -932,7 +1160,12 @@ struct SeptaskImportExportPane: View {
   }
 
   private var exportSection: some View {
-    let filename = exportFormat.suggestedFilename()
+    let attachments = SeptenaServices.shared.taskAttachmentStore.storageSummary
+    let willZip = TaskExportBundle.producesZip(format: exportFormat,
+                                               includeAttachments: includeAttachments,
+                                               attachmentCount: attachments.count,
+                                               attachmentBytes: attachments.bytes)
+    let isExporting = exportTask != nil
     return Section {
       Picker("Format", selection: $exportFormat) {
         ForEach(TaskJSONTransfer.ExportFormat.allCases) { fmt in
@@ -940,33 +1173,43 @@ struct SeptaskImportExportPane: View {
         }
       }
       .pickerStyle(.segmented)
+      .disabled(isExporting)
 
       if exportFormat != .json {
         Toggle("Include completed tasks", isOn: $includeCompleted)
+          .disabled(isExporting)
       }
 
-      Button {
-        do {
-          let bytes = try TaskJSONTransfer.exportData(
-            format: exportFormat,
-            includeCompleted: includeCompleted,
-            context: modelContext
-          )
-          exportDocument = TaskJSONDocument(data: bytes)
-          showingFileExporter = true
-          exportError = nil
-        } catch {
-          exportError = error.localizedDescription
+      if attachments.count > 0 {
+        Toggle("Include attachments", isOn: $includeAttachments)
+          .disabled(isExporting)
+        if willZip {
+          Text("Saves a .zip with the attachments as separate files.")
+            .font(.septenaCaption)
+            .foregroundStyle(.secondary)
         }
-      } label: {
-        Label("Save \(exportFormat.label)…", systemImage: "square.and.arrow.down")
       }
 
-      ShareLink(item: TaskExportFile(format: exportFormat,
-                                     includeCompleted: includeCompleted,
-                                     suggestedName: filename),
-                preview: SharePreview(filename, image: Image(systemName: "doc.text"))) {
-        Label("Share \(exportFormat.label)…", systemImage: "square.and.arrow.up")
+      if isExporting {
+        HStack(spacing: 12) {
+          ProgressView(value: exportProgress)
+          Button("Cancel", role: .cancel) { exportTask?.cancel() }
+        }
+      } else {
+        Button {
+          startExport()
+        } label: {
+          Label("Save \(exportFormat.label)…", systemImage: "square.and.arrow.down")
+        }
+
+        ShareLink(item: TaskExportFile(format: exportFormat,
+                                       includeCompleted: includeCompleted,
+                                       includeAttachments: includeAttachments),
+                  preview: SharePreview(willZip ? "septena-tasks-\(TaskJSONTransfer.todayStamp).zip"
+                                                : exportFormat.suggestedFilename(),
+                                        image: Image(systemName: "doc.text"))) {
+          Label("Share \(exportFormat.label)…", systemImage: "square.and.arrow.up")
+        }
       }
 
       if let exportError {
@@ -977,8 +1220,49 @@ struct SeptaskImportExportPane: View {
     } header: {
       Text("Export")
     } footer: {
-      Text("JSON Backup is lossless (every task, project, area, conversation, and local attachment). Exports are unencrypted files stored where you choose. Free on every tier, offline with no account.")
+      Text("JSON Backup is lossless (every task, project, area, conversation, and local attachment). Over 25 MB of attachments, it saves as a .zip. Exports are unencrypted files stored where you choose. Free on every tier, offline with no account.")
     }
+  }
+
+  private func startExport() {
+    // A save panel dismissed without saving skips the completion handler,
+    // so a stale file from the previous run can still be here.
+    discardExportFile()
+    exportError = nil
+    exportProgress = 0
+    let format = exportFormat
+    let completed = includeCompleted
+    let attachments = includeAttachments
+    exportTask = Task {
+      defer { exportTask = nil }
+      do {
+        let result = try await TaskExportBundle.build(
+          format: format,
+          includeCompleted: completed,
+          includeAttachments: attachments,
+          context: modelContext,
+          progress: { exportProgress = $0 })
+        if Task.isCancelled {
+          try? FileManager.default.removeItem(at: result.workDirectory)
+          return
+        }
+        exportResult = result
+        exportDocument = TaskExportDocument(url: result.url)
+        showingFileExporter = true
+      } catch is CancellationError {
+        exportError = nil
+      } catch {
+        exportError = error.localizedDescription
+      }
+    }
+  }
+
+  private func discardExportFile() {
+    if let exportResult {
+      try? FileManager.default.removeItem(at: exportResult.workDirectory)
+    }
+    exportResult = nil
+    exportDocument = nil
   }
 
   private var importSection: some View {
@@ -1001,7 +1285,7 @@ struct SeptaskImportExportPane: View {
     } header: {
       Text("Restore backup")
     } footer: {
-      Text("Imports a Septena JSON backup into this device. Matching IDs update in place; non-task records are skipped.")
+      Text("Imports a Septena JSON backup into this device. Matching IDs update in place; non-task records are skipped. For a .zip backup, unzip it and choose the JSON file inside; its attachments are not restored yet.")
     }
   }
 

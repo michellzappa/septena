@@ -34,6 +34,7 @@ struct SidebarRootView: View {
   /// Tasks completed today — drives the Logbook tile/row count.
   @State private var doneTodayCount: Int = 0
   @State private var reviewCount: Int = 0
+  @State private var agentCount: Int = 0
   @State private var starredCount: Int = 0
   @State private var fadedCount: Int = 0
   @State private var recentlyDeletedCount: Int = 0
@@ -85,6 +86,7 @@ struct SidebarRootView: View {
     _starredCount = State(initialValue: agg.starredCount)
     _fadedCount = State(initialValue: agg.fadedCount)
     _reviewCount = State(initialValue: agg.reviewCount)
+    _agentCount = State(initialValue: agg.agentCount)
     _repeatingCount = State(initialValue: agg.repeatingCount)
     _projectOpenCount = State(initialValue: agg.projectOpenCount)
     _areaOpenCount = State(initialValue: agg.areaOpenCount)
@@ -429,10 +431,49 @@ struct SidebarRootView: View {
                    title: spec.title,
                    count: spec.count)
     }
+    .contextMenu { smartListContextMenu(for: spec) }
     #if os(macOS)
     row.modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
     #else
     row
+    #endif
+  }
+
+  @ViewBuilder
+  private func smartListContextMenu(for spec: SmartListSpec) -> some View {
+    if case .filter(let filter) = spec.route,
+       let destID = filter.destinationID,
+       RegistryDestinations.byId[destID]?.canHide == true {
+      Button {
+        let prefs = SmartListPreferences.shared
+        let before = prefs.snapshot()
+        prefs.setHidden(true, for: destID)
+        let after = prefs.snapshot()
+        if after != before {
+          if isSelected(spec.route) {
+            selectRoute(.filter(.today))
+          }
+          TaskUndo.record(
+            name: String(localized: "Hide \(spec.title)", comment: "Sidebar: undo action"),
+            undo: { SmartListPreferences.shared.restore(before) },
+            redo: { SmartListPreferences.shared.restore(after) }
+          )
+        }
+      } label: {
+        Label("Hide \(spec.title)", systemImage: "eye.slash")
+      }
+    }
+    #if SEPTASK
+    Button {
+      SeptaskSettingsLink.request(RegistrySettings.PageID.smartLists)
+      #if os(macOS)
+      SeptaskKitSettingsWindow.show()
+      #else
+      nav.showSettings = true
+      #endif
+    } label: {
+      Label("Customize Smart Lists…", systemImage: "slider.horizontal.3")
+    }
     #endif
   }
 
@@ -454,6 +495,7 @@ struct SidebarRootView: View {
                         isSelected: isSelected(spec.route))
         }
         .buttonStyle(InertButtonStyle())
+        .contextMenu { smartListContextMenu(for: spec) }
         // Drag-a-task-onto-Today re-home, matching the area / project cards
         // below. Only the Today tile takes a drop; self-gates to iPad
         // full-screen (inert on iPhone/compact).
@@ -508,6 +550,19 @@ struct SidebarRootView: View {
     } label: {
       Label("New Project", systemImage: "number")
     }
+    #if SEPTASK
+    Divider()
+    Button {
+      SeptaskSettingsLink.request(RegistrySettings.PageID.smartLists)
+      #if os(macOS)
+      SeptaskKitSettingsWindow.show()
+      #else
+      nav.showSettings = true
+      #endif
+    } label: {
+      Label("Customize Smart Lists…", systemImage: "slider.horizontal.3")
+    }
+    #endif
     #if !SEPTASK
     Divider()
     // Page-specific settings, in the same slot Next uses (just above the
@@ -589,24 +644,26 @@ struct SidebarRootView: View {
     let count: Int?
   }
 
-  // The smart-list SET + order is single-sourced in `TaskDestinations` (shared
-  // with the title dropdown); icon + title come off `Route`. Color and the live
-  // count are sidebar-specific styling, resolved per route here.
-  //
-  // No separate Inbox row — loose captures now live in the triage band on top
-  // of Today (docs/TRIAGE_BAND_SPEC.md). Next is a top-level tab on Septena;
-  // Septask inserts it after Today via `TaskDestinations.sidebarRoutes`.
-  private var visibleSmartListRoutes: [Route] {
-    var routes = TaskDestinations.sidebarRoutes
-    // Review progressively discloses right below Today when non-empty (or
-    // while currently selected so accepting the last item keeps focus calm).
-    if reviewCount > 0 || isSelected(.filter(.review)) {
-      let insertAt = routes.firstIndex(where: { $0.sameDestination(as: .filter(.today)) }).map { $0 + 1 } ?? 0
-      routes.insert(.filter(.review), at: insertAt)
-    }
-    return routes
+  private var nonEmptySmartListIDs: Set<String> {
+    var ids = Set<String>()
+    // Review and Agent also stay while selected, so accepting the last item
+    // does not pull the row out from under the user.
+    if reviewCount > 0 || isSelected(.filter(.review)) { ids.insert("review") }
+    if agentCount > 0 || isSelected(.filter(.agent)) { ids.insert("agent") }
+    if starredCount > 0 { ids.insert("starred") }
+    if fadedCount > 0 { ids.insert("faded") }
+    if recentlyDeletedCount > 0 { ids.insert("recentlyDeleted") }
+    return ids
   }
 
+  private var visibleSmartListRoutes: [Route] {
+    TaskDestinations.sidebarRoutes(nonEmptyIDs: nonEmptySmartListIDs)
+  }
+
+  // The smart-list SET + order is single-sourced in `SmartListPreferences` over
+  // `registry/destinations.json` (shared with the macOS AppKit sidebar and the
+  // title dropdown); icon + title come off `Route`. Color and the live count
+  // are sidebar-specific styling, resolved per route here.
   private var smartListSpecs: [SmartListSpec] {
     visibleSmartListRoutes.map { route in
       SmartListSpec(route: route,
@@ -633,13 +690,17 @@ struct SidebarRootView: View {
     switch route {
     // Today total = pinned-today + scheduled/due rolling in. Both buckets live
     // on Today, so the user-facing count is the sum.
-    case .filter(.today):       return counts.map { $0.todayCount + $0.reviewCount }
-    case .filter(.review):      return reviewCount > 0 ? reviewCount : nil
-    case .filter(.upcoming):    return counts?.upcomingCount
-    case .filter(.repeating):   return repeatingCount
-    case .filter(.unscheduled): return counts?.unscheduledCount
-    case .filter(.logbook):     return doneTodayCount > 0 ? doneTodayCount : nil
-    default:                    return nil
+    case .filter(.today):           return counts.map { $0.todayCount + $0.reviewCount }
+    case .filter(.review):          return reviewCount > 0 ? reviewCount : nil
+    case .filter(.agent):           return agentCount > 0 ? agentCount : nil
+    case .filter(.upcoming):        return counts?.upcomingCount
+    case .filter(.repeating):       return repeatingCount
+    case .filter(.unscheduled):     return counts?.unscheduledCount
+    case .filter(.logbook):         return doneTodayCount > 0 ? doneTodayCount : nil
+    case .filter(.starred):         return starredCount > 0 ? starredCount : nil
+    case .filter(.faded):           return fadedCount > 0 ? fadedCount : nil
+    case .filter(.recentlyDeleted): return recentlyDeletedCount > 0 ? recentlyDeletedCount : nil
+    default:                        return nil
     }
   }
 
@@ -665,16 +726,13 @@ struct SidebarRootView: View {
     #endif
   }
 
-  /// Every route the sidebar can currently select — smart lists, areas, every
-  /// active project, and (when present) Recently Deleted. Used to resolve a
-  /// `Route.id` tag back to its full `Route` for the selection binding.
+  /// Every route the sidebar can currently select — visible smart lists, areas,
+  /// and every active project. Used to resolve a `Route.id` tag back to its
+  /// full `Route` for the selection binding.
   private var selectableRoutes: [Route] {
     var routes = visibleSmartListRoutes
     routes += areas.map { .area(id: $0.id) }
     routes += projects.filter { $0.status == .active }.map { .project(id: $0.id) }
-    if starredCount > 0 { routes.append(.filter(.starred)) }
-    if fadedCount > 0 { routes.append(.filter(.faded)) }
-    if recentlyDeletedCount > 0 { routes.append(.filter(.recentlyDeleted)) }
     return routes
   }
 
@@ -780,38 +838,6 @@ struct SidebarRootView: View {
         }
       }
     }
-    // Starred, Faded & Recently Deleted — shown conditionally when non-empty.
-    if starredCount > 0 || fadedCount > 0 || recentlyDeletedCount > 0 {
-      Section {
-        if starredCount > 0 {
-          compactRow(route: .filter(.starred)) {
-            navRow(.filter(.starred)) {
-              SmartListRow(icon: "star.fill",
-                           title: "Starred",
-                           count: starredCount)
-            }
-          }
-        }
-        if fadedCount > 0 {
-          compactRow(route: .filter(.faded)) {
-            navRow(.filter(.faded)) {
-              SmartListRow(icon: "circle.dashed",
-                           title: "Faded",
-                           count: fadedCount)
-            }
-          }
-        }
-        if recentlyDeletedCount > 0 {
-          compactRow(route: .filter(.recentlyDeleted)) {
-            navRow(.filter(.recentlyDeleted)) {
-              SmartListRow(icon: "trash",
-                           title: "Recently Deleted",
-                           count: recentlyDeletedCount)
-            }
-          }
-        }
-      }
-    }
   }
 
   /// Tightens a sidebar list row to Reminders-like density. The row views carry
@@ -913,108 +939,86 @@ struct SidebarRootView: View {
 
   // MARK: - Context menus
 
-  @ViewBuilder
+  /// Registry `sidebar.project`, the same menu the AppKit sidebar renders.
   private func projectMenu(_ project: Project) -> some View {
-    Button {
-      renameDraft = project.title
-      renameProjectTarget = project
-    } label: {
-      Label("Rename", systemImage: "pencil")
-    }
     let siblings = projects.filter { $0.area == project.area && $0.status == .active }
-    if let idx = siblings.firstIndex(where: { $0.id == project.id }) {
-      Divider()
-      Button {
-        reorderProject(project.id, before: siblings[idx - 1].id, parent: project.area)
-      } label: {
-        Label("Move Up", systemImage: "chevron.up")
-      }
-      .disabled(idx == 0)
-      Button {
-        let next = siblings[idx + 1]
-        reorderProject(next.id, before: project.id, parent: project.area)
-      } label: {
-        Label("Move Down", systemImage: "chevron.down")
-      }
-      .disabled(idx == siblings.count - 1)
-    }
-    Divider()
-    Menu {
-      Button {
-        moveProject(project, to: nil)
-      } label: {
-        Label("No Area", systemImage: "tray")
-      }
-      .disabled(project.area == nil)
-      if !areas.isEmpty {
-        Divider()
-        ForEach(areas) { area in
-          Button {
-            moveProject(project, to: area.id)
-          } label: {
-            Label(area.title, systemImage: "square.stack.3d.up.fill")
+    let idx = siblings.firstIndex(where: { $0.id == project.id })
+    return RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
+      RegistryActions.menu("sidebar.project"),
+      bind: { id in
+        switch id {
+        case "project.rename":
+          return .init {
+            renameDraft = project.title
+            renameProjectTarget = project
           }
-          .disabled(project.area == area.id)
+        case "project.moveUp":
+          guard let idx else { return nil }
+          return .init(perform: idx == 0 ? nil : {
+            reorderProject(project.id, before: siblings[idx - 1].id, parent: project.area)
+          })
+        case "project.moveDown":
+          guard let idx else { return nil }
+          return .init(perform: idx == siblings.count - 1 ? nil : {
+            reorderProject(siblings[idx + 1].id, before: project.id, parent: project.area)
+          })
+        case "project.markDone": return .init { setProjectStatus(project, to: .done) }
+        case "project.cancel": return .init { setProjectStatus(project, to: .cancelled) }
+        case "project.delete": return .init { deleteProjectTarget = project }
+        default: return nil
         }
-      }
-    } label: {
-      Label("Move to Area", systemImage: "folder")
-    }
-    Divider()
-    Button {
-      setProjectStatus(project, to: .done)
-    } label: {
-      Label("Mark Done", systemImage: "checkmark.circle")
-    }
-    Button {
-      setProjectStatus(project, to: .cancelled)
-    } label: {
-      Label("Cancel Project", systemImage: "xmark.circle")
-    }
-    Divider()
-    Button(role: .destructive) {
-      deleteProjectTarget = project
-    } label: {
-      Label("Delete Project", systemImage: "trash")
-    }
+      },
+      slot: { id in
+        guard id == "moveToAreaDestinations" else { return [] }
+        return projectAreaDestinations(project)
+      }))
   }
 
-  @ViewBuilder
+  /// Move to Area ▸ — No Area, then every area; the current parent is
+  /// checked and inert. Same slot the AppKit sidebar fills.
+  private func projectAreaDestinations(_ project: Project) -> [RegistryMenuNode] {
+    var nodes: [RegistryMenuNode] = [
+      RegistryMenuEntry.slot(id: "area.none", title: String(localized: "No Area"),
+                             isOn: project.area == nil,
+                             perform: project.area == nil ? nil : { moveProject(project, to: nil) }),
+    ]
+    if !areas.isEmpty { nodes.append(.divider(id: "areas.divider")) }
+    for area in areas {
+      nodes.append(RegistryMenuEntry.slot(
+        id: "area.\(area.id)", title: area.title, isOn: project.area == area.id,
+        perform: project.area == area.id ? nil : { moveProject(project, to: area.id) }))
+    }
+    return nodes
+  }
+
+  /// Registry `sidebar.area`, the same menu the AppKit sidebar renders.
   private func areaMenu(_ area: Area) -> some View {
-    Button {
-      renameDraft = area.title
-      renameAreaTarget = area
-    } label: {
-      Label("Rename", systemImage: "pencil")
-    }
-    Button {
-      newProjectInArea = area.id
-      showingNewProject = true
-    } label: {
-      Label("New Project", systemImage: "plus.square")
-    }
-    if let idx = areas.firstIndex(where: { $0.id == area.id }) {
-      Divider()
-      Button {
-        reorderArea(area.id, before: areas[idx - 1].id)
-      } label: {
-        Label("Move Up", systemImage: "chevron.up")
-      }
-      .disabled(idx == 0)
-      Button {
-        let next = areas[idx + 1]
-        reorderArea(next.id, before: area.id)
-      } label: {
-        Label("Move Down", systemImage: "chevron.down")
-      }
-      .disabled(idx == areas.count - 1)
-    }
-    Divider()
-    Button(role: .destructive) {
-      deleteAreaTarget = area
-    } label: {
-      Label("Delete Area", systemImage: "trash")
-    }
+    let idx = areas.firstIndex(where: { $0.id == area.id })
+    return RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
+      RegistryActions.menu("sidebar.area")) { id in
+        switch id {
+        case "area.newProject":
+          return .init {
+            newProjectInArea = area.id
+            showingNewProject = true
+          }
+        case "area.rename":
+          return .init {
+            renameDraft = area.title
+            renameAreaTarget = area
+          }
+        case "area.moveUp":
+          guard let idx else { return nil }
+          return .init(perform: idx == 0 ? nil : { reorderArea(area.id, before: areas[idx - 1].id) })
+        case "area.moveDown":
+          guard let idx else { return nil }
+          return .init(perform: idx == areas.count - 1 ? nil : {
+            reorderArea(areas[idx + 1].id, before: area.id)
+          })
+        case "area.delete": return .init { deleteAreaTarget = area }
+        default: return nil
+        }
+      })
   }
 
   /// Move the area with id `movedId` to the position immediately before
@@ -1153,6 +1157,7 @@ struct SidebarRootView: View {
     var starredCount: Int = 0
     var fadedCount: Int = 0
     var reviewCount: Int = 0
+    var agentCount: Int = 0
     var repeatingCount: Int = 0
   }
 
@@ -1170,7 +1175,8 @@ struct SidebarRootView: View {
     // their own rows, so rolling them up would double-count.
     var areaDirectOpen: [String: Int] = [:]
     var inbox = 0, triage = 0, todayN = 0, upcoming = 0, unscheduled = 0, open = 0
-    var starred = 0, faded = 0, review = 0, repeating = 0
+    var starred = 0, faded = 0, review = 0, agent = 0, repeating = 0
+    let now = Date()
     for t in tasks {
       // Faded open tasks leave every count and project ratio (docs/TASK_FADE_SPEC.md §4).
       if t.isFaded { faded += 1; continue }
@@ -1189,7 +1195,11 @@ struct SidebarRootView: View {
       if t.starred { starred += 1 }
       // Check the raw columns first so only rows that carry JSON decode it.
       if t.recurrenceUnit != nil, t.recurrence != nil { repeating += 1 }
-      if t.conversationJSON != nil, t.conversation.needsHumanReview { review += 1 }
+      if t.conversationJSON != nil {
+        let convo = t.conversation
+        if convo.needsHumanReview { review += 1 }
+        if convo.agentStage(at: now) != nil { agent += 1 }
+      }
       if t.isInInbox { inbox += 1 }
       // The triage band (unratified) sits above Today and is excluded from it.
       if t.isInTriageBand { triage += 1 }
@@ -1223,6 +1233,7 @@ struct SidebarRootView: View {
       starredCount: starred,
       fadedCount: faded,
       reviewCount: review,
+      agentCount: agent,
       repeatingCount: repeating)
   }
 
@@ -1235,6 +1246,7 @@ struct SidebarRootView: View {
     starredCount = agg.starredCount
     fadedCount = agg.fadedCount
     reviewCount = agg.reviewCount
+    agentCount = agg.agentCount
     repeatingCount = agg.repeatingCount
   }
 
@@ -1328,6 +1340,18 @@ private struct SidebarBehaviorModifier: ViewModifier {
   let onCreateArea: () -> Void
   let reload: () -> Void
 
+  /// The sidebar re-reads the store (two full entity passes) after each task
+  /// change. While it is off screen (another iPhone tab, or a project page
+  /// pushed on top) that work is wasted, so it waits and runs once when the
+  /// sidebar comes back. Same rule as `TaskListView.reloadOrDeferWhileEditing`.
+  @State private var isVisible = false
+  @State private var reloadPending = false
+
+  private func reloadIfVisible() {
+    guard isVisible else { reloadPending = true; return }
+    reload()
+  }
+
   func body(content: Content) -> some View {
     content
       .modifier(SidebarSheets(
@@ -1343,15 +1367,23 @@ private struct SidebarBehaviorModifier: ViewModifier {
         onCreateArea: onCreateArea
       ))
       .task { reload() }
+      .onAppear {
+        isVisible = true
+        if reloadPending {
+          reloadPending = false
+          reload()
+        }
+      }
+      .onDisappear { isVisible = false }
       // Debounced: a burst of toggles (or a CK batch fanning out per-record
       // mutator posts) coalesces into one reload instead of one per post.
       .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)
         .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
-        reload()
+        reloadIfVisible()
       }
       .onReceive(NotificationCenter.default.publisher(for: .septenaStructureChanged)
         .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
-        reload()
+        reloadIfVisible()
       }
   }
 }

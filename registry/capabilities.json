@@ -7,6 +7,7 @@
     "lists.inbox": { "title": "Inbox band on Today", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "partial" },
     "lists.today": { "title": "Today", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "partial" },
     "lists.review": { "title": "Review (needs_verify)", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
+    "lists.agent": { "title": "Agent (claimed and assigned work by stage)", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
     "lists.upcoming": { "title": "Upcoming", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
     "lists.anytime": { "title": "Anytime", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
     "lists.repeating": { "title": "Repeating", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
