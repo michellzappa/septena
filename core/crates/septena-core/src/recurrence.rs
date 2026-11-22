@@ -56,11 +56,19 @@ pub fn next_scheduled_date(
     let anchor = if rule.after_completion {
         completed
     } else {
-        logical_scheduled.or(scheduled).as_deref().and_then(Day::parse).unwrap_or(completed)
+        logical_scheduled
+            .or(scheduled)
+            .as_deref()
+            .and_then(Day::parse)
+            .unwrap_or(completed)
     };
     let step = i64::from(rule.interval.max(1));
     let fixed = !rule.after_completion;
-    let weekdays = if fixed { normalize_weekdays(rule.weekdays.as_deref()) } else { Vec::new() };
+    let weekdays = if fixed {
+        normalize_weekdays(rule.weekdays.as_deref())
+    } else {
+        Vec::new()
+    };
     let month_day = if fixed { rule.month_day } else { None };
     let ordinal = if fixed { rule.ordinal_weekday } else { None };
     let keep_month_end = fixed && month_day.is_none() && ordinal.is_none();
@@ -83,12 +91,19 @@ pub fn next_scheduled_date(
                     resolve_month_day(target, month_day)
                 } else {
                     let keep_end = keep_month_end && date.day_of_month() == YearMonth::of(date).length();
-                    let target_day = if keep_end { target.length() } else { date.day_of_month().min(target.length()) };
+                    let target_day = if keep_end {
+                        target.length()
+                    } else {
+                        date.day_of_month().min(target.length())
+                    };
                     target.at_day(target_day)
                 }
             }
             recurrence_unit::YEAR => {
-                let target = YearMonth { year: date.year() + step, month: date.month() };
+                let target = YearMonth {
+                    year: date.year() + step,
+                    month: date.month(),
+                };
                 if let Some(ordinal) = ordinal {
                     resolve_ordinal_weekday(target, ordinal)
                 } else if let Some(month_day) = month_day {
@@ -168,7 +183,11 @@ fn resolve_ordinal_weekday(month: YearMonth, value: OrdinalWeekday) -> Option<Da
     if !(1..=7).contains(&value.weekday) || (value.ordinal != -1 && !(1..=4).contains(&value.ordinal)) {
         return None;
     }
-    let target = if value.weekday == 1 { 7 } else { value.weekday as u32 - 1 };
+    let target = if value.weekday == 1 {
+        7
+    } else {
+        value.weekday as u32 - 1
+    };
     if value.ordinal == -1 {
         let last = month.at_end();
         let back = (last.iso_weekday() + 7 - target) % 7;

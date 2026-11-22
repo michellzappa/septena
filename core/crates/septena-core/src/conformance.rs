@@ -19,8 +19,14 @@ pub struct ConformanceReport {
 }
 
 /// The fixtures the core runs, by file name without `.json`.
-pub const CONFORMANCE_FIXTURES: &[&str] =
-    &["convo-derived", "recurrence", "reminders", "sync-engine", "task-fade", "task-views"];
+pub const CONFORMANCE_FIXTURES: &[&str] = &[
+    "convo-derived",
+    "recurrence",
+    "reminders",
+    "sync-engine",
+    "task-fade",
+    "task-views",
+];
 
 /// The `now` of `convo-derived.json`, which has no clock of its own. No case
 /// carries a claim, so the value only has to parse.
@@ -31,7 +37,11 @@ const CONVO_NOW: &str = "2026-11-20T12:00:00Z";
 pub fn run_conformance(fixture: String, json: String) -> Result<ConformanceReport, CoreError> {
     let doc: Value =
         serde_json::from_str(&json).map_err(|e| CoreError::invalid(format!("{fixture}.json is not JSON: {e}")))?;
-    let mut run = Run { fixture: fixture.clone(), cases: 0, failures: Vec::new() };
+    let mut run = Run {
+        fixture: fixture.clone(),
+        cases: 0,
+        failures: Vec::new(),
+    };
     match fixture.as_str() {
         "task-fade" => {
             for case in cases(&doc, "rowOpacity") {
@@ -49,7 +59,13 @@ pub fn run_conformance(fixture: String, json: String) -> Result<ConformanceRepor
         }
         "recurrence" => {
             for case in cases(&doc, "nextScheduledDate") {
-                run.check("nextScheduledDate", case, "nextScheduledDate", case["input"].clone(), false);
+                run.check(
+                    "nextScheduledDate",
+                    case,
+                    "nextScheduledDate",
+                    case["input"].clone(),
+                    false,
+                );
             }
             for case in cases(&doc, "occurrenceID") {
                 let input = json!({ "sourceTaskID": case["sourceTaskID"], "scheduled": case["scheduled"] });
@@ -57,7 +73,11 @@ pub fn run_conformance(fixture: String, json: String) -> Result<ConformanceRepor
             }
         }
         "reminders" => {
-            for section in ["shiftReminderForRecurrence", "shiftReminderOnReschedule", "shouldArmReminder"] {
+            for section in [
+                "shiftReminderForRecurrence",
+                "shiftReminderOnReschedule",
+                "shouldArmReminder",
+            ] {
                 for case in cases(&doc, section) {
                     run.check(section, case, section, case["input"].clone(), false);
                 }
@@ -86,12 +106,21 @@ pub fn run_conformance(fixture: String, json: String) -> Result<ConformanceRepor
                 }
             }
         }
-        other => return Err(CoreError::invalid(format!("The core has no runner for conformance fixture {other}"))),
+        other => {
+            return Err(CoreError::invalid(format!(
+                "The core has no runner for conformance fixture {other}"
+            )));
+        }
     }
     if run.cases == 0 {
-        run.failures.push(format!("{}: the fixture has no cases the core knows", run.fixture));
+        run.failures
+            .push(format!("{}: the fixture has no cases the core knows", run.fixture));
     }
-    Ok(ConformanceReport { fixture: run.fixture, cases: run.cases, failures: run.failures })
+    Ok(ConformanceReport {
+        fixture: run.fixture,
+        cases: run.cases,
+        failures: run.failures,
+    })
 }
 
 struct Run {
@@ -110,7 +139,8 @@ impl Run {
             Err(error) => json!({ "error": error.message() }),
         };
         if !matches(&expected, &actual, subset) {
-            self.failures.push(format!("{section}/{name}: expected {expected}, got {actual}"));
+            self.failures
+                .push(format!("{section}/{name}: expected {expected}, got {actual}"));
         }
     }
 }
@@ -131,11 +161,10 @@ fn matches(expected: &Value, actual: &Value, subset: bool) -> bool {
             if !subset && e.len() != a.len() {
                 return false;
             }
-            e.iter().all(|(key, value)| a.get(key).is_some_and(|other| matches(value, other, false)))
+            e.iter()
+                .all(|(key, value)| a.get(key).is_some_and(|other| matches(value, other, false)))
         }
-        (Value::Array(e), Value::Array(a)) => {
-            e.len() == a.len() && e.iter().zip(a).all(|(x, y)| matches(x, y, false))
-        }
+        (Value::Array(e), Value::Array(a)) => e.len() == a.len() && e.iter().zip(a).all(|(x, y)| matches(x, y, false)),
         _ => expected == actual,
     }
 }

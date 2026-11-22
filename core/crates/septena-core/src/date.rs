@@ -84,7 +84,10 @@ impl YearMonth {
 
     pub(crate) fn plus_months(self, months: i64) -> YearMonth {
         let total = self.year * 12 + i64::from(self.month) - 1 + months;
-        YearMonth { year: total.div_euclid(12), month: (total.rem_euclid(12) + 1) as u32 }
+        YearMonth {
+            year: total.div_euclid(12),
+            month: (total.rem_euclid(12) + 1) as u32,
+        }
     }
 
     pub(crate) fn length(self) -> u32 {
@@ -165,10 +168,7 @@ pub(crate) fn parse_instant_ms(raw: &str) -> Option<i64> {
         }
         _ => return None,
     };
-    Some(
-        day.days() * MS_PER_DAY + hour * 3_600_000 + minute * 60_000 + second * 1000 + millis
-            - offset_seconds * 1000,
-    )
+    Some(day.days() * MS_PER_DAY + hour * 3_600_000 + minute * 60_000 + second * 1000 + millis - offset_seconds * 1000)
 }
 
 fn digits(chars: &[char]) -> Option<i64> {

@@ -114,7 +114,9 @@ fn carried_days(task: &TaskSnapshot, today: Day, open: bool, is_on_today: bool, 
     }
     landed.extend(parse_day(&task.scheduled).filter(|d| *d <= today));
     landed.extend(parse_day(&task.deadline).filter(|d| *d <= today));
-    let Some(landed) = landed.into_iter().min() else { return 0 };
+    let Some(landed) = landed.into_iter().min() else {
+        return 0;
+    };
     let floor = match parse_day(&task.created) {
         Some(created) if created > landed => created,
         _ => landed,

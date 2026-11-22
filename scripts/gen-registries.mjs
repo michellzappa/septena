@@ -1923,7 +1923,14 @@ function generateRustCore(bundle) {
       seen.add(name);
       lines.push(`        pub const ${name}: &str = ${rustStr(value)};`);
     }
-    lines.push(`        pub const ALL: &[&str] = &[${values.map(rustStr).join(", ")}];`);
+    // rustfmt style (core/rustfmt.toml, max_width 120): core.yml checks it.
+    const all = `        pub const ALL: &[&str] = &[${values.map(rustStr).join(", ")}];`;
+    if (all.length <= 120) lines.push(all);
+    else {
+      lines.push("        pub const ALL: &[&str] = &[");
+      for (const value of values) lines.push(`            ${rustStr(value)},`);
+      lines.push("        ];");
+    }
     lines.push("    }");
   }
   lines.push("}");

@@ -40,8 +40,10 @@ pub fn shift_reminder_on_reschedule(
 ) -> Option<String> {
     let raw = reminder_at?;
     let reminder: Vec<char> = raw.chars().collect();
-    let (Some(old), Some(new)) = (old_scheduled.filter(|s| !s.is_empty()), new_scheduled.filter(|s| !s.is_empty()))
-    else {
+    let (Some(old), Some(new)) = (
+        old_scheduled.filter(|s| !s.is_empty()),
+        new_scheduled.filter(|s| !s.is_empty()),
+    ) else {
         return Some(raw);
     };
     if reminder.len() <= 10 || reminder[10] != 'T' {

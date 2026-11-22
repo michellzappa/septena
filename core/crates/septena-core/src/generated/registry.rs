@@ -97,7 +97,17 @@ pub mod enums {
         pub const PROMOTED_TO_TODAY: &str = "promoted_to_today";
         pub const WONT_DO: &str = "wont_do";
         pub const OPEN: &str = "open";
-        pub const ALL: &[&str] = &["agent_done", "human_done", "agent_assisted_done", "needs_verify", "decomposed", "reminder_set", "promoted_to_today", "wont_do", "open"];
+        pub const ALL: &[&str] = &[
+            "agent_done",
+            "human_done",
+            "agent_assisted_done",
+            "needs_verify",
+            "decomposed",
+            "reminder_set",
+            "promoted_to_today",
+            "wont_do",
+            "open",
+        ];
     }
     pub mod convo_handoff_action_type {
         pub const OPEN_URL: &str = "open_url";
@@ -142,7 +152,17 @@ pub mod enums {
         pub const ACAI: &str = "acai";
         pub const PITAYA: &str = "pitaya";
         pub const JABUTICABA: &str = "jabuticaba";
-        pub const ALL: &[&str] = &["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "haskap", "acai", "pitaya", "jabuticaba"];
+        pub const ALL: &[&str] = &[
+            "colorful",
+            "tamarillo",
+            "persimmon",
+            "yuzu",
+            "carambola",
+            "haskap",
+            "acai",
+            "pitaya",
+            "jabuticaba",
+        ];
     }
     pub mod app_icon_finish {
         pub const OBSIDIAN: &str = "obsidian";
@@ -158,7 +178,15 @@ pub mod enums {
         pub const CAUSTIC_GLASS: &str = "causticGlass";
         pub const RIDGES: &str = "ridges";
         pub const WASHI_PAPER: &str = "washiPaper";
-        pub const ALL: &[&str] = &["none", "topography", "fieldMatrix", "stippleDrift", "causticGlass", "ridges", "washiPaper"];
+        pub const ALL: &[&str] = &[
+            "none",
+            "topography",
+            "fieldMatrix",
+            "stippleDrift",
+            "causticGlass",
+            "ridges",
+            "washiPaper",
+        ];
     }
     pub mod texture_motion {
         pub const STILL: &str = "still";
