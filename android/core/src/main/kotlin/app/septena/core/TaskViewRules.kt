@@ -4,6 +4,7 @@ import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.generated.RegistryRules
+import app.septena.core.generated.RegistryDestinationIds
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -84,7 +85,7 @@ object TaskViewRules {
             )
         val isInbox = activeTask && unfiled
         val freshAgentProposal = isFreshAgentProposal(task, now)
-        val inTriageBand = isInbox && if (task.source == "mcp") {
+        val inTriageBand = isInbox && if (task.source == RegistryEntityEnums.TaskSource.MCP) {
             freshAgentProposal && if (task.today || task.scheduled != null || task.deadline != null) {
                 task.acknowledgedAt == null
             } else {
@@ -94,16 +95,16 @@ object TaskViewRules {
             task.scheduled == null && task.deadline == null && !task.today
         }
         val inTodayInbox = inTriageBand || (isInbox && isOnToday)
-        val hasAgentCue = task.source == "mcp" && task.acknowledgedAt == null && freshAgentProposal
+        val hasAgentCue = task.source == RegistryEntityEnums.TaskSource.MCP && task.acknowledgedAt == null && freshAgentProposal
         val daysOnToday = carriedDays(task, today, open, isOnToday, hasAgentCue)
         val scheduled = day(task.scheduled)
         val deadline = day(task.deadline)
         val matches = linkedMapOf(
-            "today" to (activeTask && (isOnToday || inTriageBand)),
-            "inbox" to inTodayInbox,
-            "upcoming" to (activeTask && !task.today &&
+            RegistryDestinationIds.TODAY to (activeTask && (isOnToday || inTriageBand)),
+            RegistryDestinationIds.INBOX to inTodayInbox,
+            RegistryDestinationIds.UPCOMING to (activeTask && !task.today &&
                 (scheduled?.isAfter(today) == true || deadline?.isAfter(today) == true)),
-            "anytime" to (activeTask && !task.today && task.scheduled == null && task.deadline == null),
+            RegistryDestinationIds.ANYTIME to (activeTask && !task.today && task.scheduled == null && task.deadline == null),
         )
         return TaskViewMembership(
             isUnfiled = unfiled,
@@ -117,7 +118,7 @@ object TaskViewRules {
     }
 
     private fun isFreshAgentProposal(task: TaskSnapshot, now: Instant): Boolean {
-        if (task.source != "mcp") return false
+        if (task.source != RegistryEntityEnums.TaskSource.MCP) return false
         val createdAt = instant(task.createdAt) ?: return false
         return Duration.between(createdAt, now) < Duration.ofDays(RegistryRules.CUE_DECAY_DAYS)
     }

@@ -4,13 +4,14 @@ import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.generated.RegistryEntityLimits
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityPatterns
+import app.septena.core.generated.RegistryTurnFields
 import java.time.OffsetDateTime
 
 /** JSON wire codec shared by the Android and future Windows transport adapters. */
 object SyncWireCodec {
     fun encodePushBody(operations: List<SyncOperation>): String {
         require(operations.isNotEmpty()) { "The sync endpoint requires at least one operation" }
-        require(operations.size <= RegistryEntityLimits.all.getValue("maxOpsPerPush").toInt()) {
+        require(operations.size <= RegistryEntityLimits.MAX_OPS_PER_PUSH.toInt()) {
             "Push exceeds the registry operation limit"
         }
         return JsonValue.ObjectValue(mapOf("ops" to JsonValue.ArrayValue(operations.map(::encodeOperation))))
@@ -146,11 +147,7 @@ object SyncWireCodec {
         fields[key] as? JsonValue.ObjectValue
 
     private fun validateTurn(turn: Map<String, JsonValue>) {
-        val allowed = setOf(
-            "role", "step", "provider", "confidence", "question", "options", "chosen",
-            "otherText", "inReplyTo", "note", "ts",
-        )
-        require((turn.keys - allowed).isEmpty()) { "Turn contains fields outside the backend schema" }
+        require((turn.keys - RegistryTurnFields.all).isEmpty()) { "Turn contains fields outside the backend schema" }
         val role = turn["role"].stringValue()
         require(role != null && role in RegistryEntityEnums.all.getValue("convoTurnRole")) {
             "Turn role is not in the registry enum"
@@ -164,11 +161,11 @@ object SyncWireCodec {
             "Turn timestamp must include a UTC offset"
         }
 
-        checkOptionalString(turn, "provider", RegistryEntityLimits.all.getValue("turnProviderMax"))
-        checkOptionalString(turn, "question", RegistryEntityLimits.all.getValue("turnQuestionMax"))
-        checkOptionalString(turn, "chosen", RegistryEntityLimits.all.getValue("turnChosenMax"))
-        checkOptionalString(turn, "otherText", RegistryEntityLimits.all.getValue("turnOtherTextMax"))
-        checkOptionalString(turn, "note", RegistryEntityLimits.all.getValue("turnNoteMax"))
+        checkOptionalString(turn, "provider", RegistryEntityLimits.TURN_PROVIDER_MAX)
+        checkOptionalString(turn, "question", RegistryEntityLimits.TURN_QUESTION_MAX)
+        checkOptionalString(turn, "chosen", RegistryEntityLimits.TURN_CHOSEN_MAX)
+        checkOptionalString(turn, "otherText", RegistryEntityLimits.TURN_OTHER_TEXT_MAX)
+        checkOptionalString(turn, "note", RegistryEntityLimits.TURN_NOTE_MAX)
 
         when (val confidence = turn["confidence"]) {
             null, JsonValue.Null -> Unit
@@ -182,12 +179,12 @@ object SyncWireCodec {
         when (val options = turn["options"]) {
             null, JsonValue.Null -> Unit
             is JsonValue.ArrayValue -> {
-                require(options.values.size <= RegistryEntityLimits.all.getValue("turnMaxOptions")) {
+                require(options.values.size <= RegistryEntityLimits.TURN_MAX_OPTIONS) {
                     "Turn has more options than the registry allows"
                 }
                 options.values.forEachIndexed { index, value ->
                     val option = value.stringValue() ?: error("Turn option $index must be a string")
-                    require(option.length.toLong() <= RegistryEntityLimits.all.getValue("turnOptionMax")) {
+                    require(option.length.toLong() <= RegistryEntityLimits.TURN_OPTION_MAX) {
                         "Turn option $index exceeds the registry length limit"
                     }
                 }

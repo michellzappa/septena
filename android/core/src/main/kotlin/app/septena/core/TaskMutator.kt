@@ -122,7 +122,7 @@ class TaskMutator(
     )
 
     suspend fun setTags(id: String, tagIds: List<String>): TaskRecord? {
-        require(tagIds.size.toLong() <= RegistryEntityLimits.all.getValue("maxTagsPerTask")) {
+        require(tagIds.size.toLong() <= RegistryEntityLimits.MAX_TAGS_PER_TASK) {
             "Task has more tags than the registry limit"
         }
         return updateFields(
@@ -175,7 +175,7 @@ class TaskMutator(
     }
 
     private fun validateTitle(title: String) {
-        val maximum = RegistryEntityLimits.all.getValue("textMax")
+        val maximum = RegistryEntityLimits.TEXT_MAX
         require(title.length.toLong() <= maximum) { "Task title exceeds the registry limit of $maximum characters" }
     }
 }

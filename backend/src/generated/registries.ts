@@ -35,6 +35,7 @@ export const ENTITY_LIMITS = {
 
 export const ENTITY_ENUMS = {
   taskStatus: ["open","done","cancelled"] as const,
+  taskSource: ["app","mcp"] as const,
   projectStatus: ["active","done","cancelled"] as const,
   taskKind: ["heading"] as const,
   recurrenceUnit: ["day","week","month","year"] as const,
@@ -52,6 +53,8 @@ export const ENTITY_ENUMS = {
   canvasTexture: ["none","topography","fieldMatrix","stippleDrift","causticGlass","ridges","washiPaper"] as const,
   textureMotion: ["still","slowDrift"] as const,
 } as const;
+
+export const TURN_FIELDS = ["role","step","provider","confidence","question","options","chosen","otherText","inReplyTo","note","ts"] as const;
 
 export const DELETABLE_ENTITIES = ["task","area","project","attachment","checklistItem","tag"] as const;
 

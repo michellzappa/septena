@@ -34,7 +34,7 @@ data class TaskRecord(
             today: Boolean = false,
             todaySetOn: String? = null,
             notes: String? = null,
-            source: String = "app",
+            source: String = RegistryEntityEnums.TaskSource.APP,
             sourceClient: String = "Septena Android",
         ): Map<String, JsonValue> = linkedMapOf(
             RegistryEntityFields.Task.TITLE to JsonValue.StringValue(title),
@@ -58,11 +58,12 @@ data class TaskRecord(
 enum class TaskStatus(val wireValue: String) {
     OPEN(RegistryEntityEnums.TaskStatus.OPEN),
     DONE(RegistryEntityEnums.TaskStatus.DONE),
-    CANCELLED(RegistryEntityEnums.TaskStatus.CANCELLED);
+    CANCELLED(RegistryEntityEnums.TaskStatus.CANCELLED),
+    UNKNOWN("unknown");
 
     companion object {
         fun fromWire(value: String?): TaskStatus = entries.firstOrNull { it.wireValue == value }
-            ?: error("Unknown task status '$value'")
+            ?: UNKNOWN
     }
 }
 

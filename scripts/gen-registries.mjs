@@ -57,6 +57,9 @@ function validateEntities(entities) {
       seen.add(v);
     }
   }
+  assert(Array.isArray(entities.turnFields) && entities.turnFields.length > 0, "entities.json: missing turnFields");
+  assert(entities.turnFields.every((field) => typeof field === "string" && field.length > 0), "entities.json: turnFields must contain non-empty strings");
+  assert(new Set(entities.turnFields).size === entities.turnFields.length, "entities.json: turnFields contains duplicates");
   const validKinds = new Set(["text", "int", "real", "bool", "json"]);
   assert(entities.entities && typeof entities.entities === "object", "entities.json: missing entities");
   for (const [name, spec] of Object.entries(entities.entities)) {
@@ -617,6 +620,11 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   const deletable = entityNames.filter((n) => entities.entities[n].deletable);
   lines.push(`  static let entityNames: [String] = [${entityNames.map(swiftStr).join(", ")}]`);
   lines.push(`  static let deletableEntities: [String] = [${deletable.map(swiftStr).join(", ")}]`);
+  lines.push("}");
+  lines.push("");
+  lines.push("/// Canonical conversation turn fields shared with the backend (`registry/entities.json`).");
+  lines.push("enum RegistryTurnFields {");
+  lines.push(`  static let all: Set<String> = [${entities.turnFields.map(swiftStr).join(", ")}]`);
   lines.push("}");
   lines.push("");
 
@@ -1487,6 +1495,8 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   }
   lines.push("} as const;");
   lines.push("");
+  lines.push(`export const TURN_FIELDS = ${JSON.stringify(entities.turnFields)} as const;`);
+  lines.push("");
   const deletable = Object.keys(entities.entities).filter((n) => entities.entities[n].deletable);
   lines.push(`export const DELETABLE_ENTITIES = ${JSON.stringify(deletable)} as const;`);
   lines.push("");
@@ -1559,9 +1569,12 @@ function generateKotlinCore(bundle) {
 
   lines.push("/** Limits and enum values come directly from `registry/entities.json`. */");
   lines.push("object RegistryEntityLimits {");
+  for (const [key, value] of Object.entries(entities.limits)) {
+    lines.push(`    const val ${kotlinConstName(key)}: Long = ${value}L`);
+  }
   lines.push("    val all: Map<String, Long> = linkedMapOf(");
   for (const [key, value] of Object.entries(entities.limits)) {
-    lines.push(`        ${kotlinStr(key)} to ${value}L,`);
+    lines.push(`        ${kotlinStr(key)} to ${kotlinConstName(key)},`);
   }
   lines.push("    )");
   lines.push("}");
@@ -1580,6 +1593,11 @@ function generateKotlinCore(bundle) {
     }
     lines.push("    }");
   }
+  lines.push("}");
+  lines.push("");
+  lines.push("/** Canonical turn field keys shared with the backend. */");
+  lines.push("object RegistryTurnFields {");
+  lines.push(`    val all: Set<String> = linkedSetOf(${entities.turnFields.map(kotlinStr).join(", ")})`);
   lines.push("}");
   lines.push("");
 

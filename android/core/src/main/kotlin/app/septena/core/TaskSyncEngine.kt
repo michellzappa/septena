@@ -12,7 +12,7 @@ class TaskSyncEngine(
     private val clock: DayClock,
 ) {
     suspend fun sync(): SyncSummary {
-        val batchLimit = RegistryEntityLimits.all.getValue("maxOpsPerPush").toInt()
+        val batchLimit = RegistryEntityLimits.MAX_OPS_PER_PUSH.toInt()
         var pushedCount = 0
         var pulledPages = 0
 
@@ -116,7 +116,7 @@ class TaskSyncEngine(
     }
 
     private suspend fun pullUntilCaughtUp(): Int {
-        val pageLimit = RegistryEntityLimits.all.getValue("maxPull").toInt()
+        val pageLimit = RegistryEntityLimits.MAX_PULL.toInt()
         var pages = 0
         var resetCount = 0
         while (true) {

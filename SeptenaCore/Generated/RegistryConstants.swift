@@ -66,6 +66,7 @@ enum RegistryEntityPatterns {
 /// Canonical enum wire strings shared with the backend (`registry/entities.json`).
 enum RegistryEntityEnums {
   static let taskStatus: [String] = ["open", "done", "cancelled"]
+  static let taskSource: [String] = ["app", "mcp"]
   static let projectStatus: [String] = ["active", "done", "cancelled"]
   static let taskKind: [String] = ["heading"]
   static let recurrenceUnit: [String] = ["day", "week", "month", "year"]
@@ -84,6 +85,11 @@ enum RegistryEntityEnums {
   static let textureMotion: [String] = ["still", "slowDrift"]
   static let entityNames: [String] = ["task", "area", "project", "attachment", "checklistItem", "tag", "convo", "setting"]
   static let deletableEntities: [String] = ["task", "area", "project", "attachment", "checklistItem", "tag"]
+}
+
+/// Canonical conversation turn fields shared with the backend (`registry/entities.json`).
+enum RegistryTurnFields {
+  static let all: Set<String> = ["role", "step", "provider", "confidence", "question", "options", "chosen", "otherText", "inReplyTo", "note", "ts"]
 }
 
 /// Domain thresholds and retention constants shared across platforms (`registry/rules.json`).

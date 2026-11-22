@@ -1,5 +1,18 @@
 {
   "version": 1,
+  "turnFields": [
+    "role",
+    "step",
+    "provider",
+    "confidence",
+    "question",
+    "options",
+    "chosen",
+    "otherText",
+    "inReplyTo",
+    "note",
+    "ts"
+  ],
   "patterns": {
     "id": "^[A-Za-z0-9._:-]{1,128}$",
     "clientOpId": "^[A-Za-z0-9_-]{8,64}$",
@@ -31,6 +44,7 @@
   },
   "enums": {
     "taskStatus": ["open", "done", "cancelled"],
+    "taskSource": ["app", "mcp"],
     "projectStatus": ["active", "done", "cancelled"],
     "taskKind": ["heading"],
     "recurrenceUnit": ["day", "week", "month", "year"],
