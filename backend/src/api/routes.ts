@@ -1,7 +1,9 @@
 import { Hono, type Context, type Next } from "hono";
 import { z } from "zod";
 import type { Env } from "../env.js";
-import { logEvent } from "../util.js";
+import { logEvent, randomId, sha256Base64Url } from "../util.js";
+import { buildIcalFeed, icalEtag, type IcalScope } from "../ical.js";
+import { isValidTz, todayYMD } from "../tz.js";
 import { MAX_ATTACHMENT_BYTES, zId } from "../store/columns.js";
 import { zPushBody, type Op } from "../store/ops.js";
 import type { ChangeEntry } from "../store/TaskStore.js";
@@ -207,6 +209,7 @@ async function apiHostOnly(c: Ctx, next: Next) {
 api.use("/sync/*", requireUser, loadPlan, requireSyncDevice);
 api.use("/attachments/*", requireUser, loadPlan, requireSyncDevice);
 api.use("/account", requireUser);
+api.use("/ical/settings", requireUser);
 api.use("/changes", requireUser, loadPlan, requireSyncDevice);
 api.use("/pair/*", requireUser);
 api.use("/auth/device", requireUser);
@@ -638,11 +641,137 @@ api.post("/admin/copy/:userId/import/end", async (c) => {
   return c.json({ tables: await store.copyImportEnd() });
 });
 
+// ---- private read-only iCal feed (docs/TASK_TIMES_AND_ICAL_SPEC.md §3, #166) ----
+// Free account feature: requires sign-in to manage settings; the .ics feed
+// itself authenticates by an unguessable 32-byte base64url URL token.
+
+const zIcalScope = z.enum(["all", "timed"]);
+const zIcalUpdateBody = z.object({
+  enabled: z.boolean().optional(),
+  scope: zIcalScope.optional(),
+  rotate: z.boolean().optional(),
+}).strict();
+const ICAL_TOKEN_RE = /^[A-Za-z0-9_-]{32,64}$/;
+
+function icalKvKey(tokenHash: string): string {
+  return `ical:${tokenHash}`;
+}
+
+function icalFeedResponse(apiPublicUrl: string, feed: { token: string; scope: IcalScope; createdAt: string } | null) {
+  if (!feed) {
+    return { enabled: false, scope: "all" as IcalScope, url: null, webcalUrl: null, createdAt: null };
+  }
+  const base = apiPublicUrl.replace(/\/+$/, "");
+  const url = `${base}/v1/ical/${feed.token}.ics`;
+  const webcalUrl = url.replace(/^https?:\/\//i, "webcal://");
+  return { enabled: true, scope: feed.scope, url, webcalUrl, createdAt: feed.createdAt };
+}
+
+function ifNoneMatchHit(header: string | undefined, etag: string): boolean {
+  if (!header) return false;
+  const bare = etag.replace(/^W\//, "");
+  for (const part of header.split(",")) {
+    const tag = part.trim();
+    if (tag === "*" || tag === etag || tag.replace(/^W\//, "") === bare) return true;
+  }
+  return false;
+}
+
+api.get("/ical/settings", async (c) => {
+  const feed = await storeFor(c.env, c.get("userId")).getIcalFeed();
+  return c.json(icalFeedResponse(c.env.API_PUBLIC_URL, feed), 200, { "Cache-Control": "no-store" });
+});
+
+api.post("/ical/settings", async (c) => {
+  const body = await parse(c, zIcalUpdateBody);
+  if (body instanceof Response) return body;
+  const userId = c.get("userId");
+  const store = storeFor(c.env, userId);
+
+  if (body.enabled === false) {
+    const { prevTokenHash } = await store.deleteIcalFeed();
+    if (prevTokenHash) await c.env.TOKENS.delete(icalKvKey(prevTokenHash));
+    logEvent("ical_feed_disabled", {});
+    return c.json(icalFeedResponse(c.env.API_PUBLIC_URL, null), 200, { "Cache-Control": "no-store" });
+  }
+
+  const existing = await store.getIcalFeed();
+  const nextScope: IcalScope = body.scope ?? existing?.scope ?? "all";
+
+  if (!existing || body.rotate === true) {
+    const token = randomId(32);
+    const tokenHash = await sha256Base64Url(token);
+    const { prevTokenHash, feed } = await store.setIcalFeed(token, tokenHash, nextScope);
+    await c.env.TOKENS.put(icalKvKey(tokenHash), userId);
+    if (prevTokenHash && prevTokenHash !== tokenHash) {
+      await c.env.TOKENS.delete(icalKvKey(prevTokenHash));
+    }
+    logEvent(existing ? "ical_feed_rotated" : "ical_feed_enabled", { scope: feed.scope });
+    return c.json(icalFeedResponse(c.env.API_PUBLIC_URL, feed), 200, { "Cache-Control": "no-store" });
+  }
+
+  const feed = body.scope && body.scope !== existing.scope
+    ? ((await store.setIcalScope(nextScope)) ?? existing)
+    : existing;
+  await c.env.TOKENS.put(icalKvKey(feed.tokenHash), userId);
+  return c.json(icalFeedResponse(c.env.API_PUBLIC_URL, feed), 200, { "Cache-Control": "no-store" });
+});
+
+api.delete("/ical/settings", async (c) => {
+  const { prevTokenHash } = await storeFor(c.env, c.get("userId")).deleteIcalFeed();
+  if (prevTokenHash) await c.env.TOKENS.delete(icalKvKey(prevTokenHash));
+  logEvent("ical_feed_disabled", {});
+  return c.body(null, 204);
+});
+
+api.get("/ical/:tokenFile", async (c) => {
+  const raw = c.req.param("tokenFile");
+  if (!raw.endsWith(".ics")) return c.notFound();
+  const token = raw.slice(0, -4);
+  if (!ICAL_TOKEN_RE.test(token)) return c.notFound();
+  const tokenHash = await sha256Base64Url(token);
+  const userId = await c.env.TOKENS.get(icalKvKey(tokenHash));
+  if (!userId) return c.notFound();
+
+  const snap = await storeFor(c.env, userId).readIcalSnapshot(tokenHash);
+  if (!snap) return c.notFound();
+
+  const tz = snap.homeTimezone && isValidTz(snap.homeTimezone) ? snap.homeTimezone : "UTC";
+  const today = todayYMD(tz);
+  const etag = icalEtag(snap.rev, snap.scope, today);
+  const headers = {
+    ETag: etag,
+    "Cache-Control": "private, max-age=300",
+  };
+  if (ifNoneMatchHit(c.req.header("If-None-Match"), etag)) {
+    return new Response(null, { status: 304, headers });
+  }
+
+  const body = buildIcalFeed({
+    tasks: snap.tasks,
+    scope: snap.scope,
+    today,
+    nowIso: new Date().toISOString(),
+    homeTimezone: snap.homeTimezone,
+  });
+  return new Response(body, {
+    status: 200,
+    headers: {
+      ...headers,
+      "Content-Type": "text/calendar; charset=utf-8",
+      "Content-Disposition": 'inline; filename="septena-tasks.ics"',
+    },
+  });
+});
+
 // ---- account deletion (§10) ----
 
 api.delete("/account", async (c) => {
   const userId = c.get("userId");
-  await storeFor(c.env, userId).deleteAccount();
+  const store = storeFor(c.env, userId);
+  const ical = await store.getIcalFeed();
+  if (ical) await c.env.TOKENS.delete(icalKvKey(ical.tokenHash));
+  await store.deleteAccount();
   const prefix = `u/${userId}/`;
   let cursor: string | undefined;
   do {

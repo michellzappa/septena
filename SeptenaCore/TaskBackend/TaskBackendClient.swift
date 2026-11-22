@@ -291,6 +291,35 @@ actor TaskBackendClient {
     return try decode(BackendSession.self, from: data, what: "device session")
   }
 
+  // MARK: - Private iCal Feed (IC1)
+
+  func getIcalFeedSettings() async throws -> BackendIcalFeedSettings {
+    let (data, status) = try await authed(path: "/v1/ical/settings", method: "GET", body: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendIcalFeedSettings.self, from: data, what: "iCal feed settings")
+  }
+
+  func updateIcalFeedSettings(
+    enabled: Bool? = nil,
+    scope: BackendIcalScope? = nil,
+    rotate: Bool? = nil
+  ) async throws -> BackendIcalFeedSettings {
+    struct Payload: Encodable {
+      let enabled: Bool?
+      let scope: BackendIcalScope?
+      let rotate: Bool?
+    }
+    let body = try JSONEncoder().encode(Payload(enabled: enabled, scope: scope, rotate: rotate))
+    let (data, status) = try await authed(path: "/v1/ical/settings", method: "POST", body: body)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendIcalFeedSettings.self, from: data, what: "iCal feed settings")
+  }
+
+  func disableIcalFeed() async throws {
+    let (data, status) = try await authed(path: "/v1/ical/settings", method: "DELETE", body: nil)
+    guard status == 204 || status == 200 else { throw Self.httpError(status, data) }
+  }
+
   // MARK: - HTTP
 
   /// Sends with a bearer token. On 401 it refreshes once and retries. A

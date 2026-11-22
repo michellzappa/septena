@@ -167,6 +167,23 @@ struct BackendSession: Decodable, Sendable {
   let userId: String
 }
 
+// MARK: - iCal Feed (IC1)
+
+enum BackendIcalScope: String, Codable, CaseIterable, Identifiable, Sendable {
+  case all
+  case timed
+
+  var id: String { rawValue }
+}
+
+struct BackendIcalFeedSettings: Codable, Equatable, Sendable {
+  let enabled: Bool
+  let scope: BackendIcalScope
+  let url: String?
+  let webcalUrl: String?
+  let createdAt: String?
+}
+
 // MARK: - Errors
 
 /// The Worker's error body: `{ error, issues? }`. `issues` are Zod issues; the

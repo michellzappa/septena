@@ -15,6 +15,7 @@ import {
 } from "./columns.js";
 import type { Op, OpResult, PullResult, PushResult, Turn } from "./ops.js";
 import type { EntitlementRow } from "../entitlement/entitlement.js";
+import type { IcalTask } from "../ical.js";
 import { DOMAIN_RULES, ENTITY_LIMITS, TURN_FIELDS } from "../generated/registries.js";
 
 /// Per changed field: [before, after]. `null` means absent / cleared.
@@ -306,6 +307,14 @@ export class TaskStore extends DurableObject<Env> {
         id TEXT PRIMARY KEY, source TEXT NOT NULL, productId TEXT, expiresAt INTEGER,
         originalTransactionId TEXT, status TEXT NOT NULL, environment TEXT, note TEXT,
         signedAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS ical_feed (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        token TEXT NOT NULL,
+        tokenHash TEXT NOT NULL,
+        scope TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS checklist_items_task ON checklist_items(taskId);
       CREATE INDEX IF NOT EXISTS tags_name_ci ON tags(lower(name));
@@ -1268,6 +1277,122 @@ export class TaskStore extends DurableObject<Env> {
 
   deleteEntitlement(id: string): boolean {
     return this.sql.exec("DELETE FROM entitlements WHERE id = ?", id).rowsWritten > 0;
+  }
+
+  // ---- private read-only iCal feed (docs/TASK_TIMES_AND_ICAL_SPEC.md §3, #166) ----
+
+  getIcalFeed(): { token: string; tokenHash: string; scope: "all" | "timed"; createdAt: string; updatedAt: string } | null {
+    const row = this.sql.exec<{
+      token: string; tokenHash: string; scope: string; createdAt: string; updatedAt: string;
+    }>("SELECT token, tokenHash, scope, createdAt, updatedAt FROM ical_feed WHERE id = 1").toArray()[0];
+    if (!row) return null;
+    return {
+      token: row.token,
+      tokenHash: row.tokenHash,
+      scope: row.scope === "timed" ? "timed" : "all",
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  setIcalFeed(
+    token: string,
+    tokenHash: string,
+    scope: "all" | "timed",
+  ): {
+    prevTokenHash: string | null;
+    feed: { token: string; tokenHash: string; scope: "all" | "timed"; createdAt: string; updatedAt: string };
+  } {
+    const now = new Date().toISOString();
+    return this.ctx.storage.transactionSync(() => {
+      const prev = this.sql.exec<{ tokenHash: string }>(
+        "SELECT tokenHash FROM ical_feed WHERE id = 1",
+      ).toArray()[0];
+      this.sql.exec(
+        `INSERT INTO ical_feed (id, token, tokenHash, scope, createdAt, updatedAt)
+         VALUES (1, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET token = excluded.token, tokenHash = excluded.tokenHash,
+           scope = excluded.scope, createdAt = excluded.createdAt, updatedAt = excluded.updatedAt`,
+        token, tokenHash, scope, now, now,
+      );
+      return {
+        prevTokenHash: prev?.tokenHash ?? null,
+        feed: { token, tokenHash, scope, createdAt: now, updatedAt: now },
+      };
+    });
+  }
+
+  setIcalScope(
+    scope: "all" | "timed",
+  ): { token: string; tokenHash: string; scope: "all" | "timed"; createdAt: string; updatedAt: string } | null {
+    const now = new Date().toISOString();
+    return this.ctx.storage.transactionSync(() => {
+      const cur = this.getIcalFeed();
+      if (!cur) return null;
+      this.sql.exec("UPDATE ical_feed SET scope = ?, updatedAt = ? WHERE id = 1", scope, now);
+      return { ...cur, scope, updatedAt: now };
+    });
+  }
+
+  deleteIcalFeed(): { prevTokenHash: string | null } {
+    return this.ctx.storage.transactionSync(() => {
+      const prev = this.sql.exec<{ tokenHash: string }>(
+        "SELECT tokenHash FROM ical_feed WHERE id = 1",
+      ).toArray()[0];
+      this.sql.exec("DELETE FROM ical_feed WHERE id = 1");
+      return { prevTokenHash: prev?.tokenHash ?? null };
+    });
+  }
+
+  readIcalSnapshot(tokenHash: string): {
+    rev: number;
+    scope: "all" | "timed";
+    homeTimezone: string | null;
+    tasks: IcalTask[];
+  } | null {
+    const row = this.sql.exec<{ tokenHash: string; scope: string }>(
+      "SELECT tokenHash, scope FROM ical_feed WHERE id = 1",
+    ).toArray()[0];
+    if (!row || row.tokenHash !== tokenHash) return null;
+    const tzRaw = this.readSetting("homeTimezone");
+    const homeTimezone = typeof tzRaw === "string" && tzRaw.trim() ? tzRaw.trim() : null;
+    const tasks = this.sql.exec<{
+      id: string;
+      title: string | null;
+      notes: string | null;
+      status: string | null;
+      kind: string | null;
+      scheduled: string | null;
+      startTime: string | null;
+      durationMinutes: number | null;
+      timeZone: string | null;
+      deadline: string | null;
+      rev: number | null;
+    }>(
+      `SELECT id, title, notes, status, kind, scheduled, startTime, durationMinutes, timeZone, deadline, rev
+       FROM tasks
+       WHERE deletedAt IS NULL AND status = 'open' AND (kind IS NULL OR kind != 'heading')
+         AND (scheduled IS NOT NULL OR deadline IS NOT NULL)
+       ORDER BY scheduled IS NULL, scheduled, startTime IS NULL, startTime, deadline IS NULL, deadline, id`,
+    ).toArray().map((r): IcalTask => ({
+      id: r.id,
+      title: r.title,
+      notes: r.notes,
+      status: r.status,
+      kind: r.kind,
+      scheduled: r.scheduled,
+      startTime: r.startTime,
+      durationMinutes: r.durationMinutes,
+      timeZone: r.timeZone,
+      deadline: r.deadline,
+      rev: r.rev,
+    }));
+    return {
+      rev: this.meta("rev"),
+      scope: row.scope === "timed" ? "timed" : "all",
+      homeTimezone,
+      tasks,
+    };
   }
 
   // ---- account move: copy (docs/CLOUDFLARE_ACCOUNT_MOVE.md, ADR 0018) ----

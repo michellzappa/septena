@@ -7,6 +7,11 @@
 import SwiftUI
 import SwiftData
 import EventKit
+#if os(macOS)
+import AppKit
+#elseif canImport(UIKit)
+import UIKit
+#endif
 
 struct RemindersInboxDetail: View {
   @Environment(\.scenePhase) private var scenePhase
@@ -154,6 +159,12 @@ struct CalendarDetail: View {
   @State private var bridge = CalendarBridge.shared
   @State private var access: CalendarBridge.Access = .notDetermined
   @State private var calendars: [EKCalendar] = []
+  @State private var icalSettings: BackendIcalFeedSettings?
+  @State private var icalLoading = false
+  @State private var icalBusy = false
+  @State private var icalError: String?
+  @State private var icalCopied = false
+  @State private var confirmRotateIcal = false
 
   var body: some View {
     Form {
@@ -195,12 +206,172 @@ struct CalendarDetail: View {
           .disabled(!showCalendarEvents)
         }
       }
+
+      icalFeedSection
     }
     .formStyle(.grouped)
-    .onAppear(perform: refresh)
-    .onChange(of: scenePhase) { _, phase in
-      if phase == .active { refresh() }
+    .onAppear {
+      refresh()
+      Task { await loadIcalFeed() }
     }
+    .onChange(of: scenePhase) { _, phase in
+      if phase == .active {
+        refresh()
+        Task { await loadIcalFeed() }
+      }
+    }
+    .confirmationDialog(
+      "Rotate Calendar Feed Link?",
+      isPresented: $confirmRotateIcal,
+      titleVisibility: .visible
+    ) {
+      Button("Rotate Link", role: .destructive) {
+        Task { await rotateIcalFeed() }
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("Rotating replaces your private feed link immediately. Existing calendar subscriptions will stop updating until you re-subscribe with the new URL.")
+    }
+  }
+
+  @ViewBuilder
+  private var icalFeedSection: some View {
+    Section {
+      if !TaskBackendClient.hasSession {
+        Text("Sign in to Septena sync to create a private calendar feed URL for Apple Calendar, Google Calendar, or Outlook.")
+          .font(.callout)
+          .foregroundStyle(.secondary)
+      } else {
+        Toggle("Private iCal feed", isOn: Binding(
+          get: { icalSettings?.enabled ?? false },
+          set: { next in Task { await setIcalEnabled(next) } }
+        ))
+        .disabled(icalLoading || icalBusy)
+
+        if let settings = icalSettings, settings.enabled {
+          Picker("Include", selection: Binding(
+            get: { settings.scope },
+            set: { next in Task { await setIcalScope(next) } }
+          )) {
+            Text("All dated tasks").tag(BackendIcalScope.all)
+            Text("Timed tasks only").tag(BackendIcalScope.timed)
+          }
+          .disabled(icalBusy)
+
+          if let webcal = settings.webcalUrl {
+            VStack(alignment: .leading, spacing: 6) {
+              Text(webcal)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+
+              HStack(spacing: 12) {
+                Button(icalCopied ? "Copied" : "Copy URL") {
+                  copyToPasteboard(webcal)
+                  icalCopied = true
+                  Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    icalCopied = false
+                  }
+                }
+                .disabled(icalBusy)
+
+                if let url = URL(string: webcal) {
+                  Link("Open in Calendar", destination: url)
+                }
+
+                Spacer()
+
+                Button("Rotate Link", role: .destructive) {
+                  confirmRotateIcal = true
+                }
+                .disabled(icalBusy)
+              }
+            }
+            .padding(.vertical, 2)
+          }
+        }
+
+        if let icalError {
+          Text(icalError)
+            .font(.caption)
+            .foregroundStyle(.red)
+        }
+      }
+    } header: {
+      Text("Calendar Feed (iCal)")
+    } footer: {
+      if TaskBackendClient.hasSession {
+        Text("Read-only subscription feed for your scheduled tasks and deadlines. Anyone with the private URL can read titles and notes in the feed; rotate or disable it anytime.")
+      }
+    }
+  }
+
+  private func loadIcalFeed() async {
+    guard TaskBackendClient.hasSession else {
+      icalSettings = nil
+      icalError = nil
+      return
+    }
+    icalLoading = true
+    defer { icalLoading = false }
+    do {
+      icalSettings = try await TaskBackendClient.shared.getIcalFeedSettings()
+      icalError = nil
+    } catch {
+      icalError = error.localizedDescription
+    }
+  }
+
+  private func setIcalEnabled(_ enabled: Bool) async {
+    icalBusy = true
+    defer { icalBusy = false }
+    do {
+      if enabled {
+        icalSettings = try await TaskBackendClient.shared.updateIcalFeedSettings(enabled: true)
+      } else {
+        try await TaskBackendClient.shared.disableIcalFeed()
+        icalSettings = BackendIcalFeedSettings(enabled: false, scope: .all, url: nil, webcalUrl: nil, createdAt: nil)
+      }
+      icalError = nil
+    } catch {
+      icalError = error.localizedDescription
+    }
+  }
+
+  private func setIcalScope(_ scope: BackendIcalScope) async {
+    icalBusy = true
+    defer { icalBusy = false }
+    do {
+      icalSettings = try await TaskBackendClient.shared.updateIcalFeedSettings(scope: scope)
+      icalError = nil
+    } catch {
+      icalError = error.localizedDescription
+    }
+  }
+
+  private func rotateIcalFeed() async {
+    icalBusy = true
+    defer { icalBusy = false }
+    do {
+      icalSettings = try await TaskBackendClient.shared.updateIcalFeedSettings(rotate: true)
+      icalCopied = false
+      icalError = nil
+    } catch {
+      icalError = error.localizedDescription
+    }
+  }
+
+  private func copyToPasteboard(_ value: String) {
+    #if os(macOS)
+    let pb = NSPasteboard.general
+    pb.clearContents()
+    pb.setString(value, forType: .string)
+    #elseif canImport(UIKit)
+    UIPasteboard.general.string = value
+    #endif
   }
 
   private func calendarRow(_ cal: EKCalendar) -> some View {
