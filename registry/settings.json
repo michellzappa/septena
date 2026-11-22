@@ -580,6 +580,38 @@
   ],
   "pages": [
     {
+      "id": "devices_access",
+      "title": "Devices & Access",
+      "icon": "settings.devices",
+      "depth": 2,
+      "featureId": "sync.backend",
+      "sections": [
+        {
+          "id": "devices",
+          "header": "Devices",
+          "footer": "Each app you signed in to. A device you sign out stops syncing within the hour.",
+          "items": [
+            { "kind": "customSurface", "surface": "access_devices", "featureId": "sync.backend" }
+          ]
+        },
+        {
+          "id": "connections",
+          "header": "Connected apps",
+          "footer": "AI apps and agents that reach your tasks through the Septena connector.",
+          "items": [
+            { "kind": "customSurface", "surface": "access_connections", "featureId": "agents.connector" }
+          ]
+        },
+        {
+          "id": "watch",
+          "platforms": ["ios"],
+          "items": [
+            { "kind": "customSurface", "surface": "apple_watch", "platforms": ["ios"], "featureId": "sync.backend" }
+          ]
+        }
+      ]
+    },
+    {
       "id": "appearance",
       "title": "Appearance",
       "icon": "settings.appearance",
@@ -642,6 +674,12 @@
           "id": "plan",
           "items": [
             { "kind": "pageLink", "page": "plus", "label": "Septena Plus", "icon": "settings.plus", "statusKey": "planStatus", "featureId": "sync.backend" }
+          ]
+        },
+        {
+          "id": "devices_access",
+          "items": [
+            { "kind": "pageLink", "page": "devices_access", "label": "Devices & Access", "icon": "settings.devices", "featureId": "sync.backend" }
           ]
         },
         {

@@ -288,6 +288,32 @@ actor TaskBackendClient {
     return status
   }
 
+  // MARK: - Devices & Access
+
+  /// Every place the account is signed in (`GET /v1/access`).
+  func access() async throws -> BackendAccess {
+    let (data, status) = try await authed(path: "/v1/access", method: "GET", body: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendAccess.self, from: data, what: "access")
+  }
+
+  /// Signs another device out (`DELETE /v1/access/devices/:sid`). The server
+  /// refuses this device's own session; use `signOut()` for that.
+  func signOutDevice(sid: String) async throws {
+    guard let id = UUID(uuidString: sid) else { throw TaskBackendError.badResponse("device id") }
+    let (data, status) = try await authed(path: "/v1/access/devices/\(id.uuidString.lowercased())", method: "DELETE", body: nil)
+    guard status == 204 else { throw Self.httpError(status, data) }
+  }
+
+  /// Disconnects one connected app (`DELETE /v1/access/connections/:id`).
+  func disconnect(connectionID: String) async throws {
+    guard connectionID.range(of: "^[A-Za-z0-9_-]{8,64}$", options: .regularExpression) != nil else {
+      throw TaskBackendError.badResponse("connection id")
+    }
+    let (data, status) = try await authed(path: "/v1/access/connections/\(connectionID)", method: "DELETE", body: nil)
+    guard status == 204 else { throw Self.httpError(status, data) }
+  }
+
   // MARK: - Companion device (Apple Watch)
 
   /// Mints a SEPARATE session for the paired watch (`POST /v1/auth/device`).

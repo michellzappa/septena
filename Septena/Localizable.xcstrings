@@ -2034,6 +2034,10 @@
     "AI & MCP" : {
 
     },
+    "AI apps and agents that reach your tasks through the Septena connector." : {
+      "comment" : "Generated from registry settings.pages.devices_access.sections.connections.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "AI diagnostics" : {
       "comment" : "Generated from registry settings.pages.advanced.sections.beta_ai.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -2332,6 +2336,10 @@
           }
         }
       }
+    },
+    "Apple Watch" : {
+      "comment" : "Generated from registry settings.pages.devices_access.sections.watch.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Apple Watch through the server" : {
       "comment" : "Generated from registry plans.outcomes.everywhere.rows.watch.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -3579,6 +3587,10 @@
     "Connected" : {
 
     },
+    "Connected apps" : {
+      "comment" : "Generated from registry settings.pages.devices_access.sections.connections.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Connected Apps" : {
 
     },
@@ -4368,7 +4380,11 @@
 
     },
     "Devices" : {
-      "comment" : "Generated from registry plans.outcomes.everywhere.rows.devices.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.devices_access.sections.devices.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Devices & Access" : {
+      "comment" : "Generated from registry settings.pages.devices_access.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Diagnostics" : {
@@ -4624,6 +4640,10 @@
     },
     "Each app keeps its own welcome, view preferences, and window setup, so you can use either one without rearranging the other." : {
 
+    },
+    "Each app you signed in to. A device you sign out stops syncing within the hour." : {
+      "comment" : "Generated from registry settings.pages.devices_access.sections.devices.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Each brief teaches a model how to use one section through the MCP — tools available, conventions, examples." : {
       "localizations" : {

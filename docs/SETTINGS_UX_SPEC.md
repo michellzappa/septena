@@ -6,6 +6,9 @@
 **Scope:** **Septena (the task app)** across iOS, iPadOS, macOS, Web (`#21`), Android (`#20`), and Windows (`#136`). (Septena Life moved out of this repo in ADR 0017.)
 **Owner of decisions:** mz. Defaults chosen by the author are marked *(default)*.
 
+**Changes after this spec (2026-11-22, mz):** `registry/settings.json` wins where the tables below disagree.
+- Account > **Devices & Access** (`devices_access`, depth 2) lists every signed-in device and connected app (`GET /v1/access`), signs another device out, disconnects an app, and holds the Apple Watch row (moved off the iOS root).
+
 ---
 
 ## 1. Goal & first principles

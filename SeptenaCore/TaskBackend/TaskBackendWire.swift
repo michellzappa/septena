@@ -196,3 +196,31 @@ struct BackendErrorBody: Decodable, Sendable {
   let error: String
   let issues: [Issue]?
 }
+
+// MARK: - Devices & Access
+
+/// Wire shape of `GET /v1/access` (backend/src/store/TaskStore.ts
+/// `AccessSummary`). Times are ms since 1970.
+struct BackendAccess: Decodable, Sendable, Equatable {
+  struct Device: Decodable, Sendable, Equatable, Identifiable {
+    let sid: String
+    /// The `X-Septena-Client` name the device sent (`septask-ios`, …); nil
+    /// for a device that never named itself.
+    let client: String?
+    let firstSeen: Double
+    let lastSeen: Double
+    let current: Bool
+    let syncing: Bool
+    var id: String { sid }
+  }
+  struct Connection: Decodable, Sendable, Equatable, Identifiable {
+    let id: String
+    /// The name the app registered with (Claude, ChatGPT, …).
+    let clientName: String
+    let scope: String
+    let createdAt: Double
+    let lastUsed: Double
+  }
+  let devices: [Device]
+  let connections: [Connection]
+}
