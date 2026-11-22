@@ -1,0 +1,2 @@
+# The shared core style (ADR 0025). core.yml runs `cargo fmt --check`.
+max_width = 120

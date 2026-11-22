@@ -56,7 +56,9 @@ pub fn should_fade(input: FadeInput) -> Result<bool, CoreError> {
     if !is_eligible(&input) {
         return Ok(false);
     }
-    let Some(clock) = clock_ms(&input) else { return Ok(false) };
+    let Some(clock) = clock_ms(&input) else {
+        return Ok(false);
+    };
     Ok(now - clock >= rules::FADE_WINDOW_DAYS * MS_PER_DAY)
 }
 
@@ -99,7 +101,13 @@ fn clock_ms(input: &FadeInput) -> Option<i64> {
         .as_deref()
         .and_then(parse_instant_ms)
         .or_else(|| input.created_at.as_deref().and_then(parse_instant_ms))
-        .or_else(|| input.created.as_deref().and_then(Day::parse).map(|d| d.start_ms(input.utc_offset_seconds)))
+        .or_else(|| {
+            input
+                .created
+                .as_deref()
+                .and_then(Day::parse)
+                .map(|d| d.start_ms(input.utc_offset_seconds))
+        })
 }
 
 pub(crate) fn instant(raw: &str, name: &str) -> Result<i64, CoreError> {

@@ -8,10 +8,10 @@ use serde_json::{Value, json};
 use crate::error::CoreError;
 use crate::{
     ConversationProjection, FadeInput, OrdinalWeekday, PullPageHeader, PushOutcome, RecurrenceRule, ReminderArmInput,
-    TaskConversation, TaskSnapshot, TaskViewMembership, check_pull_page, conversation_state, derive_conversation, fade_fill,
-    next_scheduled_date, occurrence_id, plan_pull_row, plan_push_response, row_opacity, server_rejection_reason,
-    shift_reminder_for_recurrence, shift_reminder_on_reschedule, should_arm_reminder, should_fade,
-    task_view_membership,
+    TaskConversation, TaskSnapshot, TaskViewMembership, check_pull_page, conversation_state, derive_conversation,
+    fade_fill, next_scheduled_date, occurrence_id, plan_pull_row, plan_push_response, row_opacity,
+    server_rejection_reason, shift_reminder_for_recurrence, shift_reminder_on_reschedule, should_arm_reminder,
+    should_fade, task_view_membership,
 };
 
 /// The functions `invoke_json` accepts.
@@ -42,7 +42,9 @@ pub fn invoke_json(function: String, input_json: String) -> Result<String, CoreE
         .map_err(|e| CoreError::invalid(format!("Input for {function} is not JSON: {e}")))?;
     let output = match invoke_value(&function, input) {
         Ok(value) => value,
-        Err(error @ CoreError::InvalidInput { .. }) if function_exists(&function) => json!({ "error": error.message() }),
+        Err(error @ CoreError::InvalidInput { .. }) if function_exists(&function) => {
+            json!({ "error": error.message() })
+        }
         Err(error) => return Err(error),
     };
     Ok(output.to_string())
@@ -75,13 +77,23 @@ pub(crate) fn invoke_value(function: &str, input: Value) -> Result<Value, CoreEr
         }
         "shiftReminderForRecurrence" => {
             let args: ShiftRecurrenceArgs = decode(input).map_err(|e| parse(&e))?;
-            Ok(json!(shift_reminder_for_recurrence(args.source_reminder_at, args.source_scheduled, args.next_scheduled)))
+            Ok(json!(shift_reminder_for_recurrence(
+                args.source_reminder_at,
+                args.source_scheduled,
+                args.next_scheduled
+            )))
         }
         "shiftReminderOnReschedule" => {
             let args: ShiftRescheduleArgs = decode(input).map_err(|e| parse(&e))?;
-            Ok(json!(shift_reminder_on_reschedule(args.reminder_at, args.old_scheduled, args.new_scheduled)))
+            Ok(json!(shift_reminder_on_reschedule(
+                args.reminder_at,
+                args.old_scheduled,
+                args.new_scheduled
+            )))
         }
-        "shouldArmReminder" => Ok(json!(should_arm_reminder(decode::<ReminderArmInput>(input).map_err(|e| parse(&e))?))),
+        "shouldArmReminder" => Ok(json!(should_arm_reminder(
+            decode::<ReminderArmInput>(input).map_err(|e| parse(&e))?
+        ))),
         "deriveConversation" => {
             let args: ConvoArgs = decode(input).map_err(|e| parse(&e))?;
             Ok(projection_json(&derive_conversation(args.conversation, args.now)?))
@@ -104,8 +116,14 @@ pub(crate) fn invoke_value(function: &str, input: Value) -> Result<Value, CoreEr
                 Some(Value::Null) | None => None,
                 Some(value) => Some(value.to_string()),
             };
-            Ok(plan_pull_row(args.entity, args.row.to_string(), current, args.pending_fields, args.pending_delete)?
-                .to_json())
+            Ok(plan_pull_row(
+                args.entity,
+                args.row.to_string(),
+                current,
+                args.pending_fields,
+                args.pending_delete,
+            )?
+            .to_json())
         }
         "planPushResponse" => {
             let args: PushArgs = decode(input).map_err(|e| parse(&e))?;

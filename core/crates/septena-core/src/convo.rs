@@ -75,22 +75,21 @@ pub struct ConversationState {
 pub fn conversation_state(conversation: TaskConversation, now: String) -> Result<ConversationState, CoreError> {
     let now = instant(&now, "now")?;
     let facts = Facts::of(&conversation, now);
-    let agent_stage = if conversation.assignee.as_deref() != Some(convo_assignee::CLAUDE)
-        && !facts.is_claimed
-        && !facts.needs_review
-    {
-        None
-    } else if facts.needs_review {
-        Some("review")
-    } else if facts.is_terminal {
-        Some("done")
-    } else if facts.open_question || conversation.stopped_at.is_some() {
-        Some("yourTurn")
-    } else if facts.is_claimed {
-        Some("working")
-    } else {
-        Some("queued")
-    };
+    let agent_stage =
+        if conversation.assignee.as_deref() != Some(convo_assignee::CLAUDE) && !facts.is_claimed && !facts.needs_review
+        {
+            None
+        } else if facts.needs_review {
+            Some("review")
+        } else if facts.is_terminal {
+            Some("done")
+        } else if facts.open_question || conversation.stopped_at.is_some() {
+            Some("yourTurn")
+        } else if facts.is_claimed {
+            Some("working")
+        } else {
+            Some("queued")
+        };
     Ok(ConversationState {
         is_terminal: facts.is_terminal,
         needs_human_review: facts.needs_review,
@@ -113,7 +112,10 @@ struct Facts {
 impl Facts {
     fn of(conversation: &TaskConversation, now: i64) -> Facts {
         let last = conversation.thread.iter().max_by_key(|turn| turn.sequence);
-        let is_terminal = conversation.end_state.as_deref().is_some_and(|s| s != convo_end_state::OPEN);
+        let is_terminal = conversation
+            .end_state
+            .as_deref()
+            .is_some_and(|s| s != convo_end_state::OPEN);
         Facts {
             is_terminal,
             needs_review: conversation.end_state.as_deref() == Some(convo_end_state::NEEDS_VERIFY),
@@ -125,7 +127,11 @@ impl Facts {
                 || is_terminal
                 || conversation.artifact_exists
                 || conversation.handoff_exists,
-            is_claimed: conversation.claim_until.as_deref().and_then(parse_instant_ms).is_some_and(|until| until > now),
+            is_claimed: conversation
+                .claim_until
+                .as_deref()
+                .and_then(parse_instant_ms)
+                .is_some_and(|until| until > now),
         }
     }
 }
@@ -138,7 +144,10 @@ pub fn derive_conversation(conversation: TaskConversation, now: String) -> Resul
     let mut thread = conversation.thread.clone();
     thread.sort_by_key(|turn| turn.sequence);
 
-    let is_terminal = conversation.end_state.as_deref().is_some_and(|s| s != convo_end_state::OPEN);
+    let is_terminal = conversation
+        .end_state
+        .as_deref()
+        .is_some_and(|s| s != convo_end_state::OPEN);
     let needs_review = conversation.end_state.as_deref() == Some(convo_end_state::NEEDS_VERIFY);
     let open_question = thread
         .last()
@@ -160,21 +169,34 @@ pub fn derive_conversation(conversation: TaskConversation, now: String) -> Resul
             .and_then(|t| t.confidence)
             .is_some_and(|c| c < 0.5)
     };
-    let note = |fallback: &str| conversation.end_state_note.clone().unwrap_or_else(|| fallback.to_string());
-    let projection = |stage: &str, badge: Option<&str>, next_action: String, pending_reasoning: bool| {
-        ConversationProjection {
+    let note = |fallback: &str| {
+        conversation
+            .end_state_note
+            .clone()
+            .unwrap_or_else(|| fallback.to_string())
+    };
+    let projection =
+        |stage: &str, badge: Option<&str>, next_action: String, pending_reasoning: bool| ConversationProjection {
             stage: stage.to_string(),
             badge: badge.map(str::to_string),
             next_action,
             pending_reasoning,
-        }
-    };
+        };
 
     if needs_review {
-        return Ok(projection("awaitingHuman", Some("needsYou"), note("Needs review"), false));
+        return Ok(projection(
+            "awaitingHuman",
+            Some("needsYou"),
+            note("Needs review"),
+            false,
+        ));
     }
     if is_terminal {
-        let badge = if conversation.end_state.as_deref() == Some(convo_end_state::WONT_DO) { "wontDo" } else { "done" };
+        let badge = if conversation.end_state.as_deref() == Some(convo_end_state::WONT_DO) {
+            "wontDo"
+        } else {
+            "done"
+        };
         return Ok(projection("terminal", Some(badge), note("Resolved"), false));
     }
     if !has_started {
@@ -184,10 +206,23 @@ pub fn derive_conversation(conversation: TaskConversation, now: String) -> Resul
         return Ok(projection("inProgress", None, "Stopped".into(), false));
     }
     if open_question {
-        return Ok(projection("awaitingHuman", Some("needsYou"), "Tap to answer".into(), pending));
+        return Ok(projection(
+            "awaitingHuman",
+            Some("needsYou"),
+            "Tap to answer".into(),
+            pending,
+        ));
     }
-    let stage = if conversation.confirmed_intent.is_none() { "clarifying" } else { "inProgress" };
-    let claimed = conversation.claim_until.as_deref().and_then(parse_instant_ms).is_some_and(|until| until > now);
+    let stage = if conversation.confirmed_intent.is_none() {
+        "clarifying"
+    } else {
+        "inProgress"
+    };
+    let claimed = conversation
+        .claim_until
+        .as_deref()
+        .and_then(parse_instant_ms)
+        .is_some_and(|until| until > now);
     let next = if claimed { "Claude is working" } else { "Claude's move" };
     Ok(projection(stage, Some("working"), next.into(), pending))
 }

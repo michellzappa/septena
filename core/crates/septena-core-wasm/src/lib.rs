@@ -13,8 +13,8 @@ pub fn invoke(function: &str, input_json: &str) -> Result<String, JsError> {
 /// Runs one conformance fixture inside the core. Returns the report as JSON.
 #[wasm_bindgen(js_name = runConformance)]
 pub fn run_conformance(fixture: &str, json: &str) -> Result<String, JsError> {
-    let report = septena_core::run_conformance(fixture.to_string(), json.to_string())
-        .map_err(|e| JsError::new(e.message()))?;
+    let report =
+        septena_core::run_conformance(fixture.to_string(), json.to_string()).map_err(|e| JsError::new(e.message()))?;
     serde_json::to_string(&report).map_err(|e| JsError::new(&e.to_string()))
 }
 

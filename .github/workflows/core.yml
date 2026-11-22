@@ -56,7 +56,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_VERSION }}
-          components: clippy
+          components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: core
@@ -86,15 +86,35 @@ jobs:
           path: |
             core/Cargo.lock
             core/tools/uniffi-bindgen/Cargo.lock
+      # Agents cannot run rustfmt. On a diff this step uploads the formatted
+      # sources as core-rustfmt and fails at the end: download, commit, push.
+      - name: Formatting
+        id: fmt
+        working-directory: core
+        run: |
+          if cargo fmt --all --check > "$RUNNER_TEMP/fmt.diff"; then
+            echo "state=ok" >> "$GITHUB_OUTPUT"
+          else
+            cat "$RUNNER_TEMP/fmt.diff"
+            cargo fmt --all
+            echo "::error::core is not rustfmt-clean. Commit the files from the core-rustfmt artifact."
+            echo "state=dirty" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: steps.fmt.outputs.state == 'dirty'
+        with:
+          name: core-rustfmt
+          path: |
+            core/crates/**/*.rs
+            core/tools/**/*.rs
       - name: Vectors against the crate
         working-directory: core
         run: |
           set -o pipefail
           cargo test --workspace -- --nocapture 2>&1 | tee "$RUNNER_TEMP/test.log"
-      # Advisory in C0: lints show in the log and do not fail the job.
       - name: Clippy
         working-directory: core
-        run: cargo clippy --workspace --all-targets
+        run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Summary and licences
         working-directory: core
         run: |
@@ -111,6 +131,9 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Stop on a missing or stale lockfile
         if: steps.lock.outputs.state != 'ok'
+        run: exit 1
+      - name: Stop on unformatted sources
+        if: steps.fmt.outputs.state != 'ok'
         run: exit 1
 
   apple:
