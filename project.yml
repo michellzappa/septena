@@ -126,6 +126,9 @@ targets:
       - target: SeptaskShare
         embed: true
         codeSign: true
+      - target: SeptaskWidgets
+        embed: true
+        codeSign: true
       # The Septena watch app (docs/WATCH.md). If the installed watchOS
       # simulator runtimes don't match this Xcode's SDK, the iOS scheme can't
       # resolve a watch destination: build SeptaskMac / SeptaskWatch to verify
@@ -243,6 +246,83 @@ targets:
         CODE_SIGN_ENTITLEMENTS: ShareExtension/SeptaskShare.entitlements
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: "SHARE_EXTENSION SHARE_DESTINATION_SEPTASK"
 
+  # Home Screen & Lock Screen widgets for Septask iOS (docs/TASK_WIDGETS_SPEC.md, #161).
+  # Shares sources in lockstep with SeptaskMacWidgets; compiles only pure-Foundation
+  # widget wire/store/intents so extension memory stays well below WidgetKit's cap.
+  SeptaskWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SeptaskWidgets
+        excludes:
+          - "**/.DS_Store"
+          - "**/*.entitlements"
+          - "**/*.plist"
+      - path: SeptenaCore/SeptenaAppGroup.swift
+      - path: SeptenaCore/TasksWidgetWire.swift
+      - path: SeptenaCore/TasksWidgetSnapshotStore.swift
+      - path: SeptenaCore/TasksWidgetIntents.swift
+    info:
+      path: SeptaskWidgets/Info-iOS.plist
+      properties:
+        CFBundleDisplayName: Septena
+        CFBundleName: Septena
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.tasks.widgets
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: SeptaskWidgets/SeptaskWidgets.entitlements
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG WIDGET_EXTENSION SEPTASK"
+        Release:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "WIDGET_EXTENSION SEPTASK"
+
+  # Desktop & Notification Center widgets for SeptaskMac (docs/TASK_WIDGETS_SPEC.md, #161).
+  # Kept in lockstep with SeptaskWidgets.
+  SeptaskMacWidgets:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: SeptaskWidgets
+        excludes:
+          - "**/.DS_Store"
+          - "**/*.entitlements"
+          - "**/*.plist"
+      - path: SeptenaCore/SeptenaAppGroup.swift
+      - path: SeptenaCore/TasksWidgetWire.swift
+      - path: SeptenaCore/TasksWidgetSnapshotStore.swift
+      - path: SeptenaCore/TasksWidgetIntents.swift
+    info:
+      path: SeptaskWidgets/Info-Mac.plist
+      properties:
+        CFBundleDisplayName: Septena
+        CFBundleName: Septena
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.tasks.widgets
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: SeptaskWidgets/SeptaskMacWidgets.entitlements
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG WIDGET_EXTENSION SEPTASK"
+        Release:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "WIDGET_EXTENSION SEPTASK"
+
   # Native macOS sibling, following the Septena / SeptenaMac pattern (separate
   # target, not a multiplatform destination). Same source list as Septask —
   # keep the two in lockstep when adding P-phase inclusions.
@@ -290,6 +370,9 @@ targets:
       - path: Septask/AppIcon.icns
         type: file
     dependencies:
+      - target: SeptaskMacWidgets
+        embed: true
+        codeSign: true
       - sdk: FoundationModels.framework
       - package: Sparkle
       - package: SeptenaSharedCore
