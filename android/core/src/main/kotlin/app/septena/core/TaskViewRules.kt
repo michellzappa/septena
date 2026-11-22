@@ -53,6 +53,7 @@ data class TaskSnapshot(
                 starred = f[RegistryEntityFields.Task.STARRED].booleanValue() ?: false,
                 recurrenceUnit = f[RegistryEntityFields.Task.RECURRENCE_UNIT].stringValue(),
                 deletedAt = record.deletedAt,
+                fadedAt = f["fadedAt"].stringValue(),
             )
         }
     }
@@ -73,7 +74,7 @@ object TaskViewRules {
     fun membership(task: TaskSnapshot, today: LocalDate, now: Instant): TaskViewMembership {
         val open = task.status == RegistryEntityEnums.TaskStatus.OPEN
         val deleted = task.deletedAt != null
-        val faded = task.fadedAt != null
+        val faded = TaskFadeRules.isFaded(task.fadedAt)
         val activeTask = open && !task.isHeading && !deleted && !faded
         val unfiled = task.area == null && task.project == null
         val isOnToday = activeTask && (

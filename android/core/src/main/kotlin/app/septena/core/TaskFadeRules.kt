@@ -12,6 +12,8 @@ object TaskFadeRules {
     private val grace = Duration.ofDays(RegistryRules.FADE_GRACE_DAYS)
     val minOpacity: Double = RegistryRules.FADE_MIN_OPACITY
 
+    fun isFaded(fadedAt: String?): Boolean = fadedAt != null
+
     fun rowOpacity(fill: Double?): Double {
         if (fill == null || !fill.isFinite() || fill <= 0.0) return 1.0
         return 1.0 - minOf(1.0, fill) * (1.0 - minOpacity)
