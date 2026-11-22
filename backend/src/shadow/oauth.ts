@@ -136,6 +136,7 @@ export async function authorize(c: Context<{ Bindings: Env }>) {
     const created = await pairingFor(c.env, candidate).create({
       pendingId,
       clientId,
+      purpose: "connector",
       clientName: client.name,
       redirectUri,
       oauthState: state,
@@ -222,6 +223,71 @@ interface StoredCode {
   clientId: string;
   redirectUri: string;
   codeChallenge: string;
+}
+
+// ---- device sign-in by approval (ADR 0016, issue #170) ----
+//
+// A new device (the Android client first) has no Apple identity. It calls
+// POST /v1/auth/device/start, shows the 8-character code, and the user enters
+// it where Septask already takes connector codes (POST /v1/pair/approve, which
+// handles both purposes). The device polls POST /v1/auth/device/poll with the
+// secret only it holds; after approval the poll returns an app session for the
+// approving user. The purpose check in PairingStore keeps the two flows apart.
+
+export const zDeviceStartBody = z.object({
+  clientName: z.string().regex(/^[\w .()-]{1,40}$/),
+}).strict();
+
+export const zDevicePollBody = z.object({
+  code: z.string().min(1).max(32),
+  pollSecret: z.string().regex(/^[A-Za-z0-9_-]{20,64}$/),
+}).strict();
+
+export type DeviceStartResult = { code: string; pollSecret: string; expiresIn: number; interval: number };
+
+export async function startDevicePairing(
+  env: Env,
+  body: z.infer<typeof zDeviceStartBody>,
+): Promise<DeviceStartResult | null> {
+  const pollSecret = randomId(24);
+  const expiresAt = Date.now() + PAIR_TTL_MS;
+  for (let i = 0; i < 4; i++) {
+    const candidate = newPairCode();
+    const created = await pairingFor(env, candidate).create({
+      purpose: "device",
+      pendingId: pollSecret,
+      clientId: "device",
+      clientName: body.clientName,
+      redirectUri: "",
+      oauthState: "",
+      codeChallenge: "",
+      expiresAt,
+    });
+    if (created) {
+      logEvent("device_pair_start", { ok: true, client: body.clientName });
+      return { code: candidate, pollSecret, expiresIn: PAIR_TTL_MS / 1000, interval: 3 };
+    }
+  }
+  logEvent("device_pair_start", { ok: false });
+  return null;
+}
+
+export type DevicePollResult =
+  | { status: "pending" }
+  | { status: "gone" }
+  | { status: "approved"; userId: string };
+
+/// One-shot on approval: the caller issues the session; a second poll is gone.
+export async function pollDevicePairing(env: Env, body: z.infer<typeof zDevicePollBody>): Promise<DevicePollResult> {
+  const code = normalizePairCode(body.code);
+  if (!code) return { status: "gone" };
+  const pairing = pairingFor(env, code);
+  const s = await pairing.status(body.pollSecret, "device");
+  if (s.status !== "approved") return { status: s.status };
+  const taken = await pairing.take(body.pollSecret, "device");
+  if (!taken) return { status: "gone" };
+  logEvent("device_pair_finished", { client: taken.pending.clientName });
+  return { status: "approved", userId: taken.approval.userId };
 }
 
 // ---- POST /v1/pair/approve (called by the app, bearer-authenticated) ----

@@ -12,6 +12,12 @@ import type { Env } from "../env.js";
 // one strongly consistent view; the alarm wipes the object at expiry.
 
 export interface PendingAuth {
+  /// "connector" (absent on records written before 2026-11-22) finishes the
+  /// MCP OAuth redirect; "device" mints an app session for a new device
+  /// (ADR 0016, issue #170). Each finish path refuses the other purpose, so a
+  /// connector code never mints an app session and a device code never mints
+  /// MCP tokens.
+  purpose?: "connector" | "device";
   /// Random secret held only in the browser's cookie. Polling and finishing
   /// need it, so knowing the short code alone cannot complete the flow.
   pendingId: string;
@@ -62,17 +68,23 @@ export class PairingStore extends DurableObject<Env> {
     return { outcome: "ok", clientName: p.clientName };
   }
 
-  async status(pendingId: string): Promise<{ status: PairStatus; clientName?: string; redirectUri?: string }> {
+  async status(
+    pendingId: string,
+    purpose: "connector" | "device" = "connector",
+  ): Promise<{ status: PairStatus; clientName?: string; redirectUri?: string }> {
     const p = await this.live();
-    if (!p || p.pendingId !== pendingId) return { status: "gone" };
+    if (!p || p.pendingId !== pendingId || (p.purpose ?? "connector") !== purpose) return { status: "gone" };
     const approved = !!(await this.ctx.storage.get<PairApproval>("approved"));
     return { status: approved ? "approved" : "pending", clientName: p.clientName, redirectUri: p.redirectUri };
   }
 
   /// One-shot: returns the approved authorization and wipes the object.
-  async take(pendingId: string): Promise<{ pending: PendingAuth; approval: PairApproval } | null> {
+  async take(
+    pendingId: string,
+    purpose: "connector" | "device" = "connector",
+  ): Promise<{ pending: PendingAuth; approval: PairApproval } | null> {
     const p = await this.live();
-    if (!p || p.pendingId !== pendingId) return null;
+    if (!p || p.pendingId !== pendingId || (p.purpose ?? "connector") !== purpose) return null;
     const approval = await this.ctx.storage.get<PairApproval>("approved");
     if (!approval) return null;
     await this.ctx.storage.deleteAll();

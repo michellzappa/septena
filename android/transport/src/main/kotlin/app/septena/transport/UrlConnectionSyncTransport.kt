@@ -7,13 +7,7 @@ import app.septena.core.SyncTransport
 import app.septena.core.SyncWireCodec
 import java.io.IOException
 import java.net.HttpURLConnection
-import java.net.URL
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
 
 /** Credentials are supplied by the app layer, where refresh tokens live in the Android Keystore. */
 interface SyncCredentials {
@@ -29,12 +23,15 @@ class SyncHttpException(val statusCode: Int, val responseBody: String) : IOExcep
 
 class SyncAuthenticationException : IOException("Sign in to sync this device")
 
+/** HTTP 402 from the sync routes: the account has no active sync subscription. */
+class SyncSubscriptionRequiredException : IOException("Sync needs an active Septena subscription")
+
 /** HTTP adapter shared by Android and future JVM clients; endpoint payloads stay in `SyncWireCodec`. */
 class UrlConnectionSyncTransport(
     private val credentials: SyncCredentials,
     private val clientVersion: String,
     private val baseUrl: String = DEFAULT_BASE_URL,
-    private val executor: ExecutorService = NETWORK_EXECUTOR,
+    private val executor: ExecutorService = JsonHttp.executor,
 ) : SyncTransport {
     override suspend fun push(operations: List<SyncOperation>): SyncPushResponse {
         val body = SyncWireCodec.encodePushBody(operations)
@@ -69,56 +66,18 @@ class UrlConnectionSyncTransport(
         } else {
             first
         }
+        if (final.statusCode == HTTP_PAYMENT_REQUIRED) throw SyncSubscriptionRequiredException()
         if (final.statusCode !in 200..299) throw SyncHttpException(final.statusCode, final.body)
         return final.body
     }
 
     private suspend fun perform(path: String, method: String, body: String?, token: String): HttpResponse =
-        suspendCoroutine { continuation ->
-            executor.execute {
-                try {
-                    continuation.resume(execute(path, method, body, token))
-                } catch (error: Throwable) {
-                    continuation.resumeWithException(error)
-                }
-            }
-        }
-
-    private fun execute(path: String, method: String, body: String?, token: String): HttpResponse {
-        val connection = URL(baseUrl.trimEnd('/') + path).openConnection() as HttpURLConnection
-        try {
-            connection.requestMethod = method
-            connection.connectTimeout = CONNECT_TIMEOUT_MS
-            connection.readTimeout = READ_TIMEOUT_MS
-            connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty("Authorization", "Bearer $token")
-            connection.setRequestProperty("X-Septena-Client", "android $clientVersion")
-            if (body != null) {
-                connection.doOutput = true
-                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                connection.outputStream.use { output ->
-                    output.write(body.toByteArray(StandardCharsets.UTF_8))
-                }
-            }
-            val status = connection.responseCode
-            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-            val responseBody = stream?.use { it.readBytes().toString(StandardCharsets.UTF_8) }.orEmpty()
-            return HttpResponse(status, responseBody)
-        } finally {
-            connection.disconnect()
-        }
-    }
+        JsonHttp.send(baseUrl, path, method, body, clientVersion, bearer = token, pool = executor)
 
     private fun Boolean.flag(): Int = if (this) 1 else 0
 
-    private data class HttpResponse(val statusCode: Int, val body: String)
-
     companion object {
-        const val DEFAULT_BASE_URL = "https://api.septena.app"
-        private const val CONNECT_TIMEOUT_MS = 15_000
-        private const val READ_TIMEOUT_MS = 30_000
-        private val NETWORK_EXECUTOR = Executors.newFixedThreadPool(2) { runnable ->
-            Thread(runnable, "septena-sync-http").apply { isDaemon = true }
-        }
+        const val DEFAULT_BASE_URL = JsonHttp.DEFAULT_BASE_URL
+        private const val HTTP_PAYMENT_REQUIRED = 402
     }
 }

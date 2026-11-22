@@ -33,12 +33,15 @@ fun TaskHomeContent(
     onDraftTitleChange: (String) -> Unit,
     onQuickAdd: () -> Unit,
     onComplete: (String) -> Unit,
+    /** Host-owned controls under the title (destination picker, sync status). */
+    header: @Composable () -> Unit = {},
 ) {
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(destinationTitle)
+        header()
 
         if (canQuickAdd) {
             Row(

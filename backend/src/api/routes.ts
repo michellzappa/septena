@@ -6,7 +6,14 @@ import { MAX_ATTACHMENT_BYTES, zId } from "../store/columns.js";
 import { zPushBody, type Op } from "../store/ops.js";
 import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from "./appleIdentity.js";
 import { issueSession, refreshSession, revokeSession, storeFor, verifyAccessToken } from "./session.js";
-import { approvePairing, zPairApproveBody } from "../shadow/oauth.js";
+import {
+  approvePairing,
+  pollDevicePairing,
+  startDevicePairing,
+  zDevicePollBody,
+  zDeviceStartBody,
+  zPairApproveBody,
+} from "../shadow/oauth.js";
 import {
   appAccountTokenFor,
   entitlementGate,
@@ -87,6 +94,23 @@ api.post("/auth/signout", async (c) => {
   if (body instanceof Response) return body;
   await revokeSession(c.env, body.refreshToken);
   return c.body(null, 204);
+});
+
+// Device sign-in by approval (ADR 0016, issue #170): see src/shadow/oauth.ts.
+api.post("/auth/device/start", async (c) => {
+  const body = await parse(c, zDeviceStartBody);
+  if (body instanceof Response) return body;
+  const res = await startDevicePairing(c.env, body);
+  return res ? c.json(res, 200, { "Cache-Control": "no-store" }) : c.json({ error: "pairing_unavailable" }, 503);
+});
+
+api.post("/auth/device/poll", async (c) => {
+  const body = await parse(c, zDevicePollBody);
+  if (body instanceof Response) return body;
+  const res = await pollDevicePairing(c.env, body);
+  if (res.status === "pending") return c.json({ status: "pending" }, 202, { "Cache-Control": "no-store" });
+  if (res.status === "gone") return c.json({ error: "expired_or_unknown" }, 410);
+  return c.json(await issueSession(c.env, res.userId), 200, { "Cache-Control": "no-store" });
 });
 
 // ---- everything below needs a bearer access token ----
