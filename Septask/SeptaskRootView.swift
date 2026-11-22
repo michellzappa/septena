@@ -1,26 +1,20 @@
 import SwiftUI
 
-/// Septask's top-level tabs (iPhone). Tasks hosts the full sidebar module —
-/// same label and checkmark as Septena's Tasks tab, so the ✓ means "the task
-/// module" in both apps; Today and Upcoming are first-class destinations.
-/// Quick capture lives in the separate floating circular Magic Plus orb
-/// (`MagicPlusOrb`) anchored just above the bottom-right edge of the tab bar:
-/// tap opens the create quick menu, and hold-and-drag drops a new inline task
-/// onto any row gap, heading, group, or Upcoming day — or creates a Project/Area
-/// on the Tasks page. Search lives in the trailing nav bar.
+/// Septask's root. There is no tab bar (removed 2026-11-22, Things /
+/// Reminders model): on iPhone the sidebar list (Today, Upcoming, smart lists,
+/// areas, projects) IS the root of one `NavigationStack`, and every list
+/// pushes onto it. The app opens on Today with the list one Back away. On iPad
+/// regular / macOS the split-view sidebar is the switcher. Composition only:
+/// `ContentView` and the task views are shared and unchanged.
+///
+/// Quick capture lives in the floating circular Magic Plus orb
+/// (`MagicPlusOrb`) at the bottom-right edge: tap opens the create quick
+/// menu, and hold-and-drag drops a new inline task onto any row gap, heading,
+/// group, or Upcoming day — or creates a Project/Area on the list root.
+/// Search lives in the trailing nav bar.
 ///
 /// Septask has no Next page (removed 2026-11-19: it showed life-OS content,
 /// not tasks; Today covers "what's next" for tasks).
-enum SeptaskTab: Hashable {
-  case tasks, today, upcoming
-}
-
-/// Septask's root, mirroring `RootTabView`'s shell shape: the standard
-/// system `TabView` on iPhone (bottom bar, Music-style minimize on scroll),
-/// and NO tab bar on iPad regular / macOS — there the split-view sidebar is
-/// the switcher, which is the norm (Septena's iPad segmented switcher is a
-/// full-app exception, deliberately not copied). Composition only: every
-/// tab hosts shared views unchanged.
 struct SeptaskRootView: View {
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
@@ -38,7 +32,6 @@ struct SeptaskRootView: View {
   @Environment(SettingsStore.self) private var settingsStore
   @Environment(LogCommitCenter.self) private var logCommit
   @Environment(\.modelContext) private var modelContext
-  @State private var selection: SeptaskTab = .today
   @State private var magicPlusDrag = MagicPlusDragState()
   @State private var showingNewProjectSheet = false
   @State private var newProjectInitialAreaId: String? = nil
@@ -167,37 +160,7 @@ struct SeptaskRootView: View {
       if usesSplitLayout {
         ContentView()
       } else {
-        systemTabView
-      }
-    }
-    // Fold / unfold continuity (iPhone Duo) and iPad multitasking resize:
-    // preserve the exact surface the user is viewing across the TabView ↔
-    // NavigationSplitView boundary instead of snapping back to Today.
-    .onChange(of: usesSplitLayout) { _, isSplit in
-      syncRouteAcrossLayoutTransition(toSplit: isSplit)
-    }
-    // Shared task views navigate through the ONE NavigationState path
-    // (project drill-ins, smart-list jumps); ContentView's stack renders it
-    // on the Tasks tab. A route landing while a filter tab is frontmost
-    // must move selection — the tab-bar twin of RootTabView's pendingTab
-    // forwarding.
-    //
-    // Today and Upcoming ARE tabs, so a route to either switches to that tab
-    // and is then dropped from the shared path. Leaving it there also pushed a
-    // second copy of the list inside the Tasks tab: back on Tasks you landed in
-    // a duplicate Today instead of the Tasks home, and that hidden copy could
-    // consume a search reveal meant for the tab you were looking at.
-    .onChange(of: nav.path) { _, path in
-      guard !usesSplitLayout, let last = path.last else { return }
-      switch last {
-      case .filter(.today):
-        selection = .today
-        nav.path = []
-      case .filter(.upcoming):
-        selection = .upcoming
-        nav.path = []
-      default:
-        selection = .tasks
+        compactStack
       }
     }
     #else
@@ -206,103 +169,34 @@ struct SeptaskRootView: View {
   }
 
   #if os(iOS)
-  /// Keep the user's active view aligned when crossing compact ↔ split
-  /// (folding/unfolding iPhone Duo or resizing an iPad window).
-  private func syncRouteAcrossLayoutTransition(toSplit: Bool) {
-    if toSplit {
-      switch selection {
-      case .today:
-        nav.path = [.filter(.today)]
-      case .upcoming:
-        nav.path = [.filter(.upcoming)]
-      case .tasks:
-        if nav.path.isEmpty { nav.path = [.filter(.today)] }
-      }
-    } else {
-      switch nav.path.last {
-      case .filter(.today):
-        selection = .today
-        nav.path = []
-      case .filter(.upcoming):
-        selection = .upcoming
-        nav.path = []
-      case .some:
-        selection = .tasks
-      case nil:
-        break
-      }
-    }
-  }
-  #endif
-
-  #if os(iOS)
-  /// User tab-bar selection bridge:
-  /// - Tapping `Tasks` (switching from Today/Upcoming or re-tapping Tasks)
-  ///   always clears `nav.path` so Tasks lands at its top-level index.
-  /// - Switching to Today or Upcoming clears any stale Tasks stack route.
-  ///
-  /// Programmatic navigation (e.g. tapping a project from Quick Find or a task
-  /// row) sets `selection = .tasks` directly in `.onChange(of: nav.path)` and
-  /// bypasses this setter so the pushed route is preserved.
-  private var tabSelection: Binding<SeptaskTab> {
-    Binding(
-      get: { selection },
-      set: { tapped in
-        magicPlusDrag.reset()
-        if !nav.path.isEmpty {
-          nav.path = []
-        }
-        selection = tapped
-      }
-    )
-  }
-
   /// Start a new task inline (never a modal sheet/drawer):
   /// - On Today, Upcoming, Project, Area, Anytime, or Inbox: opens the inline
   ///   composer right in the active list via `nav.requestNewTask()`.
-  /// - On the Tasks index (no list mounted) or read-only history smart lists:
-  ///   switches to Today (Inbox) and opens the inline composer there.
+  /// - On the list root (no list mounted) or read-only history smart lists:
+  ///   opens Today (Inbox) and opens the inline composer there.
   private func triggerInlineNewTask() {
     Haptics.tap()
-    if selection == .tasks {
-      let canCreateInPlace: Bool = {
-        guard let last = nav.path.last else { return false }
-        switch last {
-        case .project, .area, .filter(.unscheduled), .filter(.triage),
-             .filter(.today), .filter(.upcoming):
-          return true
-        default:
-          return false
-        }
-      }()
-      if !canCreateInPlace {
-        if !nav.path.isEmpty { nav.path = [] }
-        selection = .today
+    let canCreateInPlace: Bool = {
+      guard let last = nav.path.last else { return false }
+      switch last {
+      case .project, .area, .filter(.unscheduled), .filter(.triage),
+           .filter(.today), .filter(.upcoming):
+        return true
+      default:
+        return false
       }
-    }
+    }()
+    if !canCreateInPlace { nav.path = [.filter(.today)] }
     nav.requestNewTask()
   }
 
-  /// Real iOS 26 3-tab `TabView` (`Tasks`, `Today`, `Upcoming`) with system
-  /// scroll minimization, paired with a separate floating circular Magic Plus
-  /// orb anchored just above the bottom-right edge of the tab bar (Things 3
-  /// style) so it stays behind the keyboard when typing inline.
-  private var systemTabView: some View {
+  /// The iPhone shell: `ContentView`'s compact `NavigationStack` (the
+  /// sidebar list is its root) with the floating circular Magic Plus orb
+  /// over the bottom-right corner (Things 3 style), so it stays behind the
+  /// keyboard when typing inline.
+  private var compactStack: some View {
     ZStack(alignment: .bottomTrailing) {
-      TabView(selection: tabSelection) {
-        // Septask has no section colors: the bar, the tabs and their content
-        // all take the platform accent (no `.tint` on the TabView).
-        Tab("Tasks", systemImage: "checkmark", value: SeptaskTab.tasks) {
-          ContentView()
-        }
-        Tab("Today", systemImage: "sun.max.fill", value: SeptaskTab.today) {
-          NavigationStack { TaskListView(filter: .today) }.tint(theme.accent)
-        }
-        Tab("Upcoming", systemImage: "calendar", value: SeptaskTab.upcoming) {
-          NavigationStack { TaskListView(filter: .upcoming) }.tint(theme.accent)
-        }
-      }
-      .tabBarMinimizeBehavior(.onScrollDown)
+      ContentView()
 
       let hideMagicPlus = nav.isTaskMultiSelectActive || SeptenaToastActivity.shared.hasActiveToast
       MagicPlusOrb(
@@ -320,8 +214,7 @@ struct SeptaskRootView: View {
         }
       )
       .padding(.trailing, 16)
-      .padding(.bottom, 92)
-      .ignoresSafeArea(.all, edges: .bottom)
+      .padding(.bottom, 8)
       .opacity(hideMagicPlus ? 0 : 1)
       .allowsHitTesting(!hideMagicPlus)
       .a11yAnimation(.snappy(duration: 0.2), value: hideMagicPlus)
@@ -331,6 +224,9 @@ struct SeptaskRootView: View {
     .environment(\.magicPlusDrag, magicPlusDrag)
     .onAppear {
       magicPlusDrag.fallbackDrop = { triggerInlineNewTask() }
+      // Open on Today, with the list root one Back away. The split layout
+      // already falls back to Today when the path is empty (ContentView).
+      if nav.path.isEmpty { nav.path = [.filter(.today)] }
     }
     .onChange(of: nav.path) { _, _ in
       if !magicPlusDrag.isDragging {
@@ -340,12 +236,12 @@ struct SeptaskRootView: View {
   }
 
   private var isViewingProject: Bool {
-    if selection == .tasks, case .project = nav.path.last { return true }
+    if case .project = nav.path.last { return true }
     return false
   }
 
   private var activeAreaIdForNewProject: String? {
-    if selection == .tasks, case .area(let id) = nav.path.last { return id }
+    if case .area(let id) = nav.path.last { return id }
     return nil
   }
 
@@ -369,8 +265,8 @@ struct SeptaskRootView: View {
 }
 
 #if os(iOS)
-/// Separate floating circular Magic Plus orb anchored above bottom-right of
-/// the real iOS 26 `TabView`:
+/// Separate floating circular Magic Plus orb anchored at the bottom-right of
+/// the iPhone navigation stack:
 /// - Solid accent circle + subtle 6-dot grip beneath `+` communicates a
 ///   grabbable object rather than a flat tap-only tab icon.
 /// - Tap opens a native popover quick menu (`New Task` inline, `New Section`
