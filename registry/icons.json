@@ -89,6 +89,7 @@
     "settings.paste": { "sfSymbol": "doc.on.clipboard", "material": "content_paste", "lucide": "clipboard-paste" },
     "settings.companion_app": { "sfSymbol": "arrow.up.forward.app", "material": "open_in_new", "lucide": "external-link" },
     "settings.plus": { "sfSymbol": "plus.circle.fill", "material": "add_circle", "lucide": "circle-plus" },
+    "plans.free": { "sfSymbol": "iphone", "material": "smartphone", "lucide": "smartphone" },
     "plans.history": { "sfSymbol": "clock.arrow.circlepath", "material": "history", "lucide": "history" },
     "notice.sign_in": { "sfSymbol": "person.crop.circle.badge.exclamationmark", "material": "account_circle", "lucide": "user-x" },
     "notice.rolled_in": { "sfSymbol": "arrow.down.circle", "material": "arrow_circle_down", "lucide": "arrow-down-circle" },

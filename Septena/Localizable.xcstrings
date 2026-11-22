@@ -5,6 +5,22 @@
       "comment" : "Generated from registry plans.outcomes.agents.rows.links.cells.account. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "€5 a month. You save €24 against paying monthly." : {
+      "comment" : "Generated from registry plans.prices.annual.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "€7 a month" : {
+      "comment" : "Generated from registry plans.prices.monthly.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "€60 a year" : {
+      "comment" : "Generated from registry plans.prices.annual.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "€60 a year or €7 a month" : {
+      "comment" : "Generated from registry plans.levels.plus.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "“%@” deleted" : {
       "comment" : "Generated from registry surfaces.toasts.templates.deletedSingle.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",

@@ -22,8 +22,10 @@ struct SeptaskPlusPane: View {
         }
         .padding(.vertical, 4)
         if let line = status.statusLine {
-          LabeledContent(RegistryPlans.Copy.yourPlan) {
+          LabeledContent {
             Text(line).foregroundStyle(.secondary)
+          } label: {
+            Label(RegistryPlans.Copy.yourPlan, systemImage: Self.cardSymbol(status.isPlus ? "plus" : "free"))
           }
         }
       }
@@ -61,8 +63,10 @@ struct SeptaskPlusPane: View {
           Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
             GridRow {
               Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-              Text(RegistryPlans.Status.free).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-              Text(RegistryPlans.shortName).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+              Label(RegistryPlans.Status.free, systemImage: Self.cardSymbol("free"))
+                .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+              Label(RegistryPlans.shortName, systemImage: Self.cardSymbol("plus"))
+                .font(.caption.weight(.semibold)).foregroundStyle(.tint)
             }
             ForEach(outcome.rows) { row in
               GridRow(alignment: .firstTextBaseline) {
@@ -101,6 +105,12 @@ struct SeptaskPlusPane: View {
     .navigationBarTitleDisplayMode(.inline)
     #endif
     .task { await PlanStatus.shared.refresh() }
+  }
+
+  /// SF Symbol of a plan card's registry icon (plans.json `cards[].icon`).
+  private static func cardSymbol(_ id: String) -> String {
+    let icon = RegistryPlans.cards.first { $0.id == id }?.icon ?? ""
+    return RegistryIcons.sfSymbols[icon] ?? "circle"
   }
 }
 

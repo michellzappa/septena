@@ -512,6 +512,7 @@ function validatePlans(plans, icons, caps) {
   assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
   assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(["free", "plus"]), "plans.json: cards must be free, plus");
   assert(plans.cards.filter((c) => c.highlighted).length === 1, "plans.json: exactly one card must be highlighted");
+  for (const c of plans.cards) assert(c.icon in icons.icons, `plans.json: card ${c.id} icon "${c.icon}" is not in icons.json`);
 
   const lim = plans.limits;
   const keys = Object.keys(lim.account).sort();
@@ -1435,6 +1436,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("struct RegistryPlanCard: Sendable, Hashable, Identifiable {");
   lines.push("  let id: String");
   lines.push("  let title: String");
+  lines.push("  /// Registry icon id (icons.json).");
+  lines.push("  let icon: String");
   lines.push("  let detail: String");
   lines.push("  let points: [String]");
   lines.push("  let footnote: String?");
@@ -1477,7 +1480,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const pr of P.prices) lines.push(`    RegistryPlanPrice(id: ${swiftStr(pr.id)}, productId: ${swiftStr(pr.productId)}, amountMinor: ${pr.amountMinor}, currency: ${swiftStr(pr.currency)}, interval: ${swiftStr(pr.interval)}, highlighted: ${pr.highlighted}, label: ${L(pr.label, pr, "label")}, detail: ${L(pr.detail, pr, "detail")}),`);
   lines.push("  ] }");
   lines.push("  static var cards: [RegistryPlanCard] { [");
-  for (const c of P.cards) lines.push(`    RegistryPlanCard(id: ${swiftStr(c.id)}, title: ${L(c.title, c, "title")}, detail: ${L(c.detail, c, "detail")}, points: [${c.points.map((pt) => L(pt, null, null)).join(", ")}], footnote: ${LOpt(c.footnote, c, "footnote")}, highlighted: ${c.highlighted === true}),`);
+  for (const c of P.cards) lines.push(`    RegistryPlanCard(id: ${swiftStr(c.id)}, title: ${L(c.title, c, "title")}, icon: ${swiftStr(c.icon)}, detail: ${L(c.detail, c, "detail")}, points: [${c.points.map((pt) => L(pt, null, null)).join(", ")}], footnote: ${LOpt(c.footnote, c, "footnote")}, highlighted: ${c.highlighted === true}),`);
   lines.push("  ] }");
   lines.push("  static var outcomes: [RegistryPlanOutcome] { [");
   for (const o of P.outcomes) {

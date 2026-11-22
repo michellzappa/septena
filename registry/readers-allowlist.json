@@ -49,10 +49,6 @@
       "reason": "The reverse trial is not built; the Plus pane shows trial copy only.",
       "issue": "#46"
     },
-    "RegistryPlans.cards": {
-      "reason": "Plan cards render in the paywall, which is not built.",
-      "issue": "#46"
-    },
     "RegistryPlans.upsell": {
       "reason": "Upsell moments show in the paywall flows, which are not built.",
       "issue": "#46"

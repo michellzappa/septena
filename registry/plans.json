@@ -20,21 +20,21 @@
     {
       "id": "annual",
       "productId": "com.septena.tasks.sync.annual",
-      "amountMinor": 4000,
+      "amountMinor": 6000,
       "currency": "EUR",
       "interval": "year",
       "highlighted": true,
-      "label": "€40 a year",
-      "detail": "About €3.33 a month. You save €20 against paying monthly."
+      "label": "€60 a year",
+      "detail": "€5 a month. You save €24 against paying monthly."
     },
     {
       "id": "monthly",
       "productId": "com.septena.tasks.sync.monthly",
-      "amountMinor": 500,
+      "amountMinor": 700,
       "currency": "EUR",
       "interval": "month",
       "highlighted": false,
-      "label": "€5 a month",
+      "label": "€7 a month",
       "detail": "Cancel at any time."
     }
   ],
@@ -42,12 +42,13 @@
   "levels": [
     { "id": "device", "title": "This device", "detail": "No account" },
     { "id": "account", "title": "Free account", "detail": "Sign in with Apple" },
-    { "id": "plus", "title": "Plus", "detail": "€40 a year or €5 a month" }
+    { "id": "plus", "title": "Plus", "detail": "€60 a year or €7 a month" }
   ],
   "cards": [
     {
       "id": "free",
       "title": "Free",
+      "icon": "plans.free",
       "priceLabel": "€0",
       "detail": "The full task app on one iPhone, iPad or Mac. You do not need an account.",
       "points": [
@@ -63,6 +64,7 @@
     {
       "id": "plus",
       "title": "Septena Plus",
+      "icon": "settings.plus",
       "highlighted": true,
       "detail": "Plus is the same app on every device, and nothing in it is capped.",
       "points": [
@@ -85,7 +87,7 @@
         { "id": "devices", "label": "Devices", "limit": "devices", "featureId": "sync.backend", "cells": { "device": "1, not synced", "account": "1, backed up", "plus": "All your devices" } },
         { "id": "live", "label": "Sync speed", "limit": "liveSync", "featureId": "sync.backend", "cells": { "device": false, "account": "Every few minutes", "plus": "Live" } },
         { "id": "new_device", "label": "Move to a new device", "featureId": "sync.backend", "cells": { "device": "Export and import", "account": true, "plus": true } },
-        { "id": "watch", "label": "Apple Watch through the server", "status": "planned", "cells": { "device": false, "account": false, "plus": true } }
+        { "id": "watch", "label": "Apple Watch through the server", "cells": { "device": false, "account": false, "plus": true } }
       ]
     },
     {

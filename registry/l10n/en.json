@@ -102,12 +102,6 @@
       "settings.pages.about.title"
     ]
   },
-  "About €3.33 a month. You save €20 against paying monthly.": {
-    "text": "About €3.33 a month. You save €20 against paying monthly.",
-    "paths": [
-      "plans.prices.annual.detail"
-    ]
-  },
   "Accent": {
     "text": "Accent",
     "paths": [
@@ -2878,20 +2872,26 @@
       "plans.cards.free.priceLabel"
     ]
   },
-  "€40 a year": {
-    "text": "€40 a year",
+  "€5 a month. You save €24 against paying monthly.": {
+    "text": "€5 a month. You save €24 against paying monthly.",
+    "paths": [
+      "plans.prices.annual.detail"
+    ]
+  },
+  "€60 a year": {
+    "text": "€60 a year",
     "paths": [
       "plans.prices.annual.label"
     ]
   },
-  "€40 a year or €5 a month": {
-    "text": "€40 a year or €5 a month",
+  "€60 a year or €7 a month": {
+    "text": "€60 a year or €7 a month",
     "paths": [
       "plans.levels.plus.detail"
     ]
   },
-  "€5 a month": {
-    "text": "€5 a month",
+  "€7 a month": {
+    "text": "€7 a month",
     "paths": [
       "plans.prices.monthly.label"
     ]

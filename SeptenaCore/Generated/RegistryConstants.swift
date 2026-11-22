@@ -192,6 +192,7 @@ enum RegistryIcons {
     "settings.paste": "doc.on.clipboard",
     "settings.companion_app": "arrow.up.forward.app",
     "settings.plus": "plus.circle.fill",
+    "plans.free": "iphone",
     "plans.history": "clock.arrow.circlepath",
     "notice.sign_in": "person.crop.circle.badge.exclamationmark",
     "notice.rolled_in": "arrow.down.circle",
@@ -1411,6 +1412,8 @@ struct RegistryPlanPrice: Sendable, Hashable, Identifiable {
 struct RegistryPlanCard: Sendable, Hashable, Identifiable {
   let id: String
   let title: String
+  /// Registry icon id (icons.json).
+  let icon: String
   let detail: String
   let points: [String]
   let footnote: String?
@@ -1453,19 +1456,19 @@ enum RegistryPlans {
   static var trialDetail: String { RegistryL10n.t("You do not need a card. After 14 days the account becomes a free account, and your tasks stay where they are.") }
   static var priceFootnote: String { RegistryL10n.t("Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.") }
   static var prices: [RegistryPlanPrice] { [
-    RegistryPlanPrice(id: "annual", productId: "com.septena.tasks.sync.annual", amountMinor: 4000, currency: "EUR", interval: "year", highlighted: true, label: RegistryL10n.t("€40 a year"), detail: RegistryL10n.t("About €3.33 a month. You save €20 against paying monthly.")),
-    RegistryPlanPrice(id: "monthly", productId: "com.septena.tasks.sync.monthly", amountMinor: 500, currency: "EUR", interval: "month", highlighted: false, label: RegistryL10n.t("€5 a month"), detail: RegistryL10n.t("Cancel at any time.")),
+    RegistryPlanPrice(id: "annual", productId: "com.septena.tasks.sync.annual", amountMinor: 6000, currency: "EUR", interval: "year", highlighted: true, label: RegistryL10n.t("€60 a year"), detail: RegistryL10n.t("€5 a month. You save €24 against paying monthly.")),
+    RegistryPlanPrice(id: "monthly", productId: "com.septena.tasks.sync.monthly", amountMinor: 700, currency: "EUR", interval: "month", highlighted: false, label: RegistryL10n.t("€7 a month"), detail: RegistryL10n.t("Cancel at any time.")),
   ] }
   static var cards: [RegistryPlanCard] { [
-    RegistryPlanCard(id: "free", title: RegistryL10n.t("Free"), detail: RegistryL10n.t("The full task app on one iPhone, iPad or Mac. You do not need an account."), points: [RegistryL10n.t("Today with its Inbox, Upcoming, Anytime, Faded and Logbook"), RegistryL10n.t("Areas, projects, sections, notes and attachments"), RegistryL10n.t("When dates, deadlines and repeats"), RegistryL10n.t("Task conversations with the on-device model"), RegistryL10n.t("Import from Things and Apple Reminders"), RegistryL10n.t("Export everything as plain JSON")], footnote: RegistryL10n.t("Sign in for a free account. The server then keeps a backup of that device, and you can try agents on real tasks."), highlighted: false),
-    RegistryPlanCard(id: "plus", title: RegistryL10n.t("Septena Plus"), detail: RegistryL10n.t("Plus is the same app on every device, and nothing in it is capped."), points: [RegistryL10n.t("Live sync on every iPhone, iPad and Mac"), RegistryL10n.t("A year of change history, and a year to restore deleted tasks"), RegistryL10n.t("Files and images synced, up to 10 GB"), RegistryL10n.t("Your agents work your tasks without a daily cap"), RegistryL10n.t("Early builds on TestFlight")], footnote: RegistryL10n.t("Everything in Free is included."), highlighted: true),
+    RegistryPlanCard(id: "free", title: RegistryL10n.t("Free"), icon: "plans.free", detail: RegistryL10n.t("The full task app on one iPhone, iPad or Mac. You do not need an account."), points: [RegistryL10n.t("Today with its Inbox, Upcoming, Anytime, Faded and Logbook"), RegistryL10n.t("Areas, projects, sections, notes and attachments"), RegistryL10n.t("When dates, deadlines and repeats"), RegistryL10n.t("Task conversations with the on-device model"), RegistryL10n.t("Import from Things and Apple Reminders"), RegistryL10n.t("Export everything as plain JSON")], footnote: RegistryL10n.t("Sign in for a free account. The server then keeps a backup of that device, and you can try agents on real tasks."), highlighted: false),
+    RegistryPlanCard(id: "plus", title: RegistryL10n.t("Septena Plus"), icon: "settings.plus", detail: RegistryL10n.t("Plus is the same app on every device, and nothing in it is capped."), points: [RegistryL10n.t("Live sync on every iPhone, iPad and Mac"), RegistryL10n.t("A year of change history, and a year to restore deleted tasks"), RegistryL10n.t("Files and images synced, up to 10 GB"), RegistryL10n.t("Your agents work your tasks without a daily cap"), RegistryL10n.t("Early builds on TestFlight")], footnote: RegistryL10n.t("Everything in Free is included."), highlighted: true),
   ] }
   static var outcomes: [RegistryPlanOutcome] { [
     RegistryPlanOutcome(id: "everywhere", icon: "onboarding.devices", title: RegistryL10n.t("Your list everywhere"), detail: RegistryL10n.t("The same tasks on your phone, tablet and Mac, updated as you type."), rows: [
       RegistryPlanRow(id: "devices", label: RegistryL10n.t("Devices"), planned: false, device: .text(RegistryL10n.t("1, not synced")), account: .text(RegistryL10n.t("1, backed up")), plus: .text(RegistryL10n.t("All your devices"))),
       RegistryPlanRow(id: "live", label: RegistryL10n.t("Sync speed"), planned: false, device: .notIncluded, account: .text(RegistryL10n.t("Every few minutes")), plus: .text(RegistryL10n.t("Live"))),
       RegistryPlanRow(id: "new_device", label: RegistryL10n.t("Move to a new device"), planned: false, device: .text(RegistryL10n.t("Export and import")), account: .included, plus: .included),
-      RegistryPlanRow(id: "watch", label: RegistryL10n.t("Apple Watch through the server"), planned: true, device: .notIncluded, account: .notIncluded, plus: .included),
+      RegistryPlanRow(id: "watch", label: RegistryL10n.t("Apple Watch through the server"), planned: false, device: .notIncluded, account: .notIncluded, plus: .included),
     ]),
     RegistryPlanOutcome(id: "nothing_lost", icon: "plans.history", title: RegistryL10n.t("Nothing lost"), detail: RegistryL10n.t("See who changed what and bring back what you deleted. Your files open on every device."), rows: [
       RegistryPlanRow(id: "history", label: RegistryL10n.t("Change history"), planned: false, device: .text(RegistryL10n.t("On this device")), account: .text(RegistryL10n.t("30 days")), plus: .text(RegistryL10n.t("365 days"))),

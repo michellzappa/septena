@@ -34,7 +34,8 @@ The one-line rule is: **free on one device, Plus on all of them.**
 - **Moving to a new device is free.** When a free account signs in on a new
   device, that device takes the one slot and the old device stops syncing.
   It keeps its local data. Replacing a phone never needs Plus.
-- **Plus (€5 a month / €40 a year):** sync on every device, as in 0010.
+- **Plus (€7 a month / €60 a year):** sync on every device, as in 0010.
+  The price was €5 / €40 until 2026-11-22, when MZ raised it.
 - The paid plan is named **Septena Plus** on every surface: site, app,
   App Store product, receipts. "Support Septena" and "Supporter" leave the
   task app.

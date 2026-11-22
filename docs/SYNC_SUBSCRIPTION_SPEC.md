@@ -57,7 +57,7 @@ Three levels (ADR 0010, ADR 0023). The earlier rule "the server is paid" is
 replaced. The public rule: **free on one device, Plus on all of them.** The
 paid plan is named **Septena Plus** on every surface.
 
-| Free, no account | Free account | Septena Plus (€5 / €40) |
+| Free, no account | Free account | Septena Plus (€7 / €60) |
 |---|---|---|
 | Every task feature: lists, projects, areas, Today, Next, recurrence, fade, the composer, quick entry, widgets | Everything in the left column | Everything in the left column |
 | Watch app paired to the phone (syncs through the phone) | Server sync for 1 device (backup; moving to a new device is free, the old one stops syncing) | Server sync on all devices, including the watch through the server |
@@ -404,7 +404,7 @@ before any public release that uses the backend.
 
 | Question | Default |
 |---|---|
-| Monthly and annual price | Decided 2026-11-19: €5 / €40 (reasoning in the private site repo) |
+| Monthly and annual price | Decided 2026-11-19: €5 / €40. Raised 2026-11-22 to €7 / €60 |
 | Trial length | Decided 2026-11-19: 14 days |
 | Does the watch need the subscription? | No, it syncs through the paired phone |
 | Is the hosted Claude connector paid? | Yes, it runs on our server |
