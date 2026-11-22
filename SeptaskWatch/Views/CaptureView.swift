@@ -17,6 +17,7 @@ struct CaptureButton: View {
       if !trimmed.isEmpty { onTitle(trimmed) }
     }
     .buttonStyle(.glassProminent)
+    .buttonBorderShape(.circle)
     .tint(store.accentColor)
     .accessibilityLabel("New To-Do")
   }

@@ -28,7 +28,9 @@ struct TodayView: View {
           ToolbarItem(placement: .topBarLeading) {
             NavigationLink(value: WatchRoute.lists) {
               Image(systemName: "list.bullet")
+                .foregroundStyle(.primary)
             }
+            .buttonStyle(.plain)
             .accessibilityLabel("Lists")
           }
           ToolbarItem(placement: .topBarTrailing) {
