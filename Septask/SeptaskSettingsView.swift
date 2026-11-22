@@ -175,6 +175,9 @@ struct SeptaskSettingsView: View {
         }
       }
     }
+    // Apple Watch: install + link state (not in the shared settings
+    // registry: iOS-only, and it reads live WatchConnectivity state).
+    SeptaskWatchSettingsSection()
   }
   #endif
 

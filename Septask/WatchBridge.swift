@@ -17,17 +17,29 @@ import WatchConnectivity
 //    launch snapshot) it pushes today's rows as application context. The
 //    watch shows them before its own network fetch finishes.
 @MainActor
+@Observable
 final class WatchBridge: NSObject {
   static let shared = WatchBridge()
+
+  /// What Settings ▸ Apple Watch shows.
+  struct WatchState: Equatable {
+    var supported = false
+    var paired = false
+    var installed = false
+    var reachable = false
+  }
+  private(set) var state = WatchState()
+  private(set) var lastHandoff: Date? = UserDefaults.standard.object(forKey: "septena.watch.lastHandoff") as? Date
+  private(set) var lastError: String?
 
   private static let debounce: Duration = .seconds(2)
   /// The account a session was last handed to the watch for.
   private static let deliveredKey = "septena.watch.sessionDeliveredFor"
 
-  private var started = false
-  private var pending: Task<Void, Never>?
-  private var minting = false
-  private var observers: [NSObjectProtocol] = []
+  @ObservationIgnored private var started = false
+  @ObservationIgnored private var pending: Task<Void, Never>?
+  private(set) var minting = false
+  @ObservationIgnored private var observers: [NSObjectProtocol] = []
 
   private override init() { super.init() }
 
@@ -43,6 +55,24 @@ final class WatchBridge: NSObject {
         MainActor.assumeIsolated { WatchBridge.shared.schedulePublish() }
       })
     }
+  }
+
+  /// Re-reads pairing / install state (Settings calls it on appear).
+  func refreshState() {
+    guard WCSession.isSupported() else { state = WatchState(); return }
+    let s = WCSession.default
+    let activated = s.activationState == .activated
+    state = WatchState(supported: true,
+                       paired: activated && s.isPaired,
+                       installed: activated && s.isWatchAppInstalled,
+                       reachable: activated && s.isReachable)
+  }
+
+  /// Settings ▸ Apple Watch ▸ Reconnect: mint and send a fresh session.
+  func reconnect() {
+    refreshState()
+    deliverSessionIfNeeded(force: true)
+    publishNow()
   }
 
   /// Sign-out, account switch or delete. Clears the watch's rows and session.
@@ -74,6 +104,7 @@ final class WatchBridge: NSObject {
   }
 
   private func publishNow() {
+    refreshState()
     guard canTalk else { return }
     var context: [String: Any] = [WatchLink.contextUserKey: userID ?? ""]
     if userID != nil, let data = try? JSONEncoder.watchWire.encode(todayList()) {
@@ -134,7 +165,11 @@ final class WatchBridge: NSObject {
         where WatchLink.kind(of: transfer.userInfo) == .session { transfer.cancel() }
         WCSession.default.transferUserInfo(WatchLink.message(.session, payload: data))
         UserDefaults.standard.set(s.userId, forKey: Self.deliveredKey)
+        lastHandoff = .now
+        lastError = nil
+        UserDefaults.standard.set(lastHandoff, forKey: "septena.watch.lastHandoff")
       } catch {
+        lastError = error.localizedDescription
         SeptenaLog.error("[WatchBridge] device session failed", error)
       }
     }
@@ -159,6 +194,10 @@ extension WatchBridge: WCSessionDelegate {
   nonisolated func sessionDidDeactivate(_ session: WCSession) {
     // Switched to another watch: activate again for the new one.
     WCSession.default.activate()
+  }
+
+  nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
+    Task { @MainActor in WatchBridge.shared.refreshState() }
   }
 
   nonisolated func sessionWatchStateDidChange(_ session: WCSession) {
