@@ -123,6 +123,16 @@ struct SeptaskSettingsView: View {
     #endif
   }
 
+  /// The depth-1 page that links to a depth-2 page (About ▸ Advanced,
+  /// Privacy & Data ▸ Import & Export), read from the registry.
+  private static func parentPage(of pageID: String) -> String? {
+    RegistrySettings.pages.first { page in
+      page.sections.contains { section in
+        section.items.contains { $0.kind == "pageLink" && $0.page == pageID }
+      }
+    }?.id
+  }
+
   /// Opens the canonical registry page ID requested via `SeptaskSettingsLink`.
   private func consumeLink() {
     guard let pageID = SeptaskSettingsLink.pending else { return }
@@ -142,8 +152,8 @@ struct SeptaskSettingsView: View {
       }
     }
     #else
-    if pageID == RegistrySettings.PageID.advanced {
-      path = [RegistrySettings.PageID.about, RegistrySettings.PageID.advanced]
+    if let parent = Self.parentPage(of: pageID) {
+      path = [parent, pageID]
     } else {
       path = [pageID]
     }
@@ -213,12 +223,8 @@ struct SeptaskSettingsView: View {
     if !aboutTabs.isEmpty {
       Section {
         ForEach(aboutTabs) { tab in
-          Label {
-            Text(tab.title)
-          } icon: {
-            SeptenaDiscTile(size: 20)
-          }
-          .settingsSidebarRow(tab.id, selection: selectedTab)
+          macSidebarRow(tab)
+            .settingsSidebarRow(tab.id, selection: selectedTab)
         }
       }
     }
@@ -316,7 +322,7 @@ struct SeptaskSettingsView: View {
 
   private func owningDesktopTab(for pageID: String) -> String {
     if RegistrySettings.tabById[pageID] != nil { return pageID }
-    if pageID == RegistrySettings.PageID.advanced { return RegistrySettings.TabID.about }
+    if let parent = Self.parentPage(of: pageID) { return owningDesktopTab(for: parent) }
     for group in RegistrySettings.rootGroups {
       if let tab = group.desktopTab,
          group.items.contains(where: { $0.kind == "pageLink" && $0.page == pageID }) {
@@ -434,12 +440,6 @@ struct SeptaskSettingsView: View {
           .frame(width: 20, height: 20)
       }
       .foregroundStyle(.primary)
-    } else if item.page == RegistrySettings.PageID.about {
-      Label {
-        Text(title)
-      } icon: {
-        SeptenaDiscTile(size: 24)
-      }
     } else if let symbol = item.sfSymbol {
       Label(title, systemImage: symbol)
     } else {
@@ -782,6 +782,18 @@ private struct SeptaskPrivacyPane: View {
         Text(RegistrySettings.itemBySurface["privacy_explainer"]?.detail ?? "")
       } header: {
         Text(dataSection?.header ?? "")
+      }
+
+      if let transfer = RegistrySettings.section("transfer", page: RegistrySettings.PageID.privacy) {
+        Section {
+          ForEach(transfer.items.filter { $0.kind == "pageLink" }) { item in
+            if let target = item.page {
+              NavigationLink(value: target) {
+                Label(item.label ?? "", systemImage: item.sfSymbol ?? "square.and.arrow.up")
+              }
+            }
+          }
+        }
       }
 
       Section {

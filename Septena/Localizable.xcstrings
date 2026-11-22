@@ -3614,7 +3614,14 @@
       }
     },
     "Connections" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conexões"
+          }
+        }
+      }
     },
     "Connections & Data" : {
       "comment" : "Generated from registry settings.desktopTabs.connections_data.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -6071,7 +6078,7 @@
       }
     },
     "Import & Export" : {
-      "comment" : "Generated from registry settings.rootGroups.connections_data_root.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.import_export.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -9258,6 +9265,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Privacidade"
+          }
+        }
+      }
+    },
+    "Privacy & Data" : {
+      "comment" : "Generated from registry settings.desktopTabs.privacy.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacidade e dados"
           }
         }
       }

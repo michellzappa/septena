@@ -480,8 +480,8 @@
       "surfaces.notices.items.getStarted.steps.connectAI.title"
     ]
   },
-  "Connections & Data": {
-    "text": "Connections & Data",
+  "Connections": {
+    "text": "Connections",
     "paths": [
       "settings.desktopTabs.connections_data.title",
       "settings.rootGroups.connections_data_root.header"
@@ -973,8 +973,8 @@
   "Import & Export": {
     "text": "Import & Export",
     "paths": [
-      "settings.rootGroups.connections_data_root.items.2.label",
-      "settings.pages.import_export.title"
+      "settings.pages.import_export.title",
+      "settings.pages.privacy.sections.transfer.items.0.label"
     ]
   },
   "Import from Things": {
@@ -1719,8 +1719,8 @@
       "tokens.textures.stippleDrift.tag"
     ]
   },
-  "Privacy": {
-    "text": "Privacy",
+  "Privacy & Data": {
+    "text": "Privacy & Data",
     "paths": [
       "settings.desktopTabs.privacy.title",
       "settings.rootGroups.meta_root.items.0.label",

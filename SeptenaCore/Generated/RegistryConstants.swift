@@ -116,7 +116,7 @@ enum RegistryIcons {
     "list.today": "sun.max.fill",
     "list.inbox": "tray.full",
     "list.review": "eye",
-    "list.agent": "sparkles",
+    "list.agent": "person.2.badge.gearshape",
     "agent.queued": "clock",
     "agent.working": "ellipsis.circle",
     "agent.your_turn": "questionmark.bubble",
@@ -171,7 +171,7 @@ enum RegistryIcons {
     "auth.device": "laptopcomputer.and.iphone",
     "settings.general": "slider.horizontal.3",
     "settings.tasks": "checklist",
-    "settings.ai_agents": "sparkles",
+    "settings.ai_agents": "cpu",
     "settings.claude": "bubble.left.and.text.bubble.right",
     "settings.connections_ai": "brain.head.profile",
     "settings.connections": "link",
@@ -467,9 +467,9 @@ enum RegistrySettings {
   static let desktopTabs: [RegistrySettingsTab] = [
     RegistrySettingsTab(id: "account", title: RegistryL10n.t("Account"), iconId: "settings.account", sfSymbol: "person.crop.circle", group: "identity", paletteSlot: nil, featureId: "sync.backend"),
     RegistrySettingsTab(id: "general", title: RegistryL10n.t("General"), iconId: "settings.general", sfSymbol: "slider.horizontal.3", group: "main", paletteSlot: 0, featureId: "lists.today"),
-    RegistrySettingsTab(id: "ai_agents", title: RegistryL10n.t("AI & Agents"), iconId: "settings.ai_agents", sfSymbol: "sparkles", group: "main", paletteSlot: 4, featureId: "ai.reach-dial"),
-    RegistrySettingsTab(id: "connections_data", title: RegistryL10n.t("Connections & Data"), iconId: "settings.connections", sfSymbol: "link", group: "main", paletteSlot: 5, featureId: "sync.backend"),
-    RegistrySettingsTab(id: "privacy", title: RegistryL10n.t("Privacy"), iconId: "settings.privacy", sfSymbol: "hand.raised", group: "main", paletteSlot: 6, featureId: "settings.display"),
+    RegistrySettingsTab(id: "ai_agents", title: RegistryL10n.t("AI & Agents"), iconId: "settings.ai_agents", sfSymbol: "cpu", group: "main", paletteSlot: 4, featureId: "ai.reach-dial"),
+    RegistrySettingsTab(id: "connections_data", title: RegistryL10n.t("Connections"), iconId: "settings.connections", sfSymbol: "link", group: "main", paletteSlot: 5, featureId: "sync.backend"),
+    RegistrySettingsTab(id: "privacy", title: RegistryL10n.t("Privacy & Data"), iconId: "settings.privacy", sfSymbol: "hand.raised", group: "main", paletteSlot: 6, featureId: "settings.display"),
     RegistrySettingsTab(id: "about", title: RegistryL10n.t("About"), iconId: "settings.about", sfSymbol: "info.circle", group: "about", paletteSlot: nil, featureId: "settings.display"),
   ]
 
@@ -480,12 +480,11 @@ enum RegistrySettings {
     RegistrySettingsGroup(id: "ai_agents_root", header: RegistryL10n.t("AI & Agents"), mobilePresentation: "inline", desktopTab: "ai_agents", items: [
       RegistrySettingsItem(kind: "pageLink", key: nil, page: "claude_pairing", surface: nil, label: RegistryL10n.t("Connect Claude"), detail: nil, iconId: "settings.claude", sfSymbol: "bubble.left.and.text.bubble.right", statusKey: "claudeStatus", desktopInline: true, visibility: "always", platforms: nil, featureId: "agents.connector"),
       RegistrySettingsItem(kind: "setting", key: "agentsPaused", page: nil, surface: nil, label: RegistryL10n.t("Pause all agents"), detail: RegistryL10n.t("While paused, no agent can start or work on a task."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "signedIn", platforms: nil, featureId: "agents.stop-pause"),
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "ai_preferences", surface: nil, label: RegistryL10n.t("AI Preferences"), detail: nil, iconId: "settings.ai_agents", sfSymbol: "sparkles", statusKey: "aiMode", desktopInline: true, visibility: "always", platforms: nil, featureId: "ai.reach-dial"),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "ai_preferences", surface: nil, label: RegistryL10n.t("AI Preferences"), detail: nil, iconId: "settings.ai_agents", sfSymbol: "cpu", statusKey: "aiMode", desktopInline: true, visibility: "always", platforms: nil, featureId: "ai.reach-dial"),
     ]),
-    RegistrySettingsGroup(id: "connections_data_root", header: RegistryL10n.t("Connections & Data"), mobilePresentation: "inline", desktopTab: "connections_data", items: [
+    RegistrySettingsGroup(id: "connections_data_root", header: RegistryL10n.t("Connections"), mobilePresentation: "inline", desktopTab: "connections_data", items: [
       RegistrySettingsItem(kind: "pageLink", key: nil, page: "calendar", surface: nil, label: RegistryL10n.t("Calendar"), detail: nil, iconId: "settings.calendar", sfSymbol: "calendar", statusKey: "calendarStatus", desktopInline: false, visibility: "always", platforms: nil, featureId: "calendar.events"),
       RegistrySettingsItem(kind: "pageLink", key: nil, page: "reminders", surface: nil, label: RegistryL10n.t("Reminders"), detail: nil, iconId: "settings.reminders", sfSymbol: "checklist", statusKey: "remindersStatus", desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "import.reminders"),
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "import_export", surface: nil, label: RegistryL10n.t("Import & Export"), detail: nil, iconId: "settings.data", sfSymbol: "square.and.arrow.up", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
     ]),
     RegistrySettingsGroup(id: "lists_root", header: RegistryL10n.t("Lists"), mobilePresentation: "inline", desktopTab: "general", items: [
       RegistrySettingsItem(kind: "pageLink", key: nil, page: "smart_lists", surface: nil, label: RegistryL10n.t("Smart Lists"), detail: nil, iconId: "list.today", sfSymbol: "sun.max.fill", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
@@ -500,7 +499,7 @@ enum RegistrySettings {
       RegistrySettingsItem(kind: "pageLink", key: nil, page: "appearance", surface: nil, label: RegistryL10n.t("Appearance"), detail: nil, iconId: "settings.appearance", sfSymbol: "paintpalette", statusKey: nil, desktopInline: true, visibility: "always", platforms: nil, featureId: "settings.display"),
     ]),
     RegistrySettingsGroup(id: "meta_root", header: nil, mobilePresentation: "inline", desktopTab: nil, items: [
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "privacy", surface: nil, label: RegistryL10n.t("Privacy"), detail: nil, iconId: "settings.privacy", sfSymbol: "hand.raised", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "privacy", surface: nil, label: RegistryL10n.t("Privacy & Data"), detail: nil, iconId: "settings.privacy", sfSymbol: "hand.raised", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
       RegistrySettingsItem(kind: "pageLink", key: nil, page: "about", surface: nil, label: RegistryL10n.t("About"), detail: nil, iconId: "settings.about", sfSymbol: "info.circle", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
     ]),
   ]
@@ -542,7 +541,7 @@ enum RegistrySettings {
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "claude_connector", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "agents.connector"),
       ]),
     ]),
-    RegistrySettingsPage(id: "ai_preferences", title: RegistryL10n.t("AI Preferences"), iconId: "settings.ai_agents", sfSymbol: "sparkles", depth: 1, platforms: nil, featureId: "ai.reach-dial", sections: [
+    RegistrySettingsPage(id: "ai_preferences", title: RegistryL10n.t("AI Preferences"), iconId: "settings.ai_agents", sfSymbol: "cpu", depth: 1, platforms: nil, featureId: "ai.reach-dial", sections: [
       RegistrySettingsSection(id: "on_device", header: RegistryL10n.t("AI on this device"), footer: nil, platforms: ["ios", "ipados", "macos"], items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "apple_intelligence_status", label: RegistryL10n.t("Apple Intelligence"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "ai.reach-dial"),
       ]),
@@ -563,7 +562,7 @@ enum RegistrySettings {
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reminders_inbox", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "import.reminders"),
       ]),
     ]),
-    RegistrySettingsPage(id: "import_export", title: RegistryL10n.t("Import & Export"), iconId: "settings.data", sfSymbol: "square.and.arrow.up", depth: 1, platforms: nil, featureId: "sync.backend", sections: [
+    RegistrySettingsPage(id: "import_export", title: RegistryL10n.t("Import & Export"), iconId: "settings.data", sfSymbol: "square.and.arrow.up", depth: 2, platforms: nil, featureId: "sync.backend", sections: [
       RegistrySettingsSection(id: "move_in", header: RegistryL10n.t("Move from another app"), footer: RegistryL10n.t("Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import."), platforms: ["ios", "ipados", "macos"], items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "things_import", label: RegistryL10n.t("Import from Things"), detail: nil, iconId: "settings.import", sfSymbol: "square.and.arrow.down", statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "import.things"),
       ]),
@@ -571,9 +570,12 @@ enum RegistrySettings {
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "import_export", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
     ]),
-    RegistrySettingsPage(id: "privacy", title: RegistryL10n.t("Privacy"), iconId: "settings.privacy", sfSymbol: "hand.raised", depth: 1, platforms: nil, featureId: "settings.display", sections: [
+    RegistrySettingsPage(id: "privacy", title: RegistryL10n.t("Privacy & Data"), iconId: "settings.privacy", sfSymbol: "hand.raised", depth: 1, platforms: nil, featureId: "settings.display", sections: [
       RegistrySettingsSection(id: "data_locality", header: RegistryL10n.t("Your data"), footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "privacy_explainer", label: nil, detail: RegistryL10n.t("Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect Claude under AI & Agents."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+      ]),
+      RegistrySettingsSection(id: "transfer", header: nil, footer: nil, platforms: nil, items: [
+        RegistrySettingsItem(kind: "pageLink", key: nil, page: "import_export", surface: nil, label: RegistryL10n.t("Import & Export"), detail: nil, iconId: "settings.data", sfSymbol: "square.and.arrow.up", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
       RegistrySettingsSection(id: "telemetry", header: RegistryL10n.t("Anonymous usage data"), footer: RegistryL10n.t("Your task text and titles are never sent through analytics. This setting syncs across your devices."), platforms: nil, items: [
         RegistrySettingsItem(kind: "setting", key: "telemetryLevel", page: nil, surface: nil, label: RegistryL10n.t("Usage data"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
@@ -675,7 +677,7 @@ enum RegistryDestinations {
     RegistryDestination(id: "inbox", navigationKey: "triage", serverView: "triage", title: RegistryL10n.t("Inbox"), iconId: "list.inbox", sfSymbol: "tray.full", sidebarSection: "top", visibility: "todayBand", canHide: false, canMoveSection: false, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("Inbox is empty"), emptyDetail: RegistryL10n.t("New tasks wait at the top of Today until you schedule or file them."), featureId: "lists.inbox"),
     RegistryDestination(id: "today", navigationKey: "today", serverView: "today", title: RegistryL10n.t("Today"), iconId: "list.today", sfSymbol: "sun.max.fill", sidebarSection: "top", visibility: "always", canHide: false, canMoveSection: false, shortcutKeycaps: ["⌘", "1"], emptyTitle: RegistryL10n.t("Nothing on Today"), emptyDetail: RegistryL10n.t("Add a task or move one here when you want to work on it today."), featureId: "lists.today"),
     RegistryDestination(id: "review", navigationKey: "review", serverView: "all", title: RegistryL10n.t("Review"), iconId: "list.review", sfSymbol: "eye", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("Nothing to review"), emptyDetail: RegistryL10n.t("Work an agent finished appears here so you can check and accept it."), featureId: "lists.review"),
-    RegistryDestination(id: "agent", navigationKey: "agent", serverView: "all", title: RegistryL10n.t("Agent"), iconId: "list.agent", sfSymbol: "sparkles", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No agent work"), emptyDetail: RegistryL10n.t("Tasks you assign to Claude appear here, grouped by where the work stands."), featureId: "lists.agent"),
+    RegistryDestination(id: "agent", navigationKey: "agent", serverView: "all", title: RegistryL10n.t("Agent"), iconId: "list.agent", sfSymbol: "person.2.badge.gearshape", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No agent work"), emptyDetail: RegistryL10n.t("Tasks you assign to Claude appear here, grouped by where the work stands."), featureId: "lists.agent"),
     RegistryDestination(id: "upcoming", navigationKey: "upcoming", serverView: "upcoming", title: RegistryL10n.t("Upcoming"), iconId: "list.upcoming", sfSymbol: "calendar", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: true, shortcutKeycaps: ["⌘", "2"], emptyTitle: RegistryL10n.t("Nothing upcoming"), emptyDetail: RegistryL10n.t("Tasks with a future When or Deadline date appear here."), featureId: "lists.upcoming"),
     RegistryDestination(id: "repeating", navigationKey: "repeating", serverView: "all", title: RegistryL10n.t("Repeating"), iconId: "list.repeating", sfSymbol: "arrow.clockwise", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No repeating tasks"), emptyDetail: RegistryL10n.t("Give any task a Repeat rule and it will show up here."), featureId: "lists.repeating"),
     RegistryDestination(id: "anytime", navigationKey: "unscheduled", serverView: "unscheduled", title: RegistryL10n.t("Anytime"), iconId: "list.anytime", sfSymbol: "rectangle.stack.fill", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: true, shortcutKeycaps: ["⌘", "3"], emptyTitle: RegistryL10n.t("Nothing in Anytime"), emptyDetail: RegistryL10n.t("Open tasks without a date live here."), featureId: "lists.anytime"),
@@ -1097,7 +1099,7 @@ enum RegistryActions {
     RegistryMenu(id: "go", title: RegistryL10n.t("Go"), system: nil, items: [
       RegistryMenuItem(kind: "destination", id: "today", title: RegistryL10n.t("Today"), sfSymbol: "sun.max.fill", items: []),
       RegistryMenuItem(kind: "destination", id: "review", title: RegistryL10n.t("Review"), sfSymbol: "eye", items: []),
-      RegistryMenuItem(kind: "destination", id: "agent", title: RegistryL10n.t("Agent"), sfSymbol: "sparkles", items: []),
+      RegistryMenuItem(kind: "destination", id: "agent", title: RegistryL10n.t("Agent"), sfSymbol: "person.2.badge.gearshape", items: []),
       RegistryMenuItem(kind: "destination", id: "upcoming", title: RegistryL10n.t("Upcoming"), sfSymbol: "calendar", items: []),
       RegistryMenuItem(kind: "destination", id: "repeating", title: RegistryL10n.t("Repeating"), sfSymbol: "arrow.clockwise", items: []),
       RegistryMenuItem(kind: "destination", id: "anytime", title: RegistryL10n.t("Anytime"), sfSymbol: "rectangle.stack.fill", items: []),

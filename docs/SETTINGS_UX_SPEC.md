@@ -44,9 +44,9 @@ Every setting and custom surface currently in `Septask/` and shared `Septena/She
 | `claude_pairing` | `customSurface` | ephemeral | Inline row in **AI & Agents** (live status) → pushes pairing pane | `ai_agents` (top section, inline — no extra push) | all | `always` | **Rescued from `About ▸ Advanced ▸ Task backend`.** Shows inline Sign-in CTA when signed out |
 | `agentsPaused` | `setting` (`bool`) | `synced` | Inline toggle in **AI & Agents** | `ai_agents` | all | `signedIn` | Global server-enforced agent kill switch |
 | `ai_preferences` (subpage: `aiMode`, `apple_intelligence_status`, `ai_explainer`) | `page` link (`statusKey: aiMode`) | mixed | Inline row in **AI & Agents** (`Automatic`) → pushes subpage | `ai_agents` (inline sections below Pause) | all (`apple_intelligence_status` Apple-only) | `always` | Fix Septena Life copy in `AISettingsPane` & iCloud copy in `AIExplainerView` |
-| `calendar_detail` (owns `tasksShowCalendarEvents` + `calendarHiddenTitles`) | `customSurface` | mixed (`device` + `synced`) | Inline row in **Connections & Data** (`Off` / `N calendars`) → pushes detail | `connections_data` (or linked detail on macOS) | all (EventKit on Apple; iCal `#128` cross-platform later) | `always` | **Unifies** master toggle `tasksShowCalendarEvents` at top of `CalendarDetail`; removes duplicate link; fixes *"Next page"* copy |
-| `reminders_inbox` | `customSurface` | ephemeral (EventKit) | Inline row in **Connections & Data** (`Off` / list name) → pushes detail | `connections_data` | `ios`, `ipados`, `macos` | `always` | Removes duplicate link from `Tasks` |
-| `import_export` (owns `things_import` + JSON backup/restore + on-device counts) | `customSurface` | ephemeral | Inline row in **Connections & Data** → pushes **Import & Export** | `connections_data` | all (`things_import` Apple-only) | `always` | **Moves `Import from Things` here** under *"Move from another app"*; removes duplicates from `Tasks` and `Connections & AI`; moves `Paste JSON` to Depth 2 |
+| `calendar_detail` (owns `tasksShowCalendarEvents` + `calendarHiddenTitles`) | `customSurface` | mixed (`device` + `synced`) | Inline row in **Connections** (`Off` / `N calendars`) → pushes detail | `connections_data` (or linked detail on macOS) | all (EventKit on Apple; iCal `#128` cross-platform later) | `always` | **Unifies** master toggle `tasksShowCalendarEvents` at top of `CalendarDetail`; removes duplicate link; fixes *"Next page"* copy |
+| `reminders_inbox` | `customSurface` | ephemeral (EventKit) | Inline row in **Connections** (`Off` / list name) → pushes detail | `connections_data` | `ios`, `ipados`, `macos` | `always` | Removes duplicate link from `Tasks` |
+| `import_export` (owns `things_import` + JSON backup/restore + on-device counts) | `customSurface` | ephemeral | Row in **Privacy & Data** (depth 2, moved 2026-11-22) → pushes **Import & Export** | `privacy` | all (`things_import` Apple-only) | `always` | **Moves `Import from Things` here** under *"Move from another app"*; removes duplicates from `Tasks` and `Connections & AI`; moves `Paste JSON` to Depth 2 |
 | `todayGroupByList` | `setting` (`bool`) | `device` | Inline toggle in **Lists** | `general` | all | `always` | Mirrors macOS `View` menu |
 | `todayShowCompleted` | `setting` (`bool`) | `device` | Inline toggle in **Lists** | `general` | all | `always` | Mirrors macOS `View` menu |
 | `tasksShowAging` | `setting` (`bool`) | `device` | Inline toggle in **Lists** | `general` | all | `always` | Update registry label/detail to match P2 (`c1ad4b76`): *"Fade untouched tasks"* |
@@ -123,7 +123,7 @@ Replace the flat 6-page legacy `pages` array with an explicit two-surface projec
     { "id": "account",          "title": "Account",            "icon": "settings.account",      "group": "identity", "featureId": "sync.backend" },
     { "id": "general",          "title": "General",            "icon": "settings.general",      "group": "main",     "paletteSlot": 0, "featureId": "lists.today" },
     { "id": "ai_agents",        "title": "AI & Agents",        "icon": "settings.ai_agents",    "group": "main",     "paletteSlot": 4, "featureId": "ai.reach-dial" },
-    { "id": "connections_data", "title": "Connections & Data", "icon": "settings.connections",  "group": "main",     "paletteSlot": 5, "featureId": "sync.backend" },
+    { "id": "connections_data", "title": "Connections", "icon": "settings.connections",  "group": "main",     "paletteSlot": 5, "featureId": "sync.backend" },
     { "id": "privacy",          "title": "Privacy",            "icon": "settings.privacy",      "group": "main",     "paletteSlot": 6, "featureId": "settings.display" },
     { "id": "about",            "title": "About",              "icon": "settings.about",        "group": "about",    "featureId": "settings.display" }
   ],
@@ -151,7 +151,7 @@ Replace the flat 6-page legacy `pages` array with an explicit two-surface projec
     },
     {
       "id": "connections_data_root",
-      "header": "Connections & Data",
+      "header": "Connections",
       "mobilePresentation": "inline",
       "desktopTab": "connections_data",
       "depth": 0,
@@ -288,6 +288,6 @@ Sequenced so each issue is small, independently verifiable, and leaves `main` gr
 |---|---|
 | Schema version for `registry/settings.json` | Bump `version: 1` → `2` atomically with `scripts/gen-registries.mjs` *(default)* |
 | Sequencing relative to Launch / M2 vs M3 | Run S0 → S1 → S2 ahead of M3 (Launch/M2) so iOS/macOS Settings is reorganized once directly on the registry *(default)* |
-| macOS sidebar tab count | 6 tabs (`Account`, `General`, `AI & Agents`, `Connections & Data`, `Privacy`, `About`) *(default)* |
+| macOS sidebar tab count | 6 tabs (`Account`, `General`, `AI & Agents`, `Connections`, `Privacy & Data`, `About`) *(default)* |
 | Privacy's second telemetry control (`Share anonymous weekly diagnostics` / Community Pulse) | Move to `About ▸ Advanced` so consumer Privacy has one usage-data dial (preserves code; easy to delete outright later) *(default)* |
 | Existing issue `#178` | Repurpose/close `#178` in favor of S0–S2 (linking `docs/SETTINGS_UX_SPEC.md`) so Factory runs one unambiguous chain *(default)* |
