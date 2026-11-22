@@ -145,6 +145,9 @@ private struct SeptaskMainWindow: View {
         }
         navigation.pendingShortcut = nil
       }
+      .onOpenURL { url in
+        SeptaskDeepLinkRouter.handle(url, navigation: navigation, context: localStore.container.mainContext)
+      }
       // Shared with Septena — see `septenaSharedEnvironment`. Adding a
       // dependency there breaks BOTH roots until each supplies it, which is
       // what stops one app launching into a missing-environment crash.

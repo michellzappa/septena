@@ -183,6 +183,10 @@ targets:
         NSRemindersUsageDescription: Septena moves reminders from your Reminders lists into the Inbox and deletes them from Reminders.
         NSCalendarsFullAccessUsageDescription: Septena shows today's calendar events above your task list.
         NSCalendarsUsageDescription: Septena shows today's calendar events above your task list.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.septena.tasks
+            CFBundleURLSchemes:
+              - septask
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
@@ -310,6 +314,10 @@ targets:
         NSRemindersUsageDescription: Septena moves reminders from your Reminders lists into the Inbox and deletes them from Reminders.
         NSCalendarsFullAccessUsageDescription: Septena shows today's calendar events above your task list.
         NSCalendarsUsageDescription: Septena shows today's calendar events above your task list.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.septena.tasks
+            CFBundleURLSchemes:
+              - septask
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
@@ -423,6 +431,7 @@ targets:
       - path: SeptenaCore/ConvoDerived.swift
       - path: SeptenaCore/TaskFade.swift
       - path: SeptenaCore/SharedCoreBridge.swift
+      - path: SeptenaCore/TasksWidgetWire.swift
       - path: SeptenaCore/Generated/RegistryConstants.swift
     dependencies:
       - package: SeptenaSharedCore

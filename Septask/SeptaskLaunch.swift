@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import UserNotifications
 
 // The process's launch sequence, in one place because two roots now perform
@@ -37,6 +38,8 @@ enum SeptaskLaunch {
       SeptaskDiagnosticsCoordinator.shared.start()
       BadgeManager.shared.start(context: localStore.container.mainContext)
       TaskReminderScheduler.shared.start(context: localStore.container.mainContext)
+      TasksWidgetSnapshotPublisher.shared.drainPendingCompletions(using: services.taskMutator)
+      TasksWidgetSnapshotPublisher.shared.start()
       #if os(iOS)
       // The next cold launch draws Today from this file (#82). macOS draws
       // its AppKit list without `TaskListView`, so it has no reader.
@@ -84,6 +87,8 @@ enum SeptaskLaunch {
     services.taskMutator.catchUpFixedSchedules()
     services.runFadePassIfDue()
     TaskReminderScheduler.shared.scheduleReconcile()
+    TasksWidgetSnapshotPublisher.shared.drainPendingCompletions(using: services.taskMutator)
+    TasksWidgetSnapshotPublisher.shared.schedulePublish()
     #if os(iOS)
     WatchBridge.shared.appDidBecomeActive()
     #endif
@@ -276,5 +281,107 @@ final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidBecomeActive(_ notification: Notification) {
     Task { @MainActor in await SeptaskLaunch.activate() }
   }
+
+  func application(_ application: NSApplication, open urls: [URL]) {
+    for url in urls {
+      SeptaskDeepLinkRouter.handleMac(url)
+    }
+  }
 }
 #endif
+
+/// Routes `septask://` deep links from widgets and iCal events (`quick-add`,
+/// `list/<id>`, `task/<id>`) into the active iOS or macOS shell.
+@MainActor
+enum SeptaskDeepLinkRouter {
+  static func filter(forListID id: String) -> TaskFilter {
+    switch id {
+    case TasksWidgetListSummary.todayID:    return .today
+    case TasksWidgetListSummary.upcomingID: return .upcoming
+    case TasksWidgetListSummary.inboxID:    return .triage
+    case TasksWidgetListSummary.starredID:  return .starred
+    default:
+      if id.hasPrefix("project:") {
+        return .project(String(id.dropFirst("project:".count)))
+      }
+      if id.hasPrefix("area:") {
+        return .area(String(id.dropFirst("area:".count)))
+      }
+      return .today
+    }
+  }
+
+  static func route(forListID id: String) -> Route {
+    switch id {
+    case TasksWidgetListSummary.todayID:    return .filter(.today)
+    case TasksWidgetListSummary.upcomingID: return .filter(.upcoming)
+    case TasksWidgetListSummary.inboxID:    return .filter(.triage)
+    case TasksWidgetListSummary.starredID:  return .filter(.starred)
+    default:
+      if id.hasPrefix("project:") {
+        return .project(id: String(id.dropFirst("project:".count)))
+      }
+      if id.hasPrefix("area:") {
+        return .area(id: String(id.dropFirst("area:".count)))
+      }
+      return .filter(.today)
+    }
+  }
+
+  private static func destinationFilter(forTaskID taskID: String, context: ModelContext) -> TaskFilter {
+    let tid = taskID
+    if let entity = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.id == tid && $0.deletedAt == nil }
+    )).first {
+      let task = SeptenaTask(entity)
+      if task.status != .open { return .logbook }
+      if task.isOnToday { return .today }
+      if let p = task.project { return .project(p) }
+      if let a = task.area { return .area(a) }
+      if task.scheduled != nil || task.deadline != nil { return .upcoming }
+      if task.isInTriageBand { return .triage }
+      return .unscheduled
+    }
+    return .today
+  }
+
+  static func handle(_ url: URL, navigation: NavigationState, context: ModelContext) {
+    guard let link = TasksWidgetDeepLink.parse(url) else { return }
+    switch link {
+    case .quickAdd:
+      navigation.presentAddInfo(section: .tasks)
+    case .list(let id):
+      navigation.go(to: route(forListID: id))
+    case .task(let taskID):
+      let filter = destinationFilter(forTaskID: taskID, context: context)
+      let dest: Route
+      switch filter {
+      case .project(let pid): dest = .project(id: pid)
+      case .area(let aid):    dest = .area(id: aid)
+      default:                dest = .filter(filter)
+      }
+      navigation.pendingTaskReveal = NavigationState.TaskReveal(taskID: taskID, routeID: dest.id)
+      navigation.go(to: dest)
+    }
+  }
+
+  #if os(macOS)
+  static func handleMac(_ url: URL) {
+    guard let link = TasksWidgetDeepLink.parse(url) else { return }
+    NSApp.activate(ignoringOtherApps: true)
+    SeptaskKitWindowController.show()
+    guard let shell = SeptaskKitWindowController.existing else { return }
+    switch link {
+    case .quickAdd:
+      shell.go(to: .today)
+      shell.newTask()
+    case .list(let id):
+      shell.go(to: filter(forListID: id))
+    case .task(let taskID):
+      let context = LocalStore.shared.container.mainContext
+      let dest = destinationFilter(forTaskID: taskID, context: context)
+      shell.revealTask(id: taskID, in: dest)
+    }
+  }
+  #endif
+}

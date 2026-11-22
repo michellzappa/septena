@@ -1100,6 +1100,7 @@ final class TaskSyncEngine {
     Task { @MainActor in await PlanStatus.shared.refresh() }
     // The launch snapshot shows this account's Today (#82).
     TodaySnapshotStore.invalidate()
+    TasksWidgetSnapshotStore.invalidate()
     #if os(iOS) && SEPTASK
     WatchBridge.shared.accountChanged()
     #endif
@@ -1166,6 +1167,7 @@ final class TaskSyncEngine {
     SmartListPreferences.shared.clearLocalForAccountSwitch()
     // Account switch / delete: the launch snapshot holds the old rows (#82).
     TodaySnapshotStore.invalidate()
+    TasksWidgetSnapshotStore.invalidate()
     #if os(iOS) && SEPTASK
     WatchBridge.shared.accountChanged()
     #endif

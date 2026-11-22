@@ -312,6 +312,10 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   func focusWindow() { window?.makeKeyAndOrderFront(nil) }
 
   func go(to filter: TaskFilter) { sidebar?.select(filter) }
+  func revealTask(id taskId: String, in filter: TaskFilter) {
+    sidebar?.select(filter)
+    list?.select(taskId: taskId)
+  }
   func newTask() { list?.createTask() }
   func newProject() { sidebar?.newProject() }
   func newArea() { sidebar?.newArea() }
