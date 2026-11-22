@@ -4,32 +4,58 @@
 // draws device corners with CSS border-radius: Safari has no corner-shape, and
 // circular arcs are not Apple's continuous corners.
 //
-// corner "continuous": a superellipse that eases into the edge, reaching 1.528x
-// the nominal radius along each edge (Apple's continuous corner).
-// corner "circular": plain arcs (exponent 2 is a circle).
+// corner "continuous": Apple's continuous corner, the Bezier construction of
+// UIBezierPath(roundedRect:cornerRadius:) since iOS 7. The curve starts 1.528x
+// the radius from the corner and eases in, with no sudden change in curvature.
+// corner "circular": plain quarter circles.
 
-const CURVES = { continuous: { exponent: 5, reach: 1.528 }, circular: { exponent: 2, reach: 1 } };
 const RIM = 2;
+// One corner as cubic segments in corner coordinates: a = distance back along
+// the incoming edge, b = distance along the outgoing edge, in units of the radius.
+const CORNERS = {
+  continuous: [
+    [1.52866483, 0],
+    ["C", [1.08849323, 0], [0.86840689, 0], [0.66993427, 0.06549600]],
+    ["L", [0.63149399, 0.07491176]],
+    ["C", [0.37282392, 0.16906013], [0.16906013, 0.37282392], [0.07491176, 0.63149399]],
+    ["L", [0.06549600, 0.66993427]],
+    ["C", [0, 0.86840689], [0, 1.08849323], [0, 1.52866483]],
+  ],
+  circular: [
+    [1, 0],
+    ["C", [0.44771525, 0], [0, 0.44771525], [0, 1]],
+  ],
+};
+const REACH = { continuous: 1.52866483, circular: 1 };
 
 /**
- * Path of a rounded rectangle with separate top and bottom corner radii.
+ * Path of a rounded rectangle with separate top and bottom corner radii, drawn clockwise.
  * @param {number} width @param {number} height
  * @param {{ top: number, bottom?: number }} radius
  * @param {"continuous" | "circular"} corner
  */
-export function roundedRectPath(width, height, radius, corner = "circular", steps = 18) {
-  const { exponent, reach } = CURVES[corner];
-  const limit = Math.min(width, height) / 2;
-  const top = Math.min(radius.top * reach, limit), bottom = Math.min((radius.bottom ?? radius.top) * reach, limit);
-  const corners = [[width - bottom, height - bottom, bottom], [bottom, height - bottom, bottom], [top, top, top], [width - top, top, top]];
-  const points = [];
-  corners.forEach(([cx, cy, r], quadrant) => {
-    for (let i = 0; i <= steps; i++) {
-      const t = (quadrant + i / steps) * (Math.PI / 2), c = Math.cos(t), s = Math.sin(t);
-      points.push(`${(cx + r * Math.sign(c) * Math.abs(c) ** (2 / exponent)).toFixed(2)} ${(cy + r * Math.sign(s) * Math.abs(s) ** (2 / exponent)).toFixed(2)}`);
+export function roundedRectPath(width, height, radius, corner = "circular") {
+  const reach = REACH[corner], limit = Math.min(width, height) / 2 / reach;
+  const top = Math.max(0, Math.min(radius.top, limit)), bottom = Math.max(0, Math.min(radius.bottom ?? radius.top, limit));
+  // Each corner maps (a, b) to page coordinates, walking clockwise from the top edge.
+  const maps = [
+    [top, (a, b, r) => [width - a * r, b * r]],
+    [bottom, (a, b, r) => [width - b * r, height - a * r]],
+    [bottom, (a, b, r) => [a * r, height - b * r]],
+    [top, (a, b, r) => [b * r, a * r]],
+  ];
+  const f = n => n.toFixed(2);
+  let d = "";
+  maps.forEach(([r, map], index) => {
+    const [first, ...segments] = CORNERS[corner];
+    const start = map(first[0], first[1], r);
+    d += `${index === 0 ? "M" : "L"}${f(start[0])} ${f(start[1])}`;
+    if (r === 0) return;
+    for (const [kind, ...points] of segments) {
+      d += kind + points.map(([a, b]) => map(a, b, r)).map(([x, y]) => `${f(x)} ${f(y)}`).join(" ");
     }
   });
-  return `M${points.join("L")}Z`;
+  return `${d}Z`;
 }
 
 /** CSS linear-gradient for a finish ({ angle, stops }). */

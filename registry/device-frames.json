@@ -9,7 +9,7 @@
         "height": 874
       },
       "bezel": 6,
-      "outerRadius": 64,
+      "outerRadius": 62,
       "corner": "continuous",
       "cutout": {
         "kind": "island",
