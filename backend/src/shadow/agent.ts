@@ -182,6 +182,9 @@ export async function runAgentTool(
   clientId: string,
   name: AgentToolName,
   args: Record<string, unknown>,
+  /// The plan's history window (ISO): tasks_history and tasks_activity show
+  /// nothing older. null = no window.
+  historySince: string | null = null,
 ): Promise<unknown> {
   switch (name) {
     case "tasks_claim": {
@@ -209,11 +212,11 @@ export async function runAgentTool(
       return { paused, ...r };
     }
     case "tasks_activity": {
-      const rows = await store.history(null, (args.id as string | undefined) ?? null, null, (args.limit as number | undefined) ?? 50);
+      const rows = await store.history(null, (args.id as string | undefined) ?? null, null, (args.limit as number | undefined) ?? 50, historySince);
       return { activity: rows.map(describeChange) };
     }
     case "tasks_history": {
-      const rows = await store.history(null, args.id as string, null, (args.limit as number | undefined) ?? 50);
+      const rows = await store.history(null, args.id as string, null, (args.limit as number | undefined) ?? 50, historySince);
       return { id: args.id, history: rows.map(historyEntry) };
     }
   }

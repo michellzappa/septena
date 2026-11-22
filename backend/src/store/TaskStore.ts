@@ -311,7 +311,18 @@ export class TaskStore extends DurableObject<Env> {
       );
       CREATE INDEX IF NOT EXISTS checklist_items_task ON checklist_items(taskId);
       CREATE INDEX IF NOT EXISTS tags_name_ci ON tags(lower(name));
+      CREATE TABLE IF NOT EXISTS devices (
+        sid TEXT PRIMARY KEY, client TEXT, firstSeen INTEGER NOT NULL,
+        lastSeen INTEGER NOT NULL, slotAt INTEGER
+      );
+      CREATE TABLE IF NOT EXISTS usage (
+        key TEXT PRIMARY KEY, count INTEGER NOT NULL, updatedAt INTEGER NOT NULL
+      );
     `);
+    // A session's stable id (one per sign-in on one install). It survives
+    // refresh-token rotation, so it names the device for the sync slot.
+    const sessionCols = this.sql.exec<{ name: string }>("PRAGMA table_info(sessions)").toArray().map((r) => r.name);
+    if (!sessionCols.includes("sid")) this.sql.exec("ALTER TABLE sessions ADD COLUMN sid TEXT");
   }
 
   // ---- rev counter ----
@@ -360,14 +371,10 @@ export class TaskStore extends DurableObject<Env> {
 
   /// History of one row (newest first), or of the whole store when `id` is
   /// omitted. Paged by rev: pass the smallest rev seen as `before`.
-  history(entity: string | null, id: string | null, before: number | null, limit: number): ChangeEntry[] {
-    const where: string[] = [];
-    const args: (string | number)[] = [];
-    if (entity) { where.push("entity = ?"); args.push(entity); }
-    if (id) {
-      // Turns are logged as `taskId:seq`; a task's history includes them.
-      where.push("(id = ? OR id LIKE ?)"); args.push(id, `${id}:%`);
-    }
+  /// `since` (ISO) is the plan's history window: older rows stay stored but
+  /// are not shown.
+  history(entity: string | null, id: string | null, before: number | null, limit: number, since: string | null = null): ChangeEntry[] {
+    const { where, args } = this.historyWhere(entity, id, since);
     if (before !== null) { where.push("rev < ?"); args.push(before); }
     const sql = `SELECT rev, entity, id, op, fields, diff, actor, at, reason FROM changes${where.length ? ` WHERE ${where.join(" AND ")}` : ""} ORDER BY rev DESC LIMIT ?`;
     return this.sql.exec<{ rev: number; entity: string; id: string; op: string; fields: string | null; diff: string | null; actor: string; at: string; reason: string | null }>(sql, ...args, limit)
@@ -377,6 +384,26 @@ export class TaskStore extends DurableObject<Env> {
         fields: r.fields ? (JSON.parse(r.fields) as string[]) : null,
         diff: r.diff ? (JSON.parse(r.diff) as ChangeDiff) : null,
       }));
+  }
+
+  /// How many changes the history window hides (for the "older changes"
+  /// upsell, spec §3.2).
+  historyHidden(entity: string | null, id: string | null, since: string): number {
+    const { where, args } = this.historyWhere(entity, id, null);
+    where.push("at < ?"); args.push(since);
+    return this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM changes WHERE ${where.join(" AND ")}`, ...args).one().n;
+  }
+
+  private historyWhere(entity: string | null, id: string | null, since: string | null): { where: string[]; args: (string | number)[] } {
+    const where: string[] = [];
+    const args: (string | number)[] = [];
+    if (entity) { where.push("entity = ?"); args.push(entity); }
+    if (id) {
+      // Turns are logged as `taskId:seq`; a task's history includes them.
+      where.push("(id = ? OR id LIKE ?)"); args.push(id, `${id}:%`);
+    }
+    if (since !== null) { where.push("at >= ?"); args.push(since); }
+    return { where, args };
   }
 
   // ---- push ----
@@ -1070,6 +1097,13 @@ export class TaskStore extends DurableObject<Env> {
     return rev;
   }
 
+  /// Bytes stored in R2 for live attachments (the plan's attachment quota).
+  attachmentBytes(): number {
+    return this.sql.exec<{ n: number | null }>(
+      "SELECT SUM(byteCount) AS n FROM attachments WHERE deletedAt IS NULL AND uploadedAt IS NOT NULL",
+    ).one().n ?? 0;
+  }
+
   downloadInfo(id: string): { contentType: string; filename: string } | null {
     const row = this.sql.exec<{ contentType: string; filename: string }>(
       "SELECT contentType, filename FROM attachments WHERE id = ? AND deletedAt IS NULL AND uploadedAt IS NOT NULL", id,
@@ -1079,24 +1113,111 @@ export class TaskStore extends DurableObject<Env> {
 
   // ---- sessions (refresh tokens, stored hashed) ----
 
-  createSession(hash: string, expiresAt: number): void {
-    this.sql.exec("INSERT INTO sessions (hash, createdAt, expiresAt) VALUES (?, ?, ?)", hash, Date.now(), expiresAt);
+  createSession(hash: string, expiresAt: number, sid: string): void {
+    this.sql.exec("INSERT INTO sessions (hash, createdAt, expiresAt, sid) VALUES (?, ?, ?, ?)", hash, Date.now(), expiresAt, sid);
   }
 
   /// Single-use rotation: the old refresh token dies whether or not the new
-  /// one is ever used.
-  rotateSession(oldHash: string, newHash: string, expiresAt: number): boolean {
+  /// one is ever used. Returns the session id the new token carries (kept
+  /// across rotations; a session from before session ids gets one now), or
+  /// null when the old token is unknown or expired.
+  rotateSession(oldHash: string, newHash: string, expiresAt: number): string | null {
     return this.ctx.storage.transactionSync(() => {
-      const row = this.sql.exec<{ expiresAt: number }>("SELECT expiresAt FROM sessions WHERE hash = ?", oldHash).toArray()[0];
+      const row = this.sql.exec<{ expiresAt: number; sid: string | null }>("SELECT expiresAt, sid FROM sessions WHERE hash = ?", oldHash).toArray()[0];
       this.sql.exec("DELETE FROM sessions WHERE hash = ?", oldHash);
-      if (!row || row.expiresAt < Date.now()) return false;
-      this.sql.exec("INSERT INTO sessions (hash, createdAt, expiresAt) VALUES (?, ?, ?)", newHash, Date.now(), expiresAt);
-      return true;
+      if (!row || row.expiresAt < Date.now()) return null;
+      const sid = row.sid ?? crypto.randomUUID();
+      this.sql.exec("INSERT INTO sessions (hash, createdAt, expiresAt, sid) VALUES (?, ?, ?, ?)", newHash, Date.now(), expiresAt, sid);
+      return sid;
     });
   }
 
   revokeSession(hash: string): void {
     this.sql.exec("DELETE FROM sessions WHERE hash = ?", hash);
+  }
+
+  // ---- device slot (docs/SYNC_SUBSCRIPTION_SPEC.md §3, ADR 0023) ----
+  // A device is a session (`sid`). The slot holders are the `cap` live
+  // sessions with the newest `slotAt`. A device that is allowed to sync
+  // refreshes its `slotAt`, so with no cap (Plus) the order is "most recently
+  // used": a lapsed account keeps the device it used last.
+
+  /// Records one sync call from `sid` and says whether it holds a slot.
+  /// A device takes a free slot by itself; it never pushes out a holder
+  /// (that is `claimDeviceSlot`).
+  deviceAccess(sid: string, client: string | null, cap: number | null): { syncing: boolean } {
+    return this.ctx.storage.transactionSync(() => {
+      const now = Date.now();
+      this.touchDevice(sid, client, now);
+      const holders = cap === null ? null : this.slotHolders(cap);
+      const syncing = holders === null || holders.includes(sid) || holders.length < cap!;
+      if (syncing) this.sql.exec("UPDATE devices SET slotAt = ? WHERE sid = ?", this.nextSlotAt(now), sid);
+      return { syncing };
+    });
+  }
+
+  /// Moves a slot to `sid` ("sync this device instead"). With a cap of N the
+  /// holder used least recently stops syncing; its local data stays.
+  claimDeviceSlot(sid: string, client: string | null): void {
+    const now = Date.now();
+    this.ctx.storage.transactionSync(() => {
+      this.touchDevice(sid, client, now);
+      this.sql.exec("UPDATE devices SET slotAt = ? WHERE sid = ?", this.nextSlotAt(now), sid);
+    });
+  }
+
+  /// The devices that synced, newest first, and which of them hold a slot.
+  deviceSummary(cap: number | null): { client: string | null; sid: string; lastSeen: number; syncing: boolean }[] {
+    const holders = cap === null ? null : new Set(this.slotHolders(cap));
+    return this.sql.exec<{ sid: string; client: string | null; lastSeen: number }>(
+      "SELECT d.sid, d.client, d.lastSeen FROM devices d WHERE EXISTS (SELECT 1 FROM sessions s WHERE s.sid = d.sid) ORDER BY d.lastSeen DESC",
+    ).toArray().map((r) => ({ ...r, syncing: holders === null || holders.has(r.sid) }));
+  }
+
+  private touchDevice(sid: string, client: string | null, now: number): void {
+    this.sql.exec(
+      "INSERT INTO devices (sid, client, firstSeen, lastSeen) VALUES (?, ?, ?, ?) ON CONFLICT(sid) DO UPDATE SET lastSeen = excluded.lastSeen, client = COALESCE(excluded.client, devices.client)",
+      sid, client, now, now,
+    );
+  }
+
+  /// Strictly increasing, so two calls in the same millisecond still order.
+  private nextSlotAt(now: number): number {
+    const top = this.sql.exec<{ m: number | null }>("SELECT MAX(slotAt) AS m FROM devices").one().m;
+    return top === null ? now : Math.max(now, top + 1);
+  }
+
+  private slotHolders(cap: number): string[] {
+    if (cap <= 0) return [];
+    return this.sql.exec<{ sid: string }>(
+      "SELECT d.sid FROM devices d WHERE d.slotAt IS NOT NULL AND EXISTS (SELECT 1 FROM sessions s WHERE s.sid = d.sid) ORDER BY d.slotAt DESC LIMIT ?",
+      cap,
+    ).toArray().map((r) => r.sid);
+  }
+
+  // ---- usage counters (connector writes per day, agent runs per month) ----
+
+  addUsage(key: string, n = 1): number {
+    const now = Date.now();
+    this.sql.exec(
+      "INSERT INTO usage (key, count, updatedAt) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET count = usage.count + excluded.count, updatedAt = excluded.updatedAt",
+      key, n, now,
+    );
+    return this.usageCounts([key])[key];
+  }
+
+  usageCounts(keys: string[]): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const k of keys) {
+      out[k] = this.sql.exec<{ count: number }>("SELECT count FROM usage WHERE key = ?", k).toArray()[0]?.count ?? 0;
+    }
+    return out;
+  }
+
+  /// What a plan check needs, in one call: the entitlement rows and the
+  /// asked-for usage counters.
+  planSnapshot(usageKeys: string[]): { entitlements: EntitlementRow[]; usage: Record<string, number> } {
+    return { entitlements: this.entitlements(), usage: this.usageCounts(usageKeys) };
   }
 
   // ---- sync entitlement (docs/SYNC_SUBSCRIPTION_SPEC.md §6) ----
@@ -1279,6 +1400,9 @@ export class TaskStore extends DurableObject<Env> {
       this.sql.exec("DELETE FROM client_ops WHERE at < ?", now - CLIENT_OP_TTL_MS);
       this.sql.exec("DELETE FROM changes WHERE at < ?", new Date(now - CHANGE_LOG_TTL_MS).toISOString());
       this.sql.exec("DELETE FROM sessions WHERE expiresAt < ?", now);
+      this.sql.exec("DELETE FROM devices WHERE sid NOT IN (SELECT sid FROM sessions WHERE sid IS NOT NULL)");
+      // Day and month counters: two months covers the current month.
+      this.sql.exec("DELETE FROM usage WHERE updatedAt < ?", now - 62 * DAY_MS);
     });
     await this.ctx.storage.setAlarm(now + DAY_MS);
   }
