@@ -8,6 +8,7 @@ struct SeptaskWatchApp: App {
   var body: some Scene {
     WindowGroup {
       TodayView()
+        .tint(WatchStore.shared.accentColor)
     }
   }
 }

@@ -178,6 +178,14 @@ struct AllClearView: View {
 }
 
 struct NotConnectedView: View {
+  /// When this binary was built, so a tester can tell an update landed.
+  static var build: String {
+    guard let url = Bundle.main.executableURL,
+          let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+    else { return "" }
+    return "Built \(date.formatted(date: .abbreviated, time: .shortened))"
+  }
+
   var body: some View {
     ScrollView {
       VStack(spacing: 10) {
@@ -188,9 +196,13 @@ struct NotConnectedView: View {
           .font(.footnote)
           .multilineTextAlignment(.center)
         Button("Try Again") {
-          WatchPhoneLink.shared.requestSession()
+          WatchPhoneLink.shared.requestSession(force: true)
           WatchStore.shared.refresh(.today)
         }
+        if let asked = WatchPhoneLink.shared.lastAsked {
+          Text(asked).font(.footnote).foregroundStyle(.secondary)
+        }
+        Text(Self.build).font(.footnote).foregroundStyle(.tertiary)
         #if DEBUG
         Button("Use Sample Data") { WatchStore.shared.sampleMode = true }
           .font(.footnote)

@@ -102,6 +102,22 @@ enum WatchLink {
   /// Application-context keys (phone → watch, latest wins).
   static let contextTodayKey = "septena.today"      // WatchTaskList JSON
   static let contextUserKey = "septena.userId"      // String, "" when signed out
+  static let contextAccentHexKey = "septena.accentHex"       // "#RRGGBB" dark-mode accent
+  static let contextAccentInkHexKey = "septena.accentInkHex" // "#RRGGBB" contrasting ink on accent
+  /// The newest `WatchSessionHandoff` JSON. Application context is the one
+  /// channel that is always delivered on activation, so the handoff rides it
+  /// too (a queued `transferUserInfo` can take minutes). The watch adopts a
+  /// given token once (`WatchLink.fingerprint`); after it rotates, the stale
+  /// copy in the context is ignored.
+  static let contextSessionKey = "septena.session"
+
+  /// A short, non-secret id for a handoff, so the watch remembers which
+  /// tokens it already adopted without storing them.
+  static func fingerprint(_ handoff: WatchSessionHandoff) -> String {
+    var hash: UInt64 = 1469598103934665603
+    for byte in handoff.refreshToken.utf8 { hash = (hash ^ UInt64(byte)) &* 1099511628211 }
+    return String(hash, radix: 36)
+  }
 
   static func message(_ kind: Kind, payload: Data? = nil) -> [String: Any] {
     var m: [String: Any] = [kindKey: kind.rawValue]

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import WatchKit
 import WidgetKit
 
@@ -84,6 +85,23 @@ final class WatchStore {
   private(set) var queue: [WatchOp] = []
   /// The removal still inside its undo window.
   private(set) var undoable: Undoable?
+  /// Synced from the iPhone's AppearancePreferences (`currentFruit.darkHex` / `checkDarkHex`).
+  private(set) var accentHex: String = UserDefaults.standard.string(forKey: "septena.watch.accentHex") ?? "#0A84FF"
+  private(set) var accentInkHex: String = UserDefaults.standard.string(forKey: "septena.watch.accentInkHex") ?? "#FFFFFF"
+
+  var accentColor: Color { Color(watchHex: accentHex) ?? .accentColor }
+  var accentInkColor: Color { Color(watchHex: accentInkHex) ?? .white }
+
+  func adoptAccent(hex: String, inkHex: String?) {
+    if hex != accentHex {
+      accentHex = hex
+      UserDefaults.standard.set(hex, forKey: "septena.watch.accentHex")
+    }
+    if let inkHex, inkHex != accentInkHex {
+      accentInkHex = inkHex
+      UserDefaults.standard.set(inkHex, forKey: "septena.watch.accentInkHex")
+    }
+  }
 
   struct Undoable: Equatable {
     let op: WatchOp
@@ -455,4 +473,18 @@ enum WatchDay {
 
   static func string(from date: Date) -> String { formatter.string(from: date) }
   static func date(from ymd: String) -> Date? { formatter.date(from: ymd) }
+}
+
+extension Color {
+  /// Parses `#RRGGBB` from the iPhone's synced `AppearancePreferences`.
+  init?(watchHex: String) {
+    let s = watchHex.trimmingCharacters(in: .whitespacesAndNewlines)
+      .trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+    guard s.count == 6, let value = UInt64(s, radix: 16) else { return nil }
+    self.init(
+      red: Double((value >> 16) & 0xFF) / 255,
+      green: Double((value >> 8) & 0xFF) / 255,
+      blue: Double(value & 0xFF) / 255
+    )
+  }
 }

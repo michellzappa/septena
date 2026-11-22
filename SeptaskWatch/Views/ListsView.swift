@@ -153,7 +153,7 @@ struct StatusView: View {
         .disabled(store.isRefreshing)
         if store.connection == .notConnected {
           Button {
-            WatchPhoneLink.shared.requestSession()
+            WatchPhoneLink.shared.requestSession(force: true)
           } label: {
             Label("Connect to iPhone", systemImage: "iphone")
           }

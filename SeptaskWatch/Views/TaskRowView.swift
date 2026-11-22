@@ -1,6 +1,6 @@
 import SwiftUI
 
-// One task row. Two targets, like Reminders: the circle completes, the rest
+// One task row. Two targets, like Reminders: the checkbox completes, the rest
 // of the row opens the task. Each label carries `.contentShape` so its whole
 // frame is tappable, gaps included (AGENTS.md "row dead zone").
 
@@ -11,6 +11,11 @@ struct TaskRowView: View {
   let onOpen: () -> Void
 
   @State private var checked = false
+  private var store: WatchStore { .shared }
+
+  private static let boxSize: CGFloat = 18
+  private static let boxCorner: CGFloat = 4.5
+  private static let boxStroke: CGFloat = 1.4
 
   var body: some View {
     HStack(alignment: .top, spacing: 8) {
@@ -24,12 +29,24 @@ struct TaskRowView: View {
           checked = false
         }
       } label: {
-        Image(systemName: checked ? "checkmark.circle.fill" : "circle")
-          .font(.title3)
-          .foregroundStyle(checked ? Color.green : circleTint)
-          .contentTransition(.symbolEffect(.replace))
-          .frame(width: 28, height: 28)
-          .contentShape(Rectangle())
+        ZStack {
+          RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
+            .strokeBorder(Color.secondary, lineWidth: Self.boxStroke)
+            .frame(width: Self.boxSize, height: Self.boxSize)
+            .opacity(checked ? 0 : 1)
+          ZStack {
+            RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
+              .fill(store.accentColor)
+              .frame(width: Self.boxSize, height: Self.boxSize)
+            Image(systemName: "checkmark")
+              .font(.system(size: 11, weight: .bold))
+              .foregroundStyle(store.accentInkColor)
+          }
+          .scaleEffect(checked ? 1 : 0.55)
+          .opacity(checked ? 1 : 0)
+        }
+        .frame(width: 28, height: 28)
+        .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
       .accessibilityLabel("Complete \(task.title)")
@@ -51,12 +68,6 @@ struct TaskRowView: View {
     }
     .padding(.vertical, 2)
     .accessibilityElement(children: .contain)
-  }
-
-  /// Tasks carried over for days darken, as on the phone (one seventh a day).
-  private var circleTint: Color {
-    let days = min(task.daysOnToday ?? 0, 7)
-    return days == 0 ? .secondary : Color.orange.opacity(0.45 + Double(days) * 0.08)
   }
 }
 

@@ -6,14 +6,18 @@ import SwiftUI
 
 struct CaptureButton: View {
   let onTitle: (String) -> Void
+  private var store: WatchStore { .shared }
 
   var body: some View {
     TextFieldLink(prompt: Text("New To-Do")) {
       Image(systemName: "plus")
+        .foregroundStyle(store.accentInkColor)
     } onSubmit: { text in
       let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
       if !trimmed.isEmpty { onTitle(trimmed) }
     }
+    .buttonStyle(.glassProminent)
+    .tint(store.accentColor)
     .accessibilityLabel("New To-Do")
   }
 }

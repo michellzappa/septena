@@ -23,6 +23,12 @@ enum SeptaskLaunch {
     let localStore = LocalStore.shared
 
     services.bindWriteBoundary()
+    #if os(iOS)
+    // The Apple Watch link (docs/WATCH.md), before the first-frame wait: a
+    // watch message can launch the app in the background, where no frame is
+    // ever drawn. Activation is cheap and reads nothing.
+    WatchBridge.shared.start()
+    #endif
     await waitForFirstFrameIfNeeded()
     await services.start()
     LaunchTrace.spanSync("launch.deferredWork") {
@@ -35,8 +41,6 @@ enum SeptaskLaunch {
       // The next cold launch draws Today from this file (#82). macOS draws
       // its AppKit list without `TaskListView`, so it has no reader.
       TodaySnapshotWriter.shared.start()
-      // The Apple Watch: session handoff + Today context (docs/WATCH.md).
-      WatchBridge.shared.start()
       #endif
     }
     Task(priority: .utility) {
@@ -74,6 +78,9 @@ enum SeptaskLaunch {
     services.taskMutator.catchUpFixedSchedules()
     services.runFadePassIfDue()
     TaskReminderScheduler.shared.scheduleReconcile()
+    #if os(iOS)
+    WatchBridge.shared.appDidBecomeActive()
+    #endif
   }
 
   /// iOS: hold deferred launch work until the first Today frame is drawn.
