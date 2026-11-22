@@ -1530,3 +1530,9 @@ enum TaskInbox {
     isInTriageBand || (isInInbox && isOnToday)
   }
 }
+
+extension SeptenaTask {
+  /// Associated GitHub issue or PR for this task, if any.
+  /// Single entry point so L0 (`extKey`/`extUrl`) can plug in ahead of `conversation`.
+  var linkedIssue: ConvoIssueLink? { conversation.linkedIssue }
+}
