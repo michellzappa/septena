@@ -1812,7 +1812,7 @@ private struct SidebarSheets: ViewModifier {
   func body(content: Content) -> some View {
     content
       .confirmationDialog("Create", isPresented: $showingCreateMenu, titleVisibility: .hidden) {
-        Button("New To-Do")   { onNewTodo() }
+        Button("New Task")   { onNewTodo() }
         Button("New Project") { showingNewProject = true }
         Button("New Area")    { newAreaName = ""; showingNewArea = true }
         Button(RegistryPrompts.cancelTitle, role: .cancel) {}

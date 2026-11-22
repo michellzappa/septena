@@ -185,7 +185,7 @@ private struct SeptaskDeleteAccountSheet: View {
         Label("Your synced settings", systemImage: "gearshape")
       }
       .padding(.leading, 4)
-      Text("It also removes your tasks from this device and signs you out. You can't undo this.")
+      Text("It also removes your tasks from this device and signs you out. You can’t undo this.")
       if let error {
         Text(error).font(.callout).foregroundStyle(.red)
       }
