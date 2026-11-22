@@ -4,7 +4,8 @@ import SwiftUI
 /// (ADR 0019 / `docs/CUSTOMIZATION_SPEC.md`).
 ///
 /// Covers:
-///   • Mode (`System` / `Light` / `Dark`, device-local) + `Sync across devices`
+///   • Mode (`System` / `Light` / `Dark`, device-local). `syncTheme` has no UI
+///     for now; it keeps its stored value (default on).
 ///   • Accent Color (`Colorful` default + 7 exotic fruits, restrained reach)
 ///   • Header Texture (`Pure Canvas` default + 6 procedural Header Wash styles)
 ///   • `Slow drift` texture motion (intensity stays at its stored value; no UI)
@@ -56,16 +57,6 @@ struct AppearancePickerView: View {
           .pickerStyle(.segmented)
           .labelsHidden()
           .frame(maxWidth: 210)
-        }
-
-        Toggle(isOn: $prefs.syncTheme) {
-          VStack(alignment: .leading, spacing: 1) {
-            Text("Sync theme across devices")
-              .font(.subheadline)
-            Text("Keep accent and header texture in sync; Light/Dark stays per device.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
         }
       }
 
