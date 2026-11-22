@@ -199,20 +199,21 @@ reads this table; `appstore/validate.mjs` checks it.
 - `callout` is an element id from that step's `.elements.json`, or `-`. The
   callout repeats the element's own on-screen text, larger, with a line to it.
   Callout text is never written by hand.
-- `title` is at most 28 characters, without the `*` marks. `*stars*` mark the
-  accent span. `sub` is one sentence of at most 90 characters.
+- `title` is at most 28 characters, without the `*` marks. It is the only
+  text on the panel (decided 2026-11-22: one level of title, no subtitle).
+  Leave `sub` empty. Each panel shows one shipped feature.
 - No em or en dashes. Every title and sub passes the humanizer skill.
 
 ### iPhone
 
 | slug | scene | callout | title | sub |
 | --- | --- | --- | --- | --- |
-| hook | today/0 | - | Tasks that *think with you* | Inbox, Today, and projects, in sync on iPhone, iPad, and Mac. |
-| inbox | capture/1 | task-capture | Today is *your call* | New tasks wait in the Inbox until you put them on your day. |
-| plan | plan/1 | task-reply | Pick the *few that matter* | Choose today's work from Anytime and leave the rest where it is. |
-| agent-asks | agents/2 | agent-status | Your agent *asks first* | Hand a task to Claude and it asks you when it needs a decision. |
-| agent-result | agents/3 | agent-status | The result *waits for you* | Claude leaves its work on the task for you to check. |
-| notes | project/1 | - | Notes stay *with the task* | A project keeps next steps, notes, and finished work together. |
+| thinks | thinking/1 | - | Tasks that think with you | |
+| agent | agents/3 | agent-status | Claude does the legwork | |
+| inbox | capture/1 | - | Today stays yours | |
+| plan | plan/1 | task-reply | Pick the few that matter | |
+| dates | dates/2 | - | Start Monday, due Friday | |
+| details | notes/2 | - | Keep the details on the task | |
 
 ---
 

@@ -24,7 +24,9 @@ import { phoneShape } from "../registry/device-shape.mjs";
 const IPHONE = JSON.parse(readFileSync(new URL("../registry/device-frames.json", import.meta.url), "utf8")).devices.iphone;
 const IPHONE_CASE_WIDTH = IPHONE.screen.width + 2 * IPHONE.bezel;
 // Case drawing and screen mask from registry/device-shape.mjs (continuous corners).
-const PHONE = phoneShape(IPHONE);
+// phoneShape returns CSS url("…") values; they go inside double-quoted style
+// attributes here, so escape the quotes or the attribute ends early.
+const PHONE = Object.fromEntries(Object.entries(phoneShape(IPHONE)).map(([k, v]) => [k, typeof v === "string" ? v.replaceAll('"', "&quot;") : v]));
 
 const esc = (s = "") =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -39,7 +41,11 @@ function background(bg = {}) {
   // The app's own canvas with one of its header textures, drawn in the page
   // by WASH_SCRIPT (render.mjs passes the drawing code).
   if (bg.style === "texture") {
-    return `<div class="bg" style="background:${bg.canvas ?? theme.app.canvas};"><canvas class="bg-wash" data-texture="${esc(bg.texture)}" data-accent="${bg.accent ?? theme.app.accent}" data-intensity="${bg.intensity ?? 62}" data-seed="${bg.seed ?? 42}" data-fade="${bg.fade ?? 0.62}"></canvas></div>`;
+    // bg.fill: a solid accent field with the texture drawn in white on it
+    // (the wash code's dark-appearance ink, mixed with white).
+    const fill = bg.fill ? `linear-gradient(180deg, ${bg.fill} 0%, color-mix(in oklab, ${bg.fill} 82%, black) 100%)` : (bg.canvas ?? theme.app.canvas);
+    const ink = bg.fill ? "#FFFFFF" : (bg.accent ?? theme.app.accent);
+    return `<div class="bg" style="background:${fill};"><canvas class="bg-wash" data-texture="${esc(bg.texture)}" data-accent="${ink}" data-dark="${bg.fill ? 1 : 0}" data-intensity="${bg.intensity ?? 62}" data-seed="${bg.seed ?? 42}" data-fade="${bg.fade ?? 0.62}"></canvas></div>`;
   }
   const base =
     bg.style === "solid" ? tint :
@@ -234,6 +240,8 @@ html,body { width:${device.width}px; height:${device.height}px; overflow:hidden;
 h1 { font-family:${theme.fonts.display}; font-weight:600; font-size:${panel.headlineSize ?? 168}px;
   line-height:1.06; letter-spacing:-0.025em; text-wrap:balance; }
 h1 em { font-style:normal; color:${tint}; }
+${panel.background?.fill ? `h1, h1 em { color:#fff; } h1 { font-weight:700; text-shadow:0 2px 24px rgb(0 0 0 / 0.12); }
+.co-line { filter: drop-shadow(0 0 4px rgb(0 0 0 / 0.35)); }` : ""}
 .bg-wash { position:absolute; inset:0; width:100%; height:100%; }
 .sub { font-size:62px; line-height:1.32; color:${theme.inkSecondary};
   margin-top:44px; max-width:1080px; }
@@ -346,7 +354,7 @@ document.querySelectorAll("canvas.bg-wash").forEach((real) => {
   const w = r.width / S, h = r.height / S, d = real.dataset;
   const stand = { getContext: () => proxy, getBoundingClientRect: () => ({ width: w, height: h }),
     get width() { return Math.round(w * 2); }, set width(_) {}, get height() { return Math.round(h * 2); }, set height(_) {} };
-  drawHeaderWash(stand, { texture: d.texture, accentHex: d.accent, isDark: false,
+  drawHeaderWash(stand, { texture: d.texture, accentHex: d.accent, isDark: d.dark === "1",
     intensity: Number(d.intensity), seed: Number(d.seed), fadeHeight: h * Number(d.fade) });
 });`;
 

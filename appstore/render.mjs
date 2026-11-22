@@ -79,12 +79,16 @@ const flattenAlpha = (file) => {
 // strip its types and inline it. SEPTENA_SITE overrides the site checkout.
 const SITE = process.env.SEPTENA_SITE ?? join(ROOT, "../../_/septena-site");
 const washCode = (() => {
-  const file = join(SITE, "components/task-ui/header-wash-canvas.tsx");
-  if (!existsSync(file)) return null;
+  const dir = join(SITE, "components/task-ui");
+  const dataFile = join(dir, "header-wash-data.ts"), file = join(dir, "header-wash-canvas.tsx");
+  if (!existsSync(file) || !existsSync(dataFile)) return null;
+  // header-wash-data.ts holds the accents and texture list; the canvas file
+  // holds the drawing code between its imports and the React component.
+  const data = readFileSync(dataFile, "utf8");
   const src = readFileSync(file, "utf8");
-  const start = src.indexOf("export type FruitAccentId"), end = src.indexOf("export function HeaderWashCanvas");
+  const start = src.indexOf("function hexToRgb"), end = src.indexOf("export function HeaderWashCanvas");
   if (start < 0 || end < 0) throw new Error(`${file}: header-wash layout changed; update render.mjs`);
-  return stripTypeScriptTypes(src.slice(start, end).replace(/^export /gm, ""));
+  return stripTypeScriptTypes(`${data}\n${src.slice(start, end)}`.replace(/^export /gm, ""));
 })();
 
 const chrome = await openChrome();
