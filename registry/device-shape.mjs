@@ -82,13 +82,13 @@ export function phoneShape(device) {
   };
 }
 
-/** A laptop lid: lid size, the lid drawing (rim plus black glass) and the screen mask (rounded top corners only). */
+/** A laptop lid: lid size, the lid drawing (rim plus black glass) and the screen mask (the same corner on all four corners, concentric with the lid top). */
 export function laptopShape(device) {
   const w = device.screen.width + 2 * (device.bezel + RIM), h = device.screen.height + 2 * (device.bezel + RIM);
   const lid = { top: device.outerRadius, bottom: device.hingeRadius }, glass = { top: device.outerRadius - RIM, bottom: Math.max(0, device.hingeRadius - RIM) };
   return {
     width: w, height: h, rim: RIM,
     lid: svg(w, h, `<defs>${svgGradient(device.finish)}</defs><path d="${roundedRectPath(w, h, lid, device.corner)}" fill="url(#f)"/><path d="${roundedRectPath(w - 2 * RIM, h - 2 * RIM, glass, device.corner)}" transform="translate(${RIM} ${RIM})" fill="${device.finish.glass}"/>`),
-    screen: svg(device.screen.width, device.screen.height, `<path d="${roundedRectPath(device.screen.width, device.screen.height, { top: Math.max(0, device.outerRadius - RIM - device.bezel), bottom: 0 }, device.corner)}"/>`),
+    screen: svg(device.screen.width, device.screen.height, `<path d="${roundedRectPath(device.screen.width, device.screen.height, { top: Math.max(0, device.outerRadius - RIM - device.bezel) }, device.corner)}"/>`),
   };
 }
