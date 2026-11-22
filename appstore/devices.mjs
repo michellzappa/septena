@@ -16,7 +16,11 @@
 // rawDir / outDir are computed per selected app (apps.mjs) so Septena and
 // Septask never overwrite each other's captures or renders.
 
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { currentApp } from "./apps.mjs";
+
+const ROOT = dirname(fileURLToPath(import.meta.url));
 
 const GEOMETRY = {
   iphone69: {
@@ -75,7 +79,12 @@ export function allDevices() {
       active: !!cfg.active,
       rawDir: `${app.rawRoot}/${key}`,
       outDir: `${isMac ? app.screenshotsMacDir : app.screenshotsDir}/en-US`,
-      captureNote: `SEPTENA_APP=${app.key} appstore/capture.sh ${key} light`,
+      // Scene builder source, when the app takes this class from it.
+      sceneDir: app.scenes?.layout?.[key] ? app.scenes.dir : null,
+      sceneLayout: app.scenes?.layout?.[key] ?? null,
+      captureNote: app.scenes?.layout?.[key]
+        ? "export scenes: see docs/APPSTORE-SEPTASK.md Workflow"
+        : `SEPTENA_APP=${app.key} appstore/capture.sh ${key} light`,
     };
   }
   return out;
@@ -85,3 +94,15 @@ export const activeDevices = () =>
   Object.entries(allDevices())
     .filter(([, d]) => d.active)
     .map(([key, d]) => ({ key, ...d }));
+
+// Where a panel's screen lives. A scene source "<scene id>/<step>" resolves to
+// the scene builder export (scenes/<scene>/<layout>/<appearance>/<step>.png
+// plus its .elements.json); anything else is a raw capture name in rawDir.
+export function shotPaths(device, src, appearance = "light") {
+  if (device.sceneDir) {
+    const [scene, step = "0"] = String(src).split("/");
+    const base = join(ROOT, device.sceneDir, scene, device.sceneLayout, appearance, step);
+    return { png: `${base}.png`, elements: `${base}.elements.json` };
+  }
+  return { png: join(ROOT, device.rawDir, appearance, `${src}.png`), elements: null };
+}

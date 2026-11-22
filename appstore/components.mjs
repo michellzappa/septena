@@ -71,11 +71,63 @@ function shot(s, device, tint) {
   const island = f.island && !s.img ? `<div class="island"></div>` : "";
   return `
   <div class="shot-zone" style="transform: translateY(${Math.round((s.offsetY ?? 0) * 100)}%);">
-    <div class="frame" style="width:${w}px; padding:${f.pad}px; border-radius:${f.radius}px; transform: rotate(${s.rotate ?? 0}deg);">
-      ${screen}${island}
+    <div class="shot-wrap" style="width:${w}px; transform: rotate(${s.rotate ?? 0}deg);">
+      <div class="frame" style="width:${w}px; padding:${f.pad}px; border-radius:${f.radius}px;">
+        ${screen}${island}
+      </div>
+      ${s.img ? callout(s.callout, { w, pad: f.pad, margin: (dw - w) / 2, tint }) : ""}
     </div>
   </div>`;
 }
+
+// --------------------------------------------------------------- callout
+// Bipe-style callout: a card that repeats an on-screen element's own text,
+// larger, with a curved line down to it and a ring around the element. The
+// element's frame and label come from the scene's .elements.json (render.mjs),
+// so the card can only say what the screen says. Coordinates are in the
+// shot-wrap box (frame width w); the card is placed in the browser after
+// layout (layoutCallouts below) so it never runs off the panel.
+function callout(c, { w, pad, margin, tint }) {
+  if (!c?.frame) return "";
+  const k = (w - 2 * pad) / (c.screenWidth ?? 402);
+  const [x, y, fw, fh] = c.frame;
+  const ex = pad + x * k, ey = pad + y * k, ew = fw * k, eh = fh * k;
+  const text = c.label.split("\n").map((l) => l.trim()).filter(Boolean).join(" · ");
+  const side = c.side ?? "right";
+  const cy = ey + eh / 2 + (c.dy ?? -70) * k;
+  return `
+      <div class="co-ring" style="left:${ex - 10}px; top:${ey - 10}px; width:${ew + 20}px; height:${eh + 20}px; border-color:${tint};"></div>
+      <svg class="co-line" data-co-line width="${w}" height="10" style="color:${tint};"><path fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/><circle r="14" fill="currentColor"/></svg>
+      <div class="co-card" data-callout data-ex="${ex}" data-ew="${ew}" data-top="${ey - 10}" data-bottom="${ey + eh + 10}" data-cy="${cy}" data-side="${side}" data-min="${-margin + 50}" data-max="${w + margin - 50}" style="--tint:${tint}; transform: rotate(${side === "left" ? -1.5 : 1.5}deg);">
+        <span class="co-dot"></span>${esc(text)}
+      </div>`;
+}
+
+// Runs in the page after fonts load (render.mjs calls it): places each card
+// over its anchor, clamped inside the panel, and draws the connector.
+const LAYOUT_CALLOUTS = `window.__layoutCallouts = () => {
+  for (const card of document.querySelectorAll("[data-callout]")) {
+    const d = card.dataset, cy = +d.cy;
+    const cw = card.offsetWidth, ch = card.offsetHeight;
+    // The card sticks out past the phone on its side; the line runs down the
+    // panel margin (outside the screen) and enters the element from the side,
+    // so it never crosses screen content.
+    const left = d.side === "left" ? +d.min : +d.max - cw;
+    card.style.left = left + "px";
+    card.style.top = (cy - ch / 2) + "px";
+    const below = cy > +d.bottom;
+    const sx = d.side === "left" ? left + 44 : left + cw - 44;
+    const sy = below ? cy - ch / 2 : cy + ch / 2;
+    const my = (+d.top + +d.bottom) / 2;
+    const ex = d.side === "left" ? +d.ex - 10 : +d.ex + +d.ew + 10;
+    const r = Math.min(60, Math.abs(my - sy) / 2), dir = ex > sx ? 1 : -1, vy = my > sy ? 1 : -1;
+    const svg = card.parentElement.querySelector("[data-co-line]");
+    svg.style.top = "0px"; svg.setAttribute("height", String(Math.max(my, sy) + 40));
+    svg.querySelector("path").setAttribute("d",
+      "M" + sx + " " + sy + " L" + sx + " " + (my - vy * r) + " Q" + sx + " " + my + " " + (sx + dir * r) + " " + my + " L" + ex + " " + my);
+    const dot = svg.querySelector("circle"); dot.setAttribute("cx", ex); dot.setAttribute("cy", my);
+  }
+};`;
 
 // Quiet, honest placeholder — neutral screen with the expected capture name.
 function placeholderScreen(src, tint, aspect, radius = 0) {
@@ -165,6 +217,13 @@ h1 em { font-style:italic; color:${tint}; }
 .sub { font-size:62px; line-height:1.32; color:color-mix(in oklab, ${theme.ink} 64%, transparent);
   margin-top:44px; max-width:1080px; }
 .frame { position:relative; background:#0b0b0c; box-shadow:${theme.shadow.device}; overflow:hidden; }
+.shot-wrap { position:relative; }
+.co-ring { position:absolute; border:6px solid; border-radius:28px; background:color-mix(in oklab, currentColor 0%, transparent); }
+.co-line { position:absolute; left:0; overflow:visible; pointer-events:none; }
+.co-card { position:absolute; white-space:nowrap; display:flex; align-items:center; gap:24px;
+  padding:34px 48px; background:${theme.white}; border-radius:44px; box-shadow:${theme.shadow.card};
+  font:600 54px/1.1 ${theme.fonts.ui}; color:${theme.ink}; }
+.co-dot { width:26px; height:26px; border-radius:50%; background:var(--tint); flex:none; }
 .screen { display:block; width:100%; }
 img.screen { height:auto; }
 .island { position:absolute; top:50px; left:50%; transform:translateX(-50%);
@@ -251,5 +310,5 @@ function landscape(panel, device, tint) {
 export function renderPanelHTML(panel, device, { fontFace = "", appearance = "light" } = {}) {
   const tint = panel.background?.tint ?? theme.accent;
   const body = device.landscape ? landscape(panel, device, tint) : portrait(panel, device, tint);
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${css(panel, device, tint, fontFace)}</style></head><body>${body}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${css(panel, device, tint, fontFace)}</style></head><body>${body}<script>${LAYOUT_CALLOUTS}</script></body></html>`;
 }

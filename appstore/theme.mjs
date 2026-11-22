@@ -29,6 +29,10 @@ export const theme = {
     goals: "#8b5cf6",
   },
 
+  // Task-app panel backgrounds, in panel order. Neutral hues around the
+  // platform accent; the task app has no section colors.
+  tints: ["#336bd1", "#5b5bd6", "#0f9d8f", "#c2410c", "#7c3aed", "#0369a1"],
+
   // ----- typography -----
   // Display type follows Apple's New York via the system serif stack. App Store
   // renders inline local New York font files when they are available on macOS.

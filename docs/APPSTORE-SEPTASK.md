@@ -17,7 +17,10 @@ files.
   `privacy_url`. Non-localized: `copyright`, `primary_category`,
   `secondary_category`.
 - A platform with `### status` of `planned` is parsed but not emitted.
-- Panel **visuals** live in `appstore/panels.septask.mjs`; copy lives here.
+- A platform ends at the next `## ` heading.
+- Panel **copy and order** live in the `## Screenshots` tables below. Panel
+  **visuals** (background tint, phone geometry) live in
+  `appstore/panels.septask.mjs`, keyed by slug.
 
 **Listing strategy** (keep panels honest to this, updated 2026-11-21): the
 angle is *tasks that think with you*: a native task app with AI that asks before
@@ -27,8 +30,9 @@ Starlings `/strategy/positioning-septena-the-task-app` and the feature map
 Someday; sections, not headings; When for the start date). Claim only what
 ships; web, Android, Windows and self-hosting stay out of store copy until they
 ship. The screenshots must prove **a focused task UI**, **today is your call**
-(the Inbox waits above Today), and **your own agent can work a task**. Shots come from `SeptaskUITests/ScreenshotTests.swift` (names are the
-contract): `tasks-today`, `tasks-upcoming`, `tasks-project`.
+(the Inbox waits above Today), and **your own agent can work a task**. Screens come from the website's scene builder
+(`../septena-site/lib/task-ui/model.ts`), not from the simulator. See
+`## Screenshots`.
 
 **Character limits** (validated by `appstore/validate.mjs`): name 30, subtitle
 30, promotional_text 170, description 4000, keywords 100.
@@ -109,7 +113,7 @@ UTILITIES
 
 ## Platform: macOS (com.septena.tasks)
 
-> Separate App Store Connect app (own bundle id) → its own `deliver` run:
+> The macOS platform of the same App Store Connect record (ADR 0007), with its own `deliver` run:
 > `fastlane deliver --app_identifier com.septena.tasks --platform osx
 > --metadata_path appstore/metadata-septask-mac --screenshots_path appstore/screenshots-septask-mac`.
 > Mac screenshots must be 16:10 (the render pipeline outputs 2880×1800).
@@ -184,36 +188,67 @@ UTILITIES
 
 ---
 
+## Screenshots
+
+One row is one App Store panel, in store order. `appstore/panels.septask.mjs`
+reads this table; `appstore/validate.mjs` checks it.
+
+- `scene` is `<scene id>/<step>` in the scene builder
+  (`../septena-site/lib/task-ui/model.ts`, `SCENES`). The phone layout of that
+  step is the screen in the panel.
+- `callout` is an element id from that step's `.elements.json`, or `-`. The
+  callout repeats the element's own on-screen text, larger, with a line to it.
+  Callout text is never written by hand.
+- `title` is at most 28 characters, without the `*` marks. `*stars*` mark the
+  accent span. `sub` is one sentence of at most 90 characters.
+- No em or en dashes. Every title and sub passes the humanizer skill.
+
+### iPhone
+
+| slug | scene | callout | title | sub |
+| --- | --- | --- | --- | --- |
+| hook | today/0 | - | Tasks that *think with you* | Inbox, Today, and projects, in sync on iPhone, iPad, and Mac. |
+| inbox | capture/1 | task-capture | Today is *your call* | New tasks wait in the Inbox until you put them on your day. |
+| plan | plan/1 | task-reply | Pick the *few that matter* | Choose today's work from Anytime and leave the rest where it is. |
+| agent-asks | agents/2 | agent-status | Your agent *asks first* | Hand a task to Claude and it asks you when it needs a decision. |
+| agent-result | agents/3 | agent-status | The result *waits for you* | Claude leaves its work on the task for you to check. |
+| notes | project/1 | - | Notes stay *with the task* | A project keeps next steps, notes, and finished work together. |
+
+---
+
 ## Workflow (the Septask loop)
 
-The App Store pipeline in `appstore/` is shared by both apps and selected with
-the `SEPTENA_APP` env var (default `septena`). See `appstore/apps.mjs` for the
-registry (schemes, test targets, bundle ids, output dirs).
+The App Store pipeline in `appstore/` is shared with Septena Life and selected
+with the `SEPTENA_APP` env var (default `septena`). See `appstore/apps.mjs` for
+the registry. The renderer drives the installed Google Chrome over the
+DevTools protocol (`appstore/chrome.mjs`): no npm install, no browser download.
+
+iPhone screens come from the website's scene builder (decided 2026-11-22,
+after Bipe's pipeline): the same task UI recreation the site uses, with a fixed
+sample world (09:41, Friday 20 November), so the store and the site show the
+same screens. Each screen comes with an `.elements.json`, and callouts anchor on
+it.
 
 ```bash
-xcodegen generate                                   # 0. once, after adding the UITest targets
-cd appstore && npm install                          #    first time only (Playwright)
-SEPTENA_APP=septask ./capture.sh iphone69 light     # 1. capture raw task screens
-SEPTENA_APP=septask ./capture.sh ipad13 light       #    (per device class)
-SEPTENA_APP=septask ./capture.sh mac light
-npm run all:septask                                 # 2. metadata + render + validate (Septask)
-npm run viz:septask                                 # 3. open the viz to review
-# 4. upload — Septask is two separate ASC apps (see fastlane/Deliverfile):
+cd ../septena-site && npx next build                 # 1. build the site (scene pages)
+SCENE_OUTPUT=../septena/appstore/scenes SCENE_SCALE=3 SCENE_LAYOUTS=phone \
+  node scripts/capture-scenes.mjs                    # 2. export phone screens at 3x
+cd ../septena/appstore && npm run all:septask        # 3. metadata + render + validate
+npm run viz:septask                                  # 4. review at 127.0.0.1:4477/viz/
 fastlane deliver --app_identifier com.septena.tasks --platform ios \
-  --metadata_path appstore/metadata-septask --screenshots_path appstore/screenshots-septask
-fastlane deliver --app_identifier com.septena.tasks --platform osx \
-  --metadata_path appstore/metadata-septask-mac --screenshots_path appstore/screenshots-septask-mac
+  --metadata_path appstore/metadata-septask \
+  --screenshots_path appstore/screenshots-septask    # 5. upload (from the repo root)
 ```
 
-- Capture targets are `SeptaskUITests` (iPhone/iPad) and `SeptaskMacUITests`
-  (Mac); navigation is task-only (no tabs/Week/Next). Demo seed bypasses the
-  Septask welcome so a fresh sim lands straight in tasks.
-- If the configured simulator isn't installed, set `SEPTENA_SIM` (e.g.
-  `SEPTENA_SIM="iPhone 17 Pro Max"`) — any 6.9" Pro Max keeps the ASC size.
-- Raw shots land in `appstore/raw-septask/<device>/<appearance>/`; composites in
-  `screenshots-septask/en-US/` (iOS) and `screenshots-septask-mac/en-US/` (Mac).
-- Device `active` flags live in `apps.mjs`; each class stays inactive (and so
-  exempt from the parity guard) until its real captures exist.
-- Website: copy a raw shot into `../septena-site/public/screenshots/` as
-  `iphone/septask-today.png` and `septask-mac.png` and the `/septask` hero swaps
-  the placeholder for it automatically.
+- `appstore/scenes/` is gitignored. Its `manifest.json` records the site
+  revision and fixture the screens came from; the viz shows them.
+- Re-export when a scene changes in `../septena-site/lib/task-ui/model.ts` or
+  when a table row points at a new scene step.
+- A new panel: add a row to the table above, pick its `scene` from the
+  `/scenes` page on the site, and pick a `callout` id from that step's
+  `.elements.json`. Visual tweaks (callout side and offset) go in
+  `appstore/panels.septask.mjs`.
+- One App Store Connect record holds iOS and macOS (ADR 0007). The Mac set
+  still uses the July simulator panels and stays inactive until it moves to
+  the scene builder's mac layout. iPad is inactive too.
+- Composites land in `appstore/screenshots-septask/en-US/`.

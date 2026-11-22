@@ -2,7 +2,7 @@
   "name": "septena-appstore",
   "private": true,
   "type": "module",
-  "description": "App Store packaging: metadata gen, marketing panel render, validation, viz. See docs/APPSTORE.md.",
+  "description": "App Store packaging: metadata gen, marketing panel render (installed Chrome, no dependencies), validation, viz. See docs/APPSTORE-SEPTASK.md.",
   "scripts": {
     "shots:sync": "./sync-shots.sh",
     "metadata": "node metadata.mjs",
@@ -11,10 +11,6 @@
     "all": "node metadata.mjs && node render.mjs && node validate.mjs",
     "all:septask": "SEPTENA_APP=septask npm run all",
     "viz": "npm run all && node serve.mjs",
-    "viz:septask": "SEPTENA_APP=septask npm run viz",
-    "postinstall": "playwright install chromium"
-  },
-  "devDependencies": {
-    "playwright": "^1.60.0"
+    "viz:septask": "SEPTENA_APP=septask npm run viz"
   }
 }
