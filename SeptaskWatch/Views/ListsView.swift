@@ -83,9 +83,11 @@ struct ListsView: View {
 
       Section {
         NavigationLink(value: WatchRoute.status) {
-          Label("Sync", systemImage: store.connection == .connected ? "checkmark.icloud" : "exclamationmark.icloud")
+          SyncFooter()
         }
+        .buttonStyle(.plain)
       }
+      .listRowBackground(Color.clear)
     }
     .navigationTitle("Lists")
     .task { await store.refreshStructure() }
