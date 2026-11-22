@@ -3,6 +3,7 @@
   "description": "Notices, destructive/fork prompts, toast contracts, and task composer/inspector attribute definitions (ADR 0015, docs/SEPTASK_APPKIT_SURFACES.md).",
   "notices": {
     "maxConcurrentExplainers": 1,
+    "dismissTitle": "Dismiss",
     "items": [
       {
         "id": "signIn",

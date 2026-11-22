@@ -258,6 +258,26 @@ struct SeptaskCommandMenus: Commands {
     #endif
   }
 
+  /// The registry's Go menu (`registry/actions.json` `menuBar`).
+  private static let goMenu: RegistryMenu = {
+    guard let menu = RegistryActions.menuBar.first(where: { $0.id == "go" }) else {
+      preconditionFailure("registry/actions.json has no go menu")
+    }
+    return menu
+  }()
+
+  /// The smart lists the Go menu lists, in registry order.
+  private static let goDestinations: [TaskFilter] = goMenu.items
+    .filter { $0.kind == "destination" }
+    .compactMap { TaskFilter(destinationID: $0.id) }
+
+  /// The ⌘-digit shortcut a destination's registry keycaps name, if any.
+  private static func shortcut(for filter: TaskFilter) -> KeyboardShortcut? {
+    guard let caps = filter.registryDestination?.shortcutKeycaps,
+          let key = caps.last?.first, caps.dropLast().allSatisfy({ $0 == "⌘" }) else { return nil }
+    return KeyboardShortcut(KeyEquivalent(key), modifiers: .command)
+  }
+
   private func go(_ filter: TaskFilter) {
     if let actions {
       actions.go(filter)
@@ -412,25 +432,15 @@ struct SeptaskCommandMenus: Commands {
   }
 
   var body: some Commands {
-    CommandMenu("Go") {
-      Button("Today") { go(.today) }
-        .keyboardShortcut("1", modifiers: .command)
-        .disabled(!canNavigate)
-      Button("Review") { go(.review) }
-        .disabled(!canNavigate)
-      Button(TaskFilter.agent.title) { go(.agent) }
-        .disabled(!canNavigate)
-      Button("Upcoming") { go(.upcoming) }
-        .keyboardShortcut("2", modifiers: .command)
-        .disabled(!canNavigate)
-      Button("Repeating") { go(.repeating) }
-        .disabled(!canNavigate)
-      Button("Anytime") { go(.unscheduled) }
-        .keyboardShortcut("3", modifiers: .command)
-        .disabled(!canNavigate)
-      Button("Logbook") { go(.logbook) }
-        .keyboardShortcut("4", modifiers: .command)
-        .disabled(!canNavigate)
+    CommandMenu(Self.goMenu.title) {
+      // Destinations from the registry's `go` menu (`registry/actions.json`):
+      // titles and ⌘-digit shortcuts from `registry/destinations.json`, the
+      // same rows the sidebar and title dropdown show.
+      ForEach(Self.goDestinations, id: \.self) { filter in
+        Button(filter.title) { go(filter) }
+          .keyboardShortcut(Self.shortcut(for: filter))
+          .disabled(!canNavigate)
+      }
 
       Divider()
 

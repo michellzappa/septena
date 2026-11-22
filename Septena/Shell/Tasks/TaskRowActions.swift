@@ -257,7 +257,7 @@ struct TaskRowActions: ViewModifier {
           } else {
             mutator.moveToToday(id: id, today: false)
             mutator.schedule(id: id, date: d)
-            toastStore?.show(SeptenaToastCopy.deferred(to: d))
+            toastStore?.show(RegistryToasts.deferred(to: d))
           }
         } else {
           mutator.schedule(id: id, date: nil)
@@ -302,7 +302,7 @@ struct TaskRowActions: ViewModifier {
       projectId.flatMap { pid in projects.first { $0.id == pid }?.title }
       ?? areaId.flatMap { aid in areas.first { $0.id == aid }?.title }
       ?? "Inbox"
-    toastStore?.show(SeptenaToastCopy.moved(to: destName)) {
+    toastStore?.show(RegistryToasts.moved(destination: destName)) {
       ticket.undo { TaskUndo.restore(undoBefore, using: mutator) }
       onChange?()
     }
@@ -392,7 +392,7 @@ struct TaskRowActions: ViewModifier {
     let ticket = TaskUndoTicket()
     onChange?()
     let id = task.id
-    toastStore?.show(SeptenaToastCopy.deleted(title: title)) {
+    toastStore?.show(RegistryToasts.deletedSingle(title: title)) {
       ticket.undo { mutator.restore(id: id) }
       onChange?()
     }

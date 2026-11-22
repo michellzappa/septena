@@ -180,8 +180,7 @@ final class SeptaskKitTaskListController: NSViewController {
   private let tableView = SeptaskKitTableView()
   private let scrollView = NSScrollView()
   private let headerWashView = KitHeaderWashView()
-  private let emptyLabel = NSTextField(labelWithString: String(localized: "No Tasks",
-                                                                comment: "SeptaskKit: empty list"))
+  private let emptyLabel = NSTextField(labelWithString: RegistryDestinations.GenericEmpty.title)
   private let emptyDetailLabel = NSTextField(wrappingLabelWithString: "")
   private let emptyStack = NSStackView()
   private var rows: [Row] = []
@@ -363,32 +362,22 @@ final class SeptaskKitTaskListController: NSViewController {
   private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
   private var sendBackPopover: KitSendBackPopover?
 
-  /// "No Tasks" is a lie while the first pull from the task backend is still
+  /// An empty list is a lie while the first pull from the task backend is still
   /// running for a signed-in account — the list is empty because the data
   /// hasn't arrived yet. Signed out (free no-account mode) is a real empty
   /// local list, never a sign-in gate (docs/SYNC_SUBSCRIPTION_SPEC.md §3, §7).
   private func refreshEmptyLabel() {
     let sync = TaskSyncEngine.shared
     if sync.signedIn && sync.isSyncing && sync.lastPull == nil {
-      emptyLabel.stringValue = String(localized: "Syncing…",
-                                      comment: "SeptaskKit: empty list during the first task-backend pull")
+      emptyLabel.stringValue = RegistryDestinations.GenericEmpty.syncingTitle
       emptyDetailLabel.stringValue = ""
       emptyDetailLabel.isHidden = true
-    } else if filter == .agent, let dest = RegistryDestinations.byNavigationKey["agent"] {
-      emptyLabel.stringValue = dest.emptyTitle
-      emptyDetailLabel.stringValue = dest.emptyDetail
-      emptyDetailLabel.isHidden = false
-    } else if filter == .review {
-      emptyLabel.stringValue = String(localized: "Nothing to review",
-                                      comment: "SeptaskKit: empty review list")
-      emptyDetailLabel.stringValue = String(
-        localized: "Work an agent finished appears here so you can check and accept it.",
-        comment: "SeptaskKit: empty review list detail")
-      emptyDetailLabel.isHidden = false
     } else {
-      emptyLabel.stringValue = String(localized: "No Tasks", comment: "SeptaskKit: empty list")
-      emptyDetailLabel.stringValue = ""
-      emptyDetailLabel.isHidden = true
+      // Registry copy (`registry/destinations.json`), the same words the
+      // SwiftUI list's empty state shows.
+      emptyLabel.stringValue = filter.emptyTitle
+      emptyDetailLabel.stringValue = filter.emptyDetail
+      emptyDetailLabel.isHidden = false
     }
   }
 
@@ -1677,7 +1666,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // bulk-import line is an action, not an item, so it doesn't count.
     let count = band.count + reminderPairs.count
     return [.header(id: "inbox",
-                    title: String(localized: "Inbox", comment: "Smart list title"),
+                    title: TaskFilter.triage.title,
                     icon: .symbol("tray"), count: count)]
       + reminders
       + band.map(chipped)
@@ -1874,37 +1863,37 @@ final class SeptaskKitTaskListController: NSViewController {
     let snapshot = StructureCache.snapshot(in: context)
     switch filter {
     case .today:
-      return .screenTitle(title: String(localized: "Today", comment: "Smart list title"),
+      return .screenTitle(title: TaskFilter.today.title,
                           icon: .symbol("sun.max.fill"))
     case .triage:
-      return .screenTitle(title: String(localized: "Inbox", comment: "Smart list title"),
+      return .screenTitle(title: TaskFilter.triage.title,
                           icon: .symbol("tray"))
     case .review:
-      return .screenTitle(title: String(localized: "Review", comment: "Smart list title"),
+      return .screenTitle(title: TaskFilter.review.title,
                           icon: .symbol("eye"))
     case .agent:
       return .screenTitle(title: TaskFilter.agent.title,
                           icon: .symbol(Route.filter(.agent).icon))
     case .upcoming:
-      return .screenTitle(title: String(localized: "Upcoming", comment: "Smart list title"),
+      return .screenTitle(title: TaskFilter.upcoming.title,
                           icon: .symbol("calendar"))
     case .repeating:
-      return .screenTitle(title: String(localized: "Repeating", comment: "Smart list title"),
+      return .screenTitle(title: TaskFilter.repeating.title,
                           icon: .symbol("arrow.clockwise"))
     case .unscheduled:
-      return .screenTitle(title: String(localized: "Anytime", comment: "Smart list title"),
+      return .screenTitle(title: TaskFilter.unscheduled.title,
                           icon: .symbol("rectangle.stack.fill"))
     case .starred:
-      return .screenTitle(title: String(localized: "Starred", comment: "Smart list title"),
+      return .screenTitle(title: TaskFilter.starred.title,
                           icon: .symbol("star.fill"))
     case .logbook:
-      return .screenTitle(title: String(localized: "Logbook", comment: "Smart list title"),
+      return .screenTitle(title: TaskFilter.logbook.title,
                           icon: .symbol("checkmark"))
     case .faded:
-      return .screenTitle(title: String(localized: "Faded", comment: "Smart list title"),
+      return .screenTitle(title: TaskFilter.faded.title,
                           icon: .symbol("circle.dashed"))
     case .recentlyDeleted:
-      return .screenTitle(title: String(localized: "Recently Deleted", comment: "Smart list title"),
+      return .screenTitle(title: TaskFilter.recentlyDeleted.title,
                           icon: .symbol("trash"))
     case .project(let id):
       guard let project = snapshot.projects.first(where: { $0.id == id }) else { return nil }
@@ -2373,11 +2362,11 @@ final class SeptaskKitTaskListController: NSViewController {
     let ticket = TaskUndoTicket()
     let structure = StructureCache.snapshot(in: context)
     let destinationName: String = switch destination {
-    case .none: "Inbox"
-    case .area(let areaId): structure.areas.first { $0.id == areaId }?.title ?? "Inbox"
-    case .project(let projectId): structure.projects.first { $0.id == projectId }?.title ?? "Inbox"
+    case .none: TaskFilter.triage.title
+    case .area(let areaId): structure.areas.first { $0.id == areaId }?.title ?? TaskFilter.triage.title
+    case .project(let projectId): structure.projects.first { $0.id == projectId }?.title ?? TaskFilter.triage.title
     }
-    toastStore.show(SeptenaToastCopy.moved(to: destinationName)) { [weak self, mutator] in
+    toastStore.show(RegistryToasts.moved(destination: destinationName)) { [weak self, mutator] in
       ticket.undo { TaskUndo.restore(previous, using: mutator) }
       self?.reload()
     }
@@ -2953,7 +2942,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// it. No Undo button there either: ⌘Z takes it back.
   private func showDeferredToast(_ date: Date?) {
     guard let date, !Calendar.current.isDateInToday(date) else { return }
-    toastStore.show(SeptenaToastCopy.deferred(to: date))
+    toastStore.show(RegistryToasts.deferred(to: date))
   }
 
   /// Fixed-schedule repeats get the same two-way decision as the iOS shell.
@@ -2965,19 +2954,9 @@ final class SeptaskKitTaskListController: NSViewController {
       return .makeException
     }
 
-    let chosen = KitPrompt.choice(
-      title: String(localized: "Reschedule Repeating Task?",
-                    comment: "SeptaskKit: fixed recurrence move"),
-      message: String(localized:
-        "Move only this task, or update the repeating schedule to the new date?",
-        comment: "SeptaskKit: fixed recurrence move"),
-      options: [String(localized: "Only This Task",
-                       comment: "SeptaskKit: fixed recurrence move"),
-                String(localized: "Update Schedule",
-                       comment: "SeptaskKit: fixed recurrence move")])
-    switch chosen {
-    case 0: return .makeException
-    case 1: return .updateRule
+    switch KitPrompt.choice(RegistryPrompts.prompt("rescheduleFixedRepeat")) {
+    case "exception": return .makeException
+    case "updateRule": return .updateRule
     default: return nil
     }
   }
@@ -3079,8 +3058,8 @@ final class SeptaskKitTaskListController: NSViewController {
     let ticket = TaskUndoTicket()
     for id in ids { mutator.delete(id: id) }
     let message = victims.count == 1
-      ? SeptenaToastCopy.deleted(title: victims[0].title)
-      : SeptenaToastCopy.deleted(count: victims.count)
+      ? RegistryToasts.deletedSingle(title: victims[0].title)
+      : RegistryToasts.deletedBulk(count: victims.count)
     toastStore.show(message) { [weak self, mutator] in
       ticket.undo { for id in ids { mutator.restore(id: id) } }
       self?.reload()
@@ -3094,17 +3073,8 @@ final class SeptaskKitTaskListController: NSViewController {
   /// first — as a sheet on this window, Cancel the Return-safe default
   /// (`KitPrompt`'s sheet form).
   private func confirmPurge(count: Int, then purge: @escaping @MainActor () -> Void) {
-    KitPrompt.confirmDestructive(
-      title: count == 1
-        ? String(localized: "Delete this task permanently?",
-                 comment: "SeptaskKit: permanent delete confirm (one task)")
-        : String(localized: "Delete \(count) tasks permanently?",
-                 comment: "SeptaskKit: permanent delete confirm (several tasks)"),
-      message: String(localized: "You can't undo this.",
-                      comment: "SeptaskKit: permanent delete confirm"),
-      confirmTitle: String(localized: "Delete Permanently", comment: "SeptaskKit: context menu"),
-      in: view.window,
-      onConfirm: purge)
+    KitPrompt.confirmDestructive(RegistryPrompts.deletePermanently(count: count),
+                                 in: view.window, onConfirm: purge)
   }
 
   private func commitRename(id: String, title: String) {
@@ -3184,7 +3154,7 @@ final class SeptaskKitTaskListController: NSViewController {
     alert.alertStyle = .warning
     alert.messageText = StoreHealthState.alertTitle
     alert.informativeText = StoreHealthState.alertMessage
-    alert.addButton(withTitle: String(localized: "OK", comment: "SeptaskKit: dismiss an alert"))
+    alert.addButton(withTitle: RegistryPrompts.errorConfirmTitle)
     alert.beginSheetModal(for: window) { [weak self] _ in
       MainActor.assumeIsolated {
         self?.storeHealthSheetUp = false
@@ -4454,17 +4424,12 @@ final class SeptaskKitTaskListController: NSViewController {
     let ids = loggedClearIDs
     guard !ids.isEmpty else { return }
     let copy = RegistryPrompts.clearLogged(count: ids.count, name: scopeDisplayName)
-    KitPrompt.confirmDestructive(
-      title: copy.title,
-      message: copy.message,
-      confirmTitle: copy.confirmTitle,
-      in: view.window
-    ) { [weak self] in
+    KitPrompt.confirmDestructive(copy, in: view.window) { [weak self] in
       guard let self else { return }
       TaskUndo.recordDelete(ids: ids, mutator: self.mutator)
       let ticket = TaskUndoTicket()
       for id in ids { self.mutator.delete(id: id) }
-      self.toastStore.show(SeptenaToastCopy.deleted(count: ids.count)) { [weak self, mutator] in
+      self.toastStore.show(RegistryToasts.deletedBulk(count: ids.count)) { [weak self, mutator] in
         ticket.undo { for id in ids { mutator.restore(id: id) } }
         self?.reload()
       }
@@ -4475,15 +4440,9 @@ final class SeptaskKitTaskListController: NSViewController {
   private func menuDeleteHeading() {
     let row = tableView.selectedRow
     guard row >= 0, let heading = rows[row].task, heading.isHeading else { return }
-    // Exact copy from TaskListView's confirmationDialog — same story either shell.
+    // Registry copy, the same prompt TaskListView's confirmationDialog shows.
     let headingId = heading.id
-    KitPrompt.confirmDestructive(
-      title: String(localized: "Delete this section?", comment: "Project heading delete confirm"),
-      message: String(localized: "Its tasks stay in the project.",
-                      comment: "Project heading delete confirm"),
-      confirmTitle: String(localized: "Delete Section", comment: "SeptaskKit: heading CRUD"),
-      in: view.window
-    ) { [weak self] in
+    KitPrompt.confirmDestructive(RegistryPrompts.prompt("deleteSection"), in: view.window) { [weak self] in
       guard let self else { return }
       self.mutator.delete(id: headingId)
       self.reload()

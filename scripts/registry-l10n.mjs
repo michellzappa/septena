@@ -29,7 +29,7 @@ const FIELDS = {
   destinations: new Set(["title", "detail", "pointerDetail", "touchDetail", "syncingTitle"]),
   actions: new Set(["title", "desktopTitle", "activeTitle", "pluralTitle", "addTitle", "removeTitle", "shortTitle"]),
   surfaces: new Set([
-    "title", "primaryTitle", "detail", "message", "confirmTitle", "cancelTitle", "format",
+    "title", "primaryTitle", "detail", "message", "confirmTitle", "cancelTitle", "dismissTitle", "format",
     "emptyTitleFormat", "singularFormat", "body", "footnote", "returningTitle", "returningBody",
     "label", "countLabel", "workingLabel", "instructions", "setup", "first", "placeholder", "untitledName",
   ]),

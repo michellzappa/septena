@@ -1185,6 +1185,8 @@ struct RegistryNoticeStep: Sendable, Hashable, Identifiable {
 
 enum RegistryNotices {
   static let maxConcurrentExplainers: Int = 1
+  /// The close button's title and accessibility label on every notice.
+  static let dismissTitle: String = RegistryL10n.t("Dismiss")
   static let all: [RegistryNotice] = [
     RegistryNotice(id: "signIn", kind: "actionNeeded", priority: 0, iconId: "notice.sign_in", sfSymbol: "person.crop.circle.badge.exclamationmark", dismissScope: "device", dismissible: true, explainerSlot: false, featureId: "sync.backend", title: RegistryL10n.t("Not signed in"), detail: RegistryL10n.t("Your changes stay on this device until you sign in."), platformDetails: ["macos": RegistryL10n.t("Your changes stay on this Mac until you sign in."), "ipados": RegistryL10n.t("Your changes stay on this iPad until you sign in."), "ios": RegistryL10n.t("Your changes stay on this iPhone until you sign in.")], primaryTitle: RegistryL10n.t("Sign in…"), steps: []),
     RegistryNotice(id: "rolledIn", kind: "info", priority: 1, iconId: "notice.rolled_in", sfSymbol: "arrow.down.circle", dismissScope: "accountDay", dismissible: true, explainerSlot: false, featureId: "lists.today", title: nil, detail: nil, platformDetails: [:], primaryTitle: nil, steps: []),

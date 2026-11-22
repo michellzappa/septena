@@ -22,13 +22,7 @@ import UIKit
 @MainActor
 enum SeptaskFirstRunGate {
   /// The registry platform name for this device.
-  static var platform: String {
-    #if os(macOS)
-    return "macos"
-    #else
-    return UIDevice.current.userInterfaceIdiom == .pad ? "ipados" : "ios"
-    #endif
-  }
+  static var platform: String { RegistryPlatform.current }
 
   /// True when this device still owes the user a first run: not done here,
   /// not done on another device (as far as this device knows), and the

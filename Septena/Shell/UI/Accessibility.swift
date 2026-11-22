@@ -267,7 +267,7 @@ final class PromoteFlashStore {
 struct SeptenaToast: Identifiable {
   let id = UUID()
   var message: String
-  var duration: Double = 7
+  var duration: Double = RegistryToasts.durationSeconds
   var undo: (() -> Void)?
 }
 
@@ -301,7 +301,8 @@ final class SeptenaToastStore {
     }
   }
 
-  func show(_ message: String, undo: (() -> Void)? = nil, duration: Double = 7) {
+  func show(_ message: String, undo: (() -> Void)? = nil,
+            duration: Double = RegistryToasts.durationSeconds) {
     current = SeptenaToast(message: message, duration: duration, undo: undo)
   }
 
@@ -394,21 +395,11 @@ struct SeptenaToastCapsule: View {
 
 /// The toast copy, one wording for both shells (`TaskRowActions`, the
 /// AppKit task list). Plain strings, like the call sites always passed.
-enum SeptenaToastCopy {
+extension RegistryToasts {
+  /// "Deferred to …" with the date as the schedule headers print it.
+  /// The copy itself is `registry/surfaces.json` `toasts`.
   static func deferred(to date: Date) -> String {
-    "Deferred to \(SeptenaDate.scheduleHeaderLabel(for: date))"
-  }
-
-  static func moved(to destination: String) -> String {
-    "Moved to \(destination)"
-  }
-
-  static func deleted(title: String) -> String {
-    title.isEmpty ? "Task deleted" : "\"\(title)\" deleted"
-  }
-
-  static func deleted(count: Int) -> String {
-    count == 1 ? "Task deleted" : "\(count) tasks deleted"
+    deferred(date: SeptenaDate.scheduleHeaderLabel(for: date))
   }
 }
 

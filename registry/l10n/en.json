@@ -751,6 +751,12 @@
       "surfaces.taskAttributes.discuss.label"
     ]
   },
+  "Dismiss": {
+    "text": "Dismiss",
+    "paths": [
+      "surfaces.notices.dismissTitle"
+    ]
+  },
   "Done": {
     "text": "Done",
     "paths": [

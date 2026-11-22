@@ -1165,6 +1165,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   };
   lines.push("enum RegistryNotices {");
   lines.push(`  static let maxConcurrentExplainers: Int = ${surfaces.notices.maxConcurrentExplainers}`);
+  lines.push("  /// The close button's title and accessibility label on every notice.");
+  lines.push(`  static let dismissTitle: String = ${L(surfaces.notices.dismissTitle, surfaces.notices, "dismissTitle")}`);
   lines.push("  static let all: [RegistryNotice] = [");
   for (const n of surfaces.notices.items) {
     const title = n.title === undefined || isTmpl(n.title) ? "nil" : L(n.title, n, "title");

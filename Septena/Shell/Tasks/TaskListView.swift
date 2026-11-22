@@ -635,30 +635,30 @@ struct TaskListView: View {
         }
       }
       .confirmationDialog(
-        "Reschedule Repeating Task?",
+        RegistryPrompts.prompt("rescheduleFixedRepeat").title,
         isPresented: Binding(
           get: { reschedulePrompt != nil },
           set: { if !$0 { reschedulePrompt = nil } }
         ),
         titleVisibility: .visible
       ) {
-        Button("Only This Task") {
+        Button(RegistryPrompts.prompt("rescheduleFixedRepeat").optionTitle("exception")) {
           guard let prompt = reschedulePrompt else { return }
           reschedulePrompt = nil
           for id in prompt.taskIDs {
             applyScheduledWhen(id: id, date: prompt.date, mode: .makeException)
           }
         }
-        Button("Update Schedule") {
+        Button(RegistryPrompts.prompt("rescheduleFixedRepeat").optionTitle("updateRule")) {
           guard let prompt = reschedulePrompt else { return }
           reschedulePrompt = nil
           for id in prompt.taskIDs {
             applyScheduledWhen(id: id, date: prompt.date, mode: .updateRule)
           }
         }
-        Button("Cancel", role: .cancel) { reschedulePrompt = nil }
+        Button(RegistryPrompts.cancelTitle, role: .cancel) { reschedulePrompt = nil }
       } message: {
-        Text("Move only this task, or update the repeating schedule to the new date?")
+        Text(RegistryPrompts.prompt("rescheduleFixedRepeat").message)
       }
     // A rolled-back save is reported here, on the surface where a lost task is
     // noticed. NOT the snackbar below it: that is a one-line auto-dismissing
@@ -792,51 +792,53 @@ struct TaskListView: View {
   // the compiler's limit on iOS).
   private var taskListDialogs: some View {
     taskListChromed
-    .alert("Error", isPresented: Binding(
+    .alert(RegistryPrompts.errorTitle, isPresented: Binding(
       get: { errorMessage != nil },
       set: { if !$0 { errorMessage = nil } }
     )) {
-      Button("OK", role: .cancel) { errorMessage = nil }
+      Button(RegistryPrompts.errorConfirmTitle, role: .cancel) { errorMessage = nil }
     } message: {
       Text(errorMessage ?? "")
     }
     // Section (heading) create — a standard alert TextField, never an inline
     // row field (the macOS selectable-List focus trap). See ORDERING_AND_HEADINGS_PLAN.
-    .alert("New Section", isPresented: Binding(
+    .alert(RegistryPrompts.textPrompt("newSection").title, isPresented: Binding(
       get: { headingCreateProject != nil },
       set: { if !$0 { headingCreateProject = nil } }
     )) {
-      TextField("Section name", text: $headingDraftTitle)
-      Button("Add") {
+      TextField(RegistryPrompts.textPrompt("newSection").placeholder, text: $headingDraftTitle)
+      Button(RegistryPrompts.textPrompt("newSection").confirmTitle) {
         if let pid = headingCreateProject { commitHeadingCreate(title: headingDraftTitle, project: pid) }
         headingCreateProject = nil
       }
-      Button("Cancel", role: .cancel) { headingCreateProject = nil }
+      Button(RegistryPrompts.cancelTitle, role: .cancel) { headingCreateProject = nil }
     }
-    .alert("Rename Section", isPresented: Binding(
+    .alert(RegistryPrompts.textPrompt("renameSection").title, isPresented: Binding(
       get: { headingRenameTarget != nil },
       set: { if !$0 { headingRenameTarget = nil } }
     )) {
-      TextField("Section name", text: $headingDraftTitle)
-      Button("Rename") {
+      TextField(RegistryPrompts.textPrompt("renameSection").placeholder, text: $headingDraftTitle)
+      Button(RegistryPrompts.textPrompt("renameSection").confirmTitle) {
         if let h = headingRenameTarget { commitHeadingRename(h, title: headingDraftTitle) }
         headingRenameTarget = nil
       }
-      Button("Cancel", role: .cancel) { headingRenameTarget = nil }
+      Button(RegistryPrompts.cancelTitle, role: .cancel) { headingRenameTarget = nil }
     }
     .confirmationDialog(
-      "Delete this section? Its tasks stay in the project.",
+      RegistryPrompts.prompt("deleteSection").title,
       isPresented: Binding(
         get: { headingDeleteTarget != nil },
         set: { if !$0 { headingDeleteTarget = nil } }
       ),
       titleVisibility: .visible
     ) {
-      Button("Delete Section", role: .destructive) {
+      Button(RegistryPrompts.prompt("deleteSection").confirmTitle ?? "", role: .destructive) {
         if let h = headingDeleteTarget { mutator.delete(id: h.id); Task { await load() } }
         headingDeleteTarget = nil
       }
-      Button("Cancel", role: .cancel) { headingDeleteTarget = nil }
+      Button(RegistryPrompts.cancelTitle, role: .cancel) { headingDeleteTarget = nil }
+    } message: {
+      Text(RegistryPrompts.prompt("deleteSection").message)
     }
     // Registry `clearLogged`, the same copy the AppKit shell's sheet shows.
     .confirmationDialog(
@@ -857,13 +859,13 @@ struct TaskListView: View {
       Text(request.copy.message)
     }
     .alert(
-      "Delete Permanently?",
+      RegistryPrompts.deletePermanently(count: 1).title,
       isPresented: Binding(
         get: { permanentDeleteConfirmTask != nil },
         set: { if !$0 { permanentDeleteConfirmTask = nil } }
       )
     ) {
-      Button("Delete Permanently", role: .destructive) {
+      Button(RegistryPrompts.deletePermanently(count: 1).confirmTitle ?? "", role: .destructive) {
         if let t = permanentDeleteConfirmTask {
           Haptics.warning()
           removeLocally(id: t.id)
@@ -871,9 +873,9 @@ struct TaskListView: View {
         }
         permanentDeleteConfirmTask = nil
       }
-      Button("Cancel", role: .cancel) { permanentDeleteConfirmTask = nil }
+      Button(RegistryPrompts.cancelTitle, role: .cancel) { permanentDeleteConfirmTask = nil }
     } message: {
-      Text("This task will be permanently deleted and cannot be undone.")
+      Text(RegistryPrompts.deletePermanently(count: 1).message)
     }
   }
 
@@ -2383,67 +2385,23 @@ struct TaskListView: View {
     // projects it's plain wrong (the area isn't empty). Show the empty state
     // only where there's no inline capture affordance (Logbook, Recently
     // Deleted, Upcoming).
+    // Copy is the registry's (`registry/destinations.json` `emptyTitle` /
+    // `emptyDetail`, `genericEmptyState` for a project or an area), the same
+    // words the AppKit list shows.
     if showsEmptyTaskList && !allowsInlineCreate {
-      if filter == .recentlyDeleted {
-        ContentUnavailableView(
-          "No Recently Deleted Tasks",
-          systemImage: titleIcon,
-          description: Text("Deleted tasks appear here for 30 days before being permanently removed.")
+      ContentUnavailableView(
+        filter.emptyTitle,
+        systemImage: titleIcon,
+        description: Text(
+          filter.registryDestination == nil && showsQuickAddAtTop
+            ? RegistryDestinations.GenericEmpty.detail
+            : filter.emptyDetail
         )
-        .frame(maxWidth: .infinity)
-        .padding(.top, 40)
-        .plainListChrome()
-      } else if filter == .agent, let dest = RegistryDestinations.byNavigationKey["agent"] {
-        ContentUnavailableView(
-          dest.emptyTitle,
-          systemImage: titleIcon,
-          description: Text(dest.emptyDetail)
-        )
-        .frame(maxWidth: .infinity)
-        .padding(.top, 40)
-        .plainListChrome()
-      } else if filter == .review {
-        ContentUnavailableView(
-          "Nothing to review",
-          systemImage: titleIcon,
-          description: Text("Work an agent finished appears here so you can check and accept it.")
-        )
-        .frame(maxWidth: .infinity)
-        .padding(.top, 40)
-        .plainListChrome()
-      } else if filter == .faded {
-        ContentUnavailableView(
-          "No Faded Tasks",
-          systemImage: titleIcon,
-          description: Text("Undated tasks without activity for 14 days appear here until you keep them or let them go.")
-        )
-        .frame(maxWidth: .infinity)
-        .padding(.top, 40)
-        .plainListChrome()
-      } else {
-        ContentUnavailableView(
-          "Nothing here yet",
-          systemImage: titleIcon,
-          description: Text(
-            showsQuickAddAtTop
-              ? "Type above to add your first task."
-              : Self.emptyListAddHint
-          )
-        )
-        .frame(maxWidth: .infinity)
-        .padding(.top, showsQuickAddAtTop ? 24 : 40)
-        .plainListChrome()
-      }
+      )
+      .frame(maxWidth: .infinity)
+      .padding(.top, showsQuickAddAtTop ? 24 : 40)
+      .plainListChrome()
     }
-  }
-
-  /// "Double-click" only exists with a pointer; on iOS the + is the way in.
-  private static var emptyListAddHint: LocalizedStringKey {
-    #if os(macOS)
-    "Click + or double-click below to add a task."
-    #else
-    "Tap + to add a task."
-    #endif
   }
 
   private var visibleRows: some View {
@@ -3074,7 +3032,7 @@ struct TaskListView: View {
     }
     TaskUndo.recordDelete(ids: ids, mutator: mutator)
     let ticket = TaskUndoTicket()
-    showToast(SeptenaToastCopy.deleted(count: ids.count)) {
+    showToast(RegistryToasts.deletedBulk(count: ids.count)) {
       ticket.undo { for id in ids { mutator.restore(id: id) } }
       Task { await load() }
     }
@@ -3508,7 +3466,7 @@ struct TaskListView: View {
     // `TaskUndo.undo()` would take back that newer action instead, so the
     // ticket restores the row directly.
     let ticket = TaskUndoTicket()
-    showToast(SeptenaToastCopy.deleted(title: title)) {
+    showToast(RegistryToasts.deletedSingle(title: title)) {
       ticket.undo { mutator.restore(id: id) }
       Task { await load() }
     }
@@ -3591,9 +3549,7 @@ struct TaskListView: View {
     let ticket = TaskUndoTicket()
     Task { await load() }
     let destName = destinationName(areaId: areaId, projectId: projectId)
-    let message = moved.count == 1
-      ? "Moved to \(destName)"
-      : "Moved \(moved.count) tasks to \(destName)"
+    let message = RegistryToasts.movedBulk(count: moved.count, destination: destName)
     showToast(message) {
       ticket.undo { TaskUndo.restore(undoBefore, using: mutator) }
       Task { await load() }
@@ -4570,7 +4526,7 @@ struct TaskListView: View {
     let ticket = TaskUndoTicket()
     Task { await load() }
 
-    showToast(SeptenaToastCopy.moved(to: suggestion.title)) {
+    showToast(RegistryToasts.moved(destination: suggestion.title)) {
       ticket.undo { TaskUndo.restore(undoBefore, using: mutator) }
       Task { await load() }
     }
@@ -5209,7 +5165,7 @@ struct TaskListView: View {
         mutator.reschedule(id: id, date: d, mode: mode)
         // Deferring drops the row off Today; confirm where it landed. No
         // Undo — re-opening the When picker is the natural reversal.
-        showToast(SeptenaToastCopy.deferred(to: d))
+        showToast(RegistryToasts.deferred(to: d))
       }
     } else {
       mutator.reschedule(id: id, date: nil, mode: .makeException)

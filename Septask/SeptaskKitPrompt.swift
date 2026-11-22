@@ -10,6 +10,10 @@ import AppKit
 // Every alert in the AppKit shell is built here. There used to be a third one
 // hand-rolled inside the task list, which is exactly how alert copy and button
 // order drift apart.
+//
+// The copy is the registry's (`registry/surfaces.json` `prompts`, generated as
+// `RegistryPrompts`): the SwiftUI dialogs read the same `RegistryPromptCopy`,
+// so the two shells can never word one question differently.
 @MainActor
 enum KitPrompt {
 
@@ -19,20 +23,17 @@ enum KitPrompt {
   /// role, so the platform paints it. Prefer the sheet form below whenever a
   /// window is at hand; this one remains for callers that need a synchronous
   /// answer.
-  static func confirmDestructive(title: String, message: String,
-                                 confirmTitle: String? = nil) -> Bool {
-    let alert = destructiveAlert(title: title, message: message, confirmTitle: confirmTitle)
-    return alert.runModal() == .alertSecondButtonReturn
+  static func confirmDestructive(_ copy: RegistryPromptCopy) -> Bool {
+    destructiveAlert(copy).runModal() == .alertSecondButtonReturn
   }
 
   /// The same question as a window-modal sheet: it blocks only the window it
   /// is about, not the whole app. `onConfirm` runs only on the destructive
   /// answer. Falls back to the app-modal form when there is no window.
-  static func confirmDestructive(title: String, message: String,
-                                 confirmTitle: String? = nil,
+  static func confirmDestructive(_ copy: RegistryPromptCopy,
                                  in window: NSWindow?,
                                  onConfirm: @escaping @MainActor () -> Void) {
-    let alert = destructiveAlert(title: title, message: message, confirmTitle: confirmTitle)
+    let alert = destructiveAlert(copy)
     guard let window else {
       if alert.runModal() == .alertSecondButtonReturn { onConfirm() }
       return
@@ -43,37 +44,33 @@ enum KitPrompt {
     }
   }
 
-  private static func destructiveAlert(title: String, message: String,
-                                       confirmTitle: String?) -> NSAlert {
+  private static func destructiveAlert(_ copy: RegistryPromptCopy) -> NSAlert {
     let alert = NSAlert()
-    alert.messageText = title
-    alert.informativeText = message
+    alert.messageText = copy.title
+    alert.informativeText = copy.message
     // Cancel first: the first button is the default (Return) button.
     // Set explicitly: AppKit also hands a button titled "Cancel" the Escape
     // equivalent, and Return must stay on Cancel.
-    let cancel = alert.addButton(withTitle: String(localized: "Cancel",
-                                                   comment: "SeptaskKit: prompt dismiss"))
+    let cancel = alert.addButton(withTitle: RegistryPrompts.cancelTitle)
     cancel.keyEquivalent = "\r"
-    let confirm = confirmTitle
-      ?? String(localized: "Delete", comment: "SeptaskKit: prompt confirm")
-    let destructive = alert.addButton(withTitle: confirm)
+    let destructive = alert.addButton(withTitle: copy.confirmTitle ?? copy.title)
     destructive.keyEquivalent = ""
     destructive.hasDestructiveAction = true
     return alert
   }
 
   /// A fork with more than two answers — the reschedule-repeating question is
-  /// the shell's only one. Returns the index of the chosen option, or nil when
+  /// the shell's only one. Returns the id of the chosen option, or nil when
   /// the user cancelled. Cancel is appended here so no caller can forget it.
-  static func choice(title: String, message: String, options: [String]) -> Int? {
+  static func choice(_ copy: RegistryPromptCopy) -> String? {
     let alert = NSAlert()
-    alert.messageText = title
-    alert.informativeText = message
-    for option in options { alert.addButton(withTitle: option) }
-    alert.addButton(withTitle: String(localized: "Cancel", comment: "SeptaskKit: prompt dismiss"))
+    alert.messageText = copy.title
+    alert.informativeText = copy.message
+    for option in copy.options { alert.addButton(withTitle: option.title) }
+    alert.addButton(withTitle: RegistryPrompts.cancelTitle)
     let chosen = alert.runModal().rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
-    guard chosen >= 0, chosen < options.count else { return nil }
-    return chosen
+    guard chosen >= 0, chosen < copy.options.count else { return nil }
+    return copy.options[chosen].id
   }
 }
 #endif

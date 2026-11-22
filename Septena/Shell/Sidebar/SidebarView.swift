@@ -158,10 +158,10 @@ struct SidebarRootView: View {
       commitDeleteProject: { p in deleteProject(p) },
       commitDeleteArea:    { a in deleteArea(a) },
       projectDeleteCopy: { p in
-        ContainerDeleteCopy.project(id: p.id, title: p.title, context: modelContext)
+        RegistryPrompts.deleteProject(id: p.id, title: p.title, context: modelContext)
       },
       areaDeleteCopy: { a in
-        ContainerDeleteCopy.area(id: a.id, title: a.title, context: modelContext)
+        RegistryPrompts.deleteArea(id: a.id, title: a.title, context: modelContext)
       }
     )
   }
@@ -1683,7 +1683,7 @@ struct NewProjectSheet: View {
     NavigationStack {
       Form {
         Section {
-          TextField("Project title", text: $title)
+          TextField(RegistryPrompts.textPrompt("newProject").placeholder, text: $title)
         }
         Section("Area") {
           Picker("Area", selection: $selectedAreaId) {
@@ -1700,14 +1700,14 @@ struct NewProjectSheet: View {
       // (default-styled Forms report no flexible height) — same rule the
       // shared AdaptiveEditScaffold applies to its sheet branch.
       .formStyle(.grouped)
-      .navigationTitle("New Project")
+      .navigationTitle(RegistryPrompts.textPrompt("newProject").title)
       .septenaInlineTitle()
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
+          Button(RegistryPrompts.cancelTitle) { dismiss() }
         }
         ToolbarItem(placement: .confirmationAction) {
-          Button("Create") {
+          Button(RegistryPrompts.textPrompt("newProject").confirmTitle) {
             onCreate(title, selectedAreaId)
             dismiss()
           }
@@ -1733,45 +1733,48 @@ private struct RightClickAlerts: ViewModifier {
   let commitRenameArea:    (Area, String) -> Void
   let commitDeleteProject: (Project) -> Void
   let commitDeleteArea:    (Area) -> Void
-  let projectDeleteCopy: (Project) -> ContainerDeleteCopy.Text
-  let areaDeleteCopy: (Area) -> ContainerDeleteCopy.Text
+  let projectDeleteCopy: (Project) -> RegistryPromptCopy
+  let areaDeleteCopy: (Area) -> RegistryPromptCopy
 
   func body(content: Content) -> some View {
-    content
-      .alert("Rename Project",
+    let renameProject = RegistryPrompts.textPrompt("renameProject")
+    let renameArea = RegistryPrompts.textPrompt("renameArea")
+    return content
+      .alert(renameProject.title,
              isPresented: Binding(
               get: { renameProjectTarget != nil },
               set: { if !$0 { renameProjectTarget = nil } })) {
-        TextField("Project name", text: $renameDraft)
-        Button("Save") {
+        TextField(renameProject.placeholder, text: $renameDraft)
+        Button(renameProject.confirmTitle) {
           if let p = renameProjectTarget { commitRenameProject(p, renameDraft) }
           renameProjectTarget = nil
         }
-        Button("Cancel", role: .cancel) { renameProjectTarget = nil }
+        Button(RegistryPrompts.cancelTitle, role: .cancel) { renameProjectTarget = nil }
       }
-      .alert("Rename Area",
+      .alert(renameArea.title,
              isPresented: Binding(
               get: { renameAreaTarget != nil },
               set: { if !$0 { renameAreaTarget = nil } })) {
-        TextField("Area name", text: $renameDraft)
-        Button("Save") {
+        TextField(renameArea.placeholder, text: $renameDraft)
+        Button(renameArea.confirmTitle) {
           if let a = renameAreaTarget { commitRenameArea(a, renameDraft) }
           renameAreaTarget = nil
         }
-        Button("Cancel", role: .cancel) { renameAreaTarget = nil }
+        Button(RegistryPrompts.cancelTitle, role: .cancel) { renameAreaTarget = nil }
       }
       // Copy states what goes with the container and where it goes
-      // (`ContainerDeleteCopy`, shared with the AppKit sheet).
+      // (`RegistryPrompts.deleteArea` / `deleteProject`, shared with the AppKit sheet).
       .confirmationDialog(deleteProjectTarget.map { projectDeleteCopy($0).title } ?? "",
                           isPresented: Binding(
                             get: { deleteProjectTarget != nil },
                             set: { if !$0 { deleteProjectTarget = nil } }),
                           titleVisibility: .visible) {
-        Button("Delete", role: .destructive) {
+        Button(deleteProjectTarget.flatMap { projectDeleteCopy($0).confirmTitle } ?? "",
+               role: .destructive) {
           if let p = deleteProjectTarget { commitDeleteProject(p) }
           deleteProjectTarget = nil
         }
-        Button("Cancel", role: .cancel) { deleteProjectTarget = nil }
+        Button(RegistryPrompts.cancelTitle, role: .cancel) { deleteProjectTarget = nil }
       } message: {
         Text(deleteProjectTarget.map { projectDeleteCopy($0).message } ?? "")
       }
@@ -1780,11 +1783,12 @@ private struct RightClickAlerts: ViewModifier {
                             get: { deleteAreaTarget != nil },
                             set: { if !$0 { deleteAreaTarget = nil } }),
                           titleVisibility: .visible) {
-        Button("Delete", role: .destructive) {
+        Button(deleteAreaTarget.flatMap { areaDeleteCopy($0).confirmTitle } ?? "",
+               role: .destructive) {
           if let a = deleteAreaTarget { commitDeleteArea(a) }
           deleteAreaTarget = nil
         }
-        Button("Cancel", role: .cancel) { deleteAreaTarget = nil }
+        Button(RegistryPrompts.cancelTitle, role: .cancel) { deleteAreaTarget = nil }
       } message: {
         Text(deleteAreaTarget.map { areaDeleteCopy($0).message } ?? "")
       }
@@ -1811,7 +1815,7 @@ private struct SidebarSheets: ViewModifier {
         Button("New To-Do")   { onNewTodo() }
         Button("New Project") { showingNewProject = true }
         Button("New Area")    { newAreaName = ""; showingNewArea = true }
-        Button("Cancel", role: .cancel) {}
+        Button(RegistryPrompts.cancelTitle, role: .cancel) {}
       }
       .sheet(isPresented: $showingNewProject, onDismiss: { newProjectInArea = nil }) {
         NewProjectSheet(areas: areas,
@@ -1820,16 +1824,16 @@ private struct SidebarSheets: ViewModifier {
           .presentationDetents([.medium])
           .septenaSheetChrome()
       }
-      .alert("New Area", isPresented: $showingNewArea) {
-        TextField("Area name", text: $newAreaName)
-        Button("Create") { onCreateArea() }
-        Button("Cancel", role: .cancel) { newAreaName = "" }
+      .alert(RegistryPrompts.textPrompt("newArea").title, isPresented: $showingNewArea) {
+        TextField(RegistryPrompts.textPrompt("newArea").placeholder, text: $newAreaName)
+        Button(RegistryPrompts.textPrompt("newArea").confirmTitle) { onCreateArea() }
+        Button(RegistryPrompts.cancelTitle, role: .cancel) { newAreaName = "" }
       }
-      .alert("Error", isPresented: Binding(
+      .alert(RegistryPrompts.errorTitle, isPresented: Binding(
         get: { errorMessage != nil },
         set: { if !$0 { errorMessage = nil } }
       )) {
-        Button("OK") { errorMessage = nil }
+        Button(RegistryPrompts.errorConfirmTitle) { errorMessage = nil }
       } message: {
         Text(errorMessage ?? "")
       }
