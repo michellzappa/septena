@@ -82,8 +82,9 @@ struct TaskListNotice<Actions: View>: View {
 
   private var message: some View {
     VStack(alignment: .leading, spacing: 2) {
+      // Same font as a task title: a notice reads as a row of the list.
       title
-        .font(.septenaMetaStrong)
+        .font(.septenaTaskTitle)
         .foregroundStyle(Theme.inkPrimary)
       if let detail {
         detail

@@ -60,8 +60,10 @@ final class KitNoticeCell: NSTableCellView {
   /// Row height for a notice. Text is one line per field (truncated), so the
   /// height is a function of the content, not of the width.
   static func height(for notice: KitNotice) -> CGFloat {
-    let line = lineHeight(SeptaskKitTheme.meta)
-    let text = notice.detail == nil ? line : line * 2 + 1
+    // The title reads like a task title (same font), the detail like a
+    // task's meta line.
+    let title = lineHeight(SeptaskKitTheme.taskTitle)
+    let text = notice.detail == nil ? title : title + lineHeight(SeptaskKitTheme.meta) + 1
     let control: CGFloat = notice.primaryTitle == nil ? 16 : 22
     let gap: CGFloat = notice.headsCard ? 0 : bottomGap
     return ceil(max(text, control)) + verticalPad * 2 + gap
@@ -99,7 +101,7 @@ final class KitNoticeCell: NSTableCellView {
     glyph.setContentHuggingPriority(.required, for: .horizontal)
     glyph.kitA11yIgnore()
 
-    titleLabel.font = SeptaskKitTheme.metaStrong
+    titleLabel.font = SeptaskKitTheme.taskTitle
     titleLabel.textColor = SeptaskKitTheme.inkPrimary
     titleLabel.lineBreakMode = .byTruncatingTail
     titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
