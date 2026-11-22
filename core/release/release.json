@@ -1,36 +1,36 @@
 {
-  "version": "0.1.0",
-  "tag": "core-v0.1.0",
+  "version": "0.2.0",
+  "tag": "core-v0.2.0",
   "assets": [
     {
-      "name": "SeptenaSharedCore-0.1.0.swift",
-      "sha256": "2d3b10549759ad67dd015177f1f1888b6c75c647e1f0391b9df04f93f645bb19",
-      "url": "https://github.com/michellzappa/septena/releases/download/core-v0.1.0/SeptenaSharedCore-0.1.0.swift"
+      "name": "SeptenaSharedCore-0.2.0.swift",
+      "sha256": "afdd7075fbf62df3484e9400ae770e33348d24a07a0efdbd2006418c08b244c0",
+      "url": "https://github.com/michellzappa/septena/releases/download/core-v0.2.0/SeptenaSharedCore-0.2.0.swift"
     },
     {
-      "name": "SeptenaSharedCoreFFI-0.1.0.xcframework.zip",
-      "sha256": "40f9cbb1dc3c7070227e4b404a866dbe6da5047b36ea0795909facfa469af267",
-      "url": "https://github.com/michellzappa/septena/releases/download/core-v0.1.0/SeptenaSharedCoreFFI-0.1.0.xcframework.zip"
+      "name": "SeptenaSharedCoreFFI-0.2.0.xcframework.zip",
+      "sha256": "06a55a718d1998c3e8557341aa73b1dd0d18431c2486f041173ad19434744e79",
+      "url": "https://github.com/michellzappa/septena/releases/download/core-v0.2.0/SeptenaSharedCoreFFI-0.2.0.xcframework.zip"
     },
     {
-      "name": "septena-core-android-jnilibs-0.1.0.zip",
-      "sha256": "347e7b4b16b90adf421385877b06dc687e6f7a2fb37934d3e362bcd424852640",
-      "url": "https://github.com/michellzappa/septena/releases/download/core-v0.1.0/septena-core-android-jnilibs-0.1.0.zip"
+      "name": "septena-core-android-jnilibs-0.2.0.zip",
+      "sha256": "62197356ba0346a5331699b1015bd71e5c325c2399ac07f5bd0e4b8f11ae6ccc",
+      "url": "https://github.com/michellzappa/septena/releases/download/core-v0.2.0/septena-core-android-jnilibs-0.2.0.zip"
     },
     {
-      "name": "septena-core-jvm-natives-0.1.0.jar",
-      "sha256": "57b7fc6242248f9ee37e8bed1f427ba90297b0c3808f44cba857593bbb5964ce",
-      "url": "https://github.com/michellzappa/septena/releases/download/core-v0.1.0/septena-core-jvm-natives-0.1.0.jar"
+      "name": "septena-core-jvm-natives-0.2.0.jar",
+      "sha256": "fe854f2ac08e782ffd89f424485adea1ac41b504f83aa12e5e45b44107a08af8",
+      "url": "https://github.com/michellzappa/septena/releases/download/core-v0.2.0/septena-core-jvm-natives-0.2.0.jar"
     },
     {
-      "name": "septena-core-kotlin-0.1.0.zip",
-      "sha256": "4833fdd337cb42d9c66f147e27f7eab24468b88e419d9b7c8bc811951ed1b659",
-      "url": "https://github.com/michellzappa/septena/releases/download/core-v0.1.0/septena-core-kotlin-0.1.0.zip"
+      "name": "septena-core-kotlin-0.2.0.zip",
+      "sha256": "e15652c6420311300a36eef8ae48302d7f8afd898403af93e2b9e98fdb3adb3e",
+      "url": "https://github.com/michellzappa/septena/releases/download/core-v0.2.0/septena-core-kotlin-0.2.0.zip"
     },
     {
-      "name": "septena-core-wasm-web-0.1.0.tgz",
-      "sha256": "082091ff1c6b9f25bc829f2a919563c733eb444cfa05309900f5898604366f87",
-      "url": "https://github.com/michellzappa/septena/releases/download/core-v0.1.0/septena-core-wasm-web-0.1.0.tgz"
+      "name": "septena-core-wasm-web-0.2.0.tgz",
+      "sha256": "e75376067a2fb9707b35b21cc4f4c9d3df38fd5085fd9b8f4fac6306e09687f4",
+      "url": "https://github.com/michellzappa/septena/releases/download/core-v0.2.0/septena-core-wasm-web-0.2.0.tgz"
     }
   ]
 }

@@ -23,26 +23,28 @@ struct ConvoDerived {
 }
 
 extension TaskConvo {
+  /// The core's conversation facts (`conversation_state`, ADR 0025). The
+  /// predicates below read it, so every client shares one rule. A claim lease
+  /// is wall-clock time on the backend, so this reads the real clock.
+  func coreState(at now: Date = Date()) -> ConversationState? {
+    try? conversationState(conversation: coreConversation, now: SharedCoreValues.instant(now))
+  }
+
   /// True when the last turn is a provider turn still awaiting the human's tap
   /// (it offered options and no user turn followed). The 🟡 state.
-  var hasOpenProviderQuestion: Bool {
-    guard let last = thread.last else { return false }
-    return last.role == .provider && (last.options?.isEmpty == false)
-  }
+  var hasOpenProviderQuestion: Bool { coreState()?.hasOpenProviderQuestion ?? false }
 
   /// True when an agent finished work and handed the task back for the human
   /// to verify and accept or send back (`#87`). Single source of truth for the
-  /// Review smart list and badge.
+  /// Review smart list and badge. A single-field read: it stays in Swift.
   var needsHumanReview: Bool { endState == .needsVerify }
 
   /// True when the conversation is waiting on a human action — either verifying
   /// finished agent work (`needs_verify`) or answering an open choice card.
-  var awaitsHuman: Bool { needsHumanReview || hasOpenProviderQuestion }
+  var awaitsHuman: Bool { coreState()?.awaitsHuman ?? needsHumanReview }
 
   /// There's a conversation worth surfacing at all.
-  var hasStarted: Bool {
-    !thread.isEmpty || confirmedIntent != nil || isTerminal || artifact != nil || handoff != nil
-  }
+  var hasStarted: Bool { coreState()?.hasStarted ?? false }
 
   /// SINGLE source of truth for the reasoning queue, shared by the in-app
   /// backend filter and the badge: marked for Claude, OR last provider turn
@@ -56,7 +58,7 @@ extension TaskConvo {
   var coreConversation: TaskConversation {
     TaskConversation(
       confirmedIntent: confirmedIntent,
-      thread: thread.map {
+      thread: coreTurns.map {
         ConversationTurn(sequence: Int64($0.seq), role: $0.role.rawValue, options: $0.options, confidence: $0.confidence)
       },
       artifactExists: artifact != nil,
@@ -67,6 +69,16 @@ extension TaskConvo {
       stoppedAt: stoppedAt.map(SharedCoreValues.instant),
       claimUntil: claimedBy == nil ? nil : claimUntil.map(SharedCoreValues.instant)
     )
+  }
+
+  /// The turns the core reads: the last turn and the last provider turn.
+  /// Sending only these keeps a core call the same cost for any thread
+  /// length; the core's answers depend on nothing else in the thread.
+  private var coreTurns: [ConvoTurn] {
+    guard let last = thread.max(by: { $0.seq < $1.seq }) else { return [] }
+    guard last.role != .provider,
+          let provider = thread.filter({ $0.role == .provider }).max(by: { $0.seq < $1.seq }) else { return [last] }
+    return [provider, last]
   }
 
   /// The core's projection; nil only if the core rejects the input.
@@ -94,14 +106,9 @@ extension TaskConvo {
   /// a stale assignee; a stop counts as Your turn, because only the human can
   /// resume it (ADR 0008).
   func agentStage(at now: Date) -> AgentStage? {
-    let claimed = isClaimed(at: now)
-    guard assignee == .claude || claimed || needsHumanReview else { return nil }
-    if needsHumanReview { return .review }
-    if isTerminal { return .done }
-    if hasOpenProviderQuestion || stoppedAt != nil { return .yourTurn }
-    if claimed { return .working }
-    return .queued
+    coreState(at: now)?.agentStage.flatMap(AgentStage.init(rawValue:))
   }
+
 }
 
 /// Pure projection of a conversation into UI/queue state, computed by the

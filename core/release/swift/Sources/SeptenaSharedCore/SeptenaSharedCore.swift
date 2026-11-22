@@ -725,6 +725,147 @@ public func FfiConverterTypeConversationProjection_lower(_ value: ConversationPr
 }
 
 
+/**
+ * The facts about a conversation that task lists and the Agent list read.
+ */
+public struct ConversationState {
+    public var isTerminal: Bool
+    /**
+     * An agent handed the task back for the human to verify (`needs_verify`).
+     */
+    public var needsHumanReview: Bool
+    /**
+     * The last turn is a provider turn with options and no answer yet.
+     */
+    public var hasOpenProviderQuestion: Bool
+    public var awaitsHuman: Bool
+    public var hasStarted: Bool
+    /**
+     * A live claim: `claim_until` is after `now`. The host passes
+     * `claim_until` only when the claim has a claimant.
+     */
+    public var isClaimed: Bool
+    /**
+     * The Agent smart list stage (`queued`, `working`, `yourTurn`, `review`,
+     * `done`), or none when the task is not agent work.
+     */
+    public var agentStage: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(isTerminal: Bool, 
+        /**
+         * An agent handed the task back for the human to verify (`needs_verify`).
+         */needsHumanReview: Bool, 
+        /**
+         * The last turn is a provider turn with options and no answer yet.
+         */hasOpenProviderQuestion: Bool, awaitsHuman: Bool, hasStarted: Bool, 
+        /**
+         * A live claim: `claim_until` is after `now`. The host passes
+         * `claim_until` only when the claim has a claimant.
+         */isClaimed: Bool, 
+        /**
+         * The Agent smart list stage (`queued`, `working`, `yourTurn`, `review`,
+         * `done`), or none when the task is not agent work.
+         */agentStage: String?) {
+        self.isTerminal = isTerminal
+        self.needsHumanReview = needsHumanReview
+        self.hasOpenProviderQuestion = hasOpenProviderQuestion
+        self.awaitsHuman = awaitsHuman
+        self.hasStarted = hasStarted
+        self.isClaimed = isClaimed
+        self.agentStage = agentStage
+    }
+}
+
+#if compiler(>=6)
+extension ConversationState: Sendable {}
+#endif
+
+
+extension ConversationState: Equatable, Hashable {
+    public static func ==(lhs: ConversationState, rhs: ConversationState) -> Bool {
+        if lhs.isTerminal != rhs.isTerminal {
+            return false
+        }
+        if lhs.needsHumanReview != rhs.needsHumanReview {
+            return false
+        }
+        if lhs.hasOpenProviderQuestion != rhs.hasOpenProviderQuestion {
+            return false
+        }
+        if lhs.awaitsHuman != rhs.awaitsHuman {
+            return false
+        }
+        if lhs.hasStarted != rhs.hasStarted {
+            return false
+        }
+        if lhs.isClaimed != rhs.isClaimed {
+            return false
+        }
+        if lhs.agentStage != rhs.agentStage {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(isTerminal)
+        hasher.combine(needsHumanReview)
+        hasher.combine(hasOpenProviderQuestion)
+        hasher.combine(awaitsHuman)
+        hasher.combine(hasStarted)
+        hasher.combine(isClaimed)
+        hasher.combine(agentStage)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeConversationState: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ConversationState {
+        return
+            try ConversationState(
+                isTerminal: FfiConverterBool.read(from: &buf), 
+                needsHumanReview: FfiConverterBool.read(from: &buf), 
+                hasOpenProviderQuestion: FfiConverterBool.read(from: &buf), 
+                awaitsHuman: FfiConverterBool.read(from: &buf), 
+                hasStarted: FfiConverterBool.read(from: &buf), 
+                isClaimed: FfiConverterBool.read(from: &buf), 
+                agentStage: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ConversationState, into buf: inout [UInt8]) {
+        FfiConverterBool.write(value.isTerminal, into: &buf)
+        FfiConverterBool.write(value.needsHumanReview, into: &buf)
+        FfiConverterBool.write(value.hasOpenProviderQuestion, into: &buf)
+        FfiConverterBool.write(value.awaitsHuman, into: &buf)
+        FfiConverterBool.write(value.hasStarted, into: &buf)
+        FfiConverterBool.write(value.isClaimed, into: &buf)
+        FfiConverterOptionString.write(value.agentStage, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeConversationState_lift(_ buf: RustBuffer) throws -> ConversationState {
+    return try FfiConverterTypeConversationState.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeConversationState_lower(_ value: ConversationState) -> RustBuffer {
+    return FfiConverterTypeConversationState.lower(value)
+}
+
+
 public struct ConversationTurn {
     public var sequence: Int64
     public var role: String
@@ -2615,6 +2756,20 @@ public func checkPullPage(cursor: Int64, page: PullPageHeader, resetsSoFar: UInt
 })
 }
 /**
+ * The predicates and the Agent-list stage of a conversation
+ * (`docs/TASK_FACTORY_SPEC.md` §3). Review and Done win over a stale
+ * assignee; a stop counts as Your turn, because only the human can resume it
+ * (ADR 0008).
+ */
+public func conversationState(conversation: TaskConversation, now: String)throws  -> ConversationState  {
+    return try  FfiConverterTypeConversationState_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+    uniffi_septena_core_fn_func_conversation_state(
+        FfiConverterTypeTaskConversation_lower(conversation),
+        FfiConverterString.lower(now),$0
+    )
+})
+}
+/**
  * The version of this core, for host logs and the job summary.
  */
 public func coreVersion() -> String  {
@@ -2823,6 +2978,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.contractVersionMismatch
     }
     if (uniffi_septena_core_checksum_func_check_pull_page() != 24761) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_septena_core_checksum_func_conversation_state() != 24271) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_septena_core_checksum_func_core_version() != 5866) {
