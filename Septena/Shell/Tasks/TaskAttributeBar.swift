@@ -102,38 +102,46 @@ struct TaskAttributeBar: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
-      // Single horizontal row of circular icon buttons — all 6 fit comfortably
-      // on one row even on compact iPhone widths. "Today" lives inside the When
-      // control rather than duplicating the rail.
-      HStack(spacing: 8) {
-        ForEach(Attribute.draftCases) { attr in
-          AttributePill(icon: attr.icon, label: attr.label,
-                        value: value(for: attr), isSet: isSet(attr),
-                        isActive: expanded == attr, isFocused: focus == .pill(attr),
-                        accent: accent, neutral: neutral) { select(attr) }
-            .focused($focus, equals: .pill(attr))
-        }
-        if let task = discussTask {
-          let count = SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: task.id)
-          AttributePill(icon: Attribute.attachments.icon, label: Attribute.attachments.label,
-                        value: count == 0 ? nil : "\(count) file\(count == 1 ? "" : "s")",
-                        isSet: count > 0, isActive: expanded == .attachments,
-                        isFocused: focus == .pill(.attachments), accent: accent, neutral: neutral) {
-            select(.attachments)
+      // Horizontal rail of circular icon buttons — scrolls sideways inside its
+      // bounded slot so the rail never widens its card past the screen. "Today"
+      // lives inside the When control rather than duplicating the rail.
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 8) {
+          ForEach(Attribute.draftCases) { attr in
+            AttributePill(icon: attr.icon, label: attr.label,
+                          value: value(for: attr), isSet: isSet(attr),
+                          isActive: expanded == attr, isFocused: focus == .pill(attr),
+                          accent: accent, neutral: neutral) { select(attr) }
+              .focused($focus, equals: .pill(attr))
           }
-          .focused($focus, equals: .pill(.attachments))
+          if let task = discussTask {
+            let count = SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: task.id)
+            AttributePill(icon: Attribute.attachments.icon, label: Attribute.attachments.label,
+                          value: count == 0 ? nil : "\(count) file\(count == 1 ? "" : "s")",
+                          isSet: count > 0, isActive: expanded == .attachments,
+                          isFocused: focus == .pill(.attachments), accent: accent, neutral: neutral) {
+              select(.attachments)
+            }
+            .focused($focus, equals: .pill(.attachments))
+          }
+          if showsDiscuss {
+            AttributePill(icon: Attribute.discuss.icon, label: Attribute.discuss.label,
+                          value: discussWorking ? "Thinking…" : nil,
+                          isSet: discussWorking, isActive: false,
+                          isLoading: discussWorking,
+                          isFocused: focus == .pill(.discuss),
+                          accent: accent, neutral: neutral) { select(.discuss) }
+              .focused($focus, equals: .pill(.discuss))
+              .disabled(discussWorking)
+          }
         }
-        if showsDiscuss {
-          AttributePill(icon: Attribute.discuss.icon, label: Attribute.discuss.label,
-                        value: discussWorking ? "Thinking…" : nil,
-                        isSet: discussWorking, isActive: false,
-                        isLoading: discussWorking,
-                        isFocused: focus == .pill(.discuss),
-                        accent: accent, neutral: neutral) { select(.discuss) }
-            .focused($focus, equals: .pill(.discuss))
-            .disabled(discussWorking)
-        }
+        // Small inset so the circular glass edge and focus ring don't clip
+        // against the scroll viewport's bounds.
+        .padding(.vertical, 2)
+        .padding(.horizontal, 1)
       }
+      .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+      .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
 
       inlineEditor
     }

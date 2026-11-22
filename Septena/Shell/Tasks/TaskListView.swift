@@ -3484,7 +3484,7 @@ struct TaskListView: View {
         purgeDraftIfEmpty(id: task.id)
       }
     )
-    .frame(maxWidth: .infinity, alignment: .leading)
+    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
     // No own card or screen margin: the surrounding `TaskCardChrome` slice paints
     // the card surface + margin (and sets `rowHInset`), so the editor simply
     // expands the row IN PLACE inside the group card instead of floating as a

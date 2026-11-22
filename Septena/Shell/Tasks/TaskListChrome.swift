@@ -161,6 +161,8 @@ private struct TaskCardChrome: ViewModifier {
   func body(content: Content) -> some View {
     let shape = effectiveShape
     content
+      .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+      .clipShape(shape)
       .environment(\.rowHInset, TaskCardMetrics.contentInset)
       .background(alignment: .bottom) {
         ZStack(alignment: .bottom) {
