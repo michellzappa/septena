@@ -45,10 +45,10 @@ stay as history.
 - **Not compiled in Septask:** `TaskBackendImporter`, `TaskStoreRollback`,
   `CloudKitRecordRegistry`, `SchemaSeedRegistrar`,
   `TasksWatchSnapshotPublisher` (project.yml excludes).
-- **Watch:** the Septask watch read a CloudKit snapshot record the phone
-  published. That publisher is off, so the watch needs a new transport
-  (WatchConnectivity or the backend) before `WATCH_EMBED_DISABLED` in
-  project.yml is undone.
+- **Watch:** (2026-11-22) the watch is a thin client of the backend
+  (`GET/POST /v1/tasks`), with its own session handed over by the phone
+  through WatchConnectivity. See `docs/WATCH.md`. The old CloudKit snapshot
+  path is gone.
 
 ## AppKit shell on macOS (2026-08-06)
 

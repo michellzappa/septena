@@ -1,19 +1,24 @@
 import type { Env } from "../env.js";
 import { logEvent } from "../util.js";
 import { storeFor } from "../api/session.js";
+import { PLAN_LIMITS, PLAN_UPSELLS } from "../generated/registries.js";
 
-// Sync subscription entitlement (docs/SYNC_SUBSCRIPTION_SPEC.md §5–§6).
+// Plan and entitlement (docs/SYNC_SUBSCRIPTION_SPEC.md §5–§6, ADR 0010,
+// ADR 0023).
 //
 // Rows live in the user's TaskStore Durable Object (`entitlements` table).
 // One row per source of access: `apple:<originalTransactionId>` for an App
 // Store subscription, `grant:<name>` for a hand-made grant (mz, testers,
-// press). The user has sync when ANY row is active.
+// press). The user is on Plus when ANY row is active, else on the free
+// account.
 //
-// `hasSyncEntitlement` is the one check. Every paid path calls it through
-// `entitlementGate`: the /v1 sync middleware and the api.septena.app
-// connector's write tools. `ENTITLEMENT_ENFORCE` decides what a "no" does:
-// "true" blocks (402 / tool error); anything else only logs
-// `entitlement_would_block` and lets the call through.
+// `resolvePlan` turns the rows into a plan id, and `PLAN_TABLE` maps the plan
+// to its limits (registry/plans.json `limits`, generated to PLAN_LIMITS).
+// Gates read limits, never the plan name: a later tier is a new row in the
+// table, not a code change at the gates. Every limited call goes through
+// `decide`. `ENTITLEMENT_ENFORCE` decides what a "no" does: "true" blocks
+// (402 / tool error); anything else only logs `entitlement_would_block` and
+// lets the call through.
 
 export type EntitlementSource = "apple" | "grant" | "stripe";
 export type EntitlementStatus = "active" | "grace" | "billing_retry" | "expired" | "revoked";
@@ -63,28 +68,118 @@ export function isEnforcing(env: Env): boolean {
   return env.ENTITLEMENT_ENFORCE === "true";
 }
 
-export async function hasSyncEntitlement(env: Env, userId: string): Promise<boolean> {
-  const rows = await storeFor(env, userId).entitlements();
-  const now = Date.now();
-  return rows.some((r) => isRowActive(r, now));
+// ---- plans and limits ----
+
+/// The plans the server knows. `trial` (the 14-day reverse trial, spec §3)
+/// is not built yet; it will resolve to the Plus limits.
+export type PlanId = "free" | "plus";
+
+export interface PlanLimits {
+  /// Devices that sync to the server; null = no cap.
+  devices: number | null;
+  /// The live socket (`/v1/sync/ws`). Without it the app polls.
+  liveSync: boolean;
+  /// Change history the reads show (`/v1/changes`, tasks_history,
+  /// tasks_activity). null = everything the store keeps.
+  changeLogDays: number | null;
+  /// Logbook window. Read by the apps; the server has no Logbook read.
+  logbookDays: number | null;
+  /// Recently Deleted window. Read by the apps; the server has no Recently
+  /// Deleted read.
+  recentlyDeletedDays: number | null;
+  /// Server attachment storage (R2). 0 = attachments stay on the device.
+  attachmentsGB: number | null;
+  /// Connector write calls per UTC day; null = no cap.
+  connectorWritesPerDay: number | null;
+  /// New agent claims per UTC month; null = no cap (the per-task run budget
+  /// of ADR 0008 still applies).
+  agentRunsPerMonth: number | null;
+  createShares: boolean;
+  linkedProjects: number | null;
 }
 
-/// "allow" or "block" for one paid call. Logs every "no". In log-only mode
-/// (ENTITLEMENT_ENFORCE != "true") the answer is always "allow", and a failed
-/// check never breaks sync. In enforce mode a failed check blocks (fail
-/// closed).
-export async function entitlementGate(env: Env, userId: string, surface: string): Promise<"allow" | "block"> {
+/// The plan table. Values come only from registry/plans.json.
+export const PLAN_TABLE: Record<PlanId, PlanLimits> = {
+  free: PLAN_LIMITS.account,
+  plus: PLAN_LIMITS.plus,
+};
+
+export function resolvePlan(rows: EntitlementRow[], now = Date.now()): PlanId {
+  return rows.some((r) => isRowActive(r, now)) ? "plus" : "free";
+}
+
+export interface PlanState {
+  plan: PlanId;
+  limits: PlanLimits;
+  rows: EntitlementRow[];
+  /// Usage counters asked for in `planFor` (key → count).
+  usage: Record<string, number>;
+}
+
+/// The caller's plan, with the usage counters a gate needs, in one call to
+/// the user's Durable Object.
+export async function planFor(env: Env, userId: string, usageKeys: string[] = []): Promise<PlanState> {
+  const snap = await storeFor(env, userId).planSnapshot(usageKeys);
+  const plan = resolvePlan(snap.entitlements);
+  return { plan, limits: PLAN_TABLE[plan], rows: snap.entitlements, usage: snap.usage };
+}
+
+export type UpsellId = keyof typeof PLAN_UPSELLS;
+
+/// A call that breaks one limit, and the upsell moment it maps to (spec
+/// §3.2). null: no upsell (the app falls back quietly, e.g. live sync → poll).
+export interface LimitBreach {
+  limit: keyof PlanLimits;
+  upsell: UpsellId | null;
+}
+
+/// The upsell as one line, for a refusal the user or the model reads.
+export function upsellLine(id: UpsellId): string {
+  const u = PLAN_UPSELLS[id];
+  return `${u.title}. ${u.detail}`;
+}
+
+/// "allow" or "block" for one limited call. Logs every breach. In log-only
+/// mode (ENTITLEMENT_ENFORCE != "true") the answer is always "allow".
+export function decide(env: Env, userId: string, surface: string, state: PlanState, breach: LimitBreach | null): "allow" | "block" {
+  if (!breach) return "allow";
   const enforce = isEnforcing(env);
-  let ok: boolean;
-  try {
-    ok = await hasSyncEntitlement(env, userId);
-  } catch (e) {
-    logEvent("entitlement_check_failed", { surface, userId, enforce, error: e instanceof Error ? e.message : String(e) });
-    return enforce ? "block" : "allow";
-  }
-  if (ok) return "allow";
-  logEvent(enforce ? "entitlement_blocked" : "entitlement_would_block", { surface, userId });
+  logEvent(enforce ? "entitlement_blocked" : "entitlement_would_block", {
+    surface, userId, plan: state.plan, limit: breach.limit,
+  });
   return enforce ? "block" : "allow";
+}
+
+/// A failed plan check. Log-only mode lets the call through with no limits;
+/// enforce mode blocks (fail closed).
+export function planCheckFailed(env: Env, userId: string, surface: string, e: unknown): "allow" | "block" {
+  const enforce = isEnforcing(env);
+  logEvent("entitlement_check_failed", { surface, userId, enforce, error: e instanceof Error ? e.message : String(e) });
+  return enforce ? "block" : "allow";
+}
+
+/// Counter keys. Days and months are UTC.
+export const usageKeys = {
+  connectorWrites: (now = new Date()) => `cw:${now.toISOString().slice(0, 10)}`,
+  agentRuns: (now = new Date()) => `ar:${now.toISOString().slice(0, 7)}`,
+};
+
+/// A count against a cap: over when the next call would pass the cap.
+export function atCap(used: number, cap: number | null): boolean {
+  return cap !== null && used >= cap;
+}
+
+const DAY_MS = 24 * HOUR_MS;
+
+/// The oldest change a read may show, or null for no window. Applied only
+/// when enforcing, so log-only mode reads exactly as before.
+export function historyCutoff(env: Env, limits: PlanLimits | null, now = Date.now()): string | null {
+  if (!limits || limits.changeLogDays === null || !isEnforcing(env)) return null;
+  return new Date(now - limits.changeLogDays * DAY_MS).toISOString();
+}
+
+export function attachmentQuotaBytes(limits: PlanLimits): number | null {
+  return limits.attachmentsGB === null ? null : limits.attachmentsGB * 1024 ** 3;
 }
 
 // ---- appAccountToken ----
