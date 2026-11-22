@@ -98,14 +98,21 @@ function containerNames(areas: Row[], projects: Row[]): Map<string, string> {
 
 const zView = z.enum(["today", "inbox", "upcoming", "repeating", "anytime", "completed", "starred", "review"]);
 
+/// Mirrors `TaskStructureOrder.positionOrdered` in SeptenaCore: positive
+/// `position` ascending, unset (`0` / missing) sinks to the bottom, ties break
+/// by title (case-insensitive).
 function numPos(v: unknown): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : Number.POSITIVE_INFINITY;
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : Number.POSITIVE_INFINITY;
 }
 
 function sortByPosition(rows: Row[]): Row[] {
   return rows
-    .map((r, i) => ({ r, i }))
-    .sort((a, b) => numPos(a.r.position) - numPos(b.r.position) || a.i - b.i)
+    .map((r, i) => ({ r, i, title: typeof r.title === "string" ? r.title : "" }))
+    .sort((a, b) =>
+      numPos(a.r.position) - numPos(b.r.position)
+      || a.title.localeCompare(b.title, undefined, { sensitivity: "base" })
+      || a.i - b.i,
+    )
     .map((x) => x.r);
 }
 
