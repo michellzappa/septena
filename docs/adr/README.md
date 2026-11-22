@@ -29,6 +29,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0021](0021-one-import-engine-with-source-adapters.md) | One import engine, with source adapters behind a versioned bundle | accepted |
 | [0022](0022-marketing-scenes-come-from-the-native-app.md) | Marketing scenes come from the native app | rejected |
 | [0023](0023-sync-across-devices-is-plus.md) | Make sync across devices the paid line (amends 0010) | accepted |
+| [0024](0024-no-iphone-tab-bar.md) | No tab bar on iPhone: the list is the root of one navigation stack | accepted |
 
 ## Template
 

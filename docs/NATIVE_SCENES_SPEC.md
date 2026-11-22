@@ -57,8 +57,7 @@ Use `.a11yID(.tasks(…))` / `.a11yID(.sidebar(…))` in SwiftUI and the `kitA11
 | `tasks.detail` | task detail (iOS) / inspector (Mac) |
 | `tasks.detail.notes`, `.when`, `.deadline`, `.repeat`, `.attachments`, `.project` | parts of the detail |
 | `tasks.thread` | the task conversation |
-| `sidebar.destination.<id>` | Mac sidebar rows |
-| `tasks.tab.<id>` | iPhone tab bar items |
+| `sidebar.destination.<id>` | sidebar rows (Mac sidebar, and the iPhone list root: iPhone has no tab bar, ADR 0024) |
 
 Destination ids come from `registry/destinations.json`. These identifiers also serve VoiceOver, Voice Control and the existing contract tests.
 

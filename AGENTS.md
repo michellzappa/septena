@@ -277,7 +277,7 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
 - **Septask-specific exceptions, three sizes:** (1) `#if SEPTASK` inside a
   shared file for small branches (the target sets that compilation
   condition); (2) a Septask-only implementation in `Septask/` (settings
-  shell, welcome, tab bar) — composition only, never task business logic;
+  shell, welcome, root navigation) — composition only, never task business logic;
   (3) a `project.yml` exclude when a file shouldn't compile at all.
   **Never copy a task file into `Septask/` to tweak it** — copies drift.
 - **After touching shared code, build all four schemes.** The compiler
@@ -503,7 +503,9 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
 - `Septena/Shell/` — dashboards, settings, tasks, goals, intelligence, shared UI.
 - `Septena/Sections/` — per-section destination views and sheets.
 - `Septask/` — Septask's composition root only (app entry, welcome, settings
-  shell, tab bar, assets, entitlements). Task behavior never lives here.
+  shell, root navigation, assets, entitlements). Task behavior never lives here.
+  iPhone has NO tab bar: the list is the root of one navigation stack
+  (ADR 0024). Never add one back, in the app or in any mock.
 - `SeptenaWatch/` + `SeptenaWatchComplication/` — watch app & complications
   (**hand-wired per section**, not manifest-driven, except the shared Next feed).
 - `SeptenaWidgets/`, `SeptenaLiveActivitiesExtension/` — extensions.
