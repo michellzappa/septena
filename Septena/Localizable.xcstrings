@@ -8353,6 +8353,18 @@
     "Part of Septena" : {
 
     },
+    "Paste" : {
+      "comment" : "Generated from registry surfaces.taskAttributes.paste.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colar"
+          }
+        }
+      }
+    },
     "Paste a Septena JSON export below." : {
       "localizations" : {
         "pt-BR" : {

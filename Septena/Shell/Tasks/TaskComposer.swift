@@ -175,6 +175,11 @@ struct TaskComposerCard: View {
   @State private var suggestedList: SuggestionEngine.Suggestion?
   /// Mirrors whether the Discuss pill is on the rail (edit mode, no thread yet).
   @State private var discussKickoffVisible = false
+  /// The clipboard held text when this blank new task opened, so the Paste
+  /// chip is on offer (#210). Checked once per seed with `hasText`, which
+  /// never reads the clipboard, so no iOS paste-permission alert appears.
+  /// Cleared by a paste or by the first keystroke.
+  @State private var pasteOffered = false
 
   init(mode: Mode, areas: [Area], projects: [Project], accent: Color,
        presentation: Presentation = .drawer, deferredCreate: Bool = false,
@@ -304,6 +309,9 @@ struct TaskComposerCard: View {
         //     so the field never *shows* a break (the row is laid out for one
         //     line), joining the lines with a space so the words don't fuse.
         //     A paste must NOT commit: the user is still editing.
+        // Typing hides the Paste chip (#210). One flag write per editing
+        // session; later keystrokes skip it.
+        if pasteOffered, !newValue.isEmpty { pasteOffered = false }
         guard newValue.contains(where: \.isNewline) else { updateSuggestion(); return }
         if TaskTitleText.withoutLineBreaks(newValue) == oldValue {
           draft.title = TaskTitleText.withoutLineBreaks(newValue)
@@ -615,8 +623,10 @@ struct TaskComposerCard: View {
   private var quickEntryChips: some View {
     let tokens = detectedTokens
     let suggestion = listSuggestion
-    if !tokens.isEmpty || suggestion != nil {
+    let paste = showsPasteChip
+    if !tokens.isEmpty || suggestion != nil || paste {
       FlowLayout(spacing: 8) {
+        if paste { pasteChip }
         ForEach(tokens) { token in
           chip(icon: token.icon, leading: "plus", text: token.displayText) { apply(token) }
         }
@@ -646,6 +656,62 @@ struct TaskComposerCard: View {
     }
     .buttonStyle(.plain)
     .background(Capsule().fill(accent.opacity(0.28)))
+  }
+
+  // MARK: - Paste chip (#210)
+
+  /// Blank new task, clipboard had text at open, nothing typed yet.
+  private var showsPasteChip: Bool {
+    pasteOffered && isCreating && draft.title.isEmpty && draft.notes.isEmpty
+  }
+
+  /// The Paste chip. Label and icon come from the registry
+  /// (`taskAttributes` `paste`, tier `chip`).
+  @ViewBuilder
+  private var pasteChip: some View {
+    #if os(iOS)
+    // iOS: the system `PasteButton` reads the clipboard with the user's tap
+    // as consent, so no paste-permission alert appears. It draws its own
+    // system "Paste" label and clipboard glyph.
+    PasteButton(payloadType: String.self) { strings in
+      guard let text = strings.first else { return }
+      Task { @MainActor in applyPaste(text) }
+    }
+    .buttonBorderShape(.capsule)
+    .labelStyle(.titleAndIcon)
+    .controlSize(.small)
+    .tint(accent)
+    #else
+    let attr = RegistrySurfaces.taskAttribute("paste")
+    Button {
+      if let text = NSPasteboard.general.string(forType: .string) { applyPaste(text) }
+    } label: {
+      HStack(spacing: 5) {
+        Image(systemName: attr.sfSymbol).font(.system(size: 11, weight: .semibold))
+        Text(verbatim: attr.label).font(.septenaLabel).lineLimit(1)
+      }
+      .foregroundStyle(accent)
+      .padding(.horizontal, 11)
+      .padding(.vertical, 6)
+      .contentShape(Capsule())
+    }
+    .buttonStyle(.plain)
+    .background(Capsule().fill(accent.opacity(0.28)))
+    #endif
+  }
+
+  /// Fill the blank draft from clipboard text (`TaskTitleText.pasteSplit`)
+  /// and retire the chip. Does not commit: the user is still composing.
+  private func applyPaste(_ text: String) {
+    pasteOffered = false
+    guard let split = TaskTitleText.pasteSplit(text) else { return }
+    Haptics.tick()
+    a11yAnimate(.snappy(duration: 0.2)) {
+      draft.title = split.title
+      if let notes = split.notes { draft.notes = notes }
+    }
+    updateSuggestion()
+    focusTitle()
   }
 
   private func applySuggestedList() {
@@ -765,6 +831,8 @@ struct TaskComposerCard: View {
       }
       #endif
     }
+    pasteOffered = isCreating && draft.title.isEmpty && draft.notes.isEmpty
+      && SeptenaPasteboard.hasText
   }
 
   /// Move keyboard focus into the title field and — on macOS — collapse

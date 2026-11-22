@@ -450,7 +450,7 @@ function validateSurfaces(surfaces, icons, caps) {
   for (const attr of surfaces.taskAttributes) {
     assert(!attrIds.has(attr.id), `surfaces.json: duplicate attribute ${attr.id}`);
     attrIds.add(attr.id);
-    assert(["field", "inline", "popover"].includes(attr.surfaceTier), `surfaces.json: attribute ${attr.id} unknown surfaceTier "${attr.surfaceTier}"`);
+    assert(["field", "inline", "popover", "chip"].includes(attr.surfaceTier), `surfaces.json: attribute ${attr.id} unknown surfaceTier "${attr.surfaceTier}"`);
     assert(attr.icon in icons.icons, `surfaces.json: attribute ${attr.id} unknown icon "${attr.icon}"`);
     assert(attr.featureId in caps.capabilities, `surfaces.json: attribute ${attr.id} unknown featureId "${attr.featureId}"`);
   }
@@ -1116,7 +1116,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
 
   lines.push("/// One task attribute (`registry/surfaces.json` `taskAttributes`): a composer");
   lines.push("/// pill, an inspector row and a picker title. `surfaceTier` `field` is an");
-  lines.push("/// always-visible field (notes), not a pill. `editOnly` needs a saved task.");
+  lines.push("/// always-visible field (notes), not a pill. `chip` is a transient composer");
+  lines.push("/// chip shown only on a blank new task (Paste), not a pill. `editOnly` needs a saved task.");
   lines.push("struct RegistryTaskAttribute: Sendable, Hashable, Identifiable {");
   lines.push("  let id: String");
   lines.push("  let label: String");
@@ -1128,7 +1129,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let editOnly: Bool");
   lines.push("  /// Pill text while the attribute's work runs (Discuss).");
   lines.push("  let workingLabel: String?");
-  lines.push("  var isPill: Bool { surfaceTier != \"field\" }");
+  lines.push("  var isPill: Bool { surfaceTier == \"inline\" || surfaceTier == \"popover\" }");
   lines.push("}");
   lines.push("");
   lines.push("enum RegistrySurfaces {");
@@ -1138,7 +1139,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     lines.push(`    RegistryTaskAttribute(id: ${swiftStr(a.id)}, label: ${L(a.label, a, "label")}, iconId: ${swiftStr(a.icon)}, sfSymbol: ${swiftStr(icons.icons[a.icon].sfSymbol)}, commitContract: ${swiftStr(a.commitContract)}, surfaceTier: ${swiftStr(a.surfaceTier)}, featureId: ${swiftStr(a.featureId)}, editOnly: ${a.editOnly === true}, workingLabel: ${LOpt(a.workingLabel, a, "workingLabel")}),`);
   }
   lines.push("  ]");
-  lines.push("  /// The pills, in rail order (every attribute except fields).");
+  lines.push("  /// The pills, in rail order (every attribute except fields and chips).");
   lines.push("  static let taskAttributePills: [RegistryTaskAttribute] = taskAttributes.filter(\\.isPill)");
   lines.push("  static let taskAttributeLabels: [String: String] = Dictionary(uniqueKeysWithValues: taskAttributes.map { ($0.id, $0.label) })");
   lines.push("  /// The attribute with `id`. Traps on an unknown id: the ids are a closed set.");

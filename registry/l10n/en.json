@@ -1153,6 +1153,12 @@
       "settings.rootGroups.lists_root.items.5.label"
     ]
   },
+  "Paste": {
+    "text": "Paste",
+    "paths": [
+      "surfaces.taskAttributes.paste.label"
+    ]
+  },
   "Paste JSON Backup…": {
     "text": "Paste JSON Backup…",
     "paths": [

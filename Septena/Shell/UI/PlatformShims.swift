@@ -17,6 +17,20 @@ enum SeptenaPasteboard {
     pb.setString(text, forType: .string)
     #endif
   }
+
+  /// Whether the clipboard holds text, WITHOUT reading it. On iOS this is
+  /// `hasStrings`, which does not show the system paste-permission alert
+  /// (reading `.string` does). Gates the new-task Paste chip (#210).
+  static var hasText: Bool {
+    #if canImport(UIKit)
+    return UIPasteboard.general.hasStrings
+    #elseif canImport(AppKit)
+    return !(NSPasteboard.general.string(forType: .string) ?? "")
+      .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    #else
+    return false
+    #endif
+  }
 }
 
 // Tiny cross-platform shims so view files can call the same modifiers on
