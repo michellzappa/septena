@@ -469,6 +469,90 @@ function validateSurfaces(surfaces, icons, caps) {
   }
 }
 
+// ---- plans.json (ADR 0010, ADR 0023) ----
+const PLAN_LEVELS = ["device", "account", "plus"];
+const PLAN_LIMIT_PLANS = ["account", "plus"];
+
+/** Every string in a JSON value, with its path. */
+function stringsOf(node, p, out = []) {
+  if (typeof node === "string") out.push([p, node]);
+  else if (Array.isArray(node)) node.forEach((v, i) => stringsOf(v, `${p}.${i}`, out));
+  else if (node && typeof node === "object") for (const [k, v] of Object.entries(node)) if (k !== "description") stringsOf(v, `${p}.${k}`, out);
+  return out;
+}
+
+function validatePlans(plans, icons, caps) {
+  assert(plans.version === 1, "plans.json: version must be 1");
+  assert(plans.featureId in caps.capabilities, `plans.json: unknown featureId "${plans.featureId}"`);
+  for (const f of ["name", "shortName", "headline", "subhead"]) assert(typeof plans[f] === "string" && plans[f].length > 0, `plans.json: ${f} missing`);
+  // House rule: rendered copy has no em or en dashes.
+  for (const [p, v] of stringsOf(plans, "plans")) assert(!/[–—]/.test(v), `plans.json: ${p} contains an em or en dash`);
+  assert(typeof plans.checkout?.open === "boolean", "plans.json: checkout.open must be a boolean");
+  assert(Number.isInteger(plans.trial?.days) && plans.trial.days > 0, "plans.json: trial.days must be a positive integer");
+  assert(plans.trial.kind === "reverse", "plans.json: trial.kind must be reverse (ADR 0010: one server-side trial, no store offer)");
+  assert(plans.trial.title.includes(String(plans.trial.days)), "plans.json: trial.title must state trial.days");
+
+  const priceIds = new Set();
+  for (const pr of plans.prices) {
+    assert(!priceIds.has(pr.id), `plans.json: duplicate price "${pr.id}"`);
+    priceIds.add(pr.id);
+    assert(/^com\.septena\.tasks\.sync\.[a-z]+$/.test(pr.productId), `plans.json: price ${pr.id} productId must start com.septena.tasks.sync.`);
+    assert(Number.isInteger(pr.amountMinor) && pr.amountMinor > 0, `plans.json: price ${pr.id} amountMinor must be a positive integer`);
+    assert(pr.currency === "EUR", `plans.json: price ${pr.id} currency must be EUR`);
+    assert(["year", "month"].includes(pr.interval), `plans.json: price ${pr.id} unknown interval "${pr.interval}"`);
+    const whole = String(pr.amountMinor / 100);
+    assert(pr.label.includes(whole), `plans.json: price ${pr.id} label must state ${whole}`);
+  }
+  assert(plans.prices.filter((x) => x.highlighted).length === 1, "plans.json: exactly one price must be highlighted");
+
+  assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
+  assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(["free", "plus"]), "plans.json: cards must be free, plus");
+  assert(plans.cards.filter((c) => c.highlighted).length === 1, "plans.json: exactly one card must be highlighted");
+
+  const lim = plans.limits;
+  const keys = Object.keys(lim.account).sort();
+  for (const plan of PLAN_LIMIT_PLANS) {
+    assert(JSON.stringify(Object.keys(lim[plan] ?? {}).sort()) === JSON.stringify(keys), `plans.json: limits.${plan} must have the same keys as limits.account`);
+    for (const [k, v] of Object.entries(lim[plan])) {
+      assert(v === null || typeof v === "boolean" || (Number.isInteger(v) && v >= 0), `plans.json: limits.${plan}.${k} must be null, a boolean or a non-negative integer`);
+    }
+  }
+
+  const rowIds = new Set();
+  for (const o of plans.outcomes) {
+    assert(o.icon in icons.icons, `plans.json: outcome ${o.id} unknown icon "${o.icon}"`);
+    for (const r of o.rows) {
+      assert(!rowIds.has(r.id), `plans.json: duplicate row "${r.id}"`);
+      rowIds.add(r.id);
+      if (r.featureId !== undefined) assert(r.featureId in caps.capabilities, `plans.json: row ${r.id} unknown featureId "${r.featureId}"`);
+      if (r.status !== undefined) assert(r.status === "planned", `plans.json: row ${r.id} status must be planned`);
+      for (const lv of PLAN_LEVELS) {
+        const c = r.cells?.[lv];
+        assert(typeof c === "boolean" || (typeof c === "string" && c.length > 0), `plans.json: row ${r.id} cell ${lv} must be a boolean or text`);
+      }
+      if (r.limit !== undefined) {
+        assert(r.limit in lim.account, `plans.json: row ${r.id} unknown limit "${r.limit}"`);
+        // The copy states the number the server enforces.
+        for (const plan of PLAN_LIMIT_PLANS) {
+          const v = lim[plan][r.limit];
+          const cell = r.cells[plan];
+          if (Number.isInteger(v) && v > 0) {
+            assert(typeof cell === "string" && new RegExp(`(^|\\D)${v}(\\D|$)`).test(cell), `plans.json: row ${r.id} ${plan} cell must state the limit ${v}`);
+          }
+        }
+      }
+    }
+  }
+  for (const list of ["promises", "upsells"]) {
+    const ids = new Set();
+    for (const n of plans[list]) {
+      assert(!ids.has(n.id), `plans.json: duplicate ${list} "${n.id}"`);
+      ids.add(n.id);
+      assert(n.title && n.detail, `plans.json: ${list} ${n.id} needs title and detail`);
+    }
+  }
+}
+
 function validateConformance() {
   const dir = path.join(REPO, "registry/conformance");
   const files = fs.readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
@@ -498,10 +582,10 @@ function appleKeycaps(sc) {
   return caps;
 }
 
-function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, actions, surfaces }) {
+function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans }) {
   const lines = [];
   lines.push("// GENERATED FILE — DO NOT EDIT BY HAND.");
-  lines.push("// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces}.json");
+  lines.push("// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces,plans}.json");
   lines.push("// Regenerate: node scripts/gen-registries.mjs");
   lines.push("");
   lines.push("import Foundation");
@@ -1259,6 +1343,107 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  // 10. Plans and pricing (plans.json, ADR 0010 / ADR 0023). Limits are not
+  // emitted: the app reads its limits from the server's plan table.
+  const P = plans;
+  const cellSwift = (c, row, lv) => (c === true ? ".included" : c === false ? ".notIncluded" : `.text(${L(c, row.cells, lv)})`);
+  lines.push("/// One plan-comparison cell: a check, a dash, or text.");
+  lines.push("enum RegistryPlanCell: Sendable, Hashable {");
+  lines.push("  case included, notIncluded, text(String)");
+  lines.push("}");
+  lines.push("");
+  lines.push("struct RegistryPlanPrice: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let productId: String");
+  lines.push("  let amountMinor: Int");
+  lines.push("  let currency: String");
+  lines.push("  let interval: String");
+  lines.push("  let highlighted: Bool");
+  lines.push("  let label: String");
+  lines.push("  let detail: String");
+  lines.push("}");
+  lines.push("");
+  lines.push("struct RegistryPlanCard: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let title: String");
+  lines.push("  let detail: String");
+  lines.push("  let points: [String]");
+  lines.push("  let footnote: String?");
+  lines.push("  let highlighted: Bool");
+  lines.push("}");
+  lines.push("");
+  lines.push("struct RegistryPlanRow: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let label: String");
+  lines.push("  let planned: Bool");
+  lines.push("  let device: RegistryPlanCell");
+  lines.push("  let account: RegistryPlanCell");
+  lines.push("  let plus: RegistryPlanCell");
+  lines.push("}");
+  lines.push("");
+  lines.push("struct RegistryPlanOutcome: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let icon: String");
+  lines.push("  let title: String");
+  lines.push("  let detail: String");
+  lines.push("  let rows: [RegistryPlanRow]");
+  lines.push("}");
+  lines.push("");
+  lines.push("struct RegistryPlanNote: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let title: String");
+  lines.push("  let detail: String");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// Plans and pricing (`registry/plans.json`). The site's /pricing page reads the same file.");
+  lines.push("enum RegistryPlans {");
+  for (const f of ["name", "shortName", "headline", "subhead"]) lines.push(`  static var ${f}: String { ${L(P[f], P, f)} }`);
+  lines.push(`  static let checkoutOpen = ${P.checkout.open}`);
+  lines.push(`  static var checkoutNotice: String { ${L(P.checkout.notice, P.checkout, "notice")} }`);
+  lines.push(`  static let trialDays = ${P.trial.days}`);
+  lines.push(`  static var trialTitle: String { ${L(P.trial.title, P.trial, "title")} }`);
+  lines.push(`  static var trialDetail: String { ${L(P.trial.detail, P.trial, "detail")} }`);
+  lines.push(`  static var priceFootnote: String { ${L(P.priceFootnote, P, "priceFootnote")} }`);
+  lines.push("  static var prices: [RegistryPlanPrice] { [");
+  for (const pr of P.prices) lines.push(`    RegistryPlanPrice(id: ${swiftStr(pr.id)}, productId: ${swiftStr(pr.productId)}, amountMinor: ${pr.amountMinor}, currency: ${swiftStr(pr.currency)}, interval: ${swiftStr(pr.interval)}, highlighted: ${pr.highlighted}, label: ${L(pr.label, pr, "label")}, detail: ${L(pr.detail, pr, "detail")}),`);
+  lines.push("  ] }");
+  lines.push("  static var cards: [RegistryPlanCard] { [");
+  for (const c of P.cards) lines.push(`    RegistryPlanCard(id: ${swiftStr(c.id)}, title: ${L(c.title, c, "title")}, detail: ${L(c.detail, c, "detail")}, points: [${c.points.map((pt) => L(pt, null, null)).join(", ")}], footnote: ${LOpt(c.footnote, c, "footnote")}, highlighted: ${c.highlighted === true}),`);
+  lines.push("  ] }");
+  lines.push("  static var outcomes: [RegistryPlanOutcome] { [");
+  for (const o of P.outcomes) {
+    const rows = o.rows.map((r) => `RegistryPlanRow(id: ${swiftStr(r.id)}, label: ${L(r.label, r, "label")}, planned: ${r.status === "planned"}, device: ${cellSwift(r.cells.device, r, "device")}, account: ${cellSwift(r.cells.account, r, "account")}, plus: ${cellSwift(r.cells.plus, r, "plus")})`).join(",\n      ");
+    lines.push(`    RegistryPlanOutcome(id: ${swiftStr(o.id)}, icon: ${swiftStr(o.icon)}, title: ${L(o.title, o, "title")}, detail: ${L(o.detail, o, "detail")}, rows: [\n      ${rows},\n    ]),`);
+  }
+  lines.push("  ] }");
+  for (const list of ["promises", "upsells"]) {
+    lines.push(`  static var ${list}: [RegistryPlanNote] { [`);
+    for (const n of P[list]) lines.push(`    RegistryPlanNote(id: ${swiftStr(n.id)}, title: ${L(n.title, n, "title")}, detail: ${L(n.detail, n, "detail")}),`);
+    lines.push("  ] }");
+  }
+  lines.push("  static func upsell(_ id: String) -> RegistryPlanNote? { upsells.first { $0.id == id } }");
+  lines.push("");
+  lines.push("  enum Action {");
+  for (const [k, v] of Object.entries(P.actions)) lines.push(`    static var ${k}: String { ${L(v, P.actions, k)} }`);
+  lines.push("  }");
+  lines.push("");
+  lines.push("  enum Copy {");
+  for (const [k, v] of Object.entries(P.labels)) lines.push(`    static var ${k}: String { ${L(v, P.labels, k)} }`);
+  lines.push("  }");
+  lines.push("");
+  lines.push("  enum Status {");
+  for (const [k, v] of Object.entries(P.status)) {
+    if (/\{[a-zA-Z]/.test(v)) {
+      const t = L10N.swiftTemplate(BY_KEY, P.status.l10nKeys?.[k] ?? v);
+      lines.push(`    static func ${k}(${t.params}) -> String { ${t.body} }`);
+    } else {
+      lines.push(`    static var ${k}: String { ${L(v, P.status, k)} }`);
+    }
+  }
+  lines.push("  }");
+  lines.push("}");
+  lines.push("");
+
   // 9. Capabilities parity ledger
   lines.push("/// Canonical capability parity ledger (`registry/capabilities.json`, ADR 0013 / ADR 0015).");
   lines.push("enum RegistryCapabilities {");
@@ -1278,10 +1463,10 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   return lines.join("\n");
 }
 
-function generateTS({ entities, rules, icons, tokens, caps, settings, dests, actions, surfaces }) {
+function generateTS({ entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans }) {
   const lines = [];
   lines.push("// GENERATED FILE — DO NOT EDIT BY HAND.");
-  lines.push("// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces}.json");
+  lines.push("// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces,plans}.json");
   lines.push("// Regenerate: node scripts/gen-registries.mjs");
   lines.push("");
   lines.push("export const ENTITY_PATTERNS = {");
@@ -1324,6 +1509,10 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, swipeActions: actions.swipeActions, shortcutsSheet: actions.shortcutsSheet })} as const;`);
   lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
+  lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
+  lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);
+  lines.push(`export const PLAN_TRIAL_DAYS = ${plans.trial.days};`);
+  lines.push(`export const PLAN_PRODUCTS = ${JSON.stringify(plans.prices.map((p) => p.productId))} as const;`);
   lines.push("");
   lines.push("// Localized registry copy (ADR 0020). Keys are the English text.");
   lines.push(L10N.tsTables(BY_KEY, TRANSLATIONS));
@@ -1580,6 +1769,7 @@ const settings = readJSON("registry/settings.json");
 const dests = readJSON("registry/destinations.json");
 const actions = readJSON("registry/actions.json");
 const surfaces = readJSON("registry/surfaces.json");
+const plans = readJSON("registry/plans.json");
 
 validateEntities(entities);
 validateRules(rules);
@@ -1591,9 +1781,10 @@ const destIds = validateDestinations(dests, icons, caps);
 validateActions(actions, icons, caps, destIds);
 validateSurfaces(surfaces, icons, caps);
 validateFirstRun(surfaces, icons, caps, settings);
+validatePlans(plans, icons, caps);
 validateConformance();
 
-BY_KEY = L10N.collectStrings({ settings, destinations: dests, actions, surfaces, tokens }, assert);
+BY_KEY = L10N.collectStrings({ settings, destinations: dests, actions, surfaces, tokens, plans }, assert);
 
 const CATALOG_PATH = "Septena/Localizable.xcstrings";
 const catalog = readJSON(CATALOG_PATH);
@@ -1616,7 +1807,7 @@ const conformance = Object.fromEntries(
     .map((name) => [name.replace(/\.json$/, ""), readJSON(`registry/conformance/${name}`)]),
 );
 const bundle = {
-  entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, conformance,
+  entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans, conformance,
   translations: { en: JSON.parse(L10N.englishFile(BY_KEY)), ...TRANSLATIONS },
 };
 const outputs = [
@@ -1650,7 +1841,7 @@ for (const [lang, rep] of Object.entries(l10nReport)) {
 }
 
 if (CHECK) {
-  console.log("registries: ok (all 9 registries valid and generated files up to date)");
+  console.log("registries: ok (all 10 registries valid and generated files up to date)");
 } else if (changed === 0) {
   console.log("registries: already up to date");
 }

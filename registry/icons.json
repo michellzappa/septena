@@ -84,6 +84,8 @@
     "settings.backend": { "sfSymbol": "arrow.up.doc", "material": "cloud_sync", "lucide": "cloud" },
     "settings.animations": { "sfSymbol": "party.popper", "material": "celebration", "lucide": "party-popper" },
     "settings.feedback": { "sfSymbol": "paperplane", "material": "send", "lucide": "send" },
+    "settings.plus": { "sfSymbol": "plus.circle.fill", "material": "add_circle", "lucide": "circle-plus" },
+    "plans.history": { "sfSymbol": "clock.arrow.circlepath", "material": "history", "lucide": "history" },
     "notice.sign_in": { "sfSymbol": "person.crop.circle.badge.exclamationmark", "material": "account_circle", "lucide": "user-x" },
     "notice.rolled_in": { "sfSymbol": "arrow.down.circle", "material": "arrow_circle_down", "lucide": "arrow-down-circle" },
     "notice.get_started": { "sfSymbol": "sparkles", "material": "auto_awesome", "lucide": "sparkles" },

@@ -72,7 +72,11 @@ paid plan is named **Septena Plus** on every surface.
 | | Hosted AI: small monthly allowance *(if ADR 0009 is accepted)* | Hosted AI: larger allowance *(if ADR 0009 is accepted)* |
 
 Exact numbers ("a few", allowances) are set in the plan table (§6) and can
-change without a new ADR. Moving a free thing to paid still needs one.
+change without a new ADR. Moving a free thing to paid still needs one. The
+plan table's values and all plan copy live in `registry/plans.json`: the
+backend reads `PLAN_LIMITS`, the app's Septena Plus page and the site's
+/pricing page render the copy, and the generator fails when a stated number
+differs from its limit.
 
 Rules:
 
@@ -343,4 +347,4 @@ before any public release that uses the backend.
 | Does the code stay open source? | Yes; the paid product is the hosted service |
 | Free server tier | Decided 2026-11-20: yes, a free account with limits (ADR 0010) |
 | Attachments on the free account | Decided 2026-11-20: none on the server; files stay on the device that added them |
-| Limit values ("a few" connector writes, agent runs, hosted-AI allowance) | Open: set in the plan table before P1.5 |
+| Limit values ("a few" connector writes, agent runs, hosted-AI allowance) | Decided 2026-11-22: free account gets connector reads plus 25 writes a day and 10 agent runs a month. Hosted-AI allowance still open. The values live in `registry/plans.json` `limits` (generated to `PLAN_LIMITS` for the backend) |

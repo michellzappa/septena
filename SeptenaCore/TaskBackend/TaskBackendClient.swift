@@ -248,6 +248,14 @@ actor TaskBackendClient {
     return try decode(Approval.self, from: data, what: "pairing").client
   }
 
+  /// The caller's plan (`GET /v1/entitlement`, docs/SYNC_SUBSCRIPTION_SPEC.md
+  /// §6). The server decides; the app only shows what it says.
+  func entitlement() async throws -> BackendEntitlement {
+    let (data, status) = try await authed(path: "/v1/entitlement", method: "GET", body: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendEntitlement.self, from: data, what: "entitlement")
+  }
+
   // MARK: - HTTP
 
   /// Sends with a bearer token. On 401 it refreshes once and retries. A

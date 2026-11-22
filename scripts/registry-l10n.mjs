@@ -34,6 +34,11 @@ const FIELDS = {
     "label", "countLabel", "workingLabel", "instructions", "setup", "first", "placeholder", "untitledName",
   ]),
   tokens: new Set(["name", "tag", "label"]),
+  plans: new Set([
+    "name", "shortName", "headline", "subhead", "notice", "title", "detail", "label", "priceLabel",
+    "points", "footnote", "priceFootnote", "device", "account", "plus", "free", "trial", "trialEnds",
+    "paidThrough", "subscribe", "restore", "manage", "notNow", "learnMore", "yourPlan", "planned", "included", "notIncluded",
+  ]),
 };
 /** Fields skipped even when their name matches (machine data). */
 const SKIP_PATHS = [/^settings\.keys\.[^.]+\.(title|label)$/];

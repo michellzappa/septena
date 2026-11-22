@@ -582,6 +582,12 @@
           ]
         },
         {
+          "id": "plan",
+          "items": [
+            { "kind": "pageLink", "page": "plus", "label": "Septena Plus", "icon": "settings.plus", "statusKey": "planStatus", "featureId": "sync.backend" }
+          ]
+        },
+        {
           "id": "sync",
           "items": [
             { "kind": "customSurface", "surface": "sync_account_status" }
@@ -591,6 +597,21 @@
           "id": "delete_account",
           "items": [
             { "kind": "customSurface", "surface": "delete_account", "visibility": "signedIn", "featureId": "account.delete" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "plus",
+      "title": "Septena Plus",
+      "icon": "settings.plus",
+      "depth": 2,
+      "featureId": "sync.backend",
+      "sections": [
+        {
+          "id": "offer",
+          "items": [
+            { "kind": "customSurface", "surface": "plus_offer" }
           ]
         }
       ]

@@ -1,5 +1,5 @@
 // GENERATED FILE — DO NOT EDIT BY HAND.
-// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces}.json
+// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces,plans}.json
 // Regenerate: node scripts/gen-registries.mjs
 
 import Foundation
@@ -190,6 +190,8 @@ enum RegistryIcons {
     "settings.backend": "arrow.up.doc",
     "settings.animations": "party.popper",
     "settings.feedback": "paperplane",
+    "settings.plus": "plus.circle.fill",
+    "plans.history": "clock.arrow.circlepath",
     "notice.sign_in": "person.crop.circle.badge.exclamationmark",
     "notice.rolled_in": "arrow.down.circle",
     "notice.get_started": "sparkles",
@@ -432,6 +434,7 @@ enum RegistrySettings {
 
   enum PageID {
     static let account = "account"
+    static let plus = "plus"
     static let claudePairing = "claude_pairing"
     static let aiPreferences = "ai_preferences"
     static let calendar = "calendar"
@@ -498,11 +501,19 @@ enum RegistrySettings {
       RegistrySettingsSection(id: "profile", header: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "account_profile_editor", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
+      RegistrySettingsSection(id: "plan", header: nil, platforms: nil, items: [
+        RegistrySettingsItem(kind: "pageLink", key: nil, page: "plus", surface: nil, label: RegistryL10n.t("Septena Plus"), detail: nil, iconId: "settings.plus", sfSymbol: "plus.circle.fill", statusKey: "planStatus", desktopInline: false, visibility: "always", platforms: nil),
+      ]),
       RegistrySettingsSection(id: "sync", header: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sync_account_status", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
       RegistrySettingsSection(id: "delete_account", header: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "delete_account", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "signedIn", platforms: nil),
+      ]),
+    ]),
+    RegistrySettingsPage(id: "plus", title: RegistryL10n.t("Septena Plus"), iconId: "settings.plus", sfSymbol: "plus.circle.fill", depth: 2, platforms: nil, featureId: "sync.backend", sections: [
+      RegistrySettingsSection(id: "offer", header: nil, platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "plus_offer", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
     ]),
     RegistrySettingsPage(id: "claude_pairing", title: RegistryL10n.t("Connect Claude"), iconId: "settings.claude", sfSymbol: "bubble.left.and.text.bubble.right", depth: 1, platforms: nil, featureId: "agents.connector", sections: [
@@ -1342,6 +1353,137 @@ enum RegistryFirstRun {
     RegistryFirstRunStep(id: "connectClaude", kind: "connectAgent", icon: "settings.claude", title: RegistryL10n.t("Connect Claude"), body: RegistryL10n.t("Claude reads and changes your tasks through your Septena account. You decide which tasks it works on."), footnote: nil, returningTitle: nil, returningBody: nil, skipWhen: nil, requires: "signedIn", completesGetStartedStep: "connectAI", points: [], choices: [], instructions: [RegistryL10n.t("Copy the setup prompt and paste it into Claude."), RegistryL10n.t("When Claude shows a code, enter it below."), RegistryL10n.t("Paste the first prompt. Claude sets up your areas and projects with you.")], primary: RegistryFirstRunButton(title: RegistryL10n.t("Copy setup prompt"), action: "copySetupPrompt"), secondary: RegistryFirstRunButton(title: RegistryL10n.t("Later"), action: "next"), tertiary: RegistryFirstRunButton(title: RegistryL10n.t("Copy first prompt"), action: "copyFirstPrompt"), afterDone: RegistryFirstRunButton(title: RegistryL10n.t("Continue"), action: "next")),
     RegistryFirstRunStep(id: "done", kind: "finish", icon: "onboarding.done", title: RegistryL10n.t("You're all set"), body: RegistryL10n.t("Today shows what to do now. Anything you skipped stays on the Get started list."), footnote: nil, returningTitle: RegistryL10n.t("Welcome back"), returningBody: RegistryL10n.t("This account is already set up. Your tasks are syncing to this device."), skipWhen: nil, requires: nil, completesGetStartedStep: nil, points: [], choices: [], instructions: [], primary: RegistryFirstRunButton(title: RegistryL10n.t("Open Today"), action: "finish"), secondary: nil, tertiary: nil, afterDone: nil),
   ]
+}
+
+/// One plan-comparison cell: a check, a dash, or text.
+enum RegistryPlanCell: Sendable, Hashable {
+  case included, notIncluded, text(String)
+}
+
+struct RegistryPlanPrice: Sendable, Hashable, Identifiable {
+  let id: String
+  let productId: String
+  let amountMinor: Int
+  let currency: String
+  let interval: String
+  let highlighted: Bool
+  let label: String
+  let detail: String
+}
+
+struct RegistryPlanCard: Sendable, Hashable, Identifiable {
+  let id: String
+  let title: String
+  let detail: String
+  let points: [String]
+  let footnote: String?
+  let highlighted: Bool
+}
+
+struct RegistryPlanRow: Sendable, Hashable, Identifiable {
+  let id: String
+  let label: String
+  let planned: Bool
+  let device: RegistryPlanCell
+  let account: RegistryPlanCell
+  let plus: RegistryPlanCell
+}
+
+struct RegistryPlanOutcome: Sendable, Hashable, Identifiable {
+  let id: String
+  let icon: String
+  let title: String
+  let detail: String
+  let rows: [RegistryPlanRow]
+}
+
+struct RegistryPlanNote: Sendable, Hashable, Identifiable {
+  let id: String
+  let title: String
+  let detail: String
+}
+
+/// Plans and pricing (`registry/plans.json`). The site's /pricing page reads the same file.
+enum RegistryPlans {
+  static var name: String { RegistryL10n.t("Septena Plus") }
+  static var shortName: String { RegistryL10n.t("Plus") }
+  static var headline: String { RegistryL10n.t("Free on one device. Plus on all of them.") }
+  static var subhead: String { RegistryL10n.t("Every task feature is free on the device you use. Plus syncs your list to all your devices and keeps its full history and files. It also lets your agents work without a daily cap.") }
+  static let checkoutOpen = false
+  static var checkoutNotice: String { RegistryL10n.t("Subscriptions open at App Store launch.") }
+  static let trialDays = 14
+  static var trialTitle: String { RegistryL10n.t("Every new account starts with 14 days of Plus") }
+  static var trialDetail: String { RegistryL10n.t("You do not need a card. After 14 days the account becomes a free account, and your tasks stay where they are.") }
+  static var priceFootnote: String { RegistryL10n.t("Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.") }
+  static var prices: [RegistryPlanPrice] { [
+    RegistryPlanPrice(id: "annual", productId: "com.septena.tasks.sync.annual", amountMinor: 4000, currency: "EUR", interval: "year", highlighted: true, label: RegistryL10n.t("€40 a year"), detail: RegistryL10n.t("About €3.33 a month. You save €20 against paying monthly.")),
+    RegistryPlanPrice(id: "monthly", productId: "com.septena.tasks.sync.monthly", amountMinor: 500, currency: "EUR", interval: "month", highlighted: false, label: RegistryL10n.t("€5 a month"), detail: RegistryL10n.t("Cancel at any time.")),
+  ] }
+  static var cards: [RegistryPlanCard] { [
+    RegistryPlanCard(id: "free", title: RegistryL10n.t("Free"), detail: RegistryL10n.t("The full task app on one iPhone, iPad or Mac. You do not need an account."), points: [RegistryL10n.t("Today, Inbox, Upcoming, Anytime and Logbook"), RegistryL10n.t("Areas, projects, sections, notes and attachments"), RegistryL10n.t("Start dates, deadlines and repeats"), RegistryL10n.t("Task conversations with the on-device model"), RegistryL10n.t("Import from Things and Apple Reminders"), RegistryL10n.t("Export everything as plain JSON")], footnote: RegistryL10n.t("Sign in for a free account. The server then keeps a backup of that device, and you can try agents on real tasks."), highlighted: false),
+    RegistryPlanCard(id: "plus", title: RegistryL10n.t("Septena Plus"), detail: RegistryL10n.t("Plus is the same app on every device, and nothing in it is capped."), points: [RegistryL10n.t("Live sync on every iPhone, iPad and Mac"), RegistryL10n.t("A year of change history, and a year to restore deleted tasks"), RegistryL10n.t("Files and images synced, up to 10 GB"), RegistryL10n.t("Your agents work your tasks without a daily cap"), RegistryL10n.t("Early builds on TestFlight")], footnote: RegistryL10n.t("Everything in Free is included."), highlighted: true),
+  ] }
+  static var outcomes: [RegistryPlanOutcome] { [
+    RegistryPlanOutcome(id: "everywhere", icon: "onboarding.devices", title: RegistryL10n.t("Your list everywhere"), detail: RegistryL10n.t("The same tasks on your phone, tablet and Mac, updated as you type."), rows: [
+      RegistryPlanRow(id: "devices", label: RegistryL10n.t("Devices"), planned: false, device: .text(RegistryL10n.t("1, not synced")), account: .text(RegistryL10n.t("1, backed up")), plus: .text(RegistryL10n.t("All your devices"))),
+      RegistryPlanRow(id: "live", label: RegistryL10n.t("Sync speed"), planned: false, device: .notIncluded, account: .text(RegistryL10n.t("Every few minutes")), plus: .text(RegistryL10n.t("Live"))),
+      RegistryPlanRow(id: "new_device", label: RegistryL10n.t("Move to a new device"), planned: false, device: .text(RegistryL10n.t("Export and import")), account: .included, plus: .included),
+      RegistryPlanRow(id: "watch", label: RegistryL10n.t("Apple Watch through the server"), planned: true, device: .notIncluded, account: .notIncluded, plus: .included),
+    ]),
+    RegistryPlanOutcome(id: "nothing_lost", icon: "plans.history", title: RegistryL10n.t("Nothing lost"), detail: RegistryL10n.t("See who changed what and bring back what you deleted. Your files open on every device."), rows: [
+      RegistryPlanRow(id: "history", label: RegistryL10n.t("Change history"), planned: false, device: .text(RegistryL10n.t("On this device")), account: .text(RegistryL10n.t("30 days")), plus: .text(RegistryL10n.t("365 days"))),
+      RegistryPlanRow(id: "logbook", label: RegistryL10n.t("Logbook"), planned: false, device: .text(RegistryL10n.t("All")), account: .text(RegistryL10n.t("Last 90 days")), plus: .text(RegistryL10n.t("All"))),
+      RegistryPlanRow(id: "deleted", label: RegistryL10n.t("Recently Deleted"), planned: false, device: .text(RegistryL10n.t("30 days")), account: .text(RegistryL10n.t("30 days")), plus: .text(RegistryL10n.t("365 days"))),
+      RegistryPlanRow(id: "files", label: RegistryL10n.t("Files and images"), planned: false, device: .text(RegistryL10n.t("On this device")), account: .text(RegistryL10n.t("On the device that added them")), plus: .text(RegistryL10n.t("Synced, up to 10 GB"))),
+      RegistryPlanRow(id: "export", label: RegistryL10n.t("Export as JSON"), planned: false, device: .included, account: .included, plus: .included),
+    ]),
+    RegistryPlanOutcome(id: "agents", icon: "onboarding.agent", title: RegistryL10n.t("Help that keeps working"), detail: RegistryL10n.t("Connect Claude or another agent to your list. It asks before it acts, and you can stop it at any time."), rows: [
+      RegistryPlanRow(id: "connector", label: RegistryL10n.t("Claude connector"), planned: false, device: .text(RegistryL10n.t("Local server on the Mac")), account: .text(RegistryL10n.t("Reads, and 25 changes a day")), plus: .text(RegistryL10n.t("No daily cap"))),
+      RegistryPlanRow(id: "runs", label: RegistryL10n.t("Agent runs"), planned: false, device: .notIncluded, account: .text(RegistryL10n.t("10 a month")), plus: .text(RegistryL10n.t("Within a monthly run budget"))),
+      RegistryPlanRow(id: "share", label: RegistryL10n.t("Shared projects"), planned: true, device: .notIncluded, account: .text(RegistryL10n.t("Join")), plus: .text(RegistryL10n.t("Create and invite"))),
+      RegistryPlanRow(id: "links", label: RegistryL10n.t("Linked projects (GitHub, Linear)"), planned: true, device: .notIncluded, account: .text(RegistryL10n.t("1")), plus: .text(RegistryL10n.t("No cap"))),
+    ]),
+  ] }
+  static var promises: [RegistryPlanNote] { [
+    RegistryPlanNote(id: "core_free", title: RegistryL10n.t("The task app stays free"), detail: RegistryL10n.t("Tasks, lists, projects and areas have no caps on any plan.")),
+    RegistryPlanNote(id: "no_hostage", title: RegistryL10n.t("We never hold your data back"), detail: RegistryL10n.t("Export works on every plan. A limit hides older items. It never deletes them, and Plus shows them again.")),
+    RegistryPlanNote(id: "cancel", title: RegistryL10n.t("Cancel at any time"), detail: RegistryL10n.t("Your account becomes a free account. Every device keeps its tasks, and the server keeps your synced copy for 12 months.")),
+    RegistryPlanNote(id: "own_ai", title: RegistryL10n.t("You pay your AI provider, not us"), detail: RegistryL10n.t("Septena runs the sync server and the connector. When you connect Claude or another agent, its bill stays with that provider.")),
+  ] }
+  static var upsells: [RegistryPlanNote] { [
+    RegistryPlanNote(id: "second_device", title: RegistryL10n.t("This device is not syncing"), detail: RegistryL10n.t("A free account syncs one device. Plus syncs all of them. You can also move your free account to this device.")),
+    RegistryPlanNote(id: "history_edge", title: RegistryL10n.t("Older changes are hidden"), detail: RegistryL10n.t("A free account shows 30 days of history. Plus shows a full year.")),
+    RegistryPlanNote(id: "file_elsewhere", title: RegistryL10n.t("This file is on another device"), detail: RegistryL10n.t("Plus syncs files and images to all your devices.")),
+    RegistryPlanNote(id: "agent_runs", title: RegistryL10n.t("Agent runs resume on the 1st"), detail: RegistryL10n.t("Your free account used its 10 runs this month. The work waits for you. Plus runs it now.")),
+    RegistryPlanNote(id: "connector_cap", title: RegistryL10n.t("Daily change limit reached"), detail: RegistryL10n.t("A free account allows 25 agent changes a day. Plus has no daily cap.")),
+    RegistryPlanNote(id: "share_create", title: RegistryL10n.t("Sharing a project needs Plus"), detail: RegistryL10n.t("Anyone can join a shared project for free. Plus lets you create one and invite people.")),
+    RegistryPlanNote(id: "trial_end", title: RegistryL10n.t("Your 14 days of Plus have ended"), detail: RegistryL10n.t("Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are.")),
+  ] }
+  static func upsell(_ id: String) -> RegistryPlanNote? { upsells.first { $0.id == id } }
+
+  enum Action {
+    static var subscribe: String { RegistryL10n.t("Subscribe") }
+    static var restore: String { RegistryL10n.t("Restore Purchases") }
+    static var manage: String { RegistryL10n.t("Manage Subscription") }
+    static var notNow: String { RegistryL10n.t("Not Now") }
+    static var learnMore: String { RegistryL10n.t("See what Plus adds") }
+  }
+
+  enum Copy {
+    static var yourPlan: String { RegistryL10n.t("Your plan") }
+    static var planned: String { RegistryL10n.t("Planned") }
+    static var included: String { RegistryL10n.t("Included") }
+    static var notIncluded: String { RegistryL10n.t("Not included") }
+  }
+
+  enum Status {
+    static var device: String { RegistryL10n.t("On this device") }
+    static var free: String { RegistryL10n.t("Free account") }
+    static var trial: String { RegistryL10n.t("Plus trial") }
+    static var plus: String { RegistryL10n.t("Plus") }
+    static func trialEnds(date: String) -> String { RegistryL10n.format("Plus trial until %@", english: "Plus trial until %@", args: [date]) }
+    static func paidThrough(date: String) -> String { RegistryL10n.format("Plus through %@", english: "Plus through %@", args: [date]) }
+  }
 }
 
 /// Canonical capability parity ledger (`registry/capabilities.json`, ADR 0013 / ADR 0015).
