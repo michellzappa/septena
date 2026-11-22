@@ -14,8 +14,10 @@ import AppKit
 // where a task title starts. Nothing reaches into the page gutter. The
 // SwiftUI counterpart is `TaskListNotice` (Septena/Shell/Tasks).
 //
-// The fill is the card surface, never a selection color (one selection
-// language per surface). Only a warning tints it, with a light wash.
+// The fill is the card surface. Only a warning tints it, with a light wash.
+// A notice without steps is a selectable row (↑/↓ reach it, ⌘K dismisses it,
+// Return does its action). Selected, its fill takes the list's ONE selection
+// wash (`listSelectionFill`), the same token a task row draws.
 
 /// What a notice is about. One enum for both shells: `TaskNoticeKind`
 /// (Septena/Shell/Tasks/TaskNotices.swift), where which notices show is decided.
@@ -47,7 +49,7 @@ extension KitNotice {
 }
 
 @MainActor
-final class KitNoticeCell: NSTableCellView {
+final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
   /// Padding inside the fill, top and bottom.
   private static let verticalPad: CGFloat = 8
   /// Page space under the fill, before the next row.
@@ -234,6 +236,8 @@ final class KitNoticeCell: NSTableCellView {
     }
   }
 
+  func rowNeedsRepaint() { fill.refreshAppearance() }
+
   @objc private func firePrimary() { onPrimary?() }
   @objc private func fireDismiss() { onDismiss?() }
 }
@@ -283,6 +287,15 @@ final class KitNoticeFill: NSView {
     syncGlass()
   }
 
+  /// The enclosing row's selection, read at draw time so it cannot go stale
+  /// on a recycled cell. Nil when the row is not selected.
+  fileprivate var selectionFill: NSColor? {
+    var view = superview
+    while let current = view, !(current is NSTableRowView) { view = current.superview }
+    guard drawsSurface, let row = view as? NSTableRowView, row.isSelected else { return nil }
+    return SeptaskKitTheme.listSelectionFill(emphasized: row.septaskSelectionIsActive)
+  }
+
   private var usesGlass: Bool {
     AppearancePreferences.shared.hasActiveTexture
       && !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
@@ -306,6 +319,7 @@ final class KitNoticeFill: NSView {
 
     overlayView.frame = bounds
     overlayView.kind = kind
+    overlayView.selectionFill = selectionFill
     overlayView.needsDisplay = true
   }
 
@@ -319,6 +333,10 @@ final class KitNoticeFill: NSView {
       SeptaskKitTheme.noticeWarningWash.setFill()
       path.fill()
     }
+    if let selectionFill {
+      selectionFill.setFill()
+      path.fill()
+    }
   }
 }
 
@@ -329,6 +347,7 @@ final class KitNoticeFill: NSView {
 @MainActor
 private final class KitNoticeGlassOverlayView: NSView {
   var kind: KitNoticeKind = .info
+  var selectionFill: NSColor?
 
   override var isFlipped: Bool { true }
   override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -342,6 +361,10 @@ private final class KitNoticeGlassOverlayView: NSView {
     path.fill()
     if kind == .warning {
       SeptaskKitTheme.noticeWarningWash.setFill()
+      path.fill()
+    }
+    if let selectionFill {
+      selectionFill.setFill()
       path.fill()
     }
     path.addClip()

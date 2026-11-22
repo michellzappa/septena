@@ -157,6 +157,14 @@ final class SeptaskKitTaskListController: NSViewController {
       return nil
     }
 
+    /// A standalone notice (no steps under it). It is a selectable row: ↑/↓
+    /// reach it, ⌘K dismisses it, Return does its action. A notice that heads
+    /// Get started steps is not: its steps are the rows.
+    var standaloneNotice: TaskNotice? {
+      if case .notice(let notice) = self, notice.steps.isEmpty { return notice }
+      return nil
+    }
+
     /// Rows that draw on a card (tasks and events), vs. headers on the page.
     /// Project section headings sit BETWEEN cards (SwiftUI's `headingRow`),
     /// so they break the card run the same way a Today area/project header does.
@@ -1444,6 +1452,33 @@ final class SeptaskKitTaskListController: NSViewController {
     reload()
   }
 
+  /// ⌘K on selected notices: dismisses each one, the same as its close
+  /// button. Selection moves to the row that takes the first notice's place.
+  private func dismissSelectedNotices() {
+    let notices = selectedDismissibleNotices
+    guard !notices.isEmpty else { return }
+    let anchor = tableView.selectedRowIndexes.first ?? 0
+    for notice in notices {
+      TaskNotices.dismiss(notice.id, today: SeptenaDate.today, context: context)
+    }
+    reload()
+    let next = (anchor..<rows.count).first { self.tableView(self.tableView, shouldSelectRow: $0) }
+    if let next {
+      tableView.selectRowIndexes([next], byExtendingSelection: false)
+      tableView.scrollRowToVisible(next)
+    }
+  }
+
+  /// The bordered button of a notice, if it has one. The cell's button and
+  /// Return on the selected notice both run this.
+  private func noticePrimaryAction(_ id: TaskNotice.ID) -> (() -> Void)? {
+    switch id {
+    case .signIn: return { SeptaskAppKitSignIn.shared.start() }
+    case .weeklySweep: return { [weak self] in self?.presentWeeklySweepSheet() }
+    default: return nil
+    }
+  }
+
   // MARK: - Reminders inbox
   //
   // The AppKit counterpart of `RemindersInboxSection`. Same placement as
@@ -2224,8 +2259,20 @@ final class SeptaskKitTaskListController: NSViewController {
     }
   }
 
-  /// ⌘K and Task ▸ Complete have a target: a task or a Get started step.
-  var hasCompletableSelection: Bool { hasActionableSelection || !selectedNoticeSteps.isEmpty }
+  /// The selected standalone notices that a ⌘K can dismiss.
+  private var selectedDismissibleNotices: [TaskNotice] {
+    tableView.selectedRowIndexes.compactMap { row in
+      guard rows.indices.contains(row), let notice = rows[row].standaloneNotice,
+            notice.dismissible else { return nil }
+      return notice
+    }
+  }
+
+  /// ⌘K and Task ▸ Complete have a target: a task, a Get started step, or a
+  /// dismissible notice.
+  var hasCompletableSelection: Bool {
+    hasActionableSelection || !selectedNoticeSteps.isEmpty || !selectedDismissibleNotices.isEmpty
+  }
 
   /// Copy the selection's titles — one per line. Reached through Edit ▸ Copy
   /// (the table implements `copy(_:)`, so the standard menu item finds it on
@@ -2645,6 +2692,7 @@ final class SeptaskKitTaskListController: NSViewController {
       return
     }
     toggleSelectedNoticeSteps()
+    dismissSelectedNotices()
     let selection = actionableSelection
     guard !selection.isEmpty else { return }
     apply(completing: selection.filter { $0.status == .open },
@@ -3446,6 +3494,12 @@ final class SeptaskKitTaskListController: NSViewController {
     // Return on a Get started step does the step.
     if rows.indices.contains(row), let step = rows[row].noticeStep {
       openNoticeStep(step.id)
+      return
+    }
+    // Return on a notice does its button (Sweep, Sign In). A notice with no
+    // button takes no Return.
+    if rows.indices.contains(row), let notice = rows[row].standaloneNotice {
+      noticePrimaryAction(notice.id)?()
       return
     }
     guard row >= 0, let task = rows[row].task else { return }
@@ -4494,6 +4548,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
                  row: Int) -> String? {
     guard rows.indices.contains(row) else { return nil }
     return rows[row].task?.title ?? rows[row].noticeStep?.title
+      ?? rows[row].standaloneNotice?.title
   }
 
   func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
@@ -4505,6 +4560,8 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // Get started steps are list rows too; the notice header above them is
     // not (it has no task and no step).
     if case .noticeStep = rows[row] { return true }
+    // A standalone notice is a row too: ↑/↓ reach it, ⌘K dismisses it.
+    if rows[row].standaloneNotice != nil { return true }
     return rows[row].task != nil
   }
 
@@ -5222,14 +5279,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
 
     case .notice(let notice):
       let cell = noticeCell(KitNotice(notice))
-      switch notice.id {
-      case .signIn:
-        cell.onPrimary = { SeptaskAppKitSignIn.shared.start() }
-      case .weeklySweep:
-        cell.onPrimary = { [weak self] in self?.presentWeeklySweepSheet() }
-      default:
-        cell.onPrimary = nil
-      }
+      cell.onPrimary = noticePrimaryAction(notice.id)
       cell.onDismiss = notice.dismissible ? { [weak self] in self?.dismissNotice(notice.id) } : nil
       return cell
 

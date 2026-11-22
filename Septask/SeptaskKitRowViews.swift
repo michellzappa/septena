@@ -713,6 +713,13 @@ enum KitMoveMenu {
   }
 }
 
+/// A table cell that draws the list's selection wash itself, on its own
+/// fill, instead of relying on `KitCardRowView.drawBackground`.
+@MainActor
+protocol KitSelfSelectingCell: AnyObject {
+  func rowNeedsRepaint()
+}
+
 // MARK: - Selection emphasis
 
 /// Whether this row's selection should read as ACTIVE — the accent wash —
@@ -794,6 +801,17 @@ final class KitCardRowView: NSTableRowView {
   /// to the layout minimum so there's no visible jump on that first pass.
   static let horizontalInset: CGFloat = SeptaskKitLayout.minInset
   static let corner: CGFloat = 11
+
+  /// A cell that paints its own selection (a standalone notice draws its
+  /// fill on top of this row, so the row's wash would be hidden under it)
+  /// repaints whenever the row does: selection, key-window and focus changes
+  /// all reach the row as `needsDisplay = true`.
+  override var needsDisplay: Bool {
+    didSet {
+      guard needsDisplay else { return }
+      for case let cell as KitSelfSelectingCell in subviews { cell.rowNeedsRepaint() }
+    }
+  }
 
   var isCard = true { didSet { syncGlassBackdrop() } }
   var isFirstInGroup = true { didSet { syncGlassBackdrop() } }
