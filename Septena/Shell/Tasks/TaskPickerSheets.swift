@@ -111,7 +111,7 @@ struct ReminderPickerSheet: View {
             } label: {
               HStack(spacing: 8) {
                 Image(systemName: "bell.slash")
-                Text("Notifications are off — Open Settings")
+                Text("Notifications are off. Open Settings")
                   .font(.subheadline.weight(.medium))
                 Spacer(minLength: 0)
               }

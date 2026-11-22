@@ -7,6 +7,8 @@ description: Work and manage tasks in Septena over MCP following the Septena age
 
 # Septena Agent Loop Rules
 
+Septena: tasks that think with you. Your agents do the work. You decide when it’s done.
+
 Septena is a task app for iPhone, iPad and Mac. Its tasks live on Septena's
 task server (`https://api.septena.app/mcp`, MCP over streamable HTTP with OAuth
 PKCE). Full setup instructions for humans and agents live at

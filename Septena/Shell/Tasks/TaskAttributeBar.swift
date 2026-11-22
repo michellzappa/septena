@@ -588,7 +588,7 @@ private struct InlineReminderPanel: View {
           HStack(spacing: 6) {
             Image(systemName: "bell.slash")
               .font(.caption.weight(.semibold))
-            Text("Notifications are off — Open Settings")
+            Text("Notifications are off. Open Settings")
               .font(.caption.weight(.medium))
             Spacer(minLength: 0)
           }
@@ -797,7 +797,7 @@ private struct InlineRepeatPanel: View {
           && recurrence?.unit == .week
           && recurrence?.interval == 1
           && Set(recurrence?.weekdays ?? []) == Set([2, 3, 4, 5, 6])
-        SelectableChip("Weekdays (Mon–Fri)", isSelected: isWeekdays, tint: accent) {
+        SelectableChip("Weekdays (Mon to Fri)", isSelected: isWeekdays, tint: accent) {
           write(Recurrence(unit: .week, interval: 1, afterCompletion: false,
                            weekdays: [2, 3, 4, 5, 6]))
         }

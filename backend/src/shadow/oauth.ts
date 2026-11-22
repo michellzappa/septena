@@ -482,7 +482,7 @@ function pairPage(
     <h1>Connect ${escapeHtml(opts.clientName)} to your Septena tasks</h1>
     <p>Open Septena &#9656; Settings &#9656; Connect Claude (on Mac: Settings &#9656; AI &amp; Agents), and enter this code:</p>
     <div class="code">${escapeHtml(shown)}</div>
-    <p>Claude will be able to read and change your tasks.</p>
+    <p>${escapeHtml(opts.clientName)} will be able to read and change your tasks.</p>
     <p class="small">The code works for 10 minutes. This page checks for your approval every few seconds.</p>
     ${back}
   </main>

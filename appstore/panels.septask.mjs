@@ -20,10 +20,10 @@ import { parseScreenshots } from "./metadata.mjs";
 // never over content; positive dy puts it below the element.
 const VISUAL = {
   hook:           { fill: "#007AFF", texture: "topography" },
-  "agent-asks":   { fill: "#6544D6", texture: "causticGlass" },
+  thinking:       { fill: "#C28500", texture: "fieldMatrix" },
+  "agent-work":   { fill: "#6544D6", texture: "causticGlass" },
   "agent-result": { fill: "#27272E", texture: "stippleDrift" },
   inbox:          { fill: "#5B8C00", texture: "washiPaper" },
-  plan:           { fill: "#C28500", texture: "fieldMatrix", callout: { side: "right", dy: 340 } },
   dates:          { fill: "#E05212", texture: "ridges" },
 };
 
@@ -57,31 +57,25 @@ const ipad = iphone.map((p) =>
 );
 
 // Mac is landscape (text column + windowed shot). Fewer panels, all with a shot.
-// Inactive (apps.mjs). Still the July story; rebuild from a "### Mac" table
+// Inactive (apps.mjs). Titles follow the iPhone tentpoles; rebuild from a "### Mac" table
 // when the Mac set moves to the scene builder mac layout.
 const mac = [
   {
     id: "hook",
     background: { tint: theme.tints[0], dots: true },
-    badge: "JUST YOUR TASKS",
-    headline: "A real task app, *now on the Mac*",
-    sub: "Keyboard flow, calm density, fast import. Built to stand next to Things.",
+    headline: "Tasks that think with you",
     shot: { src: "tasks-today", rotate: 0 },
   },
   {
     id: "project",
     background: { tint: theme.accent },
-    badge: "PROJECTS",
-    headline: "Projects with *real progress*",
-    sub: "Group work under an area, watch the progress ring fill as you finish.",
+    headline: "Your agents do the work",
     shot: { src: "tasks-project", rotate: 0 },
   },
   {
     id: "lists",
     background: { tint: theme.tints[2] },
-    badge: "SMART LISTS",
-    headline: "Today, Upcoming, *Anytime*",
-    sub: "The lists that fit how work actually shows up, with a count on each.",
+    headline: "You decide when it’s done",
     shot: { src: "tasks-anytime", rotate: 0 },
   },
 ];

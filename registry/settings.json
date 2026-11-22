@@ -435,7 +435,7 @@
           "kind": "setting",
           "key": "agentsPaused",
           "label": "Pause all agents",
-          "detail": "No agent can claim or work on a task while paused.",
+          "detail": "While paused, no agent can start or work on a task.",
           "visibility": "signedIn"
         },
         {
@@ -672,7 +672,7 @@
       "sections": [
         {
           "id": "on_device",
-          "header": "On-device intelligence",
+          "header": "AI on this device",
           "platforms": ["ios", "ipados", "macos"],
           "items": [
             { "kind": "customSurface", "surface": "apple_intelligence_status", "label": "Apple Intelligence", "platforms": ["ios", "ipados", "macos"], "featureId": "ai.reach-dial" }

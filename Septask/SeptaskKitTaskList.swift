@@ -6860,7 +6860,7 @@ final class KitImportAllRemindersCell: NSTableCellView {
   func configure(count: Int, importing: Bool) {
     let title = importing
       ? String(localized: "Importing…", comment: "SeptaskKit: reminders import in flight")
-      : String(localized: "Move all \(count) from Reminders (removes originals)",
+      : String(localized: "Import all \(count). Each one leaves Reminders.",
                comment: "SeptaskKit: bulk import action line")
     label.stringValue = title
     hit.isEnabled = !importing

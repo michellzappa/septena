@@ -472,7 +472,7 @@ private final class KitRepeatBoard: NSView {
       preset.fillRow(
         symbol: "briefcase",
         tint: SeptaskKitTheme.inkSecondary,
-        title: String(localized: "Weekdays (Mon–Fri)", comment: "Repeat quick preset")
+        title: String(localized: "Weekdays (Mon to Fri)", comment: "Repeat quick preset")
       )
       weekdaysPresetCell = preset
       views.append(preset)
@@ -1151,7 +1151,7 @@ private final class KitReminderBoard: NSView {
     denied.fillRow(
       symbol: "bell.slash",
       tint: SeptaskKitTheme.overdueRed,
-      title: String(localized: "Notifications are off — Open Settings",
+      title: String(localized: "Notifications are off. Open Settings",
                     comment: "Reminder denied permission notice"),
       titleColor: SeptaskKitTheme.overdueRed
     )

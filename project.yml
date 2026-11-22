@@ -173,8 +173,8 @@ targets:
         # and the backend's silent push is not built yet).
         # The compiled task UI includes the Reminders inbox and the Today
         # calendar strip (EventKit) — access requests crash without these.
-        NSRemindersFullAccessUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
-        NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
+        NSRemindersFullAccessUsageDescription: Septena moves reminders from your Reminders lists into the Inbox and deletes them from Reminders.
+        NSRemindersUsageDescription: Septena moves reminders from your Reminders lists into the Inbox and deletes them from Reminders.
         NSCalendarsFullAccessUsageDescription: Septena shows today's calendar events above your task list.
         NSCalendarsUsageDescription: Septena shows today's calendar events above your task list.
     configFiles:
@@ -299,8 +299,8 @@ targets:
         SUEnableAutomaticChecks: true
         SUScheduledCheckInterval: 86400
         SUAutomaticallyUpdate: false
-        NSRemindersFullAccessUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
-        NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
+        NSRemindersFullAccessUsageDescription: Septena moves reminders from your Reminders lists into the Inbox and deletes them from Reminders.
+        NSRemindersUsageDescription: Septena moves reminders from your Reminders lists into the Inbox and deletes them from Reminders.
         NSCalendarsFullAccessUsageDescription: Septena shows today's calendar events above your task list.
         NSCalendarsUsageDescription: Septena shows today's calendar events above your task list.
     configFiles:

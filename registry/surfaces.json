@@ -43,7 +43,7 @@
         "title": "Get started with Septena",
         "featureId": "lists.today",
         "steps": [
-          { "id": "connectAI", "title": "Connect your AI", "detail": "Connect an assistant to your tasks" },
+          { "id": "connectAI", "title": "Connect your agent", "detail": "Let Claude or your own agent work your list" },
           { "id": "importTasks", "title": "Bring in your tasks", "detail": "Import from another app" },
           {
             "id": "addTask",
@@ -98,7 +98,7 @@
         "id": "deletePermanently",
         "kind": "destructive",
         "title": { "one": "Delete this task permanently?", "other": "Delete {count} tasks permanently?" },
-        "message": "You can't undo this.",
+        "message": "You can’t undo this.",
         "confirmTitle": "Delete Permanently",
         "featureId": "lists.recently-deleted"
       },
@@ -193,9 +193,9 @@
   "toasts": {
     "durationSeconds": 7,
     "templates": {
-      "deferred": { "format": "Deferred to {date}", "undoable": false },
+      "deferred": { "format": "Moved to {date}", "l10nKeys": { "format": "Moved to {date} (When)" }, "undoable": false },
       "moved": { "format": "Moved to {destination}", "undoable": true },
-      "deletedSingle": { "format": "\"{title}\" deleted", "emptyTitleFormat": "Task deleted", "undoable": true },
+      "deletedSingle": { "format": "“{title}” deleted", "emptyTitleFormat": "Task deleted", "undoable": true },
       "deletedBulk": { "format": { "one": "Task deleted", "other": "{count} tasks deleted" }, "undoable": true },
       "movedBulk": { "format": { "one": "Moved to {destination}", "other": "Moved {count} tasks to {destination}" }, "undoable": true }
     }
@@ -213,15 +213,15 @@
         "kind": "intro",
         "icon": "onboarding.welcome",
         "title": "Welcome to Septena",
-        "body": "A task list you share with your AI.",
+        "body": "Tasks that think with you.",
         "points": [
           { "icon": "onboarding.devices", "title": "On every device", "detail": "Your tasks stay in step on iPhone, iPad and Mac." },
           {
             "icon": "onboarding.agent",
-            "title": "Work with Claude",
-            "detail": "Claude can take a task, ask you a question, and hand back the result."
+            "title": "Your agents do the work",
+            "detail": "You decide when it’s done."
           },
-          { "icon": "onboarding.notes", "title": "Notes keep the context", "detail": "Each project has notes, so you and Claude know what it's for." }
+          { "icon": "onboarding.notes", "title": "Notes keep the context", "detail": "Each project has notes, so you and Claude know what it’s for." }
         ],
         "primary": { "title": "Continue", "action": "next" }
       },
@@ -256,7 +256,7 @@
             "id": "reminders",
             "icon": "settings.reminders",
             "title": "From Reminders",
-            "detail": "Pick a Reminders list. Its items wait in your Inbox until you bring them in.",
+            "detail": "Pick a Reminders list. Each reminder you bring in moves to your Inbox, and Septena deletes it from Reminders.",
             "action": "importReminders",
             "platforms": ["ios", "ipados", "macos"]
           },
@@ -292,7 +292,7 @@
         "id": "done",
         "kind": "finish",
         "icon": "onboarding.done",
-        "title": "You're all set",
+        "title": "You’re all set",
         "body": "Today shows what to do now. Anything you skipped stays on the Get started list.",
         "returningTitle": "Welcome back",
         "returningBody": "This account is already set up. Your tasks are syncing to this device.",

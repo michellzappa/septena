@@ -316,8 +316,8 @@ struct ImportReportSections: View {
       }
       if report.danglingReferences > 0 {
         Text(report.danglingReferences == 1
-             ? String(localized: "1 task points to a project or heading that is not in the file. It lands in its area or the Inbox.")
-             : String(localized: "\(report.danglingReferences) tasks point to a project or heading that is not in the file. They land in their area or the Inbox."))
+             ? String(localized: "1 task points to a project or section that is not in the file. It lands in its area or the Inbox.")
+             : String(localized: "\(report.danglingReferences) tasks point to a project or section that is not in the file. They land in their area or the Inbox."))
           .font(.callout)
           .foregroundStyle(.secondary)
       }
@@ -503,7 +503,7 @@ enum ImportCopy {
     switch entity {
     case .area: String(localized: "Areas")
     case .project: String(localized: "Projects")
-    case .heading: String(localized: "Headings")
+    case .heading: String(localized: "Sections")
     case .task: String(localized: "Tasks")
     }
   }
@@ -567,7 +567,7 @@ enum ImportCopy {
     case "completedAt": String(localized: "Completion dates")
     case "reminder": String(localized: "Reminders")
     case "recurrence": String(localized: "Repeats")
-    case "someday": String(localized: "Someday")
+    case "someday": String(localized: "Someday (now Anytime)")
     case "reminderTime": String(localized: "Reminder times")
     case "repeating": String(localized: "Repeating tasks")
     case "trashedAreasProjects": String(localized: "Trashed areas and projects")

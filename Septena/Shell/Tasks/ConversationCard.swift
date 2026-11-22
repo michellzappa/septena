@@ -463,7 +463,7 @@ struct AIExplainerView: View {
     NavigationStack {
       ScrollView {
         VStack(alignment: .leading, spacing: 18) {
-          Text("Some tasks need a moment of thinking before you can act. \(AppDisplayName.current) can talk them through with AI, right on the task.")
+          Text("Some tasks need thinking before you can act. Tap Discuss and talk them through, right on the task.")
             .font(.headline)
 
           VStack(alignment: .leading, spacing: 0) {
@@ -472,7 +472,7 @@ struct AIExplainerView: View {
             ForEach(Array(steps.enumerated()), id: \.offset) { i, s in
               stepRow(s, isLast: i == steps.count - 1)
             }
-            Text("On Automatic, every step runs on your device first. It only escalates for steps the on-device model can’t handle (↗).")
+            Text("On Automatic, every step runs on your device first. It reaches further only for steps your device can’t do (↗).")
               .font(.caption2).foregroundStyle(.secondary).padding(.top, 6)
           }
 
@@ -493,7 +493,7 @@ struct AIExplainerView: View {
           VStack(alignment: .leading, spacing: 6) {
             Label("Your AI, never our servers", systemImage: "lock.fill")
               .font(.subheadline).fontWeight(.semibold)
-            Text("\(AppDisplayName.current) never runs AI on your tasks and never reads them. The intelligence is your own (on-device or your Claude), connected by you. Your tasks stay on your device, and sync through Septena’s private server only if you sign in. Turn AI off and the app works the same, minus the conversations.")
+            Text("\(AppDisplayName.current)’s servers never run AI on your tasks. AI runs on your device, or in your own Claude when you connect it. Turn AI off and the app works the same, without conversations.")
               .font(.callout).foregroundStyle(.secondary)
           }
           .padding(12)
@@ -516,7 +516,7 @@ struct AIExplainerView: View {
     [
       Step(icon: "square.and.pencil", title: "Capture", desc: "Jot down the task. A few words are enough.", runs: "You", tint: .gray),
       Step(icon: "questionmark.bubble", title: "Confirm", desc: "AI asks what you mean. Nothing happens until you answer.", runs: "On-device", tint: .green),
-      Step(icon: "doc.text.magnifyingglass", title: "Ground", desc: "Pulls relevant context from your own data.", runs: "On-device", tint: .green),
+      Step(icon: "doc.text.magnifyingglass", title: "Look up", desc: "Pulls relevant context from your own data.", runs: "On-device", tint: .green),
       Step(icon: "checklist", title: "Decide", desc: "Offers a few options for you to pick. A harder call may use the cloud.", runs: "On-device ↗", tint: .blue),
       Step(icon: "hammer", title: "Work", desc: "Does what it can: a draft, a comparison. Uses the web or your Claude only when needed.", runs: "On-device ↗", tint: .blue),
       Step(icon: "hand.point.right", title: "Hand off", desc: "Anything only you can do (pay, send) becomes one clear button.", runs: "You", tint: .gray),

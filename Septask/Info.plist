@@ -35,9 +35,9 @@
 	<key>NSCalendarsUsageDescription</key>
 	<string>Septena shows today's calendar events above your task list.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
-	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
+	<string>Septena moves reminders from your Reminders lists into the Inbox and deletes them from Reminders.</string>
 	<key>NSRemindersUsageDescription</key>
-	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
+	<string>Septena moves reminders from your Reminders lists into the Inbox and deletes them from Reminders.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
