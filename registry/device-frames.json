@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Canonical device shapes for marketing visuals: the website scenes (septena-site) and the App Store panels (appstore/). Units are points (dp on Android) at 1x. A phone case is the screen plus the bezel on every side; screen radius = outerRadius - bezel. A laptop is a lid (a thin rim, a black glass bezel, the screen) on a base that overhangs the lid; outerRadius rounds the lid top, hingeRadius the lid bottom. corner: continuous (Apple) or circular. registry/device-shape.mjs draws these; renderers never redefine them.",
+  "description": "Canonical device shapes for marketing visuals: the website scenes (septena-site) and the App Store panels (appstore/). The iPad is drawn in landscape. Units are points (dp on Android) at 1x. A phone case is the screen plus the bezel on every side; screen radius = outerRadius - bezel. A laptop is a lid (a thin rim, a black glass bezel, the screen) on a base that overhangs the lid; outerRadius rounds the lid top, hingeRadius the lid bottom. corner: continuous (Apple) or circular. registry/device-shape.mjs draws these; renderers never redefine them.",
   "devices": {
     "iphone": {
       "label": "iPhone",
@@ -75,6 +75,43 @@
           ]
         ],
         "highlight": "rgb(255 255 255 / .22)"
+      }
+    },
+    "ipad": {
+      "label": "iPad",
+      "screen": {
+        "width": 1180,
+        "height": 820
+      },
+      "bezel": 20,
+      "outerRadius": 38,
+      "corner": "continuous",
+      "cutout": {
+        "kind": "camera",
+        "diameter": 6,
+        "top": 7
+      },
+      "finish": {
+        "angle": 145,
+        "stops": [
+          [
+            0,
+            "#747479"
+          ],
+          [
+            0.28,
+            "#202023"
+          ],
+          [
+            0.8,
+            "#303034"
+          ],
+          [
+            1,
+            "#737379"
+          ]
+        ],
+        "highlight": "rgb(255 255 255 / .3)"
       }
     },
     "macbook": {
