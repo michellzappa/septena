@@ -864,22 +864,35 @@ struct TaskDragStackPreview: View {
   }
 }
 
-// MARK: - iOS swipe-to-select (pull-left toggle on SelectableScrollList)
+// MARK: - iOS task-row horizontal swipes (left = Select, right = Quick Action)
+
+/// Descriptor for the leading (swipe-right) quick action on a task row
+/// (`docs/IOS_SWIPE_ACTIONS_SPEC.md` #132).
+struct TaskRowLeadingSwipeAction {
+  let title: String
+  let symbol: String
+  let tint: Color
+  let perform: () -> Void
+}
 
 extension View {
-  /// Things-style horizontal pull-left gesture to toggle task selection on iOS
-  /// and iPadOS (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §3). Pass-through
-  /// on macOS or when `enabled` is false.
+  /// Unified scroll-safe horizontal swipe on iOS/iPadOS `SelectableScrollList` rows:
+  ///   • Swipe left  → toggle task selection (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §3).
+  ///   • Swipe right → run `leadingAction` (`docs/IOS_SWIPE_ACTIONS_SPEC.md` #132).
+  /// Pass-through on macOS or when neither direction is enabled.
   @ViewBuilder
-  func taskRowSwipeToSelect(
-    enabled: Bool,
+  func taskRowSwipe(
+    allowSelect: Bool,
     isSelected: Bool,
-    onToggleSelect: @escaping () -> Void
+    onToggleSelect: @escaping () -> Void,
+    leadingAction: TaskRowLeadingSwipeAction? = nil
   ) -> some View {
     #if os(iOS)
-    if enabled {
-      modifier(TaskRowSwipeToSelectModifier(isSelected: isSelected,
-                                            onToggleSelect: onToggleSelect))
+    if allowSelect || leadingAction != nil {
+      modifier(TaskRowHorizontalSwipeModifier(allowSelect: allowSelect,
+                                              isSelected: isSelected,
+                                              onToggleSelect: onToggleSelect,
+                                              leadingAction: leadingAction))
     } else {
       self
     }
