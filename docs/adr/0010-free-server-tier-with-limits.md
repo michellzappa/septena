@@ -1,6 +1,6 @@
 # 0010. Offer a free server tier with limits; paid lifts them
 
-- Status: accepted (2026-11-20)
+- Status: accepted (2026-11-20); free device count amended by [0023](0023-sync-across-devices-is-plus.md) (2026-11-22)
 - Date: 2026-11-20
 - Deciders: mz
 
