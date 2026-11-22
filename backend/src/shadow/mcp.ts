@@ -458,7 +458,7 @@ function matchesTagFilter(taskTags: string[] | undefined, requiredLower: string[
   return requiredLower.every((req) => have.has(req));
 }
 
-async function listTasks(
+export async function listTasks(
   store: StoreRpc,
   timeZone: string,
   rawView: unknown,

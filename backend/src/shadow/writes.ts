@@ -209,6 +209,12 @@ export interface WriteContext {
   store: StoreRpc;
   /// IANA zone from the pairing; decides "today" and the completion stamp.
   timeZone: string;
+  /// Who the change log credits. Absent = the MCP agent (`MCP_ACTOR`). The
+  /// app REST surface (`/v1/tasks`, the watch) passes `app:<client>` so the
+  /// store treats the write as the human, not an agent.
+  actor?: string;
+  /// Provenance stamped on a created task. Absent = the MCP connector.
+  source?: { source: string; sourceClient: string };
 }
 
 /// Runs one validated write tool. Throws a plain Error (the tool error the
@@ -267,14 +273,14 @@ export async function runWriteTool(ctx: WriteContext, name: WriteToolName, args:
 /// One push for the whole call. The ops are checked against the same schema
 /// /v1/sync/push uses, so this path can never store what an app push could
 /// not.
-async function push(store: StoreRpc, ops: NewOp[]): Promise<OpResult[]> {
+async function push(store: StoreRpc, actor: string | undefined, ops: NewOp[]): Promise<OpResult[]> {
   const base = `mcp-${randomId(12)}`;
   const withIds = ops.map((op, i) => ({ ...op, clientOpId: `${base}-${i}` })) as Op[];
   const parsed = zPushBody.safeParse({ ops: withIds });
   if (!parsed.success) {
     throw new Error(`Invalid task fields: ${parsed.error.issues.slice(0, 5).map((i) => `${i.path.slice(2).join(".")} ${i.message}`).join("; ")}`);
   }
-  const { result } = await store.push(withIds, MCP_ACTOR);
+  const { result } = await store.push(withIds, actor ?? MCP_ACTOR);
   return result.results;
 }
 
@@ -396,14 +402,15 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     status: "open",
     created: today,
     createdAt: now,
-    source: "mcp",
-    sourceClient: "Claude",
+    source: ctx.source?.source ?? "mcp",
+    sourceClient: ctx.source?.sourceClient ?? "Claude",
     today: input.today === true,
     starred: input.starred === true,
     position,
   };
   if (input.today) fields.todaySetOn = today;
-  if (plan.committed) fields.acknowledgedAt = now;
+  // A human capture (the watch) is engaged by definition.
+  if (plan.committed || ctx.source) fields.acknowledgedAt = now;
   if (input.scheduled) fields.scheduled = input.scheduled;
   if (plan.startTime) {
     fields.startTime = plan.startTime;
@@ -454,7 +461,7 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     }
   }
 
-  const results = await push(store, ops);
+  const results = await push(store, ctx.actor, ops);
   const r = results[taskOpIdx];
   if (!applied(r)) throw new Error(`Task was not created: ${r?.status === "rejected" ? r.reason : r?.status ?? "no result"}`);
   return {
@@ -558,7 +565,7 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
   const taskOpIdx = ops.length;
   ops.push({ op: "upsert", entity: "task", id: input.id, fields });
 
-  const results = await push(store, ops);
+  const results = await push(store, ctx.actor, ops);
   requireApplied(results[taskOpIdx], input.id);
   return { id: input.id, updated };
 }
@@ -676,7 +683,7 @@ async function completeTask(ctx: WriteContext, id: string) {
     }
   }
 
-  const results = await push(store, ops);
+  const results = await push(store, ctx.actor, ops);
   if (results[0]?.status === "rejected" && results[0].reason === "human_accepts") {
     return {
       id,
@@ -723,7 +730,7 @@ async function checklistAdd(ctx: WriteContext, taskId: string, items: string[]) 
     added.push({ id, title, position: maxPos });
   }
   if (ops.length === 0) return { task_id: taskId, added: [] };
-  const results = await push(store, ops);
+  const results = await push(store, ctx.actor, ops);
   for (let i = 0; i < results.length; i++) {
     requireApplied(results[i], added[i].id);
   }
@@ -745,7 +752,7 @@ async function checklistUpdate(
   }
   if (input.position !== undefined) fields.position = input.position;
   if (Object.keys(fields).length === 0) return { id: input.id, updated: [] };
-  const [r] = await push(store, [{ op: "upsert", entity: "checklistItem", id: input.id, fields }]);
+  const [r] = await push(store, ctx.actor, [{ op: "upsert", entity: "checklistItem", id: input.id, fields }]);
   requireApplied(r, input.id);
   return { id: input.id, updated: Object.keys(fields) };
 }
@@ -754,7 +761,7 @@ async function checklistDelete(ctx: WriteContext, id: string) {
   const { store } = ctx;
   const current = await store.readChecklistItem(id);
   if (!current) throw new Error(`Checklist item not found: ${id}`);
-  const [r] = await push(store, [{ op: "delete", entity: "checklistItem", id }]);
+  const [r] = await push(store, ctx.actor, [{ op: "delete", entity: "checklistItem", id }]);
   requireApplied(r, id);
   return { id, deleted: true };
 }
@@ -784,14 +791,14 @@ async function threadAppend(
   if (confirmedIntent !== undefined) {
     ops.push({ op: "upsert", entity: "convo", id: input.id, fields: { confirmedIntent } });
   }
-  const results = await push(ctx.store, ops);
+  const results = await push(ctx.store, ctx.actor, ops);
   requireApplied(results[0], input.id);
   const r = results[0];
   return { id: input.id, seq: r.status === "applied" ? r.seq : undefined };
 }
 
 async function writeConvo(ctx: WriteContext, id: string, fields: Record<string, unknown>): Promise<void> {
-  const [r] = await push(ctx.store, [{ op: "upsert", entity: "convo", id, fields }]);
+  const [r] = await push(ctx.store, ctx.actor, [{ op: "upsert", entity: "convo", id, fields }]);
   requireApplied(r, id);
 }
 

@@ -42,6 +42,7 @@ import {
   type NotificationV2,
 } from "../entitlement/appleJws.js";
 import { appleRow, rejectReason } from "../entitlement/apple.js";
+import { tasksRest } from "./tasksRest.js";
 
 // Task backend API, mounted at /v1 (docs/SEPTASK_BACKEND.md in the app repo).
 // Phase 0: no app or MCP tool calls this yet. The live connector is unchanged.
@@ -202,6 +203,11 @@ api.use("/attachments/*", requireUser, loadPlan, requireSyncDevice);
 api.use("/account", requireUser);
 api.use("/changes", requireUser, loadPlan, requireSyncDevice);
 api.use("/pair/*", requireUser);
+api.use("/auth/device", requireUser);
+// The watch is a companion of a signed-in phone or Mac: it loads the plan
+// but takes no sync device slot of its own.
+api.use("/tasks", requireUser, loadPlan);
+api.use("/tasks/*", requireUser, loadPlan);
 api.use("/entitlement", apiHostOnly, requireUser);
 api.use("/entitlement/*", apiHostOnly, requireUser);
 api.use("/webhooks/*", apiHostOnly);
@@ -342,6 +348,22 @@ api.post("/pair/inspect", async (c) => {
     ? c.json({ kind: res.kind, client: res.client, expiresIn: res.expiresIn }, 200, { "Cache-Control": "no-store" })
     : c.json({ error: res.error }, res.status);
 });
+
+// ---- a session for a companion device (the Apple Watch) ----
+
+/// A signed-in app mints a SEPARATE session for a device it hands it to over
+/// a private channel (WatchConnectivity). Refresh tokens are single-use and
+/// rotate, so two devices can never share one: each would sign the other out.
+/// The new session is a sibling, revocable on its own through /auth/signout.
+api.post("/auth/device", async (c) => {
+  const userId = c.get("userId");
+  logEvent("api_device_session", { by: c.get("actor") });
+  return c.json(await issueSession(c.env, userId));
+});
+
+// ---- task views and verbs for thin clients (src/api/tasksRest.ts) ----
+
+api.route("/tasks", tasksRest);
 
 api.post("/pair/approve", async (c) => {
   const body = await parse(c, zPairApproveBody);
