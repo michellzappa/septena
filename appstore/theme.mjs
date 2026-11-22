@@ -55,8 +55,6 @@ export const theme = {
 
   // ----- shape & depth (panel-space px, designed at 1320 wide) -----
   radius: { card: 40, device: 120, badge: 999 },
-  // The site's 3D-ish phone bezel (same file), instead of a flat black frame.
-  bezel: "linear-gradient(145deg,#747479,#202023 28%,#303034 80%,#737379)",
   shadow: {
     device: "0 60px 120px -30px rgb(0 0 0 / 0.35)",
     // septena-site components/scenes/scenes.css .scene-frame--phone, scaled.

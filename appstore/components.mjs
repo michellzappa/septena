@@ -16,7 +16,12 @@
 //   founder    — quote card
 //   footnote   — small print at the bottom
 
+import { readFileSync } from "node:fs";
 import { theme } from "./theme.mjs";
+
+// The one iPhone shape (registry/device-frames.json), shared with the website scenes.
+const IPHONE = JSON.parse(readFileSync(new URL("../registry/device-frames.json", import.meta.url), "utf8")).devices.iphone;
+const IPHONE_CASE_WIDTH = IPHONE.screen.width + 2 * IPHONE.bezel;
 
 const esc = (s = "") =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -56,7 +61,6 @@ function badge(b, tint) {
 // are tuned to real device proportions (~14% of width for iPhone). The frame's
 // `overflow:hidden` guarantees the screenshot is actually clipped to the curve.
 const FRAME = {
-  phone: { pad: 24, radius: 158, island: true },
   pad:   { pad: 30, radius: 92,  island: false },
   mac:   { pad: 0,  radius: 28,  island: false }, // window chrome added separately
   none:  { pad: 0,  radius: 40,  island: false },
@@ -66,23 +70,23 @@ function shot(s, device, tint) {
   if (!s) return "";
   const dw = device.designWidth;
   const w = Math.round(dw * (s.width ?? 0.74));
-  // Phone: the site's bezel proportions (scenes.css .scene-frame--phone, a
-  // 414px frame with a 6px bezel and a 48px outer radius).
-  const k = w / 414;
+  // Phone: the canonical iPhone (registry/device-frames.json), scaled to this width.
+  const k = w / IPHONE_CASE_WIDTH;
   const f = device.frame === "phone"
-    ? { pad: Math.round(6 * k), radius: Math.round(48 * k), island: true, bezel: true }
-    : FRAME[device.frame] ?? FRAME.phone;
+    ? { pad: Math.round(IPHONE.bezel * k), radius: Math.round(IPHONE.outerRadius * k), island: true, bezel: true }
+    : FRAME[device.frame] ?? FRAME.none;
   const screenR = Math.max(0, f.radius - f.pad);
   const screen = s.img
     ? `<img class="screen" src="${s.img}" alt="" style="border-radius:${screenR}px;">`
     : placeholderScreen(s.src, tint, device.screenAspect ?? 0.46, screenR);
   // Real captures already include the device's Dynamic Island/status bar — only
   // draw a synthetic island on the (content-free) placeholder.
-  const island = f.island && !s.img ? `<div class="island"></div>` : "";
+  const c = IPHONE.cutout;
+  const island = f.island && !s.img ? `<div class="island" style="top:${Math.round((IPHONE.bezel + c.top) * k)}px; width:${Math.round(c.width * k)}px; height:${Math.round(c.height * k)}px;"></div>` : "";
   return `
   <div class="shot-zone" style="transform: translateY(${Math.round((s.offsetY ?? 0) * 100)}%);">
     <div class="shot-wrap" style="width:${w}px; transform: rotate(${s.rotate ?? 0}deg);">
-      <div class="frame" style="width:${w}px; padding:${f.pad}px; border-radius:${f.radius}px;${f.bezel ? ` background:${theme.bezel}; box-shadow:${theme.shadow.phone(k)};` : ""}">
+      <div class="frame" style="width:${w}px; padding:${f.pad}px; border-radius:${f.radius}px;${f.bezel ? ` background:${IPHONE.finish.gradient}; box-shadow:${theme.shadow.phone(k)};` : ""}">
         ${screen}${island}
       </div>
       ${s.img ? callout(s.callout, { w, pad: f.pad, margin: (dw - w) / 2, tint }) : ""}
@@ -237,8 +241,8 @@ h1 em { font-style:normal; color:${tint}; }
 .co-dot { width:26px; height:26px; border-radius:50%; background:var(--tint); flex:none; }
 .screen { display:block; width:100%; }
 img.screen { height:auto; }
-.island { position:absolute; top:50px; left:50%; transform:translateX(-50%);
-  width:268px; height:80px; background:#000; border-radius:999px; }
+.island { position:absolute; left:50%; transform:translateX(-50%);
+  background:#000; border-radius:999px; }
 .ph { position:relative; }
 .ph-center { position:absolute; inset:0; display:flex; flex-direction:column;
   align-items:center; justify-content:center; gap:40px; }
