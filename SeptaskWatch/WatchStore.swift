@@ -75,10 +75,12 @@ final class WatchStore {
   // MARK: Shown state
 
   private(set) var today: WatchTaskList?
+  private(set) var review: WatchTaskList?
   private(set) var upcoming: WatchTaskList?
   private(set) var repeating: WatchTaskList?
   private(set) var anytime: WatchTaskList?
   private(set) var logbook: WatchTaskList?
+  private(set) var starred: WatchTaskList?
   private(set) var structure: WatchStructure?
   private(set) var containers: [String: WatchTaskList] = [:]
   private(set) var connection: WatchConnection = WatchAPI.hasSession ? .connected : .notConnected
@@ -131,10 +133,12 @@ final class WatchStore {
 
   /// Today with every queued / undoable change applied on top.
   var todayRows: [WatchTask] { overlay(today?.tasks ?? [], view: .today) }
+  var reviewRows: [WatchTask] { overlay(review?.tasks ?? [], view: .review) }
   var upcomingRows: [WatchTask] { overlay(upcoming?.tasks ?? [], view: .upcoming) }
   var repeatingRows: [WatchTask] { overlay(repeating?.tasks ?? [], view: .repeating) }
   var anytimeRows: [WatchTask] { overlay(anytime?.tasks ?? [], view: .anytime) }
   var logbookRows: [WatchTask] { logbook?.tasks ?? [] }
+  var starredRows: [WatchTask] { overlay(starred?.tasks ?? [], view: .starred) }
   func containerRows(key: String) -> [WatchTask] { overlay(containers[key]?.tasks ?? [], view: .repeating) }
   var todayDay: String { today?.today ?? WatchDay.string(from: .now) }
 
@@ -224,6 +228,9 @@ final class WatchStore {
       connection = .connected
       offline = false
       lastError = nil
+      if view == .today {
+        Task { await self.refreshStructure() }
+      }
     } catch let error as WatchAPIError {
       handle(error)
     } catch {}
@@ -252,6 +259,10 @@ final class WatchStore {
     case .completed:
       logbook = list
       Self.write(list, "logbook.json")
+    case .review:
+      review = list
+    case .starred:
+      starred = list
     case .inbox:
       break
     }
@@ -456,7 +467,7 @@ final class WatchStore {
         if action != .tomorrow(id) { hidden.insert(id) }
       case .anytime, .inbox:
         hidden.insert(id)
-      case .repeating:
+      case .repeating, .starred, .review:
         if case .complete = action { hidden.insert(id) }
         if case .cancel = action { hidden.insert(id) }
       case .completed:

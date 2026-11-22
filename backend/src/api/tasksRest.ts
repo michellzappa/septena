@@ -6,6 +6,7 @@ import { zId } from "../store/columns.js";
 import type { Row } from "../store/TaskStore.js";
 import { addDaysYMD, isValidTz, todayYMD } from "../tz.js";
 import type { TaskOut } from "../tools/taskShared.js";
+import { matchesView } from "../tools/taskShared.js";
 import { listTasks } from "../shadow/mcp.js";
 import { rpcStoreFor, runWriteTool, zWriteArgs, type StoreRpc, type WriteContext, type WriteToolName } from "../shadow/writes.js";
 
@@ -95,7 +96,7 @@ function containerNames(areas: Row[], projects: Row[]): Map<string, string> {
   return m;
 }
 
-const zView = z.enum(["today", "inbox", "upcoming", "repeating", "anytime", "completed"]);
+const zView = z.enum(["today", "inbox", "upcoming", "repeating", "anytime", "completed", "starred", "review"]);
 
 function numPos(v: unknown): number {
   return typeof v === "number" && Number.isFinite(v) ? v : Number.POSITIVE_INFINITY;
@@ -111,11 +112,14 @@ function sortByPosition(rows: Row[]): Row[] {
 tasksRest.get("/lists", async (c) => {
   const store = rpcStoreFor(c.env, c.get("userId"));
   const timeZone = await timeZoneFor(c, store);
-  const [areas, projects, open] = await Promise.all([
+  const [areas, projects, open, review] = await Promise.all([
     store.readAreas(500),
     store.readProjects("active", 500),
     listTasks(store, timeZone, "all", 500),
+    listTasks(store, timeZone, "review", 100),
   ]);
+  const today = todayYMD(timeZone);
+  const nowMs = Date.now();
   const projectArea = new Map<string, string>();
   for (const p of projects) {
     if (typeof p.id === "string" && typeof p.area === "string" && p.area) {
@@ -124,7 +128,17 @@ tasksRest.get("/lists", async (c) => {
   }
   const projectCounts = new Map<string, number>();
   const areaCounts = new Map<string, number>();
+  let todayCount = 0;
+  let upcomingCount = 0;
+  let repeatingCount = 0;
+  let anytimeCount = 0;
+  let starredCount = 0;
   for (const t of open.tasks as TaskOut[]) {
+    if (matchesView(t, "today", today, nowMs)) todayCount++;
+    if (matchesView(t, "upcoming", today, nowMs)) upcomingCount++;
+    if (t.recurrence) repeatingCount++;
+    if (matchesView(t, "anytime", today, nowMs)) anytimeCount++;
+    if (t.starred) starredCount++;
     if (t.project) {
       projectCounts.set(t.project, (projectCounts.get(t.project) ?? 0) + 1);
     }
@@ -134,6 +148,14 @@ tasksRest.get("/lists", async (c) => {
     }
   }
   return c.json({
+    counts: {
+      today: todayCount,
+      review: review.total,
+      upcoming: upcomingCount,
+      repeating: repeatingCount,
+      anytime: anytimeCount,
+      starred: starredCount,
+    },
     areas: sortByPosition(areas).map((r) => {
       const id = r.id as string;
       const out: { id: string; title: string; emoji?: string; count: number } = {
@@ -167,7 +189,7 @@ tasksRest.get("/", async (c) => {
   if (!q.success) return c.json({ error: "invalid_request" }, 400);
   const store = rpcStoreFor(c.env, c.get("userId"));
   const timeZone = await timeZoneFor(c, store);
-  const needsAll = !!q.data.area || !!q.data.project || q.data.view === "repeating";
+  const needsAll = !!q.data.area || !!q.data.project || q.data.view === "repeating" || q.data.view === "starred";
   const [list, areas, projects] = await Promise.all([
     listTasks(store, timeZone, needsAll ? "all" : q.data.view, needsAll ? 500 : q.data.limit),
     store.readAreas(500),
@@ -196,6 +218,11 @@ tasksRest.get("/", async (c) => {
     tasks = tasks.slice(0, q.data.limit);
   } else if (q.data.view === "repeating") {
     tasks = tasks.filter((t) => !!t.recurrence);
+    total = tasks.length;
+    truncated = total > q.data.limit;
+    tasks = tasks.slice(0, q.data.limit);
+  } else if (q.data.view === "starred") {
+    tasks = tasks.filter((t) => !!t.starred);
     total = tasks.length;
     truncated = total > q.data.limit;
     tasks = tasks.slice(0, q.data.limit);

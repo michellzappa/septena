@@ -44,7 +44,7 @@ struct WatchTask: Codable, Identifiable, Equatable, Hashable, Sendable {
 
 /// A view's rows. Same shape from the server and from the phone's snapshot.
 struct WatchTaskList: Codable, Equatable, Sendable {
-  enum View: String, Codable, Sendable { case today, inbox, upcoming, repeating, anytime, completed }
+  enum View: String, Codable, Sendable { case today, inbox, upcoming, repeating, anytime, completed, starred, review }
 
   var view: View
   /// The day the list was computed for (YYYY-MM-DD, the user's zone).
@@ -90,7 +90,17 @@ struct WatchProject: Codable, Identifiable, Equatable, Hashable, Sendable {
   var count: Int
 }
 
+struct WatchListCounts: Codable, Equatable, Sendable {
+  var today: Int
+  var review: Int
+  var upcoming: Int
+  var repeating: Int
+  var anytime: Int
+  var starred: Int
+}
+
 struct WatchStructure: Codable, Equatable, Sendable {
+  var counts: WatchListCounts?
   var areas: [WatchArea]
   var projects: [WatchProject]
 }

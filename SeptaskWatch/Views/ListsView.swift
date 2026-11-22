@@ -1,29 +1,51 @@
 import SwiftUI
 
-// Lists: matches the Phone/Mac sidebar — smart lists, standalone projects,
-// areas with their projects, and Sync at the bottom.
+// Lists: matches the Phone/Mac sidebar — Today, Review (when non-empty),
+// Upcoming, Repeating, Anytime, Logbook, standalone projects, areas with
+// their projects, Starred (when non-empty), and Sync at the bottom.
 
 struct ListsView: View {
+  @Environment(\.dismiss) private var dismiss
   private var store: WatchStore { .shared }
 
   var body: some View {
+    let counts = store.structure?.counts
     let areas = store.structure?.areas ?? []
     let projects = store.structure?.projects ?? []
     let standaloneProjects = projects.filter { $0.area == nil }
 
     List {
       Section {
+        Button { dismiss() } label: {
+          ListCountRow(title: String(localized: "Today"), symbol: "sun.max.fill", count: counts?.today ?? store.todayRows.count)
+        }
+        if let rev = counts?.review, rev > 0 {
+          NavigationLink(value: WatchRoute.review) {
+            ListCountRow(title: String(localized: "Review"), symbol: "eye", count: rev)
+          }
+        }
         NavigationLink(value: WatchRoute.upcoming) {
-          Label("Upcoming", systemImage: "calendar")
+          ListCountRow(title: String(localized: "Upcoming"), symbol: "calendar", count: counts?.upcoming ?? 0)
         }
         NavigationLink(value: WatchRoute.repeating) {
-          Label("Repeating", systemImage: "arrow.clockwise")
+          ListCountRow(title: String(localized: "Repeating"), symbol: "arrow.clockwise", count: counts?.repeating ?? 0)
         }
         NavigationLink(value: WatchRoute.anytime) {
-          Label("Anytime", systemImage: "square.stack")
+          ListCountRow(title: String(localized: "Anytime"), symbol: "rectangle.stack.fill", count: counts?.anytime ?? 0)
         }
         NavigationLink(value: WatchRoute.logbook) {
-          Label("Logbook", systemImage: "checkmark")
+          ListCountRow(title: String(localized: "Logbook"), symbol: "checkmark", count: 0)
+        }
+      }
+
+      if store.structure == nil, store.connection == .connected {
+        Section {
+          HStack {
+            Spacer()
+            ProgressView()
+            Spacer()
+          }
+          .listRowBackground(Color.clear)
         }
       }
 
@@ -47,6 +69,14 @@ struct ListsView: View {
             NavigationLink(value: WatchRoute.project(project)) {
               ListCountRow(title: project.title, symbol: "number", count: project.count)
             }
+          }
+        }
+      }
+
+      if let starred = counts?.starred, starred > 0 {
+        Section {
+          NavigationLink(value: WatchRoute.starred) {
+            ListCountRow(title: String(localized: "Starred"), symbol: "star.fill", count: starred)
           }
         }
       }
@@ -179,6 +209,51 @@ struct RepeatingView: View {
     .navigationTitle("Repeating")
     .navigationDestination(item: $open) { TaskDetailView(task: $0, onToday: false) }
     .task { await store.refreshNow(.repeating) }
+  }
+}
+
+struct SmartView: View {
+  let title: String
+  let view: WatchTaskList.View
+  let symbol: String
+  let emptyText: String
+
+  @State private var open: WatchTask?
+  private var store: WatchStore { .shared }
+
+  private var rows: [WatchTask] {
+    switch view {
+    case .review: return store.reviewRows
+    case .starred: return store.starredRows
+    default: return []
+    }
+  }
+
+  private var loaded: Bool {
+    switch view {
+    case .review: return store.review != nil
+    case .starred: return store.starred != nil
+    default: return true
+    }
+  }
+
+  var body: some View {
+    ZStack {
+      if rows.isEmpty, loaded {
+        EmptyList(symbol: symbol, text: emptyText)
+      } else if rows.isEmpty {
+        ProgressView()
+      } else {
+        List {
+          ForEach(rows) { task in
+            LaterRow(task: task, today: store.todayDay) { open = task }
+          }
+        }
+      }
+    }
+    .navigationTitle(title)
+    .navigationDestination(item: $open) { TaskDetailView(task: $0, onToday: false) }
+    .task { await store.refreshNow(view) }
   }
 }
 

@@ -9,10 +9,12 @@ import WatchKit
 enum WatchRoute: Hashable {
   case task(WatchTask, onToday: Bool)
   case lists
+  case review
   case upcoming
   case repeating
   case anytime
   case logbook
+  case starred
   case area(WatchArea)
   case project(WatchProject)
   case status
@@ -44,10 +46,12 @@ struct TodayView: View {
         .navigationDestination(for: WatchRoute.self) { route in
           switch route {
           case .task(let task, let onToday): TaskDetailView(task: task, onToday: onToday)
+          case .review: SmartView(title: String(localized: "Review"), view: .review, symbol: "eye", emptyText: String(localized: "Nothing to review."))
           case .upcoming: UpcomingView()
           case .repeating: RepeatingView()
           case .anytime: AnytimeView()
           case .logbook: LogbookView()
+          case .starred: SmartView(title: String(localized: "Starred"), view: .starred, symbol: "star.fill", emptyText: String(localized: "No starred tasks."))
           case .area(let area): ContainerTasksView(title: area.title, areaID: area.id, projectID: nil)
           case .project(let project): ContainerTasksView(title: project.title, areaID: nil, projectID: project.id)
           case .lists: ListsView()
