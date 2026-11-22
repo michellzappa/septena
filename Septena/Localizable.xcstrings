@@ -5,6 +5,18 @@
       "comment" : "Generated from registry plans.outcomes.agents.rows.links.cells.account. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "“%@” deleted" : {
+      "comment" : "Generated from registry surfaces.toasts.templates.deletedSingle.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” apagada"
+          }
+        }
+      }
+    },
     "" : {
 
     },
@@ -2026,6 +2038,18 @@
         }
       }
     },
+    "AI on this device" : {
+      "comment" : "Generated from registry settings.pages.ai_preferences.sections.on_device.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IA neste dispositivo"
+          }
+        }
+      }
+    },
     "AI Preferences" : {
       "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -3276,6 +3300,18 @@
         }
       }
     },
+    "Clear When" : {
+      "comment" : "Generated from registry actions.actions.task.clearSchedule.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpar Quando"
+          }
+        }
+      }
+    },
     "Cleared items move to Recently Deleted. You can undo this." : {
       "comment" : "Generated from registry surfaces.prompts.items.clearLogged.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -3492,6 +3528,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Conecte o Withings em Ajustes › Integrações."
+          }
+        }
+      }
+    },
+    "Connect your agent" : {
+      "comment" : "Generated from registry surfaces.notices.items.getStarted.steps.connectAI.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conecte seu agente"
           }
         }
       }
@@ -4574,6 +4622,18 @@
 
     },
     "Each project has notes, so you and Claude know what it's for." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.2.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada projeto tem notas, para você e o Claude saberem para que ele serve."
+          }
+        }
+      }
+    },
+    "Each project has notes, so you and Claude know what it’s for." : {
       "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.2.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
@@ -6602,6 +6662,18 @@
     "Left" : {
 
     },
+    "Let Claude or your own agent work your list" : {
+      "comment" : "Generated from registry surfaces.notices.items.getStarted.steps.connectAI.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deixe o Claude ou seu próprio agente trabalhar na sua lista"
+          }
+        }
+      }
+    },
     "Let Claude read and write your Septena data at mcp.septena.app." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -7531,6 +7603,24 @@
         }
       }
     },
+    "Moved to %@ (When)" : {
+      "comment" : "Generated from registry surfaces.toasts.templates.deferred.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moved to %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Movida para %@"
+          }
+        }
+      }
+    },
     "n < %@ — too noisy to plot" : {
       "localizations" : {
         "pt-BR" : {
@@ -7670,6 +7760,18 @@
     },
     "New task…" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
+    },
+    "New tasks wait at the top of Today until you schedule or file them." : {
+      "comment" : "Generated from registry destinations.destinations.inbox.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Novas tarefas esperam no topo de Hoje até você agendar ou arquivar."
+          }
+        }
+      }
     },
     "New tasks wait here until you schedule or file them." : {
       "comment" : "Generated from registry destinations.destinations.inbox.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -8908,6 +9010,18 @@
         }
       }
     },
+    "Pick a Reminders list. Each reminder you bring in moves to your Inbox, and Septena deletes it from Reminders." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.moveIn.choices.reminders.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha uma lista dos Lembretes. Cada lembrete que você traz vai para a caixa de entrada, e o Septena o apaga dos Lembretes."
+          }
+        }
+      }
+    },
     "Pick a Reminders list. Its items wait in your Inbox until you bring them in." : {
       "comment" : "Generated from registry surfaces.firstRun.steps.moveIn.choices.reminders.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -10096,6 +10210,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "O Septena copia suas áreas, projetos e tarefas. O outro app não é alterado, e você pode desfazer uma importação."
+          }
+        }
+      }
+    },
+    "Septena keeps deleted tasks here for 30 days, then deletes them for good." : {
+      "comment" : "Generated from registry destinations.destinations.recentlyDeleted.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena guarda as tarefas apagadas aqui por 30 dias e depois as apaga de vez."
           }
         }
       }
@@ -11649,6 +11775,18 @@
         }
       }
     },
+    "Tasks that think with you." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.welcome.body. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas que pensam com você."
+          }
+        }
+      }
+    },
     "Tasks Today" : {
 
     },
@@ -11683,6 +11821,18 @@
     "Tasks you assign to Claude appear here, grouped by where the work stands." : {
       "comment" : "Generated from registry destinations.destinations.agent.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
+    },
+    "Tasks you complete or let go end up here." : {
+      "comment" : "Generated from registry destinations.destinations.logbook.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas que você conclui ou descarta vêm parar aqui."
+          }
+        }
+      }
     },
     "Tasks, lists, projects and areas have no caps on any plan." : {
       "comment" : "Generated from registry plans.promises.core_free.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -12167,6 +12317,10 @@
           }
         }
       }
+    },
+    "Today with its Inbox, Upcoming, Anytime, Faded and Logbook" : {
+      "comment" : "Generated from registry plans.cards.free.points.0. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Today, Inbox, Upcoming, Anytime and Logbook" : {
       "comment" : "Generated from registry plans.cards.free.points.0. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -12927,6 +13081,10 @@
         }
       }
     },
+    "When dates, deadlines and repeats" : {
+      "comment" : "Generated from registry plans.cards.free.points.2. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "When off, tasks appear in one list with their project or area underneath." : {
       "comment" : "Generated from registry settings.rootGroups.lists_root.items.1.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -12999,6 +13157,18 @@
     },
     "Which sections contribute their entries to the Next list. Turning one off here hides it from Next only — its page and data stay put." : {
 
+    },
+    "While paused, no agent can start or work on a task." : {
+      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.1.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enquanto estiver pausado, nenhum agente pode começar ou trabalhar numa tarefa."
+          }
+        }
+      }
     },
     "Whose turn?" : {
 
@@ -13184,6 +13354,30 @@
         }
       }
     },
+    "You can’t undo this." : {
+      "comment" : "Generated from registry surfaces.prompts.items.deletePermanently.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não é possível desfazer."
+          }
+        }
+      }
+    },
+    "You decide when it’s done." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.1.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você decide quando está pronto."
+          }
+        }
+      }
+    },
     "You do not need a card. After 14 days the account becomes a free account, and your tasks stay where they are." : {
       "comment" : "Generated from registry plans.trial.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -13235,6 +13429,18 @@
         }
       }
     },
+    "You’re all set" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.done.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tudo pronto"
+          }
+        }
+      }
+    },
     "You’re at %lld of %lld ml — log a glass?" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -13270,6 +13476,18 @@
     "Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are." : {
       "comment" : "Generated from registry plans.upsells.trial_end.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
+    },
+    "Your agents do the work" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.1.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seus agentes fazem o trabalho"
+          }
+        }
+      }
     },
     "Your agents work your tasks without a daily cap" : {
       "comment" : "Generated from registry plans.cards.plus.points.3. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -13462,6 +13680,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Suas tarefas, áreas, projetos e conversas são apagados do servidor e deste dispositivo."
+          }
+        }
+      }
+    },
+    "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect Claude under AI & Agents." : {
+      "comment" : "Generated from registry settings.pages.privacy.sections.data_locality.items.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suas tarefas, áreas, projetos e conversas ficam neste dispositivo até você entrar. Depois de entrar, elas sincronizam pelo servidor privado do Septena em api.septena.app, criptografadas em repouso (não de ponta a ponta, então agentes conectados podem lê-las quando você escolher). A IA no seu dispositivo fica no seu dispositivo. Conecte o Claude em IA e agentes."
           }
         }
       }
