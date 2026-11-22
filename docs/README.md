@@ -96,7 +96,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [WEB_CLIENT_SPEC.md](WEB_CLIENT_SPEC.md) | proposal (#21); WB2 uses the Rust core's WASM (ADR 0025) |
 | [CLOUDFLARE_ACCOUNT_MOVE.md](CLOUDFLARE_ACCOUNT_MOVE.md) | accepted; ADR 0018 |
 | [ANDROID_CLIENT_SPEC.md](ANDROID_CLIENT_SPEC.md) | accepted (#20); shared Kotlin core for Windows; rules move to the Rust core in C1 (ADR 0025) |
-| [SHARED_CORE_SPEC.md](SHARED_CORE_SPEC.md) | accepted (ADR 0025), C0 passed (#246): one Rust core for rules and sync decisions, C0–C5 |
+| [SHARED_CORE_SPEC.md](SHARED_CORE_SPEC.md) | accepted (ADR 0025); C0 and C5 done, C4 in progress (#250): one Rust core for rules and sync decisions |
 | [REGISTRY_AUDIT.md](REGISTRY_AUDIT.md) | audit 2026-11-21; hard-coded copy vs registry, l10n proposal (#214–#219) |
 | [SEPTASK_ANDROID_PLAN.md](SEPTASK_ANDROID_PLAN.md) | superseded by ANDROID_CLIENT_SPEC.md |
 | [TASK_CONVERSATIONS_PLAN.md](TASK_CONVERSATIONS_PLAN.md) | shipped — historical, still the design rationale |
