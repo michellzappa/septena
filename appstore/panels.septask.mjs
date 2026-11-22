@@ -19,12 +19,12 @@ import { parseScreenshots } from "./metadata.mjs";
 // (the scene builder's 402-wide space). Put the card in empty screen space,
 // never over content; positive dy puts it below the element.
 const VISUAL = {
-  thinks:  { fill: "#007AFF", texture: "topography" },
-  agent:   { fill: "#6544D6", texture: "causticGlass", callout: { side: "right", dy: 330 } },
-  inbox:   { fill: "#27272E", texture: "stippleDrift" },
-  plan:    { fill: "#C28500", texture: "fieldMatrix",  callout: { side: "right", dy: 340 } },
-  dates:   { fill: "#E05212", texture: "ridges" },
-  details: { fill: "#D6333F", texture: "washiPaper" },
+  hook:           { fill: "#007AFF", texture: "topography" },
+  "agent-asks":   { fill: "#6544D6", texture: "causticGlass" },
+  "agent-result": { fill: "#27272E", texture: "stippleDrift" },
+  inbox:          { fill: "#5B8C00", texture: "washiPaper" },
+  plan:           { fill: "#C28500", texture: "fieldMatrix", callout: { side: "right", dy: 340 } },
+  dates:          { fill: "#E05212", texture: "ridges" },
 };
 
 const rows = parseScreenshots().iPhone ?? [];

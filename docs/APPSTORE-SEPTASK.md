@@ -22,7 +22,9 @@ files.
   **visuals** (background tint, phone geometry) live in
   `appstore/panels.septask.mjs`, keyed by slug.
 
-**Listing strategy** (keep panels honest to this, updated 2026-11-21): the
+**Listing strategy** (keep panels honest to this, updated 2026-11-22; the
+first panel says what the app is and its one unique claim: a task list your
+own agent can work): the
 angle is *tasks that think with you*: a native task app with AI that asks before
 it acts, built for the agents people already use, and open source. Sources:
 Starlings `/strategy/positioning-septena-the-task-app` and the feature map
@@ -210,12 +212,12 @@ reads this table; `appstore/validate.mjs` checks it.
 
 | slug | scene | callout | title | sub |
 | --- | --- | --- | --- | --- |
-| thinks | thinking/1 | - | AI that asks first | |
-| agent | agents/3 | - | Your agent works your list | |
+| hook | today/0 | - | Tasks your agent can work | |
+| agent-asks | agents/2 | - | Your agent asks, you decide | |
+| agent-result | agents/3 | - | The result waits on the task | |
 | inbox | capture/1 | - | New tasks wait in the Inbox | |
 | plan | plan/1 | task-reply | Plan today from Anytime | |
 | dates | dates/2 | - | Start dates and deadlines | |
-| details | notes/2 | - | Notes and files on the task | |
 
 ---
 
