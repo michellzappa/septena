@@ -7,7 +7,7 @@ import SwiftUI
 ///   • Mode (`System` / `Light` / `Dark`, device-local). `syncTheme` has no UI
 ///     for now; it keeps its stored value (default on).
 ///   • Accent Color (`Colorful` default + 7 exotic fruits, restrained reach)
-///   • Header Texture (`Pure Canvas` default + 6 procedural Header Wash styles)
+///   • Header Texture (`Pure Canvas` default + 5 procedural Header Wash styles)
 ///   • `Slow drift` texture motion (intensity stays at its stored value; no UI)
 struct AppearancePickerView: View {
   private let appearance = AppearancePreferences.shared
@@ -90,7 +90,7 @@ struct AppearancePickerView: View {
 
       Divider()
 
-      // 4. Header Wash Texture (Pure Canvas + 6 procedural surfaces)
+      // 4. Header Wash Texture (Pure Canvas + 5 procedural surfaces)
       VStack(alignment: .leading, spacing: 8) {
         Text("Header Texture")
           .font(.subheadline.weight(.medium))

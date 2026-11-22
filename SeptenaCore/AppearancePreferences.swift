@@ -46,7 +46,6 @@ enum HeaderTextureStyle: String, CaseIterable, Sendable, Identifiable {
   case topography
   case fieldMatrix
   case stippleDrift
-  case causticGlass
   case ridges
   case washiPaper
 

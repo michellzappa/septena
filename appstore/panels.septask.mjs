@@ -21,7 +21,7 @@ import { parseScreenshots } from "./metadata.mjs";
 const VISUAL = {
   hook:           { fill: "#007AFF", texture: "topography" },
   thinking:       { fill: "#C28500", texture: "fieldMatrix" },
-  "agent-work":   { fill: "#6544D6", texture: "causticGlass" },
+  "agent-work":   { fill: "#6544D6", texture: "ridges" },
   "agent-result": { fill: "#27272E", texture: "stippleDrift" },
   inbox:          { fill: "#5B8C00", texture: "washiPaper" },
   dates:          { fill: "#E05212", texture: "ridges" },

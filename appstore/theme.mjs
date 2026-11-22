@@ -41,7 +41,7 @@ export const theme = {
   app: {
     canvas: "#f2f2f7",
     accent: "#007AFF",
-    textures: ["topography", "fieldMatrix", "stippleDrift", "causticGlass", "ridges", "washiPaper"],
+    textures: ["topography", "fieldMatrix", "stippleDrift", "ridges", "washiPaper"],
   },
 
   // ----- typography -----

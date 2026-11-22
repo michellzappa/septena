@@ -62,7 +62,7 @@ Selecting any fruit overrides `selectionAccent`, `listSelectionFill`, `checkboxF
 
 ### 3.1 Locked v1 Texture Roster (6 procedural + `none`)
 
-Selected by mz (2026-11-21); `relief`, `isoFlow`, and `terrainMesh` were dropped after visual review:
+Selected by mz (2026-11-21); `relief`, `isoFlow`, and `terrainMesh` were dropped after visual review. `causticGlass` was dropped on 2026-11-22: it did not look good. Its id stays in the `canvasTexture` wire enum (`registry/entities.json`) so older clients can still sync it; the app reads it as `none`.
 
 | ID | Display Name | Generative Primitive | Aesthetic Feel |
 |---|---|---|---|
@@ -70,7 +70,6 @@ Selected by mz (2026-11-21); `relief`, `isoFlow`, and `terrainMesh` were dropped
 | `topography` | **Topography** | Marching-squares elevation contours over 4-octave **3D** fBm (every 4th contour weighted as an index line); subtly **morphs shape in place** along `z = t` when motion is on rather than flat scrolling | Swiss cartography, architectural calm |
 | `fieldMatrix` | **Field Matrix** | Precision micro-dot grid whose radius and opacity modulate across a 3D height field | Braun / Dieter Rams industrial grid |
 | `stippleDrift` | **Stipple Drift** | Deterministic elevation-gated stipple dither (fixed dot anchors, evolving height wave — zero flicker) | Risograph print / e-ink texture |
-| `causticGlass` | **Caustic Glass** | Two interfering domain-warped Voronoi webs (`F₂ - F₁` core + halo) whose cells orbit with phase; brighter knots where they cross | Light on a pool floor |
 | `ridges` | **Ridge Lines** | Horizontal elevation cross-sections smoothly displaced by 3D noise, vertically tapered | Rhythmic terrain profiles |
 | `washiPaper` | **Washi Paper** | Fine laid-paper screen lines (`sugeta`) + long curved kozo/unryu mulberry fibers + short pulp micro-fibers (pure vector fiber geometry, zero tonal blobs) | Tactile handmade Japanese stationery |
 
@@ -81,7 +80,7 @@ Textures render **exclusively as a faded top header wash** extending **all the w
 | Parameter | Type / Range | Default | Notes |
 |---|---|---|---|
 | `canvasTexture` | enum (`none`, `topography`, `fieldMatrix`, `stippleDrift`, `causticGlass`, `ridges`, `washiPaper`) | `"none"` *(default; could preview `"topography"` in onboarding)* | |
-| `textureIntensity` | int `15…100` (exposed as 3 presets in UI: `Subtle` 35 / `Balanced` 55 / `Bold` 80, or continuous slider) | `55` | Clamped so high values never hurt contrast |
+| `textureIntensity` | int `15…100` (no UI since 2026-11-22; the stored value still applies) | `55` | Clamped so high values never hurt contrast |
 | `textureMotion` | enum (`still`, `slowDrift`) | `"still"` | Optional glacial **3D slice morphing** (`z = t * speed` so shapes evolve in place rather than treadmill-scrolling; ~20fps GPU cadence, auto-pauses under Reduce Motion, Low Power Mode, and inactive/background windows) |
 
 **Daily deterministic seed (no user setting):** Smart lists (`Today`, `Upcoming`, `Anytime`, etc.) derive their seed automatically from **`FNV-1a(DayClock.today)`** (`"YYYY-MM-DD"`). Every morning produces a fresh procedural terrain that matches identically across all of a user's devices with zero synced seed state and no manual Shuffle button (honors `DayClock` day-rollover and time-travel automatically).

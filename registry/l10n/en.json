@@ -354,12 +354,6 @@
       "tokens.fruitAccents.carambola.name"
     ]
   },
-  "Caustic Glass": {
-    "text": "Caustic Glass",
-    "paths": [
-      "tokens.textures.causticGlass.name"
-    ]
-  },
   "Change history": {
     "text": "Change history",
     "paths": [
@@ -1568,12 +1562,6 @@
     "text": "Open tasks without a date live here.",
     "paths": [
       "destinations.destinations.anytime.emptyState.detail"
-    ]
-  },
-  "Optical": {
-    "text": "Optical",
-    "paths": [
-      "tokens.textures.causticGlass.tag"
     ]
   },
   "Optional product diagnostics": {

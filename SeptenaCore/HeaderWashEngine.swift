@@ -4,12 +4,11 @@ import Foundation
 // Shared procedural Header Wash renderer for iOS, iPadOS, and macOS (ADR 0019 /
 // docs/CUSTOMIZATION_SPEC.md).
 //
-// Renders the 6 locked procedural surfaces purely in CoreGraphics from a
+// Renders the 5 locked procedural surfaces purely in CoreGraphics from a
 // deterministic Mulberry32 PRNG + 3D value-noise fBm volume:
 //   • topography   — marching-squares elevation contours (3D morphing in place)
 //   • fieldMatrix  — elevation-modulated precision micro-dot grid
 //   • stippleDrift — fixed-anchor elevation-gated stipple dither (zero flicker)
-//   • causticGlass — pool-floor light: two interfering orbiting Voronoi webs
 //   • ridges       — tapered horizontal elevation profiles
 //   • washiPaper   — laid sugeta screen lines + sinuous kozo/unryu mulberry fibers
 //
@@ -205,10 +204,6 @@ enum HeaderWashEngine {
     case .stippleDrift:
       drawStippleDrift(ctx: ctx, w: w, h: h, isDark: params.isDark, intensity: intensity,
                        seed: params.seed, mini: params.mini, sample: sample, setFill: setFill)
-    case .causticGlass:
-      drawCausticGlass(ctx: ctx, w: w, h: h, isDark: params.isDark, intensity: intensity,
-                       seed: params.seed, mini: params.mini, phase: params.phase,
-                       ink: inkRGB, sample: sample)
     case .ridges:
       drawRidges(ctx: ctx, w: w, h: h, isDark: params.isDark, intensity: intensity,
                  mini: params.mini, sample: sample, setStroke: setStroke)
@@ -367,124 +362,7 @@ enum HeaderWashEngine {
     }
   }
 
-  // MARK: - 4. Caustic Glass (Pool-Floor Light Network)
-
-  // Light on a pool floor: two interfering Voronoi webs, each a thin bright
-  // filament with a soft halo, whose cell centers orbit slowly with `phase`.
-  // Filaments get brighter and thinner where a low-frequency "focus" field
-  // peaks, and brighter still where the two webs cross (the hot knots).
-  private static func drawCausticGlass(
-    ctx: CGContext, w: Double, h: Double, isDark: Bool, intensity: Double,
-    seed: UInt32, mini: Bool, phase: Double, ink: RGBTriple,
-    sample: (Double, Double, Int) -> Double
-  ) {
-    let div = mini ? 1.3 : 1.6
-    let rw = min(320, max(56, Int(w / div)))
-    let rh = min(200, max(40, Int(h / div)))
-    // Pixel → wash-point scale so cell size is resolution-independent.
-    let sx = w / Double(rw)
-    let sy = h / Double(rh)
-
-    let cellA = mini ? 0.055 : 0.020
-    let cellB = cellA * 1.62
-    let warpFreq = cellA * 0.55
-    let strength = (0.40 + intensity * 0.90) * (isDark ? 0.95 : 0.72)
-    let t = phase * 0.32
-
-    @inline(__always) func cellHash(_ ix: Int, _ iy: Int, _ salt: UInt32) -> Double {
-      var n = UInt32(bitPattern: Int32(truncatingIfNeeded: ix)) &* 374761393
-      n = n &+ (UInt32(bitPattern: Int32(truncatingIfNeeded: iy)) &* 668265263)
-      n = n &+ ((seed &+ salt) &* 1442695041)
-      n = (n ^ (n >> 13)) &* 1274126177
-      return Double(n ^ (n >> 16)) / 4294967296.0
-    }
-
-    // F2 - F1 distance for one web, cell centers orbiting their home point.
-    @inline(__always) func web(_ px: Double, _ py: Double, salt: UInt32, speed: Double) -> Double {
-      let ix = Int(floor(px))
-      let iy = Int(floor(py))
-      var d1 = 99.0
-      var d2 = 99.0
-      for oy in -1...1 {
-        for ox in -1...1 {
-          let cx = ix + ox
-          let cy = iy + oy
-          let hA = cellHash(cx, cy, salt)
-          let hB = cellHash(cx, cy, salt &+ 17)
-          let ang = t * speed * (0.6 + hB * 0.8) + hA * .pi * 2
-          let fx = Double(cx) + 0.5 + 0.34 * sin(ang)
-          let fy = Double(cy) + 0.5 + 0.34 * cos(ang * 0.83 + hB * 3.1)
-          let dx = px - fx
-          let dy = py - fy
-          let dist = dx * dx + dy * dy
-          if dist < d1 {
-            d2 = d1; d1 = dist
-          } else if dist < d2 {
-            d2 = dist
-          }
-        }
-      }
-      return d2.squareRoot() - d1.squareRoot()
-    }
-
-    // Thin core + soft halo for one filament.
-    @inline(__always) func filament(_ gap: Double, width: Double) -> Double {
-      let core = max(0.0, 1.0 - gap / width)
-      let halo = max(0.0, 1.0 - gap / (width * 3.2))
-      return core * core * core + halo * halo * 0.22
-    }
-
-    var pixels = [UInt8](repeating: 0, count: rw * rh * 4)
-    let rByte = Double(max(0, min(255, Int(round(ink.r * 255)))))
-    let gByte = Double(max(0, min(255, Int(round(ink.g * 255)))))
-    let bByte = Double(max(0, min(255, Int(round(ink.b * 255)))))
-
-    for y in 0..<rh {
-      let yd = Double(y) * sy
-      for x in 0..<rw {
-        let xd = Double(x) * sx
-        // Shared ripple warp bends both webs the same way, like one water surface.
-        let wx = (sample(xd * warpFreq + 2.1, yd * warpFreq + 4.3, 2) - 0.5) * 1.6
-        let wy = (sample(xd * warpFreq + 9.4, yd * warpFreq + 1.7, 2) - 0.5) * 1.6
-        let focus = sample(xd * warpFreq * 0.45 + 5.5, yd * warpFreq * 0.45 + 7.9, 2)
-        let focusN = max(0.0, min(1.0, (focus - 0.30) / 0.42))
-        let width = 0.11 - focusN * 0.05
-
-        let gA = web(xd * cellA + wx, yd * cellA + wy, salt: 11, speed: 1.0)
-        let gB = web(xd * cellB + wx * 1.3 + 3.7, yd * cellB + wy * 1.3 + 1.9, salt: 47, speed: -1.35)
-        let fA = filament(gA, width: width)
-        let fB = filament(gB, width: width * 1.15) * 0.62
-        let knot = fA * fB * 1.6
-
-        let lum = (fA + fB + knot) * (0.55 + focusN * 0.65)
-        let a = min(1.0, lum * strength)
-        let idx = (y * rw + x) * 4
-        // Premultiplied RGBA for CGImage
-        pixels[idx]     = UInt8(rByte * a)
-        pixels[idx + 1] = UInt8(gByte * a)
-        pixels[idx + 2] = UInt8(bByte * a)
-        pixels[idx + 3] = UInt8(round(a * 255.0))
-      }
-    }
-
-    let colorSpace = CGColorSpaceCreateDeviceRGB()
-    let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
-    let created: CGImage? = pixels.withUnsafeMutableBytes { buf in
-      guard let base = buf.baseAddress else { return nil }
-      guard let bmp = CGContext(
-        data: base, width: rw, height: rh,
-        bitsPerComponent: 8, bytesPerRow: rw * 4,
-        space: colorSpace, bitmapInfo: bitmapInfo.rawValue
-      ) else { return nil }
-      return bmp.makeImage()
-    }
-    if let img = created {
-      ctx.interpolationQuality = .high
-      ctx.draw(img, in: CGRect(x: 0, y: 0, width: w, height: h))
-    }
-  }
-
-  // MARK: - 5. Ridge Lines (Displaced Elevation Profiles)
+  // MARK: - 4. Ridge Lines (Displaced Elevation Profiles)
 
   private static func drawRidges(
     ctx: CGContext, w: Double, h: Double, isDark: Bool, intensity: Double,
@@ -520,7 +398,7 @@ enum HeaderWashEngine {
     }
   }
 
-  // MARK: - 6. Washi Paper (Laid Sugeta Screen + Sinuous Kozo Fibers)
+  // MARK: - 5. Washi Paper (Laid Sugeta Screen + Sinuous Kozo Fibers)
 
   private static func drawWashiPaper(
     ctx: CGContext, w: Double, h: Double, isDark: Bool, intensity: Double,

@@ -280,7 +280,6 @@ enum RegistryTokens {
     RegistryTextureOption(id: "topography", name: RegistryL10n.t("Topography"), tag: RegistryL10n.t("Height Map")),
     RegistryTextureOption(id: "fieldMatrix", name: RegistryL10n.t("Field Matrix"), tag: RegistryL10n.t("Industrial")),
     RegistryTextureOption(id: "stippleDrift", name: RegistryL10n.t("Stipple Drift"), tag: RegistryL10n.t("Print / Ink")),
-    RegistryTextureOption(id: "causticGlass", name: RegistryL10n.t("Caustic Glass"), tag: RegistryL10n.t("Optical")),
     RegistryTextureOption(id: "ridges", name: RegistryL10n.t("Ridge Lines"), tag: RegistryL10n.t("Elevation")),
     RegistryTextureOption(id: "washiPaper", name: RegistryL10n.t("Washi Paper"), tag: RegistryL10n.t("Tactile")),
   ]
