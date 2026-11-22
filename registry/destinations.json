@@ -19,7 +19,7 @@
       "supportsInlineCreate": true,
       "dropBehavior": "clearPlace",
       "featureId": "lists.inbox",
-      "emptyState": { "title": "Inbox is empty", "detail": "New tasks wait here until you schedule or file them." }
+      "emptyState": { "title": "Inbox is empty", "detail": "New tasks wait at the top of Today until you schedule or file them." }
     },
     {
       "id": "today",
@@ -163,7 +163,7 @@
       "supportsInlineCreate": false,
       "dropBehavior": "complete",
       "featureId": "lists.logbook",
-      "emptyState": { "title": "Logbook is empty", "detail": "Completed and let-go tasks are archived here." }
+      "emptyState": { "title": "Logbook is empty", "detail": "Tasks you complete or let go end up here." }
     },
     {
       "id": "starred",
@@ -220,7 +220,7 @@
       "supportsInlineCreate": false,
       "dropBehavior": "delete",
       "featureId": "lists.recently-deleted",
-      "emptyState": { "title": "No Recently Deleted Tasks", "detail": "Deleted tasks appear here for 30 days before being permanently removed." }
+      "emptyState": { "title": "No Recently Deleted Tasks", "detail": "Septena keeps deleted tasks here for 30 days, then deletes them for good." }
     }
   ],
   "genericEmptyState": {

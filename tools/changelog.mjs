@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const KINDS = ['new', 'improved', 'fixed', 'removed'];
-export const PLATFORMS = ['ios', 'ipad', 'mac'];
+export const PLATFORMS = ['ios', 'ipad', 'mac', 'watch'];
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const UPDATES = join(ROOT, 'changelog', 'updates');
 const FILE_RE = /^\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/;

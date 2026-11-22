@@ -751,7 +751,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     switch action {
     case .today:
       TaskUndo.recordScheduleChange(
-        name: String(localized: "Move to Today", comment: "SeptaskKit: undo action"),
+        name: RegistryActions.title("task.toggleToday", .add),
         before: scheduleBefore, context: context, mutator: mutator)
     case .scheduleTomorrow, .anytime:
       TaskUndo.recordScheduleChange(
@@ -1430,7 +1430,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     Task { [weak self] in
       guard let self,
             let area = try? await self.areasMutator.create(
-              title: String(localized: "New Area", comment: "SeptaskKit: structure CRUD"))
+              title: RegistryActions.title("sidebar.newArea"))
       else { return }
       self.recordAreaCreate(area)
       self.rebuild(preserving: "area:\(area.id)")
@@ -1443,7 +1443,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   private func recordAreaCreate(_ area: Area) {
     let mutator = areasMutator
     recordStructure(
-      name: String(localized: "New Area", comment: "SeptaskKit: undo action"),
+      name: RegistryActions.title("sidebar.newArea"),
       undo: { Task { try? await mutator.delete(id: area.id) } },
       redo: { Task { _ = try? await mutator.createWithExplicitID(id: area.id, title: area.title) } })
   }
@@ -1451,7 +1451,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   private func recordProjectCreate(_ project: Project) {
     let mutator = projectsMutator
     recordStructure(
-      name: String(localized: "New Project", comment: "SeptaskKit: undo action"),
+      name: RegistryActions.title("sidebar.newProject"),
       undo: { Task { try? await mutator.delete(id: project.id) } },
       redo: {
         Task {
@@ -1474,7 +1474,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     Task { [weak self] in
       guard let self,
             let project = try? await self.projectsMutator.create(
-              title: String(localized: "New Project", comment: "SeptaskKit: structure CRUD"),
+              title: RegistryActions.title("sidebar.newProject"),
               area: areaId)
       else { return }
       self.recordProjectCreate(project)
@@ -1516,7 +1516,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       cell.beginRename(onCommit: { [weak self] title in
         Task { try? await mutator.rename(id: area.id, to: title) }
         self?.recordStructure(
-          name: String(localized: "Rename Area", comment: "SeptaskKit: undo action"),
+          name: RegistryPrompts.textPrompt("renameArea").title,
           undo: { Task { try? await mutator.rename(id: area.id, to: area.title) } },
           redo: { Task { try? await mutator.rename(id: area.id, to: title) } })
       }, onEnd: onEnd)
@@ -1525,7 +1525,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       cell.beginRename(onCommit: { [weak self] title in
         Task { try? await mutator.rename(id: project.id, to: title) }
         self?.recordStructure(
-          name: String(localized: "Rename Project", comment: "SeptaskKit: undo action"),
+          name: RegistryPrompts.textPrompt("renameProject").title,
           undo: { Task { try? await mutator.rename(id: project.id, to: project.title) } },
           redo: { Task { try? await mutator.rename(id: project.id, to: title) } })
       }, onEnd: onEnd)

@@ -350,7 +350,7 @@ final class SeptaskKitTaskListController: NSViewController {
     let scheduled = KitDayFormat.date(fromWire: task.scheduled)
     let today = task.today
     let mutator = self.mutator
-    recordCreateUndo(name: String(localized: "New Task", comment: "SeptaskKit: undo action"),
+    recordCreateUndo(name: RegistryActions.title("app.newTask"),
                      ids: [id],
                      rebuild: {
                        [mutator.create(title: title, area: area, project: project,
@@ -1345,7 +1345,7 @@ final class SeptaskKitTaskListController: NSViewController {
 
     var eventsByDay: [String: [EKEvent]] = [:]
     if showsCalendarEvents {
-      for event in CalendarBridge.shared.upcomingEvents(days: 30) {
+      for event in CalendarBridge.shared.upcomingEvents(days: RegistryRules.upcomingCalendarDays) {
         for key in upcomingDayKeys(for: event) {
           eventsByDay[key, default: []].append(event)
         }
@@ -2406,7 +2406,7 @@ final class SeptaskKitTaskListController: NSViewController {
     guard !selection.isEmpty else { return }
     let single = selection.count == 1
     let title = single
-      ? String(localized: "Move", comment: "SeptaskKit: Move picker title")
+      ? RegistryActions.title("task.move", .short)
       : String(localized: "Move \(selection.count) Tasks",
                comment: "SeptaskKit: Move picker title (plural)")
     let current = single ? currentMoveDestination(for: selection[0]) : nil
@@ -2564,8 +2564,8 @@ final class SeptaskKitTaskListController: NSViewController {
     }
     reload()
     recordScheduleUndo(name: paused
-                       ? String(localized: "Pause Repeat", comment: "SeptaskKit: undo action")
-                       : String(localized: "Resume Repeat", comment: "SeptaskKit: undo action"),
+                       ? RegistryActions.title("task.pauseResumeRepeat")
+                       : RegistryActions.title("task.pauseResumeRepeat", .active),
                        before: before)
     onStoreChanged?()
   }
@@ -2993,9 +2993,7 @@ final class SeptaskKitTaskListController: NSViewController {
     }
     reload()
     playPendingPromoteFlashes()
-    recordScheduleUndo(name: String(localized: "Toggle Today",
-                                    comment: "SeptaskKit: undo action"),
-                       before: before)
+    recordScheduleUndo(name: RegistryActions.title("task.toggleToday"), before: before)
   }
 
   /// ⌥⌘S — star or unstar the current selection (if all are starred, unstar
@@ -3013,8 +3011,8 @@ final class SeptaskKitTaskListController: NSViewController {
     reload()
     recordScheduleUndo(
       name: nextStarred
-        ? String(localized: "Star", comment: "SeptaskKit: undo action")
-        : String(localized: "Remove Star", comment: "SeptaskKit: undo action"),
+        ? RegistryActions.title("task.toggleStar", .add)
+        : RegistryActions.title("task.toggleStar", .remove),
       before: before
     )
     onStoreChanged?()
@@ -4095,7 +4093,7 @@ final class SeptaskKitTaskListController: NSViewController {
     }
     if !selection.allSatisfy(\.isInTriageBand) {
       nodes.append(RegistryMenuEntry.slot(
-        id: "inbox", title: String(localized: "Inbox", comment: "SeptaskKit: move destination"),
+        id: "inbox", title: TaskFilter.triage.title,
         sfSymbol: RegistryIcons.sfSymbol(for: "list.inbox")) { [weak self] in
           self?.move(to: .none)
         })
@@ -4381,7 +4379,7 @@ final class SeptaskKitTaskListController: NSViewController {
   private func menuNewSection() {
     guard case .project(let projectId) = filter else { return }
     let heading = mutator.createHeading(
-      title: String(localized: "New Section", comment: "SeptaskKit: heading CRUD"),
+      title: RegistryActions.title("section.new"),
       project: projectId)
     reload()
     guard let id = heading?.id,
@@ -5799,11 +5797,11 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     if showFadedInScope {
       statusChip.isHidden = false
       statusChip.configure(symbol: "circle.dashed",
-                           title: String(localized: "Faded", comment: "Task row trailing pill when task is faded"))
+                           title: TaskFilter.faded.title)
     } else if !done && task.isOnToday && filter != .today && task.deletedAt == nil && !task.isFaded {
       statusChip.isHidden = false
       statusChip.configure(symbol: "sun.max.fill",
-                           title: String(localized: "Today", comment: "Task row trailing pill when task is on Today"))
+                           title: TaskFilter.today.title)
     } else {
       statusChip.isHidden = true
     }
@@ -6860,7 +6858,7 @@ final class KitImportAllRemindersCell: NSTableCellView {
   func configure(count: Int, importing: Bool) {
     let title = importing
       ? String(localized: "Importing…", comment: "SeptaskKit: reminders import in flight")
-      : String(localized: "Move all \(count) from Reminders (removes originals)",
+      : String(localized: "Import all \(count). Each one leaves Reminders.",
                comment: "SeptaskKit: bulk import action line")
     label.stringValue = title
     hit.isEnabled = !importing
@@ -6991,7 +6989,7 @@ final class KitReminderCell: NSTableCellView {
   private static func shortDate(_ date: Date) -> String {
     let cal = Calendar.current
     if cal.isDateInToday(date) {
-      return String(localized: "Today", comment: "Smart list title")
+      return TaskFilter.today.title
     }
     if cal.isDateInTomorrow(date) {
       return String(localized: "Tomorrow", comment: "Relative day label")

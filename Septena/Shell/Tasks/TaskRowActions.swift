@@ -89,8 +89,8 @@ struct TaskRowActions: ViewModifier {
           onMoveToToday: { ids, today in
             Haptics.tick()
             recordingSchedule(today
-                                ? String(localized: "Move to Today", comment: "Undo action name")
-                                : String(localized: "Remove from Today", comment: "Undo action name"),
+                                ? RegistryActions.title("task.toggleToday", .add)
+                                : RegistryActions.title("task.toggleToday", .remove),
                               ids) {
               if today {
                 for id in ids {
@@ -110,8 +110,8 @@ struct TaskRowActions: ViewModifier {
           onToggleStar: { ids, starred in
             Haptics.tick()
             recordingSchedule(starred
-                              ? String(localized: "Star", comment: "Undo action name")
-                              : String(localized: "Remove Star", comment: "Undo action name"),
+                              ? RegistryActions.title("task.toggleStar", .add)
+                              : RegistryActions.title("task.toggleStar", .remove),
                               ids) {
               for id in ids { mutator.setStarred(id: id, starred: starred) }
             }
@@ -141,7 +141,7 @@ struct TaskRowActions: ViewModifier {
           },
           onClearSchedule: { ids in
             Haptics.tick()
-            recordingSchedule(String(localized: "Clear Schedule", comment: "Undo action name"), ids) {
+            recordingSchedule(RegistryActions.title("task.clearSchedule"), ids) {
               for id in ids {
                 mutator.schedule(id: id, date: nil)
                 mutator.setDeadline(id: id, date: nil)
@@ -173,7 +173,7 @@ struct TaskRowActions: ViewModifier {
             Haptics.tick()
             if let copy = mutator.createNextOccurrence(id: t.id) {
               TaskUndo.recordCreate(
-                name: String(localized: "Create Next Copy", comment: "Undo action name"),
+                name: RegistryActions.title("task.createNextCopy"),
                 ids: [copy.id], mutator: mutator,
                 rebuild: { [mutator] in
                   mutator.createNextOccurrence(id: t.id).map { [$0.id] } ?? []
@@ -301,7 +301,7 @@ struct TaskRowActions: ViewModifier {
     let destName =
       projectId.flatMap { pid in projects.first { $0.id == pid }?.title }
       ?? areaId.flatMap { aid in areas.first { $0.id == aid }?.title }
-      ?? "Inbox"
+      ?? TaskFilter.triage.title
     toastStore?.show(RegistryToasts.moved(destination: destName)) {
       ticket.undo { TaskUndo.restore(undoBefore, using: mutator) }
       onChange?()

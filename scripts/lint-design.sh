@@ -137,6 +137,23 @@ if [ -n "$row_dead_zone" ]; then
   printf '%s\n' "$OFF"
 fi
 
+# ── Registry-owned copy (ADR 0020) ──────────────────────────────────────────
+# Copy that the registry owns (an action title, a smart-list name, a prompt)
+# comes from the generated registry, so it is translated once and the SwiftUI
+# and AppKit shells cannot drift. A literal copy of it in a shared shell file is
+# how the shells drifted before P2. Known leftovers live in
+# scripts/registry-literal-allowlist.json, each with the issue that removes it.
+registry_literals=$(python3 scripts/lint-registry-literals.py)
+if [ -n "$registry_literals" ]; then
+  count=$(printf '%s\n' "$registry_literals" | wc -l | tr -d ' ')
+  printf '%s✗ %s%s  (%s)\n' "$RED" "registry-owned-literal" "$OFF" "$count"
+  errors=$((errors + 1))
+  printf '  %s\n' 'This text is registry copy. Read it from the generated registry (RegistryActions.title, TaskFilter.title, RegistryPrompts, …), not a literal.'
+  printf '%s' "$DIM"; printf '%s\n' "$registry_literals" | head -8 | sed 's/^/    /'
+  [ "$count" -gt 8 ] && printf '    … and %s more\n' "$((count - 8))"
+  printf '%s\n' "$OFF"
+fi
+
 # ── Space must never complete a task ────────────────────────────────────────
 # On macOS, Space activates the first button in a selected row — the checkbox —
 # so a bare Space silently completed the task the user was only looking at. It

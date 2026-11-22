@@ -683,10 +683,10 @@ struct TaskRow: View {
     }
     if showsFadedIndicator && task.isFaded {
       TaskStatusPill(symbol: "circle.dashed",
-                     title: String(localized: "Faded", comment: "Task row trailing pill when task is faded"))
+                     title: TaskFilter.faded.title)
     } else if showsTodayIndicator && task.isOnToday && task.status == .open && task.deletedAt == nil && !task.isFaded {
       TaskStatusPill(symbol: "sun.max.fill",
-                     title: String(localized: "Today", comment: "Task row trailing pill when task is on Today"))
+                     title: TaskFilter.today.title)
     }
     trailingDate
     if task.status == .open, task.deletedAt == nil,
@@ -763,7 +763,7 @@ struct TaskRow: View {
       Image(systemName: "star.fill")
         .scaledFont(size: 11)
         .foregroundStyle(Theme.todayAccent)
-        .accessibilityLabel(String(localized: "Starred", comment: "Task row star a11y"))
+        .accessibilityLabel(TaskFilter.starred.title)
     }
     if hasNotes { TaskNotesGlyph.view }
     agentSignal

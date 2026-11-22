@@ -136,7 +136,7 @@
       "featureId": "edit.filing-suggestion"
     },
     "task.clearSchedule": {
-      "title": "Clear Schedule",
+      "title": "Clear When",
       "icon": "action.clear_schedule",
       "role": "default",
       "shortcut": { "key": ".", "modifiers": ["primary", "shift"] },
@@ -288,7 +288,7 @@
     },
     "notice.hideGetStarted": { "title": "Hide Get Started", "icon": "action.cancel", "role": "default", "availability": { "selection": "none" }, "featureId": "lists.today" },
     "app.newTask": {
-      "title": "New To-Do",
+      "title": "New Task",
       "icon": "action.add",
       "role": "default",
       "shortcut": { "key": "n", "modifiers": ["primary"] },

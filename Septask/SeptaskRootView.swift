@@ -390,23 +390,23 @@ private struct MagicPlusOrb: View {
 
   private var quickMenu: some View {
     VStack(alignment: .leading, spacing: 2) {
-      menuRow(title: "New Task", icon: "checkmark.circle") {
+      menuRow(title: RegistryActions.title("app.newTask"), icon: "checkmark.circle") {
         showingMenu = false
         onNewTask()
       }
       if isViewingProject {
-        menuRow(title: "New Section", icon: "rectangle.split.1x2") {
+        menuRow(title: RegistryActions.title("section.new"), icon: "rectangle.split.1x2") {
           showingMenu = false
           onNewSection()
         }
       }
       Divider()
         .padding(.vertical, 4)
-      menuRow(title: "New Project", icon: "number") {
+      menuRow(title: RegistryActions.title("sidebar.newProject"), icon: "number") {
         showingMenu = false
         onNewProject()
       }
-      menuRow(title: "New Area", icon: "square.stack.3d.up") {
+      menuRow(title: RegistryActions.title("sidebar.newArea"), icon: "square.stack.3d.up") {
         showingMenu = false
         onNewArea()
       }
@@ -451,7 +451,7 @@ private struct SeptaskQuickAdd: View {
   var body: some View {
     NavigationStack {
       AddTaskPage(router: router, hostsTitleField: true, forcesInbox: true)
-        .navigationTitle("New Task")
+        .navigationTitle(RegistryActions.title("app.newTask"))
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif

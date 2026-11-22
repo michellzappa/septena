@@ -112,7 +112,13 @@ enum TaskNotices {
     } else if let explainer = explainers(pool: pool).first {
       out.append(explainer)
     }
-    return out
+    // A notice whose capability does not ship here never shows (ADR 0015).
+    return out.filter(isShippedHere)
+  }
+
+  private static func isShippedHere(_ notice: TaskNotice) -> Bool {
+    guard let row = RegistryNotices.byId[notice.id.rawValue] else { return true }
+    return RegistryCapabilities.isAvailable(row.featureId, on: RegistryPlatform.current)
   }
 
   /// Remembers a dismissal. Rolled-in and Get started are account-wide (synced);

@@ -23,8 +23,9 @@ files.
   `appstore/panels.septask.mjs`, keyed by slug.
 
 **Listing strategy** (keep panels honest to this, updated 2026-11-22; the
-first panel says what the app is and its one unique claim: a task list your
-own agent can work): the
+panels follow the tentpoles of Starlings `/house/language`, in order: tasks
+that think with you, AI that asks before it acts, your agents do the work, you
+decide when it’s done): the
 angle is *tasks that think with you*: a native task app with AI that asks before
 it acts, built for the agents people already use, and open source. Sources:
 Starlings `/strategy/positioning-septena-the-task-app` and the feature map
@@ -53,31 +54,34 @@ Tasks that think with you
 
 ### promotional_text
 
-A task app that thinks with you, on iPhone, iPad, and Mac. Inbox, Today, and projects, with AI that asks before it acts. Connect Claude and work your list together.
+Tasks that think with you, on iPhone, iPad and Mac. Your agents do the work. You decide when it’s done. AI asks before it acts.
 
 ### description
 
-Septena is a task app that thinks with you. It is for people who want a short list and a clear day. Capture a thought in a second, sort it when you're ready, and decide what today holds before it decides for you.
+Septena is a task app that thinks with you. It is for people who want a short list and a clear day. Capture a thought in a second, sort it when you’re ready, and decide what today holds before it decides for you.
 
 THE BASICS, DONE CAREFULLY
 Inbox, Today, Upcoming, and Anytime, with areas, projects, and sections to group the work. Deadlines, repeating tasks, notes, and attachments. Your calendar events sit next to today's tasks, so you plan against the hours you actually have.
 
 TODAY IS YOUR CALL
-New and loose tasks wait in the Inbox above Today. Nothing lands on your day until you put it there. Septena also learns where you usually file things and suggests the right project, on your device.
+New and loose tasks wait in the Inbox at the top of Today. Nothing lands on your day until you put it there. Septena also learns where you usually file things and suggests the right project, on your device.
 
-AI THAT ASKS FIRST
-Some tasks need a moment of thinking before anyone can act on them. Open one and Septena asks a short question with a few answers to tap. Where it can, it drafts, compares, or looks something up. Then it hands you the one step only you can take. It runs on your device first and reaches further only when you let it.
+AI THAT ASKS BEFORE IT ACTS
+Some tasks need a moment of thinking before anyone can act on them. Tap Discuss on a task and Septena asks a short question with a few answers to tap. Where it can, it drafts, compares, or looks something up. Then it hands you the one step only you can take. It runs on your device first and reaches further only when you let it.
 
-YOUR AGENTS, IN YOUR LIST
-Connect Claude or another agent that speaks MCP. Hand it a task and it claims it, asks you in the task when it needs a decision, and leaves the result for you to check. You can stop it on one task or pause every agent at once. Anything an agent writes is marked, so you can see what it touched.
+YOUR AGENTS DO THE WORK. YOU DECIDE WHEN IT’S DONE.
+Connect Claude or your own agent and hand it a task. It works on the task and asks you there when it needs a decision. It never closes the task. Finished work waits in Review until you Accept it or Send it back. Stop an agent on one task, or Pause all agents at once. Anything an agent writes is marked, so you can see what it touched.
+
+THE LIST THAT LETS GO
+An undated task you leave alone for 14 days moves to Faded. Once a week, Septena asks you to sweep. Keep what still matters. Let go of the rest, and it moves to the Logbook.
 
 COMING FROM THINGS OR REMINDERS
-Import from Things once and keep your areas, projects, and sections. Things stays as it is. Pick a Reminders list and its reminders wait in your Inbox; each one you import moves out of Reminders.
+Import from Things once and keep your areas, projects, and sections. Things stays as it is. From Reminders, pick a list and bring its reminders into your Inbox. Septena deletes each one from Reminders as it comes in.
 
-OPEN SOURCE
-The apps and the sync server are open source under the MIT License, so your tasks never depend on us. You can read how they are stored and how agents reach them.
+YOURS, BUILT IN THE OPEN
+The apps and the sync server are open source under the MIT License. Septena works without an account: your tasks stay on your device until you sign in. When you sign in, they sync through Septena’s private server. Back up everything as JSON at any time, and preview a backup before you import it.
 
-Native on iPhone, iPad, and Mac, with your tasks in sync across all three.
+Native on iPhone, iPad and Mac, with your tasks in sync across all three.
 
 ### keywords
 
@@ -85,7 +89,7 @@ task manager,to-do,todo,tasks,things,reminders,projects,inbox,today,productivity
 
 ### release_notes
 
-The first release of Septena: Inbox, Today, Upcoming, and Anytime, with areas and projects, Things and Reminders import, AI that asks before it acts, and a connector for your agents. Native on iPhone, iPad, and Mac.
+The first release of Septena: Inbox, Today, Upcoming, and Anytime, with areas and projects, Things and Reminders import, AI that asks before it acts, and a connector for your agents. Native on iPhone, iPad and Mac.
 
 ### support_url
 
@@ -130,31 +134,34 @@ Tasks that think with you
 
 ### promotional_text
 
-A task app that thinks with you, built for the Mac: keyboard first, Quick Entry from anywhere, AI that asks before it acts. Connect Claude and work your list together.
+Tasks that think with you, built for the Mac. Your agents do the work. You decide when it’s done. Keyboard first, with Quick Entry from anywhere.
 
 ### description
 
-Septena is a task app that thinks with you, built as a real Mac app for people who want a short list and a clear day. Every action has a keyboard shortcut, and Quick Entry opens from anywhere so you can capture a task without leaving what you're doing.
+Septena is a task app that thinks with you, built as a real Mac app for people who want a short list and a clear day. Every action has a keyboard shortcut, and Quick Entry opens from anywhere so you can capture a task without leaving what you’re doing.
 
 THE BASICS, DONE CAREFULLY
 Inbox, Today, Upcoming, and Anytime, with areas, projects, and sections to group the work. Deadlines, repeating tasks, notes, and attachments. Your calendar events sit next to today's tasks, so you plan against the hours you actually have.
 
 TODAY IS YOUR CALL
-New and loose tasks wait in the Inbox above Today. Nothing lands on your day until you put it there. Septena also learns where you usually file things and suggests the right project, on your device.
+New and loose tasks wait in the Inbox at the top of Today. Nothing lands on your day until you put it there. Septena also learns where you usually file things and suggests the right project, on your device.
 
-AI THAT ASKS FIRST
-Some tasks need a moment of thinking before anyone can act on them. Open one and Septena asks a short question with a few answers to tap. Where it can, it drafts, compares, or looks something up. Then it hands you the one step only you can take. It runs on your device first and reaches further only when you let it.
+AI THAT ASKS BEFORE IT ACTS
+Some tasks need a moment of thinking before anyone can act on them. Tap Discuss on a task and Septena asks a short question with a few answers to tap. Where it can, it drafts, compares, or looks something up. Then it hands you the one step only you can take. It runs on your device first and reaches further only when you let it.
 
-YOUR AGENTS, IN YOUR LIST
-Connect Claude or another agent that speaks MCP. Hand it a task and it claims it, asks you in the task when it needs a decision, and leaves the result for you to check. You can stop it on one task or pause every agent at once. Anything an agent writes is marked, so you can see what it touched.
+YOUR AGENTS DO THE WORK. YOU DECIDE WHEN IT’S DONE.
+Connect Claude or your own agent and hand it a task. It works on the task and asks you there when it needs a decision. It never closes the task. Finished work waits in Review until you Accept it or Send it back. Stop an agent on one task, or Pause all agents at once. Anything an agent writes is marked, so you can see what it touched.
+
+THE LIST THAT LETS GO
+An undated task you leave alone for 14 days moves to Faded. Once a week, Septena asks you to sweep. Keep what still matters. Let go of the rest, and it moves to the Logbook.
 
 COMING FROM THINGS OR REMINDERS
-Import from Things once and keep your areas, projects, and sections. Things stays as it is. Pick a Reminders list and its reminders wait in your Inbox; each one you import moves out of Reminders.
+Import from Things once and keep your areas, projects, and sections. Things stays as it is. From Reminders, pick a list and bring its reminders into your Inbox. Septena deletes each one from Reminders as it comes in.
 
-OPEN SOURCE
-The apps and the sync server are open source under the MIT License, so your tasks never depend on us. You can read how they are stored and how agents reach them.
+YOURS, BUILT IN THE OPEN
+The apps and the sync server are open source under the MIT License. Septena works without an account: your tasks stay on your device until you sign in. When you sign in, they sync through Septena’s private server. Back up everything as JSON at any time, and preview a backup before you import it.
 
-Your tasks stay in sync across your Mac, iPhone, and iPad.
+Your tasks stay in sync across your Mac, iPhone and iPad.
 
 ### keywords
 
@@ -212,12 +219,12 @@ reads this table; `appstore/validate.mjs` checks it.
 
 | slug | scene | callout | title | sub |
 | --- | --- | --- | --- | --- |
-| hook | today/0 | - | Tasks your agent can work | |
-| agent-asks | agents/2 | - | Your agent asks, you decide | |
-| agent-result | agents/3 | - | The result waits on the task | |
+| hook | today/0 | - | Tasks that think with you | |
+| thinking | thinking/1 | - | AI that asks before it acts | |
+| agent-work | agents/2 | - | Your agents do the work | |
+| agent-result | agents/3 | - | You decide when it’s done | |
 | inbox | capture/1 | - | New tasks wait in the Inbox | |
-| plan | plan/1 | task-reply | Plan today from Anytime | |
-| dates | dates/2 | - | Start dates and deadlines | |
+| dates | dates/2 | - | Pick When, keep the Deadline | |
 
 ---
 

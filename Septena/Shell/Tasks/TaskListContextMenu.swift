@@ -265,7 +265,7 @@ struct TaskListRowContextMenu: View {
     }
     if !target.tasks.allSatisfy(\.isInTriageBand) {
       nodes.append(RegistryMenuEntry.slot(
-        id: "inbox", title: String(localized: "Inbox"),
+        id: "inbox", title: TaskFilter.triage.title,
         sfSymbol: RegistryIcons.sfSymbol(for: "list.inbox")) {
           onMoveTo(target, nil, nil)
         })

@@ -1600,7 +1600,7 @@ struct TaskListView: View {
       Spacer(minLength: 4)
 
       Button { openWhenForSelected() } label: {
-        Label("When", systemImage: "calendar")
+        Label(RegistrySurfaces.taskAttribute("when").label, systemImage: "calendar")
           .labelStyle(.iconOnly)
           .frame(width: 40, height: 38)
           .contentShape(Rectangle())
@@ -1608,7 +1608,7 @@ struct TaskListView: View {
       .accessibilityLabel("Schedule selected tasks")
 
       Button { openMoveForSelected() } label: {
-        Label("Move", systemImage: "arrow.right.circle")
+        Label(RegistryActions.title("task.move", .short), systemImage: "arrow.right.circle")
           .labelStyle(.iconOnly)
           .frame(width: 40, height: 38)
           .contentShape(Rectangle())
@@ -1647,7 +1647,7 @@ struct TaskListView: View {
         Button {
           toggleTodayForSelected()
         } label: {
-          Label(allSelectedAreToday ? "Remove from Today" : "Move to Today",
+          Label(allSelectedAreToday ? RegistryActions.title("task.toggleToday", .remove) : RegistryActions.title("task.toggleToday", .add),
                 systemImage: allSelectedAreToday ? "sun.max" : "sun.max.fill")
         }
         Button {
@@ -1666,7 +1666,7 @@ struct TaskListView: View {
         Button(role: .destructive) {
           cancelSelected()
         } label: {
-          Label("Cancel Tasks", systemImage: "xmark.circle")
+          Label(RegistryActions.title("task.cancel", .plural), systemImage: "xmark.circle")
         }
       } label: {
         Label("More", systemImage: "ellipsis.circle")
@@ -1697,9 +1697,9 @@ struct TaskListView: View {
         .font(.septenaMeta)
         .foregroundStyle(Theme.inkSecondary)
       Spacer(minLength: 0)
-      Button("When") { openWhenForSelected() }
+      Button(RegistrySurfaces.taskAttribute("when").label) { openWhenForSelected() }
       Button("Copy") { copyTasks(orderedActionIDs()) }
-      Button("Move") { openMoveForSelected() }
+      Button(RegistryActions.title("task.move", .short)) { openMoveForSelected() }
       Button("Complete") { toggleSelected() }
       Button("Delete", role: .destructive) { deleteSelected() }
     }
@@ -1870,7 +1870,7 @@ struct TaskListView: View {
   /// Foldable Inbox header — see `foldableSectionHeader`.
   @ViewBuilder
   private func inboxHeader(count: Int) -> some View {
-    foldableSectionHeader(icon: "tray.full", title: "Inbox", count: count,
+    foldableSectionHeader(icon: "tray.full", title: TaskFilter.triage.title, count: count,
                           isCollapsed: inboxCollapsed) {
       inboxCollapsed.toggle()
     }
@@ -1998,7 +1998,7 @@ struct TaskListView: View {
               HStack(spacing: 4) {
                 Image(systemName: "star.fill")
                   .scaledFont(size: 11)
-                Text("Starred")
+                Text(TaskFilter.starred.title)
               }
             }
           }
@@ -2247,10 +2247,10 @@ struct TaskListView: View {
       toggleNoticeStep(step)
     } label: {
       if step.done {
-        Label(String(localized: "Mark as Not Done", comment: "Get started step menu"),
+        Label(RegistryActions.title("notice.toggleStep", .active),
               systemImage: "circle")
       } else {
-        Label(String(localized: "Mark as Done", comment: "Get started step menu"),
+        Label(RegistryActions.title("notice.toggleStep"),
               systemImage: "checkmark.circle")
       }
     }
@@ -2258,7 +2258,7 @@ struct TaskListView: View {
     Button {
       dismissNotice(.getStarted)
     } label: {
-      Label(String(localized: "Hide Get Started", comment: "Get started step menu"),
+      Label(RegistryActions.title("notice.hideGetStarted"),
             systemImage: "eye.slash")
     }
   }
@@ -2726,7 +2726,7 @@ struct TaskListView: View {
         },
         TaskRowSwipeAction(
           id: "rename-heading",
-          title: String(localized: "Rename", comment: "Swipe action rename section heading"),
+          title: RegistryActions.title("section.rename"),
           systemImage: "pencil",
           tint: .blue
         ) {
@@ -3323,7 +3323,7 @@ struct TaskListView: View {
       mutator.acknowledge(id: id)
     }
     TaskUndo.recordScheduleChange(
-      name: String(localized: "Remove from Today", comment: "Undo action name"),
+      name: RegistryActions.title("task.toggleToday", .remove),
       before: undoBefore, context: modelContext, mutator: mutator)
     if filter == .today {
       func drop(_ list: inout [SeptenaTask]) {
@@ -3346,7 +3346,7 @@ struct TaskListView: View {
     // one undo group because `TaskUndo.manager.groupsByEvent` is true, so a
     // single gesture stays a single ⌘Z.
     TaskUndo.recordScheduleChange(
-      name: String(localized: "Move to Today", comment: "Undo action name"),
+      name: RegistryActions.title("task.toggleToday", .add),
       before: undoBefore, context: modelContext, mutator: mutator)
   }
 
@@ -3515,7 +3515,7 @@ struct TaskListView: View {
   private func destinationName(areaId: String?, projectId: String?) -> String {
     projectId.flatMap { pid in projects.first { $0.id == pid }?.title }
       ?? areaId.flatMap { aid in areas.first { $0.id == aid }?.title }
-      ?? "Inbox"
+      ?? TaskFilter.triage.title
   }
 
   private func applyMove(id: String, areaId: String?, projectId: String?) {
@@ -3803,7 +3803,7 @@ struct TaskListView: View {
       Button {
         keepFadedTasks([task.id])
       } label: {
-        Text(String(localized: "Keep", comment: "Faded pile row keep button"))
+        Text(RegistryActions.title("task.keepFaded"))
           .scaledFont(size: 12, weight: .medium)
           .lineLimit(1)
           .padding(.horizontal, 10)
@@ -4047,8 +4047,8 @@ struct TaskListView: View {
         onToggleStar: { ids, starred in
           Haptics.tick()
           recordingSchedule(starred
-                            ? String(localized: "Star", comment: "Undo action name")
-                            : String(localized: "Remove Star", comment: "Undo action name"),
+                            ? RegistryActions.title("task.toggleStar", .add)
+                            : RegistryActions.title("task.toggleStar", .remove),
                             ids) {
             for id in ids { mutator.setStarred(id: id, starred: starred) }
           }
@@ -4367,7 +4367,7 @@ struct TaskListView: View {
 
     if filter == .recentlyDeleted {
       return TaskRowLeadingSwipeAction(
-        title: "Restore",
+        title: RegistryActions.title("task.restore"),
         symbol: "arrow.uturn.backward.circle.fill",
         tint: Color.accentColor
       ) {
@@ -4381,7 +4381,7 @@ struct TaskListView: View {
 
     if filter == .faded || task.isFaded {
       return TaskRowLeadingSwipeAction(
-        title: "Keep",
+        title: RegistryActions.title("task.keepFaded"),
         symbol: "arrow.uturn.backward.circle.fill",
         tint: Color.accentColor
       ) {
@@ -4417,7 +4417,7 @@ struct TaskListView: View {
     case .today:
       if task.isOnToday {
         return TaskRowLeadingSwipeAction(
-          title: "Remove from Today",
+          title: RegistryActions.title("task.toggleToday", .remove),
           symbol: "sun.max",
           tint: Theme.inkSecondary
         ) {
@@ -4431,7 +4431,7 @@ struct TaskListView: View {
         }
       }
       return TaskRowLeadingSwipeAction(
-        title: "Move to Today",
+        title: RegistryActions.title("task.toggleToday", .add),
         symbol: "sun.max.fill",
         tint: Theme.todayAccent
       ) {
@@ -4449,7 +4449,7 @@ struct TaskListView: View {
 
     case .schedule:
       return TaskRowLeadingSwipeAction(
-        title: "Schedule",
+        title: RegistryActions.title("task.when", .short),
         symbol: "calendar",
         tint: Color.accentColor
       ) {
@@ -4459,7 +4459,7 @@ struct TaskListView: View {
 
     case .move:
       return TaskRowLeadingSwipeAction(
-        title: "Move",
+        title: RegistryActions.title("task.move", .short),
         symbol: "arrow.right.circle.fill",
         tint: Color.accentColor
       ) {
@@ -4471,15 +4471,15 @@ struct TaskListView: View {
     case .star:
       let nextStarred = !task.starred
       return TaskRowLeadingSwipeAction(
-        title: nextStarred ? "Star" : "Remove Star",
+        title: nextStarred ? RegistryActions.title("task.toggleStar", .add) : RegistryActions.title("task.toggleStar", .remove),
         symbol: nextStarred ? "star.fill" : "star.slash",
         tint: Theme.todayAccent
       ) {
         Haptics.tick()
         recordingSchedule(
           nextStarred
-            ? String(localized: "Star", comment: "Undo action name")
-            : String(localized: "Remove Star", comment: "Undo action name"),
+            ? RegistryActions.title("task.toggleStar", .add)
+            : RegistryActions.title("task.toggleStar", .remove),
           [task.id]
         ) {
           mutator.setStarred(id: task.id, starred: nextStarred)

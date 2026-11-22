@@ -24,8 +24,8 @@ export const PROMPTS: Prompt[] = [
     name: ONBOARD_PROMPT_NAME,
     title: "Set up Septena",
     description:
-      "Populate your Septena account with real areas (with context and emoji), projects (with briefs), and tasks " +
-      "— starting from what your assistant already knows about you, or a short conversation if starting fresh.",
+      "Populate your Septena account with real areas (with context and emoji), projects (with briefs), and tasks, " +
+      "starting from what your agent already knows about you, or a short conversation if starting fresh.",
     arguments: [
       {
         name: "focus",

@@ -228,7 +228,7 @@ struct TaskComposerCard: View {
     return nil
   }
 
-  private var headerTitle: String { isEditing ? "Edit To-Do" : "New Task" }
+  private var headerTitle: String { isEditing ? "Edit To-Do" : RegistryActions.title("app.newTask") }
   private var saveTitle: String { isEditing ? "Save" : "Add" }
 
   /// Close: fold the inline editor (`onClose`) when hosted inline, else go
@@ -905,7 +905,7 @@ struct TaskComposerCard: View {
   private func recordCreateUndo(id: String) {
     let saved = draft
     TaskUndo.recordCreate(
-      name: String(localized: "New Task", comment: "Undo action name"),
+      name: RegistryActions.title("app.newTask"),
       ids: [id], mutator: mutator,
       rebuild: { [mutator] in [saved.create(via: mutator).id] })
   }

@@ -472,7 +472,7 @@ private final class KitRepeatBoard: NSView {
       preset.fillRow(
         symbol: "briefcase",
         tint: SeptaskKitTheme.inkSecondary,
-        title: String(localized: "Weekdays (Mon–Fri)", comment: "Repeat quick preset")
+        title: String(localized: "Weekdays (Mon to Fri)", comment: "Repeat quick preset")
       )
       weekdaysPresetCell = preset
       views.append(preset)
@@ -812,8 +812,8 @@ private final class KitRepeatBoard: NSView {
   /// Mixed paused state offers the action that makes the selection uniform.
   private var pauseTitle: String {
     paused == true
-      ? String(localized: "Resume Repeat", comment: "Repeat editor pause action")
-      : String(localized: "Pause Repeat", comment: "Repeat editor pause action")
+      ? RegistryActions.title("task.pauseResumeRepeat", .active)
+      : RegistryActions.title("task.pauseResumeRepeat")
   }
 
   private var pauseSymbol: String { paused == true ? "play.circle" : "pause.circle" }
@@ -1151,7 +1151,7 @@ private final class KitReminderBoard: NSView {
     denied.fillRow(
       symbol: "bell.slash",
       tint: SeptaskKitTheme.overdueRed,
-      title: String(localized: "Notifications are off — Open Settings",
+      title: String(localized: "Notifications are off. Open Settings",
                     comment: "Reminder denied permission notice"),
       titleColor: SeptaskKitTheme.overdueRed
     )

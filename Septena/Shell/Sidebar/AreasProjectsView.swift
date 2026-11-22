@@ -592,18 +592,18 @@ struct ProjectDetailView: View {
       Button {
         setStatus(.done)
       } label: {
-        Label("Mark Done", systemImage: "checkmark.circle")
+        Label(RegistryActions.title("project.markDone"), systemImage: "checkmark.circle")
       }
       Button {
         setStatus(.cancelled)
       } label: {
-        Label("Cancel Project", systemImage: "xmark.circle")
+        Label(RegistryActions.title("project.cancel"), systemImage: "xmark.circle")
       }
       Divider()
       Button(role: .destructive) {
         showingDeleteConfirm = true
       } label: {
-        Label("Delete Project", systemImage: "trash")
+        Label(RegistryActions.title("project.delete"), systemImage: "trash")
       }
     }
   }

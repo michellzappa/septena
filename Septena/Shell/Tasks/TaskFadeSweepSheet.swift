@@ -92,7 +92,7 @@ struct TaskFadeSweepSheet: View {
           .lineLimit(1)
       }
       Spacer(minLength: 8)
-      Button(String(localized: "Keep", comment: "Sweep sheet row action")) {
+      Button(RegistryActions.title("task.keepFaded")) {
         keep(task)
       }
       .buttonStyle(.bordered)

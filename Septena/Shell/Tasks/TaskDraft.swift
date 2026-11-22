@@ -272,7 +272,7 @@ struct TaskDraft: Equatable {
   func listLabel(areas: [Area], projects: [Project]) -> String {
     if let projectId, let p = projects.first(where: { $0.id == projectId }) { return p.title }
     if let areaId, let a = areas.first(where: { $0.id == areaId }) { return a.title }
-    return "Inbox"
+    return TaskFilter.triage.title
   }
 }
 

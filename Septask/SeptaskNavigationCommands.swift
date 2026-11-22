@@ -38,7 +38,7 @@ private struct ClassicWindowCommand: View {
   @Environment(\.openWindow) private var openWindow
 
   var body: some View {
-    Button("Classic Window") { openWindow(id: "main") }
+    Button(RegistryActions.title("app.classicWindow")) { openWindow(id: "main") }
       .keyboardShortcut("0", modifiers: [.command, .option])
   }
 }
@@ -269,6 +269,7 @@ struct SeptaskCommandMenus: Commands {
   /// The smart lists the Go menu lists, in registry order.
   private static let goDestinations: [TaskFilter] = goMenu.items
     .filter { $0.kind == "destination" }
+    .filter { RegistryDestinations.byId[$0.id]?.applies(to: RegistryPlatform.current) ?? true }
     .compactMap { TaskFilter(destinationID: $0.id) }
 
   /// The ⌘-digit shortcut a destination's registry keycaps name, if any.
@@ -444,7 +445,7 @@ struct SeptaskCommandMenus: Commands {
 
       Divider()
 
-      Button("Quick Find…") { showQuickFind() }
+      Button(RegistryActions.title("app.quickFind")) { showQuickFind() }
         .keyboardShortcut("f", modifiers: [.command, .shift])
         .disabled(!canNavigate)
 
@@ -454,14 +455,14 @@ struct SeptaskCommandMenus: Commands {
       // The AppKit shell is the default window on macOS; this reopens it if
       // it was closed. No shortcut: ⌘0 is Reset Text Size, ⌘1–4 are the
       // lists, and the Dock icon reopens the window too.
-      Button("Septena Window") { SeptaskKitWindowController.show() }
+      Button(RegistryActions.title("app.septenaWindow")) { SeptaskKitWindowController.show() }
       ClassicWindowCommand()
 
       // Shows the global hotkey `SeptaskKitQuickEntry.installHotKey()`
       // registers (⌃⌥Space), so the combination is discoverable here.
       // Not a task-row binding: it carries two modifiers and opens the
       // capture panel, so it cannot reach a row checkbox.
-      Button("Quick Entry") { SeptaskKitQuickEntry.show() }
+      Button(RegistryActions.title("app.quickEntry")) { SeptaskKitQuickEntry.show() }
         .keyboardShortcut(.space, modifiers: [.control, .option]) // septena-lint:allow task-space-binding — global ⌃⌥Space capture hotkey, not a row key
       #endif
     }

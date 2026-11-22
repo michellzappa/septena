@@ -233,7 +233,7 @@ struct QuickFindView: View {
       return a.title
     }
     if t.status == .done { return "Completed" }
-    if t.isOnToday { return "Today" }
+    if t.isOnToday { return TaskFilter.today.title }
     return nil
   }
 

@@ -694,7 +694,7 @@ enum KitMoveMenu {
   static func pickerDestinations(areas: [Area], projects: [Project]) -> [PickerRow] {
     let active = projects.filter { $0.status == .active }
     var rows: [PickerRow] = [
-      PickerRow(title: String(localized: "Inbox", comment: "SeptaskKit: move destination"),
+      PickerRow(title: TaskFilter.triage.title,
                 target: .none, emoji: nil, indent: false, projectId: nil)
     ]
     for project in active where project.area == nil {
