@@ -94,7 +94,7 @@ struct RemindersInboxSection: View {
     Button { nav.showSettings = true } label: {
       ctaRow(icon: "checklist",
              title: "Pick a Reminders list",
-             subtitle: "Mirror items from Apple Reminders into your Inbox.")
+             subtitle: "Move reminders from a list into your Inbox.")
     }
     .buttonStyle(.plain)
     .taskCardChrome(.solo)
@@ -105,7 +105,7 @@ struct RemindersInboxSection: View {
     Button { nav.showSettings = true } label: {
       ctaRow(icon: "lock.open",
              title: "Connect Apple Reminders",
-             subtitle: "Grant access to mirror reminders into your Inbox.")
+             subtitle: "Allow access to move reminders into your Inbox.")
     }
     .buttonStyle(.plain)
     .taskCardChrome(.solo)

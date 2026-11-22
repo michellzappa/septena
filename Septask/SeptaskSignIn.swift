@@ -181,11 +181,11 @@ private struct SeptaskDeleteAccountSheet: View {
       VStack(alignment: .leading, spacing: 6) {
         Label("Your tasks, areas and projects", systemImage: "checklist")
         Label("Your attachments", systemImage: "paperclip")
-        Label("Your conversations with Claude", systemImage: "bubble.left.and.text.bubble.right")
+        Label("Your task conversations", systemImage: "bubble.left.and.text.bubble.right")
         Label("Your synced settings", systemImage: "gearshape")
       }
       .padding(.leading, 4)
-      Text("It also removes your tasks from this device and signs you out. You can't undo this.")
+      Text("It also removes your tasks from this device and signs you out. You can’t undo this.")
       if let error {
         Text(error).font(.callout).foregroundStyle(.red)
       }

@@ -5,15 +5,6 @@
       "plans.outcomes.agents.rows.links.cells.account"
     ]
   },
-  "\"{title}\" deleted": {
-    "text": "\"{title}\" deleted",
-    "placeholders": [
-      "title"
-    ],
-    "paths": [
-      "surfaces.toasts.templates.deletedSingle.format"
-    ]
-  },
   "1, backed up": {
     "text": "1, backed up",
     "paths": [
@@ -65,12 +56,6 @@
       "plans.upsells.second_device.detail"
     ]
   },
-  "A task list you share with your AI.": {
-    "text": "A task list you share with your AI.",
-    "paths": [
-      "surfaces.firstRun.steps.welcome.body"
-    ]
-  },
   "A year of change history, and a year to restore deleted tasks": {
     "text": "A year of change history, and a year to restore deleted tasks",
     "paths": [
@@ -101,6 +86,12 @@
     "text": "AI diagnostics",
     "paths": [
       "settings.pages.advanced.sections.beta_ai.header"
+    ]
+  },
+  "AI on this device": {
+    "text": "AI on this device",
+    "paths": [
+      "settings.pages.ai_preferences.sections.on_device.header"
     ]
   },
   "About": {
@@ -399,12 +390,6 @@
       "actions.actions.app.classicWindow.title"
     ]
   },
-  "Claude can take a task, ask you a question, and hand back the result.": {
-    "text": "Claude can take a task, ask you a question, and hand back the result.",
-    "paths": [
-      "surfaces.firstRun.steps.welcome.points.1.detail"
-    ]
-  },
   "Claude connector": {
     "text": "Claude connector",
     "paths": [
@@ -429,8 +414,8 @@
       "actions.actions.logged.clear.title"
     ]
   },
-  "Clear Schedule": {
-    "text": "Clear Schedule",
+  "Clear When": {
+    "text": "Clear When",
     "paths": [
       "actions.actions.task.clearSchedule.title"
     ]
@@ -474,12 +459,6 @@
       "actions.menuBar.task.items.complete.title"
     ]
   },
-  "Completed and let-go tasks are archived here.": {
-    "text": "Completed and let-go tasks are archived here.",
-    "paths": [
-      "destinations.destinations.logbook.emptyState.detail"
-    ]
-  },
   "Completion animations": {
     "text": "Completion animations",
     "paths": [
@@ -501,14 +480,8 @@
       "plans.outcomes.agents.detail"
     ]
   },
-  "Connect an assistant to your tasks": {
-    "text": "Connect an assistant to your tasks",
-    "paths": [
-      "surfaces.notices.items.getStarted.steps.connectAI.detail"
-    ]
-  },
-  "Connect your AI": {
-    "text": "Connect your AI",
+  "Connect your agent": {
+    "text": "Connect your agent",
     "paths": [
       "surfaces.notices.items.getStarted.steps.connectAI.title"
     ]
@@ -604,15 +577,6 @@
     "text": "Decrease Text Size",
     "paths": [
       "actions.actions.app.textSizeDecrease.title"
-    ]
-  },
-  "Deferred to {date}": {
-    "text": "Deferred to {date}",
-    "placeholders": [
-      "date"
-    ],
-    "paths": [
-      "surfaces.toasts.templates.deferred.format"
     ]
   },
   "Delete": {
@@ -727,12 +691,6 @@
       "surfaces.prompts.items.deleteProject.variants.empty.title"
     ]
   },
-  "Deleted tasks appear here for 30 days before being permanently removed.": {
-    "text": "Deleted tasks appear here for 30 days before being permanently removed.",
-    "paths": [
-      "destinations.destinations.recentlyDeleted.emptyState.detail"
-    ]
-  },
   "Devices": {
     "text": "Devices",
     "paths": [
@@ -775,8 +733,8 @@
       "actions.actions.task.duplicate.pluralTitle"
     ]
   },
-  "Each project has notes, so you and Claude know what it's for.": {
-    "text": "Each project has notes, so you and Claude know what it's for.",
+  "Each project has notes, so you and Claude know what it’s for.": {
+    "text": "Each project has notes, so you and Claude know what it’s for.",
     "paths": [
       "surfaces.firstRun.steps.welcome.points.2.detail"
     ]
@@ -1132,6 +1090,12 @@
       "settings.rootGroups.lists_root.items.5.detail"
     ]
   },
+  "Let Claude or your own agent work your list": {
+    "text": "Let Claude or your own agent work your list",
+    "paths": [
+      "surfaces.notices.items.getStarted.steps.connectAI.detail"
+    ]
+  },
   "Let Go": {
     "text": "Let Go",
     "paths": [
@@ -1305,6 +1269,15 @@
       "plans.outcomes.everywhere.rows.new_device.label"
     ]
   },
+  "Moved to {date} (When)": {
+    "text": "Moved to {date}",
+    "placeholders": [
+      "date"
+    ],
+    "paths": [
+      "surfaces.toasts.templates.deferred.format"
+    ]
+  },
   "Moved to {destination}": {
     "text": "Moved to {destination}",
     "placeholders": [
@@ -1360,20 +1333,20 @@
       "surfaces.prompts.text.newSection.title"
     ]
   },
+  "New Task": {
+    "text": "New Task",
+    "paths": [
+      "actions.actions.app.newTask.title"
+    ]
+  },
   "New Task in Section": {
     "text": "New Task in Section",
     "paths": [
       "actions.actions.section.newTask.title"
     ]
   },
-  "New To-Do": {
-    "text": "New To-Do",
-    "paths": [
-      "actions.actions.app.newTask.title"
-    ]
-  },
-  "New tasks wait here until you schedule or file them.": {
-    "text": "New tasks wait here until you schedule or file them.",
+  "New tasks wait at the top of Today until you schedule or file them.": {
+    "text": "New tasks wait at the top of Today until you schedule or file them.",
     "paths": [
       "destinations.destinations.inbox.emptyState.detail"
     ]
@@ -1400,12 +1373,6 @@
     "text": "No account",
     "paths": [
       "plans.levels.device.detail"
-    ]
-  },
-  "No agent can claim or work on a task while paused.": {
-    "text": "No agent can claim or work on a task while paused.",
-    "paths": [
-      "settings.rootGroups.ai_agents_root.items.1.detail"
     ]
   },
   "No agent work": {
@@ -1542,12 +1509,6 @@
       "plans.status.device"
     ]
   },
-  "On-device intelligence": {
-    "text": "On-device intelligence",
-    "paths": [
-      "settings.pages.ai_preferences.sections.on_device.header"
-    ]
-  },
   "On-device only": {
     "text": "On-device only",
     "paths": [
@@ -1662,8 +1623,8 @@
       "tokens.fruitAccents.persimmon.name"
     ]
   },
-  "Pick a Reminders list. Its items wait in your Inbox until you bring them in.": {
-    "text": "Pick a Reminders list. Its items wait in your Inbox until you bring them in.",
+  "Pick a Reminders list. Each reminder you bring in moves to your Inbox, and Septena deletes it from Reminders.": {
+    "text": "Pick a Reminders list. Each reminder you bring in moves to your Inbox, and Septena deletes it from Reminders.",
     "paths": [
       "surfaces.firstRun.steps.moveIn.choices.reminders.detail"
     ]
@@ -2006,6 +1967,12 @@
       "settings.pages.import_export.sections.move_in.footer"
     ]
   },
+  "Septena keeps deleted tasks here for 30 days, then deletes them for good.": {
+    "text": "Septena keeps deleted tasks here for 30 days, then deletes them for good.",
+    "paths": [
+      "destinations.destinations.recentlyDeleted.emptyState.detail"
+    ]
+  },
   "Septena never runs AI on your data and never reads it. The intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets where requests may run.": {
     "text": "Septena never runs AI on your data and never reads it. The intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets where requests may run.",
     "paths": [
@@ -2184,12 +2151,6 @@
       "destinations.destinations.starred.title"
     ]
   },
-  "Start dates, deadlines and repeats": {
-    "text": "Start dates, deadlines and repeats",
-    "paths": [
-      "plans.cards.free.points.2"
-    ]
-  },
   "Start empty": {
     "text": "Start empty",
     "paths": [
@@ -2334,6 +2295,12 @@
       "settings.pages.about.sections.version.items.0.label"
     ]
   },
+  "Tasks that think with you.": {
+    "text": "Tasks that think with you.",
+    "paths": [
+      "surfaces.firstRun.steps.welcome.body"
+    ]
+  },
   "Tasks with a future When or Deadline date appear here.": {
     "text": "Tasks with a future When or Deadline date appear here.",
     "paths": [
@@ -2356,6 +2323,12 @@
     "text": "Tasks you assign to Claude appear here, grouped by where the work stands.",
     "paths": [
       "destinations.destinations.agent.emptyState.detail"
+    ]
+  },
+  "Tasks you complete or let go end up here.": {
+    "text": "Tasks you complete or let go end up here.",
+    "paths": [
+      "destinations.destinations.logbook.emptyState.detail"
     ]
   },
   "Tasks, lists, projects and areas have no caps on any plan.": {
@@ -2465,8 +2438,8 @@
       "surfaces.firstRun.steps.done.body"
     ]
   },
-  "Today, Inbox, Upcoming, Anytime and Logbook": {
-    "text": "Today, Inbox, Upcoming, Anytime and Logbook",
+  "Today with its Inbox, Upcoming, Anytime, Faded and Logbook": {
+    "text": "Today with its Inbox, Upcoming, Anytime, Faded and Logbook",
     "paths": [
       "plans.cards.free.points.0"
     ]
@@ -2594,6 +2567,12 @@
       "surfaces.firstRun.steps.connectClaude.instructions.1"
     ]
   },
+  "When dates, deadlines and repeats": {
+    "text": "When dates, deadlines and repeats",
+    "paths": [
+      "plans.cards.free.points.2"
+    ]
+  },
   "When off, tasks appear in one list with their project or area underneath.": {
     "text": "When off, tasks appear in one list with their project or area underneath.",
     "paths": [
@@ -2612,6 +2591,12 @@
       "settings.pages.ai_preferences.sections.reach.header"
     ]
   },
+  "While paused, no agent can start or work on a task.": {
+    "text": "While paused, no agent can start or work on a task.",
+    "paths": [
+      "settings.rootGroups.ai_agents_root.items.1.detail"
+    ]
+  },
   "Within a monthly run budget": {
     "text": "Within a monthly run budget",
     "paths": [
@@ -2622,12 +2607,6 @@
     "text": "Work an agent finished appears here so you can check and accept it.",
     "paths": [
       "destinations.destinations.review.emptyState.detail"
-    ]
-  },
-  "Work with Claude": {
-    "text": "Work with Claude",
-    "paths": [
-      "surfaces.firstRun.steps.welcome.points.1.title"
     ]
   },
   "Working": {
@@ -2644,10 +2623,16 @@
       "surfaces.prompts.items.deleteProject.variants.empty.message"
     ]
   },
-  "You can't undo this.": {
-    "text": "You can't undo this.",
+  "You can’t undo this.": {
+    "text": "You can’t undo this.",
     "paths": [
       "surfaces.prompts.items.deletePermanently.message"
+    ]
+  },
+  "You decide when it’s done.": {
+    "text": "You decide when it’s done.",
+    "paths": [
+      "surfaces.firstRun.steps.welcome.points.1.detail"
     ]
   },
   "You do not need a card. After 14 days the account becomes a free account, and your tasks stay where they are.": {
@@ -2660,12 +2645,6 @@
     "text": "You pay your AI provider, not us",
     "paths": [
       "plans.promises.own_ai.title"
-    ]
-  },
-  "You're all set": {
-    "text": "You're all set",
-    "paths": [
-      "surfaces.firstRun.steps.done.title"
     ]
   },
   "Your 14 days of Plus have ended": {
@@ -2684,6 +2663,12 @@
     "text": "Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are.",
     "paths": [
       "plans.upsells.trial_end.detail"
+    ]
+  },
+  "Your agents do the work": {
+    "text": "Your agents do the work",
+    "paths": [
+      "surfaces.firstRun.steps.welcome.points.1.title"
     ]
   },
   "Your agents work your tasks without a daily cap": {
@@ -2770,8 +2755,8 @@
       "surfaces.prompts.items.deleteAccount.message"
     ]
   },
-  "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena's private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). Apple's on-device intelligence runs locally; you can connect Claude under AI & Agents.": {
-    "text": "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena's private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). Apple's on-device intelligence runs locally; you can connect Claude under AI & Agents.",
+  "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect Claude under AI & Agents.": {
+    "text": "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect Claude under AI & Agents.",
     "paths": [
       "settings.pages.privacy.sections.data_locality.items.0.detail"
     ]
@@ -2780,6 +2765,12 @@
     "text": "Your turn",
     "paths": [
       "destinations.destinations.agent.groups.yourTurn.title"
+    ]
+  },
+  "You’re all set": {
+    "text": "You’re all set",
+    "paths": [
+      "surfaces.firstRun.steps.done.title"
     ]
   },
   "Yuzu": {
@@ -2870,6 +2861,15 @@
     ],
     "paths": [
       "surfaces.notices.items.rolledIn.title"
+    ]
+  },
+  "“{title}” deleted": {
+    "text": "“{title}” deleted",
+    "placeholders": [
+      "title"
+    ],
+    "paths": [
+      "surfaces.toasts.templates.deletedSingle.format"
     ]
   },
   "€0": {

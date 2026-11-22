@@ -87,7 +87,7 @@ struct TaskListNewTaskButton: View {
     }
     .glassProminentButtonStyleCompat()
     .tint(AdaptiveColor.fillForWhiteInk(theme.color(for: "tasks")))
-    .accessibilityLabel("New Task")
+    .accessibilityLabel(RegistryActions.title("app.newTask"))
   }
 }
 

@@ -720,7 +720,7 @@ struct MagicPlusFloatingOverlay: View {
           RoundedRectangle(cornerRadius: 6, style: .continuous)
             .strokeBorder(accent, lineWidth: 2)
             .frame(width: 20, height: 20)
-          Text("New Task")
+          Text(RegistryActions.title("app.newTask"))
             .font(.septenaTaskTitle)
             .foregroundStyle(.primary)
           Spacer(minLength: 8)

@@ -212,12 +212,6 @@
       "issue": "#260"
     },
     {
-      "file": "Septena/Shell/Sidebar/SidebarView.swift",
-      "literal": "New To-Do",
-      "reason": "Placeholder, section title or label with no registry field yet.",
-      "issue": "#260"
-    },
-    {
       "file": "Septena/Shell/Tasks/ConversationCard.swift",
       "literal": "How AI helps with your tasks",
       "reason": "Placeholder, section title or label with no registry field yet.",

@@ -350,7 +350,7 @@ final class SeptaskKitTaskListController: NSViewController {
     let scheduled = KitDayFormat.date(fromWire: task.scheduled)
     let today = task.today
     let mutator = self.mutator
-    recordCreateUndo(name: String(localized: "New Task", comment: "SeptaskKit: undo action"),
+    recordCreateUndo(name: RegistryActions.title("app.newTask"),
                      ids: [id],
                      rebuild: {
                        [mutator.create(title: title, area: area, project: project,
@@ -6858,7 +6858,7 @@ final class KitImportAllRemindersCell: NSTableCellView {
   func configure(count: Int, importing: Bool) {
     let title = importing
       ? String(localized: "Importing…", comment: "SeptaskKit: reminders import in flight")
-      : String(localized: "Move all \(count) from Reminders (removes originals)",
+      : String(localized: "Import all \(count). Each one leaves Reminders.",
                comment: "SeptaskKit: bulk import action line")
     label.stringValue = title
     hit.isEnabled = !importing

@@ -215,8 +215,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     titleView.textColor = .labelColor
     titleView.typingAttributes = Self.titleAttributes
     titleView.textContainerInset = .zero
-    titleView.placeholder = String(localized: "New Task",
-                                   comment: "SeptaskKit: composer title placeholder")
+    titleView.placeholder = RegistryActions.title("app.newTask")
     Self.styleTextView(titleView, in: titleScroll)
     // A task title is ONE line, enforced in the view itself (see
     // `isSingleLine`) so no delegate wiring — present or absent — can put a

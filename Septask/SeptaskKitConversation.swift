@@ -283,8 +283,8 @@ final class KitConversationView: NSView {
     let text = stopped
       ? String(localized: "Agent work stopped", comment: "SeptaskKit: the user stopped agent work on a task")
       : convo.isClaimed(at: DayClock.appNow)
-        ? String(localized: "Claude is working…", comment: "SeptaskKit: an agent holds the task")
-        : String(localized: "Waiting for Claude", comment: "SeptaskKit: assigned to Claude, not picked up yet")
+        ? String(localized: "Your agent is working…", comment: "SeptaskKit: an agent holds the task")
+        : String(localized: "Waiting for your agent", comment: "SeptaskKit: assigned to an agent, not picked up yet")
     let label = NSTextField(labelWithString: text)
     label.font = SeptaskKitTheme.chip
     label.textColor = SeptaskKitTheme.inkSecondary

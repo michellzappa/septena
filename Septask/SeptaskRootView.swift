@@ -390,7 +390,7 @@ private struct MagicPlusOrb: View {
 
   private var quickMenu: some View {
     VStack(alignment: .leading, spacing: 2) {
-      menuRow(title: "New Task", icon: "checkmark.circle") {
+      menuRow(title: RegistryActions.title("app.newTask"), icon: "checkmark.circle") {
         showingMenu = false
         onNewTask()
       }
@@ -451,7 +451,7 @@ private struct SeptaskQuickAdd: View {
   var body: some View {
     NavigationStack {
       AddTaskPage(router: router, hostsTitleField: true, forcesInbox: true)
-        .navigationTitle("New Task")
+        .navigationTitle(RegistryActions.title("app.newTask"))
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif

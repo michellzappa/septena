@@ -89,7 +89,7 @@ struct AddTaskPage: View {
       if hostsTitleField {
         Section {
           // Return adds. One line: a capture is a title, details come later.
-          TextField("New Task", text: $router.query)
+          TextField(RegistryActions.title("app.newTask"), text: $router.query)
             .focused($titleFocused)
             .submitLabel(.done)
             .onSubmit { if !trimmed.isEmpty { commit(title: trimmed) } }
@@ -187,7 +187,7 @@ struct AddTaskPage: View {
     let created = draft.create(via: mutator)
     let saved = draft
     TaskUndo.recordCreate(
-      name: String(localized: "New Task", comment: "Undo action name"),
+      name: RegistryActions.title("app.newTask"),
       ids: [created.id], mutator: mutator,
       rebuild: { [mutator] in [saved.create(via: mutator).id] })
     AddInfoSection.tasks.notifyTilesChanged()

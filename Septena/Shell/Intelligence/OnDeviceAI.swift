@@ -86,7 +86,7 @@ enum OnDeviceAI {
     case .unavailable(.modelNotReady):
       return "The on-device model is still downloading. Try again shortly."
     @unknown default:
-      return "On-device intelligence is unavailable right now."
+      return "AI on this device isn’t available right now."
     }
   }
 }
