@@ -87,6 +87,12 @@
       "settings.pages.ai_preferences.title"
     ]
   },
+  "AI apps and agents that reach your tasks through the Septena connector.": {
+    "text": "AI apps and agents that reach your tasks through the Septena connector.",
+    "paths": [
+      "settings.pages.devices_access.sections.connections.footer"
+    ]
+  },
   "AI on this device": {
     "text": "AI on this device",
     "paths": [
@@ -456,6 +462,12 @@
       "surfaces.notices.items.getStarted.steps.connectAI.title"
     ]
   },
+  "Connected apps": {
+    "text": "Connected apps",
+    "paths": [
+      "settings.pages.devices_access.sections.connections.header"
+    ]
+  },
   "Connections": {
     "text": "Connections",
     "paths": [
@@ -652,7 +664,15 @@
   "Devices": {
     "text": "Devices",
     "paths": [
+      "settings.pages.devices_access.sections.devices.header",
       "plans.outcomes.everywhere.rows.devices.label"
+    ]
+  },
+  "Devices & Access": {
+    "text": "Devices & Access",
+    "paths": [
+      "settings.pages.devices_access.title",
+      "settings.pages.account.sections.devices_access.items.0.label"
     ]
   },
   "Diagnostics": {
@@ -690,6 +710,12 @@
     "text": "Duplicate Tasks",
     "paths": [
       "actions.actions.task.duplicate.pluralTitle"
+    ]
+  },
+  "Each app you signed in to. A device you sign out stops syncing within the hour.": {
+    "text": "Each app you signed in to. A device you sign out stops syncing within the hour.",
+    "paths": [
+      "settings.pages.devices_access.sections.devices.footer"
     ]
   },
   "Each project has notes, so you and Claude know what it’s for.": {

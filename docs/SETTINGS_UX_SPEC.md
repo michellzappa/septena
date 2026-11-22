@@ -11,6 +11,7 @@
 - Import & Export is a depth-2 page under **Privacy & Data**. The tab and group formerly "Connections & Data" are **Connections**.
 - Advanced holds only sync and storage diagnostics. MCP Skills moved to Connect Claude. Paste JSON, weekly product diagnostics (`diagnosticsEnabled`, now cleared at launch) and the AI diagnostics switches (`showModelLabels`, `pccRoutingEnabled`, `pccReasoning`, now `ui: false`) are gone.
 - AI icons never use sparkles.
+- Account > **Devices & Access** (`devices_access`, depth 2) lists every signed-in device and connected app (`GET /v1/access`), signs another device out, disconnects an app, and holds the Apple Watch row (moved off the iOS root).
 
 ---
 

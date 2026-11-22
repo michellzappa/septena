@@ -370,6 +370,16 @@ tasks through CloudKit.
   closed.
 - Secrets live in wrangler secrets only (Apple keys, token signing key).
 - Account deletion deletes the DO storage and the R2 prefix.
+- **Devices & Access (2026-11-22).** `GET /v1/access` lists every place the
+  account is signed in: app sessions (the `devices` and `sessions` tables,
+  one row per install, `current` marks the caller) and MCP connections (the
+  `connections` table, one row per token family, named from the OAuth client
+  registration). `DELETE /v1/access/devices/:sid` kills that device's refresh
+  tokens; its stateless access token lives out its hour. It refuses the
+  caller's own sid (sign out through `/v1/auth/signout`).
+  `DELETE /v1/access/connections/:id` revokes the token family. A connection
+  appears on its first token issue or refresh after deploy, and drops out
+  after 30 days without a refresh.
 - Attachment limits: **25 MB per file, 2 GB per user.** The Worker checks
   both before it mints an upload URL, and the app checks the file size before
   upload so the user sees the error at once.

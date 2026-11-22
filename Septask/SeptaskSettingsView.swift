@@ -187,9 +187,7 @@ struct SeptaskSettingsView: View {
         }
       }
     }
-    // Apple Watch: install + link state (not in the shared settings
-    // registry: iOS-only, and it reads live WatchConnectivity state).
-    SeptaskWatchSettingsSection()
+    // Apple Watch moved to Account ▸ Devices & Access (2026-11-22).
   }
   #endif
 
@@ -669,6 +667,8 @@ struct SeptaskSettingsView: View {
       SeptaskSmartListsPane()
     case RegistrySettings.PageID.plus:
       SeptaskPlusPane()
+    case RegistrySettings.PageID.devicesAccess:
+      SeptaskDevicesAccessPane()
     case RegistrySettings.PageID.appearance:
       Form {
         registryPageSections(pageID, titleAsHeader: false)
@@ -736,6 +736,13 @@ private struct SeptaskAccountPane: View {
             Label(RegistrySettings.pageById[RegistrySettings.PageID.plus]?.title ?? RegistryPlans.name,
                   systemImage: RegistryIcons.sfSymbols["settings.plus"] ?? "plus.circle.fill")
           }
+        }
+      }
+
+      Section {
+        NavigationLink(value: RegistrySettings.PageID.devicesAccess) {
+          Label(RegistrySettings.pageById[RegistrySettings.PageID.devicesAccess]?.title ?? "",
+                systemImage: RegistryIcons.sfSymbols["settings.devices"] ?? "laptopcomputer.and.iphone")
         }
       }
 

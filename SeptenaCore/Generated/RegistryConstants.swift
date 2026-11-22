@@ -167,6 +167,7 @@ enum RegistryIcons {
     "action.reminder": "bell",
     "action.star": "star",
     "settings.account": "person.crop.circle",
+    "settings.devices": "laptopcomputer.and.iphone",
     "settings.sign_in_approval": "person.badge.key",
     "auth.device": "laptopcomputer.and.iphone",
     "settings.general": "slider.horizontal.3",
@@ -443,6 +444,7 @@ enum RegistrySettings {
   }
 
   enum PageID {
+    static let devicesAccess = "devices_access"
     static let appearance = "appearance"
     static let account = "account"
     static let plus = "plus"
@@ -505,6 +507,17 @@ enum RegistrySettings {
   ]
 
   static let pages: [RegistrySettingsPage] = [
+    RegistrySettingsPage(id: "devices_access", title: RegistryL10n.t("Devices & Access"), iconId: "settings.devices", sfSymbol: "laptopcomputer.and.iphone", depth: 2, platforms: nil, featureId: "sync.backend", sections: [
+      RegistrySettingsSection(id: "devices", header: RegistryL10n.t("Devices"), footer: RegistryL10n.t("Each app you signed in to. A device you sign out stops syncing within the hour."), platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "access_devices", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
+      ]),
+      RegistrySettingsSection(id: "connections", header: RegistryL10n.t("Connected apps"), footer: RegistryL10n.t("AI apps and agents that reach your tasks through the Septena connector."), platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "access_connections", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "agents.connector"),
+      ]),
+      RegistrySettingsSection(id: "watch", header: nil, footer: nil, platforms: ["ios"], items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "apple_watch", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios"], featureId: "sync.backend"),
+      ]),
+    ]),
     RegistrySettingsPage(id: "appearance", title: RegistryL10n.t("Appearance"), iconId: "settings.appearance", sfSymbol: "paintpalette", depth: 1, platforms: nil, featureId: "settings.display", sections: [
       RegistrySettingsSection(id: "appearance", header: nil, footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "accent_color", label: RegistryL10n.t("Accent"), detail: nil, iconId: "settings.appearance", sfSymbol: "paintpalette", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
@@ -520,6 +533,9 @@ enum RegistrySettings {
       ]),
       RegistrySettingsSection(id: "plan", header: nil, footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "pageLink", key: nil, page: "plus", surface: nil, label: RegistryL10n.t("Septena Plus"), detail: nil, iconId: "settings.plus", sfSymbol: "plus.circle.fill", statusKey: "planStatus", desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
+      ]),
+      RegistrySettingsSection(id: "devices_access", header: nil, footer: nil, platforms: nil, items: [
+        RegistrySettingsItem(kind: "pageLink", key: nil, page: "devices_access", surface: nil, label: RegistryL10n.t("Devices & Access"), detail: nil, iconId: "settings.devices", sfSymbol: "laptopcomputer.and.iphone", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
       RegistrySettingsSection(id: "sync", header: nil, footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sync_account_status", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),

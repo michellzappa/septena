@@ -19,6 +19,7 @@ import {
   zPairApproveBody,
   zPairInspectBody,
 } from "../shadow/oauth.js";
+import { disconnectFamily } from "../shadow/tokens.js";
 import {
   appAccountTokenFor,
   attachmentQuotaBytes,
@@ -218,6 +219,8 @@ api.use("/auth/device", requireUser);
 // but takes no sync device slot of its own.
 api.use("/tasks", requireUser, loadPlan);
 api.use("/tasks/*", requireUser, loadPlan);
+api.use("/access", apiHostOnly, requireUser);
+api.use("/access/*", apiHostOnly, requireUser);
 api.use("/entitlement", apiHostOnly, requireUser);
 api.use("/entitlement/*", apiHostOnly, requireUser);
 api.use("/webhooks/*", apiHostOnly);
@@ -382,6 +385,49 @@ api.post("/pair/approve", async (c) => {
   if (body instanceof Response) return body;
   const res = await approvePairing(c.env, c.get("userId"), body);
   return res.ok ? c.json({ ok: true, client: res.client, kind: res.kind }) : c.json({ error: res.error }, res.status);
+});
+
+// ---- Devices & Access (Settings > Account > Devices & Access) ----
+// Every place the account is signed in: app sessions (one per install) and
+// MCP connections (Claude, ChatGPT and other connector clients).
+
+const zSid = z.string().uuid();
+const zFamilyId = z.string().regex(/^[A-Za-z0-9_-]{8,64}$/);
+
+api.get("/access", async (c) => {
+  const userId = c.get("userId");
+  let cap: number | null = null;
+  try {
+    cap = (await planFor(c.env, userId)).limits.devices;
+  } catch {
+    // The list still shows; "syncing" then reads true for every device.
+  }
+  const summary = await storeFor(c.env, userId).accessSummary(c.get("sid"), cap);
+  return c.json(summary, 200, { "Cache-Control": "no-store" });
+});
+
+/// Signs another device out. The caller's own device signs out through
+/// /v1/auth/signout, which also clears its keychain.
+api.delete("/access/devices/:sid", async (c) => {
+  const sid = zSid.safeParse(c.req.param("sid"));
+  if (!sid.success) return c.json({ error: "invalid_request" }, 400);
+  if (sid.data === c.get("sid")) return c.json({ error: "current_device" }, 400);
+  const userId = c.get("userId");
+  const hashes = await storeFor(c.env, userId).revokeDevice(sid.data);
+  if (!hashes.length) return c.json({ error: "not_found" }, 404);
+  await Promise.all(hashes.map((h) => c.env.TOKENS.delete(`api-refresh:${h}`)));
+  logEvent("access_device_signed_out", { userId, by: c.get("actor") });
+  return c.body(null, 204);
+});
+
+api.delete("/access/connections/:id", async (c) => {
+  const id = zFamilyId.safeParse(c.req.param("id"));
+  if (!id.success) return c.json({ error: "invalid_request" }, 400);
+  const userId = c.get("userId");
+  const had = await disconnectFamily(c.env, userId, id.data);
+  if (!had) return c.json({ error: "not_found" }, 404);
+  logEvent("access_connection_revoked", { userId, by: c.get("actor") });
+  return c.body(null, 204);
 });
 
 // ---- sync entitlement (docs/SYNC_SUBSCRIPTION_SPEC.md §5–§6) ----

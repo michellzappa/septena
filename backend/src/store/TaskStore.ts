@@ -17,9 +17,16 @@ import type { Op, OpResult, PullResult, PushResult, Turn } from "./ops.js";
 import type { EntitlementRow } from "../entitlement/entitlement.js";
 import type { IcalTask } from "../ical.js";
 import { DOMAIN_RULES, ENTITY_LIMITS, TURN_FIELDS } from "../generated/registries.js";
+import { MCP_REFRESH_TTL_S } from "../shadow/tokens.js";
 
 /// Per changed field: [before, after]. `null` means absent / cleared.
 export type ChangeDiff = Record<string, [unknown, unknown]>;
+
+/// `GET /v1/access`: every place the account is signed in.
+export interface AccessSummary {
+  devices: { sid: string; client: string | null; firstSeen: number; lastSeen: number; current: boolean; syncing: boolean }[];
+  connections: { id: string; clientName: string; scope: string; createdAt: number; lastUsed: number }[];
+}
 
 export interface ChangeEntry {
   rev: number;
@@ -147,6 +154,8 @@ function clipForLog(v: unknown): unknown {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TOMBSTONE_TTL_MS = DOMAIN_RULES.tombstoneTtlDays * DAY_MS;
 const CLIENT_OP_TTL_MS = DOMAIN_RULES.clientOpTtlDays * DAY_MS;
+/// A connection unused this long has an expired refresh token (src/shadow/tokens.ts).
+const CONNECTION_TTL_MS = MCP_REFRESH_TTL_S * 1000;
 const CHANGE_LOG_TTL_MS = DOMAIN_RULES.changeLogTtlDays * DAY_MS;
 const MAX_PULL = ENTITY_LIMITS.maxPull;
 const PAIR_FAIL_WINDOW_MS = 10 * 60 * 1000;
@@ -324,6 +333,10 @@ export class TaskStore extends DurableObject<Env> {
       );
       CREATE TABLE IF NOT EXISTS usage (
         key TEXT PRIMARY KEY, count INTEGER NOT NULL, updatedAt INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS connections (
+        familyId TEXT PRIMARY KEY, clientId TEXT NOT NULL, clientName TEXT NOT NULL,
+        scope TEXT NOT NULL, createdAt INTEGER NOT NULL, lastUsed INTEGER NOT NULL
       );
     `);
     // A session's stable id (one per sign-in on one install). It survives
@@ -1143,6 +1156,53 @@ export class TaskStore extends DurableObject<Env> {
     this.sql.exec("DELETE FROM sessions WHERE hash = ?", hash);
   }
 
+  // ---- Devices & Access (Settings ▸ Account ▸ Devices & Access) ----
+
+  /// Signs one device out: drops every refresh token of session `sid` and
+  /// its device row. Returns the refresh hashes so the caller can drop their
+  /// KV index. Its access token lives out its hour (it is stateless).
+  revokeDevice(sid: string): string[] {
+    return this.ctx.storage.transactionSync(() => {
+      const hashes = this.sql.exec<{ hash: string }>("SELECT hash FROM sessions WHERE sid = ?", sid).toArray().map((r) => r.hash);
+      this.sql.exec("DELETE FROM sessions WHERE sid = ?", sid);
+      this.sql.exec("DELETE FROM devices WHERE sid = ?", sid);
+      return hashes;
+    });
+  }
+
+  /// Notes an MCP token family (a connected app such as Claude). Called on
+  /// every issue and refresh rotation, so `lastUsed` moves about hourly.
+  recordConnection(familyId: string, clientId: string, clientName: string, scope: string, now = Date.now()): void {
+    this.sql.exec(
+      "INSERT INTO connections (familyId, clientId, clientName, scope, createdAt, lastUsed) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(familyId) DO UPDATE SET lastUsed = excluded.lastUsed, scope = excluded.scope, clientName = excluded.clientName",
+      familyId, clientId, clientName, scope, now, now,
+    );
+  }
+
+  /// True when the row existed.
+  forgetConnection(familyId: string): boolean {
+    const had = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM connections WHERE familyId = ?", familyId).one().n > 0;
+    this.sql.exec("DELETE FROM connections WHERE familyId = ?", familyId);
+    return had;
+  }
+
+  /// Every place this account is signed in: app sessions and MCP connections.
+  /// A connection unused for its refresh lifetime has expired and is left out.
+  accessSummary(currentSid: string | null, cap: number | null, now = Date.now()): AccessSummary {
+    const devices = this.deviceSummary(cap);
+    const firstSeen = new Map(this.sql.exec<{ sid: string; firstSeen: number }>("SELECT sid, firstSeen FROM devices").toArray().map((r) => [r.sid, r.firstSeen]));
+    const connections = this.sql.exec<{ familyId: string; clientName: string; scope: string; createdAt: number; lastUsed: number }>(
+      "SELECT familyId, clientName, scope, createdAt, lastUsed FROM connections WHERE lastUsed > ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS,
+    ).toArray();
+    return {
+      devices: devices.map((d) => ({
+        sid: d.sid, client: d.client, firstSeen: firstSeen.get(d.sid) ?? d.lastSeen, lastSeen: d.lastSeen,
+        current: d.sid === currentSid, syncing: d.syncing,
+      })),
+      connections: connections.map((r) => ({ id: r.familyId, clientName: r.clientName, scope: r.scope, createdAt: r.createdAt, lastUsed: r.lastUsed })),
+    };
+  }
+
   // ---- device slot (docs/SYNC_SUBSCRIPTION_SPEC.md §3, ADR 0023) ----
   // A device is a session (`sid`). The slot holders are the `cap` live
   // sessions with the newest `slotAt`. A device that is allowed to sync
@@ -1536,6 +1596,7 @@ export class TaskStore extends DurableObject<Env> {
       this.sql.exec("DELETE FROM changes WHERE at < ?", new Date(now - CHANGE_LOG_TTL_MS).toISOString());
       this.sql.exec("DELETE FROM sessions WHERE expiresAt < ?", now);
       this.sql.exec("DELETE FROM devices WHERE sid NOT IN (SELECT sid FROM sessions WHERE sid IS NOT NULL)");
+      this.sql.exec("DELETE FROM connections WHERE lastUsed < ?", now - CONNECTION_TTL_MS);
       // Day and month counters: two months covers the current month.
       this.sql.exec("DELETE FROM usage WHERE updatedAt < ?", now - 62 * DAY_MS);
     });
