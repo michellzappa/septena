@@ -81,6 +81,9 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// Title, notes, checklist (when shown), attachments (when shown), pills — stacked.
   private let column = NSStackView()
   private let pillRow = NSStackView()
+  /// Holds `pillRow` so the rail scrolls sideways (trackpad, shift-wheel)
+  /// when the labelled pills are wider than the card, instead of clipping.
+  private let pillScroll = NSScrollView()
 
   private let whenPill = KitPillButton()
   private let deadlinePill = KitPillButton()
@@ -142,7 +145,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
   // MARK: - Height
 
-  /// The iOS `AttributePill` circle diameter: both shells draw the same rail.
+  /// The pill rail's height: the 30pt pills plus room for the focus ring.
   fileprivate static let pillRowHeight: CGFloat = 34
   /// Empty / short notes — two lines of room before the field grows. Things'
   /// open to-do shows about this much under the title.
@@ -298,7 +301,14 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     column.addArrangedSubview(notesScroll)
     column.addArrangedSubview(checklistView)
     column.addArrangedSubview(attachmentsView)
-    column.addArrangedSubview(pillRow)
+    pillScroll.drawsBackground = false
+    pillScroll.hasHorizontalScroller = false
+    pillScroll.hasVerticalScroller = false
+    pillScroll.verticalScrollElasticity = .none
+    pillScroll.horizontalScrollElasticity = .automatic
+    pillScroll.translatesAutoresizingMaskIntoConstraints = false
+    pillScroll.documentView = pillRow
+    column.addArrangedSubview(pillScroll)
     // The one-line title ends `titleTop` short of the closed-row band's
     // bottom; add that back so the rail hangs `interRowGap` under the BAND
     // (where it always sat), not under the glyphs.
@@ -338,8 +348,11 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
       checklistHeightConstraint,
       attachmentsView.widthAnchor.constraint(equalTo: column.widthAnchor),
       attachmentsHeightConstraint,
-      pillRow.heightAnchor.constraint(equalToConstant: Self.pillRowHeight),
-      pillRow.widthAnchor.constraint(lessThanOrEqualTo: column.widthAnchor),
+      pillScroll.heightAnchor.constraint(equalToConstant: Self.pillRowHeight),
+      pillScroll.widthAnchor.constraint(equalTo: column.widthAnchor),
+      pillRow.topAnchor.constraint(equalTo: pillScroll.contentView.topAnchor),
+      pillRow.leadingAnchor.constraint(equalTo: pillScroll.contentView.leadingAnchor),
+      pillRow.heightAnchor.constraint(equalTo: pillScroll.contentView.heightAnchor),
     ])
 
     // Tab walks title → notes (when shown) → pills, which is the composer's
@@ -947,18 +960,18 @@ final class KitPillButton: NSButton {
   var onPress: ((NSView) -> Void)?
 
   /// The registry attribute this pill stands for (`taskAttributes`). An
-  /// attribute pill is an icon-only circle, the iOS `AttributePill` design
-  /// (34pt circle, 14pt semibold symbol): the label and any value go to the
-  /// tooltip and VoiceOver, and "set" shows as the filled wash. So the rail
-  /// keeps one width whatever the values are, and never squeezes to "…".
-  /// Nil for free-text pills (conversation), which keep a text stadium.
+  /// attribute pill is a stadium with the symbol and a short label (the set
+  /// value when there is one, else the registry label), the iOS
+  /// `AttributePill` design. An icon alone was too obscure. The rail scrolls
+  /// sideways, so pills keep their natural width and never squeeze to "…".
+  /// Nil for free-text pills (conversation), which keep a plain text stadium.
   var attribute: RegistryTaskAttribute? {
     didSet {
       guard let attribute else { return }
       image = NSImage(systemSymbolName: attribute.sfSymbol, accessibilityDescription: nil)?
-        .withSymbolConfiguration(.init(pointSize: 14, weight: .semibold))
-      imagePosition = .imageOnly
-      heightConstraint.constant = KitComposerCell.pillRowHeight
+        .withSymbolConfiguration(.init(pointSize: 12, weight: .semibold))
+      imagePosition = .imageLeading
+      heightConstraint.constant = Self.attributeHeight
       show(value: nil)
       invalidateIntrinsicContentSize()
     }
@@ -975,8 +988,12 @@ final class KitPillButton: NSButton {
   }
   private let glass = KitPassthroughGlassView()
   /// Text stadiums stay 24pt (popovers, conversation options); an attribute
-  /// circle takes the rail height.
+  /// pill is taller, inside the rail height (room for the focus ring).
   private static let textHeight: CGFloat = 24
+  private static let attributeHeight: CGFloat = 30
+  /// A long value ("Fri 28 Nov · Evening", a long list name) truncates here
+  /// instead of making one pill eat the rail.
+  private static let maxAttributeWidth: CGFloat = 200
   private lazy var heightConstraint = heightAnchor.constraint(equalToConstant: Self.textHeight)
 
   var isOn: Bool {
@@ -1033,13 +1050,13 @@ final class KitPillButton: NSButton {
   required init?(coder: NSCoder) { fatalError("KitPillButton is code-only") }
 
   override var intrinsicContentSize: NSSize {
-    if attribute != nil {
-      return NSSize(width: KitComposerCell.pillRowHeight, height: KitComposerCell.pillRowHeight)
-    }
     let text = attributedTitle.size()
     let icon = image.map { $0.size.width + Self.iconGap } ?? 0
-    return NSSize(width: ceil(text.width + icon) + Self.horizontalPadding * 2,
-                  height: Self.textHeight)
+    let width = ceil(text.width + icon) + Self.horizontalPadding * 2
+    if attribute != nil {
+      return NSSize(width: min(width, Self.maxAttributeWidth), height: Self.attributeHeight)
+    }
+    return NSSize(width: width, height: Self.textHeight)
   }
 
   override func layout() {

@@ -1,6 +1,6 @@
 import SwiftUI
 
-// The composer's elective-pill rail — a single row of circular icon buttons
+// The composer's elective-pill rail — a single row of icon + label capsules
 // under the title & notes, in the registry's `taskAttributes` order — and the
 // inline panels a button expands into. Split out of
 // TaskComposer.swift.
@@ -106,7 +106,7 @@ struct TaskAttributeBar: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
-      // Horizontal rail of circular icon buttons — scrolls sideways inside its
+      // Horizontal rail of icon + label capsules — scrolls sideways inside its
       // bounded slot so the rail never widens its card past the screen. "Today"
       // lives inside the When control rather than duplicating the rail.
       ScrollView(.horizontal, showsIndicators: false) {
@@ -125,7 +125,7 @@ struct TaskAttributeBar: View {
             }
           }
         }
-        // Small inset so the circular glass edge and focus ring don't clip
+        // Small inset so the capsule glass edge and focus ring don't clip
         // against the scroll viewport's bounds.
         .padding(.vertical, 2)
         .padding(.horizontal, 1)
@@ -346,9 +346,17 @@ private struct AttributePill: View {
   let action: () -> Void
   @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
-  private static let diameter: CGFloat = 34
+  private static let height: CGFloat = 34
+  /// A long value (a list name, a tag) truncates at this many characters
+  /// instead of making one pill eat the rail. The rail's horizontal scroll
+  /// proposes no width, so a frame cap would not truncate; cut the string.
+  private static let maxChars = 24
+  private var shownText: String {
+    let text = value ?? label
+    return text.count > Self.maxChars ? String(text.prefix(Self.maxChars - 1)) + "…" : text
+  }
 
-  /// Circular fill — flat surface, no floating-glass elevation shadow.
+  /// Capsule fill — flat surface, no floating-glass elevation shadow.
   private var circleFill: Color {
     guard isSet || isActive else { return Theme.mutedSurface }
     if neutral {
@@ -365,18 +373,24 @@ private struct AttributePill: View {
 
   var body: some View {
     Button(action: action) {
-      Group {
+      // Icon + short label (the set value when there is one). An icon alone
+      // was too obscure; the rail scrolls, so pills keep their natural width.
+      HStack(spacing: 5) {
         if isLoading {
           ProgressView()
             .controlSize(.mini)
         } else {
           Image(systemName: icon)
-            .font(.system(size: 14, weight: .semibold))
+            .font(.system(size: 13, weight: .semibold))
         }
+        Text(shownText)
+          .font(.subheadline.weight(.medium))
+          .lineLimit(1)
       }
       .foregroundStyle((isSet || isActive) ? Theme.inkPrimary : Theme.inkSecondary)
-      .frame(width: Self.diameter, height: Self.diameter)
-      .contentShape(Circle())
+      .padding(.horizontal, 12)
+      .frame(height: Self.height)
+      .contentShape(Capsule())
     }
     .buttonStyle(.plain)
     .modifier(AttributePillGlassBackground(
@@ -385,7 +399,7 @@ private struct AttributePill: View {
       reduceTransparency: reduceTransparency
     ))
     .overlay {
-      Circle()
+      Capsule()
         .strokeBorder(ringColor, lineWidth: 2)
         .opacity(isFocused ? 1 : 0)
         .allowsHitTesting(false)
@@ -402,19 +416,19 @@ private struct AttributePillGlassBackground: ViewModifier {
 
   func body(content: Content) -> some View {
     if reduceTransparency {
-      content.background(Circle().fill(circleFill))
+      content.background(Capsule().fill(circleFill))
     } else {
       #if os(iOS)
       if let tint {
-        content.glassEffect(.regular.tint(tint).interactive(), in: .circle)
+        content.glassEffect(.regular.tint(tint).interactive(), in: .capsule)
       } else {
-        content.glassEffect(.regular.interactive(), in: .circle)
+        content.glassEffect(.regular.interactive(), in: .capsule)
       }
       #else
       content
-        .background(.thinMaterial, in: Circle())
-        .background(Circle().fill(tint ?? .clear))
-        .overlay(Circle().strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5))
+        .background(.thinMaterial, in: Capsule())
+        .background(Capsule().fill(tint ?? .clear))
+        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5))
       #endif
     }
   }
