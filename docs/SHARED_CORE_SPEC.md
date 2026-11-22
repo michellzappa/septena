@@ -1,6 +1,6 @@
 # Shared core spec
 
-**Status:** accepted (2026-11-22), C0 building. Issue #246.
+**Status:** accepted (2026-11-22). C0 passed (#246, PR #258); C1–C5 open.
 
 **Rests on:** ADR 0025 (shared Rust core), ADR 0015 (shared registries),
 ADR 0013 (Windows on the Android code), ADR 0002 (own backend).
