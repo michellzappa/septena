@@ -5,6 +5,12 @@ import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import app.septena.android.auth.AppCredentials
 import app.septena.android.auth.SessionStore
 import app.septena.android.sync.SyncController
+import app.septena.core.ConversationMutator
+import app.septena.core.ConversationRules
+import app.septena.core.RecurrenceRules
+import app.septena.core.RegistryEntityMutator
+import app.septena.core.SyncedSettings
+import app.septena.core.SyncedSettingsMutator
 import app.septena.core.SystemDayClock
 import app.septena.core.TaskMutator
 import app.septena.core.TaskSyncEngine
@@ -38,6 +44,12 @@ class AndroidAppGraph(application: Application) {
     val clock = SystemDayClock()
     val ids = UuidTaskIdGenerator()
     val taskMutator = TaskMutator(taskStore, clock, ids)
+    val registryEntityMutator = RegistryEntityMutator(taskStore, clock, ids)
+    val conversationMutator = ConversationMutator(taskStore, ids)
+    val recurrenceRules = RecurrenceRules
+    val conversationRules = ConversationRules
+    val syncedSettings = SyncedSettings(taskStore)
+    val syncedSettingsMutator = SyncedSettingsMutator(taskStore, ids)
 
     val auth = SeptenaAuthClient(clientVersion)
     val credentials = AppCredentials(SessionStore(application), auth)

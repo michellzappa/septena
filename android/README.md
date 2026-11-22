@@ -12,7 +12,7 @@ node scripts/gen-registries.mjs
 | `core` | Registry validation, task and conversation mutators, view rules, sync protocol and engine | Kotlin/JVM |
 | `store` | SQLDelight records, shadows, local turns and persistent outbox | Kotlin/JVM; Android driver in the app |
 | `transport` | Authenticated HTTP adapter for sync push and pull | JVM APIs available on Android and Windows |
-| `ui` | Shared Compose task-list surface | Android and desktop/JVM |
+| `ui` | Shared Compose task-list surface | Android |
 | `app` | Android lifecycle, SQLite driver, and app composition root | Android |
 
 User-visible action IDs, destination IDs, labels, settings, capabilities and
