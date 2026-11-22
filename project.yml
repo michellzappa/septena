@@ -415,9 +415,7 @@ targets:
       - path: SeptenaCore/ThingsImport/ThingsDateDecoder.swift
       - path: SeptenaCore/ThingsImport/ThingsSQLiteReader.swift
       - path: SeptenaCore/ThingsImport/ThingsImportParser.swift
-      - path: SeptenaCore/ThingsImport/ThingsImportMapping.swift
       - path: SeptenaCore/ThingsImport/ThingsImportScratchpad.swift
-      - path: SeptenaCore/ThingsImport/ThingsToSeptenaMapper.swift
       - path: SeptenaCore/TaskConvo.swift
       - path: SeptenaCore/ConvoDerived.swift
       - path: SeptenaCore/TaskFade.swift

@@ -905,19 +905,9 @@ struct SeptaskImportExportPane: View {
     ) { handleFileImport($0) }
   }
 
+  /// Source picker and past imports, on the import engine (MOVING_IN_SPEC §4).
   private var moveInSection: some View {
-    Section {
-      NavigationLink {
-        ThingsImportView()
-          .navigationTitle("Import from Things")
-      } label: {
-        Label("Import from Things", systemImage: RegistryIcons.sfSymbols["settings.import"] ?? "square.and.arrow.down")
-      }
-    } header: {
-      Text("Move from another app")
-    } footer: {
-      Text("Copy a Things database into Septena once. Nothing in Things is changed.")
-    }
+    ImportSourcesSection()
   }
 
   private var storageSection: some View {

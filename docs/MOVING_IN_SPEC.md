@@ -1,6 +1,6 @@
 # Moving in: one import engine with source adapters
 
-Status: **building** (I0 landed 2026-11-21)
+Status: **building** (I0 landed 2026-11-21, I1 2026-11-22)
 
 Rests on [ADR 0021](adr/0021-one-import-engine-with-source-adapters.md).
 Issues: #98 (coverage tracker), #99 (engine), #52 (Microsoft To Do), #100
@@ -28,7 +28,12 @@ Code: `SeptenaCore/Import/`.
 | `ImportPlanner.swift` | Pure planner: bundle + existing data + options → plan + report. |
 | `ImportApplier.swift` | Applies a plan through the mutators; undoes a batch. |
 | `ImportLedger.swift` | One JSON file per batch: lineage, originals, outcome. |
+| `ImportLegacyThingsLineage.swift` | Reads the pre-engine Things id table once into a `legacy` ledger batch (lineage only, never undone). |
 | `Adapters/ThingsImportSource.swift` | Things database → bundle. |
+
+UI: `Septena/Shell/Tasks/ImportFlowView.swift` (source picker, preview,
+apply, past imports with Undo), reached from Settings > Import & Export and
+from the first-run "From Things" choice.
 
 ## 2. The bundle (v1)
 
@@ -141,8 +146,9 @@ the field in (I5).
 One JSON file per batch at `Application Support/Septena/Imports/<batchId>.json`:
 batch id, source, options, applied time, state, the report, and one entry per
 item: entity, source id, Septena id, `created` or `merged`, and the original.
-Lineage for later plans is the union of all ledgers in state `applied` or
-`partial`.
+Lineage for later plans is the union of all ledgers not in state `undone`
+(`applying` counts too: an app that quit mid-import still owns the rows it
+recorded).
 
 ### 4.5 Undo a batch
 

@@ -40,6 +40,11 @@ struct ImportLedgerBatch: Codable, Sendable, Hashable, Identifiable {
   /// Set by undo: created rows kept because the user changed them.
   var keptOnUndo: [String]?
   var lastError: String?
+  /// Written from the pre-engine Things id table
+  /// (`ImportLegacyThingsLineage`). Holds lineage only; undo refuses it.
+  var legacy: Bool?
+
+  var isLegacy: Bool { legacy == true }
 
   var counts: (created: Int, merged: Int) {
     (items.filter { $0.action == .create }.count, items.filter { $0.action == .merge }.count)
@@ -79,11 +84,12 @@ enum ImportLedger {
       .sorted { $0.startedAt > $1.startedAt }
   }
 
-  /// Source item → Septena id, from every batch that wrote rows (`applied`
-  /// and `partial`; an `undone` batch no longer owns its rows).
+  /// Source item → Septena id, from every batch that wrote rows (`applied`,
+  /// `partial`, and `applying`: a batch the app quit inside still owns the
+  /// rows it recorded; an `undone` batch no longer owns its rows).
   static func lineage() -> [ImportLineageKey: String] {
     var out: [ImportLineageKey: String] = [:]
-    for batch in all().reversed() where batch.state == .applied || batch.state == .partial {
+    for batch in all().reversed() where batch.state != .undone {
       for item in batch.items {
         let key = ImportLineageKey(app: batch.source.app, account: batch.source.account,
                                    entity: item.entity, sourceId: item.sourceId)
