@@ -609,7 +609,17 @@ the `Transaction.updates` listener from launch, Restore Purchases, finish
 only after the server answered), the Plus sheet (`Septask/SeptaskPlusSheet.swift`)
 with its registry `paywall` copy, the plan states in `PlanStatus` (trial,
 lapsed, source), and a local StoreKit file (`Config/Septena.storekit`) on
-the `Septask` and `SeptaskMac` schemes. The App Store Connect products do
+the `Septask` and `SeptaskMac` schemes. Upsell moments built in the app
+(2026-11-22): `second_device` and `trial_end` as Today notices (at most one
+at a time, trial_end first), `history_edge` as a quiet last line under a
+task's history (`/v1/changes` sends `upsell: "history_edge"` only on the
+free plan with hidden rows). The sheet adds "Sync This Device" for
+`second_device` (`POST /v1/entitlement/device`), and Settings ▸ Septena
+Plus keeps that line after the notice is gone. "Once per account" is the
+synced setting `upsellsSeen`. Not built: `file_elsewhere` (the app drops
+`uploadedAt` on attachments, so it cannot tell bytes elsewhere from bytes
+not yet downloaded), `agent_runs` and `connector_cap` (#269),
+`share_create` (no sharing yet). The App Store Connect products do
 not exist yet; `checkout.open` stays false until they do. The Mac sells
 once its release moves to the Mac App Store (ADR 0026).
 
