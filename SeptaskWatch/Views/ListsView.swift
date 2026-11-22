@@ -1,20 +1,56 @@
 import SwiftUI
 
-// Lists: what lives beyond Today, kept to two (docs/WATCH.md §3). Upcoming
-// is the next days by date; Anytime is the undated backlog, where a swipe
-// pulls a task into Today. Status sits last.
+// Lists: matches the Phone/Mac sidebar — smart lists, standalone projects,
+// areas with their projects, and Sync at the bottom.
 
 struct ListsView: View {
   private var store: WatchStore { .shared }
 
   var body: some View {
+    let areas = store.structure?.areas ?? []
+    let projects = store.structure?.projects ?? []
+    let standaloneProjects = projects.filter { $0.area == nil }
+
     List {
-      NavigationLink(value: WatchRoute.upcoming) {
-        Label("Upcoming", systemImage: "calendar")
+      Section {
+        NavigationLink(value: WatchRoute.upcoming) {
+          Label("Upcoming", systemImage: "calendar")
+        }
+        NavigationLink(value: WatchRoute.repeating) {
+          Label("Repeating", systemImage: "arrow.clockwise")
+        }
+        NavigationLink(value: WatchRoute.anytime) {
+          Label("Anytime", systemImage: "square.stack")
+        }
+        NavigationLink(value: WatchRoute.logbook) {
+          Label("Logbook", systemImage: "checkmark")
+        }
       }
-      NavigationLink(value: WatchRoute.anytime) {
-        Label("Anytime", systemImage: "square.stack")
+
+      if !standaloneProjects.isEmpty {
+        Section("Projects") {
+          ForEach(standaloneProjects) { project in
+            NavigationLink(value: WatchRoute.project(project)) {
+              ListCountRow(title: project.title, symbol: "number", count: project.count)
+            }
+          }
+        }
       }
+
+      ForEach(areas) { area in
+        let areaProjects = projects.filter { $0.area == area.id }
+        Section {
+          NavigationLink(value: WatchRoute.area(area)) {
+            ListCountRow(title: area.title, emoji: area.emoji, symbol: "folder", count: area.count)
+          }
+          ForEach(areaProjects) { project in
+            NavigationLink(value: WatchRoute.project(project)) {
+              ListCountRow(title: project.title, symbol: "number", count: project.count)
+            }
+          }
+        }
+      }
+
       Section {
         NavigationLink(value: WatchRoute.status) {
           Label("Sync", systemImage: store.connection == .connected ? "checkmark.icloud" : "exclamationmark.icloud")
@@ -22,6 +58,35 @@ struct ListsView: View {
       }
     }
     .navigationTitle("Lists")
+    .task { await store.refreshStructure() }
+  }
+}
+
+private struct ListCountRow: View {
+  let title: String
+  var emoji: String? = nil
+  let symbol: String
+  let count: Int
+
+  var body: some View {
+    HStack(spacing: 8) {
+      if let emoji, !emoji.isEmpty {
+        Text(emoji)
+          .frame(width: 20, alignment: .center)
+      } else {
+        Image(systemName: symbol)
+          .foregroundStyle(.secondary)
+          .frame(width: 20, alignment: .center)
+      }
+      Text(title)
+        .lineLimit(1)
+      Spacer(minLength: 4)
+      if count > 0 {
+        Text("\(count)")
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+      }
+    }
   }
 }
 
@@ -89,6 +154,99 @@ struct AnytimeView: View {
     .navigationTitle("Anytime")
     .navigationDestination(item: $open) { TaskDetailView(task: $0, onToday: false) }
     .task { await store.refreshNow(.anytime) }
+  }
+}
+
+struct RepeatingView: View {
+  @State private var open: WatchTask?
+  private var store: WatchStore { .shared }
+
+  var body: some View {
+    let rows = store.repeatingRows
+    ZStack {
+      if rows.isEmpty, store.repeating != nil {
+        EmptyList(symbol: "arrow.clockwise", text: String(localized: "No repeating tasks."))
+      } else if rows.isEmpty {
+        ProgressView()
+      } else {
+        List {
+          ForEach(rows) { task in
+            LaterRow(task: task, today: store.todayDay) { open = task }
+          }
+        }
+      }
+    }
+    .navigationTitle("Repeating")
+    .navigationDestination(item: $open) { TaskDetailView(task: $0, onToday: false) }
+    .task { await store.refreshNow(.repeating) }
+  }
+}
+
+struct LogbookView: View {
+  private var store: WatchStore { .shared }
+
+  var body: some View {
+    let rows = store.logbookRows
+    ZStack {
+      if rows.isEmpty, store.logbook != nil {
+        EmptyList(symbol: "checkmark", text: String(localized: "Logbook is empty."))
+      } else if rows.isEmpty {
+        ProgressView()
+      } else {
+        List {
+          ForEach(rows) { task in
+            VStack(alignment: .leading, spacing: 2) {
+              Text(task.title)
+                .font(.body)
+                .lineLimit(3)
+                .foregroundStyle(.secondary)
+              if let container = task.container {
+                Text(container)
+                  .font(.footnote)
+                  .foregroundStyle(.tertiary)
+              }
+            }
+            .padding(.vertical, 2)
+          }
+        }
+      }
+    }
+    .navigationTitle("Logbook")
+    .task { await store.refreshNow(.completed) }
+  }
+}
+
+struct ContainerTasksView: View {
+  let title: String
+  let areaID: String?
+  let projectID: String?
+
+  @State private var open: WatchTask?
+  private var store: WatchStore { .shared }
+
+  private var key: String {
+    projectID.map { "project:\($0)" } ?? areaID.map { "area:\($0)" } ?? ""
+  }
+
+  var body: some View {
+    let rows = store.containerRows(key: key)
+    let loaded = store.containers[key] != nil
+    ZStack {
+      if rows.isEmpty, loaded {
+        EmptyList(symbol: projectID != nil ? "number" : "folder", text: String(localized: "No open tasks."))
+      } else if rows.isEmpty {
+        ProgressView()
+      } else {
+        List {
+          ForEach(rows) { task in
+            LaterRow(task: task, today: store.todayDay) { open = task }
+          }
+        }
+      }
+    }
+    .navigationTitle(title)
+    .navigationDestination(item: $open) { TaskDetailView(task: $0, onToday: false) }
+    .task { await store.refreshContainer(area: areaID, project: projectID) }
   }
 }
 

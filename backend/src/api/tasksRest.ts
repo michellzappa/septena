@@ -95,29 +95,117 @@ function containerNames(areas: Row[], projects: Row[]): Map<string, string> {
   return m;
 }
 
-const zView = z.enum(["today", "inbox", "upcoming", "anytime"]);
+const zView = z.enum(["today", "inbox", "upcoming", "repeating", "anytime", "completed"]);
+
+function numPos(v: unknown): number {
+  return typeof v === "number" && Number.isFinite(v) ? v : Number.POSITIVE_INFINITY;
+}
+
+function sortByPosition(rows: Row[]): Row[] {
+  return rows
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => numPos(a.r.position) - numPos(b.r.position) || a.i - b.i)
+    .map((x) => x.r);
+}
+
+tasksRest.get("/lists", async (c) => {
+  const store = rpcStoreFor(c.env, c.get("userId"));
+  const timeZone = await timeZoneFor(c, store);
+  const [areas, projects, open] = await Promise.all([
+    store.readAreas(500),
+    store.readProjects("active", 500),
+    listTasks(store, timeZone, "all", 500),
+  ]);
+  const projectArea = new Map<string, string>();
+  for (const p of projects) {
+    if (typeof p.id === "string" && typeof p.area === "string" && p.area) {
+      projectArea.set(p.id, p.area);
+    }
+  }
+  const projectCounts = new Map<string, number>();
+  const areaCounts = new Map<string, number>();
+  for (const t of open.tasks as TaskOut[]) {
+    if (t.project) {
+      projectCounts.set(t.project, (projectCounts.get(t.project) ?? 0) + 1);
+    }
+    const a = t.area ?? (t.project ? projectArea.get(t.project) : undefined);
+    if (a) {
+      areaCounts.set(a, (areaCounts.get(a) ?? 0) + 1);
+    }
+  }
+  return c.json({
+    areas: sortByPosition(areas).map((r) => {
+      const id = r.id as string;
+      const out: { id: string; title: string; emoji?: string; count: number } = {
+        id,
+        title: typeof r.title === "string" ? r.title : "",
+        count: areaCounts.get(id) ?? 0,
+      };
+      if (typeof r.emoji === "string" && r.emoji) out.emoji = r.emoji;
+      return out;
+    }),
+    projects: sortByPosition(projects).map((r) => {
+      const id = r.id as string;
+      const out: { id: string; title: string; area?: string; count: number } = {
+        id,
+        title: typeof r.title === "string" ? r.title : "",
+        count: projectCounts.get(id) ?? 0,
+      };
+      if (typeof r.area === "string" && r.area) out.area = r.area;
+      return out;
+    }),
+  });
+});
 
 tasksRest.get("/", async (c) => {
   const q = z.object({
     view: zView.default("today"),
+    area: zId.optional(),
+    project: zId.optional(),
     limit: z.coerce.number().int().min(1).max(500).default(300),
   }).safeParse(c.req.query());
   if (!q.success) return c.json({ error: "invalid_request" }, 400);
   const store = rpcStoreFor(c.env, c.get("userId"));
   const timeZone = await timeZoneFor(c, store);
+  const needsAll = !!q.data.area || !!q.data.project || q.data.view === "repeating";
   const [list, areas, projects] = await Promise.all([
-    listTasks(store, timeZone, q.data.view, q.data.limit),
+    listTasks(store, timeZone, needsAll ? "all" : q.data.view, needsAll ? 500 : q.data.limit),
     store.readAreas(500),
     store.readProjects("active", 500),
   ]);
   const today = todayYMD(timeZone);
   const names = containerNames(areas, projects);
+  let tasks = list.tasks as TaskOut[];
+  let total = list.total;
+  let truncated = list.truncated;
+  if (q.data.project) {
+    tasks = tasks.filter((t) => t.project === q.data.project);
+    total = tasks.length;
+    truncated = total > q.data.limit;
+    tasks = tasks.slice(0, q.data.limit);
+  } else if (q.data.area) {
+    const projectArea = new Map<string, string>();
+    for (const p of projects) {
+      if (typeof p.id === "string" && typeof p.area === "string" && p.area) {
+        projectArea.set(p.id, p.area);
+      }
+    }
+    tasks = tasks.filter((t) => t.area === q.data.area || (!!t.project && projectArea.get(t.project) === q.data.area));
+    total = tasks.length;
+    truncated = total > q.data.limit;
+    tasks = tasks.slice(0, q.data.limit);
+  } else if (q.data.view === "repeating") {
+    tasks = tasks.filter((t) => !!t.recurrence);
+    total = tasks.length;
+    truncated = total > q.data.limit;
+    tasks = tasks.slice(0, q.data.limit);
+  }
   return c.json({
     view: q.data.view,
     today,
-    total: list.total,
-    truncated: list.truncated,
-    tasks: (list.tasks as TaskOut[]).map((t) => clientTask(t, names)),
+    total,
+    truncated,
+    tasks: tasks.map((t) => clientTask(t, names)),
   });
 });
 

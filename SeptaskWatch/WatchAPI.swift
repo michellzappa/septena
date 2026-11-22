@@ -117,6 +117,35 @@ actor WatchAPI {
     return list
   }
 
+  func lists() async throws -> WatchStructure {
+    let (data, status) = try await authed(path: "/v1/tasks/lists", method: "GET", body: nil)
+    try Self.check(status, data)
+    guard let structure = try? JSONDecoder.watchWire.decode(WatchStructure.self, from: data) else {
+      throw WatchAPIError.badResponse
+    }
+    return structure
+  }
+
+  func list(area: String? = nil, project: String? = nil) async throws -> WatchTaskList {
+    let query: String
+    if let project {
+      let enc = project.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? project
+      query = "project=\(enc)"
+    } else if let area {
+      let enc = area.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? area
+      query = "area=\(enc)"
+    } else {
+      query = "view=anytime"
+    }
+    let (data, status) = try await authed(path: "/v1/tasks?\(query)", method: "GET", body: nil)
+    try Self.check(status, data)
+    guard var list = try? JSONDecoder.watchWire.decode(WatchTaskList.self, from: data) else {
+      throw WatchAPIError.badResponse
+    }
+    list.fetchedAt = .now
+    return list
+  }
+
   func send(_ op: WatchOp) async throws {
     switch op.action {
     case .create(let title, let when):

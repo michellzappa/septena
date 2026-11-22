@@ -76,7 +76,11 @@ final class WatchStore {
 
   private(set) var today: WatchTaskList?
   private(set) var upcoming: WatchTaskList?
+  private(set) var repeating: WatchTaskList?
   private(set) var anytime: WatchTaskList?
+  private(set) var logbook: WatchTaskList?
+  private(set) var structure: WatchStructure?
+  private(set) var containers: [String: WatchTaskList] = [:]
   private(set) var connection: WatchConnection = WatchAPI.hasSession ? .connected : .notConnected
   private(set) var isRefreshing = false
   private(set) var lastError: String?
@@ -128,7 +132,10 @@ final class WatchStore {
   /// Today with every queued / undoable change applied on top.
   var todayRows: [WatchTask] { overlay(today?.tasks ?? [], view: .today) }
   var upcomingRows: [WatchTask] { overlay(upcoming?.tasks ?? [], view: .upcoming) }
+  var repeatingRows: [WatchTask] { overlay(repeating?.tasks ?? [], view: .repeating) }
   var anytimeRows: [WatchTask] { overlay(anytime?.tasks ?? [], view: .anytime) }
+  var logbookRows: [WatchTask] { logbook?.tasks ?? [] }
+  func containerRows(key: String) -> [WatchTask] { overlay(containers[key]?.tasks ?? [], view: .repeating) }
   var todayDay: String { today?.today ?? WatchDay.string(from: .now) }
 
   private var undoTask: Task<Void, Never>?
@@ -161,8 +168,39 @@ final class WatchStore {
     }
     today = Self.read(WatchTaskList.self, "today.json")
     upcoming = Self.read(WatchTaskList.self, "upcoming.json")
+    repeating = Self.read(WatchTaskList.self, "repeating.json")
     anytime = Self.read(WatchTaskList.self, "anytime.json")
+    logbook = Self.read(WatchTaskList.self, "logbook.json")
+    structure = Self.read(WatchStructure.self, "structure.json")
     lastSyncedAt = today?.fetchedAt
+  }
+
+  func refreshStructure() async {
+    guard !sampleMode else { return }
+    guard WatchAPI.hasSession else { return }
+    do {
+      let s = try await WatchAPI.shared.lists()
+      structure = s
+      Self.write(s, "structure.json")
+      offline = false
+    } catch let error as WatchAPIError {
+      handle(error)
+    } catch {}
+  }
+
+  func refreshContainer(area: String? = nil, project: String? = nil) async {
+    guard !sampleMode else { return }
+    guard WatchAPI.hasSession else { return }
+    let key = project.map { "project:\($0)" } ?? area.map { "area:\($0)" } ?? ""
+    guard !key.isEmpty else { return }
+    await flush()
+    do {
+      let list = try await WatchAPI.shared.list(area: area, project: project)
+      containers[key] = list
+      offline = false
+    } catch let error as WatchAPIError {
+      handle(error)
+    } catch {}
   }
 
   /// Fetches a view. Silent: the cached rows stay on screen meanwhile.
@@ -205,9 +243,15 @@ final class WatchStore {
     case .upcoming:
       upcoming = list
       Self.write(list, "upcoming.json")
+    case .repeating:
+      repeating = list
+      Self.write(list, "repeating.json")
     case .anytime:
       anytime = list
       Self.write(list, "anytime.json")
+    case .completed:
+      logbook = list
+      Self.write(list, "logbook.json")
     case .inbox:
       break
     }
@@ -412,6 +456,11 @@ final class WatchStore {
         if action != .tomorrow(id) { hidden.insert(id) }
       case .anytime, .inbox:
         hidden.insert(id)
+      case .repeating:
+        if case .complete = action { hidden.insert(id) }
+        if case .cancel = action { hidden.insert(id) }
+      case .completed:
+        break
       }
     }
     var out = rows.filter { !hidden.contains($0.id) }

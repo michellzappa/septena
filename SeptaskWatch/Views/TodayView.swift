@@ -10,7 +10,11 @@ enum WatchRoute: Hashable {
   case task(WatchTask, onToday: Bool)
   case lists
   case upcoming
+  case repeating
   case anytime
+  case logbook
+  case area(WatchArea)
+  case project(WatchProject)
   case status
 }
 
@@ -41,7 +45,11 @@ struct TodayView: View {
           switch route {
           case .task(let task, let onToday): TaskDetailView(task: task, onToday: onToday)
           case .upcoming: UpcomingView()
+          case .repeating: RepeatingView()
           case .anytime: AnytimeView()
+          case .logbook: LogbookView()
+          case .area(let area): ContainerTasksView(title: area.title, areaID: area.id, projectID: nil)
+          case .project(let project): ContainerTasksView(title: project.title, areaID: nil, projectID: project.id)
           case .lists: ListsView()
           case .status: StatusView()
           }
