@@ -26,6 +26,8 @@ import {
   isRowActive,
   planCheckFailed,
   planFor,
+  trialEndsAt,
+  trialRow,
   upsellLine,
   usageKeys,
   type LimitBreach,
@@ -94,6 +96,10 @@ api.post("/auth/apple", async (c) => {
   try {
     const { sub } = await verifyAppleIdentityToken(body.identityToken, body.nonce, c.env.APPLE_AUDIENCES.split(","));
     const userId = await userIdForAppleSub(sub);
+    // Every new account starts with 14 days of Plus (spec §3). Only the
+    // first sign-in writes the row; later sign-ins find it and do nothing.
+    const trialStarted = await storeFor(c.env, userId).startTrialOnce(trialRow());
+    if (trialStarted) logEvent("trial_started", { userId });
     logEvent("api_signin", { ok: true });
     return c.json(await issueSession(c.env, userId));
   } catch (e) {
@@ -394,6 +400,8 @@ api.get("/entitlement", async (c) => {
     active: state.rows.some((r) => isRowActive(r, now)),
     enforced: isEnforcing(c.env),
     entitlements: state.rows.map((r) => ({ ...r, active: isRowActive(r, now) })),
+    // The reverse trial's end (ms) while it is the only active row, else null.
+    trialEndsAt: trialEndsAt(state.rows, now),
     // The plan table row the server enforces (spec §6). Apps read limits
     // here and never hardcode them.
     plan: state.plan,

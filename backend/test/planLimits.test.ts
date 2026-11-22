@@ -145,3 +145,35 @@ describe("usage and history", () => {
     assert.equal(store.attachmentBytes(), 0);
   });
 });
+
+describe("reverse trial", () => {
+  const DAY = 86_400_000;
+
+  it("gives Plus for 14 days, then the free account", () => {
+    const now = Date.UTC(2026, 10, 22);
+    const row = { ...ent.trialRow(now), updatedAt: now };
+    assert.equal(row.expiresAt, now + 14 * DAY);
+    assert.equal(ent.resolvePlan([row], now + 13 * DAY), "plus");
+    assert.equal(ent.trialEndsAt([row], now), now + 14 * DAY);
+    // No renewal leeway: the trial ends on the hour it says.
+    assert.equal(ent.resolvePlan([row], now + 14 * DAY), "free");
+    assert.equal(ent.trialEndsAt([row], now + 14 * DAY), null);
+  });
+
+  it("reports no trial end once a paid row is active too", () => {
+    const now = Date.UTC(2026, 10, 22);
+    const row = { ...ent.trialRow(now), updatedAt: now };
+    assert.equal(ent.trialEndsAt([row, grant()], now), null);
+    assert.equal(ent.resolvePlan([row, grant()], now), "plus");
+  });
+
+  it("starts once per account", async () => {
+    const { store } = await createTestTaskStore();
+    const first = Date.UTC(2026, 10, 22);
+    assert.equal(store.startTrialOnce(ent.trialRow(first)), true);
+    assert.equal(store.startTrialOnce(ent.trialRow(first + 30 * DAY)), false);
+    const rows = store.entitlements();
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].expiresAt, first + 14 * DAY);
+  });
+});

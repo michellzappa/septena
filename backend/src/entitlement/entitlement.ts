@@ -1,7 +1,7 @@
 import type { Env } from "../env.js";
 import { logEvent } from "../util.js";
 import { storeFor } from "../api/session.js";
-import { PLAN_LIMITS, PLAN_UPSELLS } from "../generated/registries.js";
+import { PLAN_LIMITS, PLAN_TRIAL_DAYS, PLAN_UPSELLS } from "../generated/registries.js";
 
 // Plan and entitlement (docs/SYNC_SUBSCRIPTION_SPEC.md §5–§6, ADR 0010,
 // ADR 0023).
@@ -9,8 +9,8 @@ import { PLAN_LIMITS, PLAN_UPSELLS } from "../generated/registries.js";
 // Rows live in the user's TaskStore Durable Object (`entitlements` table).
 // One row per source of access: `apple:<originalTransactionId>` for an App
 // Store subscription, `grant:<name>` for a hand-made grant (mz, testers,
-// press). The user is on Plus when ANY row is active, else on the free
-// account.
+// press), `trial` for the 14-day reverse trial. The user is on Plus when ANY
+// row is active, else on the free account.
 //
 // `resolvePlan` turns the rows into a plan id, and `PLAN_TABLE` maps the plan
 // to its limits (registry/plans.json `limits`, generated to PLAN_LIMITS).
@@ -20,7 +20,7 @@ import { PLAN_LIMITS, PLAN_UPSELLS } from "../generated/registries.js";
 // (402 / tool error); anything else only logs `entitlement_would_block` and
 // lets the call through.
 
-export type EntitlementSource = "apple" | "grant" | "stripe";
+export type EntitlementSource = "apple" | "grant" | "stripe" | "trial";
 export type EntitlementStatus = "active" | "grace" | "billing_retry" | "expired" | "revoked";
 
 export interface EntitlementRow {
@@ -54,7 +54,7 @@ export function isRowActive(row: EntitlementRow, now = Date.now()): boolean {
   switch (row.status) {
     case "active":
       if (row.expiresAt === null) return true;
-      return now < row.expiresAt + (row.source === "grant" ? 0 : RENEWAL_LEEWAY_MS);
+      return now < row.expiresAt + (row.source === "grant" || row.source === "trial" ? 0 : RENEWAL_LEEWAY_MS);
     case "grace":
       return row.expiresAt === null || now < row.expiresAt + RENEWAL_LEEWAY_MS;
     case "billing_retry":
@@ -70,9 +70,31 @@ export function isEnforcing(env: Env): boolean {
 
 // ---- plans and limits ----
 
-/// The plans the server knows. `trial` (the 14-day reverse trial, spec §3)
-/// is not built yet; it will resolve to the Plus limits.
+/// The plans the server knows. The 14-day reverse trial (spec §3) is a
+/// `trial` entitlement row, so a trial account resolves to `plus` and gets
+/// the Plus limits with no plan of its own.
 export type PlanId = "free" | "plus";
+
+/// The reverse trial's row id. One per account, kept after it expires: its
+/// presence is the record that the account had its trial.
+export const TRIAL_ROW_ID = "trial";
+
+/// The reverse trial row a new account gets (spec §3, ADR 0010).
+export function trialRow(now = Date.now()): Omit<EntitlementRow, "updatedAt"> {
+  return {
+    id: TRIAL_ROW_ID, source: "trial", productId: null,
+    expiresAt: now + PLAN_TRIAL_DAYS * 24 * HOUR_MS, originalTransactionId: null,
+    status: "active", environment: null, note: "reverse trial", signedAt: now,
+  };
+}
+
+/// When the reverse trial ends, while it is the account's only active row;
+/// else null. Apps show "Plus trial until {date}" from it.
+export function trialEndsAt(rows: EntitlementRow[], now = Date.now()): number | null {
+  const active = rows.filter((r) => isRowActive(r, now));
+  if (active.length !== 1 || active[0].source !== "trial") return null;
+  return active[0].expiresAt;
+}
 
 export interface PlanLimits {
   /// Devices that sync to the server; null = no cap.

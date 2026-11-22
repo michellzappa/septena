@@ -712,7 +712,8 @@
   "Done": {
     "text": "Done",
     "paths": [
-      "destinations.destinations.agent.groups.done.title"
+      "destinations.destinations.agent.groups.done.title",
+      "plans.paywall.done"
     ]
   },
   "Duplicate": {
@@ -955,6 +956,12 @@
     "text": "If you skip this, your tasks stay on this device until you sign in.",
     "paths": [
       "surfaces.firstRun.steps.account.footnote"
+    ]
+  },
+  "If you subscribe during the trial, billing starts on the day you subscribe.": {
+    "text": "If you subscribe during the trial, billing starts on the day you subscribe.",
+    "paths": [
+      "plans.paywall.trialBilling"
     ]
   },
   "Import & Export": {
@@ -1643,6 +1650,27 @@
       "plans.status.plus"
     ]
   },
+  "Plus is on for this account.": {
+    "text": "Plus is on for this account.",
+    "paths": [
+      "plans.paywall.ownedGrant"
+    ]
+  },
+  "Plus is on until {date}.": {
+    "text": "Plus is on until {date}.",
+    "placeholders": [
+      "date"
+    ],
+    "paths": [
+      "plans.paywall.trialStarted"
+    ]
+  },
+  "Plus is on. Your other devices start syncing.": {
+    "text": "Plus is on. Your other devices start syncing.",
+    "paths": [
+      "plans.paywall.success"
+    ]
+  },
   "Plus is the same app on every device, and nothing in it is capped.": {
     "text": "Plus is the same app on every device, and nothing in it is capped.",
     "paths": [
@@ -1716,6 +1744,12 @@
     "paths": [
       "surfaces.prompts.text.newProject.placeholder",
       "surfaces.prompts.text.renameProject.placeholder"
+    ]
+  },
+  "Purchase received. Plus turns on when Septena reaches the server.": {
+    "text": "Purchase received. Plus turns on when Septena reaches the server.",
+    "paths": [
+      "plans.paywall.serverRetry"
     ]
   },
   "Pure Canvas": {
@@ -1902,6 +1936,12 @@
     "paths": [
       "surfaces.prompts.text.newSection.placeholder",
       "surfaces.prompts.text.renameSection.placeholder"
+    ]
+  },
+  "See Plus": {
+    "text": "See Plus",
+    "paths": [
+      "plans.paywall.seePlus"
     ]
   },
   "See what Plus adds": {
@@ -2169,6 +2209,12 @@
       "plans.actions.subscribe"
     ]
   },
+  "Subscribe in Septena on your iPhone or iPad. Plus then works on this Mac too.": {
+    "text": "Subscribe in Septena on your iPhone or iPad. Plus then works on this Mac too.",
+    "paths": [
+      "plans.paywall.buyOnIPhone"
+    ]
+  },
   "Subscriptions open at App Store launch.": {
     "text": "Subscriptions open at App Store launch.",
     "paths": [
@@ -2350,6 +2396,12 @@
       "plans.cards.free.detail"
     ]
   },
+  "The purchase did not go through. Try again in a moment.": {
+    "text": "The purchase did not go through. Try again in a moment.",
+    "paths": [
+      "plans.paywall.failed"
+    ]
+  },
   "The same tasks on your phone, tablet and Mac, updated as you type.": {
     "text": "The same tasks on your phone, tablet and Mac, updated as you type.",
     "paths": [
@@ -2456,6 +2508,12 @@
       "tokens.textures.topography.name"
     ]
   },
+  "Try Plus free for 14 days": {
+    "text": "Try Plus free for 14 days",
+    "paths": [
+      "plans.paywall.startTrial"
+    ]
+  },
   "Two": {
     "text": "Two",
     "paths": [
@@ -2525,6 +2583,12 @@
       "actions.menuBar.view.title"
     ]
   },
+  "Waiting for approval.": {
+    "text": "Waiting for approval.",
+    "paths": [
+      "plans.paywall.pending"
+    ]
+  },
   "Washi Paper": {
     "text": "Washi Paper",
     "paths": [
@@ -2540,7 +2604,8 @@
   "Welcome back": {
     "text": "Welcome back",
     "paths": [
-      "surfaces.firstRun.steps.done.returningTitle"
+      "surfaces.firstRun.steps.done.returningTitle",
+      "plans.paywall.welcomeBack"
     ]
   },
   "Welcome to Septena": {
@@ -2609,6 +2674,12 @@
       "destinations.destinations.agent.groups.working.title"
     ]
   },
+  "You can cancel at any time in Settings.": {
+    "text": "You can cancel at any time in Settings.",
+    "paths": [
+      "plans.paywall.cancelNote"
+    ]
+  },
   "You can undo this.": {
     "text": "You can undo this.",
     "paths": [
@@ -2633,6 +2704,24 @@
     "text": "You do not need a card. After 14 days the account becomes a free account, and your tasks stay where they are.",
     "paths": [
       "plans.trial.detail"
+    ]
+  },
+  "You have Plus through Google Play. Manage it in Google Play.": {
+    "text": "You have Plus through Google Play. Manage it in Google Play.",
+    "paths": [
+      "plans.paywall.ownedGoogle"
+    ]
+  },
+  "You have Plus through the App Store.": {
+    "text": "You have Plus through the App Store.",
+    "paths": [
+      "plans.paywall.ownedApple"
+    ]
+  },
+  "You have Plus through the web. Manage it at septena.app.": {
+    "text": "You have Plus through the web. Manage it at septena.app.",
+    "paths": [
+      "plans.paywall.ownedWeb"
     ]
   },
   "You pay your AI provider, not us": {

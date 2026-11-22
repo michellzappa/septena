@@ -450,8 +450,10 @@ size):
   outcomes and every label come from `registry/plans.json` (a new
   `paywall` block), so the site, iOS, Mac and Android say the same words.
   Copy goes through the humanizer skill.
-- The Mac AppKit shell presents the same SwiftUI sheet in an
-  `NSHostingController`.
+- The Mac app ships outside the Mac App Store, so its sheet shows the
+  prices as information and one line: subscribe on the iPhone or iPad,
+  and Plus works on the Mac too. The Stripe checkout (P3) replaces that
+  line (ADR 0026).
 - The sheet reads `PlanStatus` and the entitlement source. It never decides
   the plan itself.
 
@@ -521,6 +523,18 @@ store, valid on every device.
 | P2 | Free-mode audit: every free feature works with no account and no network. | Fresh install, airplane mode, every free feature works. |
 | P3 | Stripe for the web client and Windows (ADR 0026): Checkout, customer portal, webhooks, Stripe Tax. | A web purchase turns on sync on iPhone. |
 | P4 | Google Play Billing with the Android app (ADR 0026): `google` source, Play Developer API, real-time developer notifications. | A Play purchase turns on sync on Mac. |
+
+**P1 status (2026-11-22).** Built in code: the reverse trial on the server
+(a `trial` entitlement row written once at the first sign-in, `trialEndsAt`
+on `GET /v1/entitlement`), `PlusStore` (purchase with `appAccountToken`,
+the `Transaction.updates` listener from launch, Restore Purchases, finish
+only after the server answered), the Plus sheet (`Septask/SeptaskPlusSheet.swift`)
+with its registry `paywall` copy, the plan states in `PlanStatus` (trial,
+lapsed, source), and a local StoreKit file (`Config/Septena.storekit`) on
+the `Septask` scheme. Not built: the upsell moments in the app (§3.2), the
+trial-end notice, and the once-per-account mark. The App Store Connect
+products do not exist yet; `checkout.open` stays false until they do. The
+Mac sells nothing until P3 (ADR 0026).
 
 P0 can start after roadmap M1 phase 0 (backend auth exists). P1 must ship
 before any public release that uses the backend.

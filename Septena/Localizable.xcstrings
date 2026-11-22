@@ -6024,6 +6024,10 @@
         }
       }
     },
+    "If you subscribe during the trial, billing starts on the day you subscribe." : {
+      "comment" : "Generated from registry plans.paywall.trialBilling. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "If you think an entry got moved here by mistake, check nearby days too." : {
       "localizations" : {
         "pt-BR" : {
@@ -9142,6 +9146,18 @@
       "comment" : "Generated from registry plans.shortName. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Plus is on for this account." : {
+      "comment" : "Generated from registry plans.paywall.ownedGrant. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Plus is on until %@." : {
+      "comment" : "Generated from registry plans.paywall.trialStarted. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Plus is on. Your other devices start syncing." : {
+      "comment" : "Generated from registry plans.paywall.success. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Plus is the same app on every device, and nothing in it is capped." : {
       "comment" : "Generated from registry plans.cards.plus.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -9311,6 +9327,10 @@
     },
     "Pulls your highlights into the daily-message rotation. The token is kept in your Keychain, syncs to your other devices via iCloud Keychain, and is never sent to any Septena server." : {
 
+    },
+    "Purchase received. Plus turns on when Septena reaches the server." : {
+      "comment" : "Generated from registry plans.paywall.serverRetry. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Pure Canvas" : {
       "comment" : "Generated from registry tokens.textures.none.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -10142,6 +10162,10 @@
           }
         }
       }
+    },
+    "See Plus" : {
+      "comment" : "Generated from registry plans.paywall.seePlus. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "See the wider picture" : {
 
@@ -11276,6 +11300,10 @@
       "comment" : "Generated from registry plans.actions.subscribe. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Subscribe in Septena on your iPhone or iPad. Plus then works on this Mac too." : {
+      "comment" : "Generated from registry plans.paywall.buyOnIPhone. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Subscriptions open at App Store launch." : {
       "comment" : "Generated from registry plans.checkout.notice. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -12040,6 +12068,10 @@
         }
       }
     },
+    "The purchase did not go through. Try again in a moment." : {
+      "comment" : "Generated from registry plans.paywall.failed. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "The same app on every device, with nothing capped." : {
       "comment" : "Generated from registry plans.cards.plus.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -12507,6 +12539,10 @@
         }
       }
     },
+    "Try Plus free for 14 days" : {
+      "comment" : "Generated from registry plans.paywall.startTrial. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Turn a reflection into goals" : {
       "localizations" : {
         "pt-BR" : {
@@ -12870,6 +12906,10 @@
     },
     "Vote cast" : {
 
+    },
+    "Waiting for approval." : {
+      "comment" : "Generated from registry plans.paywall.pending. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "WAKE" : {
       "localizations" : {
@@ -13346,6 +13386,10 @@
         }
       }
     },
+    "You can cancel at any time in Settings." : {
+      "comment" : "Generated from registry plans.paywall.cancelNote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "You can undo this." : {
       "comment" : "Generated from registry surfaces.prompts.items.deleteArea.variants.empty.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -13408,6 +13452,18 @@
           }
         }
       }
+    },
+    "You have Plus through Google Play. Manage it in Google Play." : {
+      "comment" : "Generated from registry plans.paywall.ownedGoogle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "You have Plus through the App Store." : {
+      "comment" : "Generated from registry plans.paywall.ownedApple. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "You have Plus through the web. Manage it at septena.app." : {
+      "comment" : "Generated from registry plans.paywall.ownedWeb. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "You pay your AI provider, not us" : {
       "comment" : "Generated from registry plans.promises.own_ai.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -13729,6 +13785,10 @@
     },
     "Your Things data was not modified. Check Inbox and Today in the Tasks tab to verify routing." : {
 
+    },
+    "Your trial runs until %@. If you subscribe now, billing starts today." : {
+      "comment" : "Generated from registry plans.paywall.trialBilling. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Your turn" : {
       "comment" : "Generated from registry destinations.destinations.agent.groups.yourTurn.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

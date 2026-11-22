@@ -1254,6 +1254,18 @@ export class TaskStore extends DurableObject<Env> {
     });
   }
 
+  /// Starts the reverse trial if this account never had one (spec §3).
+  /// Idempotent: the row stays after it expires, so a second sign-in never
+  /// starts a second trial. Returns whether a trial started.
+  startTrialOnce(row: Omit<EntitlementRow, "updatedAt">): boolean {
+    return this.sql.exec(
+      `INSERT OR IGNORE INTO entitlements (id, source, productId, expiresAt, originalTransactionId, status, environment, note, signedAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      row.id, row.source, row.productId, row.expiresAt, row.originalTransactionId, row.status,
+      row.environment, row.note, row.signedAt, Date.now(),
+    ).rowsWritten > 0;
+  }
+
   deleteEntitlement(id: string): boolean {
     return this.sql.exec("DELETE FROM entitlements WHERE id = ?", id).rowsWritten > 0;
   }

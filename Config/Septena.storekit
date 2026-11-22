@@ -1,96 +1,71 @@
 {
-  "appPolicies" : {
-    "eula" : "",
-    "policies" : [
-    ]
+  "appPolicies": {
+    "eula": "",
+    "policies": []
   },
-  "identifier" : "SeptenaSupport",
-  "nonRenewingSubscriptions" : [
-  ],
-  "products" : [
-    {
-      "displayPrice" : "177.00",
-      "familyShareable" : false,
-      "internalID" : "1001",
-      "localizations" : [
-        {
-          "description" : "A one-time gift that keeps Septena free and independent — and a permanent Founding Supporter mark for being here early.",
-          "displayName" : "Founding Supporter",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.septena.cloud.support.lifetime",
-      "referenceName" : "Founding Supporter (Lifetime)",
-      "type" : "NonConsumable"
-    }
-  ],
-  "settings" : {
-    "_failTransactionsEnabled" : false,
-    "_storeKitErrors" : [
-    ]
+  "identifier": "SeptenaPlus",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {
+    "_failTransactionsEnabled": false,
+    "_storeKitErrors": [],
+    "_storefront": "NLD"
   },
-  "subscriptionGroups" : [
+  "subscriptionGroups": [
     {
-      "id" : "20001",
-      "localizations" : [
-      ],
-      "name" : "Support Septena",
-      "subscriptions" : [
+      "id": "30001",
+      "localizations": [],
+      "name": "Septena Plus",
+      "subscriptions": [
         {
-          "adHocOffers" : [
-          ],
-          "codeOffers" : [
-          ],
-          "displayPrice" : "77.00",
-          "familyShareable" : false,
-          "groupNumber" : 1,
-          "internalID" : "20002",
-          "introductoryOffer" : null,
-          "localizations" : [
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "60.00",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "30002",
+          "introductoryOffer": null,
+          "localizations": [
             {
-              "description" : "Support Septena for a year and keep it free and independent. Unlocks nothing — there's nothing to unlock.",
-              "displayName" : "Annual",
-              "locale" : "en_US"
+              "description": "Sync on all your devices, a year of history and synced files. Billed every year.",
+              "displayName": "Septena Plus Yearly",
+              "locale": "en_US"
             }
           ],
-          "productID" : "com.septena.cloud.support.annual",
-          "recurringSubscriptionPeriod" : "P1Y",
-          "referenceName" : "Support Annual",
-          "subscriptionGroupID" : "20001",
-          "type" : "RecurringSubscription",
-          "winbackOffers" : [
-          ]
+          "productID": "com.septena.tasks.sync.annual",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Septena Plus Yearly",
+          "subscriptionGroupID": "30001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
         },
         {
-          "adHocOffers" : [
-          ],
-          "codeOffers" : [
-          ],
-          "displayPrice" : "7.00",
-          "familyShareable" : false,
-          "groupNumber" : 1,
-          "internalID" : "20003",
-          "introductoryOffer" : null,
-          "localizations" : [
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "7.00",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "30003",
+          "introductoryOffer": null,
+          "localizations": [
             {
-              "description" : "Support Septena month to month and keep it free and independent. Unlocks nothing — there's nothing to unlock.",
-              "displayName" : "Monthly",
-              "locale" : "en_US"
+              "description": "Sync on all your devices, a year of history and synced files. Billed every month.",
+              "displayName": "Septena Plus Monthly",
+              "locale": "en_US"
             }
           ],
-          "productID" : "com.septena.cloud.support.monthly",
-          "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Support Monthly",
-          "subscriptionGroupID" : "20001",
-          "type" : "RecurringSubscription",
-          "winbackOffers" : [
-          ]
+          "productID": "com.septena.tasks.sync.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Septena Plus Monthly",
+          "subscriptionGroupID": "30001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
         }
       ]
     }
   ],
-  "version" : {
-    "major" : 4,
-    "minor" : 0
+  "version": {
+    "major": 4,
+    "minor": 0
   }
 }

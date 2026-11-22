@@ -48,17 +48,9 @@
     "RegistryPlans.trialDays": {
       "reason": "The reverse trial is not built; the Plus pane shows trial copy only.",
       "issue": "#46"
-    },
-    "RegistryPlans.upsell": {
-      "reason": "Upsell moments show in the paywall flows, which are not built.",
-      "issue": "#46"
     }
   },
   "ts": {
-    "PLAN_TRIAL_DAYS": {
-      "reason": "The server has no trial plan yet (entitlement.ts).",
-      "issue": "#46"
-    },
     "PLAN_PRODUCTS": {
       "reason": "The server accepts any product under the sync prefix; the StoreKit work narrows it to these IDs.",
       "issue": "#46"

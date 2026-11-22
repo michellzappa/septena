@@ -3,13 +3,14 @@
 // Renders `registry/plans.json` through `RegistryPlans`, the same source as
 // the site's /pricing page, so the two never disagree. The pane shows the
 // account's plan as the server reports it (`PlanStatus`), then what Plus
-// adds. It sells nothing yet: `RegistryPlans.checkoutOpen` is false until
-// the App Store products exist, so no purchase control draws.
+// adds. It sells nothing itself: its button opens the Plus sheet
+// (`SeptaskPlusSheet`, spec §7.1), the one place that sells Plus.
 
 import SwiftUI
 
 struct SeptaskPlusPane: View {
   private var status: PlanStatus { .shared }
+  @State private var showingSheet = false
 
   var body: some View {
     Form {
@@ -27,6 +28,9 @@ struct SeptaskPlusPane: View {
           } label: {
             Label(RegistryPlans.Copy.yourPlan, systemImage: Self.cardSymbol(status.isPlus ? "plus" : "free"))
           }
+        }
+        if status.plan != nil {
+          Button(sheetButtonTitle) { showingSheet = true }
         }
       }
 
@@ -47,7 +51,7 @@ struct SeptaskPlusPane: View {
         Text(RegistryPlans.checkoutOpen ? RegistryPlans.priceFootnote : RegistryPlans.checkoutNotice)
       }
 
-      if status.plan == .device || status.plan == .free {
+      if status.plan == .device {
         Section {
           Label {
             Text(RegistryPlans.trialTitle)
@@ -105,6 +109,13 @@ struct SeptaskPlusPane: View {
     .navigationBarTitleDisplayMode(.inline)
     #endif
     .task { await PlanStatus.shared.refresh() }
+    .sheet(isPresented: $showingSheet) { SeptaskPlusSheet() }
+  }
+
+  /// "Manage Subscription" once the account pays, "See Plus" before.
+  private var sheetButtonTitle: String {
+    if case .plus = status.plan { return RegistryPlans.Action.manage }
+    return RegistryPlans.Paywall.seePlus
   }
 
   /// SF Symbol of a plan card's registry icon (plans.json `cards[].icon`).

@@ -269,6 +269,17 @@ actor TaskBackendClient {
     return try decode(BackendEntitlement.self, from: data, what: "entitlement")
   }
 
+  /// Hands one StoreKit 2 transaction to the server
+  /// (`POST /v1/entitlement/apple`, spec §5). Returns the HTTP status: 200
+  /// means the server recorded it; 400 / 403 / 422 mean it never will (bad
+  /// signature, another account's token, a product it does not sell). A
+  /// network error throws, so the caller keeps the transaction and retries.
+  func postAppleTransaction(signedTransaction: String) async throws -> Int {
+    let body = try JSONEncoder().encode(["signedTransaction": signedTransaction])
+    let (_, status) = try await authed(path: "/v1/entitlement/apple", method: "POST", body: body)
+    return status
+  }
+
   // MARK: - Companion device (Apple Watch)
 
   /// Mints a SEPARATE session for the paired watch (`POST /v1/auth/device`).

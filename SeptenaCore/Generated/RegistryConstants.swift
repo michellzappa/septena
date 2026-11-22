@@ -1503,6 +1503,9 @@ enum RegistryPlans {
     RegistryPlanNote(id: "trial_end", title: RegistryL10n.t("Your 14 days of Plus have ended"), detail: RegistryL10n.t("Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are.")),
   ] }
   static func upsell(_ id: String) -> RegistryPlanNote? { upsells.first { $0.id == id } }
+  /// The paywall's Terms of Use and Privacy Policy links (App Review 3.1.2).
+  static let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
+  static let privacyURL = URL(string: "https://septena.app/privacy")!
 
   enum Action {
     static var subscribe: String { RegistryL10n.t("Subscribe") }
@@ -1526,6 +1529,25 @@ enum RegistryPlans {
     static var plus: String { RegistryL10n.t("Plus") }
     static func trialEnds(date: String) -> String { RegistryL10n.format("Plus trial until %@", english: "Plus trial until %@", args: [date]) }
     static func paidThrough(date: String) -> String { RegistryL10n.format("Plus through %@", english: "Plus through %@", args: [date]) }
+  }
+
+  enum Paywall {
+    static var seePlus: String { RegistryL10n.t("See Plus") }
+    static var startTrial: String { RegistryL10n.t("Try Plus free for 14 days") }
+    static func trialStarted(date: String) -> String { RegistryL10n.format("Plus is on until %@.", english: "Plus is on until %@.", args: [date]) }
+    static var trialBilling: String { RegistryL10n.t("If you subscribe during the trial, billing starts on the day you subscribe.") }
+    static var welcomeBack: String { RegistryL10n.t("Welcome back") }
+    static var cancelNote: String { RegistryL10n.t("You can cancel at any time in Settings.") }
+    static var success: String { RegistryL10n.t("Plus is on. Your other devices start syncing.") }
+    static var pending: String { RegistryL10n.t("Waiting for approval.") }
+    static var serverRetry: String { RegistryL10n.t("Purchase received. Plus turns on when Septena reaches the server.") }
+    static var failed: String { RegistryL10n.t("The purchase did not go through. Try again in a moment.") }
+    static var ownedApple: String { RegistryL10n.t("You have Plus through the App Store.") }
+    static var ownedWeb: String { RegistryL10n.t("You have Plus through the web. Manage it at septena.app.") }
+    static var ownedGoogle: String { RegistryL10n.t("You have Plus through Google Play. Manage it in Google Play.") }
+    static var ownedGrant: String { RegistryL10n.t("Plus is on for this account.") }
+    static var buyOnIPhone: String { RegistryL10n.t("Subscribe in Septena on your iPhone or iPad. Plus then works on this Mac too.") }
+    static var done: String { RegistryL10n.t("Done") }
   }
 }
 

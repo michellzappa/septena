@@ -515,6 +515,11 @@ function validatePlans(plans, icons, caps) {
   assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
   assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(["free", "plus"]), "plans.json: cards must be free, plus");
   assert(plans.cards.filter((c) => c.highlighted).length === 1, "plans.json: exactly one card must be highlighted");
+  for (const k of ["seePlus", "startTrial", "trialStarted", "trialBilling", "success", "pending", "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "done"]) {
+    assert(typeof plans.paywall?.[k] === "string" && plans.paywall[k].length > 0, `plans.json: paywall.${k} missing`);
+  }
+  assert(plans.paywall.startTrial.includes(String(plans.trial.days)), `plans.json: paywall.startTrial must state ${plans.trial.days} days`);
+  for (const k of ["terms", "privacy"]) assert(/^https:\/\/[^\s]+$/.test(plans.legal?.[k] ?? ""), `plans.json: legal.${k} must be an https URL`);
   for (const c of plans.cards) assert(c.icon in icons.icons, `plans.json: card ${c.id} icon "${c.icon}" is not in icons.json`);
 
   const lim = plans.limits;
@@ -1499,6 +1504,9 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     lines.push("  ] }");
   }
   lines.push("  static func upsell(_ id: String) -> RegistryPlanNote? { upsells.first { $0.id == id } }");
+  lines.push("  /// The paywall's Terms of Use and Privacy Policy links (App Review 3.1.2).");
+  lines.push(`  static let termsURL = URL(string: ${swiftStr(P.legal.terms)})!`);
+  lines.push(`  static let privacyURL = URL(string: ${swiftStr(P.legal.privacy)})!`);
   lines.push("");
   lines.push("  enum Action {");
   for (const [k, v] of Object.entries(P.actions)) lines.push(`    static var ${k}: String { ${L(v, P.actions, k)} }`);
@@ -1508,16 +1516,22 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const [k, v] of Object.entries(P.labels)) lines.push(`    static var ${k}: String { ${L(v, P.labels, k)} }`);
   lines.push("  }");
   lines.push("");
-  lines.push("  enum Status {");
-  for (const [k, v] of Object.entries(P.status)) {
-    if (/\{[a-zA-Z]/.test(v)) {
-      const t = L10N.swiftTemplate(BY_KEY, P.status.l10nKeys?.[k] ?? v);
-      lines.push(`    static func ${k}(${t.params}) -> String { ${t.body} }`);
-    } else {
-      lines.push(`    static var ${k}: String { ${L(v, P.status, k)} }`);
+  // Status and the Plus sheet's words (spec §7.1): a value with a
+  // placeholder becomes a function taking it.
+  for (const [name, block] of [["Status", P.status], ["Paywall", P.paywall]]) {
+    lines.push(`  enum ${name} {`);
+    for (const [k, v] of Object.entries(block)) {
+      if (k === "l10nKeys") continue;
+      if (/\{[a-zA-Z]/.test(v)) {
+        const t = L10N.swiftTemplate(BY_KEY, block.l10nKeys?.[k] ?? v);
+        lines.push(`    static func ${k}(${t.params}) -> String { ${t.body} }`);
+      } else {
+        lines.push(`    static var ${k}: String { ${L(v, block, k)} }`);
+      }
     }
+    lines.push("  }");
+    if (name === "Status") lines.push("");
   }
-  lines.push("  }");
   lines.push("}");
   lines.push("");
 

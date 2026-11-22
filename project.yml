@@ -487,6 +487,13 @@ schemes:
     run:
       config: Release
       debugEnabled: false
+      # Local StoreKit testing for the Plus sheet before the App Store
+      # Connect products exist (docs/SYNC_SUBSCRIPTION_SPEC.md §7.1). The
+      # variable only reaches a run Xcode launches; TestFlight and the App
+      # Store never see it.
+      storeKitConfiguration: Config/Septena.storekit
+      environmentVariables:
+        SEPTENA_STOREKIT_TEST: "1"
     test:
       config: Debug
       targets:
