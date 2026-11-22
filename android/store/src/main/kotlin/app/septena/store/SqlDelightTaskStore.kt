@@ -133,7 +133,7 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
                         queries.upsertRejected(
                             client_op_id = result.clientOpId,
                             op_json = row.operationJson,
-                            reason = result.reason ?: "The server rejected this change",
+                            reason = result.reason?.takeIf(String::isNotBlank) ?: "The server rejected this change",
                             rejected_at_ms = at.toEpochMilli(),
                             retryable = 1L,
                         )

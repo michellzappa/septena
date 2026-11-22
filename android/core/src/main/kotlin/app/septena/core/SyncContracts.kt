@@ -1,5 +1,6 @@
 package app.septena.core
 
+import java.io.IOException
 import java.time.Instant
 
 sealed interface SyncOperation {
@@ -95,6 +96,12 @@ interface SyncTransport {
         includeTags: Boolean = true,
     ): SyncPullPage
 }
+
+/** HTTP failure metadata shared with the sync engine without depending on a platform transport module. */
+open class SyncHttpFailure(
+    val statusCode: Int,
+    val responseBody: String,
+) : IOException("Septena sync returned HTTP $statusCode")
 
 /** Persistence contract. Each write method must store the row and its outbox op atomically. */
 interface TaskStore {

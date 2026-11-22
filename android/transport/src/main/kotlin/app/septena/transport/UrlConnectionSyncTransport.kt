@@ -1,6 +1,7 @@
 package app.septena.transport
 
 import app.septena.core.SyncOperation
+import app.septena.core.SyncHttpFailure
 import app.septena.core.SyncPullPage
 import app.septena.core.SyncPushResponse
 import app.septena.core.SyncTransport
@@ -17,9 +18,7 @@ interface SyncCredentials {
     suspend fun refreshAfterUnauthorized(): String?
 }
 
-class SyncHttpException(val statusCode: Int, val responseBody: String) : IOException(
-    "Septena sync returned HTTP $statusCode",
-)
+class SyncHttpException(statusCode: Int, responseBody: String) : SyncHttpFailure(statusCode, responseBody)
 
 class SyncAuthenticationException : IOException("Sign in to sync this device")
 
