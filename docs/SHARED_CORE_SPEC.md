@@ -86,6 +86,13 @@ parsing, the watch.
   `core-jvm` (Linux and Windows, Kotlin harness through JNA), `core-wasm`
   (WASM package, Node harness, Brotli size).
 - Each job writes its numbers to the job summary and fails over budget.
+- **Releases (C5, #251):** a tag `core-vX.Y.Z` runs
+  `.github/workflows/core-release.yml`, which builds every artifact through
+  `core.yml` and publishes them as GitHub release assets with a
+  `release.json` manifest. `scripts/core-pin.sh X.Y.Z` pins a release in
+  `core/release/` (the manifest and a Swift package with a URL and checksum
+  `binaryTarget`). Apps link the pinned release, never a local build. Steps:
+  `core/release/README.md`.
 - **Agents do not install Rust.** When `Cargo.lock` is missing or stale,
   `core-rust` uploads the new lockfile as the `core-lockfiles` artifact and
   fails. Download it with `gh run download`, commit it, push again.
