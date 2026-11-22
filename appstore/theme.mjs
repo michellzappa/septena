@@ -5,6 +5,10 @@
 //   - typography      → docs/DesignSpec.md §5 (SF Pro for titles and UI, mono numerics)
 // Edit freely — everything downstream (components, panels) reads from here.
 
+import { readFileSync } from "node:fs";
+
+const registryTokens = JSON.parse(readFileSync(new URL("../registry/tokens.json", import.meta.url), "utf8"));
+
 export const theme = {
   // ----- color -----
   ink: "#000000",          // iOS label
@@ -41,7 +45,8 @@ export const theme = {
   app: {
     canvas: "#f2f2f7",
     accent: "#007AFF",
-    textures: ["topography", "fieldMatrix", "stippleDrift", "ridges", "washiPaper"],
+    // Every header texture the app offers (registry/tokens.json), minus the plain canvas.
+    textures: registryTokens.textures.map((t) => t.id).filter((id) => id !== "none"),
   },
 
   // ----- typography -----

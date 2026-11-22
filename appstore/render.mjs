@@ -84,7 +84,12 @@ const washCode = (() => {
   if (!existsSync(file) || !existsSync(dataFile)) return null;
   // header-wash-data.ts holds the accents and texture list; the canvas file
   // holds the drawing code between its imports and the React component.
-  const data = readFileSync(dataFile, "utf8");
+  // Its accents and textures import the registry's tokens.json; inline this
+  // repo's registry/tokens.json in place of that import (same file, synced).
+  const tokensImport = /^import tokensFile from .*tokens\.json.*;$/m;
+  const rawData = readFileSync(dataFile, "utf8");
+  if (!tokensImport.test(rawData)) throw new Error(`${dataFile}: expected the tokens.json import; update render.mjs`);
+  const data = rawData.replace(tokensImport, `const tokensFile = ${readFileSync(join(ROOT, "../registry/tokens.json"), "utf8")};`);
   const src = readFileSync(file, "utf8");
   const start = src.indexOf("function hexToRgb"), end = src.indexOf("export function HeaderWashCanvas");
   if (start < 0 || end < 0) throw new Error(`${file}: header-wash layout changed; update render.mjs`);
