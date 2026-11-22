@@ -122,6 +122,29 @@ it names what the user gets. All copy goes through the humanizer skill.
 Banned: timed nags, badges on paid features, blocked export, modals on
 launch.
 
+### 3.3 The funnel
+
+There is no sales team. The funnel is the product, the paywall (§7.1) and
+the trial-end notice. Each step has one job:
+
+| Step | What happens | What moves the user on |
+|---|---|---|
+| 1. Site | /pricing and the home page say "Free on one device. Plus on all of them." The main button is the download, not checkout. | The download. |
+| 2. Install | The full app on one device, with no account and no card. | Real use. Nothing asks for money. |
+| 3. Account | The app asks for Sign in with Apple only when the user wants an account feature: a backup, the connector, agents, a shared project, or a second device. Every new account starts the 14-day reverse trial. | One quiet entry point per feature (§7). |
+| 4. Second device | During the trial the second device syncs like Plus. | The user sees sync everywhere before paying. |
+| 5. Trial end | One notice lists what changes (`trial_end` upsell). The account becomes a free account. | The notice's "See Plus" opens the paywall. |
+| 6. Limit | At each limit, the moment's upsell (§3.2), once per account. | "See Plus" opens the paywall. |
+| 7. Purchase | The paywall (§7.1), in the store of the platform the user is on (ADR 0026). | |
+| 8. Lapse | Free limits, data kept, one device syncs (§7). | "Subscribe again" in Settings ▸ Septena Plus. |
+
+**Measure the funnel on our own server, with counts only.** The backend
+already knows each step: account created, devices per account, trial
+started, entitlement source and product, expiry. A weekly count per step
+(accounts, accounts with 2+ devices, trials, trials that converted,
+annual vs monthly, renewals, lapses) needs no client analytics and no third
+party. No per-user tracking, no SDKs.
+
 ## 4. Products
 
 - New subscription group on the `com.septena.tasks` record, one level:
@@ -370,6 +393,99 @@ plan table row), `usage` (`connectorWritesToday`, `agentRunsThisMonth`),
 - The app never deletes local data because a subscription ended.
 - Agents and links stop at expiry. Open agent claims return to the user.
 
+### 7.1 The paywall
+
+One sheet, **the Plus sheet**, is the only place that sells Plus in the
+app. It opens only from a tap, never on launch and never on a timer.
+
+**Where it opens from:**
+
+- "See Plus" on an upsell moment (§3.2). The sheet then shows that moment's
+  title as its first line, so the user sees why it opened.
+- "Subscribe" on Settings ▸ Septena Plus (`SeptaskPlusPane`).
+- "See Plus" on the trial-end notice.
+
+**Each upsell moment shows once per account.** The "shown" mark syncs with
+the account's other settings, so a second device does not repeat it. After
+that the moment stays as a quiet line where the limit is (the device row,
+the history edge, the file row), never as a new prompt.
+
+**What it looks like** (iPhone; iPad and Mac show the same sheet at form
+size):
+
+```text
+┌───────────────────────────────────────┐
+│                                   ✕   │
+│  This device is not syncing           │  ← the moment's title, if any
+│                                       │
+│  Septena Plus                         │
+│  Free on one device.                  │
+│  Plus on all of them.                 │
+│                                       │
+│  ◉  Your list everywhere             │  ← the three outcomes from
+│  ◉  Nothing lost                     │     plans.json, icon + title
+│  ◉  Help that keeps working          │
+│                                       │
+│  ┌─────────────────────────────────┐  │
+│  │ ● €60 a year    €5 a month      │  │  ← highlighted price first
+│  │   You save €24                  │  │
+│  ├─────────────────────────────────┤  │
+│  │ ○ €7 a month                    │  │
+│  └─────────────────────────────────┘  │
+│  [          Subscribe            ]    │
+│                                       │
+│  Cancel any time in Settings.         │
+│  Restore Purchases · Terms · Privacy  │
+└───────────────────────────────────────┘
+```
+
+**How it is built (standard StoreKit, no custom store UI):**
+
+- `SubscriptionStoreView(groupID:)` with a marketing header view. StoreKit
+  draws the products, the localized prices and periods, the purchase
+  button, Restore Purchases, and the Terms and Privacy links that App
+  Review requires.
+- `.subscriptionStoreControlStyle(.picker)`, annual first and selected.
+- Every purchase carries `appAccountToken` (§5). The header text, the
+  outcomes and every label come from `registry/plans.json` (a new
+  `paywall` block), so the site, iOS, Mac and Android say the same words.
+  Copy goes through the humanizer skill.
+- The Mac AppKit shell presents the same SwiftUI sheet in an
+  `NSHostingController`.
+- The sheet reads `PlanStatus` and the entitlement source. It never decides
+  the plan itself.
+
+**The sheet by plan state:**
+
+| State | Main action | Notes |
+|---|---|---|
+| No account | "Try Plus free for 14 days" (Sign in with Apple) | No prices to buy yet. Signing in starts the reverse trial, and the sheet shows "Plus is on until {date}". The prices show below as information. |
+| Trial | Subscribe | The first line reads "Plus trial until {date}". A purchase now starts billing today; the sheet says so above the button. |
+| Free account | Subscribe | The standard sheet. |
+| Lapsed (was Plus) | Subscribe | The title reads "Welcome back". |
+| Plus through Apple | Manage Subscription (`.manageSubscriptionsSheet`) | No prices. |
+| Plus through another source | None | One line: "Plus through the web. Manage it at septena.app." or "...through Google Play". No Apple button (ADR 0026). |
+
+**After the purchase:**
+
+1. `.success` with a verified transaction: the app posts the JWS to
+   `POST /v1/entitlement/apple`, refreshes `PlanStatus`, then finishes the
+   transaction. The sheet shows "Plus is on. Your other devices start
+   syncing." and a Done button.
+2. `.pending` (Ask to Buy, Strong Customer Authentication): "Waiting for
+   approval." The `Transaction.updates` listener completes it later.
+3. `.userCancelled`: the sheet stays as it was, with no message.
+4. The server cannot be reached: the transaction stays unfinished, and the
+   sheet says "Purchase received. Plus turns on when Septena reaches the
+   server." The `Transaction.updates` listener that starts at launch retries
+   until the server accepts it. The user never pays twice.
+
+**Other platforms** render the same registry copy. Android: the same sheet
+in Compose, buying through Play Billing. Web and Windows: the Plus page on
+septena.app for the signed-in account, which opens Stripe Checkout and
+returns to a thank-you page. The Windows app opens that page in the browser
+(ADR 0026).
+
 ## 8. The tip jar
 
 *(default)* Remove the tip jar from the task app. One way to pay, not two.
@@ -380,22 +496,31 @@ to the backend.
 
 ## 9. Other platforms
 
-- Web and Android buy through Stripe (web checkout) and Google Play billing.
-  Each writes the same entitlement row with its own `source`.
-- One account, one entitlement, any store. A user who pays on iPhone gets
-  sync on the web client.
-- Apple rules: the iOS app does not link to the web checkout unless the
-  storefront allows it.
+Decided in ADR 0026 (2026-11-22). One account, one Plus, bought on any
+store, valid on every device.
+
+- **Web and Windows:** Stripe Checkout in subscription mode, the Stripe
+  customer portal to manage it, Stripe webhooks to write the `stripe` row.
+  Stripe Tax calculates VAT; Envisioning Technology files EU VAT through the
+  One Stop Shop. Windows ships outside the Microsoft Store first and opens
+  the checkout in the browser.
+- **Android:** Google Play Billing in the Play Store build, a new `google`
+  source, verified through the Play Developer API and real-time developer
+  notifications.
+- **No double payment:** an account on Plus from any source sees no buy
+  button anywhere, only where to manage it.
+- **No checkout link out of a store app** at launch, on iOS or Android.
 
 ## 10. Phases
 
 | Phase | Work | Exit |
 |---|---|---|
 | P0 | Entitlement row, Apple JWS verify, webhook, `grant` rows, middleware on `/v1` and the gateway. mz has a `grant`. | A user without a row gets 402 on sync; mz syncs. |
-| P1 | Products in App Store Connect, StoreKit purchase + restore in the task app, account link, paywall sheet, lapsed state. Remove the tip jar from the task app. | A sandbox purchase turns on sync; a sandbox expiry stops it, and local data stays. |
+| P1 | Products in App Store Connect, StoreKit purchase + restore in the task app, account link, the Plus sheet (§7.1) with its registry `paywall` copy, the reverse trial, lapsed state. Remove the tip jar from the task app. | A sandbox purchase turns on sync; a sandbox expiry stops it, and local data stays. |
 | P1.5 | Server side built 2026-11-22 (§6.3), except the reverse trial. Plan table and free-account limits (ADR 0010): device count, poll-only sync, history windows, local-only attachments, connector and agent caps, reverse trial, upsell moments (§3.2). | A free account syncs 1 device; a second device stays local and shows the upsell; a paid account lifts every limit. |
 | P2 | Free-mode audit: every free feature works with no account and no network. | Fresh install, airplane mode, every free feature works. |
-| P3 | Stripe for the web client. | A web purchase turns on sync on iPhone. |
+| P3 | Stripe for the web client and Windows (ADR 0026): Checkout, customer portal, webhooks, Stripe Tax. | A web purchase turns on sync on iPhone. |
+| P4 | Google Play Billing with the Android app (ADR 0026): `google` source, Play Developer API, real-time developer notifications. | A Play purchase turns on sync on Mac. |
 
 P0 can start after roadmap M1 phase 0 (backend auth exists). P1 must ship
 before any public release that uses the backend.
@@ -405,6 +530,9 @@ before any public release that uses the backend.
 | Question | Default |
 |---|---|
 | Monthly and annual price | Decided 2026-11-19: €5 / €40. Raised 2026-11-22 to €7 / €60 |
+| Web payment provider | Decided 2026-11-22: Stripe, not a merchant of record (ADR 0026) |
+| Subscribing during the trial | Default 2026-11-22: billing starts on the day of purchase; the sheet says so (§7.1) |
+| Terms of Use | Default: Apple's standard EULA, linked from the paywall and the App Store listing |
 | Trial length | Decided 2026-11-19: 14 days |
 | Does the watch need the subscription? | No, it syncs through the paired phone |
 | Is the hosted Claude connector paid? | Yes, it runs on our server |
