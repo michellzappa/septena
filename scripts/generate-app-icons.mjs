@@ -102,10 +102,17 @@ try {
   execFileSync('qlmanage', ['-t', '-s', '1024', '-o', tmpDir, ...svgFiles], { stdio: 'ignore' });
 
   // 3. Flatten every PNG to an exact 1024x1024 opaque RGB PNG (no alpha channel for App Store Connect).
-  //    Primary `AppIcon` stays full 8-bit pristine quality; the 30 alternates
-  //    use exact 5-bit/channel (32-level, 0...255) noise-free quantization so
-  //    Xcode's LZFSE Asset Catalog shrinks ~5x (~10 MB thinned on iPhone instead
-  //    of ~46 MB) with zero visible loss at Home Screen size.
+  //    Primary `AppIcon` stays full 8-bit pristine quality. The 30 alternates
+  //    are quantized to fewer levels per channel so Xcode's LZFSE asset
+  //    catalog compresses them much better. A plain cut to few levels bands
+  //    the dial's gradients, so the cut uses an 8x8 ordered (Bayer) dither:
+  //    a repeating pattern still compresses well (random noise or error
+  //    diffusion does not), and actool's downscale to Home Screen sizes
+  //    averages the pattern back into a smooth gradient.
+  //    ICON_QUANT_LEVELS (levels per channel) and ICON_DITHER=0 override the
+  //    defaults for size experiments.
+  const quantLevels = Number(process.env.ICON_QUANT_LEVELS ?? 32);
+  const dither = process.env.ICON_DITHER !== '0';
   const flattenSwift = `
 import Foundation
 import AppKit
@@ -115,12 +122,24 @@ let args = Array(CommandLine.arguments.dropFirst())
 let size = 1024
 let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
 let bitmapInfo = CGImageAlphaInfo.noneSkipLast.rawValue
-let quantLevels = 31
+let quantSteps = ${quantLevels - 1}
+let dither = ${dither}
+let bayer8: [Int] = [
+   0, 32,  8, 40,  2, 34, 10, 42,
+  48, 16, 56, 24, 50, 18, 58, 26,
+  12, 44,  4, 36, 14, 46,  6, 38,
+  60, 28, 52, 20, 62, 30, 54, 22,
+   3, 35, 11, 43,  1, 33,  9, 41,
+  51, 19, 59, 27, 49, 17, 57, 25,
+  15, 47,  7, 39, 13, 45,  5, 37,
+  63, 31, 55, 23, 61, 29, 53, 21,
+]
 
 @inline(__always)
-func quant5(_ v: UInt8) -> UInt8 {
-  let idx = (Int(v) * quantLevels + 127) / 255
-  return UInt8((idx * 255 + quantLevels / 2) / quantLevels)
+func quant(_ v: UInt8, _ threshold: Int) -> UInt8 {
+  // threshold is 0...63; plain rounding uses the midpoint 32.
+  let idx = min(quantSteps, (Int(v) * quantSteps * 64 + threshold * 255) / (255 * 64))
+  return UInt8((idx * 255 + quantSteps / 2) / quantSteps)
 }
 
 for path in args {
@@ -147,10 +166,14 @@ for path in args {
   ctx.fill(CGRect(x: 0, y: 0, width: size, height: size))
   ctx.draw(cg, in: CGRect(x: 0, y: 0, width: size, height: size))
   if !isPrimary {
-    for i in stride(from: 0, to: buf.count, by: 4) {
-      buf[i]   = quant5(buf[i])
-      buf[i+1] = quant5(buf[i+1])
-      buf[i+2] = quant5(buf[i+2])
+    for y in 0..<size {
+      for x in 0..<size {
+        let t = dither ? bayer8[(y & 7) * 8 + (x & 7)] : 32
+        let i = (y * size + x) * 4
+        buf[i]   = quant(buf[i], t)
+        buf[i+1] = quant(buf[i+1], t)
+        buf[i+2] = quant(buf[i+2], t)
+      }
     }
   }
   guard let outCG = ctx.makeImage() else { exit(1) }
