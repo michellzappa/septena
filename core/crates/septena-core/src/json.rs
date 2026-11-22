@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use crate::error::CoreError;
 use crate::{
     ConversationProjection, FadeInput, OrdinalWeekday, PullPageHeader, PushOutcome, RecurrenceRule, ReminderArmInput,
-    TaskConversation, TaskSnapshot, TaskViewMembership, check_pull_page, derive_conversation, fade_fill,
+    TaskConversation, TaskSnapshot, TaskViewMembership, check_pull_page, conversation_state, derive_conversation, fade_fill,
     next_scheduled_date, occurrence_id, plan_pull_row, plan_push_response, row_opacity, server_rejection_reason,
     shift_reminder_for_recurrence, shift_reminder_on_reschedule, should_arm_reminder, should_fade,
     task_view_membership,
@@ -26,6 +26,7 @@ pub const JSON_FUNCTIONS: &[&str] = &[
     "shiftReminderOnReschedule",
     "shouldArmReminder",
     "deriveConversation",
+    "conversationState",
     "checkPullPage",
     "planPullRow",
     "planPushResponse",
@@ -84,6 +85,11 @@ pub(crate) fn invoke_value(function: &str, input: Value) -> Result<Value, CoreEr
         "deriveConversation" => {
             let args: ConvoArgs = decode(input).map_err(|e| parse(&e))?;
             Ok(projection_json(&derive_conversation(args.conversation, args.now)?))
+        }
+        "conversationState" => {
+            let args: ConvoArgs = decode(input).map_err(|e| parse(&e))?;
+            serde_json::to_value(conversation_state(args.conversation, args.now)?)
+                .map_err(|e| CoreError::invalid(e.to_string()))
         }
         "checkPullPage" => {
             let args: PullPageArgs = decode(input).map_err(|e| parse(&e))?;
