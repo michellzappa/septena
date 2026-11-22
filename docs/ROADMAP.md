@@ -143,9 +143,12 @@ GitHub milestone: `"M3 Factory ships code"`.
   with 9 JSON registries, Swift/TS codegen, `lint-design.sh` drift gate, and
   shared conformance fixtures)
 - Shared Rust core ([ADR 0025](adr/0025-shared-rust-core.md), `docs/SHARED_CORE_SPEC.md`):
-  #246 C0 spike (crate, Rust codegen, `core.yml`) → #248 C2 web client on the
-  core's WASM. #247 C1 (Android, Windows) sits in M4, #251 C5 releases in M4,
-  #249 C3 backend and #250 C4 Apple in M5.
+  done: #246 C0 spike, #251 C5 releases (`core-v0.1.0`, `core-v0.2.0`).
+  In progress: #250 C4 Apple (fade and conversation rules on the core; next,
+  list membership after mz's device check, then recurrence with the watch
+  change). Waiting: #247 C1 Android and Windows (after #173), #248 C2 web
+  client (after WB1), #249 C3 backend (first slice #271 fade, after #117;
+  then #272 fade-aware MCP). Housekeeping: #276 Rust lint gate, #273 MCP docs.
 - Sign-in beyond Apple (ADR 0016): #168 identity table, #169 email code,
   #170 device approval, #171 email on Apple accounts. Needed by every
   non-Apple client.
@@ -214,6 +217,12 @@ M5 breadth items ahead of Launch and switcher readiness:
    onboarding).
 4. **Hold off `ready-for-agent` until M3–M5:** `#28`, `#53`–`#56` (Task Fade),
    `#65` (Watch), `#20`, `#21` (until specs are written for M3/M4).
+5. **Shared core (ADR 0025):** an issue gets `ready-for-agent` when its
+   blocker closes, never before: `#247` after `#173`, `#248` after WB1 of
+   `#21`, `#271` after `#117`, `#272` after `#271`, the next `#250` step after
+   mz's device check. Unblocked housekeeping (`#276`) can run any time; it
+   touches only `core/` and CI. Every core change is gated by `core.yml`;
+   agents never install Rust (`AGENTS.md`).
 
 ## Decisions waiting for mz
 

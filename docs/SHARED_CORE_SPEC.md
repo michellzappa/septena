@@ -96,7 +96,7 @@ parsing, the watch.
   `core/release/` (the manifest and a Swift package with a URL and checksum
   `binaryTarget`). Apps link the pinned release, never a local build. Steps:
   `core/release/README.md`.
-- **Agents do not install Rust.** When `Cargo.lock` is missing or stale,
+- **Agents do not install Rust.** `core-rust` fails on a clippy warning or a rustfmt diff (it uploads the formatted sources as `core-rustfmt`). When `Cargo.lock` is missing or stale,
   `core-rust` uploads the new lockfile as the `core-lockfiles` artifact and
   fails. Download it with `gh run download`, commit it, push again.
 
