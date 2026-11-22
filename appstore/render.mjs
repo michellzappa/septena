@@ -14,6 +14,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, unlink
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import { stripTypeScriptTypes } from "node:module";
 import { openChrome } from "./chrome.mjs";
 import { activeDevices, shotPaths } from "./devices.mjs";
 import { panelsFor } from "./panels.config.mjs";
@@ -73,6 +74,19 @@ const flattenAlpha = (file) => {
   } catch { canFlatten = false; } // no python3/Pillow — validate.mjs will warn
 };
 
+// The app's header textures, from the site's port of HeaderWashEngine.swift
+// (components/task-ui/header-wash-canvas.tsx). The drawing part has no React;
+// strip its types and inline it. SEPTENA_SITE overrides the site checkout.
+const SITE = process.env.SEPTENA_SITE ?? join(ROOT, "../../_/septena-site");
+const washCode = (() => {
+  const file = join(SITE, "components/task-ui/header-wash-canvas.tsx");
+  if (!existsSync(file)) return null;
+  const src = readFileSync(file, "utf8");
+  const start = src.indexOf("export type FruitAccentId"), end = src.indexOf("export function HeaderWashCanvas");
+  if (start < 0 || end < 0) throw new Error(`${file}: header-wash layout changed; update render.mjs`);
+  return stripTypeScriptTypes(src.slice(start, end).replace(/^export /gm, ""));
+})();
+
 const chrome = await openChrome();
 
 for (const device of activeDevices()) {
@@ -104,7 +118,7 @@ for (const device of activeDevices()) {
     const html = renderPanelHTML(
       { ...panel, shot: panel.shot && { ...panel.shot, img: shotDataURL(device, panel.shot.src) } },
       device,
-      { fontFace, appearance },
+      { fontFace, appearance, washCode },
     );
     const htmlFile = join(buildDir, `${i}_${panel.id}.html`);
     writeFileSync(htmlFile, html);

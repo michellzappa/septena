@@ -28,6 +28,11 @@ const rich = (s = "") =>
 // ---------------------------------------------------------------- background
 function background(bg = {}) {
   const tint = bg.tint ?? theme.accent;
+  // The app's own canvas with one of its header textures, drawn in the page
+  // by WASH_SCRIPT (render.mjs passes the drawing code).
+  if (bg.style === "texture") {
+    return `<div class="bg" style="background:${bg.canvas ?? theme.app.canvas};"><canvas class="bg-wash" data-texture="${esc(bg.texture)}" data-accent="${bg.accent ?? theme.app.accent}" data-intensity="${bg.intensity ?? 62}" data-seed="${bg.seed ?? 42}" data-fade="${bg.fade ?? 0.62}"></canvas></div>`;
+  }
   const base =
     bg.style === "solid" ? tint :
     bg.style === "split" ? `linear-gradient(180deg, ${theme.wash(tint, bg.pct ?? 16)} 0%, ${theme.wash(tint, 40)} 100%)` :
@@ -60,8 +65,13 @@ const FRAME = {
 function shot(s, device, tint) {
   if (!s) return "";
   const dw = device.designWidth;
-  const f = FRAME[device.frame] ?? FRAME.phone;
   const w = Math.round(dw * (s.width ?? 0.74));
+  // Phone: the site's bezel proportions (scenes.css .scene-frame--phone, a
+  // 414px frame with a 6px bezel and a 48px outer radius).
+  const k = w / 414;
+  const f = device.frame === "phone"
+    ? { pad: Math.round(6 * k), radius: Math.round(48 * k), island: true, bezel: true }
+    : FRAME[device.frame] ?? FRAME.phone;
   const screenR = Math.max(0, f.radius - f.pad);
   const screen = s.img
     ? `<img class="screen" src="${s.img}" alt="" style="border-radius:${screenR}px;">`
@@ -72,7 +82,7 @@ function shot(s, device, tint) {
   return `
   <div class="shot-zone" style="transform: translateY(${Math.round((s.offsetY ?? 0) * 100)}%);">
     <div class="shot-wrap" style="width:${w}px; transform: rotate(${s.rotate ?? 0}deg);">
-      <div class="frame" style="width:${w}px; padding:${f.pad}px; border-radius:${f.radius}px;">
+      <div class="frame" style="width:${w}px; padding:${f.pad}px; border-radius:${f.radius}px;${f.bezel ? ` background:${theme.bezel}; box-shadow:${theme.shadow.phone(k)};` : ""}">
         ${screen}${island}
       </div>
       ${s.img ? callout(s.callout, { w, pad: f.pad, margin: (dw - w) / 2, tint }) : ""}
@@ -212,9 +222,10 @@ html,body { width:${device.width}px; height:${device.height}px; overflow:hidden;
 .badge { display:inline-block; font:600 34px/1 ${theme.fonts.mono}; letter-spacing:.14em;
   padding:18px 34px; border:3px solid; border-radius:${theme.radius.badge}px; margin-bottom:44px; }
 h1 { font-family:${theme.fonts.display}; font-weight:600; font-size:${panel.headlineSize ?? 168}px;
-  line-height:1.06; letter-spacing:-0.01em; text-wrap:balance; }
-h1 em { font-style:italic; color:${tint}; }
-.sub { font-size:62px; line-height:1.32; color:color-mix(in oklab, ${theme.ink} 64%, transparent);
+  line-height:1.06; letter-spacing:-0.025em; text-wrap:balance; }
+h1 em { font-style:normal; color:${tint}; }
+.bg-wash { position:absolute; inset:0; width:100%; height:100%; }
+.sub { font-size:62px; line-height:1.32; color:${theme.inkSecondary};
   margin-top:44px; max-width:1080px; }
 .frame { position:relative; background:#0b0b0c; box-shadow:${theme.shadow.device}; overflow:hidden; }
 .shot-wrap { position:relative; }
@@ -307,8 +318,32 @@ function landscape(panel, device, tint) {
 }
 
 // ---------------------------------------------------------------- the panel
-export function renderPanelHTML(panel, device, { fontFace = "", appearance = "light" } = {}) {
+// Draws each texture canvas with the app's header-wash code (washCode defines
+// drawHeaderWash). The texture is drawn in points: App Store pixels are 3x, so
+// the pattern has the same density as on a phone. drawHeaderWash caps the
+// pixel ratio at 2, so it gets a stand-in canvas that reports the point size
+// and a context that keeps the 3x transform.
+const WASH_SCRIPT = (washCode) => `
+${washCode}
+document.querySelectorAll("canvas.bg-wash").forEach((real) => {
+  const r = real.getBoundingClientRect(), S = 3;
+  real.width = Math.round(r.width); real.height = Math.round(r.height);
+  const ctx = real.getContext("2d");
+  const proxy = new Proxy(ctx, { get(t, p) {
+    if (p === "setTransform") return () => t.setTransform(S, 0, 0, S, 0, 0);
+    const v = t[p]; return typeof v === "function" ? v.bind(t) : v; },
+    set(t, p, v) { t[p] = v; return true; } });
+  const w = r.width / S, h = r.height / S, d = real.dataset;
+  const stand = { getContext: () => proxy, getBoundingClientRect: () => ({ width: w, height: h }),
+    get width() { return Math.round(w * 2); }, set width(_) {}, get height() { return Math.round(h * 2); }, set height(_) {} };
+  drawHeaderWash(stand, { texture: d.texture, accentHex: d.accent, isDark: false,
+    intensity: Number(d.intensity), seed: Number(d.seed), fadeHeight: h * Number(d.fade) });
+});`;
+
+export function renderPanelHTML(panel, device, { fontFace = "", appearance = "light", washCode = null } = {}) {
   const tint = panel.background?.tint ?? theme.accent;
+  if (panel.background?.style === "texture" && !washCode) throw new Error(`${panel.id}: texture background needs the header-wash code (render.mjs)`);
   const body = device.landscape ? landscape(panel, device, tint) : portrait(panel, device, tint);
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${css(panel, device, tint, fontFace)}</style></head><body>${body}<script>${LAYOUT_CALLOUTS}</script></body></html>`;
+  const wash = washCode ? `<script>${WASH_SCRIPT(washCode)}</script>` : "";
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${css(panel, device, tint, fontFace)}</style></head><body>${body}${wash}<script>${LAYOUT_CALLOUTS}</script></body></html>`;
 }

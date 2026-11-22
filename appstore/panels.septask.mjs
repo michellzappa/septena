@@ -17,21 +17,23 @@ import { parseScreenshots } from "./metadata.mjs";
 // (the scene builder's 402-wide space). Put the card in empty screen space,
 // never over content; positive dy puts it below the element.
 const VISUAL = {
-  hook:           { dots: true },
+  hook:           {},
   inbox:          { callout: { side: "right", dy: 150 } },
   plan:           { callout: { side: "right", dy: 340 } },
   "agent-asks":   { callout: { side: "left", dy: 200 } },
   "agent-result": { callout: { side: "left", dy: 330 } },
-  notes:          { style: "split" },
+  notes:          {},
 };
 
 const rows = parseScreenshots().iPhone ?? [];
 const iphone = rows.map((row, i) => {
   const v = VISUAL[row.slug] ?? {};
-  const tint = theme.tints[i % theme.tints.length];
+  // Background: the app's canvas with its header textures, one per panel in
+  // the order Settings lists them. Accent: the platform accent the app uses.
+  const tint = theme.app.accent;
   return {
     id: row.slug,
-    background: { tint, dots: !!v.dots, ...(v.style ? { style: v.style } : {}) },
+    background: { style: "texture", tint, texture: theme.app.textures[i % theme.app.textures.length], seed: 42 + i, ...(v.background ?? {}) },
     headline: row.title,
     sub: row.sub,
     align: "center",
