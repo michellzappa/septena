@@ -1,0 +1,343 @@
+# The shared Rust core (ADR 0025, docs/SHARED_CORE_SPEC.md). This workflow is
+# the core's only build gate: agents have no Rust toolchain. Each job builds
+# the core for one client, loads the packaged artifact, runs every
+# registry/conformance/*.json file through it and writes its numbers to the
+# job summary. A job fails when a vector fails or a budget is exceeded.
+name: core
+
+on:
+  push:
+    branches: [main, "wt/**"]
+    paths:
+      - "core/**"
+      - "registry/**"
+      - "scripts/gen-registries.mjs"
+      - ".github/workflows/core.yml"
+  pull_request:
+    paths:
+      - "core/**"
+      - "registry/**"
+      - "scripts/gen-registries.mjs"
+      - ".github/workflows/core.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: "1.95.0"
+  PROFILE: release-small
+  # C0 gates (ADR 0025): bytes per stripped native slice, bytes of Brotli WASM.
+  BUDGET_NATIVE: 1048576
+  BUDGET_WASM_BROTLI: 307200
+
+jobs:
+  rust:
+    name: core-rust
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generated registry files are current
+        run: node scripts/gen-registries.mjs --check
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      # Agents cannot run cargo. When a lockfile is missing or stale, this job
+      # writes the new one, uploads it as core-lockfiles and fails at the end:
+      # gh run download <run> -n core-lockfiles, commit, push again.
+      - name: Lockfiles
+        id: lock
+        working-directory: core
+        run: |
+          state=ok
+          for dir in . tools/uniffi-bindgen; do
+            if [ ! -f "$dir/Cargo.lock" ]; then
+              (cd "$dir" && cargo generate-lockfile)
+              echo "::error file=core/$dir/Cargo.lock::missing. Commit it from the core-lockfiles artifact."
+              state=stale
+            elif ! (cd "$dir" && cargo metadata --locked --format-version 1 > /dev/null); then
+              (cd "$dir" && cargo metadata --format-version 1 > /dev/null)
+              echo "::error file=core/$dir/Cargo.lock::stale. Commit it from the core-lockfiles artifact."
+              state=stale
+            fi
+          done
+          echo "state=$state" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-lockfiles
+          path: |
+            core/Cargo.lock
+            core/tools/uniffi-bindgen/Cargo.lock
+      - name: Vectors against the crate
+        working-directory: core
+        run: |
+          set -o pipefail
+          cargo test --workspace -- --nocapture 2>&1 | tee "$RUNNER_TEMP/test.log"
+      # Advisory in C0: lints show in the log and do not fail the job.
+      - name: Clippy
+        working-directory: core
+        run: cargo clippy --workspace --all-targets
+      - name: Summary and licences
+        working-directory: core
+        run: |
+          {
+            echo '### core-rust'
+            echo
+            grep -h SEPTENA_CORE_VECTORS "$RUNNER_TEMP/test.log" | head -1 | sed 's/^/- /'
+            echo
+            echo '| Package | Version | Licence |'
+            echo '| ------- | ------- | ------- |'
+            cargo tree -p septena-core -e normal --prefix none --no-dedupe --format '{p} {l}' \
+              | grep -v '^septena-core ' | sort -u \
+              | awk '{ name = $1; version = $2; $1 = ""; $2 = ""; sub(/^ +/, ""); printf "| %s | %s | %s |\n", name, version, $0 }'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Stop on a missing or stale lockfile
+        if: steps.lock.outputs.state != 'ok'
+        run: exit 1
+
+  apple:
+    name: core-apple
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      - &lockfiles
+        name: Lockfiles
+        working-directory: core
+        shell: bash
+        run: |
+          locked=--locked
+          for dir in . tools/uniffi-bindgen; do
+            if [ ! -f "$dir/Cargo.lock" ]; then (cd "$dir" && cargo generate-lockfile); locked=; fi
+          done
+          echo "LOCKED=$locked" >> "$GITHUB_ENV"
+      - name: Build each slice
+        working-directory: core
+        run: |
+          for target in aarch64-apple-ios aarch64-apple-ios-sim aarch64-apple-darwin; do
+            cargo build $LOCKED -p septena-core --profile "$PROFILE" --target "$target"
+          done
+      - name: Slice sizes
+        working-directory: core
+        run: |
+          echo '### core-apple' >> "$GITHUB_STEP_SUMMARY"
+          over=0
+          for target in aarch64-apple-ios aarch64-apple-ios-sim aarch64-apple-darwin; do
+            cp "target/$target/$PROFILE/libseptena_core.dylib" "$RUNNER_TEMP/$target.dylib"
+            strip -x "$RUNNER_TEMP/$target.dylib"
+            size=$(stat -f %z "$RUNNER_TEMP/$target.dylib")
+            static=$(stat -f %z "target/$target/$PROFILE/libseptena_core.a")
+            echo "- $target: $size bytes stripped dylib (static library $static bytes)" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$size" -gt "$BUDGET_NATIVE" ]; then echo "::error::$target is $size bytes, over $BUDGET_NATIVE"; over=1; fi
+          done
+          exit $over
+      - name: Swift bindings and XCFramework
+        working-directory: core
+        run: |
+          out="$RUNNER_TEMP/swift-out"
+          cargo run $LOCKED --release --manifest-path tools/uniffi-bindgen/Cargo.toml -- generate \
+            --library "target/aarch64-apple-darwin/$PROFILE/libseptena_core.dylib" --language swift --out-dir "$out"
+          ls -la "$out"
+          headers="$RUNNER_TEMP/headers"
+          mkdir -p "$headers" harness/swift/build
+          cp "$out/SeptenaSharedCoreFFI.h" "$headers/"
+          cp "$out/SeptenaSharedCoreFFI.modulemap" "$headers/module.modulemap"
+          cp "$out"/*.swift harness/swift/Sources/SeptenaSharedCore/
+          xcodebuild -create-xcframework \
+            -library "target/aarch64-apple-ios/$PROFILE/libseptena_core.a" -headers "$headers" \
+            -library "target/aarch64-apple-ios-sim/$PROFILE/libseptena_core.a" -headers "$headers" \
+            -library "target/aarch64-apple-darwin/$PROFILE/libseptena_core.a" -headers "$headers" \
+            -output harness/swift/build/SeptenaSharedCoreFFI.xcframework
+          mkdir -p "$RUNNER_TEMP/dist"
+          (cd harness/swift/build && ditto -c -k --sequesterRsrc --keepParent SeptenaSharedCoreFFI.xcframework "$RUNNER_TEMP/dist/SeptenaSharedCoreFFI.xcframework.zip")
+          cp "$out"/*.swift "$RUNNER_TEMP/dist/"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-dist-apple
+          path: ${{ runner.temp }}/dist
+          if-no-files-found: error
+      - name: Vectors on macOS through the XCFramework
+        working-directory: core/harness/swift
+        env:
+          SEPTENA_CONFORMANCE: ${{ github.workspace }}/registry/conformance
+        run: |
+          set -o pipefail
+          swift test -c release 2>&1 | tee "$RUNNER_TEMP/swift.log"
+          grep -h SEPTENA_CORE_METRICS "$RUNNER_TEMP/swift.log" | head -1 > "$RUNNER_TEMP/swift.metrics"
+          test -s "$RUNNER_TEMP/swift.metrics"
+          echo "- $(cat "$RUNNER_TEMP/swift.metrics")" >> "$GITHUB_STEP_SUMMARY"
+
+  android:
+    name: core-android
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
+      - *lockfiles
+      - name: Build the Android ABIs
+        working-directory: core
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 build $LOCKED -p septena-core --profile "$PROFILE"
+      - name: Slice sizes
+        working-directory: core
+        run: |
+          strip_tool="$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
+          echo '### core-android' >> "$GITHUB_STEP_SUMMARY"
+          over=0
+          mkdir -p "$RUNNER_TEMP/jniLibs"
+          for spec in aarch64-linux-android:arm64-v8a armv7-linux-androideabi:armeabi-v7a x86_64-linux-android:x86_64; do
+            IFS=: read -r target abi <<< "$spec"
+            mkdir -p "$RUNNER_TEMP/jniLibs/$abi"
+            cp "target/$target/$PROFILE/libseptena_core.so" "$RUNNER_TEMP/jniLibs/$abi/"
+            "$strip_tool" --strip-unneeded "$RUNNER_TEMP/jniLibs/$abi/libseptena_core.so"
+            size=$(stat -c %s "$RUNNER_TEMP/jniLibs/$abi/libseptena_core.so")
+            echo "- $abi: $size bytes stripped" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$size" -gt "$BUDGET_NATIVE" ]; then echo "::error::$abi is $size bytes, over $BUDGET_NATIVE"; over=1; fi
+          done
+          exit $over
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-dist-android-jnilibs
+          path: ${{ runner.temp }}/jniLibs
+          if-no-files-found: error
+
+  jvm:
+    name: core-jvm-${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      - *lockfiles
+      - name: Build the library and the Kotlin bindings
+        working-directory: core
+        run: |
+          cargo build $LOCKED -p septena-core --profile "$PROFILE"
+          lib="target/$PROFILE/libseptena_core.so"
+          [ -f "$lib" ] || lib="target/$PROFILE/septena_core.dll"
+          cargo run $LOCKED --release --manifest-path tools/uniffi-bindgen/Cargo.toml -- generate \
+            --library "$lib" --language kotlin --out-dir harness/jvm/generated
+          mkdir -p "$RUNNER_TEMP/natives"
+          cp "$lib" "$RUNNER_TEMP/natives/"
+          case "$RUNNER_OS" in
+            Linux) strip --strip-unneeded "$RUNNER_TEMP/natives/$(basename "$lib")" ;;
+          esac
+          size=$(wc -c < "$RUNNER_TEMP/natives/$(basename "$lib")" | tr -d ' ')
+          echo "### core-jvm ($RUNNER_OS)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- $(basename "$lib"): $size bytes" >> "$GITHUB_STEP_SUMMARY"
+          dir="$PWD/target/$PROFILE"
+          if command -v cygpath > /dev/null; then dir="$(cygpath -w "$dir")"; fi
+          echo "SEPTENA_CORE_LIB_DIR=$dir" >> "$GITHUB_ENV"
+          if [ "$size" -gt "$BUDGET_NATIVE" ]; then echo "::error::$(basename "$lib") is $size bytes, over $BUDGET_NATIVE"; exit 1; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-dist-jvm-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/natives
+            core/harness/jvm/generated
+          if-no-files-found: error
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Vectors on the JVM through JNA
+        working-directory: core/harness/jvm
+        env:
+          SEPTENA_CONFORMANCE: ${{ github.workspace }}/registry/conformance
+        run: |
+          ../../../android/gradlew --no-daemon run 2>&1 | tee "$RUNNER_TEMP/jvm.log"
+          test "${PIPESTATUS[0]}" -eq 0
+          grep -h SEPTENA_CORE_METRICS "$RUNNER_TEMP/jvm.log" | head -1 > "$RUNNER_TEMP/jvm.metrics"
+          test -s "$RUNNER_TEMP/jvm.metrics"
+          echo "- $(cat "$RUNNER_TEMP/jvm.metrics")" >> "$GITHUB_STEP_SUMMARY"
+
+  wasm:
+    name: core-wasm
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      - *lockfiles
+      - name: Build the WASM module
+        working-directory: core
+        run: cargo build $LOCKED -p septena-core-wasm --target wasm32-unknown-unknown --profile "$PROFILE"
+      # The CLI must match the wasm-bindgen crate in Cargo.lock exactly.
+      - name: wasm-bindgen version
+        id: wb
+        working-directory: core
+        run: |
+          version="$(awk '/^name = "wasm-bindgen"$/{getline; gsub(/version = |"/,""); print; exit}' Cargo.lock)"
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen@${{ steps.wb.outputs.version }}
+      - name: Package for Node and for the browser
+        working-directory: core
+        run: |
+          wasm="target/wasm32-unknown-unknown/$PROFILE/septena_core_wasm.wasm"
+          wasm-bindgen --target nodejs --out-dir harness/wasm/pkg "$wasm"
+          wasm-bindgen --target web --out-dir "$RUNNER_TEMP/web-pkg" "$wasm"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Vectors in Node through the WASM package
+        working-directory: core
+        run: |
+          node harness/wasm/run.mjs harness/wasm/pkg ../registry/conformance 2>&1 | tee "$RUNNER_TEMP/wasm.log"
+          test "${PIPESTATUS[0]}" -eq 0
+          echo '### core-wasm' >> "$GITHUB_STEP_SUMMARY"
+          echo "- $(grep -h SEPTENA_CORE_METRICS "$RUNNER_TEMP/wasm.log" | head -1)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-dist-wasm-web
+          path: ${{ runner.temp }}/web-pkg
+          if-no-files-found: error

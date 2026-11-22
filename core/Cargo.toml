@@ -1,0 +1,24 @@
+# The shared Rust core (ADR 0025, docs/SHARED_CORE_SPEC.md).
+# This lockfile holds only what ships in the apps. tools/uniffi-bindgen is a
+# separate workspace, so the build tool never enters the shipped graph.
+[workspace]
+members = ["crates/septena-core", "crates/septena-core-wasm"]
+exclude = ["tools/uniffi-bindgen"]
+resolver = "3"
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+publish = false
+
+# Native slices and the WASM package build with this profile.
+# strip = "debuginfo" keeps the symbols that `uniffi-bindgen --library` reads;
+# core.yml strips a copy before it measures a slice.
+[profile.release-small]
+inherits = "release"
+opt-level = "s"
+strip = "debuginfo"
+lto = true
+codegen-units = 1

@@ -1,6 +1,6 @@
 # 0015. Keep cross-platform task-app contracts in shared JSON registries
 
-- Status: accepted (2026-11-21), R0–R4 landed
+- Status: accepted (2026-11-21), R0–R4 landed; amended by ADR 0025 (complex pure logic lives once, in the shared Rust core, instead of in each language)
 - Date: 2026-11-21
 - Deciders: mz
 

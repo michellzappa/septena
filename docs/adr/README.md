@@ -18,9 +18,9 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0010](0010-free-server-tier-with-limits.md) | Offer a free server tier with limits; paid lifts them | accepted, device count amended by 0023 |
 | [0011](0011-self-hostable-backend.md) | Keep the backend self-hostable on the user's own Cloudflare account | accepted |
 | [0012](0012-project-notes-are-agent-context.md) | Project notes are the context agents read first | accepted |
-| [0013](0013-native-windows-app-on-the-android-code.md) | Build the Windows app on the Android client's Kotlin code | accepted |
+| [0013](0013-native-windows-app-on-the-android-code.md) | Build the Windows app on the Android client's Kotlin code | accepted, W0 amended by 0025 |
 | [0014](0014-today-rollover-review-or-clean-slate.md) | Today rolls over by Ask (renamed from Review) or by Clean slate; it never carries over silently | accepted |
-| [0015](0015-shared-registries-for-cross-platform-clients.md) | Keep cross-platform task-app contracts in shared JSON registries | accepted |
+| [0015](0015-shared-registries-for-cross-platform-clients.md) | Keep cross-platform task-app contracts in shared JSON registries | accepted, pure logic amended by 0025 |
 | [0016](0016-sign-in-beyond-apple.md) | Sign in beyond Apple: approve a new device, or use an email code | accepted |
 | [0017](0017-move-septena-life-out-of-repo.md) | Move Septena Life out of the Septena repo | accepted |
 | [0018](0018-septena-on-its-own-cloudflare-account.md) | Run Septena on its own Cloudflare account | accepted |
@@ -30,6 +30,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0022](0022-marketing-scenes-come-from-the-native-app.md) | Marketing scenes come from the native app | rejected |
 | [0023](0023-sync-across-devices-is-plus.md) | Make sync across devices the paid line (amends 0010) | accepted |
 | [0024](0024-no-iphone-tab-bar.md) | No tab bar on iPhone: the list is the root of one navigation stack | accepted |
+| [0025](0025-shared-rust-core.md) | Put task rules and sync decisions in one shared Rust core | accepted (amends 0013 W0, 0015) |
 
 ## Template
 

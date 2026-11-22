@@ -219,8 +219,5 @@ extension TaskConvo {
   }
 }
 
-extension SeptenaTask {
-  /// Associated GitHub issue or PR for this task, if any.
-  /// Single entry point so L0 (`extKey`/`extUrl`) can plug in ahead of `conversation`.
-  var linkedIssue: ConvoIssueLink? { conversation.linkedIssue }
-}
+// `SeptenaTask.linkedIssue` lives in Models.swift: SeptenaCoreTests compiles
+// this file without the SwiftData models.

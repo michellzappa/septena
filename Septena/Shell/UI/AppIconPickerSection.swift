@@ -291,21 +291,24 @@ struct SeptenaCompassIconView: View {
 
   // 3. Elevated inner dial plate (r = 354).
   private func dialLayer(scale: CGFloat, palette: ResolvedPalette) -> some View {
-    Circle()
-      .fill(
-        RadialGradient(
-          colors: [palette.faceTop, palette.faceMid, palette.faceBot],
-          center: UnitPoint(x: 0.42, y: 0.30),
-          startRadius: 0,
-          endRadius: 354 * scale * 1.44
-        )
-      )
-      .frame(width: 708 * scale, height: 708 * scale)
-      .overlay(
-        Circle()
-          .strokeBorder(Color.white.opacity(dialRimOpacity), lineWidth: max(0.5, 5 * scale))
-      )
-      .shadow(color: palette.shadow.opacity(dialShadowOpacity), radius: max(1, 10 * scale), y: max(0.5, 8 * scale))
+    // Typed lets: the inline CGFloat arithmetic timed out the type checker on CI.
+    let endRadius: CGFloat = 354 * scale * 1.44
+    let diameter: CGFloat = 708 * scale
+    let rimWidth: CGFloat = max(0.5, 5 * scale)
+    let shadowRadius: CGFloat = max(1, 10 * scale)
+    let shadowY: CGFloat = max(0.5, 8 * scale)
+    let gradient = RadialGradient(
+      colors: [palette.faceTop, palette.faceMid, palette.faceBot],
+      center: UnitPoint(x: 0.42, y: 0.30),
+      startRadius: 0,
+      endRadius: endRadius
+    )
+    let rim = Circle().strokeBorder(Color.white.opacity(dialRimOpacity), lineWidth: rimWidth)
+    return Circle()
+      .fill(gradient)
+      .frame(width: diameter, height: diameter)
+      .overlay(rim)
+      .shadow(color: palette.shadow.opacity(dialShadowOpacity), radius: shadowRadius, y: shadowY)
   }
 
   // 4. 6 machined ticks + upright North pointer + checkmark.
