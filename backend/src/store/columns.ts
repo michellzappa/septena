@@ -90,6 +90,10 @@ export const SETTING_VALUES = {
   textureIntensity: z.number().int().min(15).max(100),
   /// Header-wash motion mode ("still" | "slowDrift").
   textureMotion: z.enum(ENTITY_ENUMS.textureMotion),
+  /// Per-account sidebar order of special smart lists (registry/destinations.json IDs).
+  smartListOrder: z.array(z.string().max(64)).max(32),
+  /// Per-account hidden special smart lists (registry/destinations.json IDs).
+  smartListHidden: z.array(z.string().max(64)).max(32),
 } satisfies Record<string, z.ZodTypeAny>;
 
 export type SettingKey = keyof typeof SETTING_VALUES;

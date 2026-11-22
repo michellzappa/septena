@@ -28,14 +28,19 @@ private extension Int {
 enum KitSidebarDestination: Equatable {
   case filter(TaskFilter, title: String)
 
-  /// The AppKit shell's smart-list destinations, in order — read from the SAME
-  /// `TaskDestinations.sidebarRoutes` the SwiftUI sidebar and `TaskNavMenu`
-  /// use, so all four surfaces (both shells' sidebars, both shells' title
-  /// dropdowns) can never disagree about which lists exist or in what order.
-  /// Recently Deleted is deliberately absent: it's appended by each surface
-  /// only when the trash is non-empty.
+  /// The AppKit shell's smart-list destinations, in the account's configured
+  /// order — read from `TaskDestinations.sidebarRoutes(nonEmptyIDs:)`, which
+  /// reads `SmartListPreferences.shared` over `registry/destinations.json`.
+  @MainActor static func smartLists(nonEmptyIDs: Set<String>) -> [KitSidebarDestination] {
+    TaskDestinations.sidebarRoutes(nonEmptyIDs: nonEmptyIDs).compactMap(KitSidebarDestination.init(route:))
+  }
+
+  @MainActor static func smartLists(in context: ModelContext) -> [KitSidebarDestination] {
+    TaskDestinations.sidebarRoutes(in: context).compactMap(KitSidebarDestination.init(route:))
+  }
+
   @MainActor static var smartLists: [KitSidebarDestination] {
-    TaskDestinations.sidebarRoutes.compactMap(KitSidebarDestination.init(route:))
+    smartLists(nonEmptyIDs: [])
   }
 
   /// Bridge from the shared `Route` vocabulary. Areas / projects carry only an
@@ -255,7 +260,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     outlineView.indentationPerLevel = 0
     outlineView.dataSource = self
     outlineView.delegate = self
-    outlineView.registerForDraggedTypes([.septaskTask, .septaskStructureItem])
+    outlineView.registerForDraggedTypes([.septaskTask, .septaskStructureItem, .septaskSmartListItem])
     outlineView.setDraggingSourceOperationMask(.move, forLocal: true)
     // NOT `.menu`: same reasoning as the task table (SeptaskKitTaskList) —
     // AppKit's automatic path for a table's `.menu` paints its own native
@@ -281,7 +286,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // the same signal, so re-reading here is always fresh. Tasks-changed is
     // in the list for the counts.
     for name in [Notification.Name.septenaStructureChanged, .septenaDataChanged,
-                 .septenaTasksChanged] {
+                 .septenaTasksChanged, .septenaSmartListsChanged, .septaskSettingsPulled] {
       observers.append(NotificationCenter.default.addObserver(
         forName: name, object: nil, queue: .main
       ) { [weak self] _ in
@@ -476,6 +481,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       if convo.needsHumanReview { reviewCount += 1 }
       if convo.agentStage(at: now) != nil { agentCount += 1 }
     }
+    let recentlyDeletedCount = LocalCache.recentlyDeletedCount(in: context)
     let smartCounts: [TaskFilter: Int] = [
       .review: reviewCount,
       .agent: agentCount,
@@ -488,6 +494,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       .unscheduled: open.filter {
         !$0.today && $0.scheduled == nil && $0.deadline == nil
       }.count,
+      .starred: starredCount,
+      .faded: fadedCount,
+      .recentlyDeleted: recentlyDeletedCount,
     ]
     let openByProject = Dictionary(grouping: open.compactMap(\.project), by: { $0 })
       .mapValues(\.count)
@@ -524,50 +533,25 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // captures live in the triage band on top of Today (the same structure
     // the SwiftUI sidebar settled on, docs/TRIAGE_BAND_SPEC.md). The band's
     // size rides on Today's count so nothing about it is hidden.
-    // Set + order come from `KitSidebarDestination.smartLists`, which reads
-    // `TaskDestinations.sidebarRoutes` — the same list the title dropdown
-    // builds from, so the two can't drift. Only the counts are sidebar work.
-    var views = KitSidebarDestination.smartLists.map { destination in
+    // Set + order come from `SmartListPreferences.shared` over
+    // `registry/destinations.json`, shared across both sidebars and title menus.
+    var nonEmptyIDs = Set<String>()
+    // Review and Agent also stay while selected, so accepting the last item
+    // does not yank the row away.
+    if reviewCount > 0 || key == KitSidebarDestination.key(for: .filter(.review)) {
+      nonEmptyIDs.insert("review")
+    }
+    if agentCount > 0 || key == KitSidebarDestination.key(for: .filter(.agent)) {
+      nonEmptyIDs.insert("agent")
+    }
+    if starredCount > 0 { nonEmptyIDs.insert("starred") }
+    if fadedCount > 0 { nonEmptyIDs.insert("faded") }
+    if recentlyDeletedCount > 0 { nonEmptyIDs.insert("recentlyDeleted") }
+    let views = KitSidebarDestination.smartLists(nonEmptyIDs: nonEmptyIDs).map { destination in
       Node(destination.nodeContent, count: smartListCount(destination,
                                                           counts: smartCounts,
                                                           today: todayCount + inboxCount,
                                                           doneToday: doneTodayCount))
-    }
-    // Review: progressively disclosed right below Today when non-empty (or
-    // while selected so accepting the last item does not yank the row away).
-    let reviewDestination = KitSidebarDestination.filter(.review,
-                                                         title: TaskFilter.review.title)
-    if reviewCount > 0 || key == reviewDestination.key {
-      let insertAt = views.firstIndex(where: { $0.key == KitSidebarDestination.key(for: .filter(.today)) })
-        .map { $0 + 1 } ?? 0
-      views.insert(Node(reviewDestination.nodeContent, count: reviewCount.nilIfZero), at: insertAt)
-    }
-    // Agent (docs/TASK_FACTORY_SPEC.md §3): after Review, or after Today when
-    // Review is hidden. Same disclosure rule as Review.
-    let agentDestination = KitSidebarDestination.filter(.agent, title: TaskFilter.agent.title)
-    if agentCount > 0 || key == agentDestination.key {
-      let anchor = views.lastIndex(where: {
-        $0.key == reviewDestination.key || $0.key == KitSidebarDestination.key(for: .filter(.today))
-      })
-      views.insert(Node(agentDestination.nodeContent, count: agentCount.nilIfZero),
-                   at: anchor.map { $0 + 1 } ?? 0)
-    }
-    // Starred, Faded & Recently Deleted: shown once non-empty (progressive disclosure).
-    if starredCount > 0 {
-      let starred = KitSidebarDestination.filter(.starred,
-                                                 title: TaskFilter.starred.title)
-      views.append(Node(starred.nodeContent, count: starredCount))
-    }
-    if fadedCount > 0 {
-      let faded = KitSidebarDestination.filter(.faded,
-                                               title: TaskFilter.faded.title)
-      views.append(Node(faded.nodeContent, count: fadedCount))
-    }
-    let recentlyDeletedCount = LocalCache.recentlyDeletedCount(in: context)
-    if recentlyDeletedCount > 0 {
-      let deleted = KitSidebarDestination.filter(.recentlyDeleted,
-                                                 title: TaskFilter.recentlyDeleted.title)
-      views.append(Node(deleted.nodeContent, count: recentlyDeletedCount))
     }
 
     let projectsByArea = Dictionary(grouping: snapshot.projects.filter { $0.deletedAt == nil },
@@ -699,6 +683,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       outlineView.setDropItem(node, dropChildIndex: NSOutlineViewDropOnItemIndex)
       return .move
     }
+    if draggedSmartListID(from: info) != nil {
+      return validateSmartListReorder(proposedItem: item, proposedChildIndex: index)
+    }
     return validateStructureReorder(info, proposedItem: item, proposedChildIndex: index)
   }
 
@@ -720,6 +707,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   func outlineView(_ outlineView: NSOutlineView, acceptDrop info: NSDraggingInfo,
                    item: Any?, childIndex index: Int) -> Bool {
     guard !KitDrag.ids(from: info).isEmpty else {
+      if draggedSmartListID(from: info) != nil {
+        return acceptSmartListReorder(info, proposedItem: item, proposedChildIndex: index)
+      }
       return acceptStructureReorder(info, proposedItem: item, proposedChildIndex: index)
     }
     guard let node = item as? Node, let action = dropAction(for: node) else { return false }
@@ -814,9 +804,52 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       let pbItem = NSPasteboardItem()
       pbItem.setString(node.key, forType: .septaskStructureItem)
       return pbItem
-    case .filter:
-      return nil
+    case .filter(let filter, _, _):
+      guard let destID = filter.destinationID else { return nil }
+      let pbItem = NSPasteboardItem()
+      pbItem.setString(destID, forType: .septaskSmartListItem)
+      return pbItem
     }
+  }
+
+  private func draggedSmartListID(from info: NSDraggingInfo) -> String? {
+    (info.draggingPasteboard.pasteboardItems ?? [])
+      .first?.string(forType: .septaskSmartListItem)
+  }
+
+  /// Smart lists are always a dedicated "special" cluster above Areas &
+  /// Projects (`0..<organizeStartIndex`): reorderable among themselves, never
+  /// dropped into areas or projects below.
+  private func validateSmartListReorder(proposedItem item: Any?,
+                                        proposedChildIndex index: Int) -> NSDragOperation {
+    guard item == nil,
+          index != NSOutlineViewDropOnItemIndex,
+          index >= 0, index <= organizeStartIndex
+    else { return [] }
+    outlineView.setDropItem(nil, dropChildIndex: index)
+    return .move
+  }
+
+  private func acceptSmartListReorder(_ info: NSDraggingInfo, proposedItem item: Any?,
+                                      proposedChildIndex index: Int) -> Bool {
+    guard item == nil,
+          index != NSOutlineViewDropOnItemIndex,
+          let movedID = draggedSmartListID(from: info)
+    else { return false }
+    let visibleIDs: [String] = roots.prefix(organizeStartIndex).compactMap { node in
+      guard case .filter(let f, _, _) = node.content else { return nil }
+      return f.destinationID
+    }
+    let prefs = SmartListPreferences.shared
+    let before = prefs.snapshot()
+    prefs.reorderVisible(visibleIDs: visibleIDs, movedID: movedID, toVisibleIndex: index)
+    let after = prefs.snapshot()
+    guard after != before else { return true }
+    recordStructure(
+      name: String(localized: "Reorder Smart Lists", comment: "SeptaskKit: undo action"),
+      undo: { SmartListPreferences.shared.restore(before) },
+      redo: { SmartListPreferences.shared.restore(after) })
+    return true
   }
 
   private func draggedStructureNode(from info: NSDraggingInfo) -> Node? {
@@ -1314,8 +1347,52 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         default: return nil
         }
       }
+      // Smart-list show/hide (SmartListPreferences) rides on top of the
+      // registry menu: Hide <list> for a hideable list, then Customize.
+      menu.insertItem(.separator(), at: 0)
+      menu.insertItem(smartListMenuItem(String(localized: "Customize Smart Lists…",
+                                               comment: "SeptaskKit: sidebar context menu"),
+                                        #selector(openSmartListsSettings)), at: 0)
+      if case .filter(let filter, let title, _)? = node?.content,
+         let destID = filter.destinationID,
+         RegistryDestinations.byId[destID]?.canHide == true {
+        let hideItem = smartListMenuItem(String(localized: "Hide \(title)",
+                                                comment: "SeptaskKit: sidebar context menu"),
+                                         #selector(hideSmartList(_:)))
+        hideItem.representedObject = destID
+        menu.insertItem(hideItem, at: 0)
+      }
     }
     menu.popUp(positioning: nil, at: point, in: outlineView)
+  }
+
+  private func smartListMenuItem(_ title: String, _ action: Selector) -> NSMenuItem {
+    let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+    item.target = self
+    return item
+  }
+
+  @objc private func hideSmartList(_ sender: NSMenuItem) {
+    guard let destID = sender.representedObject as? String else { return }
+    let prefs = SmartListPreferences.shared
+    let before = prefs.snapshot()
+    let wasSelected = selectedKey() == "filter:\(TaskFilter(destinationID: destID)?.navigationKey ?? "")"
+    prefs.setHidden(true, for: destID)
+    let after = prefs.snapshot()
+    guard after != before else { return }
+    if wasSelected {
+      select(.today)
+    }
+    let title = RegistryDestinations.byId[destID]?.title ?? "Smart List"
+    recordStructure(
+      name: String(localized: "Hide \(title)", comment: "SeptaskKit: undo action"),
+      undo: { SmartListPreferences.shared.restore(before) },
+      redo: { SmartListPreferences.shared.restore(after) })
+  }
+
+  @objc private func openSmartListsSettings() {
+    SeptaskSettingsLink.request(RegistrySettings.PageID.smartLists)
+    SeptaskKitSettingsWindow.show()
   }
 
   /// "Move to Area ▸" — No Area, then every area; the current parent is

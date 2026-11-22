@@ -4778,7 +4778,7 @@
       }
     },
     "Fade inactive tasks" : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -5297,7 +5297,7 @@
 
     },
     "Group Today by list" : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -6344,7 +6344,7 @@
 
     },
     "Learn where you usually file similar tasks." : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.4.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.5.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -8395,7 +8395,7 @@
       }
     },
     "Overdue app icon badge" : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.5.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.6.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -10099,7 +10099,7 @@
 
     },
     "Show completed tasks" : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -10114,7 +10114,7 @@
 
     },
     "Show faded tasks" : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -10126,7 +10126,7 @@
       }
     },
     "Show faded tasks in projects and areas." : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.3.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.4.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -10402,6 +10402,10 @@
         }
       }
     },
+    "Smart Lists" : {
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Snack" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10665,7 +10669,7 @@
 
     },
     "Suggest where to file" : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.5.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -11131,7 +11135,7 @@
       "extractionState" : "manual"
     },
     "Tasks without activity for 14 days fade out and move to Faded." : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.2.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.3.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -12331,7 +12335,7 @@
       }
     },
     "When off, tasks appear in one list with their project or area underneath." : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.1.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {

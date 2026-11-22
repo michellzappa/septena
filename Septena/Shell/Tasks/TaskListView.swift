@@ -56,6 +56,9 @@ struct TaskListView: View {
   /// style). Only ever populated for those two filters, and only when calendar
   /// access is already granted (Settings → Integrations) — see `load()`.
   @AppStorage(SettingsKey.tasksShowCalendarEvents) private var showCalendarEvents: Bool = true
+  #if os(iOS)
+  @AppStorage(SettingsKey.tasksSwipeLeadingAction) private var swipeLeadingActionRaw: String = TaskSwipeLeadingAction.today.rawValue
+  #endif
   /// The fetched calendar events for the current filter's window. `todayEvents()`
   /// on Today; the next 30 days on Upcoming; empty everywhere else.
   /// The list's derived-data layer (calendar agenda, filing suggestions,
@@ -249,6 +252,9 @@ struct TaskListView: View {
   /// `!selection.isEmpty` so a single iPad trackpad cursor click doesn't flip
   /// taps into multi-select toggles.
   @State private var isTouchSelecting = false
+  /// In-window Quick-Drop Project Tray sprung open by hovering a dragged task
+  /// stack over the Move button on compact iPhone (Phase M3).
+  @State private var showingQuickDropTray = false
   #endif
 
   private var touchSelectionActive: Bool {
@@ -1010,6 +1016,7 @@ struct TaskListView: View {
     .onDisappear {
       isOnScreen = false
       #if os(iOS)
+      showingQuickDropTray = false
       if isTouchSelecting {
         nav.isTaskMultiSelectActive = false
       }
@@ -1509,6 +1516,44 @@ struct TaskListView: View {
         taskBatchActionBar
       }
     }
+    #if os(iOS)
+    .overlay {
+      if showingQuickDropTray {
+        QuickDropProjectTray(
+          areas: areas,
+          projects: projects,
+          projectProgress: model.progressByProject,
+          onDropInbox: { ids in
+            applyMove(ids, areaId: nil, projectId: nil)
+            return true
+          },
+          onDropToday: { ids in
+            let moving = ids.filter { !(currentTask(id: $0)?.isOnToday ?? false) }
+            guard !moving.isEmpty else { return false }
+            Haptics.tick()
+            promoteToToday(moving)
+            for id in ids { mutator.acknowledge(id: id) }
+            if touchSelectionActive { clearSelection() }
+            Task { await load() }
+            return true
+          },
+          onDropArea: { ids, areaId in
+            applyMove(ids, areaId: areaId, projectId: nil)
+            return true
+          },
+          onDropProject: { ids, projectId in
+            applyMove(ids, areaId: nil, projectId: projectId)
+            return true
+          },
+          onDismiss: {
+            a11yAnimate(.snappy(duration: 0.2)) {
+              showingQuickDropTray = false
+            }
+          }
+        )
+      }
+    }
+    #endif
   }
 
   private var allSelectedAreToday: Bool {
@@ -1566,6 +1611,18 @@ struct TaskListView: View {
           .frame(width: 40, height: 38)
           .contentShape(Rectangle())
       }
+      .modifier(TaskSpringLoadMoveDrop(
+        enabled: !usesPushNavigation,
+        onSpringLoad: {
+          a11yAnimate(.snappy(duration: 0.22)) {
+            showingQuickDropTray = true
+          }
+        },
+        onDirectDrop: { ids in
+          moveTargetIds = ids
+          showingMoveSheet = true
+        }
+      ))
       .accessibilityLabel("Move selected tasks")
 
       Button { toggleSelected() } label: {
@@ -3704,7 +3761,7 @@ struct TaskListView: View {
         purgeDraftIfEmpty(id: task.id)
       }
     )
-    .frame(maxWidth: .infinity, alignment: .leading)
+    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
     // No own card or screen margin: the surrounding `TaskCardChrome` slice paints
     // the card surface + margin (and sets `rowHInset`), so the editor simply
     // expands the row IN PLACE inside the group card instead of floating as a
@@ -3731,12 +3788,12 @@ struct TaskListView: View {
     staticRow(task, accessory: filter == .faded
               ? keepFadedCapsule(for: task)
               : (quickMenu ? suggestionCapsule(for: task) : nil))
-    .taskRowSwipeToSelect(
-      enabled: allowsTouchMultiSelect,
-      isSelected: selection.contains(task.id)
-    ) {
-      toggleTouchSelection(task.id)
-    }
+    .taskRowSwipe(
+      allowSelect: allowsTouchMultiSelect,
+      isSelected: selection.contains(task.id),
+      onToggleSelect: { toggleTouchSelection(task.id) },
+      leadingAction: leadingSwipeAction(for: task)
+    )
     // Drag a row (or the whole selection) to a sidebar area/project to re-home
     // it, onto an Area's project card, or between rows of a manually-ordered
     // list to reorder. `.draggable` pairs with `SidebarTaskDrop`, `TaskMoveDrop`,
@@ -4339,8 +4396,152 @@ struct TaskListView: View {
     selection.removeAll()
     #if os(iOS)
     isTouchSelecting = false
+    showingQuickDropTray = false
     editMode?.wrappedValue = .inactive
     nav.isTaskMultiSelectActive = false
+    #endif
+  }
+
+  /// Leading (swipe-right) quick action for a task row on iOS/iPadOS
+  /// (`docs/IOS_SWIPE_ACTIONS_SPEC.md` #132). Disabled while touch multi-select
+  /// or an inline editor is active, and on section headings.
+  private func leadingSwipeAction(for task: SeptenaTask) -> TaskRowLeadingSwipeAction? {
+    #if os(iOS)
+    guard !touchSelectionActive, expandedEditId == nil, !task.isHeading else { return nil }
+
+    if filter == .recentlyDeleted {
+      return TaskRowLeadingSwipeAction(
+        title: "Restore",
+        symbol: "arrow.uturn.backward.circle.fill",
+        tint: Color.accentColor
+      ) {
+        Haptics.tick()
+        mutator.restore(id: task.id)
+        removeLocally(id: task.id)
+        Task { await load() }
+        showToast("Restored \(task.title)")
+      }
+    }
+
+    if filter == .faded || task.isFaded {
+      return TaskRowLeadingSwipeAction(
+        title: "Keep",
+        symbol: "arrow.uturn.backward.circle.fill",
+        tint: Color.accentColor
+      ) {
+        keepFadedTasks([task.id])
+      }
+    }
+
+    // Inbox band — unacknowledged agent proposals: Accept / Keep into Today.
+    if task.isInTriageBand, task.source == TaskSource.mcp, task.acknowledgedAt == nil {
+      return TaskRowLeadingSwipeAction(
+        title: "Accept",
+        symbol: "checkmark.circle.fill",
+        tint: Theme.todayAccent
+      ) {
+        Haptics.tick()
+        let before = scheduleSnapshots([task.id])
+        promoteToToday([task.id])
+        mutator.acknowledge(id: task.id)
+        let ticket = TaskUndoTicket()
+        Task { await load() }
+        showToast("Added to Today") {
+          ticket.undo { TaskUndo.restore(before, using: mutator) }
+          Task { await load() }
+        }
+      }
+    }
+
+    let configured = TaskSwipeLeadingAction(rawValue: swipeLeadingActionRaw) ?? .today
+    switch configured {
+    case .none:
+      return nil
+
+    case .today:
+      if task.isOnToday {
+        return TaskRowLeadingSwipeAction(
+          title: "Remove from Today",
+          symbol: "sun.max",
+          tint: Theme.inkSecondary
+        ) {
+          let before = scheduleSnapshots([task.id])
+          applyRemoveFromToday([task.id])
+          let ticket = TaskUndoTicket()
+          showToast("Removed from Today") {
+            ticket.undo { TaskUndo.restore(before, using: mutator) }
+            Task { await load() }
+          }
+        }
+      }
+      return TaskRowLeadingSwipeAction(
+        title: "Move to Today",
+        symbol: "sun.max.fill",
+        tint: Theme.todayAccent
+      ) {
+        Haptics.tick()
+        let before = scheduleSnapshots([task.id])
+        promoteToToday([task.id])
+        mutator.acknowledge(id: task.id)
+        let ticket = TaskUndoTicket()
+        Task { await load() }
+        showToast("Added to Today") {
+          ticket.undo { TaskUndo.restore(before, using: mutator) }
+          Task { await load() }
+        }
+      }
+
+    case .schedule:
+      return TaskRowLeadingSwipeAction(
+        title: "Schedule",
+        symbol: "calendar",
+        tint: Color.accentColor
+      ) {
+        Haptics.tap()
+        whenSheet = WhenSheet(taskIds: [task.id], kind: .scheduled)
+      }
+
+    case .move:
+      return TaskRowLeadingSwipeAction(
+        title: "Move",
+        symbol: "arrow.right.circle.fill",
+        tint: Color.accentColor
+      ) {
+        Haptics.tap()
+        moveTargetIds = [task.id]
+        showingMoveSheet = true
+      }
+
+    case .star:
+      let nextStarred = !task.starred
+      return TaskRowLeadingSwipeAction(
+        title: nextStarred ? "Star" : "Remove Star",
+        symbol: nextStarred ? "star.fill" : "star.slash",
+        tint: Theme.todayAccent
+      ) {
+        Haptics.tick()
+        recordingSchedule(
+          nextStarred
+            ? String(localized: "Star", comment: "Undo action name")
+            : String(localized: "Remove Star", comment: "Undo action name"),
+          [task.id]
+        ) {
+          mutator.setStarred(id: task.id, starred: nextStarred)
+        }
+        Task { await load() }
+      }
+
+    case .complete:
+      return TaskRowLeadingSwipeAction(
+        title: task.status == .done ? "Reopen" : "Complete",
+        symbol: "checkmark.circle.fill",
+        tint: Color.accentColor
+      ) {
+        toggle(task)
+      }
+    }
+    #else
+    return nil
     #endif
   }
 

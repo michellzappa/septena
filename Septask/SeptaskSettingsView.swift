@@ -607,6 +607,8 @@ struct SeptaskSettingsView: View {
       SeptaskAboutPane()
     case RegistrySettings.PageID.advanced:
       SeptaskAdvancedPane()
+    case RegistrySettings.PageID.smartLists:
+      SeptaskSmartListsPane()
     default:
       EmptyView()
     }
@@ -806,5 +808,65 @@ enum SeptaskAbout {
     let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
     let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
     return "\(short) (\(build))"
+  }
+}
+
+// MARK: - Smart Lists (Depth 1)
+
+private struct SeptaskSmartListsPane: View {
+  @State private var prefs = SmartListPreferences.shared
+
+  var body: some View {
+    List {
+      Section {
+        ForEach(prefs.orderedDestinations) { dest in
+          HStack(spacing: 12) {
+            Image(systemName: dest.sfSymbol)
+              .font(.body.weight(.semibold))
+              .foregroundStyle(dest.id == "today" ? Theme.todayAccent : .secondary)
+              .frame(width: 24, alignment: .center)
+            VStack(alignment: .leading, spacing: 2) {
+              Text(dest.title)
+              if !dest.canHide {
+                Text("Always shown")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              } else if dest.visibility == "whenNonEmpty" {
+                Text("Shown when non-empty")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
+            }
+            Spacer(minLength: 8)
+            Toggle(dest.title, isOn: Binding(
+              get: { !prefs.isHidden(dest.id) },
+              set: { prefs.setHidden(!$0, for: dest.id) }
+            ))
+            .labelsHidden()
+            .disabled(!dest.canHide)
+          }
+        }
+        .onMove { source, destination in
+          prefs.move(fromOffsets: source, toOffset: destination)
+        }
+      } header: {
+        Text("Sidebar Smart Lists")
+      } footer: {
+        Text("Drag to reorder. Smart lists stay in their own section above Areas & Projects and sync across all your devices.")
+      }
+
+      if prefs.isCustomized {
+        Section {
+          Button("Reset to Default Order") {
+            prefs.resetToDefaults()
+          }
+        }
+      }
+    }
+    #if os(iOS)
+    .environment(\.editMode, .constant(.active))
+    .navigationBarTitleDisplayMode(.inline)
+    #endif
+    .navigationTitle("Smart Lists")
   }
 }

@@ -304,6 +304,7 @@ function validateDestinations(dests, icons, caps) {
       assert(d.sidebarOrder > lastOrder, `destinations.json: sidebarOrder must strictly increase at "${d.id}"`);
       lastOrder = d.sidebarOrder;
     }
+    assert(typeof d.canHide === "boolean", `destinations.json: ${d.id} missing boolean canHide`);
     assert(typeof d.emptyState?.title === "string" && typeof d.emptyState?.detail === "string", `destinations.json: ${d.id} needs emptyState.title and .detail`);
     assert(d.icon in icons.icons, `destinations.json: ${d.id} unknown icon "${d.icon}"`);
     assert(d.featureId in caps.capabilities, `destinations.json: ${d.id} unknown featureId "${d.featureId}"`);
@@ -794,6 +795,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let iconId: String");
   lines.push("  let sfSymbol: String");
   lines.push("  let visibility: String");
+  lines.push("  let canHide: Bool");
   lines.push("  let shortcutKeycaps: [String]?");
   lines.push("  let emptyTitle: String");
   lines.push("  let emptyDetail: String");
@@ -818,11 +820,12 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const d of dests.destinations) {
     const capsList = d.shortcut ? `[${appleKeycaps(d.shortcut).map(swiftStr).join(", ")}]` : "nil";
     lines.push(
-      `    RegistryDestination(id: ${swiftStr(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, visibility: ${swiftStr(d.visibility)}, shortcutKeycaps: ${capsList}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}),`
+      `    RegistryDestination(id: ${swiftStr(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, visibility: ${swiftStr(d.visibility)}, canHide: ${d.canHide ? "true" : "false"}, shortcutKeycaps: ${capsList}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}),`
     );
   }
   lines.push("  ]");
   lines.push("");
+  lines.push("  static let byId: [String: RegistryDestination] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })");
   lines.push("  static let byNavigationKey: [String: RegistryDestination] = Dictionary(uniqueKeysWithValues: all.map { ($0.navigationKey, $0) })");
   lines.push("");
   lines.push("  /// Ordered row groups per destination id (`groups` in destinations.json).");

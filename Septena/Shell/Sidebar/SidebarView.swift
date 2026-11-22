@@ -431,10 +431,49 @@ struct SidebarRootView: View {
                    title: spec.title,
                    count: spec.count)
     }
+    .contextMenu { smartListContextMenu(for: spec) }
     #if os(macOS)
     row.modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
     #else
     row
+    #endif
+  }
+
+  @ViewBuilder
+  private func smartListContextMenu(for spec: SmartListSpec) -> some View {
+    if case .filter(let filter) = spec.route,
+       let destID = filter.destinationID,
+       RegistryDestinations.byId[destID]?.canHide == true {
+      Button {
+        let prefs = SmartListPreferences.shared
+        let before = prefs.snapshot()
+        prefs.setHidden(true, for: destID)
+        let after = prefs.snapshot()
+        if after != before {
+          if isSelected(spec.route) {
+            selectRoute(.filter(.today))
+          }
+          TaskUndo.record(
+            name: String(localized: "Hide \(spec.title)", comment: "Sidebar: undo action"),
+            undo: { SmartListPreferences.shared.restore(before) },
+            redo: { SmartListPreferences.shared.restore(after) }
+          )
+        }
+      } label: {
+        Label("Hide \(spec.title)", systemImage: "eye.slash")
+      }
+    }
+    #if SEPTASK
+    Button {
+      SeptaskSettingsLink.request(RegistrySettings.PageID.smartLists)
+      #if os(macOS)
+      SeptaskKitSettingsWindow.show()
+      #else
+      nav.showSettings = true
+      #endif
+    } label: {
+      Label("Customize Smart Lists…", systemImage: "slider.horizontal.3")
+    }
     #endif
   }
 
@@ -456,6 +495,7 @@ struct SidebarRootView: View {
                         isSelected: isSelected(spec.route))
         }
         .buttonStyle(InertButtonStyle())
+        .contextMenu { smartListContextMenu(for: spec) }
         // Drag-a-task-onto-Today re-home, matching the area / project cards
         // below. Only the Today tile takes a drop; self-gates to iPad
         // full-screen (inert on iPhone/compact).
@@ -510,6 +550,19 @@ struct SidebarRootView: View {
     } label: {
       Label("New Project", systemImage: "number")
     }
+    #if SEPTASK
+    Divider()
+    Button {
+      SeptaskSettingsLink.request(RegistrySettings.PageID.smartLists)
+      #if os(macOS)
+      SeptaskKitSettingsWindow.show()
+      #else
+      nav.showSettings = true
+      #endif
+    } label: {
+      Label("Customize Smart Lists…", systemImage: "slider.horizontal.3")
+    }
+    #endif
     #if !SEPTASK
     Divider()
     // Page-specific settings, in the same slot Next uses (just above the
@@ -591,32 +644,26 @@ struct SidebarRootView: View {
     let count: Int?
   }
 
-  // The smart-list SET + order is single-sourced in `TaskDestinations` (shared
-  // with the title dropdown); icon + title come off `Route`. Color and the live
-  // count are sidebar-specific styling, resolved per route here.
-  //
-  // No separate Inbox row — loose captures now live in the triage band on top
-  // of Today (docs/TRIAGE_BAND_SPEC.md). Next is a top-level tab on Septena;
-  // Septask inserts it after Today via `TaskDestinations.sidebarRoutes`.
-  private var visibleSmartListRoutes: [Route] {
-    var routes = TaskDestinations.sidebarRoutes
-    // Review progressively discloses right below Today when non-empty (or
-    // while currently selected so accepting the last item keeps focus calm).
-    if reviewCount > 0 || isSelected(.filter(.review)) {
-      let insertAt = routes.firstIndex(where: { $0.sameDestination(as: .filter(.today)) }).map { $0 + 1 } ?? 0
-      routes.insert(.filter(.review), at: insertAt)
-    }
-    // Agent (docs/TASK_FACTORY_SPEC.md §3) follows Review, or Today when
-    // Review is hidden. Same disclosure rule: non-empty or selected.
-    if agentCount > 0 || isSelected(.filter(.agent)) {
-      let anchor = routes.lastIndex(where: {
-        $0.sameDestination(as: .filter(.review)) || $0.sameDestination(as: .filter(.today))
-      })
-      routes.insert(.filter(.agent), at: anchor.map { $0 + 1 } ?? 0)
-    }
-    return routes
+  private var nonEmptySmartListIDs: Set<String> {
+    var ids = Set<String>()
+    // Review and Agent also stay while selected, so accepting the last item
+    // does not pull the row out from under the user.
+    if reviewCount > 0 || isSelected(.filter(.review)) { ids.insert("review") }
+    if agentCount > 0 || isSelected(.filter(.agent)) { ids.insert("agent") }
+    if starredCount > 0 { ids.insert("starred") }
+    if fadedCount > 0 { ids.insert("faded") }
+    if recentlyDeletedCount > 0 { ids.insert("recentlyDeleted") }
+    return ids
   }
 
+  private var visibleSmartListRoutes: [Route] {
+    TaskDestinations.sidebarRoutes(nonEmptyIDs: nonEmptySmartListIDs)
+  }
+
+  // The smart-list SET + order is single-sourced in `SmartListPreferences` over
+  // `registry/destinations.json` (shared with the macOS AppKit sidebar and the
+  // title dropdown); icon + title come off `Route`. Color and the live count
+  // are sidebar-specific styling, resolved per route here.
   private var smartListSpecs: [SmartListSpec] {
     visibleSmartListRoutes.map { route in
       SmartListSpec(route: route,
@@ -643,14 +690,17 @@ struct SidebarRootView: View {
     switch route {
     // Today total = pinned-today + scheduled/due rolling in. Both buckets live
     // on Today, so the user-facing count is the sum.
-    case .filter(.today):       return counts.map { $0.todayCount + $0.reviewCount }
-    case .filter(.review):      return reviewCount > 0 ? reviewCount : nil
-    case .filter(.agent):       return agentCount > 0 ? agentCount : nil
-    case .filter(.upcoming):    return counts?.upcomingCount
-    case .filter(.repeating):   return repeatingCount
-    case .filter(.unscheduled): return counts?.unscheduledCount
-    case .filter(.logbook):     return doneTodayCount > 0 ? doneTodayCount : nil
-    default:                    return nil
+    case .filter(.today):           return counts.map { $0.todayCount + $0.reviewCount }
+    case .filter(.review):          return reviewCount > 0 ? reviewCount : nil
+    case .filter(.agent):           return agentCount > 0 ? agentCount : nil
+    case .filter(.upcoming):        return counts?.upcomingCount
+    case .filter(.repeating):       return repeatingCount
+    case .filter(.unscheduled):     return counts?.unscheduledCount
+    case .filter(.logbook):         return doneTodayCount > 0 ? doneTodayCount : nil
+    case .filter(.starred):         return starredCount > 0 ? starredCount : nil
+    case .filter(.faded):           return fadedCount > 0 ? fadedCount : nil
+    case .filter(.recentlyDeleted): return recentlyDeletedCount > 0 ? recentlyDeletedCount : nil
+    default:                        return nil
     }
   }
 
@@ -676,16 +726,13 @@ struct SidebarRootView: View {
     #endif
   }
 
-  /// Every route the sidebar can currently select — smart lists, areas, every
-  /// active project, and (when present) Recently Deleted. Used to resolve a
-  /// `Route.id` tag back to its full `Route` for the selection binding.
+  /// Every route the sidebar can currently select — visible smart lists, areas,
+  /// and every active project. Used to resolve a `Route.id` tag back to its
+  /// full `Route` for the selection binding.
   private var selectableRoutes: [Route] {
     var routes = visibleSmartListRoutes
     routes += areas.map { .area(id: $0.id) }
     routes += projects.filter { $0.status == .active }.map { .project(id: $0.id) }
-    if starredCount > 0 { routes.append(.filter(.starred)) }
-    if fadedCount > 0 { routes.append(.filter(.faded)) }
-    if recentlyDeletedCount > 0 { routes.append(.filter(.recentlyDeleted)) }
     return routes
   }
 
@@ -787,38 +834,6 @@ struct SidebarRootView: View {
         if !collapsed {
           ForEach(areaProjects) { project in
             compactRow(route: .project(id: project.id)) { projectRow(project, parent: area.id) }
-          }
-        }
-      }
-    }
-    // Starred, Faded & Recently Deleted — shown conditionally when non-empty.
-    if starredCount > 0 || fadedCount > 0 || recentlyDeletedCount > 0 {
-      Section {
-        if starredCount > 0 {
-          compactRow(route: .filter(.starred)) {
-            navRow(.filter(.starred)) {
-              SmartListRow(icon: "star.fill",
-                           title: "Starred",
-                           count: starredCount)
-            }
-          }
-        }
-        if fadedCount > 0 {
-          compactRow(route: .filter(.faded)) {
-            navRow(.filter(.faded)) {
-              SmartListRow(icon: "circle.dashed",
-                           title: "Faded",
-                           count: fadedCount)
-            }
-          }
-        }
-        if recentlyDeletedCount > 0 {
-          compactRow(route: .filter(.recentlyDeleted)) {
-            navRow(.filter(.recentlyDeleted)) {
-              SmartListRow(icon: "trash",
-                           title: "Recently Deleted",
-                           count: recentlyDeletedCount)
-            }
           }
         }
       }

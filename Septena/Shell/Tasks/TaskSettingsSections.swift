@@ -46,6 +46,9 @@ struct TaskSettingsPane<Destination: Hashable>: View {
   @AppStorage(SettingsKey.tasksTitleLines) private var titleLines: Int = RegistrySettings.Defaults.tasksTitleLines
   @State private var showingManageTags = false
   @State private var tagCount = 0
+  #if os(iOS)
+  @AppStorage(SettingsKey.tasksSwipeLeadingAction) private var swipeLeadingActionRaw: String = TaskSwipeLeadingAction.today.rawValue
+  #endif
 
   #if SEPTASK
   @Environment(\.modelContext) private var modelContext
@@ -143,10 +146,15 @@ struct TaskSettingsPane<Destination: Hashable>: View {
         Text("Two").tag(2)
         Text("Three").tag(3)
       }
+      Picker("Swipe right", selection: $swipeLeadingActionRaw) {
+        ForEach(TaskSwipeLeadingAction.allCases) { action in
+          Text(action.title).tag(action.rawValue)
+        }
+      }
     } header: {
       Text("Task rows")
     } footer: {
-      Text("Maximum lines shown for long titles. Taller rows fit fewer tasks on screen.")
+      Text("Swipe left on a task to select multiple tasks; swipe right runs the quick action above.")
     }
   }
   #endif

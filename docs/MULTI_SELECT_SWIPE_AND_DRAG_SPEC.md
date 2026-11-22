@@ -1,6 +1,6 @@
 # Touch multi-select (swipe to select) & multi-task drag — spec
 
-**Status:** building (2026-11-21 — M0–M2 implemented; M3 optional). Defaults in §10 stand unless mz overrules.
+**Status:** building (2026-11-21 — M0–M3 implemented; ready for device testing). Defaults in §10 stand unless mz overrules.
 **Decisions:** [ADR 0007](adr/0007-septena-is-the-task-app.md), [ADR 0002](adr/0002-own-backend-replaces-icloud.md).
 **Builds on:** `Septena/Shell/Tasks/TaskListView.swift`, `Septena/Shell/UI/SelectableScrollList.swift`, `Septena/Shell/Tasks/TaskListChrome.swift`, `Septena/Shell/Tasks/TaskComponents.swift`, `Septena/Shell/Sidebar/SidebarView.swift`, `Septena/Shell/Sidebar/AreasProjectsView.swift`, `Septask/SeptaskRootView.swift`, `SeptenaCore/CloudKit/TasksBackend.swift`, `SeptenaCore/TaskUndo.swift`, [DRAG_AND_DROP.md](DRAG_AND_DROP.md), [DesignSpec.md](DesignSpec.md) (§4.5).
 **Coordinates with:** [IOS_SWIPE_ACTIONS_SPEC.md](IOS_SWIPE_ACTIONS_SPEC.md) (#132 — see §3.1 for swipe-direction alignment).

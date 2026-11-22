@@ -105,24 +105,32 @@ struct TaskAttributeBar: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
-      // Single horizontal row of circular icon buttons — all 6 fit comfortably
-      // on one row even on compact iPhone widths. "Today" lives inside the When
-      // control rather than duplicating the rail.
-      HStack(spacing: 8) {
-        let edit = discussTask.map(EditOnlyState.init(task:))
-        ForEach(Attribute.rail) { attr in
-          if shows(attr) {
-            AttributePill(icon: attr.icon, label: attr.label,
-                          value: value(for: attr, edit: edit), isSet: isSet(attr, edit: edit),
-                          isActive: attr != .discuss && expanded == attr,
-                          isLoading: attr == .discuss && discussWorking,
-                          isFocused: focus == .pill(attr),
-                          accent: accent, neutral: neutral) { select(attr) }
-              .focused($focus, equals: .pill(attr))
-              .disabled(attr == .discuss && discussWorking)
+      // Horizontal rail of circular icon buttons — scrolls sideways inside its
+      // bounded slot so the rail never widens its card past the screen. "Today"
+      // lives inside the When control rather than duplicating the rail.
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 8) {
+          let edit = discussTask.map(EditOnlyState.init(task:))
+          ForEach(Attribute.rail) { attr in
+            if shows(attr) {
+              AttributePill(icon: attr.icon, label: attr.label,
+                            value: value(for: attr, edit: edit), isSet: isSet(attr, edit: edit),
+                            isActive: attr != .discuss && expanded == attr,
+                            isLoading: attr == .discuss && discussWorking,
+                            isFocused: focus == .pill(attr),
+                            accent: accent, neutral: neutral) { select(attr) }
+                .focused($focus, equals: .pill(attr))
+                .disabled(attr == .discuss && discussWorking)
+            }
           }
         }
+        // Small inset so the circular glass edge and focus ring don't clip
+        // against the scroll viewport's bounds.
+        .padding(.vertical, 2)
+        .padding(.horizontal, 1)
       }
+      .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+      .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
 
       inlineEditor
     }

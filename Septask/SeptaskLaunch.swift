@@ -42,6 +42,7 @@ enum SeptaskLaunch {
       let context = localStore.container.mainContext
       settings.reloadFromMirror(context: context)
       AppearancePreferences.shared.adoptSynced(SeptaskSyncedSettings.current())
+      SmartListPreferences.shared.adoptSynced(SeptaskSyncedSettings.current())
       settings.reconcileWelcomeName(context: context, engine: services.ckEngine)
       settings.reconcileTelemetryLevel(context: context, engine: services.ckEngine)
       settings.reconcileHiddenCalendars(context: context, engine: services.ckEngine)
