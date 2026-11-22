@@ -34,6 +34,12 @@ enum SeptaskSyncedSettings {
     UserDefaults.standard.set(encode(settings), forKey: storeKey)
   }
 
+  /// Clears the local synced-settings blob on account switch or account delete
+  /// so a previous account's preferences cannot leak into the next account.
+  static func clearLocal() {
+    UserDefaults.standard.removeObject(forKey: storeKey)
+  }
+
   static func current() -> AppSettings {
     guard let data = UserDefaults.standard.data(forKey: storeKey),
           let s = try? JSONDecoder().decode(AppSettings.self, from: data) else { return empty }
@@ -73,6 +79,8 @@ enum SeptaskSyncedSettings {
     case "textureMotion": return .from(s.textureMotion)
     case "smartListOrder": return s.smartListOrder.map { .array($0.map { .string($0) }) } ?? .null
     case "smartListHidden": return s.smartListHidden.map { .array($0.map { .string($0) }) } ?? .null
+    case "smartListPlacement":
+      return s.smartListPlacement.map { .object($0.mapValues { .string($0) }) } ?? .null
     default: return .null
     }
   }
@@ -169,6 +177,18 @@ enum SeptaskSyncedSettings {
         let ids = list.compactMap(\.stringValue)
         guard ids.count == list.count else { return false }
         s.smartListHidden = ids
+      default: return false
+      }
+    case "smartListPlacement":
+      switch v {
+      case .null: s.smartListPlacement = nil
+      case .object(let dict):
+        var out: [String: String] = [:]
+        for (k, val) in dict {
+          guard let str = val.stringValue, str == "top" || str == "bottom" else { return false }
+          out[k] = str
+        }
+        s.smartListPlacement = out
       default: return false
       }
     default:

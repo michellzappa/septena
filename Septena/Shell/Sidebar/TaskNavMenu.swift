@@ -66,7 +66,7 @@ struct TaskNavMenu<Trigger: View>: View {
     let projects = snapshot.projects
     let topLevel = projects.filter { $0.area == nil && $0.status == .active }
 
-    ForEach(TaskDestinations.sidebarRoutes(in: modelContext), id: \.id) { destButton($0) }
+    ForEach(TaskDestinations.sidebarRoutes(in: .top, context: modelContext), id: \.id) { destButton($0) }
 
     if !topLevel.isEmpty {
       Divider()
@@ -78,6 +78,12 @@ struct TaskNavMenu<Trigger: View>: View {
       Divider()
       destButton(.area(id: area.id), title: area.title)
       ForEach(areaProjects) { destButton(.project(id: $0.id), title: $0.title) }
+    }
+
+    let bottomRoutes = TaskDestinations.sidebarRoutes(in: .bottom, context: modelContext)
+    if !bottomRoutes.isEmpty {
+      Divider()
+      ForEach(bottomRoutes, id: \.id) { destButton($0) }
     }
   }
 

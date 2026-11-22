@@ -443,24 +443,48 @@ struct SidebarRootView: View {
   private func smartListContextMenu(for spec: SmartListSpec) -> some View {
     if case .filter(let filter) = spec.route,
        let destID = filter.destinationID,
-       RegistryDestinations.byId[destID]?.canHide == true {
-      Button {
-        let prefs = SmartListPreferences.shared
-        let before = prefs.snapshot()
-        prefs.setHidden(true, for: destID)
-        let after = prefs.snapshot()
-        if after != before {
-          if isSelected(spec.route) {
-            selectRoute(.filter(.today))
+       let dest = SmartListPreferences.sidebarById[destID] {
+      if dest.canMoveSection {
+        let currentSection = SmartListPreferences.shared.section(for: destID)
+        Button {
+          let prefs = SmartListPreferences.shared
+          let before = prefs.snapshot()
+          let target: SmartListSection = currentSection == .top ? .bottom : .top
+          prefs.setSection(target, for: destID)
+          let after = prefs.snapshot()
+          if after != before {
+            TaskUndo.record(
+              name: String(localized: "Move \(spec.title)", comment: "Sidebar: undo action"),
+              undo: { SmartListPreferences.shared.restore(before) },
+              redo: { SmartListPreferences.shared.restore(after) }
+            )
           }
-          TaskUndo.record(
-            name: String(localized: "Hide \(spec.title)", comment: "Sidebar: undo action"),
-            undo: { SmartListPreferences.shared.restore(before) },
-            redo: { SmartListPreferences.shared.restore(after) }
+        } label: {
+          Label(
+            currentSection == .top ? "Move Below Areas & Projects" : "Move Above Areas & Projects",
+            systemImage: currentSection == .top ? "arrow.down.to.line" : "arrow.up.to.line"
           )
         }
-      } label: {
-        Label("Hide \(spec.title)", systemImage: "eye.slash")
+      }
+      if dest.canHide {
+        Button {
+          let prefs = SmartListPreferences.shared
+          let before = prefs.snapshot()
+          prefs.setHidden(true, for: destID)
+          let after = prefs.snapshot()
+          if after != before {
+            if isSelected(spec.route) {
+              selectRoute(.filter(.today))
+            }
+            TaskUndo.record(
+              name: String(localized: "Hide \(spec.title)", comment: "Sidebar: undo action"),
+              undo: { SmartListPreferences.shared.restore(before) },
+              redo: { SmartListPreferences.shared.restore(after) }
+            )
+          }
+        } label: {
+          Label("Hide \(spec.title)", systemImage: "eye.slash")
+        }
       }
     }
     #if SEPTASK
@@ -656,22 +680,36 @@ struct SidebarRootView: View {
     return ids
   }
 
-  private var visibleSmartListRoutes: [Route] {
-    TaskDestinations.sidebarRoutes(nonEmptyIDs: nonEmptySmartListIDs)
+  private var topSmartListRoutes: [Route] {
+    TaskDestinations.sidebarRoutes(in: .top, nonEmptyIDs: nonEmptySmartListIDs)
   }
 
-  // The smart-list SET + order is single-sourced in `SmartListPreferences` over
-  // `registry/destinations.json` (shared with the macOS AppKit sidebar and the
-  // title dropdown); icon + title come off `Route`. Color and the live count
-  // are sidebar-specific styling, resolved per route here.
+  private var bottomSmartListRoutes: [Route] {
+    TaskDestinations.sidebarRoutes(in: .bottom, nonEmptyIDs: nonEmptySmartListIDs)
+  }
+
+  private var visibleSmartListRoutes: [Route] {
+    topSmartListRoutes + bottomSmartListRoutes
+  }
+
+  private func makeSmartListSpec(_ route: Route) -> SmartListSpec {
+    SmartListSpec(route: route,
+                  icon: route.icon,
+                  color: smartListColor(route),
+                  title: route.title,
+                  count: smartListCount(route))
+  }
+
+  // The smart-list SET, section placement, and order are single-sourced in
+  // `SmartListPreferences` over `registry/destinations.json`. Top lists render
+  // in the 2-column tile grid (iOS) / top cluster (macOS); bottom lists render
+  // in a grouped card below Areas & Projects.
   private var smartListSpecs: [SmartListSpec] {
-    visibleSmartListRoutes.map { route in
-      SmartListSpec(route: route,
-                    icon: route.icon,
-                    color: smartListColor(route),
-                    title: route.title,
-                    count: smartListCount(route))
-    }
+    topSmartListRoutes.map(makeSmartListSpec)
+  }
+
+  private var bottomSmartListSpecs: [SmartListSpec] {
+    bottomSmartListRoutes.map(makeSmartListSpec)
   }
 
   private func smartListColor(_ route: Route) -> Color {
@@ -835,6 +873,13 @@ struct SidebarRootView: View {
           ForEach(areaProjects) { project in
             compactRow(route: .project(id: project.id)) { projectRow(project, parent: area.id) }
           }
+        }
+      }
+    }
+    if !bottomSmartListSpecs.isEmpty {
+      Section {
+        ForEach(bottomSmartListSpecs, id: \.route.id) { spec in
+          compactRow(route: spec.route) { smartListRow(for: spec) }
         }
       }
     }

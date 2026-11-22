@@ -918,46 +918,16 @@ private struct SeptaskSmartListsPane: View {
 
   var body: some View {
     List {
-      Section {
-        ForEach(prefs.orderedDestinations) { dest in
-          HStack(spacing: 12) {
-            Image(systemName: dest.sfSymbol)
-              .font(.body.weight(.semibold))
-              .foregroundStyle(dest.id == "today" ? Theme.todayAccent : .secondary)
-              .frame(width: 24, alignment: .center)
-            VStack(alignment: .leading, spacing: 2) {
-              Text(dest.title)
-              if !dest.canHide {
-                Text("Always shown")
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
-              } else if dest.visibility == "whenNonEmpty" {
-                Text("Shown when non-empty")
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
-              }
-            }
-            Spacer(minLength: 8)
-            Toggle(dest.title, isOn: Binding(
-              get: { !prefs.isHidden(dest.id) },
-              set: { prefs.setHidden(!$0, for: dest.id) }
-            ))
-            .labelsHidden()
-            .disabled(!dest.canHide)
-          }
-        }
-        .onMove { source, destination in
-          prefs.move(fromOffsets: source, toOffset: destination)
-        }
-      } header: {
-        Text("Sidebar Smart Lists")
-      } footer: {
-        Text("Drag to reorder. Smart lists stay in their own section above Areas & Projects and sync across all your devices.")
-      }
+      sectionBlock(.top,
+                   header: "Above Areas & Projects",
+                   footer: "Working lists shown at the top of the sidebar.")
+      sectionBlock(.bottom,
+                   header: "Below Areas & Projects",
+                   footer: "Archive and utility lists shown below your areas and projects. Drag to reorder within a section, or use the arrow button to move a list above or below. Changes sync across all your devices.")
 
       if prefs.isCustomized {
         Section {
-          Button("Reset to Default Order") {
+          Button("Reset to Defaults") {
             prefs.resetToDefaults()
           }
         }
@@ -968,5 +938,74 @@ private struct SeptaskSmartListsPane: View {
     .navigationBarTitleDisplayMode(.inline)
     #endif
     .navigationTitle("Smart Lists")
+  }
+
+  @ViewBuilder
+  private func sectionBlock(_ section: SmartListSection,
+                            header: String,
+                            footer: String) -> some View {
+    let items = prefs.orderedDestinations(in: section)
+    Section {
+      if items.isEmpty {
+        Text("No smart lists in this section")
+          .foregroundStyle(.secondary)
+      } else {
+        ForEach(items) { dest in
+          smartListRow(dest, in: section)
+        }
+        .onMove { source, destination in
+          prefs.moveInSection(section, fromOffsets: source, toOffset: destination)
+        }
+      }
+    } header: {
+      Text(header)
+    } footer: {
+      Text(footer)
+    }
+  }
+
+  private func smartListRow(_ dest: RegistryDestination,
+                            in section: SmartListSection) -> some View {
+    HStack(spacing: 12) {
+      Image(systemName: dest.sfSymbol)
+        .font(.body.weight(.semibold))
+        .foregroundStyle(dest.id == "today" ? Theme.todayAccent : .secondary)
+        .frame(width: 24, alignment: .center)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(dest.title)
+        if !dest.canHide {
+          Text("Always shown")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        } else if dest.visibility == "whenNonEmpty" {
+          Text("Shown when non-empty")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+      Spacer(minLength: 8)
+      if dest.canMoveSection {
+        let target: SmartListSection = section == .top ? .bottom : .top
+        Button {
+          prefs.setSection(target, for: dest.id)
+        } label: {
+          Image(systemName: target == .bottom ? "arrow.down.to.line" : "arrow.up.to.line")
+            .foregroundStyle(.secondary)
+            .frame(width: 28, height: 28)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(target == .bottom ? "Move below Areas & Projects" : "Move above Areas & Projects")
+        .accessibilityLabel(target == .bottom
+                            ? "Move \(dest.title) below Areas & Projects"
+                            : "Move \(dest.title) above Areas & Projects")
+      }
+      Toggle(dest.title, isOn: Binding(
+        get: { !prefs.isHidden(dest.id) },
+        set: { prefs.setHidden(!$0, for: dest.id) }
+      ))
+      .labelsHidden()
+      .disabled(!dest.canHide)
+    }
   }
 }

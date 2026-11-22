@@ -143,6 +143,17 @@
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
       "featureId": "settings.display"
     },
+    "smartListPlacement": {
+      "scope": "synced",
+      "storageKey": "septena.sidebar.smartListPlacement",
+      "type": "record",
+      "maxEntries": 32,
+      "keyMaxLength": 64,
+      "values": ["top", "bottom"],
+      "default": {},
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "settings.display"
+    },
     "appearanceMode": {
       "scope": "device",
       "storageKey": "septena.appearance.mode",
@@ -881,7 +892,7 @@
             {
               "kind": "customSurface",
               "surface": "smart_lists_editor",
-              "ownsKeys": ["smartListOrder", "smartListHidden"]
+              "ownsKeys": ["smartListOrder", "smartListHidden", "smartListPlacement"]
             }
           ]
         }

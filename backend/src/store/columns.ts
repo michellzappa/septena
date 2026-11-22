@@ -94,6 +94,9 @@ export const SETTING_VALUES = {
   smartListOrder: z.array(z.string().max(64)).max(32),
   /// Per-account hidden special smart lists (registry/destinations.json IDs).
   smartListHidden: z.array(z.string().max(64)).max(32),
+  /// Per-account sidebar section overrides ("top" | "bottom") keyed by smart-list ID.
+  smartListPlacement: z.record(z.string().max(64), z.enum(["top", "bottom"]))
+    .refine((r) => Object.keys(r).length <= 32, "too many smart list placement overrides"),
 } satisfies Record<string, z.ZodTypeAny>;
 
 export type SettingKey = keyof typeof SETTING_VALUES;

@@ -26,6 +26,8 @@ import app.septena.core.JsonValue
 import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
+import app.septena.core.SmartListResolver
+import app.septena.core.SmartListSection
 import app.septena.core.TaskSnapshot
 import app.septena.core.TaskViewRules
 import app.septena.core.generated.RegistryActionIds
@@ -41,8 +43,14 @@ import kotlinx.coroutines.withContext
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-/** The destinations `TaskViewRules.membership` computes; titles come from the registry. */
-private val DESTINATIONS = listOf(
+/** The destinations `TaskViewRules.membership` computes; order and visibility come from synced smart-list preferences. */
+private val SUPPORTED_DESTINATIONS = setOf(
+    RegistryDestinationIds.TODAY,
+    RegistryDestinationIds.UPCOMING,
+    RegistryDestinationIds.ANYTIME,
+)
+
+private val DEFAULT_DESTINATIONS = listOf(
     RegistryDestinationIds.TODAY,
     RegistryDestinationIds.INBOX,
     RegistryDestinationIds.UPCOMING,
@@ -52,6 +60,7 @@ private val DESTINATIONS = listOf(
 @Composable
 fun TaskHomeScreen(graph: AndroidAppGraph) {
     var destination by remember { mutableStateOf(RegistryDestinationIds.TODAY) }
+    var destinations by remember { mutableStateOf(DEFAULT_DESTINATIONS) }
     var tasks by remember { mutableStateOf(emptyList<PositionedTask>()) }
     var draftTitle by remember { mutableStateOf("") }
     var writeError by remember { mutableStateOf<String?>(null) }
@@ -69,6 +78,24 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
         completeAction,
         RegistryActionContext(platform = RegistryPlatformIds.ANDROID, destinationId = destination, selectedCount = 1),
     )
+
+    LaunchedEffect(dataVersion) {
+        val resolved = withContext(Dispatchers.IO) {
+            val top = SmartListResolver.visibleFromSynced(graph.syncedSettings, emptySet(), SmartListSection.TOP)
+                .map { it.id }
+                .filter { it in SUPPORTED_DESTINATIONS }
+            val bottom = SmartListResolver.visibleFromSynced(graph.syncedSettings, emptySet(), SmartListSection.BOTTOM)
+                .map { it.id }
+                .filter { it in SUPPORTED_DESTINATIONS }
+            buildList {
+                addAll(top)
+                add(RegistryDestinationIds.INBOX)
+                addAll(bottom)
+            }.ifEmpty { DEFAULT_DESTINATIONS }
+        }
+        destinations = resolved
+        if (destination !in resolved) destination = RegistryDestinationIds.TODAY
+    }
 
     LaunchedEffect(destination, dataVersion) {
         tasks = withContext(Dispatchers.IO) { loadTasks(graph, destination) }
@@ -117,7 +144,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                DESTINATIONS.forEach { id ->
+                destinations.forEach { id ->
                     FilterChip(
                         selected = id == destination,
                         onClick = { destination = id },

@@ -1252,6 +1252,9 @@ struct AppSettings: Codable {
   /// user (destinations with `canHide == false`, e.g. `today`, are never hidden).
   var smartListOrder: [String]? = nil
   var smartListHidden: [String]? = nil
+  /// Optional per-destination placement override ("top" | "bottom") keyed by
+  /// canonical destination ID. Absent IDs fall back to `registry/destinations.json`.
+  var smartListPlacement: [String: String]? = nil
 
   /// When the first-run welcome (section picker + chained onboarding) was
   /// completed. The durable, cross-device "this account has been welcomed"

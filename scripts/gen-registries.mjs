@@ -166,7 +166,7 @@ function validateCapabilities(caps) {
 
 function validateSettings(settings, entities, icons, caps) {
   assert(settings.version === 2, "settings.json: version must be 2");
-  const validTypes = new Set(["bool", "int", "enum", "string", "string[]"]);
+  const validTypes = new Set(["bool", "int", "enum", "string", "string[]", "record"]);
   const validScopes = new Set(["synced", "device"]);
   const validPlatforms = new Set(caps.platforms);
   const validPresentations = new Set(["card", "inline"]);
@@ -301,14 +301,17 @@ function validateDestinations(dests, icons, caps) {
   for (const d of dests.destinations) {
     assert(!seenIds.has(d.id), `destinations.json: duplicate id "${d.id}"`);
     seenIds.add(d.id);
-    // A band (Inbox on Today) has no sidebar row, so no sidebarOrder.
+    // A band (Inbox on Today) has no sidebar row, so no sidebarOrder or sidebarSection.
     if (d.visibility === "todayBand") {
       assert(d.sidebarOrder === undefined, `destinations.json: ${d.id} is a todayBand and cannot have a sidebarOrder`);
+      assert(d.sidebarSection === undefined, `destinations.json: ${d.id} is a todayBand and cannot have a sidebarSection`);
     } else {
       assert(d.sidebarOrder > lastOrder, `destinations.json: sidebarOrder must strictly increase at "${d.id}"`);
       lastOrder = d.sidebarOrder;
+      assert(d.sidebarSection === "top" || d.sidebarSection === "bottom", `destinations.json: ${d.id} invalid sidebarSection "${d.sidebarSection}"`);
     }
     assert(typeof d.canHide === "boolean", `destinations.json: ${d.id} missing boolean canHide`);
+    assert(typeof d.canMoveSection === "boolean", `destinations.json: ${d.id} missing boolean canMoveSection`);
     assert(typeof d.emptyState?.title === "string" && typeof d.emptyState?.detail === "string", `destinations.json: ${d.id} needs emptyState.title and .detail`);
     assert(d.icon in icons.icons, `destinations.json: ${d.id} unknown icon "${d.icon}"`);
     assert(d.featureId in caps.capabilities, `destinations.json: ${d.id} unknown featureId "${d.featureId}"`);
@@ -937,8 +940,10 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let title: String");
   lines.push("  let iconId: String");
   lines.push("  let sfSymbol: String");
+  lines.push("  let sidebarSection: String");
   lines.push("  let visibility: String");
   lines.push("  let canHide: Bool");
+  lines.push("  let canMoveSection: Bool");
   lines.push("  let shortcutKeycaps: [String]?");
   lines.push("  let emptyTitle: String");
   lines.push("  let emptyDetail: String");
@@ -966,7 +971,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const d of dests.destinations) {
     const capsList = d.shortcut ? `[${appleKeycaps(d.shortcut).map(swiftStr).join(", ")}]` : "nil";
     lines.push(
-      `    RegistryDestination(id: ${swiftStr(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, visibility: ${swiftStr(d.visibility)}, canHide: ${d.canHide ? "true" : "false"}, shortcutKeycaps: ${capsList}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}, featureId: ${swiftStr(d.featureId)}),`
+      `    RegistryDestination(id: ${swiftStr(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, sidebarSection: ${swiftStr(d.sidebarSection ?? "top")}, visibility: ${swiftStr(d.visibility)}, canHide: ${d.canHide ? "true" : "false"}, canMoveSection: ${d.canMoveSection ? "true" : "false"}, shortcutKeycaps: ${capsList}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}, featureId: ${swiftStr(d.featureId)}),`
     );
   }
   lines.push("  ]");

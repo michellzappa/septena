@@ -4286,7 +4286,7 @@ final class SeptaskKitTaskListController: NSViewController {
       destItem(.filter(.project(project.id), title: project.title))
     }
 
-    for destination in KitSidebarDestination.smartLists(in: context) {
+    for destination in KitSidebarDestination.smartLists(in: .top, context: context) {
       menu.addItem(destItem(destination))
     }
 
@@ -4301,6 +4301,12 @@ final class SeptaskKitTaskListController: NSViewController {
       menu.addItem(.separator())
       menu.addItem(destItem(.filter(.area(area.id), title: area.title)))
       for project in areaProjects { menu.addItem(projectItem(project)) }
+    }
+
+    let bottomSmartLists = KitSidebarDestination.smartLists(in: .bottom, context: context)
+    if !bottomSmartLists.isEmpty {
+      menu.addItem(.separator())
+      for destination in bottomSmartLists { menu.addItem(destItem(destination)) }
     }
 
     return menu

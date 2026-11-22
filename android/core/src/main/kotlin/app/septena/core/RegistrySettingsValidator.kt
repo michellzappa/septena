@@ -87,6 +87,31 @@ object RegistrySettingsValidator {
                     }
                 }
             }
+            "record" -> {
+                val entries = (value as? JsonValue.ObjectValue)?.fields
+                if (entries == null) {
+                    issues += expected("JSON object")
+                } else {
+                    val maxEntries = definition.numberAt("maxEntries")
+                    val keyMaxLength = definition.numberAt("keyMaxLength")
+                    val allowedValues = (definition.fields["values"] as? JsonValue.ArrayValue)
+                        ?.values?.mapNotNull { it.stringValue() }?.toSet()
+                    if (maxEntries != null && entries.size.toLong() > maxEntries) {
+                        issues += RegistryValidationIssue("fields.value", "contains more than $maxEntries entries")
+                    }
+                    entries.forEach { (entryKey, entryVal) ->
+                        if (keyMaxLength != null && entryKey.length.toLong() > keyMaxLength) {
+                            issues += RegistryValidationIssue("fields.value.$entryKey", "key exceeds the maximum length of $keyMaxLength")
+                        }
+                        val text = (entryVal as? JsonValue.StringValue)?.value
+                        if (text == null) {
+                            issues += RegistryValidationIssue("fields.value.$entryKey", "expected string")
+                        } else if (allowedValues != null && text !in allowedValues) {
+                            issues += RegistryValidationIssue("fields.value.$entryKey", "is not an allowed registry value")
+                        }
+                    }
+                }
+            }
             else -> issues += RegistryValidationIssue("id", "setting '$key' has unsupported registry type '$type'")
         }
         return issues

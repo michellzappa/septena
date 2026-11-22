@@ -29,8 +29,20 @@ enum KitSidebarDestination: Equatable {
   case filter(TaskFilter, title: String)
 
   /// The AppKit shell's smart-list destinations, in the account's configured
-  /// order — read from `TaskDestinations.sidebarRoutes(nonEmptyIDs:)`, which
+  /// order — read from `TaskDestinations.sidebarRoutes(in:nonEmptyIDs:)`, which
   /// reads `SmartListPreferences.shared` over `registry/destinations.json`.
+  @MainActor static func smartLists(in section: SmartListSection,
+                                    nonEmptyIDs: Set<String>) -> [KitSidebarDestination] {
+    TaskDestinations.sidebarRoutes(in: section, nonEmptyIDs: nonEmptyIDs)
+      .compactMap(KitSidebarDestination.init(route:))
+  }
+
+  @MainActor static func smartLists(in section: SmartListSection,
+                                    context: ModelContext) -> [KitSidebarDestination] {
+    TaskDestinations.sidebarRoutes(in: section, context: context)
+      .compactMap(KitSidebarDestination.init(route:))
+  }
+
   @MainActor static func smartLists(nonEmptyIDs: Set<String>) -> [KitSidebarDestination] {
     TaskDestinations.sidebarRoutes(nonEmptyIDs: nonEmptyIDs).compactMap(KitSidebarDestination.init(route:))
   }
@@ -144,12 +156,12 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// `heightOfRowByItem`, so each area still reads as its own section without
   /// the "Areas & Projects" text header that used to separate them.
   private var topLevelAreaOrProjectKeys: Set<String> = []
-  /// Where `organize` (loose projects, then areas) begins within `roots` —
-  /// `roots = views + organize`. Structure drag-reorder uses this to convert
-  /// between "position within `roots`" (what NSOutlineView hands back for a
-  /// root-level drop) and "position within the pure loose-project or
-  /// pure-area id list" (what the mutators' `reorder(orderedIDs:)` expects).
+  /// Where `organize` (loose projects, then areas) begins and ends within
+  /// `roots` — `roots = topViews + organize + bottomViews`. Structure
+  /// drag-reorder uses `[organizeStartIndex, bottomStartIndex)` so areas and
+  /// projects never cross into either special smart-list cluster.
   private var organizeStartIndex = 0
+  private var bottomStartIndex = 0
   private var observers: [NSObjectProtocol] = []
   /// A task edit can emit several synchronous notifications. Sidebar counts
   /// are expensive aggregate reads, so rebuild once after the gesture settles
@@ -547,12 +559,14 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     if starredCount > 0 { nonEmptyIDs.insert("starred") }
     if fadedCount > 0 { nonEmptyIDs.insert("faded") }
     if recentlyDeletedCount > 0 { nonEmptyIDs.insert("recentlyDeleted") }
-    let views = KitSidebarDestination.smartLists(nonEmptyIDs: nonEmptyIDs).map { destination in
-      Node(destination.nodeContent, count: smartListCount(destination,
-                                                          counts: smartCounts,
-                                                          today: todayCount + inboxCount,
-                                                          doneToday: doneTodayCount))
+    let makeViewNode: (KitSidebarDestination) -> Node = { destination in
+      Node(destination.nodeContent, count: self.smartListCount(destination,
+                                                               counts: smartCounts,
+                                                               today: todayCount + inboxCount,
+                                                               doneToday: doneTodayCount))
     }
+    let topViews = KitSidebarDestination.smartLists(in: .top, nonEmptyIDs: nonEmptyIDs).map(makeViewNode)
+    let bottomViews = KitSidebarDestination.smartLists(in: .bottom, nonEmptyIDs: nonEmptyIDs).map(makeViewNode)
 
     let projectsByArea = Dictionary(grouping: snapshot.projects.filter { $0.deletedAt == nil },
                                     by: { $0.area ?? "" })
@@ -573,13 +587,16 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
                            count: openByArea[area.id]?.nilIfZero))
     }
 
-    // No group wrapper nodes — the views cluster and the areas/projects
-    // cluster are just adjacent siblings at the root. `roots` is what
-    // `numberOfChildrenOfItem(nil)` returns, so this list order IS the
-    // top-level row order.
-    roots = views + organize
-    organizeStartIndex = views.count
-    topLevelAreaOrProjectKeys = Set(organize.map(\.key))
+    // No group wrapper nodes — top smart lists, areas/projects, and bottom
+    // smart lists sit as adjacent siblings at the root, separated by a 16pt
+    // top margin on each top-level area/loose-project and on the first bottom
+    // smart list.
+    roots = topViews + organize + bottomViews
+    organizeStartIndex = topViews.count
+    bottomStartIndex = topViews.count + organize.count
+    var gapKeys = Set(organize.map(\.key))
+    if let firstBottom = bottomViews.first { gapKeys.insert(firstBottom.key) }
+    topLevelAreaOrProjectKeys = gapKeys
     outlineView.reloadData()
     restoreExpansion()
 
@@ -683,8 +700,8 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       outlineView.setDropItem(node, dropChildIndex: NSOutlineViewDropOnItemIndex)
       return .move
     }
-    if draggedSmartListID(from: info) != nil {
-      return validateSmartListReorder(proposedItem: item, proposedChildIndex: index)
+    if let movedID = draggedSmartListID(from: info) {
+      return validateSmartListReorder(movedID: movedID, proposedItem: item, proposedChildIndex: index)
     }
     return validateStructureReorder(info, proposedItem: item, proposedChildIndex: index)
   }
@@ -775,14 +792,14 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   // menu's "Move to Area" makes. Every structure gesture records undo.
 
   /// The `roots` index range areas occupy (always the tail of `organize`,
-  /// after any loose projects). Empty range at `roots.count` if there are
-  /// no areas.
+  /// after any loose projects and before `bottomStartIndex`). Empty range at
+  /// `bottomStartIndex` if there are no areas.
   private var areaNodeRange: Range<Int> {
-    guard let first = roots.firstIndex(where: {
+    guard let first = roots[organizeStartIndex..<bottomStartIndex].firstIndex(where: {
       if case .area = $0.content { return true }
       return false
-    }) else { return roots.count..<roots.count }
-    return first..<roots.count
+    }) else { return bottomStartIndex..<bottomStartIndex }
+    return first..<bottomStartIndex
   }
 
   private func node(forKey key: String) -> Node? {
@@ -817,14 +834,36 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       .first?.string(forType: .septaskSmartListItem)
   }
 
-  /// Smart lists are always a dedicated "special" cluster above Areas &
-  /// Projects (`0..<organizeStartIndex`): reorderable among themselves, never
-  /// dropped into areas or projects below.
-  private func validateSmartListReorder(proposedItem item: Any?,
+  /// Smart lists live in two dedicated "special" clusters framing Areas &
+  /// Projects: top (`0...organizeStartIndex`) and bottom
+  /// (`bottomStartIndex...roots.count`). They can reorder within a cluster or
+  /// move between top and bottom (when `canMoveSection` is true), but can
+  /// never drop inside Areas & Projects.
+  private func smartListDropTarget(movedID: String, index: Int) -> (section: SmartListSection, localIndex: Int)? {
+    guard index >= 0, index <= roots.count else { return nil }
+    let canMove = SmartListPreferences.sidebarById[movedID]?.canMoveSection ?? false
+    let hasOrganize = bottomStartIndex > organizeStartIndex
+    if index <= organizeStartIndex {
+      return (.top, index)
+    }
+    if hasOrganize, index >= bottomStartIndex, canMove {
+      return (.bottom, index - bottomStartIndex)
+    }
+    if !hasOrganize, index >= bottomStartIndex {
+      if bottomStartIndex < roots.count, canMove {
+        return (.bottom, index - bottomStartIndex)
+      }
+      return (.top, index)
+    }
+    return nil
+  }
+
+  private func validateSmartListReorder(movedID: String,
+                                        proposedItem item: Any?,
                                         proposedChildIndex index: Int) -> NSDragOperation {
     guard item == nil,
           index != NSOutlineViewDropOnItemIndex,
-          index >= 0, index <= organizeStartIndex
+          smartListDropTarget(movedID: movedID, index: index) != nil
     else { return [] }
     outlineView.setDropItem(nil, dropChildIndex: index)
     return .move
@@ -834,15 +873,22 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
                                       proposedChildIndex index: Int) -> Bool {
     guard item == nil,
           index != NSOutlineViewDropOnItemIndex,
-          let movedID = draggedSmartListID(from: info)
+          let movedID = draggedSmartListID(from: info),
+          let target = smartListDropTarget(movedID: movedID, index: index)
     else { return false }
-    let visibleIDs: [String] = roots.prefix(organizeStartIndex).compactMap { node in
+    let slice = target.section == .top
+      ? roots[0..<organizeStartIndex]
+      : roots[bottomStartIndex..<roots.count]
+    let targetVisibleIDs: [String] = slice.compactMap { node in
       guard case .filter(let f, _, _) = node.content else { return nil }
       return f.destinationID
     }
     let prefs = SmartListPreferences.shared
     let before = prefs.snapshot()
-    prefs.reorderVisible(visibleIDs: visibleIDs, movedID: movedID, toVisibleIndex: index)
+    prefs.reorderVisible(movedID: movedID,
+                         toSection: target.section,
+                         targetVisibleIDs: targetVisibleIDs,
+                         toVisibleIndex: target.localIndex)
     let after = prefs.snapshot()
     guard after != before else { return true }
     recordStructure(
@@ -1347,20 +1393,31 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         default: return nil
         }
       }
-      // Smart-list show/hide (SmartListPreferences) rides on top of the
-      // registry menu: Hide <list> for a hideable list, then Customize.
+      // Smart-list placement + show/hide (SmartListPreferences) rides on top of
+      // the registry menu: Move Above/Below, Hide <list>, then Customize.
       menu.insertItem(.separator(), at: 0)
       menu.insertItem(smartListMenuItem(String(localized: "Customize Smart Lists…",
                                                comment: "SeptaskKit: sidebar context menu"),
                                         #selector(openSmartListsSettings)), at: 0)
       if case .filter(let filter, let title, _)? = node?.content,
          let destID = filter.destinationID,
-         RegistryDestinations.byId[destID]?.canHide == true {
-        let hideItem = smartListMenuItem(String(localized: "Hide \(title)",
-                                                comment: "SeptaskKit: sidebar context menu"),
-                                         #selector(hideSmartList(_:)))
-        hideItem.representedObject = destID
-        menu.insertItem(hideItem, at: 0)
+         let dest = SmartListPreferences.sidebarById[destID] {
+        if dest.canHide {
+          let hideItem = smartListMenuItem(String(localized: "Hide \(title)",
+                                                  comment: "SeptaskKit: sidebar context menu"),
+                                           #selector(hideSmartList(_:)))
+          hideItem.representedObject = destID
+          menu.insertItem(hideItem, at: 0)
+        }
+        if dest.canMoveSection {
+          let currentSection = SmartListPreferences.shared.section(for: destID)
+          let moveTitle = currentSection == .top
+            ? String(localized: "Move Below Areas & Projects", comment: "SeptaskKit: sidebar context menu")
+            : String(localized: "Move Above Areas & Projects", comment: "SeptaskKit: sidebar context menu")
+          let moveItem = smartListMenuItem(moveTitle, #selector(toggleSmartListSection(_:)))
+          moveItem.representedObject = destID
+          menu.insertItem(moveItem, at: 0)
+        }
       }
     }
     menu.popUp(positioning: nil, at: point, in: outlineView)
@@ -1370,6 +1427,21 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
     item.target = self
     return item
+  }
+
+  @objc private func toggleSmartListSection(_ sender: NSMenuItem) {
+    guard let destID = sender.representedObject as? String else { return }
+    let prefs = SmartListPreferences.shared
+    let before = prefs.snapshot()
+    let target: SmartListSection = prefs.section(for: destID) == .top ? .bottom : .top
+    prefs.setSection(target, for: destID)
+    let after = prefs.snapshot()
+    guard after != before else { return }
+    let title = SmartListPreferences.sidebarById[destID]?.title ?? "Smart List"
+    recordStructure(
+      name: String(localized: "Move \(title)", comment: "SeptaskKit: undo action"),
+      undo: { SmartListPreferences.shared.restore(before) },
+      redo: { SmartListPreferences.shared.restore(after) })
   }
 
   @objc private func hideSmartList(_ sender: NSMenuItem) {

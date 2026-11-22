@@ -1157,6 +1157,10 @@ final class TaskSyncEngine {
     for p in (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? [] { context.delete(p) }
     for a in (try? context.fetch(FetchDescriptor<AreaEntity>())) ?? [] { context.delete(a) }
     _ = StoreHealth.save(context, op: "taskSync.wipe")
+    // Account switch / delete: clear cached per-account synced settings and
+    // smart-list mirrors so the previous account cannot leak into the next one.
+    SeptaskSyncedSettings.clearLocal()
+    SmartListPreferences.shared.clearLocalForAccountSwitch()
     // Account switch / delete: the launch snapshot holds the old rows (#82).
     TodaySnapshotStore.invalidate()
     #if os(iOS) && SEPTASK
