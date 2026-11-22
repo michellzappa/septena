@@ -1,0 +1,103 @@
+# Tagged releases of the shared Rust core (C5, #251, docs/SHARED_CORE_SPEC.md).
+# A tag core-vX.Y.Z builds every artifact with core.yml (vectors and budgets
+# included) and publishes them as GitHub release assets. Apps pin a release
+# (scripts/core-pin.sh), so no app build compiles Rust.
+name: core-release
+
+on:
+  push:
+    tags: ["core-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: core-release-version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches the crate version
+        id: v
+        run: |
+          version="${GITHUB_REF_NAME#core-v}"
+          crate="$(awk -F'"' '/^version = /{print $2; exit}' core/Cargo.toml)"
+          if [ "$version" != "$crate" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match core/Cargo.toml version $crate"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: version
+    uses: ./.github/workflows/core.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+
+  publish:
+    name: core-release-publish
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: core-dist-*
+          path: dist-in
+      - name: Package the assets
+        run: |
+          set -euo pipefail
+          in=dist-in
+          out="$RUNNER_TEMP/assets"
+          mkdir -p "$out" "$RUNNER_TEMP/jvm/linux-x86-64" "$RUNNER_TEMP/jvm/win32-x86-64"
+          ls -R "$in" | head -60
+
+          # Apple: the XCFramework zip that SwiftPM's binaryTarget takes, and the Swift bindings.
+          cp "$in/core-dist-apple/SeptenaSharedCoreFFI.xcframework.zip" "$out/SeptenaSharedCoreFFI-$VERSION.xcframework.zip"
+          swift_file="$(ls "$in"/core-dist-apple/*.swift | head -1)"
+          cp "$swift_file" "$out/SeptenaSharedCore-$VERSION.swift"
+
+          # Kotlin bindings: the same source serves Android and the JVM.
+          kotlin_dir="$in/core-dist-jvm-ubuntu-latest/generated"
+          (cd "$kotlin_dir" && zip -qr "$out/septena-core-kotlin-$VERSION.zip" .)
+
+          # Android: the stripped .so per ABI, in Gradle's jniLibs layout.
+          (cd "$in/core-dist-android-jnilibs" && zip -qr "$out/septena-core-android-jnilibs-$VERSION.zip" .)
+
+          # JVM (Windows app, ADR 0013): natives in JNA's resource layout, as a jar.
+          cp "$in/core-dist-jvm-ubuntu-latest/libseptena_core.so" "$RUNNER_TEMP/jvm/linux-x86-64/"
+          cp "$in/core-dist-jvm-windows-latest/septena_core.dll" "$RUNNER_TEMP/jvm/win32-x86-64/"
+          (cd "$RUNNER_TEMP/jvm" && zip -qr "$out/septena-core-jvm-natives-$VERSION.jar" .)
+
+          # Web: the wasm-bindgen --target web package.
+          tar -czf "$out/septena-core-wasm-web-$VERSION.tgz" -C "$in/core-dist-wasm-web" .
+
+          # The manifest an app pins: every asset with its SHA-256 (the SwiftPM checksum for the zip).
+          (cd "$out" && for f in *; do printf '%s %s\n' "$(sha256sum "$f" | cut -d' ' -f1)" "$f"; done) > "$RUNNER_TEMP/sums"
+          jq -Rn --arg version "$VERSION" --arg tag "$GITHUB_REF_NAME" --arg repo "$GITHUB_REPOSITORY" '
+            {version: $version, tag: $tag,
+             assets: [inputs | split(" ") | {name: .[1], sha256: .[0],
+               url: ("https://github.com/" + $repo + "/releases/download/" + $tag + "/" + .[1])}]}' \
+            "$RUNNER_TEMP/sums" > "$out/release.json"
+          cat "$out/release.json"
+          {
+            echo "### core $VERSION"
+            echo
+            echo '| Asset | Bytes | SHA-256 |'
+            echo '| ----- | ----- | ------- |'
+            (cd "$out" && for f in *; do echo "| $f | $(wc -c < "$f" | tr -d ' ') | \`$(sha256sum "$f" | cut -c1-16)…\` |"; done)
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/assets/* \
+            --title "Shared core $VERSION" \
+            --notes "Shared Rust core $VERSION (ADR 0025). Built and tested by core.yml: every conformance vector passed in each packaged artifact. Pin it with \`scripts/core-pin.sh $VERSION\`." \
+            --verify-tag

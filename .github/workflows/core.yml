@@ -20,13 +20,21 @@ on:
       - "scripts/gen-registries.mjs"
       - ".github/workflows/core.yml"
   workflow_dispatch:
+  # core-release.yml builds the release assets with these jobs (C5, #251).
+  workflow_call:
+    inputs:
+      version:
+        description: Release version, without the core-v prefix
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: core-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # github.workflow is the caller's name in a call, so a release never cancels a main push.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.workflow == 'core' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -259,6 +267,7 @@ jobs:
             --library "$lib" --language kotlin --out-dir harness/jvm/generated
           mkdir -p "$RUNNER_TEMP/natives"
           cp "$lib" "$RUNNER_TEMP/natives/"
+          cp -r harness/jvm/generated "$RUNNER_TEMP/natives/generated"
           case "$RUNNER_OS" in
             Linux) strip --strip-unneeded "$RUNNER_TEMP/natives/$(basename "$lib")" ;;
           esac
@@ -272,9 +281,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: core-dist-jvm-${{ matrix.os }}
-          path: |
-            ${{ runner.temp }}/natives
-            core/harness/jvm/generated
+          path: ${{ runner.temp }}/natives
           if-no-files-found: error
       - uses: actions/setup-java@v4
         with:
