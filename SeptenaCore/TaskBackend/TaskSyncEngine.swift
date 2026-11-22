@@ -91,7 +91,7 @@ final class TaskSyncEngine {
   /// Soft-delete grace: a delete waits this long in the outbox, so ⌘Z (which
   /// restores the row) cancels it before the backend sees it. The backend
   /// never revives a deleted row (§6.4).
-  static let deleteGrace: TimeInterval = 120
+  static let deleteGrace: TimeInterval = TimeInterval(RegistryRules.deleteGraceSeconds)
   static let batchLimit = 500
   static let sinceKey = "septena.taskSync.since"
   /// True once a pull that asked for settings finished. Until then a local

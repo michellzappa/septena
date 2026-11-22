@@ -70,6 +70,7 @@ export const DOMAIN_RULES = {
   tombstoneTtlDays: 90,
   clientOpTtlDays: 30,
   changeLogTtlDays: 365,
+  deleteGraceSeconds: 120,
 } as const;
 
 export const SYNCED_SETTING_KEYS = ["welcomeName","telemetryLevel","calendarHiddenTitles","rolledInDismissedOn","homeTimezone","agentsPaused","getStartedDismissed","getStartedSteps","onboardedAt","accentColor","canvasTexture","textureIntensity","textureMotion"] as const;

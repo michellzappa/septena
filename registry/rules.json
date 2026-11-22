@@ -13,5 +13,6 @@
   "claimTtlMaxSeconds": 14400,
   "tombstoneTtlDays": 90,
   "clientOpTtlDays": 30,
-  "changeLogTtlDays": 365
+  "changeLogTtlDays": 365,
+  "deleteGraceSeconds": 120
 }
