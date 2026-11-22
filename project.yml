@@ -32,6 +32,9 @@ settings:
     # spurious warnings, and the type-checker crashes outright on the largest
     # view bodies. Revisit when those files are broken up and we move to Swift 6.
     SWIFT_STRICT_CONCURRENCY: targeted
+    # Apple silicon only on the Mac: no Intel slice. The shared core's
+    # XCFramework ships macOS arm64 only, so a universal build fails to link.
+    "ARCHS[sdk=macosx*]": arm64
     # MARKETING_VERSION is the deliberate, human-chosen release version
     # (SemVer). Bump it by hand here only when cutting a release — see
     # docs/VERSIONING.md. CURRENT_PROJECT_VERSION (the build number) is NOT set

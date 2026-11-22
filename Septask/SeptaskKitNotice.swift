@@ -244,6 +244,14 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
 
   func rowNeedsRepaint() { fill.refreshAppearance() }
 
+  /// Set by the list on every selection change. Stored, not read from the
+  /// row view at draw time, so the wash cannot depend on which repaint
+  /// AppKit happens to send.
+  var isRowSelected: Bool {
+    get { fill.isRowSelected }
+    set { fill.isRowSelected = newValue }
+  }
+
   @objc private func firePrimary() { onPrimary?() }
   @objc private func fireDismiss() { onDismiss?() }
 }
@@ -258,6 +266,9 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
 final class KitNoticeFill: NSView {
   var kind: KitNoticeKind = .info { didSet { syncGlass(); needsDisplay = true } }
   var drawsSurface: Bool = true { didSet { syncGlass(); needsDisplay = true } }
+  var isRowSelected = false {
+    didSet { if oldValue != isRowSelected { syncGlass(); needsDisplay = true } }
+  }
 
   private let effectView: KitPassthroughVisualEffectView = {
     let v = KitCardGlassStyle.makeBackdrop()
@@ -298,8 +309,9 @@ final class KitNoticeFill: NSView {
   fileprivate var selectionFill: NSColor? {
     var view = superview
     while let current = view, !(current is NSTableRowView) { view = current.superview }
-    guard drawsSurface, let row = view as? NSTableRowView, row.isSelected else { return nil }
-    return SeptaskKitTheme.listSelectionFill(emphasized: row.septaskSelectionIsActive)
+    guard drawsSurface, isRowSelected else { return nil }
+    let emphasized = (view as? NSTableRowView)?.septaskSelectionIsActive ?? false
+    return SeptaskKitTheme.listSelectionFill(emphasized: emphasized)
   }
 
   private var usesGlass: Bool {

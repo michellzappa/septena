@@ -4754,6 +4754,10 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       guard let cardRow = rowView as? KitCardRowView, rows.indices.contains(row) else { return }
       applySelectionJoins(cardRow, atRow: row)
       cardRow.needsDisplay = true
+      // A notice draws its selection on its own fill, over the row.
+      if let notice = cardRow.view(atColumn: 0) as? KitNoticeCell {
+        notice.isRowSelected = tableView.selectedRowIndexes.contains(row)
+      }
     }
   }
 
@@ -5288,6 +5292,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
 
     case .notice(let notice):
       let cell = noticeCell(KitNotice(notice))
+      cell.isRowSelected = tableView.selectedRowIndexes.contains(row)
       cell.onPrimary = noticePrimaryAction(notice.id)
       cell.onDismiss = notice.dismissible ? { [weak self] in self?.dismissNotice(notice.id) } : nil
       return cell
