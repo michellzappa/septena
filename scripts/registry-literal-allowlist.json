@@ -86,12 +86,6 @@
       "issue": "#260"
     },
     {
-      "file": "Septask/SeptaskDataTransfer.swift",
-      "literal": "Review",
-      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
-      "issue": "#260"
-    },
-    {
       "file": "Septask/SeptaskKitComposer.swift",
       "literal": "Move Down",
       "reason": "Checklist or tag picker copy; actions.json has no checklist or tag-picker actions yet.",

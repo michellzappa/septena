@@ -6,6 +6,12 @@
 **Scope:** **Septena (the task app)** across iOS, iPadOS, macOS, Web (`#21`), Android (`#20`), and Windows (`#136`). (Septena Life moved out of this repo in ADR 0017.)
 **Owner of decisions:** mz. Defaults chosen by the author are marked *(default)*.
 
+**Changes after this spec (2026-11-22, mz):** `registry/settings.json` wins where the tables below disagree.
+- Appearance is its own page (`appearance`); on desktop it stays inline in General.
+- Import & Export is a depth-2 page under **Privacy & Data**. The tab and group formerly "Connections & Data" are **Connections**.
+- Advanced holds only sync and storage diagnostics. MCP Skills moved to Connect Claude. Paste JSON, weekly product diagnostics (`diagnosticsEnabled`, now cleared at launch) and the AI diagnostics switches (`showModelLabels`, `pccRoutingEnabled`, `pccReasoning`, now `ui: false`) are gone.
+- AI icons never use sparkles.
+
 ---
 
 ## 1. Goal & first principles

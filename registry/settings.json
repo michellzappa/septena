@@ -324,6 +324,7 @@
       "featureId": "ai.reach-dial"
     },
     "diagnosticsEnabled": {
+      "ui": false,
       "scope": "device",
       "storageKey": "septask.diagnostics.enabled",
       "type": "bool",
@@ -332,6 +333,7 @@
       "featureId": "settings.display"
     },
     "showModelLabels": {
+      "ui": false,
       "scope": "device",
       "storageKey": "septena.ai.showModelTags",
       "type": "bool",
@@ -340,6 +342,7 @@
       "featureId": "ai.reach-dial"
     },
     "pccRoutingEnabled": {
+      "ui": false,
       "scope": "device",
       "storageKey": "septena.ai.pccRoutingEnabled",
       "type": "bool",
@@ -348,6 +351,7 @@
       "featureId": "ai.reach-dial"
     },
     "pccReasoning": {
+      "ui": false,
       "scope": "device",
       "storageKey": "septena.ai.pccReasoning",
       "type": "enum",
@@ -684,6 +688,14 @@
           "items": [
             { "kind": "customSurface", "surface": "claude_connector", "featureId": "agents.connector" }
           ]
+        },
+        {
+          "id": "agent_tools",
+          "header": "Agent tools",
+          "footer": "The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples).",
+          "items": [
+            { "kind": "customSurface", "surface": "mcp_skills", "label": "MCP Skills", "icon": "settings.skills", "featureId": "agents.connector" }
+          ]
         }
       ]
     },
@@ -863,37 +875,10 @@
       "featureId": "settings.display",
       "sections": [
         {
-          "id": "agent_tools",
-          "header": "Agent tools",
-          "footer": "The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples).",
-          "items": [
-            { "kind": "customSurface", "surface": "mcp_skills", "label": "MCP Skills", "icon": "settings.skills", "featureId": "agents.connector" }
-          ]
-        },
-        {
           "id": "diagnostics",
           "header": "Diagnostics",
           "items": [
-            { "kind": "customSurface", "surface": "sync_diagnostics", "label": "Sync & storage diagnostics", "detail": "Changes the server refused appear here, newest first. The server kept its own version of each.", "icon": "settings.diagnostics", "featureId": "sync.backend" },
-            { "kind": "customSurface", "surface": "diagnostics_weekly", "label": "Optional product diagnostics", "detail": "An opt-in weekly summary that helps improve Septena. You don't need it for updates, sync, or support.", "ownsKeys": ["diagnosticsEnabled"] }
-          ]
-        },
-        {
-          "id": "data_tools",
-          "header": "Data tools",
-          "footer": "Paste raw Septena JSON directly from the clipboard to restore or merge records.",
-          "items": [
-            { "kind": "customSurface", "surface": "paste_json_import", "label": "Paste JSON Backup…", "icon": "settings.paste", "featureId": "sync.backend" }
-          ]
-        },
-        {
-          "id": "beta_ai",
-          "header": "AI diagnostics",
-          "platforms": ["ios", "ipados", "macos"],
-          "items": [
-            { "kind": "setting", "key": "showModelLabels", "label": "Show model labels", "detail": "Show which model answered next to each AI reply." },
-            { "kind": "setting", "key": "pccRoutingEnabled", "label": "Use Private Cloud Compute", "detail": "Requires the PCC entitlement. Without it, requests fail and fall back on-device.", "visibility": "minAppleOS27" },
-            { "kind": "setting", "key": "pccReasoning", "label": "Private Cloud Compute reasoning", "visibility": "minAppleOS27" }
+            { "kind": "customSurface", "surface": "sync_diagnostics", "label": "Sync & storage diagnostics", "detail": "Changes the server refused appear here, newest first. The server kept its own version of each.", "icon": "settings.diagnostics", "featureId": "sync.backend" }
           ]
         }
       ]

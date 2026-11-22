@@ -18,6 +18,8 @@ struct SeptaskClaudePairingSections: View {
   // One copy of each prompt, shared with the first run (`registry/surfaces.json`).
   private static let setupPrompt = RegistryFirstRun.setupPrompt
   private static let starterPrompt = RegistryFirstRun.firstPrompt
+  private static let agentTools = RegistrySettings.section("agent_tools", page: RegistrySettings.PageID.claudePairing)
+  private static let skills = RegistrySettings.itemBySurface["mcp_skills"]
 
   var body: some View {
     if !sync.signedIn {
@@ -57,6 +59,19 @@ struct SeptaskClaudePairingSections: View {
       Text("Connect Claude")
     } footer: {
       Text("Paste the setup prompt into Claude, or add the connector URL to Claude as a custom connector. When your browser shows a code, enter it here. Once connected, paste the first prompt to set up your areas, projects and tasks. Only enter a code from a browser window you opened yourself.")
+    }
+
+    // Agent tools (moved from About ▸ Advanced, 2026-11-22).
+    Section {
+      NavigationLink {
+        TasksSkillPane()
+      } label: {
+        Label(Self.skills?.label ?? "", systemImage: Self.skills?.sfSymbol ?? "book.closed")
+      }
+    } header: {
+      Text(Self.agentTools?.header ?? "")
+    } footer: {
+      if let footer = Self.agentTools?.footer { Text(footer) }
     }
   }
 

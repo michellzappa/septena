@@ -2005,7 +2005,7 @@
       "extractionState" : "manual"
     },
     "Agent tools" : {
-      "comment" : "Generated from registry settings.pages.advanced.sections.agent_tools.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.claude_pairing.sections.agent_tools.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -7214,7 +7214,7 @@
       }
     },
     "MCP Skills" : {
-      "comment" : "Generated from registry settings.pages.advanced.sections.agent_tools.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.claude_pairing.sections.agent_tools.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -12018,7 +12018,7 @@
 
     },
     "The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples)." : {
-      "comment" : "Generated from registry settings.pages.advanced.sections.agent_tools.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.claude_pairing.sections.agent_tools.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {

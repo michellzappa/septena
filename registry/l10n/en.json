@@ -87,12 +87,6 @@
       "settings.pages.ai_preferences.title"
     ]
   },
-  "AI diagnostics": {
-    "text": "AI diagnostics",
-    "paths": [
-      "settings.pages.advanced.sections.beta_ai.header"
-    ]
-  },
   "AI on this device": {
     "text": "AI on this device",
     "paths": [
@@ -179,7 +173,7 @@
   "Agent tools": {
     "text": "Agent tools",
     "paths": [
-      "settings.pages.advanced.sections.agent_tools.header"
+      "settings.pages.claude_pairing.sections.agent_tools.header"
     ]
   },
   "All": {
@@ -193,12 +187,6 @@
     "text": "All your devices",
     "paths": [
       "plans.outcomes.everywhere.rows.devices.cells.plus"
-    ]
-  },
-  "An opt-in weekly summary that helps improve Septena. You don't need it for updates, sync, or support.": {
-    "text": "An opt-in weekly summary that helps improve Septena. You don't need it for updates, sync, or support.",
-    "paths": [
-      "settings.pages.advanced.sections.diagnostics.items.1.detail"
     ]
   },
   "Anonymous usage data": {
@@ -529,12 +517,6 @@
     "text": "Daily change limit reached",
     "paths": [
       "plans.upsells.connector_cap.title"
-    ]
-  },
-  "Data tools": {
-    "text": "Data tools",
-    "paths": [
-      "settings.pages.advanced.sections.data_tools.header"
     ]
   },
   "Deadline": {
@@ -1137,7 +1119,7 @@
   "MCP Skills": {
     "text": "MCP Skills",
     "paths": [
-      "settings.pages.advanced.sections.agent_tools.items.0.label"
+      "settings.pages.claude_pairing.sections.agent_tools.items.0.label"
     ]
   },
   "Manage Subscription": {
@@ -1534,12 +1516,6 @@
       "destinations.destinations.anytime.emptyState.detail"
     ]
   },
-  "Optional product diagnostics": {
-    "text": "Optional product diagnostics",
-    "paths": [
-      "settings.pages.advanced.sections.diagnostics.items.1.label"
-    ]
-  },
   "Or press ⌃⌥Space anywhere on your Mac": {
     "text": "Or press ⌃⌥Space anywhere on your Mac",
     "paths": [
@@ -1556,18 +1532,6 @@
     "text": "Paste",
     "paths": [
       "surfaces.taskAttributes.paste.label"
-    ]
-  },
-  "Paste JSON Backup…": {
-    "text": "Paste JSON Backup…",
-    "paths": [
-      "settings.pages.advanced.sections.data_tools.items.0.label"
-    ]
-  },
-  "Paste raw Septena JSON directly from the clipboard to restore or merge records.": {
-    "text": "Paste raw Septena JSON directly from the clipboard to restore or merge records.",
-    "paths": [
-      "settings.pages.advanced.sections.data_tools.footer"
     ]
   },
   "Paste the first prompt. Claude sets up your areas and projects with you.": {
@@ -1689,12 +1653,6 @@
       "settings.desktopTabs.privacy.title",
       "settings.rootGroups.meta_root.items.0.label",
       "settings.pages.privacy.title"
-    ]
-  },
-  "Private Cloud Compute reasoning": {
-    "text": "Private Cloud Compute reasoning",
-    "paths": [
-      "settings.pages.advanced.sections.beta_ai.items.2.label"
     ]
   },
   "Project": {
@@ -1836,12 +1794,6 @@
     "text": "Repeat…",
     "paths": [
       "actions.actions.task.repeat.title"
-    ]
-  },
-  "Requires the PCC entitlement. Without it, requests fail and fall back on-device.": {
-    "text": "Requires the PCC entitlement. Without it, requests fail and fall back on-device.",
-    "paths": [
-      "settings.pages.advanced.sections.beta_ai.items.1.detail"
     ]
   },
   "Reschedule repeating task?": {
@@ -2073,18 +2025,6 @@
     "text": "Show faded tasks in projects and areas.",
     "paths": [
       "settings.rootGroups.lists_root.items.4.detail"
-    ]
-  },
-  "Show model labels": {
-    "text": "Show model labels",
-    "paths": [
-      "settings.pages.advanced.sections.beta_ai.items.0.label"
-    ]
-  },
-  "Show which model answered next to each AI reply.": {
-    "text": "Show which model answered next to each AI reply.",
-    "paths": [
-      "settings.pages.advanced.sections.beta_ai.items.0.detail"
     ]
   },
   "Sign in for a free account. The server then keeps a backup of that device, and you can try agents on real tasks.": {
@@ -2347,7 +2287,7 @@
   "The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples).": {
     "text": "The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples).",
     "paths": [
-      "settings.pages.advanced.sections.agent_tools.footer"
+      "settings.pages.claude_pairing.sections.agent_tools.footer"
     ]
   },
   "The full task app on one iPhone, iPad or Mac. You do not need an account.": {
@@ -2514,12 +2454,6 @@
     "text": "Usage data",
     "paths": [
       "settings.pages.privacy.sections.telemetry.items.0.label"
-    ]
-  },
-  "Use Private Cloud Compute": {
-    "text": "Use Private Cloud Compute",
-    "paths": [
-      "settings.pages.advanced.sections.beta_ai.items.1.label"
     ]
   },
   "Use my Claude": {

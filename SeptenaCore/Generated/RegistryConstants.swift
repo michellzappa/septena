@@ -540,6 +540,9 @@ enum RegistrySettings {
       RegistrySettingsSection(id: "connector", header: RegistryL10n.t("Connect Claude"), footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "claude_connector", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "agents.connector"),
       ]),
+      RegistrySettingsSection(id: "agent_tools", header: RegistryL10n.t("Agent tools"), footer: RegistryL10n.t("The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples)."), platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "mcp_skills", label: RegistryL10n.t("MCP Skills"), detail: nil, iconId: "settings.skills", sfSymbol: "book.closed", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "agents.connector"),
+      ]),
     ]),
     RegistrySettingsPage(id: "ai_preferences", title: RegistryL10n.t("AI Preferences"), iconId: "settings.ai_agents", sfSymbol: "cpu", depth: 1, platforms: nil, featureId: "ai.reach-dial", sections: [
       RegistrySettingsSection(id: "on_device", header: RegistryL10n.t("AI on this device"), footer: nil, platforms: ["ios", "ipados", "macos"], items: [
@@ -599,20 +602,8 @@ enum RegistrySettings {
       ]),
     ]),
     RegistrySettingsPage(id: "advanced", title: RegistryL10n.t("Advanced"), iconId: "settings.advanced", sfSymbol: "wrench.and.screwdriver", depth: 2, platforms: nil, featureId: "settings.display", sections: [
-      RegistrySettingsSection(id: "agent_tools", header: RegistryL10n.t("Agent tools"), footer: RegistryL10n.t("The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples)."), platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "mcp_skills", label: RegistryL10n.t("MCP Skills"), detail: nil, iconId: "settings.skills", sfSymbol: "book.closed", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "agents.connector"),
-      ]),
       RegistrySettingsSection(id: "diagnostics", header: RegistryL10n.t("Diagnostics"), footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sync_diagnostics", label: RegistryL10n.t("Sync & storage diagnostics"), detail: RegistryL10n.t("Changes the server refused appear here, newest first. The server kept its own version of each."), iconId: "settings.diagnostics", sfSymbol: "stethoscope", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "diagnostics_weekly", label: RegistryL10n.t("Optional product diagnostics"), detail: RegistryL10n.t("An opt-in weekly summary that helps improve Septena. You don't need it for updates, sync, or support."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
-      ]),
-      RegistrySettingsSection(id: "data_tools", header: RegistryL10n.t("Data tools"), footer: RegistryL10n.t("Paste raw Septena JSON directly from the clipboard to restore or merge records."), platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "paste_json_import", label: RegistryL10n.t("Paste JSON Backup…"), detail: nil, iconId: "settings.paste", sfSymbol: "doc.on.clipboard", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
-      ]),
-      RegistrySettingsSection(id: "beta_ai", header: RegistryL10n.t("AI diagnostics"), footer: nil, platforms: ["ios", "ipados", "macos"], items: [
-        RegistrySettingsItem(kind: "setting", key: "showModelLabels", page: nil, surface: nil, label: RegistryL10n.t("Show model labels"), detail: RegistryL10n.t("Show which model answered next to each AI reply."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "ai.reach-dial"),
-        RegistrySettingsItem(kind: "setting", key: "pccRoutingEnabled", page: nil, surface: nil, label: RegistryL10n.t("Use Private Cloud Compute"), detail: RegistryL10n.t("Requires the PCC entitlement. Without it, requests fail and fall back on-device."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "minAppleOS27", platforms: nil, featureId: "ai.reach-dial"),
-        RegistrySettingsItem(kind: "setting", key: "pccReasoning", page: nil, surface: nil, label: RegistryL10n.t("Private Cloud Compute reasoning"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "minAppleOS27", platforms: nil, featureId: "ai.reach-dial"),
       ]),
     ]),
     RegistrySettingsPage(id: "smart_lists", title: RegistryL10n.t("Smart Lists"), iconId: "list.today", sfSymbol: "sun.max.fill", depth: 1, platforms: nil, featureId: "settings.display", sections: [

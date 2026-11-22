@@ -35,7 +35,9 @@ enum SeptaskLaunch {
     LaunchTrace.spanSync("launch.deferredWork") {
       SharedTaskCaptureImporter.importPending(using: services.taskMutator)
       SeptaskLegacyClaudeCleanup.runOnce()
-      SeptaskDiagnosticsCoordinator.shared.start()
+      // Weekly diagnostics retired 2026-11-22 (Privacy & Data ▸ Usage data is
+      // the one telemetry control). Clears any old opt-in and its pending batch.
+      SeptaskDiagnosticsCoordinator.setEnabled(false)
       BadgeManager.shared.start(context: localStore.container.mainContext)
       TaskReminderScheduler.shared.start(context: localStore.container.mainContext)
       TasksWidgetSnapshotPublisher.shared.drainPendingCompletions(using: services.taskMutator)
@@ -74,7 +76,7 @@ enum SeptaskLaunch {
     await waitForFirstFrameIfNeeded()
     await services.start()
     SharedTaskCaptureImporter.importPending(using: services.taskMutator)
-    SeptaskDiagnosticsCoordinator.shared.start()
+    SeptaskDiagnosticsCoordinator.setEnabled(false)
     // Task backend: reconcile, push, pull, reopen the live socket.
     TaskSyncEngine.shared.activate()
     // The plan, fresh for Today's upsell notices (spec §3.2). The server
