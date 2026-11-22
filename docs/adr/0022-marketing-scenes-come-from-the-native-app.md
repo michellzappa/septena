@@ -1,6 +1,6 @@
 # 0022. Marketing scenes come from the native app
 
-- Status: proposed
+- Status: rejected (2026-11-22). mz: the website stays programmatic, with no screenshots. The web scene renderer draws from the app's registries instead (septena-site `lib/task-ui/registry.ts`, `scripts/sync-registry.mjs`).
 - Date: 2026-11-22
 - Deciders: mz
 

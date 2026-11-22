@@ -27,7 +27,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0019](0019-generative-textures-and-fruit-accents.md) | Use procedural canvas textures and exotic-fruit accents over a Colorful default | accepted |
 | [0020](0020-registry-owns-copy-and-translations.md) | The registry owns shared copy and its translations; shells render it | accepted |
 | [0021](0021-one-import-engine-with-source-adapters.md) | One import engine, with source adapters behind a versioned bundle | accepted |
-| [0022](0022-marketing-scenes-come-from-the-native-app.md) | Marketing scenes come from the native app | proposed |
+| [0022](0022-marketing-scenes-come-from-the-native-app.md) | Marketing scenes come from the native app | rejected |
 
 ## Template
 
