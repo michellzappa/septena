@@ -123,6 +123,26 @@
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
       "featureId": "settings.display"
     },
+    "smartListOrder": {
+      "scope": "synced",
+      "storageKey": "septena.sidebar.smartListOrder",
+      "type": "string[]",
+      "maxItems": 32,
+      "itemMaxLength": 64,
+      "default": [],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "settings.display"
+    },
+    "smartListHidden": {
+      "scope": "synced",
+      "storageKey": "septena.sidebar.smartListHidden",
+      "type": "string[]",
+      "maxItems": 32,
+      "itemMaxLength": 64,
+      "default": [],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "settings.display"
+    },
     "appearanceMode": {
       "scope": "device",
       "storageKey": "septena.appearance.mode",
@@ -451,6 +471,13 @@
       "desktopTab": "general",
       "items": [
         {
+          "kind": "pageLink",
+          "page": "smart_lists",
+          "label": "Smart Lists",
+          "icon": "list.today",
+          "featureId": "settings.display"
+        },
+        {
           "kind": "setting",
           "key": "todayGroupByList",
           "label": "Group Today by list",
@@ -770,6 +797,25 @@
             { "kind": "setting", "key": "showModelLabels", "label": "Show model labels", "detail": "Show which model answered next to each AI reply." },
             { "kind": "setting", "key": "pccRoutingEnabled", "label": "Use Private Cloud Compute", "visibility": "minAppleOS27" },
             { "kind": "setting", "key": "pccReasoning", "label": "Private Cloud Compute reasoning", "visibility": "minAppleOS27" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "smart_lists",
+      "title": "Smart Lists",
+      "icon": "list.today",
+      "depth": 1,
+      "featureId": "settings.display",
+      "sections": [
+        {
+          "id": "smart_lists",
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "smart_lists_editor",
+              "ownsKeys": ["smartListOrder", "smartListHidden"]
+            }
           ]
         }
       ]

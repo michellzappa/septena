@@ -13,6 +13,11 @@ extension NSPasteboard.PasteboardType {
   /// `.septaskTask` so the sidebar's single drop handler can tell "reorder
   /// the sidebar itself" apart from "file a dragged task".
   static let septaskStructureItem = NSPasteboard.PasteboardType("com.septena.septask.structure-item")
+  /// Dragged special smart-list rows (sidebar smart-list reordering) — carries
+  /// the canonical `RegistryDestination.id`, distinct from `.septaskStructureItem`
+  /// so smart lists can only reorder within their own top cluster and never mix
+  /// with areas or projects below.
+  static let septaskSmartListItem = NSPasteboard.PasteboardType("com.septena.septask.smart-list-item")
 }
 
 /// Shared by the list (reorder/re-file drops) and the sidebar (file/schedule
@@ -4028,7 +4033,7 @@ final class SeptaskKitTaskListController: NSViewController {
       destItem(.filter(.project(project.id), title: project.title))
     }
 
-    for destination in KitSidebarDestination.smartLists {
+    for destination in KitSidebarDestination.smartLists(in: context) {
       menu.addItem(destItem(destination))
     }
 
@@ -4043,22 +4048,6 @@ final class SeptaskKitTaskListController: NSViewController {
       menu.addItem(.separator())
       menu.addItem(destItem(.filter(.area(area.id), title: area.title)))
       for project in areaProjects { menu.addItem(projectItem(project)) }
-    }
-
-    let hasStarred = !LocalCache.tasks(in: context, filter: .starred).isEmpty
-    let hasFaded = !LocalCache.tasks(in: context, filter: .faded).isEmpty
-    let hasDeleted = !LocalCache.tasks(in: context, filter: .recentlyDeleted).isEmpty
-    if hasStarred || hasFaded || hasDeleted {
-      menu.addItem(.separator())
-      if hasStarred {
-        menu.addItem(destItem(.filter(.starred, title: TaskFilter.starred.title)))
-      }
-      if hasFaded {
-        menu.addItem(destItem(.filter(.faded, title: TaskFilter.faded.title)))
-      }
-      if hasDeleted {
-        menu.addItem(destItem(.filter(.recentlyDeleted, title: TaskFilter.recentlyDeleted.title)))
-      }
     }
 
     return menu

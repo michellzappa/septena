@@ -899,6 +899,39 @@ enum TaskFilter: Equatable, Hashable {
     }
   }
 
+  /// Canonical `registry/destinations.json` ID for smart-list filters, or nil
+  /// for area/project/triage filters.
+  var destinationID: String? {
+    switch self {
+    case .today: return "today"
+    case .review: return "review"
+    case .upcoming: return "upcoming"
+    case .repeating: return "repeating"
+    case .unscheduled: return "anytime"
+    case .logbook: return "logbook"
+    case .starred: return "starred"
+    case .faded: return "faded"
+    case .recentlyDeleted: return "recentlyDeleted"
+    case .triage, .project, .area: return nil
+    }
+  }
+
+  /// Maps a canonical `registry/destinations.json` ID back to its `TaskFilter`.
+  init?(destinationID: String) {
+    switch destinationID {
+    case "today": self = .today
+    case "review": self = .review
+    case "upcoming": self = .upcoming
+    case "repeating": self = .repeating
+    case "anytime", "unscheduled": self = .unscheduled
+    case "logbook": self = .logbook
+    case "starred": self = .starred
+    case "faded": self = .faded
+    case "recentlyDeleted": self = .recentlyDeleted
+    default: return nil
+    }
+  }
+
   // User-facing label. "Anytime" is the single home for open, dateless tasks
   // (it absorbed the former "Someday" bucket). The serverView key stays
   // `unscheduled` so the API contract is unchanged.
@@ -1094,6 +1127,14 @@ struct AppSettings: Codable {
   var canvasTexture: String? = nil
   var textureIntensity: Int? = nil
   var textureMotion: String? = nil
+
+  /// Per-account special smart-list sidebar customization (registry/destinations.json).
+  /// `smartListOrder` is ORDERING ONLY (never membership): any registry
+  /// destination absent from here appends in canonical `sidebarOrder`.
+  /// `smartListHidden` lists canonical destination IDs explicitly hidden by the
+  /// user (destinations with `canHide == false`, e.g. `today`, are never hidden).
+  var smartListOrder: [String]? = nil
+  var smartListHidden: [String]? = nil
 
   /// When the first-run welcome (section picker + chained onboarding) was
   /// completed. The durable, cross-device "this account has been welcomed"

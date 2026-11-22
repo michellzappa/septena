@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 enum Route: Hashable {
   case filter(TaskFilter)
@@ -66,26 +67,30 @@ extension Route {
 }
 
 /// The canonical, ordered set of Tasks destinations — smart-list identity
-/// lives here; area / project ordering is applied by `StructureCache` via
-/// `TaskStructureOrder` (synced `position`, legacy `sidebar.*Order` fallback).
-/// See `docs/DRAG_AND_DROP.md` §5.
+/// comes from `registry/destinations.json` via `SmartListPreferences.shared`
+/// (per-account, synced across devices); area / project ordering is applied by
+/// `StructureCache` via `TaskStructureOrder`. See `docs/DRAG_AND_DROP.md` §5.
 @MainActor
 enum TaskDestinations {
-  /// Smart lists, in display order. Next is intentionally absent here — on
-  /// Septena it's a top-level tab; Septask has no Next (removed 2026-11-19).
-  static let smartListRoutes: [Route] = [
-    .filter(.today),
-    .filter(.review),
-    .filter(.upcoming),
-    .filter(.repeating),
-    .filter(.unscheduled),
-    .filter(.logbook),
-  ]
+  /// Visible special smart lists, in the account's configured order. Honors
+  /// both user show/hide toggles and registry `whenNonEmpty` visibility.
+  static func sidebarRoutes(nonEmptyIDs: Set<String>) -> [Route] {
+    SmartListPreferences.shared
+      .visibleDestinations(nonEmptyIDs: nonEmptyIDs)
+      .compactMap { TaskFilter(destinationID: $0.id).map(Route.filter) }
+  }
 
-  /// Sidebar / title-dropdown destinations. Neither app puts Next in the
-  /// Tasks sidebar: Septena keeps it as a top-level tab, and Septask dropped
-  /// Next on 2026-11-19 (life-OS content, not tasks; Today covers it).
-  static var sidebarRoutes: [Route] { smartListRoutes }
+  /// Convenience for menus/dropdowns that don't already have precomputed counts.
+  static func sidebarRoutes(in context: ModelContext) -> [Route] {
+    var nonEmpty = Set<String>()
+    if !LocalCache.tasks(in: context, filter: .starred).isEmpty { nonEmpty.insert("starred") }
+    if !LocalCache.tasks(in: context, filter: .faded).isEmpty { nonEmpty.insert("faded") }
+    if !LocalCache.tasks(in: context, filter: .recentlyDeleted).isEmpty { nonEmpty.insert("recentlyDeleted") }
+    return sidebarRoutes(nonEmptyIDs: nonEmpty)
+  }
+
+  /// Always-visible smart lists in the account's configured order.
+  static var sidebarRoutes: [Route] { sidebarRoutes(nonEmptyIDs: []) }
 
   static func orderedAreas(_ loaded: [Area]) -> [Area] {
     TaskStructureOrder.orderedAreas(loaded)

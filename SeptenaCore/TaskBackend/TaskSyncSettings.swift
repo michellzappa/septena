@@ -71,6 +71,8 @@ enum SeptaskSyncedSettings {
     case "canvasTexture": return .from(s.canvasTexture)
     case "textureIntensity": return s.textureIntensity.map { .int(Int64($0)) } ?? .null
     case "textureMotion": return .from(s.textureMotion)
+    case "smartListOrder": return s.smartListOrder.map { .array($0.map { .string($0) }) } ?? .null
+    case "smartListHidden": return s.smartListHidden.map { .array($0.map { .string($0) }) } ?? .null
     default: return .null
     }
   }
@@ -151,6 +153,24 @@ enum SeptaskSyncedSettings {
     case "textureMotion":
       guard let x = string() else { return false }
       s.textureMotion = x
+    case "smartListOrder":
+      switch v {
+      case .null: s.smartListOrder = nil
+      case .array(let list):
+        let ids = list.compactMap(\.stringValue)
+        guard ids.count == list.count else { return false }
+        s.smartListOrder = ids
+      default: return false
+      }
+    case "smartListHidden":
+      switch v {
+      case .null: s.smartListHidden = nil
+      case .array(let list):
+        let ids = list.compactMap(\.stringValue)
+        guard ids.count == list.count else { return false }
+        s.smartListHidden = ids
+      default: return false
+      }
     default:
       return false
     }
