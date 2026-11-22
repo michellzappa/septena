@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Competitor Website Language</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --card: #ffffff; --border: #e2e8f0; --fg: #0f172a; --muted: #64748b;
+      --chip: #f1f5f9; --accent: #0f172a; --accent-fg: #f8fafc;
+      --crowded: #dc2626; --contested: #d97706; --owned: #7c3aed; --open: #16a34a;
+      --septena: #fef3c7; --septena-border: #f59e0b;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #0b0d12; --card: #151923; --border: #262c3a; --fg: #f1f5f9; --muted: #94a3b8;
+        --chip: #1e2433; --accent: #e2e8f0; --accent-fg: #0f172a;
+        --crowded: #f87171; --contested: #fbbf24; --owned: #a78bfa; --open: #4ade80;
+        --septena: #2a2210; --septena-border: #d97706;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg);
+      font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+    main { max-width: 1280px; margin: 0 auto; padding: 20px 16px 64px; }
+    header { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; justify-content: space-between;
+      padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+    h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+    h2 { font-size: 15px; margin: 28px 0 10px; }
+    .sub { color: var(--muted); font-size: 13px; margin: 4px 0 0; max-width: 720px; }
+    .tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+    button { font: inherit; color: inherit; cursor: pointer; }
+    .tab { border: 1px solid var(--border); background: var(--card); border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 500; }
+    .tab.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+    .filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; align-items: center; }
+    .filters label { font-size: 11px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+    select { font: inherit; font-size: 12px; padding: 5px 8px; border-radius: 7px; border: 1px solid var(--border); background: var(--card); color: var(--fg); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    .card.septena { background: var(--septena); border-color: var(--septena-border); }
+    .top { display: flex; gap: 10px; align-items: center; }
+    .icon { width: 32px; height: 32px; border-radius: 22.37%; flex: 0 0 auto; object-fit: cover; background: var(--chip); }
+    .icon.txt { display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+    .name { font-weight: 600; }
+    .tier { font-size: 11px; color: var(--muted); }
+    .hero { font-size: 19px; font-weight: 650; letter-spacing: -0.015em; line-height: 1.2; }
+    .subhead { color: var(--muted); font-size: 13px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    .chip { background: var(--chip); border-radius: 999px; padding: 2px 8px; font-size: 11px; white-space: nowrap; }
+    .lines { font-size: 12.5px; display: grid; gap: 4px; }
+    .lines b { font-weight: 600; font-size: 11px; color: var(--muted); text-transform: none; margin-right: 4px; }
+    .note { font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 8px; }
+    details summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+    details ul { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; }
+    .scroll { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; min-width: 860px; }
+    th, td { border: 1px solid var(--border); padding: 8px; vertical-align: top; font-size: 12px; text-align: left; }
+    th { background: var(--card); font-weight: 600; }
+    td { background: var(--card); }
+    td.empty { background: transparent; }
+    .pill { display: inline-flex; align-items: center; gap: 5px; margin: 0 4px 4px 0; padding: 2px 7px 2px 2px; border-radius: 999px; background: var(--chip); font-size: 11.5px; }
+    .pill img, .pill .icon { width: 18px; height: 18px; font-size: 9px; }
+    .pill.me { background: var(--septena); outline: 1px solid var(--septena-border); font-weight: 600; }
+    .bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+    .bar { display: grid; grid-template-columns: 130px 1fr 28px; gap: 8px; align-items: center; font-size: 12px; margin: 5px 0; }
+    .bar .track { height: 10px; border-radius: 5px; background: var(--chip); overflow: hidden; }
+    .bar .fill { height: 100%; background: var(--accent); }
+    .terr { display: grid; gap: 8px; }
+    .trow { background: var(--card); border: 1px solid var(--border); border-left-width: 4px; border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; }
+    .trow.crowded { border-left-color: var(--crowded); }
+    .trow.contested { border-left-color: var(--contested); }
+    .trow.owned { border-left-color: var(--owned); }
+    .trow.open { border-left-color: var(--open); }
+    .thead { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+    .phrase { font-weight: 600; }
+    .status { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    .crowded .status { color: var(--crowded); } .contested .status { color: var(--contested); }
+    .owned .status { color: var(--owned); } .open .status { color: var(--open); }
+    .take { font-size: 12.5px; color: var(--muted); }
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+    a { color: inherit; }
+    .hidden { display: none; }
+    @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } .bar { grid-template-columns: 100px 1fr 24px; } }
+  </style>
+</head>
+<body>
+  <script src="../brand-nav.js" data-active="language" data-root=".."></script>
+  <main>
+    <header>
+      <div>
+        <h1>Competitor website language</h1>
+        <p class="sub" id="sub"></p>
+      </div>
+      <div class="tabs">
+        <button class="tab on" data-tab="gallery">Gallery</button>
+        <button class="tab" data-tab="matrix">Matrix</button>
+        <button class="tab" data-tab="words">Words</button>
+        <button class="tab" data-tab="septena">Septena</button>
+      </div>
+    </header>
+
+    <section id="tab-gallery">
+      <div class="filters">
+        <label>Tier<select id="f-tier"></select></label>
+        <label>Register<select id="f-register"></select></label>
+        <label>Hero shape<select id="f-heroShape"></select></label>
+        <label>AI stance<select id="f-aiStance"></select></label>
+      </div>
+      <div class="grid" id="gallery"></div>
+    </section>
+
+    <section id="tab-matrix" class="hidden">
+      <h2>Register × AI stance</h2>
+      <p class="sub">Each cell holds the apps that speak in that register and frame AI that way. Septena sits in calm-craft × agent-first with Linear, which speaks to teams.</p>
+      <div class="scroll"><table id="matrix"></table></div>
+      <h2>Distributions</h2>
+      <div class="bars" id="bars"></div>
+    </section>
+
+    <section id="tab-words" class="hidden">
+      <h2>Word territories</h2>
+      <div class="legend">
+        <span style="color:var(--crowded)">■ crowded: 3+ sites</span>
+        <span style="color:var(--contested)">■ contested: 1–2 others</span>
+        <span style="color:var(--owned)">■ owned by one site</span>
+        <span style="color:var(--open)">■ open</span>
+      </div>
+      <div class="terr" id="territories"></div>
+    </section>
+
+    <section id="tab-septena" class="hidden">
+      <h2>Septena today</h2>
+      <div class="grid" id="septena-card"></div>
+      <h2>Neighbours in the matrix</h2>
+      <div id="neighbours"></div>
+      <h2>Best lines in the set</h2>
+      <p class="sub">Borrow the shape of these lines, never the words. The language rules for Septena live in Starlings: <a href="https://septena.starlings.work/docs/document/0b00dec2-dcd6-45ad-b36d-43f9af7aca62">Competitor copywriting and vocabulary map</a>.</p>
+      <div class="terr" id="best"></div>
+    </section>
+  </main>
+
+  <script src="./language-data.js"></script>
+  <script>
+    const DATA = window.LANGUAGE_DATA || [];
+    const ME = window.LANGUAGE_SEPTENA;
+    const AXES = window.LANGUAGE_AXES;
+    const TERR = window.LANGUAGE_TERRITORIES || [];
+    const ALL = DATA.concat(ME ? [ME] : []);
+    const bySlug = Object.fromEntries(ALL.map(a => [a.slug, a]));
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+    document.getElementById("sub").textContent =
+      `${DATA.length} competitor sites read on ${window.LANGUAGE_CHECKED}, tagged on register, hero shape and AI stance. Companion to the icon gallery.`;
+
+    function icon(a, cls = "icon") {
+      if (a.slug === "septena") return `<span class="${cls} txt">S</span>`;
+      return `<img class="${cls}" src="../competitor-gallery/icons/${esc(a.slug)}.png" alt="" loading="lazy">`;
+    }
+    function pill(a) { return `<span class="pill ${a.slug === "septena" ? "me" : ""}">${icon(a)}${esc(a.name)}</span>`; }
+
+    function card(a) {
+      return `<article class="card ${a.slug === "septena" ? "septena" : ""}">
+        <div class="top">${icon(a)}<div><div class="name">${esc(a.name)}</div>
+          <div class="tier">${esc(a.tier)} · <a href="${esc(a.url)}" target="_blank" rel="noopener">site</a></div></div></div>
+        <div class="hero">${esc(a.hero)}</div>
+        <div class="subhead">${esc(a.subhead)}</div>
+        <div class="chips">
+          <span class="chip">${esc(a.register)}</span><span class="chip">${esc(a.heroShape)}</span>
+          <span class="chip">AI: ${esc(a.aiStance)}</span><span class="chip">jargon ${esc(a.jargon)}</span>
+          <span class="chip">${esc(a.person)}</span>
+        </div>
+        <div class="lines">
+          <div><b>Sells</b>${esc(a.promise)}</div>
+          <div><b>Best</b>“${esc(a.best)}”</div>
+          <div><b>Weakest</b>“${esc(a.weak)}”</div>
+          <div><b>AI line</b>${a.aiLine === "none" ? "none" : "“" + esc(a.aiLine) + "”"}</div>
+          <div><b>Proof</b>${esc(a.proof)}</div>
+        </div>
+        <details><summary>Headings and signature words</summary>
+          <ul>${a.heads.map(h => `<li>${esc(h)}</li>`).join("")}</ul>
+          <div class="chips" style="margin-top:6px">${a.words.map(w => `<span class="chip">${esc(w)}</span>`).join("")}</div>
+          <div class="tier" style="margin-top:6px">CTA: ${a.cta.map(esc).join(" · ")}</div>
+        </details>
+        <div class="note">${esc(a.note)}</div>
+      </article>`;
+    }
+
+    const filters = { tier: ["Core", "Secondary", "Agent", "Adjacent", "Septena"], register: AXES.register, heroShape: AXES.heroShape, aiStance: AXES.aiStance };
+    for (const [k, opts] of Object.entries(filters)) {
+      const el = document.getElementById("f-" + k);
+      el.innerHTML = `<option value="">All</option>` + opts.map(o => `<option>${esc(o)}</option>`).join("");
+      el.addEventListener("change", renderGallery);
+    }
+    function renderGallery() {
+      const f = Object.fromEntries(Object.keys(filters).map(k => [k, document.getElementById("f-" + k).value]));
+      const list = ALL.filter(a => Object.entries(f).every(([k, v]) => !v || a[k] === v));
+      document.getElementById("gallery").innerHTML = list.map(card).join("") || `<p class="sub">No app matches.</p>`;
+    }
+
+    function renderMatrix() {
+      const cols = AXES.aiStance, rows = AXES.register;
+      let html = `<tr><th></th>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr>`;
+      for (const r of rows) {
+        html += `<tr><th>${esc(r)}</th>` + cols.map(c => {
+          const hits = ALL.filter(a => a.register === r && a.aiStance === c);
+          return hits.length ? `<td>${hits.map(pill).join("")}</td>` : `<td class="empty"></td>`;
+        }).join("") + `</tr>`;
+      }
+      document.getElementById("matrix").innerHTML = html;
+
+      const bar = (title, key, order) => {
+        const counts = order.map(o => [o, DATA.filter(a => a[key] === o).length]);
+        const max = Math.max(1, ...counts.map(c => c[1]));
+        return `<div class="card"><div class="name">${esc(title)}</div>${counts.map(([o, n]) =>
+          `<div class="bar"><span>${esc(o)}${ME && ME[key] === o ? " ★" : ""}</span><div class="track"><div class="fill" style="width:${(n / max) * 100}%"></div></div><span>${n}</span></div>`).join("")}
+          <div class="tier">★ marks where Septena sits.</div></div>`;
+      };
+      document.getElementById("bars").innerHTML =
+        bar("Register", "register", AXES.register) + bar("Hero shape", "heroShape", AXES.heroShape) +
+        bar("AI stance", "aiStance", AXES.aiStance) + bar("Jargon", "jargon", ["low", "medium", "high"]);
+    }
+
+    function renderTerritories() {
+      document.getElementById("territories").innerHTML = TERR.map(t => `
+        <div class="trow ${esc(t.status)}">
+          <div class="thead"><span class="phrase">${esc(t.phrase)}</span><span class="status">${esc(t.status)}</span></div>
+          <div>${t.who.map(s => bySlug[s] ? pill(bySlug[s]) : "").join("") || '<span class="take">No competitor uses it.</span>'}</div>
+          <div class="take">${esc(t.take)}</div>
+        </div>`).join("");
+    }
+
+    function renderSeptena() {
+      if (!ME) return;
+      document.getElementById("septena-card").innerHTML = card(ME);
+      const same = DATA.filter(a => a.register === ME.register || a.aiStance === ME.aiStance);
+      document.getElementById("neighbours").innerHTML =
+        `<p class="sub">Same register (${esc(ME.register)}) or same AI stance (${esc(ME.aiStance)}):</p>` + same.map(pill).join("");
+      document.getElementById("best").innerHTML = DATA.map(a => `
+        <div class="trow open" style="border-left-color:var(--border)">
+          <div class="thead">${pill(a)}</div><div>“${esc(a.best)}”</div></div>`).join("");
+    }
+
+    document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === b));
+      for (const t of ["gallery", "matrix", "words", "septena"]) document.getElementById("tab-" + t).classList.toggle("hidden", t !== b.dataset.tab);
+    }));
+
+    renderGallery(); renderMatrix(); renderTerritories(); renderSeptena();
+  </script>
+</body>
+</html>
