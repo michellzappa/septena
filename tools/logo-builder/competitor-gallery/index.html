@@ -1,0 +1,1523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Septena — Competitor Icon Gallery (39 Tracked Apps)</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    :root {
+      --background: #f8fafc;
+      --content: #ffffff;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --card-border: #e2e8f0;
+      --foreground: #0f172a;
+      --muted-foreground: #64748b;
+      --primary: #0f172a;
+      --primary-foreground: #f8fafc;
+      --secondary: #f1f5f9;
+      --secondary-foreground: #1e293b;
+      --link: #2563eb;
+      --warning: #f59e0b;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: #0b0d12;
+        --content: #131620;
+        --card: #151923;
+        --border: #262c3a;
+        --card-border: #222735;
+        --foreground: #f1f5f9;
+        --muted-foreground: #94a3b8;
+        --primary: #e2e8f0;
+        --primary-foreground: #0f172a;
+        --secondary: #1e2433;
+        --secondary-foreground: #e2e8f0;
+        --link: #60a5fa;
+        --warning: #fbbf24;
+      }
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif; }
+  </style>
+  <style>
+    .icon-frame {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+      transition: transform 140ms ease, border-radius 140ms ease, box-shadow 140ms ease;
+    }
+    .icon-frame img,
+    .icon-frame svg {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+    .icon-squircle {
+      border-radius: 22.37%;
+    }
+    .icon-square {
+      border-radius: 4px;
+    }
+    .well-light {
+      background: linear-gradient(160deg, #f3f4f6 0%, #e5e7eb 100%);
+    }
+    .well-dark {
+      background: linear-gradient(160deg, #1b1d24 0%, #0f1116 100%);
+    }
+    .dock-light {
+      background: linear-gradient(135deg, #eef2f9 0%, #dce4f2 50%, #e8ecf4 100%);
+    }
+    .dock-dark {
+      background: linear-gradient(135deg, #12151f 0%, #1b2030 50%, #10131c 100%);
+    }
+    .dock-tray-light {
+      background: rgba(255, 255, 255, 0.58);
+      border: 1px solid rgba(255, 255, 255, 0.78);
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+      backdrop-filter: blur(18px);
+    }
+    .dock-tray-dark {
+      background: rgba(28, 32, 44, 0.68);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(18px);
+    }
+    .icon-shadow-light {
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(15, 23, 42, 0.08);
+    }
+    .icon-shadow-dark {
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.12);
+    }
+    .icon-card:hover .icon-frame {
+      transform: translateY(-2px) scale(1.04);
+    }
+    .matrix-scroll {
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased m-0 p-0">
+  <script src="../brand-state.js"></script>
+  <script src="../brand-nav.js" data-active="competitors" data-root=".."></script>
+  <div id="app" class="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-5">
+
+    <!-- Header -->
+    <header class="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-4 border-b border-[var(--border)]">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2 text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
+          <span>Septena Brand &amp; Icon Research</span>
+          <span>&bull;</span>
+          <span id="verified-badge">39 / 39 Verified Official Icons</span>
+        </div>
+        <h1 class="text-xl sm:text-2xl font-semibold tracking-tight text-[var(--foreground)]">
+          Competitor Icon Gallery &amp; White-Space Map
+        </h1>
+        <p class="text-xs sm:text-sm text-[var(--muted-foreground)] max-w-3xl">
+          Every tracked app from <span class="font-mono text-xs">/strategy/task-app-competitors</span>, visually audited to spot crowded traps (blue checkmarks) and ownable craft territory. Click any icon for its craft breakdown.
+        </p>
+      </div>
+
+      <!-- View Tabs -->
+      <div class="inline-flex items-center p-1 rounded-lg bg-[var(--card)] border border-[var(--border)] self-start lg:self-auto" role="tablist">
+        <button data-tab="gallery" class="tab-btn px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer">
+          Gallery
+        </button>
+        <button data-tab="matrix" class="tab-btn px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer">
+          White-Space Matrix
+        </button>
+        <button data-tab="insights" class="tab-btn px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer">
+          Craft Synthesis
+        </button>
+      </div>
+    </header>
+
+    <!-- Side-by-Side Dock / Homescreen Strip -->
+    <section class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+            Homescreen / Dock Strip
+          </span>
+          <div class="inline-flex items-center gap-1" id="dock-presets">
+            <button data-preset="benchmarks" class="dock-preset-btn px-2.5 py-1 rounded-md text-xs font-medium border transition cursor-pointer">Core Benchmarks (8)</button>
+            <button data-preset="agents" class="dock-preset-btn px-2.5 py-1 rounded-md text-xs font-medium border transition cursor-pointer">Agent-Native (5)</button>
+            <button data-preset="tactile" class="dock-preset-btn px-2.5 py-1 rounded-md text-xs font-medium border transition cursor-pointer">Tactile 3D Leaders (7)</button>
+            <button data-preset="bluecheck" class="dock-preset-btn px-2.5 py-1 rounded-md text-xs font-medium border transition cursor-pointer">Blue-Check Swamp (8)</button>
+          </div>
+        </div>
+        <span class="text-xs text-[var(--muted-foreground)]">Click Septena in dock to cycle, or pick any shape &amp; color below</span>
+      </div>
+      <!-- Compact Septena Shape + Color Selector Bar -->
+      <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[var(--card-border)]">
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="text-xs font-medium text-[var(--muted-foreground)] mr-1">Septena Shape:</span>
+          <div id="septena-dock-shapes" class="inline-flex items-center gap-1.5 flex-wrap"></div>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <span id="septena-dock-meta" class="text-xs font-mono text-[var(--muted-foreground)]"></span>
+          <div id="septena-dock-colors" class="inline-flex items-center gap-1.5" title="8 Exotic-Fruit accents"></div>
+        </div>
+      </div>
+
+      <div id="dock-stage" class="rounded-xl p-4 sm:p-5 flex items-center justify-center transition-colors">
+        <div id="dock-tray" class="rounded-2xl px-4 py-3.5 w-full grid justify-center justify-items-center items-start gap-x-3 gap-y-4 transition-all">
+        </div>
+      </div>
+    </section>
+
+    <!-- Controls Bar -->
+    <section class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3.5 space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <!-- Tier Filter Pills -->
+        <div class="flex flex-wrap items-center gap-1.5" id="tier-pills"></div>
+
+        <!-- Context Toggles: Size, Backdrop, Squircle -->
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="inline-flex items-center rounded-lg border border-[var(--border)] bg-[var(--background)] p-0.5" title="Icon Preview Size">
+            <button data-size="32" class="size-btn px-2 py-1 rounded text-xs font-mono transition cursor-pointer">32</button>
+            <button data-size="48" class="size-btn px-2 py-1 rounded text-xs font-mono transition cursor-pointer">48</button>
+            <button data-size="64" class="size-btn px-2 py-1 rounded text-xs font-mono transition cursor-pointer">64</button>
+            <button data-size="96" class="size-btn px-2 py-1 rounded text-xs font-mono transition cursor-pointer">96</button>
+          </div>
+
+          <div class="inline-flex items-center rounded-lg border border-[var(--border)] bg-[var(--background)] p-0.5" title="Homescreen Backdrop">
+            <button data-backdrop="light" class="backdrop-btn px-2.5 py-1 rounded text-xs font-medium transition cursor-pointer">Light BG</button>
+            <button data-backdrop="dark" class="backdrop-btn px-2.5 py-1 rounded text-xs font-medium transition cursor-pointer">Dark BG</button>
+          </div>
+
+          <button id="squircle-toggle" class="px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-xs font-medium transition cursor-pointer">
+            Squircle: ON
+          </button>
+        </div>
+      </div>
+
+      <!-- Secondary Filters: Search, Motif, Color, Group By -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 pt-2 border-t border-[var(--card-border)]">
+        <div class="lg:col-span-2">
+          <input
+            id="search-input"
+            type="text"
+            placeholder="Filter by app, craft note, style..."
+            class="w-full px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] placeholder-[var(--muted-foreground)] text-xs focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+          />
+        </div>
+
+        <label class="flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+          <span class="shrink-0">Motif</span>
+          <select id="motif-select" class="w-full px-2 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-xs"></select>
+        </label>
+
+        <label class="flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+          <span class="shrink-0">Color</span>
+          <select id="color-select" class="w-full px-2 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-xs"></select>
+        </label>
+
+        <label class="flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+          <span class="shrink-0">Group</span>
+          <select id="group-select" class="w-full px-2 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-xs">
+            <option value="tier">Tier</option>
+            <option value="motif">Visual Motif</option>
+            <option value="dominantColor">Color Family</option>
+            <option value="style">Craft Style</option>
+            <option value="bgTone">Background Tone</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <!-- Main Tab Views -->
+    <main id="view-gallery" class="space-y-6"></main>
+
+    <main id="view-matrix" class="hidden space-y-4">
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 class="text-sm font-semibold text-[var(--foreground)]">Motif &times; Color Family White-Space Matrix</h2>
+            <p class="text-xs text-[var(--muted-foreground)]">
+              Every matching app plotted directly in its cell. Dashed <span class="font-mono">OPEN</span> cells mark untouched visual territory; shaded cells mark crowded clusters. Use the Tier pills above to isolate Core vs. Full market.
+            </p>
+          </div>
+          <div id="matrix-summary" class="text-xs font-mono text-[var(--muted-foreground)]"></div>
+        </div>
+        <div class="matrix-scroll">
+          <div id="matrix-grid"></div>
+        </div>
+      </div>
+    </main>
+
+    <main id="view-insights" class="hidden space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="insights-charts"></div>
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 space-y-4">
+        <h2 class="text-sm font-semibold text-[var(--foreground)]">Strategic White-Space Takeaways for Septena</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs leading-relaxed">
+          <div class="p-3.5 rounded-lg border border-[var(--card-border)] bg-[var(--background)] space-y-1.5">
+            <div class="font-semibold text-[var(--foreground)]">1. Escape the Blue-Checkmark Swamp</div>
+            <p class="text-[var(--muted-foreground)]">
+              <strong>17 of 39 apps (44%)</strong> — and <strong>14 of 17 Core + Secondary task apps (82%)</strong> — use a literal checkmark. Ten apps sit in Blue alone. Any flat blue checkmark instantly disappears next to Microsoft To Do, Any.do, TickTick, Google Tasks, DailyTask, and Tasks.org.
+            </p>
+          </div>
+          <div class="p-3.5 rounded-lg border border-[var(--card-border)] bg-[var(--background)] space-y-1.5">
+            <div class="font-semibold text-[var(--foreground)]">2. Why Things 3 Still Stands Alone</div>
+            <p class="text-[var(--muted-foreground)]">
+              Things 3 uses a blue checkmark too — yet it dominates visually because it is an <strong>architectural physical object</strong> (a sculpted blue desk tray holding a recessed paper card with real light &amp; shadow). Only <strong>7 of 39 apps (18%)</strong> invest in tactile 3D materiality (Things 3, Superlist, OmniFocus, Linear, Obsidian, Wunderlist, Amie), and every single one is a design-cult favorite.
+            </p>
+          </div>
+          <div class="p-3.5 rounded-lg border border-[var(--card-border)] bg-[var(--background)] space-y-1.5">
+            <div class="font-semibold text-[var(--foreground)]">3. Wide-Open Territory for Septena</div>
+            <p class="text-[var(--muted-foreground)]">
+              <strong>Zero Core apps</strong> own <strong>Green / Teal</strong>, <strong>Warm Amber / Terracotta</strong>, or <strong>Warm Linen / Deep Ink</strong>. Only 2 of 39 apps use a warm paper/linen surface (Weft, Wunderlist), and zero Agent-native apps have Apple-grade tactile craft. A sculptural, non-checkmark object or geometric mark in warm amber, forest/emerald, or deep ink + tactile warmth owns untouched ground.
+            </p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Craft Inspector Modal -->
+  <div id="inspector-backdrop" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0,0,0,0.55); backdrop-filter: blur(4px);">
+    <div id="inspector-card" class="bg-[var(--card)] border border-[var(--border)] rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-5 space-y-4">
+    </div>
+  </div>
+
+  <script>
+    const COMPETITORS = [
+  {
+    "name": "Things 3",
+    "slug": "things-3",
+    "tier": "Core",
+    "motif": "Checkmark in Box",
+    "dominantColor": "Blue",
+    "bgTone": "Saturated",
+    "style": "Tactile 3D / Skeuomorphic",
+    "whyItWorks": "Escapes the blue-checkmark swamp via architectural physicality: a sculpted cobalt tray cradling a recessed white paper card with subtle perspective shadow and a calm charcoal check.",
+    "status": "found",
+    "file": "icons/things-3.png",
+    "source": "iTunes App Store (id=904237743)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/78/3c/8d/783c8d18-e284-9a0c-3cc5-9907be288273/AppIcon-0-0-1x_U007ephone-0-0-0-1-0-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Microsoft To Do",
+    "slug": "microsoft-to-do",
+    "tier": "Core",
+    "motif": "Pure Checkmark",
+    "dominantColor": "Blue",
+    "bgTone": "Light",
+    "style": "Fluent / Layered",
+    "whyItWorks": "Crisp two-plane Fluent ribbon fold adds gentle depth on clean white, though blue-check-on-white makes it blend into generic utility apps.",
+    "status": "found",
+    "file": "icons/microsoft-to-do.png",
+    "source": "iTunes App Store (id=1212616790)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/93/2c/f6/932cf64b-5c9e-e76d-472d-65d64979a8f3/To-Do-AppStore-0-1x_U007emarketing-0-11-0-sRGB-85-220-0.png/512x512bb.jpg"
+  },
+  {
+    "name": "Todoist",
+    "slug": "todoist",
+    "tier": "Core",
+    "motif": "Pure Checkmark",
+    "dominantColor": "Red / Coral",
+    "bgTone": "Saturated",
+    "style": "Fluent / Layered",
+    "whyItWorks": "Owned vermilion-red tile with three repeating left-bleeding chevron checks creates unmistakable rhythm and instant 16px recognition in a dock full of blue.",
+    "status": "found",
+    "file": "icons/todoist.png",
+    "source": "iTunes App Store (id=572688855)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/fc/2e/ab/fc2eabbe-b9fc-b560-4de7-b0b636ac79da/AppIcon-0-0-1x_U007epad-0-1-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Apple Reminders",
+    "slug": "apple-reminders",
+    "tier": "Core",
+    "motif": "List / Lines",
+    "dominantColor": "Light / White",
+    "bgTone": "Light",
+    "style": "Minimal Line / Glyph",
+    "whyItWorks": "Purest literal UI miniature — three colored bullet rings (blue, red, amber) and hairline rules on soft paper white; unmistakable Apple neutrality, zero emotional drama.",
+    "status": "found",
+    "file": "icons/apple-reminders.png",
+    "source": "iTunes App Store (id=1108187841)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/4b/b4/39/4bb43986-4714-adc7-459a-1b7c7aafff1d/remindersCalistoga-0-0-1x_U007epad-0-1-0-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "TickTick",
+    "slug": "ticktick",
+    "tier": "Core",
+    "motif": "Pure Checkmark",
+    "dominantColor": "Blue",
+    "bgTone": "Light",
+    "style": "Flat Geometric",
+    "whyItWorks": "Warm amber-gold check breaking out of an open cobalt clock-ring smartly hints at time + tasks, though white ground keeps it visually lightweight.",
+    "status": "found",
+    "file": "icons/ticktick.png",
+    "source": "iTunes App Store (id=626144601)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/de/5d/64/de5d6426-bf7f-84af-389e-a0280e6359f1/AppIcon-0-0-1x_U007epad-0-0-0-1-0-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Superlist",
+    "slug": "superlist",
+    "tier": "Core",
+    "motif": "Lettermark",
+    "dominantColor": "Red / Coral",
+    "bgTone": "Saturated",
+    "style": "Tactile 3D / Skeuomorphic",
+    "whyItWorks": "Ditches checkmarks entirely for a bold, physically folded vermilion 'S' ribbon with sculptural shadows — feels like a modern hardware object rather than clipart.",
+    "status": "found",
+    "file": "icons/superlist.png",
+    "source": "iTunes software (id=1547585270)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/a9/72/7f/a9727fb9-e6ba-1fb2-7f45-7b8e0d50cafd/AppIcon-0-0-1x_U007epad-0-1-P3-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "OmniFocus",
+    "slug": "omnifocus",
+    "tier": "Core",
+    "motif": "Pure Checkmark",
+    "dominantColor": "Purple / Indigo",
+    "bgTone": "Dark",
+    "style": "Tactile 3D / Skeuomorphic",
+    "whyItWorks": "Glossy beveled violet check over dark carbon-weave immediately signals serious Mac pro-tool pedigree; high contrast on both light and dark homescreens.",
+    "status": "found",
+    "file": "icons/omnifocus.png",
+    "source": "iTunes software (id=1542143627)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/9b/be/36/9bbe36bb-fd66-1713-337d-1f7a08fde3a4/AppIcon-0-0-1x_U007epad-0-0-0-1-0-0-sRGB-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Any.do",
+    "slug": "any-do",
+    "tier": "Core",
+    "motif": "Pure Checkmark",
+    "dominantColor": "Blue",
+    "bgTone": "Saturated",
+    "style": "Flat Geometric",
+    "whyItWorks": "Off-center bottom-left white check on a solid sky-blue tile adds slight quirkiness, but reads flat and dated next to tactile Apple icons.",
+    "status": "found",
+    "file": "icons/any-do.png",
+    "source": "iTunes App Store (id=497328576)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/26/f0/0e/26f00ebc-1522-19fc-3cfd-bd9e54147983/AppIcon-0-0-1x_U007emarketing-0-11-0-sRGB-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "2Do",
+    "slug": "2do",
+    "tier": "Secondary",
+    "motif": "Checkmark in Box",
+    "dominantColor": "Blue",
+    "bgTone": "Saturated",
+    "style": "Fluent / Layered",
+    "whyItWorks": "Stacked blue/green/amber tabbed cards evoke a physical multi-list notebook with an engraved dark check, though the multi-color edge stack feels slightly busy at 32px.",
+    "status": "found",
+    "file": "icons/2do.png",
+    "source": "iTunes App Store (id=1470214600)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/cb/e1/95/cbe19578-2093-c2f0-da11-deec3e2cb0db/Icon2Do-0-0-1x_U007ephone-0-1-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "GoodTask",
+    "slug": "goodtask",
+    "tier": "Secondary",
+    "motif": "Pure Checkmark",
+    "dominantColor": "Dark / Mono",
+    "bgTone": "Light",
+    "style": "Fluent / Layered",
+    "whyItWorks": "Muted cool slate-steel folded check on pale silver-white feels restrained and Apple-adjacent, but disappears visually beside Microsoft To Do.",
+    "status": "found",
+    "file": "icons/goodtask.png",
+    "source": "iTunes App Store (id=1068039220)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/c8/b7/77/c8b777b1-5a6c-9d05-13e4-0f49cd568e27/AppIcon-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Google Tasks",
+    "slug": "google-tasks",
+    "tier": "Secondary",
+    "motif": "Pure Checkmark",
+    "dominantColor": "Blue",
+    "bgTone": "Light",
+    "style": "Fluent / Layered",
+    "whyItWorks": "Soft glowing blue-to-periwinkle orb with centered white check is polished Google 2026 glassmorphism, yet sits dead-center in the crowded blue-check cluster.",
+    "status": "found",
+    "file": "icons/google-tasks.png",
+    "source": "iTunes App Store (id=1353634006)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/42/5d/4e/425d4e7f-2d89-8819-bb06-81791bca5b5c/tasks_2026_ios-0-0-1x_U007epad-0-0-0-1-0-0-sRGB-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Zenkit To Do",
+    "slug": "zenkit-to-do",
+    "tier": "Secondary",
+    "motif": "Pure Checkmark",
+    "dominantColor": "Green / Teal",
+    "bgTone": "Saturated",
+    "style": "Flat Geometric",
+    "whyItWorks": "Fresh lime-to-aqua gradient breaks out of blue/red territory, though the generic white circle-and-check glyph lacks distinctive brand silhouette.",
+    "status": "found",
+    "file": "icons/zenkit-to-do.png",
+    "source": "iTunes software (id=1505294836)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/5e/2a/e0/5e2ae049-d3f4-904b-2470-b36363d2161b/AppIcon-0-0-1x_U007emarketing-0-11-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "SingularityApp",
+    "slug": "singularityapp",
+    "tier": "Secondary",
+    "motif": "Pure Checkmark",
+    "dominantColor": "Purple / Indigo",
+    "bgTone": "Light",
+    "style": "Fluent / Layered",
+    "whyItWorks": "Concentric black-hole indigo vortex cleverly visualizes the 'Singularity' name around a white check, though fine concentric rings muddy at small dock sizes.",
+    "status": "found",
+    "file": "icons/singularityapp.png",
+    "source": "iTunes software (id=1477784588)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/32/23/a6/3223a674-5ca6-ebfe-7d4c-b953e707fdfd/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "OpenTodo",
+    "slug": "opentodo",
+    "tier": "Secondary",
+    "motif": "Pure Checkmark",
+    "dominantColor": "Green / Teal",
+    "bgTone": "Light",
+    "style": "Flat Geometric",
+    "whyItWorks": "Forest-green crescent cradling a heavy black check communicates open-source pragmatism, but feels dated and lacks balanced optical margins.",
+    "status": "found",
+    "file": "icons/opentodo.png",
+    "source": "iTunes software (id=1490013766)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/27/b4/99/27b49981-5a9a-7a3c-2433-27a2a0a43693/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Super Productivity",
+    "slug": "super-productivity",
+    "tier": "Secondary",
+    "motif": "Pure Checkmark",
+    "dominantColor": "Blue",
+    "bgTone": "Saturated",
+    "style": "Flat Geometric",
+    "whyItWorks": "Dramatically tapered, razor-sharp oversized check slashing edge-to-edge across cobalt blue gives energetic motion, still inside the blue-check archetype.",
+    "status": "found",
+    "file": "icons/super-productivity.png",
+    "source": "iTunes software (id=1482572463)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/fc/75/5e/fc755ebb-80d5-283c-159b-d7f24f79cd20/AppIcon-0-0-1x_U007epad-0-1-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Tasks.org",
+    "slug": "tasks-org",
+    "tier": "Secondary",
+    "motif": "Pure Checkmark",
+    "dominantColor": "Blue",
+    "bgTone": "Light",
+    "style": "Flat Geometric",
+    "whyItWorks": "Classic Android Material flat blue circle + white check with subtle long shadow — clear utility, zero visual separation from stock task clones.",
+    "status": "found",
+    "file": "icons/tasks-org.png",
+    "source": "GitHub tasks/tasks (org avatar)",
+    "sourceUrl": "https://github.com/tasks.png?size=512"
+  },
+  {
+    "name": "Due",
+    "slug": "due",
+    "tier": "Secondary",
+    "motif": "Calendar / Clock",
+    "dominantColor": "Dark / Mono",
+    "bgTone": "Light",
+    "style": "Minimal Line / Glyph",
+    "whyItWorks": "Smart hybrid metaphor: minimalist ink-black alarm clock whose hands form a sweeping checkmark — immediately tells you its core job (nagging timers).",
+    "status": "found",
+    "file": "icons/due.png",
+    "source": "iTunes App Store (id=390017969)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/e3/93/2d/e3932d94-2359-242f-ffd5-6143db8e5dfc/AppIcon-Default-0-0-1x_U007epad-0-0-0-1-0-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Roma",
+    "slug": "roma",
+    "tier": "Agent",
+    "motif": "Lettermark",
+    "dominantColor": "Orange / Amber",
+    "bgTone": "Saturated",
+    "style": "Flat Geometric",
+    "whyItWorks": "Bold Swiss-brutalist black block 'R' on vivid vermilion-orange breaks hard from friendly productivity cliches; ultra-legible at tiny sizes, though stark and utilitarian.",
+    "status": "found",
+    "file": "icons/roma.png",
+    "source": "Web apple-touch-icon (https://roma.app/)",
+    "sourceUrl": "https://roma.app/apple-icon.png?apple-icon.2pq6f0luyjeyy.png"
+  },
+  {
+    "name": "Done",
+    "slug": "done",
+    "tier": "Agent",
+    "motif": "Pure Checkmark",
+    "dominantColor": "Red / Coral",
+    "bgTone": "Light",
+    "style": "Minimal Line / Glyph",
+    "whyItWorks": "Clean purple-to-coral gradient checkmark on pure white looks modern but completely indistinguishable from generic startup to-do icons.",
+    "status": "found",
+    "file": "icons/done.png",
+    "source": "Web manifest(512x512) (https://trydone.app/)",
+    "sourceUrl": "https://trydone.app/icon-512.png"
+  },
+  {
+    "name": "DailyTask",
+    "slug": "dailytask",
+    "tier": "Agent",
+    "motif": "Checkmark in Box",
+    "dominantColor": "Blue",
+    "bgTone": "Saturated",
+    "style": "Minimal Line / Glyph",
+    "whyItWorks": "Flat white outline checkbox on royal blue is instantly legible as 'tasks', yet looks like a stock Lucide/SF Symbol icon rather than a bespoke brand.",
+    "status": "found",
+    "file": "icons/dailytask.png",
+    "source": "Web manifest(512x512) (https://dailytask.dev/)",
+    "sourceUrl": "https://dailytask.dev/icons/icon-512.png"
+  },
+  {
+    "name": "Weft",
+    "slug": "weft",
+    "tier": "Agent",
+    "motif": "Object / Metaphor",
+    "dominantColor": "Orange / Amber",
+    "bgTone": "Light",
+    "style": "Minimal Line / Glyph",
+    "whyItWorks": "One of only two apps using a warm linen/paper ground: terracotta-orange horizontal weft threads weaving through gray vertical warp bars create a calm, editorial, craft-forward mark.",
+    "status": "found",
+    "file": "icons/weft.png",
+    "source": "Web apple-touch-icon(180x180) (https://letsweft.com/)",
+    "sourceUrl": "https://letsweft.com/apple-icon?00b9ce146459bae8"
+  },
+  {
+    "name": "Bond",
+    "slug": "bond",
+    "tier": "Agent",
+    "motif": "Lettermark",
+    "dominantColor": "Dark / Mono",
+    "bgTone": "Dark",
+    "style": "Flat Geometric",
+    "whyItWorks": "Stark white-on-black 'BOND' wordmark with an elongated geometric 'O' conveys executive luxury minimalism, though a 4-letter wordmark shrinks awkwardly at 32px.",
+    "status": "found",
+    "file": "icons/bond.png",
+    "source": "Y Combinator official company logo (ycombinator.com/companies/bond)",
+    "sourceUrl": "https://bookface-images.s3.amazonaws.com/small_logos/f4056bd531497eb8c59fcb550011c9196adad6a6.png"
+  },
+  {
+    "name": "Motion",
+    "slug": "motion",
+    "tier": "Adjacent",
+    "motif": "Lettermark",
+    "dominantColor": "Dark / Mono",
+    "bgTone": "Light",
+    "style": "Minimal Line / Glyph",
+    "whyItWorks": "Fluid white monoline 'm' wave inside a deep midnight-navy badge subtly blends monogram and rhythmic flow, though the circular crop wastes corner space inside a squircle.",
+    "status": "found",
+    "file": "icons/motion.png",
+    "source": "iTunes App Store (id=1580440623)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/27/01/61/2701613c-01e2-ca53-1430-a25f10f399f2/AppIcon-0-0-1x_U007ephone-0-1-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Sunsama",
+    "slug": "sunsama",
+    "tier": "Adjacent",
+    "motif": "Object / Metaphor",
+    "dominantColor": "Red / Coral",
+    "bgTone": "Light",
+    "style": "Flat Geometric",
+    "whyItWorks": "Warm coral-orange sun peeking over a quiet soft cloud captures 'calm daily ritual' in two effortless geometric shapes — memorable, serene, zero checkmarks.",
+    "status": "found",
+    "file": "icons/sunsama.png",
+    "source": "iTunes App Store (id=1475755747)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/86/f4/e6/86f4e6c4-079c-cddc-1d16-06215172ba46/AppIcon-0-0-1x_U007epad-0-1-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Akiflow",
+    "slug": "akiflow",
+    "tier": "Adjacent",
+    "motif": "Lettermark",
+    "dominantColor": "Purple / Indigo",
+    "bgTone": "Light",
+    "style": "Flat Geometric",
+    "whyItWorks": "Crisp cobalt-to-violet ribbon 'A' floating on a soft pearlescent pastel haze reads sleek and futuristic, though feels slightly generic SaaS-AI.",
+    "status": "found",
+    "file": "icons/akiflow.png",
+    "source": "iTunes software (id=1621279084)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/b4/2b/5c/b42b5c9c-a186-2e11-cf0d-6aa268546e0d/AppIcon-0-0-1x_U007epad-0-9-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Structured",
+    "slug": "structured",
+    "tier": "Adjacent",
+    "motif": "Pure Checkmark",
+    "dominantColor": "Red / Coral",
+    "bgTone": "Saturated",
+    "style": "Fluent / Layered",
+    "whyItWorks": "Soft blush-coral tile with translucent glowing frosted-glass ring and check feels warm, human, and natively Apple-polished.",
+    "status": "found",
+    "file": "icons/structured.png",
+    "source": "iTunes software (id=1499198946)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/fb/5d/bc/fb5dbc3a-ad8b-c4a2-9e19-02393073f1ed/AppIcon-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Tiimo",
+    "slug": "tiimo",
+    "tier": "Adjacent",
+    "motif": "Object / Metaphor",
+    "dominantColor": "Purple / Indigo",
+    "bgTone": "Light",
+    "style": "Playful / Illustrative",
+    "whyItWorks": "Gentle lavender character mascot with expressive eyes and a soothing hand explicitly targets neurodivergent warmth — completely different emotional register from corporate tools.",
+    "status": "found",
+    "file": "icons/tiimo.png",
+    "source": "iTunes software (id=1480220328)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/5b/1a/f8/5b1af84b-e336-d10a-b252-aeffb8f4bdd6/AppIcon-0-0-1x_U007epad-0-1-0-P3-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Taskito",
+    "slug": "taskito",
+    "tier": "Adjacent",
+    "motif": "List / Lines",
+    "dominantColor": "Blue",
+    "bgTone": "Light",
+    "style": "Minimal Line / Glyph",
+    "whyItWorks": "Vertical timeline of three connected blue check-dots with pale bars clearly nods to its timeline UI, though it reads closely to Apple Reminders in monochrome.",
+    "status": "found",
+    "file": "icons/taskito.png",
+    "source": "iTunes App Store (id=6471266496)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/88/af/85/88af85e7-145f-eccb-1bcb-117584a9d5c8/AppIcon-0-0-1x_U007emarketing-0-11-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Morgen",
+    "slug": "morgen",
+    "tier": "Adjacent",
+    "motif": "Abstract / Geometric",
+    "dominantColor": "Red / Coral",
+    "bgTone": "Light",
+    "style": "Flat Geometric",
+    "whyItWorks": "Pixel-dithered coral-to-gold sunrise disc evokes 'Morgen' (morning) + time-blocking grid simultaneously — poetic and super distinctive at 64px, slightly soft at 24px.",
+    "status": "found",
+    "file": "icons/morgen.png",
+    "source": "iTunes software (id=1604574131)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/cd/20/9a/cd209a81-9b90-13b8-dff4-901186c2c206/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Goblin.tools",
+    "slug": "goblin-tools",
+    "tier": "Adjacent",
+    "motif": "Object / Metaphor",
+    "dominantColor": "Green / Teal",
+    "bgTone": "Saturated",
+    "style": "Playful / Illustrative",
+    "whyItWorks": "Charming hand-inked lime-green goblin face brings pure indie personality and instant recall — proof that unpretentious character beats generic SaaS polish.",
+    "status": "found",
+    "file": "icons/goblin-tools.png",
+    "source": "iTunes App Store (id=6449003064)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/78/bf/c9/78bfc938-dc36-764d-16a7-46bc36731f2b/AppIcon-1x_U007epad-0-1-85-220-0.png/512x512bb.jpg"
+  },
+  {
+    "name": "Google Keep",
+    "slug": "google-keep",
+    "tier": "Adjacent",
+    "motif": "Object / Metaphor",
+    "dominantColor": "Orange / Amber",
+    "bgTone": "Light",
+    "style": "Fluent / Layered",
+    "whyItWorks": "Luminous warm golden lightbulb on white immediately communicates quick-capture ideas rather than rigid task lists; strong hue separation in a blue/red market.",
+    "status": "found",
+    "file": "icons/google-keep.png",
+    "source": "iTunes App Store (id=1029207872)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/84/8b/6e/848b6e80-fc95-f1e8-ca77-691353dca85a/keep_2026_ios-0-0-1x_U007epad-0-0-0-1-0-0-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Microsoft Planner",
+    "slug": "microsoft-planner",
+    "tier": "Adjacent",
+    "motif": "List / Lines",
+    "dominantColor": "Green / Teal",
+    "bgTone": "Light",
+    "style": "Fluent / Layered",
+    "whyItWorks": "Three stepped emerald-to-forest Fluent Kanban strips neatly visualize board columns without clutter; clean enterprise clarity, low emotional warmth.",
+    "status": "found",
+    "file": "icons/microsoft-planner.png",
+    "source": "iTunes App Store (id=1219301037)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/76/0f/ee/760feeb8-1b0d-12d2-a62c-a007c122b4b1/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Notion",
+    "slug": "notion",
+    "tier": "Adjacent",
+    "motif": "Lettermark",
+    "dominantColor": "Dark / Mono",
+    "bgTone": "Light",
+    "style": "Minimal Line / Glyph",
+    "whyItWorks": "Iconic hand-drawn isometric black-and-white cube carrying a literary serif 'N' — feels like a timeless print-studio rubber stamp that works at any size or color mode.",
+    "status": "found",
+    "file": "icons/notion.png",
+    "source": "iTunes App Store (id=1232780281)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/ea/1b/48/ea1b4840-9ee3-ab66-a482-659ced115cbb/AppIconProd-0-0-1x_U007epad-0-0-0-1-0-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Linear",
+    "slug": "linear",
+    "tier": "Adjacent",
+    "motif": "Abstract / Geometric",
+    "dominantColor": "Dark / Mono",
+    "bgTone": "Dark",
+    "style": "Tactile 3D / Skeuomorphic",
+    "whyItWorks": "Masterclass in restrained precision: brushed metallic-silver diagonally sliced sphere set into a dark speckled obsidian bezel — exudes engineering speed and craft.",
+    "status": "found",
+    "file": "icons/linear.png",
+    "source": "iTunes software (id=1645587184)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/e8/59/70/e859701a-75a5-07d2-efe9-5d82dbeee078/Linear-0-0-1x_U007epad-0-0-0-1-0-0-sRGB-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Asana",
+    "slug": "asana",
+    "tier": "Adjacent",
+    "motif": "Abstract / Geometric",
+    "dominantColor": "Red / Coral",
+    "bgTone": "Light",
+    "style": "Flat Geometric",
+    "whyItWorks": "Three coral-red circles in a serene triangle are maximally simple, scalable to 16px, and convey team balance without a single literal UI element.",
+    "status": "found",
+    "file": "icons/asana.png",
+    "source": "iTunes App Store (id=489969512)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/39/ce/8c/39ce8c2c-c69e-06fc-ef44-06ee2832a481/AppIcon-0-0-1x_U007epad-0-1-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Obsidian",
+    "slug": "obsidian",
+    "tier": "Adjacent",
+    "motif": "Object / Metaphor",
+    "dominantColor": "Purple / Indigo",
+    "bgTone": "Dark",
+    "style": "Tactile 3D / Skeuomorphic",
+    "whyItWorks": "Faceted violet amethyst shard floating in pitch black creates a coveted jewel-like object with unmistakable silhouette and cult-favorite gravity.",
+    "status": "found",
+    "file": "icons/obsidian.png",
+    "source": "iTunes App Store (id=1557175442)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/9f/6e/41/9f6e419e-d85c-d3b6-550b-40c51bf9ff26/AppIcon-0-0-1x_U007epad-0-1-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Wunderlist",
+    "slug": "wunderlist",
+    "tier": "Historical",
+    "motif": "Object / Metaphor",
+    "dominantColor": "Red / Coral",
+    "bgTone": "Light",
+    "style": "Tactile 3D / Skeuomorphic",
+    "whyItWorks": "Beloved classic: warm wood-trimmed cream notebook with a notched red bookmark ribbon and white star — human, cozy, tactile, and remembered a decade after shutdown.",
+    "status": "found",
+    "file": "icons/wunderlist.png",
+    "source": "Wikipedia File:Wunderlist Logo.png (official historical icon)",
+    "sourceUrl": "https://upload.wikimedia.org/wikipedia/en/b/ba/Wunderlist_Logo.png?utm_source=en.wikipedia.org&utm_campaign=imageinfo&utm_content=original"
+  },
+  {
+    "name": "Amie",
+    "slug": "amie",
+    "tier": "Historical",
+    "motif": "Abstract / Geometric",
+    "dominantColor": "Red / Coral",
+    "bgTone": "Saturated",
+    "style": "Tactile 3D / Skeuomorphic",
+    "whyItWorks": "Soft bubblegum-pink tile with a pillowy, glossy 3D white cloud-knot feels joyful, toy-like, and instantly stands apart in a sea of austere productivity icons.",
+    "status": "found",
+    "file": "icons/amie.png",
+    "source": "iTunes software (id=1548277133)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/57/49/4d/57494d6a-bb48-b28c-2477-b62947f5517e/app-icon-pink-0-0-1x_U007emarketing-0-8-0-85-220.png/512x512bb.jpg"
+  },
+  {
+    "name": "Clockwise",
+    "slug": "clockwise",
+    "tier": "Historical",
+    "motif": "Abstract / Geometric",
+    "dominantColor": "Green / Teal",
+    "bgTone": "Dark",
+    "style": "Flat Geometric",
+    "whyItWorks": "Deep pine-green square with four luminous lime organic spark-petals occupies rare dark-botanical territory — calm, confident, and visually distinct.",
+    "status": "found",
+    "file": "icons/clockwise.png",
+    "source": "GitHub org avatar (github.com/clockwisehq)",
+    "sourceUrl": "https://avatars.githubusercontent.com/u/22687168?s=256&v=4"
+  }
+];
+    const EMBEDDED_ICONS = null;
+
+    const TIERS = ['All', 'Core', 'Secondary', 'Agent', 'Adjacent', 'Historical'];
+    const MOTIFS = [
+      'Pure Checkmark',
+      'Checkmark in Box',
+      'List / Lines',
+      'Lettermark',
+      'Abstract / Geometric',
+      'Object / Metaphor',
+      'Calendar / Clock',
+    ];
+    const COLORS = [
+      'Blue',
+      'Red / Coral',
+      'Purple / Indigo',
+      'Dark / Mono',
+      'Green / Teal',
+      'Orange / Amber',
+      'Light / White',
+    ];
+    const COLOR_SWATCH = {
+      'Blue': '#3b82f6',
+      'Red / Coral': '#ef4444',
+      'Purple / Indigo': '#8b5cf6',
+      'Dark / Mono': '#374151',
+      'Green / Teal': '#10b981',
+      'Orange / Amber': '#f97316',
+      'Light / White': '#e5e7eb',
+    };
+
+    const DOCK_PRESETS = {
+      benchmarks: ['things-3', 'superlist', 'todoist', 'apple-reminders', 'ticktick', 'microsoft-to-do', 'omnifocus', 'linear'],
+      agents: ['roma', 'done', 'dailytask', 'weft', 'bond'],
+      tactile: ['things-3', 'superlist', 'omnifocus', 'linear', 'obsidian', 'wunderlist', 'amie'],
+      bluecheck: ['things-3', 'microsoft-to-do', 'ticktick', 'any-do', '2do', 'google-tasks', 'super-productivity', 'tasks-org', 'dailytask'],
+    };
+
+    const state = {
+      tab: 'gallery',
+      tier: 'All',
+      motif: 'All',
+      color: 'All',
+      groupBy: 'tier',
+      size: 64,
+      backdrop: 'light',
+      squircle: true,
+      search: '',
+      dockPreset: 'benchmarks',
+      selectedSlug: null,
+    };
+
+    function iconSrc(app) {
+      if (EMBEDDED_ICONS && EMBEDDED_ICONS[app.slug]) {
+        return EMBEDDED_ICONS[app.slug];
+      }
+      return './' + app.file;
+    }
+
+    function esc(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function getFiltered() {
+      const q = state.search.trim().toLowerCase();
+      return COMPETITORS.filter((c) => {
+        if (state.tier !== 'All' && c.tier !== state.tier) return false;
+        if (state.motif !== 'All' && c.motif !== state.motif) return false;
+        if (state.color !== 'All' && c.dominantColor !== state.color) return false;
+        if (q) {
+          const hay = `${c.name} ${c.tier} ${c.motif} ${c.dominantColor} ${c.style} ${c.bgTone} ${c.whyItWorks}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+    }
+
+    function iconHtml(app, sizePx, backdropOverride) {
+      const bd = backdropOverride || state.backdrop;
+      const shapeCls = state.squircle ? 'icon-squircle' : 'icon-square';
+      const shadowCls = bd === 'dark' ? 'icon-shadow-dark' : 'icon-shadow-light';
+      return `<div class="icon-frame ${shapeCls} ${shadowCls}" style="width:${sizePx}px;height:${sizePx}px;">
+        <img src="${iconSrc(app)}" alt="${esc(app.name)} icon" loading="lazy" />
+      </div>`;
+    }
+
+    function renderDock() {
+      const stage = document.getElementById('dock-stage');
+      const tray = document.getElementById('dock-tray');
+      const isDark = state.backdrop === 'dark';
+      const dockSize = state.size;
+      const cellW = Math.max(84, dockSize + 20);
+      stage.className = `rounded-xl p-4 sm:p-5 flex items-center justify-center transition-colors ${isDark ? 'dock-dark' : 'dock-light'}`;
+      tray.className = `rounded-2xl px-4 py-3.5 w-full grid justify-center justify-items-center items-start gap-x-3 gap-y-4 transition-all ${isDark ? 'dock-tray-dark' : 'dock-tray-light'}`;
+      tray.style.gridTemplateColumns = `repeat(auto-fit, ${cellW}px)`;
+
+      const slugs = DOCK_PRESETS[state.dockPreset] || DOCK_PRESETS.benchmarks;
+      const items = slugs.map((s) => COMPETITORS.find((c) => c.slug === s)).filter(Boolean);
+      const shapeCls = state.squircle ? 'icon-squircle' : 'icon-square';
+      const shadowCls = isDark ? 'icon-shadow-dark' : 'icon-shadow-light';
+
+      // Build dynamic Septena slot (inserted right at position 2 alongside Things 3 / Superlist)
+      const SB = window.SeptenaBrand;
+      let septenaHtml = '';
+      if (SB) {
+        const bState = SB.loadState();
+        const allProps = SB.ALL_PROPOSALS;
+        const idx = Math.max(0, allProps.findIndex((p) => p.id === bState.activeProposal));
+        const prop = allProps[idx];
+        const pal = SB.resolvePalette(bState, prop);
+        const metaEl = document.getElementById('septena-dock-meta');
+        if (metaEl) metaEl.textContent = `${prop.shortName} · ${pal.name}`;
+
+        const shapesEl = document.getElementById('septena-dock-shapes');
+        if (shapesEl) {
+          shapesEl.innerHTML = allProps.map((p) => {
+            const pPal = SB.resolvePalette(bState, p);
+            const on = p.id === prop.id;
+            return `<button data-septena-shape="${p.id}" title="${esc(p.name)}" class="p-0.5 rounded-[8px] cursor-pointer transition bg-transparent border-0 focus:outline-none ${on ? 'ring-2 ring-[var(--primary)] scale-105' : 'opacity-75 hover:opacity-100 hover:scale-105'}"><div class="w-8 h-8 icon-squircle overflow-hidden shadow-sm">${SB.renderProposalSVG(p.id, pPal, { size: '100%', idPrefix: `sh_${p.id}`, fullBleed: true })}</div></button>`;
+          }).join('');
+        }
+
+        const shellEl = document.getElementById('septena-dock-shell');
+        if (shellEl) {
+          const curShell = bState.shellMode || 'black';
+          shellEl.innerHTML = [
+            { id: 'black', label: 'Out: Black' },
+            { id: 'white', label: 'White' },
+            { id: 'color', label: 'Color' },
+          ].map((m) => {
+            const on = curShell === m.id;
+            return `<button data-septena-shell="${m.id}" class="px-1.5 py-0.5 rounded cursor-pointer transition ${on ? 'bg-[var(--primary)] text-[var(--primary-foreground)] font-medium' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'}">${m.label}</button>`;
+          }).join('');
+        }
+
+        const faceEl = document.getElementById('septena-dock-face');
+        if (faceEl) {
+          const curFace = bState.faceMode || 'white';
+          faceEl.innerHTML = [
+            { id: 'white', label: 'In: White' },
+            { id: 'black', label: 'Black' },
+          ].map((m) => {
+            const on = curFace === m.id;
+            return `<button data-septena-face="${m.id}" class="px-1.5 py-0.5 rounded cursor-pointer transition ${on ? 'bg-[var(--primary)] text-[var(--primary-foreground)] font-medium' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'}">${m.label}</button>`;
+          }).join('');
+        }
+
+        const colEl = document.getElementById('septena-dock-colors');
+        if (colEl) {
+          const swatches = SB.FRUIT_PALETTES.map((f) => ({
+            id: f.id,
+            label: `${f.name} — ${f.origin}`,
+            bg: f.isObsidian ? `linear-gradient(135deg, ${f.base} 56%, ${f.accent} 56%)` : f.base,
+          }));
+          const jIdx = swatches.findIndex((s) => s.id === 'jabuticaba');
+          if (jIdx > 0) swatches.unshift(swatches.splice(jIdx, 1)[0]);
+          colEl.innerHTML = swatches.map((s) => {
+            const on = bState.paletteMode === s.id;
+            return `<button data-septena-pal="${s.id}" title="${esc(s.label)}" class="w-4 h-4 rounded-full cursor-pointer transition ${on ? 'ring-2 ring-amber-400 scale-110' : 'opacity-80 hover:opacity-100'}" style="background:${s.bg};border:1px solid rgba(128,128,128,0.4)"></button>`;
+          }).join('');
+        }
+
+        septenaHtml = `
+          <button id="septena-cycle-btn" data-cycle-septena="1" title="Click to switch Septena icon (${idx + 1}/${allProps.length}: ${esc(prop.name)} — Shift+Click for previous)" class="icon-card group w-full flex flex-col items-center gap-1.5 cursor-pointer bg-transparent border-0 p-0 focus:outline-none">
+            <div class="icon-frame ${shapeCls} ${shadowCls}" style="width:${dockSize}px;height:${dockSize}px;">
+              ${SB.renderProposalSVG(prop.id, pal, { size: '100%', idPrefix: 'dock_septena', fullBleed: true })}
+            </div>
+            <span class="text-xs font-medium w-full text-center truncate" style="color:${isDark ? '#e5e7eb' : '#1f2937'}">Septena</span>
+          </button>`;
+      }
+
+      const compHtmls = items.map((app) => `
+        <button data-inspect="${app.slug}" class="icon-card group w-full flex flex-col items-center gap-1.5 cursor-pointer bg-transparent border-0 p-0 focus:outline-none">
+          ${iconHtml(app, dockSize, state.backdrop)}
+          <span class="text-xs font-medium w-full text-center truncate" style="color:${isDark ? '#e5e7eb' : '#1f2937'}">${esc(app.name)}</span>
+        </button>
+      `);
+      if (septenaHtml) compHtmls.splice(Math.min(2, compHtmls.length), 0, septenaHtml);
+      tray.innerHTML = compHtmls.join('');
+
+      document.querySelectorAll('.dock-preset-btn').forEach((btn) => {
+        const active = btn.dataset.preset === state.dockPreset;
+        btn.className = `dock-preset-btn px-2.5 py-1 rounded-md text-xs font-medium border transition cursor-pointer ${
+          active
+            ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-[var(--primary)]'
+            : 'bg-[var(--background)] text-[var(--muted-foreground)] border-[var(--border)] hover:text-[var(--foreground)]'
+        }`;
+      });
+    }
+
+    function renderControls() {
+      // Tabs
+      document.querySelectorAll('.tab-btn').forEach((btn) => {
+        const active = btn.dataset.tab === state.tab;
+        btn.className = `tab-btn px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
+          active
+            ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
+            : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+        }`;
+      });
+      document.getElementById('view-gallery').classList.toggle('hidden', state.tab !== 'gallery');
+      document.getElementById('view-matrix').classList.toggle('hidden', state.tab !== 'matrix');
+      document.getElementById('view-insights').classList.toggle('hidden', state.tab !== 'insights');
+
+      // Tier pills
+      const pillWrap = document.getElementById('tier-pills');
+      pillWrap.innerHTML = TIERS.map((t) => {
+        const count = t === 'All' ? COMPETITORS.length : COMPETITORS.filter((c) => c.tier === t).length;
+        const active = state.tier === t;
+        return `<button data-tier="${t}" class="tier-btn px-2.5 py-1 rounded-lg text-xs font-medium border transition cursor-pointer ${
+          active
+            ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-[var(--primary)]'
+            : 'bg-[var(--background)] text-[var(--muted-foreground)] border-[var(--border)] hover:text-[var(--foreground)]'
+        }">${t} <span class="opacity-75 font-mono">(${count})</span></button>`;
+      }).join('');
+
+      // Size buttons
+      document.querySelectorAll('.size-btn').forEach((btn) => {
+        const active = Number(btn.dataset.size) === state.size;
+        btn.className = `size-btn px-2 py-1 rounded text-xs font-mono transition cursor-pointer ${
+          active
+            ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
+            : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+        }`;
+      });
+
+      // Backdrop buttons
+      document.querySelectorAll('.backdrop-btn').forEach((btn) => {
+        const active = btn.dataset.backdrop === state.backdrop;
+        btn.className = `backdrop-btn px-2.5 py-1 rounded text-xs font-medium transition cursor-pointer ${
+          active
+            ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
+            : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+        }`;
+      });
+
+      // Squircle toggle
+      const sqBtn = document.getElementById('squircle-toggle');
+      sqBtn.textContent = state.squircle ? 'Squircle: ON' : 'Squircle: OFF';
+      sqBtn.className = `px-2.5 py-1.5 rounded-lg border text-xs font-medium transition cursor-pointer ${
+        state.squircle
+          ? 'bg-[var(--secondary)] text-[var(--secondary-foreground)] border-[var(--border)]'
+          : 'bg-[var(--background)] text-[var(--muted-foreground)] border-[var(--border)]'
+      }`;
+    }
+
+    function renderGallery() {
+      const container = document.getElementById('view-gallery');
+      const items = getFiltered();
+
+      if (items.length === 0) {
+        container.innerHTML = `<div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-10 text-center text-xs text-[var(--muted-foreground)]">
+          No apps match the current filter combination. Try resetting Motif, Color, or Tier.
+        </div>`;
+        return;
+      }
+
+      // Group items
+      const groups = new Map();
+      const orderMap = {
+        tier: TIERS.slice(1),
+        motif: MOTIFS,
+        dominantColor: COLORS,
+        style: ['Tactile 3D / Skeuomorphic', 'Fluent / Layered', 'Flat Geometric', 'Minimal Line / Glyph', 'Playful / Illustrative'],
+        bgTone: ['Light', 'Saturated', 'Dark'],
+      };
+      const preferredOrder = orderMap[state.groupBy] || [];
+      for (const k of preferredOrder) groups.set(k, []);
+      for (const item of items) {
+        const k = item[state.groupBy] || 'Other';
+        if (!groups.has(k)) groups.set(k, []);
+        groups.get(k).push(item);
+      }
+
+      const wellCls = state.backdrop === 'dark' ? 'well-dark' : 'well-light';
+      const gridCols = state.size >= 96
+        ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+        : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
+
+      let html = '';
+      for (const [groupName, list] of groups.entries()) {
+        if (!list.length) continue;
+        html += `
+          <section class="space-y-2.5">
+            <div class="flex items-center justify-between border-b border-[var(--card-border)] pb-1.5">
+              <div class="flex items-center gap-2">
+                ${state.groupBy === 'dominantColor' ? `<span class="inline-block w-2.5 h-2.5 rounded-full border border-[var(--border)]" style="background:${COLOR_SWATCH[groupName] || '#888'}"></span>` : ''}
+                <h2 class="text-sm font-semibold text-[var(--foreground)]">${esc(groupName)}</h2>
+              </div>
+              <span class="text-xs font-mono text-[var(--muted-foreground)]">${list.length} ${list.length === 1 ? 'app' : 'apps'}</span>
+            </div>
+            <div class="grid ${gridCols} gap-3">
+              ${list.map((app) => `
+                <button data-inspect="${app.slug}" class="icon-card text-left bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)] rounded-xl overflow-hidden transition flex flex-col cursor-pointer focus:outline-none">
+                  <div class="${wellCls} px-4 py-4 flex items-center justify-center relative border-b border-[var(--card-border)]">
+                    <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-xs font-mono" style="background:${state.backdrop === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.08)'}; color:${state.backdrop === 'dark' ? '#d1d5db' : '#374151'}">${esc(app.tier)}</span>
+                    ${iconHtml(app, state.size, state.backdrop)}
+                  </div>
+                  <div class="p-3 space-y-2 flex-1 flex flex-col justify-between">
+                    <div class="space-y-1">
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="text-sm font-semibold text-[var(--foreground)] truncate">${esc(app.name)}</span>
+                        <span class="inline-flex items-center gap-1 text-xs text-[var(--muted-foreground)] shrink-0">
+                          <span class="w-2 h-2 rounded-full border border-[var(--border)]" style="background:${COLOR_SWATCH[app.dominantColor] || '#888'}"></span>
+                          ${esc(app.dominantColor)}
+                        </span>
+                      </div>
+                      <div class="flex flex-wrap gap-1">
+                        <span class="px-1.5 py-0.5 rounded bg-[var(--secondary)] text-[var(--secondary-foreground)] text-xs">${esc(app.motif)}</span>
+                        <span class="px-1.5 py-0.5 rounded border border-[var(--card-border)] text-[var(--muted-foreground)] text-xs">${esc(app.style.split(' / ')[0])}</span>
+                      </div>
+                    </div>
+                    <p class="text-xs text-[var(--muted-foreground)] leading-snug line-clamp-2">${esc(app.whyItWorks)}</p>
+                  </div>
+                </button>
+              `).join('')}
+            </div>
+          </section>
+        `;
+      }
+      container.innerHTML = html;
+    }
+
+    function renderMatrix() {
+      const items = getFiltered();
+      const grid = document.getElementById('matrix-grid');
+      const summary = document.getElementById('matrix-summary');
+
+      const totalCells = MOTIFS.length * COLORS.length;
+      let openCells = 0;
+      let crowdedCells = 0;
+      const cellMap = {};
+      for (const m of MOTIFS) {
+        for (const c of COLORS) {
+          const matches = items.filter((a) => a.motif === m && a.dominantColor === c);
+          cellMap[`${m}::${c}`] = matches;
+          if (matches.length === 0) openCells++;
+          if (matches.length >= 3) crowdedCells++;
+        }
+      }
+      summary.textContent = `${items.length} apps plotted • ${openCells}/${totalCells} open cells • ${crowdedCells} crowded hotspots (3+)`;
+
+      const wellCls = state.backdrop === 'dark' ? 'well-dark' : 'well-light';
+      const iconPx = Math.min(Math.max(state.size - 16, 30), 48);
+
+      let html = `<table class="w-full border-collapse text-xs" style="min-width: 820px;">
+        <thead>
+          <tr>
+            <th class="text-left p-2.5 border border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] font-semibold w-40">Motif \\ Color</th>
+            ${COLORS.map((col) => {
+              const cnt = items.filter((a) => a.dominantColor === col).length;
+              return `<th class="p-2.5 border border-[var(--border)] bg-[var(--background)] text-center font-semibold text-[var(--foreground)]">
+                <div class="inline-flex items-center justify-center gap-1.5">
+                  <span class="w-2.5 h-2.5 rounded-full border border-[var(--border)]" style="background:${COLOR_SWATCH[col]}"></span>
+                  <span>${esc(col)}</span>
+                  <span class="font-mono text-[var(--muted-foreground)] font-normal">(${cnt})</span>
+                </div>
+              </th>`;
+            }).join('')}
+          </tr>
+        </thead>
+        <tbody>`;
+
+      for (const motif of MOTIFS) {
+        const rowCnt = items.filter((a) => a.motif === motif).length;
+        html += `<tr>
+          <th class="text-left p-2.5 border border-[var(--border)] bg-[var(--background)] font-semibold text-[var(--foreground)] align-middle">
+            <div>${esc(motif)}</div>
+            <div class="font-mono font-normal text-[var(--muted-foreground)]">${rowCnt} ${rowCnt === 1 ? 'app' : 'apps'}</div>
+          </th>`;
+
+        for (const col of COLORS) {
+          const matches = cellMap[`${motif}::${col}`];
+          if (matches.length === 0) {
+            html += `<td class="p-2 border border-[var(--border)] text-center align-middle bg-[var(--background)]">
+              <div class="rounded-lg border border-dashed border-[var(--card-border)] py-3 px-1 text-[var(--muted-foreground)] font-mono opacity-65">OPEN</div>
+            </td>`;
+          } else {
+            const isHot = matches.length >= 3;
+            html += `<td class="p-2 border border-[var(--border)] align-top ${wellCls}" style="${isHot ? 'outline: 2px solid var(--warning); outline-offset: -2px;' : ''}">
+              <div class="flex flex-col gap-1.5 items-center">
+                ${isHot ? `<span class="px-1.5 py-0.5 rounded font-mono text-xs font-semibold bg-[var(--warning)]" style="color:#111827">CROWDED · ${matches.length}</span>` : ''}
+                <div class="flex flex-wrap justify-center gap-1.5">
+                  ${matches.map((app) => `
+                    <button data-inspect="${app.slug}" title="${esc(app.name)} (${esc(app.tier)}) — click to inspect" class="icon-card flex flex-col items-center gap-0.5 cursor-pointer bg-transparent border-0 p-0 focus:outline-none">
+                      ${iconHtml(app, iconPx, state.backdrop)}
+                      <span class="text-xs max-w-[64px] truncate" style="color:${state.backdrop === 'dark' ? '#e5e7eb' : '#1f2937'}">${esc(app.name)}</span>
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+            </td>`;
+          }
+        }
+        html += `</tr>`;
+      }
+      html += `</tbody></table>`;
+      grid.innerHTML = html;
+    }
+
+    function renderInsights() {
+      const items = getFiltered();
+      const wrap = document.getElementById('insights-charts');
+      const total = Math.max(items.length, 1);
+
+      function buildBarCard(title, key, orderedKeys, swatchMap) {
+        const counts = orderedKeys.map((k) => ({
+          label: k,
+          count: items.filter((a) => a[key] === k).length,
+        })).sort((a, b) => b.count - a.count);
+        const max = Math.max(...counts.map((c) => c.count), 1);
+
+        return `<div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-[var(--foreground)]">${esc(title)}</h3>
+            <span class="text-xs font-mono text-[var(--muted-foreground)]">n = ${items.length}</span>
+          </div>
+          <div class="space-y-2">
+            ${counts.map((row) => {
+              const pct = Math.round((row.count / total) * 100);
+              const w = Math.round((row.count / max) * 100);
+              const barColor = swatchMap && swatchMap[row.label] ? swatchMap[row.label] : 'var(--primary)';
+              return `<div class="space-y-1">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-[var(--foreground)]">${esc(row.label)}</span>
+                  <span class="font-mono text-[var(--muted-foreground)]">${row.count} (${pct}%)</span>
+                </div>
+                <div class="h-2 rounded-full bg-[var(--background)] overflow-hidden border border-[var(--card-border)]">
+                  <div class="h-full rounded-full" style="width:${w}%; background:${barColor}"></div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }
+
+      wrap.innerHTML = [
+        buildBarCard('Visual Motif Distribution', 'motif', MOTIFS, null),
+        buildBarCard('Dominant Color Family', 'dominantColor', COLORS, COLOR_SWATCH),
+        buildBarCard('Craft Style Breakdown', 'style', ['Tactile 3D / Skeuomorphic', 'Fluent / Layered', 'Flat Geometric', 'Minimal Line / Glyph', 'Playful / Illustrative'], null),
+        buildBarCard('Icon Background Tone', 'bgTone', ['Light', 'Saturated', 'Dark'], { Light: '#d1d5db', Saturated: 'var(--primary)', Dark: '#374151' }),
+      ].join('');
+    }
+
+    function openInspector(slug) {
+      const app = COMPETITORS.find((c) => c.slug === slug);
+      if (!app) return;
+      state.selectedSlug = slug;
+
+      const sameMotif = COMPETITORS.filter((c) => c.slug !== app.slug && c.motif === app.motif).slice(0, 6);
+      const sameColor = COMPETITORS.filter((c) => c.slug !== app.slug && c.dominantColor === app.dominantColor).slice(0, 6);
+
+      const card = document.getElementById('inspector-card');
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-4 border-b border-[var(--card-border)] pb-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-lg font-semibold text-[var(--foreground)]">${esc(app.name)}</h2>
+              <span class="px-2 py-0.5 rounded-md bg-[var(--secondary)] text-[var(--secondary-foreground)] text-xs font-medium">${esc(app.tier)}</span>
+            </div>
+            <div class="text-xs text-[var(--muted-foreground)] mt-0.5">${esc(app.source)}</div>
+          </div>
+          <button id="close-inspector" class="px-2.5 py-1 rounded-lg border border-[var(--border)] bg-[var(--background)] text-xs font-medium text-[var(--foreground)] cursor-pointer hover:border-[var(--primary)]">Close</button>
+        </div>
+
+        <!-- Dual Light/Dark Homescreen Scale Test -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="well-light rounded-xl p-4 space-y-2 border border-[var(--card-border)]">
+            <div class="text-xs font-mono" style="color:#4b5563">Light Homescreen (96px / 48px / 24px)</div>
+            <div class="flex items-end justify-center gap-4 py-2">
+              ${iconHtml(app, 96, 'light')}
+              ${iconHtml(app, 48, 'light')}
+              ${iconHtml(app, 24, 'light')}
+            </div>
+          </div>
+          <div class="well-dark rounded-xl p-4 space-y-2 border border-[var(--card-border)]">
+            <div class="text-xs font-mono" style="color:#9ca3af">Dark Homescreen (96px / 48px / 24px)</div>
+            <div class="flex items-end justify-center gap-4 py-2">
+              ${iconHtml(app, 96, 'dark')}
+              ${iconHtml(app, 48, 'dark')}
+              ${iconHtml(app, 24, 'dark')}
+            </div>
+          </div>
+        </div>
+
+        <!-- Metadata Pills -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          <div class="p-2.5 rounded-lg bg-[var(--background)] border border-[var(--card-border)]">
+            <div class="text-[var(--muted-foreground)]">Motif</div>
+            <div class="font-semibold text-[var(--foreground)] mt-0.5">${esc(app.motif)}</div>
+          </div>
+          <div class="p-2.5 rounded-lg bg-[var(--background)] border border-[var(--card-border)]">
+            <div class="text-[var(--muted-foreground)]">Color Family</div>
+            <div class="font-semibold text-[var(--foreground)] mt-0.5 flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full border border-[var(--border)]" style="background:${COLOR_SWATCH[app.dominantColor]}"></span>
+              ${esc(app.dominantColor)}
+            </div>
+          </div>
+          <div class="p-2.5 rounded-lg bg-[var(--background)] border border-[var(--card-border)]">
+            <div class="text-[var(--muted-foreground)]">Craft Style</div>
+            <div class="font-semibold text-[var(--foreground)] mt-0.5">${esc(app.style)}</div>
+          </div>
+          <div class="p-2.5 rounded-lg bg-[var(--background)] border border-[var(--card-border)]">
+            <div class="text-[var(--muted-foreground)]">Background Tone</div>
+            <div class="font-semibold text-[var(--foreground)] mt-0.5">${esc(app.bgTone)}</div>
+          </div>
+        </div>
+
+        <!-- Craft Note -->
+        <div class="p-3.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] space-y-1">
+          <div class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Craft Breakdown</div>
+          <p class="text-sm text-[var(--foreground)] leading-relaxed">${esc(app.whyItWorks)}</p>
+        </div>
+
+        <!-- Neighbors -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div class="p-3 rounded-xl bg-[var(--background)] border border-[var(--card-border)] space-y-2">
+            <div class="font-semibold text-[var(--muted-foreground)]">Same Motif (${esc(app.motif)})</div>
+            <div class="flex flex-wrap gap-2">
+              ${sameMotif.length ? sameMotif.map((n) => `
+                <button data-inspect="${n.slug}" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)] cursor-pointer">
+                  ${iconHtml(n, 22, state.backdrop)}
+                  <span class="text-[var(--foreground)]">${esc(n.name)}</span>
+                </button>
+              `).join('') : '<span class="text-[var(--muted-foreground)]">Unique in this motif!</span>'}
+            </div>
+          </div>
+          <div class="p-3 rounded-xl bg-[var(--background)] border border-[var(--card-border)] space-y-2">
+            <div class="font-semibold text-[var(--muted-foreground)]">Same Color (${esc(app.dominantColor)})</div>
+            <div class="flex flex-wrap gap-2">
+              ${sameColor.length ? sameColor.map((n) => `
+                <button data-inspect="${n.slug}" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)] cursor-pointer">
+                  ${iconHtml(n, 22, state.backdrop)}
+                  <span class="text-[var(--foreground)]">${esc(n.name)}</span>
+                </button>
+              `).join('') : '<span class="text-[var(--muted-foreground)]">Unique in this color family!</span>'}
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between text-xs text-[var(--muted-foreground)] pt-1 border-t border-[var(--card-border)]">
+          <span>Status: <strong class="text-[var(--foreground)]">${esc(app.status)}</strong></span>
+          <a href="${esc(app.sourceUrl)}" target="_blank" rel="noopener" class="underline text-[var(--link)] truncate max-w-sm">Source Asset URL</a>
+        </div>
+      `;
+
+      document.getElementById('inspector-backdrop').classList.remove('hidden');
+      document.getElementById('close-inspector').addEventListener('click', closeInspector);
+    }
+
+    function closeInspector() {
+      state.selectedSlug = null;
+      document.getElementById('inspector-backdrop').classList.add('hidden');
+    }
+
+    function renderAll() {
+      renderControls();
+      renderDock();
+      if (state.tab === 'gallery') renderGallery();
+      if (state.tab === 'matrix') renderMatrix();
+      if (state.tab === 'insights') renderInsights();
+    }
+
+    // Populate filter dropdowns once
+    const motifSel = document.getElementById('motif-select');
+    motifSel.innerHTML = ['All', ...MOTIFS].map((m) => `<option value="${esc(m)}">${esc(m === 'All' ? 'All Motifs' : m)}</option>`).join('');
+    const colorSel = document.getElementById('color-select');
+    colorSel.innerHTML = ['All', ...COLORS].map((c) => `<option value="${esc(c)}">${esc(c === 'All' ? 'All Colors' : c)}</option>`).join('');
+
+    // Wire events
+    document.addEventListener('click', (e) => {
+      const cycleBtn = e.target.closest('[data-cycle-septena]');
+      if (cycleBtn && window.SeptenaBrand) {
+        const SB = window.SeptenaBrand;
+        const cur = SB.loadState();
+        const list = SB.ALL_PROPOSALS;
+        const idx = Math.max(0, list.findIndex((p) => p.id === cur.activeProposal));
+        const nextIdx = (idx + (e.shiftKey ? -1 : 1) + list.length) % list.length;
+        SB.saveState({ ...cur, activeProposal: list[nextIdx].id });
+        renderDock();
+        return;
+      }
+      const shapeBtn = e.target.closest('[data-septena-shape]');
+      if (shapeBtn && window.SeptenaBrand) {
+        const SB = window.SeptenaBrand;
+        const cur = SB.loadState();
+        SB.saveState({ ...cur, activeProposal: shapeBtn.dataset.septenaShape });
+        renderDock();
+        return;
+      }
+      const shellBtn = e.target.closest('[data-septena-shell]');
+      if (shellBtn && window.SeptenaBrand) {
+        const SB = window.SeptenaBrand;
+        const cur = SB.loadState();
+        SB.saveState({ ...cur, shellMode: shellBtn.dataset.septenaShell });
+        renderDock();
+        return;
+      }
+      const faceBtn = e.target.closest('[data-septena-face]');
+      if (faceBtn && window.SeptenaBrand) {
+        const SB = window.SeptenaBrand;
+        const cur = SB.loadState();
+        SB.saveState({ ...cur, faceMode: faceBtn.dataset.septenaFace });
+        renderDock();
+        return;
+      }
+      const palBtn = e.target.closest('[data-septena-pal]');
+      if (palBtn && window.SeptenaBrand) {
+        const SB = window.SeptenaBrand;
+        const cur = SB.loadState();
+        SB.saveState({ ...cur, paletteMode: palBtn.dataset.septenaPal });
+        renderDock();
+        return;
+      }
+      const inspectBtn = e.target.closest('[data-inspect]');
+      if (inspectBtn) {
+        openInspector(inspectBtn.dataset.inspect);
+        return;
+      }
+      const tabBtn = e.target.closest('.tab-btn');
+      if (tabBtn) {
+        state.tab = tabBtn.dataset.tab;
+        renderAll();
+        return;
+      }
+      const tierBtn = e.target.closest('.tier-btn');
+      if (tierBtn) {
+        state.tier = tierBtn.dataset.tier;
+        renderAll();
+        return;
+      }
+      const sizeBtn = e.target.closest('.size-btn');
+      if (sizeBtn) {
+        state.size = Number(sizeBtn.dataset.size);
+        renderAll();
+        return;
+      }
+      const bdBtn = e.target.closest('.backdrop-btn');
+      if (bdBtn) {
+        state.backdrop = bdBtn.dataset.backdrop;
+        renderAll();
+        return;
+      }
+      const presetBtn = e.target.closest('.dock-preset-btn');
+      if (presetBtn) {
+        state.dockPreset = presetBtn.dataset.preset;
+        renderDock();
+        return;
+      }
+      if (e.target.id === 'inspector-backdrop') {
+        closeInspector();
+      }
+    });
+
+    document.getElementById('squircle-toggle').addEventListener('click', () => {
+      state.squircle = !state.squircle;
+      renderAll();
+    });
+    document.getElementById('search-input').addEventListener('input', (e) => {
+      state.search = e.target.value;
+      renderAll();
+    });
+    motifSel.addEventListener('change', (e) => {
+      state.motif = e.target.value;
+      renderAll();
+    });
+    colorSel.addEventListener('change', (e) => {
+      state.color = e.target.value;
+      renderAll();
+    });
+    document.getElementById('group-select').addEventListener('change', (e) => {
+      state.groupBy = e.target.value;
+      renderGallery();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && state.selectedSlug) closeInspector();
+    });
+
+    renderAll();
+  </script>
+</body>
+</html>
