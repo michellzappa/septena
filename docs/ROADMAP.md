@@ -142,6 +142,10 @@ GitHub milestone: `"M3 Factory ships code"`.
   accepted; prerequisites to `#21`, `#20`, `#136`): `#141`–`#145` done (`registry/`
   with 9 JSON registries, Swift/TS codegen, `lint-design.sh` drift gate, and
   shared conformance fixtures)
+- Shared Rust core ([ADR 0025](adr/0025-shared-rust-core.md), `docs/SHARED_CORE_SPEC.md`):
+  #246 C0 spike (crate, Rust codegen, `core.yml`) → #248 C2 web client on the
+  core's WASM. #247 C1 (Android, Windows) sits in M4, #251 C5 releases in M4,
+  #249 C3 backend and #250 C4 Apple in M5.
 - Sign-in beyond Apple (ADR 0016): #168 identity table, #169 email code,
   #170 device approval, #171 email on Apple accounts. Needed by every
   non-Apple client.

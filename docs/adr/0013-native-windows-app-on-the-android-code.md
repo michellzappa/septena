@@ -1,6 +1,6 @@
 # 0013. Build the Windows app on the Android client's Kotlin code
 
-- Status: accepted (2026-11-21)
+- Status: accepted (2026-11-21); W0 amended by ADR 0025 (rules and sync decisions come from the shared Rust core)
 - Date: 2026-11-21
 - Deciders: mz
 

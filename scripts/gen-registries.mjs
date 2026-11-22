@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Validates all `registry/*.json` files (including cross-file referential
-// integrity) and generates typed Swift, TypeScript, and Kotlin bindings.
+// integrity) and generates typed Swift, TypeScript, Kotlin and Rust bindings.
 //
 // Usage:
 //   node scripts/gen-registries.mjs          # validate and write generated files
@@ -1763,6 +1763,79 @@ function generateKotlinCore(bundle) {
   return lines.join("\n");
 }
 
+// Rust target for the shared core (ADR 0025). Constants only: the core reads
+// the registry through these, never through JSON at run time.
+const rustConstName = (s) => s
+  .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+  .replace(/[^A-Za-z0-9]+/g, "_")
+  .replace(/^_+|_+$/g, "")
+  .toUpperCase()
+  .replace(/^([0-9])/, "_$1");
+const rustModName = (s) => rustConstName(s).toLowerCase();
+const rustStr = (s) => JSON.stringify(s);
+
+function generateRustCore(bundle) {
+  const { entities, rules, dests } = bundle;
+  const lines = [
+    "// GENERATED FILE — DO NOT EDIT BY HAND.",
+    "// Sources: registry/entities.json, registry/rules.json, registry/destinations.json",
+    "// Regenerate: node scripts/gen-registries.mjs",
+    "#![allow(dead_code)]",
+    "",
+    "/// Numeric domain constants (`registry/rules.json`).",
+    "pub mod rules {",
+  ];
+  for (const [key, value] of Object.entries(rules)) {
+    if (key === "version") continue;
+    if (Number.isInteger(value)) lines.push(`    pub const ${rustConstName(key)}: i64 = ${value};`);
+    else lines.push(`    pub const ${rustConstName(key)}: f64 = ${Number(value)};`);
+  }
+  lines.push("}");
+  lines.push("");
+  lines.push("/// Wire limits (`registry/entities.json` `limits`).");
+  lines.push("pub mod limits {");
+  for (const [key, value] of Object.entries(entities.limits)) {
+    lines.push(`    pub const ${rustConstName(key)}: i64 = ${value};`);
+  }
+  lines.push("}");
+  lines.push("");
+  lines.push("/// Canonical enum values (`registry/entities.json` `enums`).");
+  lines.push("pub mod enums {");
+  for (const [key, values] of Object.entries(entities.enums)) {
+    lines.push(`    pub mod ${rustModName(key)} {`);
+    const seen = new Set();
+    for (const value of values) {
+      const name = rustConstName(value);
+      assert(!seen.has(name), `Rust: enum ${key} values collide at ${value}`);
+      seen.add(name);
+      lines.push(`        pub const ${name}: &str = ${rustStr(value)};`);
+    }
+    lines.push(`        pub const ALL: &[&str] = &[${values.map(rustStr).join(", ")}];`);
+    lines.push("    }");
+  }
+  lines.push("}");
+  lines.push("");
+  lines.push("/// Synced entity names (`registry/entities.json` `entities`).");
+  lines.push("pub mod entity_names {");
+  for (const name of Object.keys(entities.entities)) {
+    lines.push(`    pub const ${rustConstName(name)}: &str = ${rustStr(name)};`);
+  }
+  lines.push("}");
+  lines.push("");
+  lines.push("/// Destination IDs (`registry/destinations.json`).");
+  lines.push("pub mod destination_ids {");
+  const seen = new Set();
+  for (const { id } of dests.destinations) {
+    const name = rustConstName(id);
+    assert(!seen.has(name), `Rust: destination IDs collide at ${id}`);
+    seen.add(name);
+    lines.push(`    pub const ${name}: &str = ${rustStr(id)};`);
+  }
+  lines.push("}");
+  lines.push("");
+  return lines.join("\n");
+}
+
 function writeOrCheck(rel, content) {
   const full = path.join(REPO, rel);
   const existing = fs.existsSync(full) ? fs.readFileSync(full, "utf8") : null;
@@ -1832,6 +1905,7 @@ const outputs = [
   ["SeptenaCore/Generated/RegistryConstants.swift", generateSwift(bundle)],
   ["backend/src/generated/registries.ts", generateTS(bundle)],
   ["android/core/src/main/kotlin/app/septena/core/generated/RegistryConstants.kt", generateKotlinCore(bundle)],
+  ["core/crates/septena-core/src/generated/registry.rs", generateRustCore(bundle)],
   ["registry/l10n/en.json", L10N.englishFile(BY_KEY)],
 ];
 // The catalog is shared with Xcode, which rewrites extraction state and

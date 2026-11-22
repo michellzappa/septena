@@ -1,0 +1,22 @@
+[package]
+name = "septena-core"
+description = "Septena task rules and sync decisions, shared by every client (ADR 0025). No I/O."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "septena_core"
+crate-type = ["cdylib", "staticlib", "lib"]
+
+[features]
+default = ["ffi"]
+# UniFFI exports for Swift and Kotlin. The WASM wrapper builds without it.
+ffi = ["dep:uniffi"]
+
+[dependencies]
+serde = { version = "1", default-features = false, features = ["std", "derive"] }
+serde_json = { version = "1", default-features = false, features = ["std"] }
+uniffi = { version = "0.29", default-features = false, optional = true }

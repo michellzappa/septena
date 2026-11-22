@@ -110,7 +110,7 @@ issue when the first release ships. Fields added in M2 (tags #96, checklists
 |---|---|---|
 | WB0 Backend readiness | CORS, cookie session mode and WebSocket tickets ship with tests. | ADR 0016 sign-in (#168, #170) |
 | WB1 Spike | A deployed preview signs in by device approval, pulls one account, creates a task offline and pushes it after reconnect. | WB0, R0 registries |
-| WB2 Sync core | The TypeScript sync engine, IndexedDB store, multi-tab lock and `packages/task-rules` pass the conformance vectors. | WB1 |
+| WB2 Sync core | The TypeScript sync engine, IndexedDB store and multi-tab lock pass the conformance vectors. Rules and sync decisions come from the shared core's WASM (ADR 0025, C2 #248), not from a `packages/task-rules` copy. | WB1, #246 |
 | WB3 First release UI | The scope in §7, judged against the Mac app per `docs/DesignSpec.md`. | WB2, registries R1 to R3 |
 | WB4 Billing | Stripe checkout turns on sync on every device (#43). | WB3, entitlements enforced, #108 |
 | WB5 Launch | `app.septena.app` is public; the site's web page swaps the waitlist for a link. | WB3 |

@@ -1,0 +1,8 @@
+[bindings.kotlin]
+package_name = "app.septena.sharedcore"
+cdylib_name = "septena_core"
+
+[bindings.swift]
+module_name = "SeptenaSharedCore"
+
+ffi_module_name = "SeptenaSharedCoreFFI"

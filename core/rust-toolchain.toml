@@ -1,0 +1,3 @@
+# The Rust version of the shared core (ADR 0025). CI installs it; agents never do.
+[toolchain]
+channel = "1.95.0"

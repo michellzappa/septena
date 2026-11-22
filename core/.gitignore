@@ -1,0 +1,9 @@
+/target/
+/tools/uniffi-bindgen/target/
+/harness/swift/build/
+/harness/swift/.build/
+/harness/swift/Sources/SeptenaSharedCore/*.swift
+/harness/jvm/generated/
+/harness/jvm/build/
+/harness/jvm/.gradle/
+/harness/wasm/pkg/

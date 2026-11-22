@@ -22,7 +22,7 @@ Windows apps beside the shared code. *(default)*
 
 | Module | Contents | Android imports |
 |---|---|---|
-| `android/core` | Wire types and codecs, generated registry constants (ADR 0015), sync engine, outbox, shadows, mutators, `DayClock`, domain rules verified by `registry/conformance/*.json` | none (Kotlin/JVM) |
+| `android/core` | Wire types and codecs, generated registry constants (ADR 0015), sync engine, outbox, shadows, mutators, `DayClock`, domain rules verified by `registry/conformance/*.json`. From C1 (#247, ADR 0025) the domain rules and sync decisions come from the shared Rust core; this module keeps the orchestration | none (Kotlin/JVM) |
 | `android/store` | Local store on SQLite through SQLDelight, so the same schema runs on Android and on the JVM for Windows *(default)* | none |
 | `android/ui` | Compose screens and view models shared with Windows where they fit | Compose Multiplatform only |
 | `android/app` | Android entry point, share target, widgets, notifications, Google Play billing | yes |

@@ -1,0 +1,272 @@
+{
+  "version": 1,
+  "description": "Golden conformance vectors for the sync decisions of the shared core (ADR 0025): pull page checks, the pull-row merge, push-response handling and server rejection reasons. Taken from the Kotlin A1 engine (android/core TaskSyncEngine.kt) and store (android/store SqlDelightTaskStore.applyPullPage). Run first by the Rust core; Swift, Kotlin and TypeScript call the core instead of re-implementing these.",
+  "pullPage": [
+    {
+      "name": "last page applies and ends the pull",
+      "input": { "cursor": 10, "page": { "resetRequired": false, "nextSince": 15, "hasMore": false }, "resetsSoFar": 0 },
+      "expected": { "decision": "apply" }
+    },
+    {
+      "name": "middle page applies and continues from nextSince",
+      "input": { "cursor": 10, "page": { "resetRequired": false, "nextSince": 20, "hasMore": true }, "resetsSoFar": 0 },
+      "expected": { "decision": "applyAndContinue", "nextCursor": 20 }
+    },
+    {
+      "name": "empty last page at the same cursor applies",
+      "input": { "cursor": 42, "page": { "resetRequired": false, "nextSince": 42, "hasMore": false }, "resetsSoFar": 0 },
+      "expected": { "decision": "apply" }
+    },
+    {
+      "name": "first reset clears the remote cache and restarts from zero",
+      "input": { "cursor": 99, "page": { "resetRequired": true, "nextSince": 0, "hasMore": false }, "resetsSoFar": 0 },
+      "expected": { "decision": "reset" }
+    },
+    {
+      "name": "second reset in one sync fails",
+      "input": { "cursor": 0, "page": { "resetRequired": true, "nextSince": 0, "hasMore": false }, "resetsSoFar": 1 },
+      "expected": { "decision": "fail", "reason": "Server requested another sync reset from revision 0" }
+    },
+    {
+      "name": "cursor that moves backwards fails",
+      "input": { "cursor": 50, "page": { "resetRequired": false, "nextSince": 40, "hasMore": false }, "resetsSoFar": 0 },
+      "expected": { "decision": "fail", "reason": "Sync cursor moved backwards" }
+    },
+    {
+      "name": "more pages without progress fails",
+      "input": { "cursor": 50, "page": { "resetRequired": false, "nextSince": 50, "hasMore": true }, "resetsSoFar": 0 },
+      "expected": { "decision": "fail", "reason": "Sync pull made no progress while more pages remain" }
+    }
+  ],
+  "pullRow": [
+    {
+      "name": "new task row merges all server fields",
+      "input": {
+        "entity": "task",
+        "row": { "id": "t1", "rev": 7, "updatedAt": "2026-11-21T10:00:00Z", "title": "Buy milk", "status": "open" },
+        "current": null, "pendingFields": [], "pendingDelete": false
+      },
+      "expected": {
+        "plan": "merge",
+        "fields": { "title": "Buy milk", "status": "open" },
+        "shadow": { "title": "Buy milk", "status": "open" },
+        "revision": 7, "updatedAt": "2026-11-21T10:00:00Z"
+      }
+    },
+    {
+      "name": "field with a queued local op keeps its local value",
+      "input": {
+        "entity": "task",
+        "row": { "id": "t1", "rev": 8, "updatedAt": "2026-11-21T11:00:00Z", "title": "Server title", "notes": "server notes" },
+        "current": { "title": "Local title", "notes": "old notes", "status": "open" },
+        "pendingFields": ["title"], "pendingDelete": false
+      },
+      "expected": {
+        "plan": "merge",
+        "fields": { "title": "Local title", "notes": "server notes", "status": "open" },
+        "shadow": { "title": "Server title", "notes": "server notes" },
+        "revision": 8, "updatedAt": "2026-11-21T11:00:00Z"
+      }
+    },
+    {
+      "name": "server null clears a local field without a pending op",
+      "input": {
+        "entity": "task",
+        "row": { "id": "t1", "rev": 9, "deadline": null },
+        "current": { "title": "Keep", "deadline": "2026-12-01" },
+        "pendingFields": [], "pendingDelete": false
+      },
+      "expected": {
+        "plan": "merge",
+        "fields": { "title": "Keep", "deadline": null },
+        "shadow": { "deadline": null },
+        "revision": 9, "updatedAt": null
+      }
+    },
+    {
+      "name": "deletedAt null is not a tombstone",
+      "input": {
+        "entity": "area",
+        "row": { "id": "a1", "rev": 3, "deletedAt": null, "title": "Work" },
+        "current": null, "pendingFields": [], "pendingDelete": false
+      },
+      "expected": {
+        "plan": "merge",
+        "fields": { "title": "Work" },
+        "shadow": { "title": "Work" },
+        "revision": 3, "updatedAt": null
+      }
+    },
+    {
+      "name": "task tombstone keeps the local row and rejects queued ops",
+      "input": {
+        "entity": "task",
+        "row": { "id": "t1", "rev": 12, "updatedAt": "2026-11-21T12:00:00Z", "deletedAt": "2026-11-21T12:00:00Z", "title": "Gone" },
+        "current": { "title": "Gone", "status": "open" },
+        "pendingFields": ["status"], "pendingDelete": false
+      },
+      "expected": {
+        "plan": "tombstone",
+        "keepLocalRow": true,
+        "shadow": { "title": "Gone" },
+        "revision": 12, "updatedAt": "2026-11-21T12:00:00Z", "deletedAt": "2026-11-21T12:00:00Z"
+      }
+    },
+    {
+      "name": "task tombstone for an unknown row deletes nothing local",
+      "input": {
+        "entity": "task",
+        "row": { "id": "t9", "rev": 13, "deletedAt": "2026-11-21T12:00:00Z" },
+        "current": null, "pendingFields": [], "pendingDelete": false
+      },
+      "expected": {
+        "plan": "tombstone",
+        "keepLocalRow": false,
+        "shadow": {},
+        "revision": 13, "updatedAt": null, "deletedAt": "2026-11-21T12:00:00Z"
+      }
+    },
+    {
+      "name": "project tombstone deletes the local row",
+      "input": {
+        "entity": "project",
+        "row": { "id": "p1", "rev": 4, "deletedAt": "2026-11-20T08:00:00Z" },
+        "current": { "title": "Old project" }, "pendingFields": [], "pendingDelete": false
+      },
+      "expected": {
+        "plan": "tombstone",
+        "keepLocalRow": false,
+        "shadow": {},
+        "revision": 4, "updatedAt": null, "deletedAt": "2026-11-20T08:00:00Z"
+      }
+    },
+    {
+      "name": "setting tombstone is skipped",
+      "input": {
+        "entity": "setting",
+        "row": { "id": "fadeEnabled", "rev": 5, "deletedAt": "2026-11-20T08:00:00Z" },
+        "current": { "value": true }, "pendingFields": [], "pendingDelete": false
+      },
+      "expected": { "plan": "skip" }
+    },
+    {
+      "name": "queued local delete records the server snapshot only",
+      "input": {
+        "entity": "task",
+        "row": { "id": "t1", "rev": 14, "title": "Edited elsewhere" },
+        "current": { "title": "Old" }, "pendingFields": [], "pendingDelete": true
+      },
+      "expected": { "plan": "shadowOnly", "shadow": { "title": "Edited elsewhere" }, "revision": 14 }
+    },
+    {
+      "name": "turn row is stored under its task and sequence",
+      "input": {
+        "entity": "turn",
+        "row": { "taskId": "t1", "seq": 3, "role": "provider", "question": "Which?" },
+        "current": null, "pendingFields": [], "pendingDelete": false
+      },
+      "expected": { "plan": "turn", "taskId": "t1", "seq": 3, "row": { "taskId": "t1", "seq": 3, "role": "provider", "question": "Which?" } }
+    },
+    {
+      "name": "turn row without taskId fails",
+      "input": {
+        "entity": "turn",
+        "row": { "seq": 3, "role": "user" },
+        "current": null, "pendingFields": [], "pendingDelete": false
+      },
+      "expected": { "error": "Pulled turn is missing taskId" }
+    },
+    {
+      "name": "turn row without seq fails",
+      "input": {
+        "entity": "turn",
+        "row": { "taskId": "t1", "role": "user" },
+        "current": null, "pendingFields": [], "pendingDelete": false
+      },
+      "expected": { "error": "Pulled turn is missing seq" }
+    },
+    {
+      "name": "entity row without id fails",
+      "input": {
+        "entity": "area",
+        "row": { "rev": 1, "title": "No id" },
+        "current": null, "pendingFields": [], "pendingDelete": false
+      },
+      "expected": { "error": "Pulled area row is missing id" }
+    }
+  ],
+  "pushResponse": [
+    {
+      "name": "response in submitted order applies its results",
+      "input": { "sentIds": ["op1", "op2"], "outcome": { "kind": "response", "resultIds": ["op1", "op2"] } },
+      "expected": { "plan": "applyResults" }
+    },
+    {
+      "name": "response out of order fails",
+      "input": { "sentIds": ["op1", "op2"], "outcome": { "kind": "response", "resultIds": ["op2", "op1"] } },
+      "expected": { "plan": "fail", "reason": "Push response did not match the submitted operation order" }
+    },
+    {
+      "name": "response with a missing result fails",
+      "input": { "sentIds": ["op1", "op2"], "outcome": { "kind": "response", "resultIds": ["op1"] } },
+      "expected": { "plan": "fail", "reason": "Push response did not match the submitted operation order" }
+    },
+    {
+      "name": "HTTP 400 on a batch bisects it",
+      "input": { "sentIds": ["op1", "op2", "op3", "op4", "op5"], "outcome": { "kind": "httpFailure", "status": 400, "body": "{}" } },
+      "expected": { "plan": "bisect", "splitAt": 2 }
+    },
+    {
+      "name": "HTTP 400 on one op rejects it with the server's reason",
+      "input": { "sentIds": ["op7"], "outcome": { "kind": "httpFailure", "status": 400, "body": "{\"message\":\"Bad op\"}" } },
+      "expected": { "plan": "rejectOne", "clientOpId": "op7", "reason": "Bad op" }
+    },
+    {
+      "name": "HTTP 503 propagates to the host's retry and backoff",
+      "input": { "sentIds": ["op1", "op2"], "outcome": { "kind": "httpFailure", "status": 503, "body": "" } },
+      "expected": { "plan": "propagate", "status": 503 }
+    },
+    {
+      "name": "HTTP 401 propagates",
+      "input": { "sentIds": ["op1"], "outcome": { "kind": "httpFailure", "status": 401, "body": "{\"error\":\"unauthorized\"}" } },
+      "expected": { "plan": "propagate", "status": 401 }
+    }
+  ],
+  "rejectionReason": [
+    {
+      "name": "issues with paths join path and message",
+      "input": { "status": 400, "body": "{\"issues\":[{\"path\":[\"ops\",0,\"fields\",\"title\"],\"message\":\"Too long\"}]}" },
+      "expected": "ops.0.fields.title: Too long"
+    },
+    {
+      "name": "several issues join with a semicolon; an issue without a path is its message",
+      "input": { "status": 400, "body": "{\"issues\":[{\"path\":[\"title\"],\"message\":\"Required\"},{\"message\":\"Bad batch\"}]}" },
+      "expected": "title: Required; Bad batch"
+    },
+    {
+      "name": "message field when there are no issues",
+      "input": { "status": 400, "body": "{\"message\":\"Bad op\"}" },
+      "expected": "Bad op"
+    },
+    {
+      "name": "error field when there is no message",
+      "input": { "status": 400, "body": "{\"error\":\"invalid_op\"}" },
+      "expected": "invalid_op"
+    },
+    {
+      "name": "plain text body is the reason, trimmed",
+      "input": { "status": 400, "body": "  nope  " },
+      "expected": "nope"
+    },
+    {
+      "name": "empty body names the status",
+      "input": { "status": 400, "body": "   " },
+      "expected": "The server rejected this operation with HTTP 400"
+    },
+    {
+      "name": "JSON array body is the reason as text",
+      "input": { "status": 400, "body": "[1,2]" },
+      "expected": "[1,2]"
+    }
+  ]
+}
