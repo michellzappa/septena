@@ -1,129 +1,177 @@
-import CloudKit
 import Foundation
 
-/// CloudKit snapshot identity — reuses the existing `WatchSnapshot` Production
-/// schema (same fields as Septena's watch snapshot) with a distinct record name
-/// so the two watch apps never clobber each other.
-enum TasksWatchSnapshot {
-  static let recordType = "WatchSnapshot"
-  static let recordName = "septask-watch-snapshot"
-}
+// The Apple Watch wire (docs/WATCH.md). Compiled into the iOS Septask app and
+// SeptaskWatch. Foundation only: the watch compiles no task model.
+//
+// Two channels carry it:
+// - The backend: `GET /v1/tasks?view=` answers a `WatchTaskList` (the server
+//   computes the view with the same rules as the MCP tools and the phone).
+// - WatchConnectivity: the phone hands the watch its own backend session
+//   (`WatchLink.Kind.session`) and pushes the current Today list as
+//   application context, so the wrist draws real rows before any network.
 
-struct TasksWatchTaskWire: Codable, Equatable, Sendable, Identifiable {
-  var id: String
+/// One row as the watch draws it. Booleans arrive as `true` or absent.
+struct WatchTask: Codable, Identifiable, Equatable, Hashable, Sendable {
+  let id: String
   var title: String
-  var isOverdue: Bool
-  var sortKey: Int
+  var notes: String?
+  var scheduled: String?
+  var deadline: String?
+  var startTime: String?
+  /// Display names, not ids.
+  var area: String?
+  var project: String?
+  var inbox: Bool?
+  var repeats: Bool?
+  var starred: Bool?
+  var daysOnToday: Int?
+  var checklistCount: Int?
+  var checklistDoneCount: Int?
+
+  var isInbox: Bool { inbox == true }
+  var isRepeating: Bool { repeats == true }
+  /// Where the row lives, for the meta line: project beats area.
+  var container: String? { project ?? area }
+
+  enum DueState: Equatable { case none, dueToday, overdue }
+  func due(today: String) -> DueState {
+    guard let deadline else { return .none }
+    if deadline < today { return .overdue }
+    if deadline == today { return .dueToday }
+    return .none
+  }
 }
 
-/// Today's open task list for the Septask watch app — the full Today list in
-/// manual order (not capped like the iOS widget wire).
-struct TasksWatchWire: Codable, Equatable, Sendable {
+/// A view's rows. Same shape from the server and from the phone's snapshot.
+struct WatchTaskList: Codable, Equatable, Sendable {
+  enum View: String, Codable, Sendable { case today, inbox, upcoming, repeating, anytime, completed, starred, review }
+
+  var view: View
+  /// The day the list was computed for (YYYY-MM-DD, the user's zone).
   var today: String
-  var totalCount: Int
-  var tasks: [TasksWatchTaskWire]
-  /// The tasks section accent from the phone (`SectionEntity.color`), so the
-  /// wrist can tint chrome without compiling `SectionTheme`.
-  var accentColor: String?
-  var updatedAt: Date
+  var total: Int
+  var truncated: Bool?
+  var tasks: [WatchTask]
+  /// Not sent by the server; stamped by whoever stored the list.
+  var fetchedAt: Date?
 
-  static var sample: TasksWatchWire {
-    TasksWatchWire(
-      today: "2026-07-12",
-      totalCount: 3,
+  static let rowCap = 150
+  static let notesPrefix = 280
+
+  static var sample: WatchTaskList {
+    WatchTaskList(
+      view: .today, today: "2026-11-22", total: 6, truncated: nil,
       tasks: [
-        .init(id: "1", title: "Reply to the landlord", isOverdue: true, sortKey: 0),
-        .init(id: "2", title: "Book dentist", isOverdue: false, sortKey: 1),
-        .init(id: "3", title: "Send invoice", isOverdue: false, sortKey: 2),
+        WatchTask(id: "s1", title: "Call the bank about the card", inbox: true),
+        WatchTask(id: "s2", title: "Pay PT €250", deadline: "2026-11-20", area: "Home", daysOnToday: 3),
+        WatchTask(id: "s3", title: "Envisioning profile photo", scheduled: "2026-11-22", area: "Envisioning"),
+        WatchTask(id: "s4", title: "Water the plants", area: "Home", repeats: true),
+        WatchTask(id: "s5", title: "Review the Septena watch build on device, end to end, before Monday",
+                  notes: "Today, Upcoming, capture by voice, complications.",
+                  deadline: "2026-11-22", project: "Septena", checklistCount: 4, checklistDoneCount: 1),
+        WatchTask(id: "s6", title: "Return AirTags", startTime: "17:30", area: "Home"),
       ],
-      accentColor: "#3b82f6",
-      updatedAt: .now)
+      fetchedAt: .now)
   }
 }
 
-/// Watch targets intentionally do not compile the full task model, but they DO
-/// write completions straight to CloudKit — so the date and id rules must be
-/// the phone's, byte for byte. These forward to `RecurrenceDateCalculator`
-/// (`SeptenaCore/DateParser.swift`, compiled into both watch targets); this
-/// used to be a hand-copied second implementation, which is exactly how the
-/// two surfaces drift apart on the next fix.
-enum TasksWatchRecurrence {
-  static func nextDate(completedOn: String,
-                       scheduled: String?,
-                       logicalScheduled: String? = nil,
-                       unit: String,
-                       interval: Int,
-                       afterCompletion: Bool) -> String? {
-    RecurrenceDateCalculator.nextDate(
-      completedOn: completedOn,
-      scheduled: scheduled,
-      logicalScheduled: logicalScheduled,
-      unit: unit,
-      interval: interval,
-      afterCompletion: afterCompletion
-    )
+/// One Area or Project row for the Watch's Lists screen (`GET /v1/tasks/lists`).
+struct WatchArea: Codable, Identifiable, Equatable, Hashable, Sendable {
+  let id: String
+  var title: String
+  var emoji: String?
+  var count: Int
+}
+
+struct WatchProject: Codable, Identifiable, Equatable, Hashable, Sendable {
+  let id: String
+  var title: String
+  var area: String?
+  var count: Int
+}
+
+struct WatchListCounts: Codable, Equatable, Sendable {
+  var today: Int
+  var review: Int
+  var upcoming: Int
+  var repeating: Int
+  var anytime: Int
+  var starred: Int
+}
+
+struct WatchStructure: Codable, Equatable, Sendable {
+  var counts: WatchListCounts?
+  var areas: [WatchArea]
+  var projects: [WatchProject]
+}
+
+/// The backend session the phone mints for its watch
+/// (`POST /v1/auth/device`). Only the refresh token matters on the wrist: the
+/// watch refreshes it at once and owns the rotation from then on.
+struct WatchSessionHandoff: Codable, Equatable, Sendable {
+  var refreshToken: String
+  var userId: String
+}
+
+/// WatchConnectivity message keys, shared so the two ends can't drift.
+enum WatchLink {
+  static let kindKey = "septena.kind"
+  static let payloadKey = "septena.payload"
+
+  enum Kind: String {
+    /// watch → phone: "I have no session, please mint one".
+    case requestSession
+    /// phone → watch: a `WatchSessionHandoff` in `payloadKey`.
+    case session
+    /// phone → watch: the phone signed out or switched accounts.
+    case signedOut
+    /// watch → phone: something changed on the wrist; refresh the snapshot.
+    case changed
   }
 
-  static func occurrenceID(sourceTaskID: String, scheduled: String) -> String {
-    RecurrenceDateCalculator.occurrenceID(sourceTaskID: sourceTaskID, scheduled: scheduled)
+  /// Application-context keys (phone → watch, latest wins).
+  static let contextTodayKey = "septena.today"      // WatchTaskList JSON
+  static let contextUserKey = "septena.userId"      // String, "" when signed out
+  static let contextAccentHexKey = "septena.accentHex"       // "#RRGGBB" dark-mode accent
+  static let contextAccentInkHexKey = "septena.accentInkHex" // "#RRGGBB" contrasting ink on accent
+  /// The newest `WatchSessionHandoff` JSON. Application context is the one
+  /// channel that is always delivered on activation, so the handoff rides it
+  /// too (a queued `transferUserInfo` can take minutes). The watch adopts a
+  /// given token once (`WatchLink.fingerprint`); after it rotates, the stale
+  /// copy in the context is ignored.
+  static let contextSessionKey = "septena.session"
+
+  /// A short, non-secret id for a handoff, so the watch remembers which
+  /// tokens it already adopted without storing them.
+  static func fingerprint(_ handoff: WatchSessionHandoff) -> String {
+    var hash: UInt64 = 1469598103934665603
+    for byte in handoff.refreshToken.utf8 { hash = (hash ^ UInt64(byte)) &* 1099511628211 }
+    return String(hash, radix: 36)
   }
 
-  /// Copies the user-facing fields needed for a fresh Task occurrence. The
-  /// completed row's deadline and conversation deliberately do not carry over.
-  static func occurrenceRecord(from source: CKRecord,
-                               recordID: CKRecord.ID,
-                               scheduled: String,
-                               created: String,
-                               createdAt: Date) -> CKRecord {
-    let next = CKRecord(recordType: "Task", recordID: recordID)
-    next["title"] = source["title"]
-    next["status"] = "open"
-    next["created"] = created
-    next["scheduled"] = scheduled
-    next["deadline"] = nil
-    next["today"] = 0
-    next["todaySetOn"] = nil
-    next["completedAt"] = nil
-    next["area"] = source["area"]
-    next["project"] = source["project"]
-    next["notesText"] = source["notesText"]
-    next["recurrenceUnit"] = source["recurrenceUnit"]
-    next["recurrenceInterval"] = source["recurrenceInterval"]
-    next["recurrenceAfterCompletion"] = source["recurrenceAfterCompletion"]
-    next["recurrencePaused"] = 0
-    // A generated copy belongs to the same series as its source. The logical
-    // slot is the newly generated date for fixed schedules; completion-based
-    // rules intentionally leave it empty and anchor from the next completion.
-    next["recurrenceSeriesID"] = (source["recurrenceSeriesID"] as? String)
-      ?? source.recordID.recordName
-    let fixed = ((source["recurrenceAfterCompletion"] as? Int)
-      ?? (source["recurrenceAfterCompletion"] as? NSNumber)?.intValue
-      ?? 1) == 0
-    next["recurrenceAnchorDate"] = fixed ? scheduled : nil
-    next["source"] = source["source"]
-    next["sourceClient"] = source["sourceClient"]
-    if source["source"] as? String == "mcp" {
-      next["acknowledgedAt"] = createdAt as NSDate
-    } else {
-      next["acknowledgedAt"] = source["acknowledgedAt"]
-    }
-    next["createdAt"] = createdAt as NSDate
-    next["kind"] = source["kind"]
-    next["heading"] = source["heading"]
-    // Manual order. The phone puts a generated occurrence at the top of the
-    // list (`TaskOrder.topPosition`), which needs the whole store — the wrist
-    // only has this one record. Placing it one gap above its OWN source is the
-    // closest local approximation and, critically, beats leaving `position`
-    // unset: 0 means "sort by createdAt", which buried every watch-generated
-    // occurrence at the BOTTOM while phone-generated ones went to the top.
-    // `gap` mirrors `TaskOrder.gap`.
-    let gap = 1024.0
-    let sourceKey: Double = {
-      if let p = source["position"] as? Double, p != 0 { return p }
-      if let created = source["createdAt"] as? Date { return created.timeIntervalSinceReferenceDate }
-      return 0
-    }()
-    next["position"] = sourceKey - gap
-    return next
+  static func message(_ kind: Kind, payload: Data? = nil) -> [String: Any] {
+    var m: [String: Any] = [kindKey: kind.rawValue]
+    if let payload { m[payloadKey] = payload }
+    return m
   }
+
+  static func kind(of message: [String: Any]) -> Kind? {
+    (message[kindKey] as? String).flatMap(Kind.init(rawValue:))
+  }
+}
+
+extension JSONEncoder {
+  static let watchWire: JSONEncoder = {
+    let e = JSONEncoder()
+    e.dateEncodingStrategy = .iso8601
+    return e
+  }()
+}
+
+extension JSONDecoder {
+  static let watchWire: JSONDecoder = {
+    let d = JSONDecoder()
+    d.dateDecodingStrategy = .iso8601
+    return d
+  }()
 }

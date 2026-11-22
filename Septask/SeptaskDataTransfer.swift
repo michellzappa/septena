@@ -1103,7 +1103,7 @@ struct SeptaskImportExportPane: View {
       importSection
     }
     .formStyle(.grouped)
-    .navigationTitle("Import & Export")
+    .navigationTitle(RegistrySettings.pageById[RegistrySettings.PageID.importExport]?.title ?? "")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif
@@ -1357,6 +1357,9 @@ struct SeptaskPasteJSONSection: View {
   @State private var importMessage: String?
   @State private var importIsError = false
 
+  private static let item = RegistrySettings.itemBySurface["paste_json_import"]
+  private static let section = RegistrySettings.section("data_tools", page: RegistrySettings.PageID.advanced)
+
   var body: some View {
     Section {
       Button {
@@ -1364,7 +1367,7 @@ struct SeptaskPasteJSONSection: View {
         importMessage = nil
         showingPaste = true
       } label: {
-        Label("Paste JSON Backup…", systemImage: "doc.on.clipboard")
+        Label(Self.item?.label ?? "", systemImage: Self.item?.sfSymbol ?? "doc.on.clipboard")
       }
       .sheet(isPresented: $showingPaste) { pasteSheet }
 
@@ -1397,9 +1400,9 @@ struct SeptaskPasteJSONSection: View {
           .foregroundStyle(importIsError ? .red : .secondary)
       }
     } header: {
-      Text("Data tools")
+      Text(Self.section?.header ?? "")
     } footer: {
-      Text("Paste raw Septena JSON directly from the clipboard to restore or merge records.")
+      if let footer = Self.section?.footer { Text(footer) }
     }
   }
 

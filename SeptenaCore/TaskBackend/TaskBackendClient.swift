@@ -269,6 +269,17 @@ actor TaskBackendClient {
     return try decode(BackendEntitlement.self, from: data, what: "entitlement")
   }
 
+  // MARK: - Companion device (Apple Watch)
+
+  /// Mints a SEPARATE session for the paired watch (`POST /v1/auth/device`).
+  /// Never adopted here: the refresh token rotates, so the phone and the
+  /// watch must each own one. The caller hands it over WatchConnectivity.
+  func mintDeviceSession() async throws -> BackendSession {
+    let (data, status) = try await authed(path: "/v1/auth/device", method: "POST", body: Data("{}".utf8))
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendSession.self, from: data, what: "device session")
+  }
+
   // MARK: - HTTP
 
   /// Sends with a bearer token. On 401 it refreshes once and retries. A

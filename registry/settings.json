@@ -229,6 +229,23 @@
       "platforms": ["ios", "ipados", "android"],
       "featureId": "settings.display"
     },
+    "tasksSwipeLeadingAction": {
+      "scope": "device",
+      "storageKey": "septena.tasks.swipeLeadingAction",
+      "type": "enum",
+      "values": ["today", "schedule", "move", "star", "complete", "none"],
+      "default": "today",
+      "options": [
+        { "value": "today", "title": "Today" },
+        { "value": "schedule", "title": "Schedule" },
+        { "value": "move", "title": "Move" },
+        { "value": "star", "title": "Star" },
+        { "value": "complete", "title": "Complete" },
+        { "value": "none", "title": "Off" }
+      ],
+      "platforms": ["ios", "ipados"],
+      "featureId": "settings.display"
+    },
     "tasksFilingSuggestions": {
       "scope": "device",
       "storageKey": "septena.tasks.filingSuggestions",
@@ -539,6 +556,13 @@
         },
         {
           "kind": "setting",
+          "key": "tasksSwipeLeadingAction",
+          "label": "Swipe right",
+          "detail": "Swipe left on a task to select multiple tasks. Swipe right runs this quick action.",
+          "platforms": ["ios", "ipados"]
+        },
+        {
+          "kind": "setting",
           "key": "loggingAnimationsEnabled",
           "label": "Completion animations",
           "icon": "settings.animations"
@@ -577,8 +601,9 @@
       "sections": [
         {
           "id": "profile",
+          "footer": "Your name stays on this device, and syncs when you sign in.",
           "items": [
-            { "kind": "customSurface", "surface": "account_profile_editor", "ownsKeys": ["welcomeName"] }
+            { "kind": "customSurface", "surface": "account_profile_editor", "label": "Your name", "ownsKeys": ["welcomeName"] }
           ]
         },
         {
@@ -650,12 +675,13 @@
           "header": "On-device intelligence",
           "platforms": ["ios", "ipados", "macos"],
           "items": [
-            { "kind": "customSurface", "surface": "apple_intelligence_status", "platforms": ["ios", "ipados", "macos"], "featureId": "ai.reach-dial" }
+            { "kind": "customSurface", "surface": "apple_intelligence_status", "label": "Apple Intelligence", "platforms": ["ios", "ipados", "macos"], "featureId": "ai.reach-dial" }
           ]
         },
         {
           "id": "reach",
           "header": "Where AI runs",
+          "footer": "Septena never runs AI on your data and never reads it. The intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets where requests may run.",
           "items": [
             { "kind": "setting", "key": "aiMode", "label": "AI Mode" }
           ]
@@ -714,6 +740,7 @@
         {
           "id": "move_in",
           "header": "Move from another app",
+          "footer": "Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import.",
           "platforms": ["ios", "ipados", "macos"],
           "items": [
             { "kind": "customSurface", "surface": "things_import", "label": "Import from Things", "icon": "settings.import", "platforms": ["ios", "ipados", "macos"], "featureId": "import.things" }
@@ -738,12 +765,17 @@
           "id": "data_locality",
           "header": "Your data",
           "items": [
-            { "kind": "customSurface", "surface": "privacy_explainer" }
+            {
+              "kind": "customSurface",
+              "surface": "privacy_explainer",
+              "detail": "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena's private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). Apple's on-device intelligence runs locally; you can connect Claude under AI & Agents."
+            }
           ]
         },
         {
           "id": "telemetry",
           "header": "Anonymous usage data",
+          "footer": "Your task text and titles are never sent through analytics. This setting syncs across your devices.",
           "items": [
             { "kind": "setting", "key": "telemetryLevel", "label": "Usage data" }
           ]
@@ -760,23 +792,29 @@
         {
           "id": "version",
           "items": [
-            { "kind": "customSurface", "surface": "about_header" }
+            { "kind": "customSurface", "surface": "about_header", "label": "Tasks that think with you", "detail": "Version {version}" }
           ]
         },
         {
           "id": "actions",
           "items": [
-            { "kind": "customSurface", "surface": "check_updates", "platforms": ["macos", "windows"], "featureId": "mac.updates" },
-            { "kind": "customSurface", "surface": "reset_get_started" },
+            { "kind": "customSurface", "surface": "check_updates", "label": "Check for Updates…", "platforms": ["macos", "windows"], "featureId": "mac.updates" },
+            { "kind": "customSurface", "surface": "reset_get_started", "label": "Show Get Started Again" },
             { "kind": "customSurface", "surface": "reset_first_run", "label": "Show Welcome Again", "featureId": "onboarding.first-run" },
-            { "kind": "customSurface", "surface": "send_feedback", "icon": "settings.feedback" }
+            { "kind": "customSurface", "surface": "send_feedback", "label": "Send feedback", "icon": "settings.feedback" }
           ]
         },
         {
           "id": "companion",
           "header": "Septena Life",
           "items": [
-            { "kind": "customSurface", "surface": "septena_life_link" }
+            {
+              "kind": "customSurface",
+              "surface": "septena_life_link",
+              "label": "Open Septena Life",
+              "detail": "Septena Life is the companion app for habits, training, food, sleep, mood, and health.",
+              "icon": "settings.companion_app"
+            }
           ]
         },
         {
@@ -797,6 +835,7 @@
         {
           "id": "agent_tools",
           "header": "Agent tools",
+          "footer": "The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples).",
           "items": [
             { "kind": "customSurface", "surface": "mcp_skills", "label": "MCP Skills", "icon": "settings.skills", "featureId": "agents.connector" }
           ]
@@ -805,15 +844,16 @@
           "id": "diagnostics",
           "header": "Diagnostics",
           "items": [
-            { "kind": "customSurface", "surface": "sync_diagnostics", "label": "Sync & storage diagnostics", "icon": "settings.diagnostics", "featureId": "sync.backend" },
-            { "kind": "customSurface", "surface": "diagnostics_weekly", "ownsKeys": ["diagnosticsEnabled"] }
+            { "kind": "customSurface", "surface": "sync_diagnostics", "label": "Sync & storage diagnostics", "detail": "Changes the server refused appear here, newest first. The server kept its own version of each.", "icon": "settings.diagnostics", "featureId": "sync.backend" },
+            { "kind": "customSurface", "surface": "diagnostics_weekly", "label": "Optional product diagnostics", "detail": "An opt-in weekly summary that helps improve Septena. You don't need it for updates, sync, or support.", "ownsKeys": ["diagnosticsEnabled"] }
           ]
         },
         {
           "id": "data_tools",
           "header": "Data tools",
+          "footer": "Paste raw Septena JSON directly from the clipboard to restore or merge records.",
           "items": [
-            { "kind": "customSurface", "surface": "paste_json_import", "label": "Paste JSON Backup…", "featureId": "sync.backend" }
+            { "kind": "customSurface", "surface": "paste_json_import", "label": "Paste JSON Backup…", "icon": "settings.paste", "featureId": "sync.backend" }
           ]
         },
         {
@@ -822,7 +862,7 @@
           "platforms": ["ios", "ipados", "macos"],
           "items": [
             { "kind": "setting", "key": "showModelLabels", "label": "Show model labels", "detail": "Show which model answered next to each AI reply." },
-            { "kind": "setting", "key": "pccRoutingEnabled", "label": "Use Private Cloud Compute", "visibility": "minAppleOS27" },
+            { "kind": "setting", "key": "pccRoutingEnabled", "label": "Use Private Cloud Compute", "detail": "Requires the PCC entitlement. Without it, requests fail and fall back on-device.", "visibility": "minAppleOS27" },
             { "kind": "setting", "key": "pccReasoning", "label": "Private Cloud Compute reasoning", "visibility": "minAppleOS27" }
           ]
         }

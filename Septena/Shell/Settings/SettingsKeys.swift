@@ -156,11 +156,6 @@ enum SettingsKey {
   /// section keys (max 4). Applied to `UIApplication.shared.shortcutItems`
   /// at launch and whenever the selection changes.
   static let quickActionKeys = "septena.quickActions.keys"
-  /// Where the Tasks tile opens to from the homepage. Other section tiles
-  /// open as a bottom-sheet drawer; Tasks historically jumped straight to
-  /// the Tasks tab. Default `drawer` so Tasks matches the other sections;
-  /// users who prefer landing on the full Tasks tab can flip it.
-  static let tasksOpenIn      = "septena.tasks.openIn"
   /// Whether the Tasks lists weave in the day's calendar events — the day's
   /// agenda at the top of Today and under each Upcoming day, Things-style.
   /// Absent → on (events only ever show once calendar access is granted in
@@ -223,7 +218,7 @@ enum SettingsKey {
   /// Device-local iOS/iPadOS swipe-right quick action on task rows
   /// (`docs/IOS_SWIPE_ACTIONS_SPEC.md` #132). Raw value of `TaskSwipeLeadingAction`;
   /// absent → `"today"`. Swipe-left is always toggle-select.
-  static let tasksSwipeLeadingAction = "septena.tasks.swipeLeadingAction"
+  static let tasksSwipeLeadingAction = RegistrySettings.StorageKey.tasksSwipeLeadingAction
 }
 
 /// Configurable iOS/iPadOS swipe-right quick action on task rows
@@ -239,14 +234,8 @@ enum TaskSwipeLeadingAction: String, CaseIterable, Identifiable {
 
   var id: String { rawValue }
 
+  /// Option title from `registry/settings.json` (`tasksSwipeLeadingAction`).
   var title: String {
-    switch self {
-    case .today:    return "Today"
-    case .schedule: return "Schedule"
-    case .move:     return "Move"
-    case .star:     return "Star"
-    case .complete: return "Complete"
-    case .none:     return "Off"
-    }
+    RegistrySettings.optionsByKey["tasksSwipeLeadingAction"]?.first { $0.value == rawValue }?.title ?? rawValue
   }
 }

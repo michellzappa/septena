@@ -23,6 +23,12 @@ enum SeptaskLaunch {
     let localStore = LocalStore.shared
 
     services.bindWriteBoundary()
+    #if os(iOS)
+    // The Apple Watch link (docs/WATCH.md), before the first-frame wait: a
+    // watch message can launch the app in the background, where no frame is
+    // ever drawn. Activation is cheap and reads nothing.
+    WatchBridge.shared.start()
+    #endif
     await waitForFirstFrameIfNeeded()
     await services.start()
     LaunchTrace.spanSync("launch.deferredWork") {
@@ -72,6 +78,9 @@ enum SeptaskLaunch {
     services.taskMutator.catchUpFixedSchedules()
     services.runFadePassIfDue()
     TaskReminderScheduler.shared.scheduleReconcile()
+    #if os(iOS)
+    WatchBridge.shared.appDidBecomeActive()
+    #endif
   }
 
   /// iOS: hold deferred launch work until the first Today frame is drawn.

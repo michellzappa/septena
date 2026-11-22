@@ -29,6 +29,15 @@ enum TaskNoticeKind {
   case actionNeeded
   /// Something went wrong (sync refused changes).
   case warning
+
+  /// The kind a registry notice row names (`info`, `actionNeeded`, `warning`).
+  init(registry kind: String) {
+    switch kind {
+    case "actionNeeded": self = .actionNeeded
+    case "warning": self = .warning
+    default: self = .info
+    }
+  }
 }
 
 struct TaskNotice: Identifiable, Equatable {
@@ -188,30 +197,29 @@ enum TaskNotices {
 
   // MARK: - Notices
 
-  private static var signIn: TaskNotice {
-    TaskNotice(
-      id: .signIn, kind: .actionNeeded,
-      symbol: "person.crop.circle.badge.exclamationmark",
-      title: String(localized: "Not signed in",
-                    comment: "Task list notice title when the task backend has no session"),
-      detail: signInDetail,
-      primaryTitle: String(localized: "Sign in…",
-                           comment: "Task list notice button that starts Sign in with Apple"),
-      dismissible: true)
+  /// The registry row for a notice (`registry/surfaces.json` `notices`).
+  /// The registry owns symbol, kind, copy and dismissibility; this file owns
+  /// only when a notice shows.
+  private static func registry(_ id: TaskNotice.ID) -> RegistryNotice {
+    guard let row = RegistryNotices.byId[id.rawValue] else {
+      preconditionFailure("registry/surfaces.json has no notice \(id.rawValue)")
+    }
+    return row
   }
 
-  private static var signInDetail: String {
-    #if os(macOS)
-    String(localized: "Your changes stay on this Mac until you sign in.",
-           comment: "Task list notice detail when the task backend has no session")
-    #else
-    UIDevice.current.userInterfaceIdiom == .pad
-      ? String(localized: "Your changes stay on this iPad until you sign in.",
-               comment: "Task list notice detail when the task backend has no session, iPad")
-      : String(localized: "Your changes stay on this iPhone until you sign in.",
-               comment: "Task list notice detail when the task backend has no session, iPhone")
-    #endif
+  /// A notice from its registry row. `title` overrides the row's title for
+  /// notices whose title carries a count.
+  private static func notice(_ id: TaskNotice.ID, title: String? = nil,
+                             steps: [TaskNoticeStep] = []) -> TaskNotice {
+    let row = registry(id)
+    return TaskNotice(
+      id: id, kind: TaskNoticeKind(registry: row.kind), symbol: row.sfSymbol,
+      title: title ?? row.title ?? "",
+      detail: row.detail(for: RegistryPlatform.current),
+      primaryTitle: row.primaryTitle, dismissible: row.dismissible, steps: steps)
   }
+
+  private static var signIn: TaskNotice { notice(.signIn) }
 
   /// Tasks that arrived on Today on their own: scheduled STRICTLY before today.
   /// A task scheduled for today, or merely due today, was placed by the user.
@@ -223,14 +231,7 @@ enum TaskNotices {
       return String(scheduled.prefix(10)) < today
     }.count
     guard count > 0 else { return nil }
-    return TaskNotice(
-      id: .rolledIn, kind: .info, symbol: "arrow.down.circle",
-      title: count == 1
-        ? String(localized: "1 task rolled into Today",
-                 comment: "Start-of-day notice: one task arrived on Today on its own")
-        : String(localized: "\(count) tasks rolled into Today",
-                 comment: "Start-of-day notice: tasks arrived on Today on their own"),
-      detail: nil, primaryTitle: nil, dismissible: true)
+    return notice(.rolledIn, title: RegistryNotices.rolledInTitle(count: count))
   }
 
   // MARK: - Get started (Septask)
@@ -287,51 +288,24 @@ enum TaskNotices {
       completeStep(id, context: context)
       return true
     }
-    let steps = [
-      TaskNoticeStep(
-        id: .connectAI,
-        title: String(localized: "Connect your AI",
-                      comment: "Get started step: connect an AI assistant or agent"),
-        detail: String(localized: "Connect an assistant to your tasks",
-                       comment: "Get started step detail: connect an AI assistant to your tasks"),
-        done: done(.connectAI, source: TaskSource.mcp)),
-      TaskNoticeStep(
-        id: .importTasks,
-        title: String(localized: "Bring in your tasks",
-                      comment: "Get started step: import tasks from another app"),
-        detail: String(localized: "Import from another app",
-                       comment: "Get started step detail: import tasks from another app"),
-        done: done(.importTasks, source: TaskSource.things)),
-      TaskNoticeStep(
-        id: .addTask,
-        title: String(localized: "Add your first task",
-                      comment: "Get started step: create a task"),
-        detail: addTaskDetail,
-        done: done(.addTask, source: TaskSource.app)),
+    let sources: [TaskNoticeStep.ID: String] = [
+      .connectAI: TaskSource.mcp, .importTasks: TaskSource.things, .addTask: TaskSource.app,
     ]
+    let steps: [TaskNoticeStep] = registry(.getStarted).steps.compactMap { row in
+      guard let id = TaskNoticeStep.ID(rawValue: row.id), let source = sources[id] else { return nil }
+      return TaskNoticeStep(id: id, title: row.title,
+                            detail: row.detail(for: RegistryPlatform.current),
+                            done: done(id, source: source))
+    }
     guard steps.contains(where: { !$0.done }) else {
       markSeen(.getStarted)
       SettingsMirror.dismissGetStarted(context: context,
                                        engine: SeptenaServices.shared.ckEngine)
       return nil
     }
-    return TaskNotice(
-      id: .getStarted, kind: .info, symbol: "sparkles",
-      title: String(localized: "Get started with Septena",
-                    comment: "Get started checklist title on Today"),
-      detail: nil, primaryTitle: nil, dismissible: true, steps: steps)
+    return notice(.getStarted, steps: steps)
     #else
     return nil
-    #endif
-  }
-
-  private static var addTaskDetail: String {
-    #if os(macOS)
-    String(localized: "Or press ⌃⌥Space anywhere on your Mac",
-           comment: "Get started step detail: the Quick Entry shortcut on Mac")
-    #else
-    String(localized: "It lands in your Inbox until you schedule or file it",
-           comment: "Get started step detail: where a new task goes")
     #endif
   }
 
@@ -351,13 +325,8 @@ enum TaskNotices {
                               lastSweepAt: TaskFade.lastSweepAt,
                               dismissedWeek: TaskFade.dismissedSweepWeek,
                               fadedDates: dates) else { return nil }
-    let copy = RegistryNotices.byId["weeklySweep"]
-    return TaskNotice(
-      id: .weeklySweep, kind: .info, symbol: copy?.sfSymbol ?? "circle.dashed",
-      title: RegistryNotices.weeklySweepTitle(count: candidates.count),
-      detail: nil,
-      primaryTitle: copy?.primaryTitle,
-      dismissible: copy?.dismissible ?? true)
+    let count = candidates.count
+    return notice(.weeklySweep, title: RegistryNotices.weeklySweepTitle(count: count))
   }
 
   /// The notice on top of the Faded pile. Its action opens the same sweep
@@ -365,32 +334,28 @@ enum TaskNotices {
   /// from the registry (`registry/surfaces.json` `fadedPile`), so the Mac and
   /// iOS shells cannot drift.
   static var fadedPile: TaskNotice {
-    let copy = RegistryNotices.byId["fadedPile"]
+    guard let row = RegistryNotices.byId["fadedPile"] else {
+      preconditionFailure("registry/surfaces.json has no notice fadedPile")
+    }
     return TaskNotice(
-      id: .weeklySweep, kind: .info, symbol: copy?.sfSymbol ?? "circle.dashed",
-      title: copy?.title ?? "",
-      detail: copy?.detail,
-      primaryTitle: copy?.primaryTitle,
-      dismissible: copy?.dismissible ?? false)
+      id: .weeklySweep, kind: TaskNoticeKind(registry: row.kind), symbol: row.sfSymbol,
+      title: row.title ?? "",
+      detail: row.detail(for: RegistryPlatform.current),
+      primaryTitle: row.primaryTitle, dismissible: row.dismissible)
   }
 
   // MARK: - Explainers
   //
   // An explainer shows the first time the user meets a feature in the list,
-  // and never again once dismissed. Add one by adding an `ID` case, a trigger
-  // here, and copy that went through the humanizer pass.
+  // and never again once dismissed. Add one by adding a notice to
+  // `registry/surfaces.json` (copy through the humanizer pass), an `ID` case
+  // and a trigger here.
 
   private static func explainers(pool: [SeptenaTask]) -> [TaskNotice] {
     var out: [TaskNotice] = []
     if !hasSeen(.fadeIntro), TaskRowFlags.agingEnabled,
        pool.contains(where: { $0.fadeFill() != nil }) {
-      out.append(TaskNotice(
-        id: .fadeIntro, kind: .info, symbol: "circle.lefthalf.filled",
-        title: String(localized: "Inactive tasks start to fade",
-                      comment: "Explainer notice title: task fade, shown the first time a task fades"),
-        detail: String(localized: "Undated tasks fade after 14 days without activity and move to Faded. Open or edit a task to bring it back. You can turn this off in Settings.",
-                       comment: "Explainer notice detail: how task fade works and how to undo or disable it"),
-        primaryTitle: nil, dismissible: true))
+      out.append(notice(.fadeIntro))
     }
     return out
   }

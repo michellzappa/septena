@@ -86,6 +86,8 @@
     "settings.backend": { "sfSymbol": "arrow.up.doc", "material": "cloud_sync", "lucide": "cloud" },
     "settings.animations": { "sfSymbol": "party.popper", "material": "celebration", "lucide": "party-popper" },
     "settings.feedback": { "sfSymbol": "paperplane", "material": "send", "lucide": "send" },
+    "settings.paste": { "sfSymbol": "doc.on.clipboard", "material": "content_paste", "lucide": "clipboard-paste" },
+    "settings.companion_app": { "sfSymbol": "arrow.up.forward.app", "material": "open_in_new", "lucide": "external-link" },
     "settings.plus": { "sfSymbol": "plus.circle.fill", "material": "add_circle", "lucide": "circle-plus" },
     "plans.history": { "sfSymbol": "clock.arrow.circlepath", "material": "history", "lucide": "history" },
     "notice.sign_in": { "sfSymbol": "person.crop.circle.badge.exclamationmark", "material": "account_circle", "lucide": "user-x" },

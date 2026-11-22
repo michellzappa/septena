@@ -117,16 +117,14 @@ targets:
       - target: SeptaskShare
         embed: true
         codeSign: true
-      # ⛔️ WATCH_EMBED_DISABLED — TEMPORARY, MUST BE RESTORED BEFORE ANY RELEASE.
-      # Uncommented = the Septask app embeds SeptaskWatch. While it's commented out the
-      # iOS scheme neither builds nor needs a watchOS runtime, which is the only
-      # way to run Septask on device when the installed watchOS simulator runtimes
-      # don't match the SDK this Xcode ships. Nothing else changes.
-      # Re-enable: delete the three '#' below, then `xcodegen generate`.
-      # An archive/upload made in this state SHIPS WITHOUT THE WATCH APP.
-      #- target: SeptaskWatch
-      #  embed: true
-      #  codeSign: true
+      # The Septena watch app (docs/WATCH.md). If the installed watchOS
+      # simulator runtimes don't match this Xcode's SDK, the iOS scheme can't
+      # resolve a watch destination: build SeptaskMac / SeptaskWatch to verify
+      # instead, or comment these three lines out locally (never commit that —
+      # an archive made without them ships no watch app).
+      - target: SeptaskWatch
+        embed: true
+        codeSign: true
       # MealPhotoModelAnalyzer (meal-photo macro estimation) imports
       # FoundationModels — same dependency the other three app targets carry.
       - sdk: FoundationModels.framework
@@ -334,11 +332,9 @@ targets:
         excludes:
           - "**/.DS_Store"
           - "**/*.entitlements"
+      # The watch wire (docs/WATCH.md). Foundation only: the watch is a thin
+      # client of the backend's /v1/tasks views and compiles no task model.
       - path: SeptenaCore/TasksWatchWire.swift
-      # The canonical recurrence math, so a wrist completion generates exactly
-      # the date and record id the phone would (TasksWatchRecurrence forwards
-      # to it). Pure Foundation — no SwiftData, no UI.
-      - path: SeptenaCore/DateParser.swift
     dependencies:
       - target: SeptaskWatchComplication
         embed: true

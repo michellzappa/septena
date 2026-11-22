@@ -53,6 +53,8 @@ struct SeptaskSettingsView: View {
   private var taskBadge: Bool = RegistrySettings.Defaults.badgeShowOverdue
   @AppStorage(SettingsKey.tasksTitleLines) private var titleLines: Int =
     RegistrySettings.Defaults.tasksTitleLines
+  @AppStorage(SettingsKey.tasksSwipeLeadingAction) private var swipeLeadingActionRaw: String =
+    RegistrySettings.Defaults.tasksSwipeLeadingAction
   @AppStorage(SettingsKey.textSizeStep) private var textSizeStep: Int =
     RegistrySettings.Defaults.textSizeStep
   @AppStorage(SettingsKey.loggingAnimationsEnabled) private var completionAnimations: Bool =
@@ -175,6 +177,9 @@ struct SeptaskSettingsView: View {
         }
       }
     }
+    // Apple Watch: install + link state (not in the shared settings
+    // registry: iOS-only, and it reads live WatchConnectivity state).
+    SeptaskWatchSettingsSection()
   }
   #endif
 
@@ -480,6 +485,18 @@ struct SeptaskSettingsView: View {
           }
         }
       }
+    case "tasksSwipeLeadingAction":
+      #if os(iOS)
+      Picker(selection: $swipeLeadingActionRaw) {
+        ForEach(RegistrySettings.optionsByKey["tasksSwipeLeadingAction"] ?? []) { opt in
+          Text(opt.title).tag(opt.value)
+        }
+      } label: {
+        rowLabel(label, detail: item.detail)
+      }
+      #else
+      EmptyView()
+      #endif
     case "textSizeStep":
       inlineTextSizeRow(label: label)
     default:
@@ -592,13 +609,13 @@ struct SeptaskSettingsView: View {
       SeptaskAIPreferencesPane()
     case RegistrySettings.PageID.calendar:
       CalendarDetail()
-        .navigationTitle("Calendar")
+        .navigationTitle(RegistrySettings.pageById[pageID]?.title ?? "")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
     case RegistrySettings.PageID.reminders:
       RemindersInboxDetail()
-        .navigationTitle("Reminders")
+        .navigationTitle(RegistrySettings.pageById[pageID]?.title ?? "")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -635,7 +652,7 @@ private struct SeptaskAccountPane: View {
         HStack(spacing: 16) {
           ProfileAvatar(name: welcomeName, isPlus: PlanStatus.shared.isPlus, size: 64)
           VStack(alignment: .leading, spacing: 4) {
-            TextField("Your name", text: $welcomeName)
+            TextField(RegistrySettings.label(surface: "account_profile_editor"), text: $welcomeName)
               .font(.title2.weight(.semibold))
               .textContentType(.givenName)
               #if os(iOS)
@@ -659,7 +676,9 @@ private struct SeptaskAccountPane: View {
         }
         .padding(.vertical, 6)
       } footer: {
-        Text("Your name stays on this device, and syncs when you sign in.")
+        if let footer = RegistrySettings.section("profile", page: RegistrySettings.PageID.account)?.footer {
+          Text(footer)
+        }
       }
 
       Section {
@@ -679,7 +698,7 @@ private struct SeptaskAccountPane: View {
     }
     .formStyle(.grouped)
     .task { await PlanStatus.shared.refresh() }
-    .navigationTitle("Account")
+    .navigationTitle(RegistrySettings.pageById[RegistrySettings.PageID.account]?.title ?? "")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif
@@ -702,16 +721,24 @@ private struct SeptaskPrivacyPane: View {
     TelemetryClient.TelemetryLevel(rawValue: levelRaw) ?? .balanced
   }
 
+  private var dataSection: RegistrySettingsSection? {
+    RegistrySettings.section("data_locality", page: RegistrySettings.PageID.privacy)
+  }
+
+  private var telemetrySection: RegistrySettingsSection? {
+    RegistrySettings.section("telemetry", page: RegistrySettings.PageID.privacy)
+  }
+
   var body: some View {
     Form {
       Section {
-        Text("Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena's private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). Apple's on-device intelligence runs locally; you can connect Claude under AI & Agents.")
+        Text(RegistrySettings.itemBySurface["privacy_explainer"]?.detail ?? "")
       } header: {
-        Text("Your data")
+        Text(dataSection?.header ?? "")
       }
 
       Section {
-        Picker("Usage data", selection: Binding(
+        Picker(RegistrySettings.label(key: "telemetryLevel"), selection: Binding(
           get: { level },
           set: { store.setTelemetryLevel($0, context: modelContext, engine: ckEngine) }
         )) {
@@ -722,13 +749,13 @@ private struct SeptaskPrivacyPane: View {
         .pickerStyle(.inline)
         .labelsHidden()
       } header: {
-        Text("Anonymous usage data")
+        Text(telemetrySection?.header ?? "")
       } footer: {
-        Text("\(level.summary) Your task text and titles are never sent through analytics. This setting syncs across your devices.")
+        Text([level.summary, telemetrySection?.footer].compactMap { $0 }.joined(separator: " "))
       }
     }
     .formStyle(.grouped)
-    .navigationTitle("Privacy")
+    .navigationTitle(RegistrySettings.pageById[RegistrySettings.PageID.privacy]?.title ?? "")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif
@@ -737,86 +764,142 @@ private struct SeptaskPrivacyPane: View {
 
 // MARK: - About (Depth 1)
 
+/// Renders the `about` page of `registry/settings.json`: section order,
+/// headers, labels, icons and copy come from the registry. Swift keeps only
+/// the native behavior behind each surface (Sparkle, mail, open URL).
 private struct SeptaskAboutPane: View {
   @Environment(\.openURL) private var openURL
   @Environment(SettingsStore.self) private var settingsStore
   @Environment(NavigationState.self) private var nav
 
+  private static let page = RegistrySettings.pageById[RegistrySettings.PageID.about]
+
+  private var platform: String {
+    #if os(macOS)
+    "macos"
+    #else
+    "ios"
+    #endif
+  }
+
   var body: some View {
     Form {
-      Section {
-        VStack(spacing: 6) {
-          SeptenaDiscTile(size: 72)
-            .padding(.bottom, 6)
-          Text("Septena")
-            .font(.title2.weight(.semibold))
-          Text("Tasks that think with you")
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-          Text("Version \(SeptaskAbout.versionString)")
-            .font(.caption)
-            .foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .listRowBackground(Color.clear)
-      }
-
-      Section {
-        #if os(macOS)
-        Button("Check for Updates…") {
-          Task { @MainActor in SeptaskUpdater.shared.checkForUpdates() }
-        }
-        #if DEBUG
-        .disabled(true)
-        #else
-        .disabled(!SeptaskUpdater.isConfigured)
-        #endif
-        #endif
-        Button("Show Get Started Again") { TaskNotices.resetGetStarted() }
-        // This device only: the synced `onboardedAt` stays, so other devices
-        // are not asked again (`SettingsStore.resetWelcomeForTesting`).
-        Button("Show Welcome Again") {
-          settingsStore.resetWelcomeForTesting()
-          #if os(macOS)
-          SeptaskKitFirstRunWindow.present()
-          #else
-          nav.showSettings = false
-          #endif
-        }
-        Link(destination: URL(string: "mailto:mz@envisioning.com?subject=Septena%20feedback")!) {
-          Label("Send feedback", systemImage: RegistryIcons.sfSymbols["settings.feedback"] ?? "paperplane")
-        }
-      }
-
-      Section {
-        Text("Septena Life is the companion app for habits, training, food, sleep, mood, and health.")
-          .font(.callout)
-          .foregroundStyle(.secondary)
-        Button {
-          openURL(URL(string: "septena://")!) { accepted in
-            if !accepted {
-              openURL(URL(string: "https://www.septena.app")!)
-            }
+      ForEach((Self.page?.sections ?? []).filter { $0.applies(to: platform) }) { section in
+        Section {
+          ForEach(section.items.filter { $0.applies(to: platform) }) { item in
+            row(item)
           }
-        } label: {
-          Label("Open Septena Life", systemImage: "arrow.up.forward.app")
-        }
-      } header: {
-        Text("Septena Life")
-      }
-
-      Section {
-        NavigationLink(value: RegistrySettings.PageID.advanced) {
-          Label("Advanced", systemImage: RegistryIcons.sfSymbols["settings.advanced"] ?? "wrench.and.screwdriver")
+        } header: {
+          if let header = section.header { Text(header) }
+        } footer: {
+          if let footer = section.footer { Text(footer) }
         }
       }
     }
     .formStyle(.grouped)
-    .navigationTitle("About")
+    .navigationTitle(Self.page?.title ?? "")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif
+  }
+
+  @ViewBuilder
+  private func label(_ item: RegistrySettingsItem) -> some View {
+    let title = item.label ?? ""
+    if let symbol = item.sfSymbol {
+      Label(title, systemImage: symbol)
+    } else {
+      Text(title)
+    }
+  }
+
+  @ViewBuilder
+  private func row(_ item: RegistrySettingsItem) -> some View {
+    switch item.kind {
+    case "pageLink":
+      if let page = item.page {
+        NavigationLink(value: page) { label(item) }
+      }
+    case "customSurface":
+      surface(item)
+    default:
+      EmptyView()
+    }
+  }
+
+  @ViewBuilder
+  private func surface(_ item: RegistrySettingsItem) -> some View {
+    switch item.surface {
+    case "about_header":
+      VStack(spacing: 6) {
+        SeptenaDiscTile(size: 72)
+          .padding(.bottom, 6)
+        Text(AppDisplayName.current)
+          .font(.title2.weight(.semibold))
+        if let tagline = item.label {
+          Text(tagline)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        }
+        Text(RegistrySettings.aboutHeaderDetail(version: SeptaskAbout.versionString))
+          .font(.caption)
+          .foregroundStyle(.tertiary)
+      }
+      .frame(maxWidth: .infinity)
+      .padding(.vertical, 12)
+      .listRowBackground(Color.clear)
+    case "check_updates":
+      #if os(macOS)
+      Button {
+        Task { @MainActor in SeptaskUpdater.shared.checkForUpdates() }
+      } label: {
+        label(item)
+      }
+      #if DEBUG
+      .disabled(true)
+      #else
+      .disabled(!SeptaskUpdater.isConfigured)
+      #endif
+      #else
+      EmptyView()
+      #endif
+    case "reset_get_started":
+      Button { TaskNotices.resetGetStarted() } label: { label(item) }
+    case "reset_first_run":
+      // This device only: the synced `onboardedAt` stays, so other devices
+      // are not asked again (`SettingsStore.resetWelcomeForTesting`).
+      Button {
+        settingsStore.resetWelcomeForTesting()
+        #if os(macOS)
+        SeptaskKitFirstRunWindow.present()
+        #else
+        nav.showSettings = false
+        #endif
+      } label: {
+        label(item)
+      }
+    case "send_feedback":
+      Link(destination: URL(string: "mailto:mz@envisioning.com?subject=Septena%20feedback")!) {
+        label(item)
+      }
+    case "septena_life_link":
+      if let detail = item.detail {
+        Text(detail)
+          .font(.callout)
+          .foregroundStyle(.secondary)
+      }
+      Button {
+        openURL(URL(string: "septena://")!) { accepted in
+          if !accepted {
+            openURL(URL(string: "https://www.septena.app")!)
+          }
+        }
+      } label: {
+        label(item)
+      }
+    default:
+      EmptyView()
+    }
   }
 }
 

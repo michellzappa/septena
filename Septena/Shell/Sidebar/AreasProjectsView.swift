@@ -215,11 +215,11 @@ struct AreaDetailView: View {
       }
     }
     #endif
-    .alert("Error", isPresented: Binding(
+    .alert(RegistryPrompts.errorTitle, isPresented: Binding(
       get: { errorMessage != nil },
       set: { if !$0 { errorMessage = nil } }
     )) {
-      Button("OK") { errorMessage = nil }
+      Button(RegistryPrompts.errorConfirmTitle) { errorMessage = nil }
     } message: {
       Text(errorMessage ?? "")
     }
@@ -279,9 +279,7 @@ struct AreaDetailView: View {
     taskMutator.moveToList(ids: moving.map(\.id), area: nil, project: project.id, acknowledge: true)
     TaskUndo.recordMove(before: undoBefore, context: modelContext, mutator: taskMutator)
     let ticket = TaskUndoTicket()
-    let message = moving.count == 1
-      ? "Moved to \(project.title)"
-      : "Moved \(moving.count) tasks to \(project.title)"
+    let message = RegistryToasts.movedBulk(count: moving.count, destination: project.title)
     toastStore.show(message) {
       ticket.undo { TaskUndo.restore(undoBefore, using: taskMutator) }
       Task { await load() }
@@ -513,16 +511,16 @@ struct ProjectDetailView: View {
     }
     .confirmationDialog(deleteCopy.title, isPresented: $showingDeleteConfirm,
                         titleVisibility: .visible) {
-      Button("Delete", role: .destructive) { deleteProject() }
-      Button("Cancel", role: .cancel) {}
+      Button(deleteCopy.confirmTitle ?? "", role: .destructive) { deleteProject() }
+      Button(RegistryPrompts.cancelTitle, role: .cancel) {}
     } message: {
       Text(deleteCopy.message)
     }
-    .alert("Error", isPresented: Binding(
+    .alert(RegistryPrompts.errorTitle, isPresented: Binding(
       get: { errorMessage != nil },
       set: { if !$0 { errorMessage = nil } }
     )) {
-      Button("OK") { errorMessage = nil }
+      Button(RegistryPrompts.errorConfirmTitle) { errorMessage = nil }
     } message: {
       Text(errorMessage ?? "")
     }
@@ -699,12 +697,15 @@ struct ProjectDetailView: View {
     }
   }
 
-  /// The delete confirmation (`ContainerDeleteCopy`, shared with the sidebar
-  /// and the AppKit sheet): counts the tasks that go to Recently Deleted.
-  /// Counted only while the dialog is up: the body reads this on every pass.
-  private var deleteCopy: ContainerDeleteCopy.Text {
-    guard showingDeleteConfirm else { return ContainerDeleteCopy.Text(title: "", message: "") }
-    return ContainerDeleteCopy.project(id: project.id, title: project.title, context: modelContext)
+  /// The delete confirmation (`RegistryPrompts.deleteProject`, shared with
+  /// the sidebar and the AppKit sheet): counts the tasks that go to Recently
+  /// Deleted. Counted only while the dialog is up: the body reads this on
+  /// every pass.
+  private var deleteCopy: RegistryPromptCopy {
+    guard showingDeleteConfirm else {
+      return RegistryPromptCopy(id: "deleteProject", title: "", message: "", confirmTitle: nil, options: [])
+    }
+    return RegistryPrompts.deleteProject(id: project.id, title: project.title, context: modelContext)
   }
 
   private func deleteProject() {

@@ -5,5 +5,6 @@ import SwiftUI
 struct TasksTodayComplicationBundle: WidgetBundle {
   var body: some Widget {
     TasksTodayComplication()
+    SeptenaSymbolComplication()
   }
 }

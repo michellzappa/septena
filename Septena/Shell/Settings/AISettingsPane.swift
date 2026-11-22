@@ -18,6 +18,9 @@ struct SeptaskAIPreferencesSections: View {
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.openURL) private var openURL
 
+  private static let reachSection = RegistrySettings.section("reach", page: RegistrySettings.PageID.aiPreferences)
+  private static let explainer = RegistrySettings.itemBySurface["ai_explainer"]
+
   var body: some View {
     appleIntelligenceSection
 
@@ -44,14 +47,14 @@ struct SeptaskAIPreferencesSections: View {
         .opacity(unsupported ? 0.5 : 1)
       }
     } header: {
-      Text("Where AI runs")
+      Text(Self.reachSection?.header ?? "")
     } footer: {
-      Text("\(AppDisplayName.current) never runs AI on your data and never reads it. The intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets where requests may run.")
+      if let footer = Self.reachSection?.footer { Text(footer) }
     }
 
     Section {
       Button { showExplainer = true } label: {
-        Label("How AI helps with your tasks", systemImage: "info.circle")
+        Label(Self.explainer?.label ?? "", systemImage: Self.explainer?.sfSymbol ?? "info.circle")
       }
       .sheet(isPresented: $showExplainer) { AIExplainerView() }
     }
@@ -69,7 +72,7 @@ struct SeptaskAIPreferencesSections: View {
           .foregroundStyle(.secondary)
           .frame(width: 28)
         VStack(alignment: .leading, spacing: 2) {
-          Text("Apple Intelligence")
+          Text(RegistrySettings.label(surface: "apple_intelligence_status"))
           Text(statusLabel).font(.footnote).foregroundStyle(.secondary)
         }
         Spacer(minLength: 0)
@@ -79,7 +82,7 @@ struct SeptaskAIPreferencesSections: View {
         Button("Open Settings", action: openSystemSettings)
       }
     } header: {
-      Text("On-device intelligence")
+      Text(RegistrySettings.section("on_device", page: RegistrySettings.PageID.aiPreferences)?.header ?? "")
     } footer: {
       Text(statusFooter)
     }
@@ -133,7 +136,7 @@ struct SeptaskAIPreferencesPane: View {
       SeptaskAIPreferencesSections()
     }
     .formStyle(.grouped)
-    .navigationTitle("AI Preferences")
+    .navigationTitle(RegistrySettings.pageById[RegistrySettings.PageID.aiPreferences]?.title ?? "")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif

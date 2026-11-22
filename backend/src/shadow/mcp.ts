@@ -17,7 +17,17 @@ import { zId } from "../store/columns.js";
 import type { Row } from "../store/TaskStore.js";
 import { isValidTz, todayYMD } from "../tz.js";
 import { TASK_TOOLS } from "../tools/taskTools.js";
-import { entitlementGate } from "../entitlement/entitlement.js";
+import {
+  atCap,
+  decide,
+  historyCutoff,
+  planCheckFailed,
+  planFor,
+  upsellLine,
+  usageKeys,
+  type LimitBreach,
+  type PlanState,
+} from "../entitlement/entitlement.js";
 import {
   type ConvoTurn,
   type TaskConvo,
@@ -72,11 +82,37 @@ const INSTRUCTIONS =
 
 const RESOURCE_METADATA = (env: Env) => `${env.API_PUBLIC_URL}/.well-known/oauth-protected-resource`;
 
-/// A write refused because the account has no sync subscription (only when
-/// ENTITLEMENT_ENFORCE is "true"; docs/SYNC_SUBSCRIPTION_SPEC.md §6).
-const SUBSCRIPTION_MESSAGE =
-  "Claude can read these tasks but cannot change them: this Septena account has no sync subscription. " +
-  "Turn on sync in Septena's settings, then try again.";
+/// A call refused by a plan limit (only when ENTITLEMENT_ENFORCE is "true";
+/// docs/SYNC_SUBSCRIPTION_SPEC.md §6). One line, the upsell words from
+/// registry/plans.json, then what still works.
+const PLAN_CHECK_FAILED_MESSAGE = "Septena could not check this account's plan. Try again in a minute.";
+
+function limitMessage(breach: LimitBreach): string {
+  const line = breach.upsell ? upsellLine(breach.upsell) : "This Septena plan does not include this.";
+  return `${line} Reading tasks still works.`;
+}
+
+/// The plan, with today's connector writes and this month's agent runs.
+/// null with `block` false: the check failed in log-only mode, run with no
+/// limits.
+async function connectorPlan(env: Env, userId: string, surface: string): Promise<{ state: PlanState | null; block: boolean }> {
+  try {
+    return { state: await planFor(env, userId, [usageKeys.connectorWrites(), usageKeys.agentRuns()]), block: false };
+  } catch (e) {
+    return { state: null, block: planCheckFailed(env, userId, surface, e) === "block" };
+  }
+}
+
+/// The daily connector write cap. Returns the refusal text, or null to go on.
+/// The caller counts the write after it runs.
+async function gateConnectorWrite(env: Env, userId: string, surface: string): Promise<string | null> {
+  const { state, block } = await connectorPlan(env, userId, surface);
+  if (block) return PLAN_CHECK_FAILED_MESSAGE;
+  if (!state) return null;
+  const breach: LimitBreach | null = atCap(state.usage[usageKeys.connectorWrites()], state.limits.connectorWritesPerDay)
+    ? { limit: "connectorWritesPerDay", upsell: "connector_cap" } : null;
+  return decide(env, userId, surface, state, breach) === "block" ? limitMessage(breach!) : null;
+}
 
 const RECONNECT_MESSAGE =
   "This Septena connection can only read tasks: it was set up before Claude could change them. " +
@@ -191,16 +227,16 @@ async function callTool(
       // In-band, so the connector stays connected and the model can relay it.
       return rpcResult(id, { isError: true, content: [{ type: "text", text: RECONNECT_MESSAGE }] }, era);
     }
-    if ((await entitlementGate(env, grant.userId, "mcp_write")) === "block") {
-      return rpcResult(id, { isError: true, content: [{ type: "text", text: SUBSCRIPTION_MESSAGE }] }, era);
-    }
     const args = zWriteArgs[name as WriteToolName].safeParse(params.arguments ?? {});
     if (!args.success) return invalidArgs(id, args.error, era);
+    const refused = await gateConnectorWrite(env, grant.userId, "mcp_write");
+    if (refused) return rpcResult(id, { isError: true, content: [{ type: "text", text: refused }] }, era);
     const result = await runWriteTool(
       { store, timeZone },
       name as WriteToolName,
       args.data as Record<string, unknown>,
     );
+    await store.addUsage(usageKeys.connectorWrites());
     return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] }, era);
   }
   if (Object.hasOwn(zAgentArgs, name)) {
@@ -208,13 +244,28 @@ async function callTool(
     if ((name === "tasks_claim" || name === "tasks_release") && !hasScope(grant, MCP_WRITE_SCOPE)) {
       return rpcResult(id, { isError: true, content: [{ type: "text", text: RECONNECT_MESSAGE }] }, era);
     }
-    if ((name === "tasks_claim" || name === "tasks_release")
-      && (await entitlementGate(env, grant.userId, "mcp_write")) === "block") {
-      return rpcResult(id, { isError: true, content: [{ type: "text", text: SUBSCRIPTION_MESSAGE }] }, era);
-    }
     const args = zAgentArgs[name as AgentToolName].safeParse(params.arguments ?? {});
     if (!args.success) return invalidArgs(id, args.error, era);
-    const result = await runAgentTool(store, grant.clientId, name as AgentToolName, args.data as Record<string, unknown>);
+    // A release always works: it hands the task back. A claim is one agent
+    // run (a renewal is not). History reads show the plan's window.
+    let historySince: string | null = null;
+    if (name === "tasks_claim" || name === "tasks_history" || name === "tasks_activity") {
+      const { state, block } = await connectorPlan(env, grant.userId, name);
+      if (block) return rpcResult(id, { isError: true, content: [{ type: "text", text: PLAN_CHECK_FAILED_MESSAGE }] }, era);
+      if (state && name === "tasks_claim") {
+        const breach: LimitBreach | null = atCap(state.usage[usageKeys.agentRuns()], state.limits.agentRunsPerMonth)
+          ? { limit: "agentRunsPerMonth", upsell: "agent_runs" } : null;
+        if (decide(env, grant.userId, "mcp_claim", state, breach) === "block") {
+          return rpcResult(id, { isError: true, content: [{ type: "text", text: limitMessage(breach!) }] }, era);
+        }
+      }
+      historySince = historyCutoff(env, state?.limits ?? null);
+    }
+    const result = await runAgentTool(store, grant.clientId, name as AgentToolName, args.data as Record<string, unknown>, historySince);
+    if (name === "tasks_claim") {
+      const r = result as { claimed?: boolean; renewed?: boolean };
+      if (r.claimed && !r.renewed) await store.addUsage(usageKeys.agentRuns());
+    }
     return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] }, era);
   }
   if (Object.hasOwn(zNotesArgs, name)) {
@@ -222,14 +273,16 @@ async function callTool(
     if (writes && !hasScope(grant, MCP_WRITE_SCOPE)) {
       return rpcResult(id, { isError: true, content: [{ type: "text", text: RECONNECT_MESSAGE }] }, era);
     }
-    if (writes && (await entitlementGate(env, grant.userId, "mcp_write")) === "block") {
-      return rpcResult(id, { isError: true, content: [{ type: "text", text: SUBSCRIPTION_MESSAGE }] }, era);
-    }
     const args = zNotesArgs[name as NotesToolName].safeParse(params.arguments ?? {});
     if (!args.success) return invalidArgs(id, args.error, era);
+    if (writes) {
+      const refused = await gateConnectorWrite(env, grant.userId, "mcp_notes_write");
+      if (refused) return rpcResult(id, { isError: true, content: [{ type: "text", text: refused }] }, era);
+    }
     const result = await runNotesTool(
       { store, clientId: grant.clientId, timeZone }, name as NotesToolName, args.data as Record<string, unknown>,
     );
+    if (writes) await store.addUsage(usageKeys.connectorWrites());
     return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] }, era);
   }
   if (!Object.hasOwn(zArgs, name)) {
@@ -405,7 +458,7 @@ function matchesTagFilter(taskTags: string[] | undefined, requiredLower: string[
   return requiredLower.every((req) => have.has(req));
 }
 
-async function listTasks(
+export async function listTasks(
   store: StoreRpc,
   timeZone: string,
   rawView: unknown,

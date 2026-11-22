@@ -1536,17 +1536,17 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
 
   @objc private func deleteSelected() {
     // Copy matches the SwiftUI sidebar's confirmation exactly
-    // (`ContainerDeleteCopy`) — one deletion story between the two shells. A
+    // (`RegistryPrompts.deleteArea` / `deleteProject`) — one deletion story between the two shells. A
     // window SHEET, not an app-modal alert, with Cancel as the Return default.
     switch selectedNode?.content {
     case .area(let area):
-      let copy = ContainerDeleteCopy.area(id: area.id, title: area.title, context: context)
-      KitPrompt.confirmDestructive(title: copy.title, message: copy.message, in: view.window) { [weak self] in
+      let copy = RegistryPrompts.deleteArea(id: area.id, title: area.title, context: context)
+      KitPrompt.confirmDestructive(copy, in: view.window) { [weak self] in
         self?.deleteArea(area)
       }
     case .project(let project, _):
-      let copy = ContainerDeleteCopy.project(id: project.id, title: project.title, context: context)
-      KitPrompt.confirmDestructive(title: copy.title, message: copy.message, in: view.window) { [weak self] in
+      let copy = RegistryPrompts.deleteProject(id: project.id, title: project.title, context: context)
+      KitPrompt.confirmDestructive(copy, in: view.window) { [weak self] in
         self?.deleteProject(project)
       }
     default:

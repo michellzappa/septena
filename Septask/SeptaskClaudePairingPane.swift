@@ -124,7 +124,7 @@ struct SeptaskClaudePairingPane: View {
       SeptaskClaudePairingSections()
     }
     .formStyle(.grouped)
-    .navigationTitle("Connect Claude")
+    .navigationTitle(RegistrySettings.pageById[RegistrySettings.PageID.claudePairing]?.title ?? "")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif

@@ -123,10 +123,10 @@ struct SeptaskRootView: View {
         .presentationDetents([.medium])
         .septenaSheetChrome()
       }
-      .alert("New Area", isPresented: $showingNewAreaAlert) {
-        TextField("Area name", text: $newAreaName)
-        Button("Create") { createArea() }
-        Button("Cancel", role: .cancel) { newAreaName = "" }
+      .alert(RegistryPrompts.textPrompt("newArea").title, isPresented: $showingNewAreaAlert) {
+        TextField(RegistryPrompts.textPrompt("newArea").placeholder, text: $newAreaName)
+        Button(RegistryPrompts.textPrompt("newArea").confirmTitle) { createArea() }
+        Button(RegistryPrompts.cancelTitle, role: .cancel) { newAreaName = "" }
       }
       .fullScreenCover(isPresented: $showingFirstRun) {
         withEnvironment(SeptaskFirstRunView { showingFirstRun = false })

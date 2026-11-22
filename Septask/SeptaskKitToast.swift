@@ -6,7 +6,7 @@ import SwiftUI
 // "Deferred to …", "… deleted" confirmation, with Undo where the SwiftUI
 // lists offer it. It is NOT a second toast: it hosts the shared
 // `SeptenaToastCapsule` (Septena/Shell/UI/Accessibility.swift), so the glass
-// capsule, the copy (`SeptenaToastCopy`), the 7 s timer, Reduce Motion and
+// capsule, the copy (`RegistryToasts`), the 7 s timer, Reduce Motion and
 // "a new toast replaces the current one" are the SwiftUI shell's, by
 // construction. The sync indicator in the title bar is hosted the same way.
 

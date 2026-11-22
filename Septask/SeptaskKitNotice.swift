@@ -130,8 +130,7 @@ final class KitNoticeCell: NSTableCellView {
     dismiss.translatesAutoresizingMaskIntoConstraints = false
     dismiss.isBordered = false
     dismiss.imagePosition = .imageOnly
-    let closeLabel = String(localized: "Dismiss",
-                            comment: "SeptaskKit: close button on an inline list notice")
+    let closeLabel = RegistryNotices.dismissTitle
     dismiss.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: closeLabel)?
       .withSymbolConfiguration(.init(pointSize: SeptenaTypeScale.size(.footnote) - 1, weight: .semibold))
     dismiss.contentTintColor = SeptaskKitTheme.iconMuted

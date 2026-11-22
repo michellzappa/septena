@@ -12,6 +12,8 @@ import UniformTypeIdentifiers
 
 /// The "Move from another app" rows: every catalog source, built or planned.
 struct ImportSourcesSection: View {
+  private static let section = RegistrySettings.section("move_in", page: RegistrySettings.PageID.importExport)
+
   var body: some View {
     Section {
       ForEach(ImportSourceCatalog.all) { source in
@@ -37,9 +39,9 @@ struct ImportSourcesSection: View {
         Label("Past imports", systemImage: "clock.arrow.circlepath")
       }
     } header: {
-      Text("Move from another app")
+      Text(Self.section?.header ?? "")
     } footer: {
-      Text("Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import.")
+      if let footer = Self.section?.footer { Text(footer) }
     }
   }
 }
