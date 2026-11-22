@@ -63,13 +63,12 @@ paid plan is named **Septena Plus** on every surface.
 | Watch app paired to the phone (syncs through the phone) | Server sync for 1 device (backup; moving to a new device is free, the old one stops syncing) | Server sync on all devices, including the watch through the server |
 | The local MCP server on the Mac | Sync every few minutes (no live socket) | Live sync (socket) |
 | Import and export (plain JSON) | Change history: 30 days | Full change history, account restore *(pending a Cloudflare check)* |
-| Attachments on the device that added them | Recently Deleted: 30 days | Recently Deleted: 1 year |
+| Attachments on the device that added them | Recently Deleted: 30 days | Recently Deleted: 90 days |
 | | Attachments stay on the device that added them (no R2) | Attachments synced, 10 GB |
 | | Claude connector: read, plus a few writes a day | Claude connector without daily caps |
 | | Agents: a few runs a month | Agents within the run budget (ADR 0008) |
 | | Join shared projects | Create shared projects and invite |
 | | 1 linked project | Linked projects without a cap |
-| | Hosted AI: small monthly allowance *(if ADR 0009 is accepted)* | Hosted AI: larger allowance *(if ADR 0009 is accepted)* |
 
 Exact numbers ("a few", allowances) are set in the plan table (§6) and can
 change without a new ADR. Moving a free thing to paid still needs one. The
@@ -97,7 +96,7 @@ Rules:
 |---|---|---|---|
 | Change log (`changes`, who changed what) | 30 days | 365 days | Pruned per plan by the daily alarm. A device offline past the window gets a full resync (exists). |
 | Logbook (completed tasks) | Last 90 days shown | All | Rows are kept on every level; reads page only within the window. |
-| Recently Deleted | 30 days | 1 year | User-facing restore window only. |
+| Recently Deleted | 30 days | 90 days | User-facing restore window only. Plus matches the 90-day tombstone window (decided 2026-11-22). |
 | Deleted rows for sync (tombstones) | 90 days | 90 days | Same on every level: it protects sync, not a feature. |
 | Conversation turns | Kept | Kept | Not limited. |
 
@@ -194,7 +193,7 @@ party. No per-user tracking, no SDKs.
   limits: device count, sync mode (live / poll), change-log window, Logbook
   window, Recently Deleted window, R2 attachments on/off and quota, connector
   writes per day, agent runs per month, shared-project create, linked-project
-  count, hosted-AI allowance. The alarm's pruning, every history read and every
+  count. There is no hosted AI (decided 2026-11-22: users bring their own). The alarm's pruning, every history read and every
   gate read this table. Apps fetch their limits from the server and never
   hardcode them.
 - **Gates read limits, never the plan name.** No code checks `plan == "paid"`.
@@ -372,8 +371,6 @@ plan table row), `usage` (`connectorWritesToday`, `agentRunsThisMonth`),
 - Per-plan pruning of the change log. The alarm still prunes every account
   at 365 days; the free window only hides. This follows "a limit hides" and
   the 12-month lapse rule; the cost is a few MB per free account.
-- Recently Deleted on Plus cannot reach 365 days while tombstones are purged
-  at 90 days on every plan (§3.1). Open question in §11.
 - App work: the second-device upsell and the "sync this device" button,
   poll-only sync on free, the 402 bodies. The app reads all of it from
   `GET /v1/entitlement` and the 402 body.
@@ -450,10 +447,9 @@ size):
   outcomes and every label come from `registry/plans.json` (a new
   `paywall` block), so the site, iOS, Mac and Android say the same words.
   Copy goes through the humanizer skill.
-- The Mac app ships outside the Mac App Store, so its sheet shows the
-  prices as information and one line: subscribe on the iPhone or iPad,
-  and Plus works on the Mac too. The Stripe checkout (P3) replaces that
-  line (ADR 0026).
+- The Mac sells through the Mac App Store (ADR 0026), with the same
+  sheet in the settings window. Manage Subscription opens the App Store's
+  subscriptions page.
 - The sheet reads `PlanStatus` and the entitlement source. It never decides
   the plan itself.
 
@@ -531,10 +527,9 @@ the `Transaction.updates` listener from launch, Restore Purchases, finish
 only after the server answered), the Plus sheet (`Septask/SeptaskPlusSheet.swift`)
 with its registry `paywall` copy, the plan states in `PlanStatus` (trial,
 lapsed, source), and a local StoreKit file (`Config/Septena.storekit`) on
-the `Septask` scheme. Not built: the upsell moments in the app (§3.2), the
-trial-end notice, and the once-per-account mark. The App Store Connect
-products do not exist yet; `checkout.open` stays false until they do. The
-Mac sells nothing until P3 (ADR 0026).
+the `Septask` and `SeptaskMac` schemes. The App Store Connect products do
+not exist yet; `checkout.open` stays false until they do. The Mac sells
+once its release moves to the Mac App Store (ADR 0026).
 
 P0 can start after roadmap M1 phase 0 (backend auth exists). P1 must ship
 before any public release that uses the backend.
@@ -558,6 +553,6 @@ before any public release that uses the backend.
 | Does the code stay open source? | Yes; the paid product is the hosted service |
 | Free server tier | Decided 2026-11-20: yes, a free account with limits (ADR 0010) |
 | Attachments on the free account | Decided 2026-11-20: none on the server; files stay on the device that added them |
-| Recently Deleted on Plus is 1 year, but tombstones are purged at 90 days on every plan (§3.1) | Open (2026-11-22): keep deleted rows 365 days on Plus, or cut Plus's Recently Deleted to 90 days |
+| Recently Deleted on Plus vs the 90-day tombstone window (§3.1) | Decided 2026-11-22: Plus keeps Recently Deleted 90 days |
 | A free account's second device: take the slot at sign-in (ADR 0023) or stay local and offer the move (§3.2) | Default 2026-11-22: stay local, offer the move (§6.3) |
-| Limit values ("a few" connector writes, agent runs, hosted-AI allowance) | Decided 2026-11-22: free account gets connector reads plus 25 writes a day and 10 agent runs a month. Hosted-AI allowance still open. The values live in `registry/plans.json` `limits` (generated to `PLAN_LIMITS` for the backend) |
+| Limit values ("a few" connector writes, agent runs, hosted-AI allowance) | Decided 2026-11-22: free account gets connector reads plus 25 writes a day and 10 agent runs a month. No hosted AI (decided 2026-11-22: users bring their own Claude). The values live in `registry/plans.json` `limits` (generated to `PLAN_LIMITS` for the backend) |

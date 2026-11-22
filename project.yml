@@ -521,6 +521,11 @@ schemes:
         SeptaskMac: all
     run:
       config: Release
+      # Same local StoreKit testing as the Septask scheme (ADR 0026: the
+      # Mac sells through the Mac App Store).
+      storeKitConfiguration: Config/Septena.storekit
+      environmentVariables:
+        SEPTENA_STOREKIT_TEST: "1"
     test:
       config: Debug
       targets:

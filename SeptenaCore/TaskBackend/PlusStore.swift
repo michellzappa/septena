@@ -48,14 +48,10 @@ final class PlusStore {
   /// The Plus sheet offers a purchase when checkout is open, or in a run
   /// Xcode launched with the `Septask` scheme, where
   /// `Config/Septena.storekit` stands in for App Store Connect (the scheme
-  /// sets `SEPTENA_STOREKIT_TEST`). Never on the Mac: it ships outside the
-  /// Mac App Store (ADR 0026).
+  /// sets `SEPTENA_STOREKIT_TEST`). The Mac sells through the Mac App
+  /// Store like the iPhone (ADR 0026).
   static var checkoutAvailable: Bool {
-    #if os(macOS)
-    return false
-    #else
-    return RegistryPlans.checkoutOpen || ProcessInfo.processInfo.environment["SEPTENA_STOREKIT_TEST"] == "1"
-    #endif
+    RegistryPlans.checkoutOpen || ProcessInfo.processInfo.environment["SEPTENA_STOREKIT_TEST"] == "1"
   }
 
   /// Starts the transaction listener once per process. Call at launch.

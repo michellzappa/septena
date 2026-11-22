@@ -34,7 +34,12 @@
   "365 days": {
     "text": "365 days",
     "paths": [
-      "plans.outcomes.nothing_lost.rows.history.cells.plus",
+      "plans.outcomes.nothing_lost.rows.history.cells.plus"
+    ]
+  },
+  "90 days": {
+    "text": "90 days",
+    "paths": [
       "plans.outcomes.nothing_lost.rows.deleted.cells.plus"
     ]
   },
@@ -56,8 +61,8 @@
       "plans.upsells.second_device.detail"
     ]
   },
-  "A year of change history, and a year to restore deleted tasks": {
-    "text": "A year of change history, and a year to restore deleted tasks",
+  "A year of change history, and 90 days to restore deleted tasks": {
+    "text": "A year of change history, and 90 days to restore deleted tasks",
     "paths": [
       "plans.cards.plus.points.1"
     ]
@@ -2214,12 +2219,6 @@
     "text": "Subscribe",
     "paths": [
       "plans.actions.subscribe"
-    ]
-  },
-  "Subscribe in Septena on your iPhone or iPad. Plus then works on this Mac too.": {
-    "text": "Subscribe in Septena on your iPhone or iPad. Plus then works on this Mac too.",
-    "paths": [
-      "plans.paywall.buyOnIPhone"
     ]
   },
   "Subscriptions open at App Store launch.": {

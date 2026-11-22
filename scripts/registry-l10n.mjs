@@ -39,7 +39,7 @@ const FIELDS = {
     "points", "footnote", "priceFootnote", "device", "account", "plus", "free", "trial", "trialEnds",
     "paidThrough", "subscribe", "restore", "manage", "notNow", "learnMore", "yourPlan", "planned", "included", "notIncluded",
     "seePlus", "startTrial", "trialStarted", "trialBilling", "welcomeBack", "cancelNote", "success", "pending",
-    "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "buyOnIPhone", "done",
+    "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "done",
   ]),
 };
 /** Fields skipped even when their name matches (machine data). */

@@ -130,7 +130,7 @@ private struct PlusSheetHeader: View {
 }
 
 /// The sheet when it cannot sell here: signed out (the trial is the offer),
-/// on the Mac (subscribe on the iPhone or iPad), or before checkout opens.
+/// or before checkout opens.
 private struct PlusInfoView: View {
   var upsellID: String?
   private var status: PlanStatus { .shared }
@@ -163,13 +163,7 @@ private struct PlusInfoView: View {
     }
   }
 
-  private var line: String {
-    #if os(macOS)
-    return RegistryPlans.Paywall.buyOnIPhone
-    #else
-    return RegistryPlans.checkoutNotice
-    #endif
-  }
+  private var line: String { RegistryPlans.checkoutNotice }
 }
 
 /// The sheet for an account already on Plus: where it is managed, and no
@@ -184,18 +178,26 @@ private struct PlusOwnedView: View {
         .font(.largeTitle)
         .foregroundStyle(.tint)
       Text(line).multilineTextAlignment(.center)
-      #if os(iOS)
       if source == "apple" {
+        #if os(iOS)
         Button(RegistryPlans.Action.manage) { managing = true }
           .buttonStyle(.borderedProminent)
           .manageSubscriptionsSheet(isPresented: $managing)
+        #else
+        // macOS has no manage sheet; the App Store app owns subscriptions.
+        Link(RegistryPlans.Action.manage, destination: Self.macSubscriptionsURL)
+          .buttonStyle(.borderedProminent)
+        #endif
       }
-      #endif
       PlusRestoreButton().font(.footnote)
     }
     .padding()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
+
+  #if os(macOS)
+  private static let macSubscriptionsURL = URL(string: "macappstores://apps.apple.com/account/subscriptions")!
+  #endif
 
   private var line: String {
     switch source {
@@ -248,13 +250,9 @@ private struct PlusOutcomeView: View {
 /// transaction.
 private struct PlusRestoreButton: View {
   var body: some View {
-    #if os(iOS)
     Button(RegistryPlans.Action.restore) {
       Task { await PlusStore.shared.restore() }
     }
     .disabled(PlusStore.shared.restoring || !TaskBackendClient.hasSession)
-    #else
-    EmptyView()
-    #endif
   }
 }

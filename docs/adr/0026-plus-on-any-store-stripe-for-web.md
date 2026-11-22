@@ -40,8 +40,7 @@ relationship.
 
 | Where the user is | How they pay | Entitlement source |
 |---|---|---|
-| iPhone, iPad | Apple in-app purchase (StoreKit 2) | `apple` |
-| Mac (Developer ID build, Sparkle updates) | Stripe Checkout in the browser once P3 ships. Until then the Mac sheet sends the user to the iPhone or iPad app. | `stripe` |
+| iPhone, iPad, Mac | Apple in-app purchase (StoreKit 2). The Mac moves to the Mac App Store (decided 2026-11-22). | `apple` |
 | Apple Watch | Nothing. The watch syncs through the paired phone. | none |
 | Android (Play Store build) | Google Play Billing | `google` (new) |
 | Web client | Stripe Checkout | `stripe` |
@@ -91,10 +90,10 @@ Rules that apply on every platform:
   steer to it.
 - Refunds and chargebacks on Stripe sales come to us. The `stripe` row moves
   to `revoked` on a refund or a lost dispute, like an Apple refund.
-- The Mac app ships outside the Mac App Store (`docs/RELEASING-MAC.md`), and
-  StoreKit sells nothing outside it. A Mac-only user cannot buy Plus until
-  the Stripe checkout (P3) ships. A Mac App Store build would add `apple`
-  there, with no change at the gates.
+- The Mac app ships through the Mac App Store, decided 2026-11-22. Today it
+  ships as a Developer ID build with Sparkle updates (`docs/RELEASING-MAC.md`),
+  where StoreKit sells nothing. The release moves to the Mac App Store
+  (sandbox, no Sparkle) before Plus launches on the Mac.
 - The app shows "manage" text by source. A user who paid on the web and
   opens the iOS app sees where to manage it, and no Apple button.
 - A user can still pay twice by buying on two stores while signed in to two

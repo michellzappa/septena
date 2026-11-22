@@ -41,11 +41,10 @@ enum SeptaskLaunch {
       // The next cold launch draws Today from this file (#82). macOS draws
       // its AppKit list without `TaskListView`, so it has no reader.
       TodaySnapshotWriter.shared.start()
-      // App Store renewals, Ask to Buy approvals and purchases the server
-      // missed (spec §7.1). The Mac build ships outside the Mac App Store,
-      // so it sells no in-app purchase (ADR 0026).
-      PlusStore.shared.start()
       #endif
+      // App Store renewals, Ask to Buy approvals and purchases the server
+      // missed (spec §7.1), on the iPhone, iPad and Mac (ADR 0026).
+      PlusStore.shared.start()
     }
     Task(priority: .utility) {
       await services.absorbRemoteChanges()

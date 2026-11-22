@@ -69,7 +69,7 @@
       "detail": "Plus is the same app on every device, and nothing in it is capped.",
       "points": [
         "Live sync on every iPhone, iPad and Mac",
-        "A year of change history, and a year to restore deleted tasks",
+        "A year of change history, and 90 days to restore deleted tasks",
         "Files and images synced, up to 10 GB",
         "Your agents work your tasks without a daily cap",
         "Early builds on TestFlight"
@@ -98,7 +98,7 @@
       "rows": [
         { "id": "history", "label": "Change history", "limit": "changeLogDays", "featureId": "task.history", "cells": { "device": "On this device", "account": "30 days", "plus": "365 days" } },
         { "id": "logbook", "label": "Logbook", "limit": "logbookDays", "featureId": "lists.logbook", "cells": { "device": "All", "account": "Last 90 days", "plus": "All" } },
-        { "id": "deleted", "label": "Recently Deleted", "limit": "recentlyDeletedDays", "featureId": "lists.recently-deleted", "cells": { "device": "30 days", "account": "30 days", "plus": "365 days" } },
+        { "id": "deleted", "label": "Recently Deleted", "limit": "recentlyDeletedDays", "featureId": "lists.recently-deleted", "cells": { "device": "30 days", "account": "30 days", "plus": "90 days" } },
         { "id": "files", "label": "Files and images", "limit": "attachmentsGB", "featureId": "task.attachments", "cells": { "device": "On this device", "account": "On the device that added them", "plus": "Synced, up to 10 GB" } },
         { "id": "export", "label": "Export as JSON", "cells": { "device": true, "account": true, "plus": true } }
       ]
@@ -134,7 +134,7 @@
       "liveSync": true,
       "changeLogDays": 365,
       "logbookDays": null,
-      "recentlyDeletedDays": 365,
+      "recentlyDeletedDays": 90,
       "attachmentsGB": 10,
       "connectorWritesPerDay": null,
       "agentRunsPerMonth": null,
@@ -189,7 +189,6 @@
     "ownedWeb": "You have Plus through the web. Manage it at septena.app.",
     "ownedGoogle": "You have Plus through Google Play. Manage it in Google Play.",
     "ownedGrant": "Plus is on for this account.",
-    "buyOnIPhone": "Subscribe in Septena on your iPhone or iPad. Plus then works on this Mac too.",
     "done": "Done"
   },
   "status": {

@@ -1405,6 +1405,10 @@
         }
       }
     },
+    "A year of change history, and 90 days to restore deleted tasks" : {
+      "comment" : "Generated from registry plans.cards.plus.points.1. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "A year of change history, and a year to restore deleted tasks" : {
       "comment" : "Generated from registry plans.cards.plus.points.1. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
