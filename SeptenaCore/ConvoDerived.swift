@@ -55,6 +55,35 @@ extension TaskConvo {
   }
 }
 
+/// The five stages the Agent smart list groups by (docs/TASK_FACTORY_SPEC.md
+/// §3). Derived, never stored. Raw values are the group ids of the `agent`
+/// destination in `registry/destinations.json`, which owns titles and icons.
+enum AgentStage: String, CaseIterable, Sendable {
+  case queued, working, yourTurn, review, done
+
+  /// Registry title + symbol for this stage's section header.
+  var group: RegistryDestinationGroup? {
+    RegistryDestinations.groups["agent"]?.first { $0.id == rawValue }
+  }
+}
+
+extension TaskConvo {
+  /// The Agent-list stage of this conversation, or nil when the task is not
+  /// agent work (not assigned to Claude, no live claim, not handed back for
+  /// review). Order of checks follows the spec table: Review and Done win over
+  /// a stale assignee; a stop counts as Your turn, because only the human can
+  /// resume it (ADR 0008).
+  func agentStage(at now: Date) -> AgentStage? {
+    let claimed = isClaimed(at: now)
+    guard assignee == .claude || claimed || needsHumanReview else { return nil }
+    if needsHumanReview { return .review }
+    if isTerminal { return .done }
+    if hasOpenProviderQuestion || stoppedAt != nil { return .yourTurn }
+    if claimed { return .working }
+    return .queued
+  }
+}
+
 /// Pure projection of a conversation into UI/queue state.
 func deriveConvo(_ convo: TaskConvo) -> ConvoDerived {
   let pending = convo.isPendingReasoning()

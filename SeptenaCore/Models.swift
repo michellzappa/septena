@@ -949,6 +949,9 @@ enum TaskFilter: Equatable, Hashable {
   case triage
   /// Agent-worked tasks waiting for the human to verify and accept (`endState == .needsVerify`).
   case review
+  /// Every open task an agent owns or worked, grouped by `AgentStage`
+  /// (docs/TASK_FACTORY_SPEC.md §3).
+  case agent
   case upcoming
   case repeating
   case unscheduled
@@ -965,6 +968,7 @@ enum TaskFilter: Equatable, Hashable {
     case .today: return "today"
     case .triage: return "triage"
     case .review: return "all"
+    case .agent: return "all"
     case .upcoming: return "upcoming"
     case .repeating: return "all"
     case .unscheduled: return "unscheduled"
@@ -983,6 +987,7 @@ enum TaskFilter: Equatable, Hashable {
     case .today: return "today"
     case .triage: return "triage"
     case .review: return "review"
+    case .agent: return "agent"
     case .upcoming: return "upcoming"
     case .repeating: return "repeating"
     case .unscheduled: return "unscheduled"
@@ -1003,6 +1008,7 @@ enum TaskFilter: Equatable, Hashable {
     case .today: return String(localized: "Today", comment: "Task filter")
     case .triage: return String(localized: "Inbox", comment: "Task filter")
     case .review: return String(localized: "Review", comment: "Task filter")
+    case .agent: return RegistryDestinations.byNavigationKey["agent"]?.title ?? "Agent"
     case .upcoming: return String(localized: "Upcoming", comment: "Task filter")
     case .repeating: return String(localized: "Repeating", comment: "Task filter")
     case .unscheduled: return String(localized: "Anytime", comment: "Task filter")

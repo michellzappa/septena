@@ -41,7 +41,7 @@ struct TaskDraft: Equatable {
     case .project(let id): projectId = id
     case .area(let id):    areaId = id
     case .starred:         starred = true
-    case .triage, .review, .unscheduled, .repeating, .logbook, .faded, .recentlyDeleted: break
+    case .triage, .review, .agent, .unscheduled, .repeating, .logbook, .faded, .recentlyDeleted: break
     }
   }
 

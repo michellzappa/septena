@@ -105,6 +105,12 @@
       "settings.pages.advanced.title"
     ]
   },
+  "Agent": {
+    "text": "Agent",
+    "paths": [
+      "destinations.destinations.agent.title"
+    ]
+  },
   "Agent tools": {
     "text": "Agent tools",
     "paths": [
@@ -527,6 +533,12 @@
     "text": "Discuss",
     "paths": [
       "surfaces.taskAttributes.discuss.label"
+    ]
+  },
+  "Done": {
+    "text": "Done",
+    "paths": [
+      "destinations.destinations.agent.groups.done.title"
     ]
   },
   "Duplicate": {
@@ -1015,6 +1027,12 @@
       "settings.rootGroups.ai_agents_root.items.1.detail"
     ]
   },
+  "No agent work": {
+    "text": "No agent work",
+    "paths": [
+      "destinations.destinations.agent.emptyState.title"
+    ]
+  },
   "No repeating tasks": {
     "text": "No repeating tasks",
     "paths": [
@@ -1234,6 +1252,12 @@
       "tokens.textures.none.name"
     ]
   },
+  "Queued": {
+    "text": "Queued",
+    "paths": [
+      "destinations.destinations.agent.groups.queued.title"
+    ]
+  },
   "Quick Add…": {
     "text": "Quick Add…",
     "paths": [
@@ -1364,7 +1388,8 @@
   "Review": {
     "text": "Review",
     "paths": [
-      "destinations.destinations.review.title"
+      "destinations.destinations.review.title",
+      "destinations.destinations.agent.groups.review.title"
     ]
   },
   "Ridge Lines": {
@@ -1652,6 +1677,12 @@
       "settings.rootGroups.lists_root.items.2.detail"
     ]
   },
+  "Tasks you assign to Claude appear here, grouped by where the work stands.": {
+    "text": "Tasks you assign to Claude appear here, grouped by where the work stands.",
+    "paths": [
+      "destinations.destinations.agent.emptyState.detail"
+    ]
+  },
   "Text Size": {
     "text": "Text Size",
     "paths": [
@@ -1848,6 +1879,12 @@
       "surfaces.firstRun.steps.welcome.points.1.title"
     ]
   },
+  "Working": {
+    "text": "Working",
+    "paths": [
+      "destinations.destinations.agent.groups.working.title"
+    ]
+  },
   "You can undo this.": {
     "text": "You can undo this.",
     "paths": [
@@ -1908,6 +1945,12 @@
     "text": "Your tasks, areas, projects, and conversations are erased from the server and this device.",
     "paths": [
       "surfaces.prompts.items.deleteAccount.message"
+    ]
+  },
+  "Your turn": {
+    "text": "Your turn",
+    "paths": [
+      "destinations.destinations.agent.groups.yourTurn.title"
     ]
   },
   "Yuzu": {

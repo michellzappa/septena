@@ -306,6 +306,17 @@ function validateDestinations(dests, icons, caps) {
     assert(typeof d.emptyState?.title === "string" && typeof d.emptyState?.detail === "string", `destinations.json: ${d.id} needs emptyState.title and .detail`);
     assert(d.icon in icons.icons, `destinations.json: ${d.id} unknown icon "${d.icon}"`);
     assert(d.featureId in caps.capabilities, `destinations.json: ${d.id} unknown featureId "${d.featureId}"`);
+    // Optional ordered sections a list groups its rows into (Agent stages).
+    if (d.groups !== undefined) {
+      assert(Array.isArray(d.groups) && d.groups.length > 0, `destinations.json: ${d.id}.groups must be a non-empty array`);
+      const seenGroups = new Set();
+      for (const g of d.groups) {
+        assert(typeof g.id === "string" && !seenGroups.has(g.id), `destinations.json: ${d.id} duplicate or missing group id "${g.id}"`);
+        seenGroups.add(g.id);
+        assert(typeof g.title === "string" && g.title.length > 0, `destinations.json: ${d.id}.groups.${g.id} needs a title`);
+        assert(g.icon in icons.icons, `destinations.json: ${d.id}.groups.${g.id} unknown icon "${g.icon}"`);
+      }
+    }
   }
   for (const f of ["title", "detail", "pointerDetail", "touchDetail", "syncingTitle"]) {
     assert(typeof dests.genericEmptyState?.[f] === "string", `destinations.json: genericEmptyState.${f} missing`);
@@ -787,6 +798,14 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let emptyDetail: String");
   lines.push("}");
   lines.push("");
+  lines.push("/// One ordered section of a grouped smart list (`groups` in destinations.json).");
+  lines.push("struct RegistryDestinationGroup: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let title: String");
+  lines.push("  let iconId: String");
+  lines.push("  let sfSymbol: String");
+  lines.push("}");
+  lines.push("");
   lines.push("enum RegistryDestinations {");
   lines.push("  static let viewAliases: [String: String] = [");
   for (const [k, v] of Object.entries(dests.viewAliases)) {
@@ -804,6 +823,18 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  ]");
   lines.push("");
   lines.push("  static let byNavigationKey: [String: RegistryDestination] = Dictionary(uniqueKeysWithValues: all.map { ($0.navigationKey, $0) })");
+  lines.push("");
+  lines.push("  /// Ordered row groups per destination id (`groups` in destinations.json).");
+  lines.push("  static let groups: [String: [RegistryDestinationGroup]] = [");
+  for (const d of dests.destinations) {
+    if (!d.groups) continue;
+    lines.push(`    ${swiftStr(d.id)}: [`);
+    for (const g of d.groups) {
+      lines.push(`      RegistryDestinationGroup(id: ${swiftStr(g.id)}, title: ${L(g.title, g, "title")}, iconId: ${swiftStr(g.icon)}, sfSymbol: ${swiftStr(icons.icons[g.icon].sfSymbol)}),`);
+    }
+    lines.push("    ],");
+  }
+  lines.push("  ]");
   lines.push("");
   lines.push("  /// Empty state for a list with no copy of its own (`genericEmptyState`).");
   lines.push("  enum GenericEmpty {");

@@ -103,6 +103,7 @@ final class SeptaskKitQuickFind {
     [
       .list(.today, title: Route.filter(.today).title, symbol: Route.filter(.today).icon),
       .list(.review, title: Route.filter(.review).title, symbol: Route.filter(.review).icon),
+      .list(.agent, title: Route.filter(.agent).title, symbol: Route.filter(.agent).icon),
       .list(.today, title: TaskFilter.triage.title, symbol: Route.filter(.triage).icon),
       .list(.upcoming, title: Route.filter(.upcoming).title,
             symbol: Route.filter(.upcoming).icon),

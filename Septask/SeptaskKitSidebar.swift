@@ -361,7 +361,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     }), collapsedKeys.contains(owner.key) {
       toggleFold(owner)
     }
-    if key == KitSidebarDestination.key(for: .filter(.review)), row(forKey: key) == nil {
+    if key == KitSidebarDestination.key(for: .filter(.review))
+        || key == KitSidebarDestination.key(for: .filter(.agent)),
+       row(forKey: key) == nil {
       rebuild(preserving: key)
     }
     guard let row = row(forKey: key) else { return }
@@ -465,11 +467,18 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let today = SeptenaDate.today
     let inboxCount = open.filter { $0.isInTriageBand }.count
     let todayCount = open.filter { $0.isOnToday && !$0.isInTriageBand }.count
-    let reviewCount = open.filter {
-      $0.conversationJSON != nil && $0.conversation.needsHumanReview
-    }.count
+    // One conversation decode per row that carries JSON feeds both the Review
+    // and the Agent counts. A claim lease is backend wall-clock time.
+    let now = Date()
+    var reviewCount = 0, agentCount = 0
+    for task in open where task.conversationJSON != nil {
+      let convo = task.conversation
+      if convo.needsHumanReview { reviewCount += 1 }
+      if convo.agentStage(at: now) != nil { agentCount += 1 }
+    }
     let smartCounts: [TaskFilter: Int] = [
       .review: reviewCount,
+      .agent: agentCount,
       .upcoming: open.filter { task in
         guard !task.today else { return false }
         return task.scheduled.map { $0 > today } == true
@@ -532,6 +541,16 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       let insertAt = views.firstIndex(where: { $0.key == KitSidebarDestination.key(for: .filter(.today)) })
         .map { $0 + 1 } ?? 0
       views.insert(Node(reviewDestination.nodeContent, count: reviewCount.nilIfZero), at: insertAt)
+    }
+    // Agent (docs/TASK_FACTORY_SPEC.md §3): after Review, or after Today when
+    // Review is hidden. Same disclosure rule as Review.
+    let agentDestination = KitSidebarDestination.filter(.agent, title: TaskFilter.agent.title)
+    if agentCount > 0 || key == agentDestination.key {
+      let anchor = views.lastIndex(where: {
+        $0.key == reviewDestination.key || $0.key == KitSidebarDestination.key(for: .filter(.today))
+      })
+      views.insert(Node(agentDestination.nodeContent, count: agentCount.nilIfZero),
+                   at: anchor.map { $0 + 1 } ?? 0)
     }
     // Starred, Faded & Recently Deleted: shown once non-empty (progressive disclosure).
     if starredCount > 0 {

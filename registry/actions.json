@@ -524,6 +524,7 @@
       "items": [
         { "kind": "destination", "id": "today" },
         { "kind": "destination", "id": "review" },
+        { "kind": "destination", "id": "agent" },
         { "kind": "destination", "id": "upcoming" },
         { "kind": "destination", "id": "repeating" },
         { "kind": "destination", "id": "anytime" },

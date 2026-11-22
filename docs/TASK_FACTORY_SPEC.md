@@ -1,6 +1,6 @@
 # Task factory — spec
 
-**Status:** accepted. F0 claims, stop and pause built 2026-11-19 (§5, ADR 0008); Agent smart list and runner not started. Written and accepted 2026-11-19. Open questions keep their defaults until mz overrules them.
+**Status:** accepted. F0 claims, stop and pause built 2026-11-19 (§5, ADR 0008). Agent smart list and manual runner built 2026-11-22 (§3, §4.1). Written and accepted 2026-11-19. Open questions keep their defaults until mz overrules them.
 **Decisions:** [ADR 0002](adr/0002-own-backend-replaces-icloud.md),
 [ADR 0005](adr/0005-tasks-as-factory-intake.md).
 **Builds on:** the task conversation loop (`docs/TASK_CONVERSATIONS_PLAN.md`,
@@ -119,6 +119,24 @@ The runner is a process that drains the queue.
   6. Append a run record (§9).
 - **The runner never asks in its own terminal.** All questions go to the task
   (`factory-day` rule: unattended means no interactive questions).
+
+### 4.1 Manual runner (F0, built)
+
+`scripts/task-runner.sh` runs ONE pass of the loop above by hand on
+`mz-mini`. It is not scheduled. It starts headless Claude Code (`claude -p`)
+with only the Septena task tools and read-only web research allowed, so F0
+handles `research`-shaped work only.
+
+- **Setup, once:** `claude mcp add --transport http septena https://api.septena.app/mcp`,
+  then authenticate the server in an interactive `claude` session and enter
+  the pairing code in Septena. Claude Code keeps the OAuth grant. The script
+  holds no token.
+- **Run:** `scripts/task-runner.sh` (one task), `--max 2` (two tasks, in
+  turn), `--task <id>` (one named task), `--dry-run` (list, claim nothing).
+- **Claim name:** `runner:<host>`; the backend adds the pairing.
+- **Stops:** a claim or write refused as `paused` or `stopped` ends the pass;
+  the script exits 3. Only mz resumes, in the app.
+- **Log:** `~/Library/Logs/septena-runner/<timestamp>.log`.
 
 ## 5. Claims
 
