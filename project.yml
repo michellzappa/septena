@@ -15,6 +15,11 @@ packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: 2.9.2
+  # The shared Rust core (ADR 0025), pinned to a GitHub release by
+  # scripts/core-pin.sh. Xcode downloads the prebuilt XCFramework; no build
+  # compiles Rust. Not on the watch: Rust's watchOS targets are tier 3.
+  SeptenaSharedCore:
+    path: core/release/swift
 
 settings:
   base:
@@ -114,6 +119,7 @@ targets:
       # ClaudeReconnectCue, left with the hosted-gateway connection, so
       # Septask now compiles no Shell/Dashboard file.
     dependencies:
+      - package: SeptenaSharedCore
       - target: SeptaskShare
         embed: true
         codeSign: true
@@ -279,6 +285,7 @@ targets:
     dependencies:
       - sdk: FoundationModels.framework
       - package: Sparkle
+      - package: SeptenaSharedCore
     info:
       path: Septask/Info-Mac.plist
       properties:
@@ -415,7 +422,10 @@ targets:
       - path: SeptenaCore/TaskConvo.swift
       - path: SeptenaCore/ConvoDerived.swift
       - path: SeptenaCore/TaskFade.swift
+      - path: SeptenaCore/SharedCoreBridge.swift
       - path: SeptenaCore/Generated/RegistryConstants.swift
+    dependencies:
+      - package: SeptenaSharedCore
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig

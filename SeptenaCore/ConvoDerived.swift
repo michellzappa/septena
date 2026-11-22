@@ -1,8 +1,11 @@
 import Foundation
+import SeptenaSharedCore
 
 // Derived view-state for a task's conversation — COMPUTED, never stored. The
 // stored facts live in `TaskConvo`; this is a pure projection the UI badge and
 // the reasoning queue read. Phase 1: docs/TASK_CONVERSATIONS_PHASE1.md.
+// The projection (stage, badge, next action, pending reasoning) runs in the
+// shared Rust core (ADR 0025), the same one the other clients use.
 
 /// Where the conversation sits in its lifecycle.
 enum ConvoStage { case open, clarifying, inProgress, awaitingHuman, terminal }
@@ -20,9 +23,6 @@ struct ConvoDerived {
 }
 
 extension TaskConvo {
-  /// Most recent provider turn, if any.
-  var lastProviderTurn: ConvoTurn? { thread.last { $0.role == .provider } }
-
   /// True when the last turn is a provider turn still awaiting the human's tap
   /// (it offered options and no user turn followed). The 🟡 state.
   var hasOpenProviderQuestion: Bool {
@@ -45,13 +45,33 @@ extension TaskConvo {
   }
 
   /// SINGLE source of truth for the reasoning queue, shared by the in-app
-  /// backend filter and the badge (the gateway mirrors this rule in TS): marked
-  /// for Claude, OR last provider turn low-confidence — and not terminal.
+  /// backend filter and the badge: marked for Claude, OR last provider turn
+  /// low-confidence — and not terminal or stopped. Computed by the shared core.
   func isPendingReasoning() -> Bool {
-    guard !isTerminal, stoppedAt == nil else { return false }
-    if assignee == .claude { return true }
-    if let c = lastProviderTurn?.confidence, c < 0.5 { return true }
-    return false
+    coreProjection(at: Date())?.pendingReasoning ?? false
+  }
+
+  /// This conversation in the shared core's shape. A claim counts only with a
+  /// claimant, as in `isClaimed(at:)`.
+  var coreConversation: TaskConversation {
+    TaskConversation(
+      confirmedIntent: confirmedIntent,
+      thread: thread.map {
+        ConversationTurn(sequence: Int64($0.seq), role: $0.role.rawValue, options: $0.options, confidence: $0.confidence)
+      },
+      artifactExists: artifact != nil,
+      handoffExists: handoff != nil,
+      endState: endState?.rawValue,
+      endStateNote: endStateNote,
+      assignee: assignee?.rawValue,
+      stoppedAt: stoppedAt.map(SharedCoreValues.instant),
+      claimUntil: claimedBy == nil ? nil : claimUntil.map(SharedCoreValues.instant)
+    )
+  }
+
+  /// The core's projection; nil only if the core rejects the input.
+  func coreProjection(at now: Date) -> ConversationProjection? {
+    try? deriveConversation(conversation: coreConversation, now: SharedCoreValues.instant(now))
   }
 }
 
@@ -84,46 +104,41 @@ extension TaskConvo {
   }
 }
 
-/// Pure projection of a conversation into UI/queue state.
+/// Pure projection of a conversation into UI/queue state, computed by the
+/// shared core. A claim lease is wall-clock time on the backend, not the
+/// app's day, and this projection is nonisolated, so it reads the real clock.
 func deriveConvo(_ convo: TaskConvo) -> ConvoDerived {
-  let pending = convo.isPendingReasoning()
-
-  if convo.needsHumanReview {
-    return ConvoDerived(stage: .awaitingHuman, badge: .needsYou,
-                        nextAction: convo.endStateNote ?? "Needs review",
-                        pendingReasoning: false)
+  guard let p = convo.coreProjection(at: Date()) else {
+    return ConvoDerived(stage: .open, badge: nil, nextAction: "No conversation yet", pendingReasoning: false)
   }
+  return ConvoDerived(stage: ConvoStage(core: p.stage), badge: p.badge.flatMap(ConvoBadge.init(core:)),
+                      nextAction: p.nextAction, pendingReasoning: p.pendingReasoning)
+}
 
-  if convo.isTerminal {
-    let badge: ConvoBadge = (convo.endState == .wontDo) ? .wontDo : .done
-    return ConvoDerived(stage: .terminal, badge: badge,
-                        nextAction: convo.endStateNote ?? "Resolved",
-                        pendingReasoning: false)
+extension ConvoStage {
+  /// The core's stage names: open, clarifying, inProgress, awaitingHuman, terminal.
+  init(core: String) {
+    switch core {
+    case "clarifying": self = .clarifying
+    case "inProgress": self = .inProgress
+    case "awaitingHuman": self = .awaitingHuman
+    case "terminal": self = .terminal
+    default: self = .open
+    }
   }
+}
 
-  guard convo.hasStarted else {
-    return ConvoDerived(stage: .open, badge: nil,
-                        nextAction: "No conversation yet", pendingReasoning: pending)
+extension ConvoBadge {
+  /// The core's badge names: needsYou, working, done, wontDo.
+  init?(core: String) {
+    switch core {
+    case "needsYou": self = .needsYou
+    case "working": self = .working
+    case "done": self = .done
+    case "wontDo": self = .wontDo
+    default: return nil
+    }
   }
-
-  // The user stopped agent work: nothing is owed by anyone until they resume.
-  if convo.stoppedAt != nil {
-    return ConvoDerived(stage: .inProgress, badge: nil,
-                        nextAction: "Stopped", pendingReasoning: false)
-  }
-
-  if convo.hasOpenProviderQuestion {
-    return ConvoDerived(stage: .awaitingHuman, badge: .needsYou,
-                        nextAction: "Tap to answer", pendingReasoning: pending)
-  }
-
-  // Agent owes the next move (just confirmed, or the user just chose).
-  let stage: ConvoStage = (convo.confirmedIntent == nil) ? .clarifying : .inProgress
-  // A claim lease is wall-clock time on the backend, not the app's day, and
-  // this projection is nonisolated, so it reads the real clock.
-  let working = convo.isClaimed(at: Date())
-  return ConvoDerived(stage: stage, badge: .working,
-                      nextAction: working ? "Claude is working" : "Claude's move", pendingReasoning: pending)
 }
 
 // MARK: - Linked GitHub issues / PRs

@@ -48,6 +48,10 @@
     "RegistryPlans.trialDays": {
       "reason": "The reverse trial is not built; the Plus pane shows trial copy only.",
       "issue": "#46"
+    },
+    "RegistryRules.fadeGraceDays": {
+      "reason": "The fade grace period is read by the shared Rust core (ADR 0025); Swift calls the core for fadeFill.",
+      "issue": "#250"
     }
   },
   "ts": {
