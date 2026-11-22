@@ -68,7 +68,13 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
     let text = notice.detail == nil ? title : title + lineHeight(SeptaskKitTheme.meta) + 1
     let control: CGFloat = notice.primaryTitle == nil ? 16 : 22
     let gap: CGFloat = notice.headsCard ? 0 : bottomGap
-    return ceil(max(text, control)) + verticalPad * 2 + gap
+    // A one-line notice is exactly a task row tall, button or not, so every
+    // notice matches the rows under it. Only a detail line makes it taller.
+    // The small push button (22pt) still fits a task row with room to spare;
+    // its content centers vertically.
+    guard notice.detail != nil else { return SeptaskKitTheme.rowHeight + gap }
+    let content = ceil(max(text, control)) + verticalPad * 2
+    return max(content, SeptaskKitTheme.rowHeight) + gap
   }
 
   private static func lineHeight(_ font: NSFont) -> CGFloat {
