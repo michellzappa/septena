@@ -107,6 +107,7 @@ for (const device of activeDevices()) {
     catch { console.log(`⚠ could not remove stale ${f} (will overwrite same-named renders)`); }
   }
 
+  const exported = [];
   for (const [i, panel] of list.entries()) {
     if (onlyPanel && panel.id !== onlyPanel) continue;
     const meta = panel.shot?.callout ? shotElements(device, panel.shot.src) : null;
@@ -125,9 +126,16 @@ for (const device of activeDevices()) {
     const file = join(outDir, `${i}_${device.key}_${panel.id}.png`);
     await chrome.screenshot(htmlFile, file, { width: device.width, height: device.height, ready: "window.__layoutCallouts?.()" });
     flattenAlpha(file);
+    exported.push({ order: i, slug: panel.id, file: `${i}_${device.key}_${panel.id}.png`, title: panel.headline.replace(/\*/g, "") });
     const missing = panel.shot && !panel.shot.img && shotDataURL(device, panel.shot.src) === null;
     console.log(`✓ ${device.key} ${i}_${panel.id} ${device.width}×${device.height}${missing ? "  (placeholder shot)" : ""}`);
   }
+  // One manifest per device class, in Bipe's store-set shape. The website's
+  // brand page reads it (septena-site scripts/sync-appstore.mjs).
+  if (!onlyPanel) writeFileSync(join(outDir, `manifest.${device.key}.json`), JSON.stringify({
+    device: device.key, label: device.label, platform: device.landscape ? "macos" : "ios", locale: "en-US",
+    width: device.width, height: device.height, exports: exported,
+  }, null, 2) + "\n");
 }
 
 await chrome.close();
