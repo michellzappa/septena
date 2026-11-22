@@ -418,6 +418,8 @@ struct SeptaskCommandMenus: Commands {
         .disabled(!canNavigate)
       Button("Review") { go(.review) }
         .disabled(!canNavigate)
+      Button(TaskFilter.agent.title) { go(.agent) }
+        .disabled(!canNavigate)
       Button("Upcoming") { go(.upcoming) }
         .keyboardShortcut("2", modifiers: .command)
         .disabled(!canNavigate)

@@ -1050,7 +1050,7 @@ struct TaskListView: View {
   /// composer still treats this as CREATE, not edit, so its behavior is in
   /// lockstep with the drawer composer. Upcoming falls back to the drawer.
   private func startCreate(areaId: String? = nil, projectId: String? = nil) {
-    guard filter != .recentlyDeleted, filter != .repeating, filter != .review else { return }
+    guard filter != .recentlyDeleted, filter != .repeating, filter != .review, filter != .agent else { return }
     // One press: fold (and so save) whatever editor is open, then start the
     // new task. This used to stop after the fold, so "+" while editing took
     // two presses.
@@ -1202,7 +1202,7 @@ struct TaskListView: View {
   /// the `+`/⌘N composer there (it lets you pick the day).
   private var allowsInlineCreate: Bool {
     switch filter {
-    case .logbook, .faded, .recentlyDeleted, .upcoming, .repeating, .review: return false
+    case .logbook, .faded, .recentlyDeleted, .upcoming, .repeating, .review, .agent: return false
     default:                                    return true
     }
   }
@@ -2006,6 +2006,11 @@ struct TaskListView: View {
         AnyView(starFilterBar)
         AnyView(reviewRows)
       })
+    case .agent:
+      return AnyView(Group {
+        AnyView(starFilterBar)
+        AnyView(agentStageRows)
+      })
     default:
       return AnyView(Group {
         AnyView(starFilterBar)
@@ -2309,6 +2314,15 @@ struct TaskListView: View {
         .frame(maxWidth: .infinity)
         .padding(.top, 40)
         .plainListChrome()
+      } else if filter == .agent, let dest = RegistryDestinations.byNavigationKey["agent"] {
+        ContentUnavailableView(
+          dest.emptyTitle,
+          systemImage: titleIcon,
+          description: Text(dest.emptyDetail)
+        )
+        .frame(maxWidth: .infinity)
+        .padding(.top, 40)
+        .plainListChrome()
       } else if filter == .review {
         ContentUnavailableView(
           "Nothing to review",
@@ -2402,6 +2416,29 @@ struct TaskListView: View {
         .taskCardChrome(position, isSelected: selection.contains(task.id))
         .taskCardContextMenu(position) { taskContextMenu(for: task) }
         .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
+      }
+    }
+  }
+
+  /// Agent smart list (docs/TASK_FACTORY_SPEC.md §3): one section per
+  /// `AgentStage`, in registry order, headers only above non-empty stages.
+  /// Stage titles and symbols come from `registry/destinations.json`.
+  @ViewBuilder
+  private var agentStageRows: some View {
+    // A claim lease is backend wall-clock time, not the app's day (same
+    // rule as `deriveConvo`), so the stage reads the real clock.
+    let now = Date()
+    let byStage = Dictionary(grouping: visibleItems) {
+      $0.conversation.agentStage(at: now) ?? .queued
+    }
+    ForEach(AgentStage.allCases, id: \.self) { stage in
+      if let tasks = byStage[stage], !tasks.isEmpty {
+        Section {
+          cardedRows(tasks)
+        } header: {
+          groupHeader(icon: stage.group?.sfSymbol ?? "circle",
+                      title: stage.group?.title ?? stage.rawValue)
+        }
       }
     }
   }
@@ -4556,7 +4593,7 @@ struct TaskListView: View {
     // Every open-work list hides done tasks (a just-completed one lingers via
     // the settle exception in `visibleItems`, then fades). Only the Logbook and
     // Recently Deleted — whose whole job is showing finished/trashed tasks — keep them.
-    case .project, .area, .unscheduled, .starred, .upcoming, .triage, .repeating, .review, .faded: return true
+    case .project, .area, .unscheduled, .starred, .upcoming, .triage, .repeating, .review, .agent, .faded: return true
     case .today:
       return !todayShowCompleted
     case .logbook, .recentlyDeleted: return false

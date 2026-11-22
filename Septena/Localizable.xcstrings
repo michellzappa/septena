@@ -1904,6 +1904,10 @@
     "Agenda" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
+    "Agent" : {
+      "comment" : "Generated from registry destinations.destinations.agent.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Agent tools" : {
       "comment" : "Generated from registry settings.pages.advanced.sections.agent_tools.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -7432,6 +7436,10 @@
         }
       }
     },
+    "No agent work" : {
+      "comment" : "Generated from registry destinations.destinations.agent.emptyState.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "No calendars found." : {
       "localizations" : {
         "pt-BR" : {
@@ -8796,6 +8804,10 @@
           }
         }
       }
+    },
+    "Queued" : {
+      "comment" : "Generated from registry destinations.destinations.agent.groups.queued.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Quick add" : {
 
@@ -11052,6 +11064,10 @@
         }
       }
     },
+    "Tasks you assign to Claude appear here, grouped by where the work stands." : {
+      "comment" : "Generated from registry destinations.destinations.agent.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Teal" : {
       "localizations" : {
         "pt-BR" : {
@@ -12391,6 +12407,10 @@
         }
       }
     },
+    "Working" : {
+      "comment" : "Generated from registry destinations.destinations.agent.groups.working.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Working…" : {
 
     },
@@ -12696,6 +12716,10 @@
     },
     "Your Things data was not modified. Check Inbox and Today in the Tasks tab to verify routing." : {
 
+    },
+    "Your turn" : {
+      "comment" : "Generated from registry destinations.destinations.agent.groups.yourTurn.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Your unique handle on feature requests and comments. Leave blank to stay unnamed." : {
 
