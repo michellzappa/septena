@@ -3,6 +3,8 @@ import type { Env } from "../env.js";
 import {
   ENTITIES,
   ENTITY_NAMES,
+  MAX_CHECKLIST_ITEMS_PER_TASK,
+  MAX_TAGS_PER_TASK,
   MAX_USER_ATTACHMENT_BYTES,
   addMissingColumnsSQL,
   createTableSQL,
@@ -66,7 +68,7 @@ export const AGENT_WRITE_RULES: Record<string, string> = {
   paused: "The user paused all agents. Do not write; only the user can unpause.",
   "retired:context": "Project context is retired (ADR 0012). Write the project's notes instead.",
   human_accepts:
-    "Only the user marks a Claude-assigned task done. Call tasks_set_endstate with endState \"needs_verify\" and a note describing what to check.",
+    "Only the user marks an agent-worked task done. Call tasks_set_endstate with endState \"needs_verify\" and a note describing what to check.",
 };
 
 /// Lease bounds for a claim. An agent that stops writing loses the task when
@@ -307,6 +309,8 @@ export class TaskStore extends DurableObject<Env> {
         originalTransactionId TEXT, status TEXT NOT NULL, environment TEXT, note TEXT,
         signedAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL
       );
+      CREATE INDEX IF NOT EXISTS checklist_items_task ON checklist_items(taskId);
+      CREATE INDEX IF NOT EXISTS tags_name_ci ON tags(lower(name));
     `);
   }
 
@@ -429,6 +433,7 @@ export class TaskStore extends DurableObject<Env> {
       if (op.entity === "task") {
         this.tombstoneConvo(op.id, now);
         purgedAttachmentIds.push(...this.tombstoneAttachments(op.id, now));
+        this.tombstoneChecklistItems(op.id, now);
       }
       return { clientOpId: op.clientOpId, status: "applied", rev };
     }
@@ -460,11 +465,48 @@ export class TaskStore extends DurableObject<Env> {
         const quota = this.checkQuota(op.id, op.fields.byteCount as number);
         if (quota) return { clientOpId: op.clientOpId, status: "rejected", reason: quota };
       }
+      if (op.entity === "checklistItem") {
+        const taskId = op.fields.taskId as string;
+        if (!this.liveTask(taskId)) return { clientOpId: op.clientOpId, status: "rejected", reason: "unknown_task" };
+        const count = this.sql.exec<{ n: number }>(
+          "SELECT COUNT(*) AS n FROM checklist_items WHERE taskId = ? AND deletedAt IS NULL",
+          taskId,
+        ).one().n;
+        if (count >= MAX_CHECKLIST_ITEMS_PER_TASK) {
+          return { clientOpId: op.clientOpId, status: "rejected", reason: "checklist_limit_exceeded" };
+        }
+      }
     } else {
       const locked = spec.updatable ? names.filter((f) => !spec.updatable!.includes(f)) : [];
       if (locked.length) return { clientOpId: op.clientOpId, status: "rejected", reason: `immutable:${locked.join(",")}` };
       const cleared = spec.requiredOnInsert.filter((f) => op.fields[f] === null);
       if (cleared.length) return { clientOpId: op.clientOpId, status: "rejected", reason: `required:${cleared.join(",")}` };
+    }
+
+    if (op.entity === "task" && Array.isArray(op.fields.tags)) {
+      const seen = new Set<string>();
+      const deduped: string[] = [];
+      for (const id of op.fields.tags as string[]) {
+        if (!seen.has(id)) {
+          seen.add(id);
+          deduped.push(id);
+        }
+      }
+      if (deduped.length > MAX_TAGS_PER_TASK) {
+        return { clientOpId: op.clientOpId, status: "rejected", reason: "tag_limit_exceeded" };
+      }
+      op.fields.tags = deduped;
+    }
+    if (op.entity === "tag" && typeof op.fields.name === "string") {
+      const trimmed = op.fields.name.trim();
+      op.fields.name = trimmed;
+      const conflict = this.sql.exec<{ id: string }>(
+        "SELECT id FROM tags WHERE lower(name) = lower(?) AND deletedAt IS NULL AND id != ?",
+        trimmed, op.id,
+      ).toArray()[0];
+      if (conflict) {
+        return { clientOpId: op.clientOpId, status: "rejected", reason: "duplicate_tag_name" };
+      }
     }
 
     const rev = this.nextRev();
@@ -489,12 +531,16 @@ export class TaskStore extends DurableObject<Env> {
         this.recordNoteRevision(noteContainer, op.id, next, actor, now, (row?.noteRev as number | null) ?? 0, this.reason);
       }
     }
+    if (isAgentActor(actor) && op.entity === "convo" && op.fields.endState === "needs_verify") {
+      // Handing off to Review puts the ball in the human's court, so the claim ends.
+      this.writeConvoServerFields(op.id, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
+    }
     return { clientOpId: op.clientOpId, status: "applied", rev };
   }
 
   /// The rules an agent write must pass, enforced here so no connector can
   /// skip them: the stop is the human's alone, a stopped task takes no agent
-  /// writes at all, and an agent cannot mark a Claude-assigned task done —
+  /// writes at all, and an agent cannot mark an agent-worked task done —
   /// only the human accepts it after review (`human_accepts`).
   private agentRefusal(op: Op): string | null {
     if (op.op === "upsert" && op.entity === "convo" && "stoppedAt" in op.fields) return "human_only:stoppedAt";
@@ -503,9 +549,10 @@ export class TaskStore extends DurableObject<Env> {
     const taskId = op.op === "appendTurn" ? op.taskId
       : (op.entity === "task" || op.entity === "convo") ? op.id
       : op.entity === "attachment" && op.op === "upsert" ? (op.fields.taskId as string | undefined) ?? null
+      : op.entity === "checklistItem" ? this.checklistItemTaskId(op)
       : null;
     if (taskId && this.convoStopped(taskId)) return "stopped";
-    if (op.op === "upsert" && op.entity === "task" && op.fields.status === "done" && this.convoAssignedToClaude(op.id)) {
+    if (op.op === "upsert" && op.entity === "task" && op.fields.status === "done" && this.convoRequiresHumanAccept(op.id)) {
       return "human_accepts";
     }
     return null;
@@ -515,11 +562,19 @@ export class TaskStore extends DurableObject<Env> {
     return this.sql.exec("SELECT 1 FROM convos WHERE id = ? AND deletedAt IS NULL AND stoppedAt IS NOT NULL", taskId).toArray().length > 0;
   }
 
-  private convoAssignedToClaude(taskId: string): boolean {
-    return this.sql.exec(
-      "SELECT 1 FROM convos WHERE id = ? AND deletedAt IS NULL AND assignee = 'claude'",
+  /// True when an agent must hand the task to Review (`needs_verify`) rather
+  /// than closing it directly: assigned to an agent (`claude`), already waiting
+  /// in Review (`needs_verify`), or currently held under a live agent claim.
+  private convoRequiresHumanAccept(taskId: string): boolean {
+    const row = this.sql.exec<{
+      assignee: string | null; endState: string | null; claimedBy: string | null; claimUntil: string | null;
+    }>(
+      "SELECT assignee, endState, claimedBy, claimUntil FROM convos WHERE id = ? AND deletedAt IS NULL",
       taskId,
-    ).toArray().length > 0;
+    ).toArray()[0];
+    if (!row) return false;
+    if (row.assignee === "claude" || row.endState === "needs_verify") return true;
+    return !!row.claimedBy && !!row.claimUntil && Date.parse(row.claimUntil) > Date.now();
   }
 
   private liveTask(id: string): boolean {
@@ -542,6 +597,30 @@ export class TaskStore extends DurableObject<Env> {
       this.sql.exec("UPDATE attachments SET deletedAt = ?, rev = ?, updatedAt = ? WHERE id = ?", now, rev, now, id);
     }
     return ids;
+  }
+
+  /// A permanently deleted task takes its checklist items with it.
+  private tombstoneChecklistItems(taskId: string, now: string): void {
+    const ids = this.sql.exec<{ id: string }>(
+      "SELECT id FROM checklist_items WHERE taskId = ? AND deletedAt IS NULL",
+      taskId,
+    ).toArray().map((r) => r.id);
+    for (const id of ids) {
+      const rev = this.nextRev();
+      this.sql.exec("UPDATE checklist_items SET deletedAt = ?, rev = ?, updatedAt = ? WHERE id = ?", now, rev, now, id);
+    }
+  }
+
+  private checklistItemTaskId(op: Op): string | null {
+    if (op.op === "upsert" && typeof op.fields.taskId === "string") return op.fields.taskId;
+    if (op.op === "upsert" || op.op === "delete") {
+      const row = this.sql.exec<{ taskId: string }>(
+        "SELECT taskId FROM checklist_items WHERE id = ?",
+        op.id,
+      ).toArray()[0];
+      return row?.taskId ?? null;
+    }
+    return null;
   }
 
   /// Returns a rejection reason, or null when the new attachment fits.
@@ -719,7 +798,7 @@ export class TaskStore extends DurableObject<Env> {
   /// `includeSettings`: the client syncs the `setting` entity. Clients built
   /// before it existed decode pulled entities strictly and would fail on it,
   /// so they get no setting rows (their cursor still moves past them).
-  pull(since: number, limit: number, includeSettings = false): PullResult {
+  pull(since: number, limit: number, includeSettings = false, includeChecklists = false, includeTags = false): PullResult {
     const n = Math.min(Math.max(limit, 1), MAX_PULL);
     if (since > 0 && since < this.meta("purgedThrough")) {
       return { resetRequired: true, changes: [], nextSince: 0, hasMore: true };
@@ -729,6 +808,8 @@ export class TaskStore extends DurableObject<Env> {
     const merged: Array<{ rev: number; entity: EntityName | "turn"; row: Record<string, unknown> }> = [];
     for (const name of ENTITY_NAMES) {
       if (name === "setting" && !includeSettings) continue;
+      if (name === "checklistItem" && !includeChecklists) continue;
+      if (name === "tag" && !includeTags) continue;
       const spec: EntitySpec = ENTITIES[name];
       for (const raw of this.sql.exec(`SELECT * FROM ${spec.table} WHERE rev > ? ORDER BY rev LIMIT ?`, since, n)) {
         merged.push({ rev: raw.rev as number, entity: name, row: decodeRow(spec, raw) });
@@ -769,6 +850,30 @@ export class TaskStore extends DurableObject<Env> {
     return { rows, total };
   }
 
+  /// Open non-heading tasks awaiting human review (`convos.endState = 'needs_verify'`),
+  /// newest hand-off first. Mirrors `TaskConvo.needsHumanReview` in SeptenaCore.
+  readReviewTasks(limit: number): { rows: Row[]; notes: Record<string, string | null>; total: number } {
+    const spec: EntitySpec = ENTITIES.task;
+    const n = Math.min(Math.max(limit, 1), 500);
+    const where =
+      "t.deletedAt IS NULL AND t.status = 'open' AND (t.kind IS NULL OR t.kind != 'heading') " +
+      "AND c.deletedAt IS NULL AND c.endState = 'needs_verify'";
+    const total = this.sql.exec<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM tasks t JOIN convos c ON c.id = t.id WHERE ${where}`,
+    ).one().n;
+    const raw = this.sql.exec(
+      `SELECT t.*, c.endStateNote AS _reviewNote FROM tasks t JOIN convos c ON c.id = t.id WHERE ${where} ORDER BY c.updatedAt DESC, c.rev DESC LIMIT ?`,
+      n,
+    ).toArray();
+    const notes: Record<string, string | null> = {};
+    const rows: Row[] = raw.map((r) => {
+      const id = r.id as string;
+      notes[id] = (r._reviewNote as string | null | undefined) ?? null;
+      return decodeRow(spec, r) as Row;
+    });
+    return { rows, notes, total };
+  }
+
   /// One live task with its conversation row and turns (oldest first).
   readTask(id: string): { task: Row; convo: Row | null; turns: Row[] } | null {
     const raw = this.sql.exec("SELECT * FROM tasks WHERE id = ? AND deletedAt IS NULL", id).toArray()[0];
@@ -780,6 +885,44 @@ export class TaskStore extends DurableObject<Env> {
       convo: convoRaw ? (decodeRow(ENTITIES.convo, convoRaw) as Row) : null,
       turns,
     };
+  }
+
+  readChecklistItems(taskId: string): Row[] {
+    return this.sql.exec(
+      "SELECT * FROM checklist_items WHERE taskId = ? AND deletedAt IS NULL ORDER BY position IS NULL, position, createdAt, id",
+      taskId,
+    ).toArray().map((r) => decodeRow(ENTITIES.checklistItem, r) as Row);
+  }
+
+  readChecklistItem(id: string): Row | null {
+    const raw = this.sql.exec(
+      "SELECT * FROM checklist_items WHERE id = ? AND deletedAt IS NULL",
+      id,
+    ).toArray()[0];
+    return raw ? (decodeRow(ENTITIES.checklistItem, raw) as Row) : null;
+  }
+
+  readChecklistCounts(): Record<string, { total: number; done: number }> {
+    const rows = this.sql.exec<{ taskId: string; total: number; done: number }>(
+      "SELECT taskId, COUNT(*) AS total, SUM(CASE WHEN checked = 1 THEN 1 ELSE 0 END) AS done FROM checklist_items WHERE deletedAt IS NULL GROUP BY taskId",
+    ).toArray();
+    const out: Record<string, { total: number; done: number }> = {};
+    for (const r of rows) out[r.taskId] = { total: r.total, done: r.done ?? 0 };
+    return out;
+  }
+
+  readTags(): Row[] {
+    return this.sql.exec(
+      "SELECT * FROM tags WHERE deletedAt IS NULL ORDER BY position IS NULL, position, lower(name), id",
+    ).toArray().map((r) => decodeRow(ENTITIES.tag, r) as Row);
+  }
+
+  readTagByName(name: string): Row | null {
+    const raw = this.sql.exec(
+      "SELECT * FROM tags WHERE lower(name) = lower(?) AND deletedAt IS NULL",
+      name.trim(),
+    ).toArray()[0];
+    return raw ? (decodeRow(ENTITIES.tag, raw) as Row) : null;
   }
 
   readAreas(limit: number): Row[] {

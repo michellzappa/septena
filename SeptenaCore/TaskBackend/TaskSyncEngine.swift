@@ -266,6 +266,8 @@ final class TaskSyncEngine {
     case .area: captureArea(id, row: fetchArea(id), store: store, lookup: lookup)
     case .project: captureProject(id, row: fetchProject(id), store: store, lookup: lookup)
     case .attachment: captureAttachment(id, row: fetchAttachment(id), store: store, lookup: lookup)
+    case .checklistItem: captureChecklistItem(id, row: fetchChecklistItem(id), store: store, lookup: lookup)
+    case .tag: captureTag(id, row: fetchTag(id), store: store, lookup: lookup)
     case .convo, .turn, .setting: break
     }
     refreshPendingCount()
@@ -312,18 +314,23 @@ final class TaskSyncEngine {
     let areas = (try? main.fetch(FetchDescriptor<AreaEntity>())) ?? []
     let projects = (try? main.fetch(FetchDescriptor<ProjectEntity>())) ?? []
     let attachments = (try? main.fetch(FetchDescriptor<TaskAttachmentEntity>())) ?? []
+    let checklistItems = (try? main.fetch(FetchDescriptor<TaskChecklistItemEntity>())) ?? []
+    let tags = (try? main.fetch(FetchDescriptor<TagEntity>())) ?? []
     for a in areas { captureArea(a.id, row: a, store: store, lookup: lookup) }
     for p in projects { captureProject(p.id, row: p, store: store, lookup: lookup) }
+    for tag in tags { captureTag(tag.id, row: tag, store: store, lookup: lookup) }
     // Headings first, as the importer does, so members never precede them.
     for t in tasks.sorted(by: { $0.isHeading && !$1.isHeading }) {
       captureTask(t.id, row: t, store: store, reconciling: true, lookup: lookup)
     }
     for a in attachments { captureAttachment(a.id, row: a, store: store, lookup: lookup) }
+    for item in checklistItems { captureChecklistItem(item.id, row: item, store: store, lookup: lookup) }
 
     // Rows the backend has that are gone here: hard-deleted without a capture.
     let present: [String: Set<String>] = [
       "task": Set(tasks.map(\.id)), "area": Set(areas.map(\.id)),
       "project": Set(projects.map(\.id)), "attachment": Set(attachments.map(\.id)),
+      "checklistItem": Set(checklistItems.map(\.id)), "tag": Set(tags.map(\.id)),
     ]
     for (key, shadow) in shadows where !shadow.gone {
       guard let colon = key.firstIndex(of: ":") else { continue }
@@ -335,6 +342,8 @@ final class TaskSyncEngine {
       case "area": captureArea(id, row: nil, store: store, lookup: lookup)
       case "project": captureProject(id, row: nil, store: store, lookup: lookup)
       case "attachment": captureAttachment(id, row: nil, store: store, lookup: lookup)
+      case "checklistItem": captureChecklistItem(id, row: nil, store: store, lookup: lookup)
+      case "tag": captureTag(id, row: nil, store: store, lookup: lookup)
       default: break
       }
     }
@@ -482,6 +491,18 @@ final class TaskSyncEngine {
     captureSimple(.attachment, id, plan: plan, store: store, lookup: lookup)
   }
 
+  private func captureChecklistItem(_ id: String, row: TaskChecklistItemEntity?, store: TaskSyncStore,
+                                    lookup: (String) -> TaskSyncShadow?) {
+    captureSimple(.checklistItem, id, plan: row.map { TaskBackendMapping.checklistItem($0) },
+                  store: store, lookup: lookup)
+  }
+
+  private func captureTag(_ id: String, row: TagEntity?, store: TaskSyncStore,
+                          lookup: (String) -> TaskSyncShadow?) {
+    captureSimple(.tag, id, plan: row.map { TaskBackendMapping.tag($0) },
+                  store: store, lookup: lookup)
+  }
+
   /// Areas, projects, attachments: no soft delete; a missing row is a delete.
   ///
   /// An area or project delete is HELD for `deleteGrace`, like a task's: ⌘Z
@@ -496,7 +517,9 @@ final class TaskSyncEngine {
     let shadow = lookup(key)
     guard let plan else {
       if let shadow, !shadow.gone {
-        queueDeleteIfNeeded(entity, id, hold: entity == .project || entity == .area, store: store)
+        queueDeleteIfNeeded(entity, id,
+                            hold: entity == .project || entity == .area || entity == .checklistItem || entity == .tag || entity == .attachment,
+                            store: store)
         shadow.gone = true
         store.saveSoon()
       }
@@ -628,6 +651,18 @@ final class TaskSyncEngine {
 
   func fetchAttachment(_ id: String) -> TaskAttachmentEntity? {
     var d = FetchDescriptor<TaskAttachmentEntity>(predicate: #Predicate { $0.id == id })
+    d.fetchLimit = 1
+    return try? main.fetch(d).first
+  }
+
+  func fetchChecklistItem(_ id: String) -> TaskChecklistItemEntity? {
+    var d = FetchDescriptor<TaskChecklistItemEntity>(predicate: #Predicate { $0.id == id })
+    d.fetchLimit = 1
+    return try? main.fetch(d).first
+  }
+
+  func fetchTag(_ id: String) -> TagEntity? {
+    var d = FetchDescriptor<TagEntity>(predicate: #Predicate { $0.id == id })
     d.fetchLimit = 1
     return try? main.fetch(d).first
   }
@@ -1114,6 +1149,7 @@ final class TaskSyncEngine {
       if let url = TaskAttachmentFiles.url(for: a) { try? FileManager.default.removeItem(at: url) }
       context.delete(a)
     }
+    for c in (try? context.fetch(FetchDescriptor<TaskChecklistItemEntity>())) ?? [] { context.delete(c) }
     for t in (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? [] { context.delete(t) }
     for p in (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? [] { context.delete(p) }
     for a in (try? context.fetch(FetchDescriptor<AreaEntity>())) ?? [] { context.delete(a) }

@@ -40,6 +40,21 @@ struct ReviewTaskRow: View {
             .font(.septenaMeta)
             .foregroundStyle(Theme.inkSecondary)
             .lineLimit(3)
+          if task.linkedIssue != nil || task.conversation.artifact != nil {
+            HStack(spacing: 8) {
+              if let issue = task.linkedIssue {
+                Label(issue.shortLabel, systemImage: issue.symbolName)
+                  .font(.septenaCaption)
+                  .foregroundStyle(Theme.inkSecondary)
+              }
+              if let artifact = task.conversation.artifact, !artifact.title.isEmpty {
+                Label(artifact.title, systemImage: "doc.text")
+                  .font(.septenaCaption)
+                  .foregroundStyle(Theme.inkSecondary)
+                  .lineLimit(1)
+              }
+            }
+          }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())

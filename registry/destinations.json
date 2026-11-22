@@ -1,12 +1,25 @@
 {
   "version": 1,
   "description": "Canonical smart lists, navigation destinations, aliases, shortcuts, behavior flags, and empty states (ADR 0015).",
-  "viewAliases": {
-    "someday": "anytime",
-    "unscheduled": "anytime",
-    "triage": "inbox"
-  },
+  "viewAliases": { "someday": "anytime", "unscheduled": "anytime", "triage": "inbox" },
   "destinations": [
+    {
+      "id": "inbox",
+      "navigationKey": "triage",
+      "serverView": "triage",
+      "title": "Inbox",
+      "icon": "list.inbox",
+      "visibility": "todayBand",
+      "countRule": "triage",
+      "supportsManualOrder": false,
+      "supportsGroupByList": false,
+      "showsCalendarAgenda": false,
+      "showsInboxBand": false,
+      "supportsInlineCreate": true,
+      "dropBehavior": "clearPlace",
+      "featureId": "lists.inbox",
+      "emptyState": { "title": "Inbox is empty", "detail": "New tasks wait here until you schedule or file them." }
+    },
     {
       "id": "today",
       "navigationKey": "today",
@@ -33,7 +46,7 @@
       "title": "Review",
       "icon": "list.review",
       "sidebarOrder": 1,
-      "visibility": "always",
+      "visibility": "whenNonEmpty",
       "countRule": "needsVerify",
       "supportsManualOrder": false,
       "supportsGroupByList": false,
@@ -42,7 +55,7 @@
       "supportsInlineCreate": false,
       "dropBehavior": "none",
       "featureId": "lists.review",
-      "emptyState": { "title": "Nothing to review", "detail": "Tasks an agent proposes as done appear here until you accept them." }
+      "emptyState": { "title": "Nothing to review", "detail": "Work an agent finished appears here so you can check and accept it." }
     },
     {
       "id": "upcoming",
@@ -120,12 +133,30 @@
       "emptyState": { "title": "Logbook is empty", "detail": "Completed and let-go tasks are archived here." }
     },
     {
+      "id": "starred",
+      "navigationKey": "starred",
+      "serverView": "all",
+      "title": "Starred",
+      "icon": "list.starred",
+      "sidebarOrder": 6,
+      "visibility": "whenNonEmpty",
+      "countRule": "openStarred",
+      "supportsManualOrder": false,
+      "supportsGroupByList": false,
+      "showsCalendarAgenda": false,
+      "showsInboxBand": false,
+      "supportsInlineCreate": true,
+      "dropBehavior": "none",
+      "featureId": "lists.starred",
+      "emptyState": { "title": "No Starred Tasks", "detail": "Star important tasks to keep them one tap away." }
+    },
+    {
       "id": "faded",
       "navigationKey": "faded",
       "serverView": "all",
       "title": "Faded",
       "icon": "list.faded",
-      "sidebarOrder": 6,
+      "sidebarOrder": 7,
       "visibility": "whenNonEmpty",
       "countRule": "openFaded",
       "supportsManualOrder": false,
@@ -135,7 +166,7 @@
       "supportsInlineCreate": false,
       "dropBehavior": "none",
       "featureId": "lists.faded",
-      "emptyState": { "title": "Nothing faded", "detail": "Undated tasks untouched for 14 days quietly gather here." }
+      "emptyState": { "title": "No Faded Tasks", "detail": "Undated tasks without activity for 14 days appear here until you keep them or let them go." }
     },
     {
       "id": "recentlyDeleted",
@@ -143,7 +174,7 @@
       "serverView": "all",
       "title": "Recently Deleted",
       "icon": "list.recently_deleted",
-      "sidebarOrder": 7,
+      "sidebarOrder": 8,
       "visibility": "whenNonEmpty",
       "countRule": "deleted",
       "supportsManualOrder": false,
@@ -153,7 +184,14 @@
       "supportsInlineCreate": false,
       "dropBehavior": "delete",
       "featureId": "lists.recently-deleted",
-      "emptyState": { "title": "Recently Deleted is empty", "detail": "Deleted tasks stay here for 30 days before they are removed." }
+      "emptyState": { "title": "No Recently Deleted Tasks", "detail": "Deleted tasks appear here for 30 days before being permanently removed." }
     }
-  ]
+  ],
+  "genericEmptyState": {
+    "title": "Nothing here yet",
+    "detail": "Type above to add your first task.",
+    "pointerDetail": "Click + or double-click below to add a task.",
+    "touchDetail": "Tap + to add a task.",
+    "syncingTitle": "Syncing…"
+  }
 }

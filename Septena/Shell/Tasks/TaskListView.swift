@@ -45,6 +45,10 @@ struct TaskListView: View {
   let embeddedHeader: () -> AnyView
 
   @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool = true
+  /// Global switch: show faded tasks inside projects and areas (collapsed
+  /// toggleable section starting open when enabled).
+  @AppStorage(SettingsKey.tasksShowFaded) private var showFadedInLists: Bool =
+    RegistrySettings.Defaults.tasksShowFaded
   /// Things-style grouped Today (area / project sections) vs a single flat
   /// list under Inbox with list subtitles and due-first ordering.
   @AppStorage(SettingsKey.todayGroupByList) private var todayGroupByList: Bool = true
@@ -68,6 +72,7 @@ struct TaskListView: View {
   // happens when @State lags behind a prop change.
   @State private var itemsStorage: [SeptenaTask] = []
   @State private var triageStorage: [SeptenaTask] = []
+  @State private var fadedScopeStorage: [SeptenaTask] = []
   @State private var storageFilter: TaskFilter? = nil
   /// The archive is deliberately incremental: 1,000 completed tasks should
   /// not be decoded, sorted, and rendered just to open the Logbook.
@@ -238,6 +243,29 @@ struct TaskListView: View {
   /// ⇧-click / ↑↓) on a container that can also host the inline editor. NOT a
   /// native `List` — see the header of `SelectableScrollList.swift` for why.
   @State private var selection: Set<String> = []
+  #if os(iOS)
+  /// Active when the user enters multi-select via swipe-to-select on touch
+  /// (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §4). Kept distinct from
+  /// `!selection.isEmpty` so a single iPad trackpad cursor click doesn't flip
+  /// taps into multi-select toggles.
+  @State private var isTouchSelecting = false
+  #endif
+
+  private var touchSelectionActive: Bool {
+    #if os(iOS)
+    isTouchSelecting
+    #else
+    false
+    #endif
+  }
+
+  private var allowsTouchMultiSelect: Bool {
+    #if os(iOS)
+    filter != .recentlyDeleted && expandedEditId == nil
+    #else
+    false
+    #endif
+  }
 
   #if os(iOS)
   /// iOS edit-mode environment key (unavailable on macOS). Vestigial now that
@@ -289,6 +317,17 @@ struct TaskListView: View {
   @State private var headingRenameTarget: SeptenaTask?
   @State private var headingDeleteTarget: SeptenaTask?
   @State private var headingDraftTitle: String = ""
+  /// Confirmation target for swipe "Delete Permanently" in Recently Deleted
+  /// (`docs/IOS_SWIPE_ACTIONS_SPEC.md` §2 — permanent delete has no undo).
+  @State private var permanentDeleteConfirmTask: SeptenaTask?
+
+  private var isSwipeEditModeActive: Bool {
+    #if os(iOS)
+    return editMode?.wrappedValue.isEditing == true
+    #else
+    return false
+    #endif
+  }
   // The title/checkbox hero-glide (`matchedGeometryEffect`) was removed: it
   // ANIMATED the title's position between the closed row and the inline editor,
   // and because a `Text` and a `TextField` never sit at a pixel-identical
@@ -362,6 +401,32 @@ struct TaskListView: View {
     }
   }
 
+  /// Project / area ids whose faded-task section was collapsed by hand.
+  /// Starts expanded while `showFadedInLists` is on (mirrors Today's completed
+  /// footer: the global setting promises faded tasks are shown).
+  @AppStorage("septena.tasks.projectFadedCollapsed") private var scopeFadedCollapsedData: Data = Data()
+  private var scopeFadedCollapsedIds: Set<String> {
+    (try? JSONDecoder().decode(Set<String>.self, from: scopeFadedCollapsedData)) ?? []
+  }
+  private var isScopeFadedExpanded: Bool {
+    guard let id = scopeLoggedFilterId else { return false }
+    return !scopeFadedCollapsedIds.contains(id)
+  }
+  private var fadedScopeItems: [SeptenaTask] {
+    guard showFadedInLists, scopeLoggedFilterId != nil else { return [] }
+    if storageFilter == filter { return fadedScopeStorage }
+    return LocalCache.fadedTasks(in: modelContext, scope: filter)
+  }
+  private func toggleScopeFadedExpanded() {
+    guard let id = scopeLoggedFilterId else { return }
+    Haptics.tick()
+    var set = scopeFadedCollapsedIds
+    if set.contains(id) { set.remove(id) } else { set.insert(id) }
+    a11yAnimate(.easeInOut(duration: 0.2)) {
+      scopeFadedCollapsedData = (try? JSONEncoder().encode(set)) ?? Data()
+    }
+  }
+
   // When picker. Use a single Identifiable item so the sheet's kind
   // is intrinsic to the presentation — avoids stale-state races where
   // tapping "When" could open the prior "Deadline" pane.
@@ -385,6 +450,12 @@ struct TaskListView: View {
   // Repeat picker
   @State private var showingRepeatSheet = false
   @State private var repeatTargetId: String?
+  @State private var reminderTargetId: String?
+  @State private var tagsTargetIds: [String] = []
+  @State private var starredOnlyFilter = false
+  @State private var selectedTagIDs: Set<String> = []
+  @State private var tagsByID: [String: TaskTag] = [:]
+  @State private var checklistCounts: [String: (done: Int, total: Int)] = [:]
 
   /// Pending Things-style choice when a fixed-schedule repeating task is
   /// moved. The date picker dismisses before this appears, so the decision is
@@ -500,7 +571,10 @@ struct TaskListView: View {
 
   /// Bumped when a notice is dismissed, so `noticesRow` re-reads
   /// `TaskNotices` (which owns the dismissal state).
+  /// Bumped after a dismiss or a ticked checklist step so `cachedTodayNotices`
+  /// re-evaluates without running SwiftData queries inside `body`.
   @State private var noticeEpoch = 0
+  @State private var cachedTodayNotices: [TaskNotice] = []
   /// Non-nil presents the Weekly Sweep sheet (`docs/TASK_FADE_SPEC.md` §5).
   @State private var sweepSheetTasks: [SeptenaTask]? = nil
   /// One group-title line of space above the logged footer (scales with
@@ -520,6 +594,8 @@ struct TaskListView: View {
         moveTargetIds: $moveTargetIds,
         showingRepeatSheet: $showingRepeatSheet,
         repeatTargetId: $repeatTargetId,
+        reminderTargetId: $reminderTargetId,
+        tagsTargetIds: $tagsTargetIds,
         areas: areas,
         projects: projects,
         currentTask: currentTask,
@@ -533,7 +609,8 @@ struct TaskListView: View {
           Haptics.tick()
           mutator.setRecurrencePaused(id: id, paused: paused)
           Task { await load() }
-        }
+        },
+        applyReminder: applyReminder
       ))
       .sheet(isPresented: Binding(
         get: { sweepSheetTasks != nil },
@@ -555,14 +632,14 @@ struct TaskListView: View {
         ),
         titleVisibility: .visible
       ) {
-        Button("Make Exception") {
+        Button("Only This Task") {
           guard let prompt = reschedulePrompt else { return }
           reschedulePrompt = nil
           for id in prompt.taskIDs {
             applyScheduledWhen(id: id, date: prompt.date, mode: .makeException)
           }
         }
-        Button("Update Rule") {
+        Button("Update Schedule") {
           guard let prompt = reschedulePrompt else { return }
           reschedulePrompt = nil
           for id in prompt.taskIDs {
@@ -571,7 +648,7 @@ struct TaskListView: View {
         }
         Button("Cancel", role: .cancel) { reschedulePrompt = nil }
       } message: {
-        Text("Make Exception moves only this copy. Update Rule moves the repeating schedule to the new date.")
+        Text("Move only this task, or update the repeating schedule to the new date?")
       }
     // A rolled-back save is reported here, on the surface where a lost task is
     // noticed. NOT the snackbar below it: that is a one-line auto-dismissing
@@ -610,18 +687,23 @@ struct TaskListView: View {
     return withSnackbar
       .background {
         if rowCommandShortcutsEnabled {
-          // Rendered from the shared `TaskRowCommands` registry so this list
-          // can't drift from the macOS menu. The titles are real (they used to
-          // be `""`), which is what the hold-⌘ HUD labels each row with.
-          ForEach(TaskRowCommands.all) { command in
-            let action = iPadRowCommandActions[keyPath: command.handler]
-            Button(command.title) { action?() }
-              .keyboardShortcut(command.shortcut)
-              .disabled(action == nil)
-            ForEach(Array(command.alternateShortcuts.enumerated()), id: \.offset) { _, shortcut in
-              Button(command.title) { action?() }
-                .keyboardShortcut(shortcut)
+          // Rendered from the registry (`RegistryActions`, the row commands
+          // `TaskActions` serves) so this list can't drift from the macOS
+          // menu. The titles are real, which is what the hold-⌘ HUD labels
+          // each row with.
+          let actions = iPadRowCommandActions
+          ForEach(TaskActions.rowCommandIds, id: \.self) { id in
+            let action = actions.handler(for: id)
+            let title = RegistryActions.title(id)
+            if let shortcut = RegistryActions.shortcut(for: id) {
+              Button(title) { action?() }
+                .keyboardShortcut(shortcut.keyboardShortcut)
                 .disabled(action == nil)
+              ForEach(Array(shortcut.alternates.enumerated()), id: \.offset) { _, alternate in
+                Button(title) { action?() }
+                  .keyboardShortcut(alternate.keyboardShortcut)
+                  .disabled(action == nil)
+              }
             }
           }
           .opacity(0)
@@ -654,14 +736,20 @@ struct TaskListView: View {
   #endif
 
   private var showsEmbeddedNewTaskToolbar: Bool {
-    #if os(iOS) && !SEPTASK
+    #if os(iOS) && SEPTASK
+    // Compact iPhone Septena uses the canonical bottom-right Magic Plus orb
+    // for creation; top-right stays Search (and Project's overflow menu).
+    // Split layouts (iPad / unfolded Duo) have no Magic Plus orb, so embedded
+    // Area/Project lists keep the toolbar "+" there.
+    embedded && filter != .recentlyDeleted && filter != .faded && usesPushNavigation
+    #elseif os(iOS)
     embedded && filter != .recentlyDeleted && filter != .faded && !usesPushNavigation
     #else
     embedded && filter != .recentlyDeleted && filter != .faded
     #endif
   }
 
-  private var taskList: some View {
+  private var taskListChromed: some View {
     taskListContent
     // Deep task-list rhythm runs denser than the drawer's: task rows read
     // `rowVInset` for their top/bottom padding, tightened here to Things-3
@@ -671,7 +759,7 @@ struct TaskListView: View {
     .environment(\.rowVInset, Theme.rowVPaddingTight)
     .scrollDismissesKeyboard(.interactively)
     .modifier(TaskListToolbarChrome(showsEmbeddedNewTask: showsEmbeddedNewTaskToolbar,
-                                    onNew: { openContextualQuickAdd() }))
+                                    onNew: { handleExternalCreateTrigger() }))
     // Unified chrome (docs/PAGE_CHROME_SPEC.md): standalone task lists get the
     // constant gear (→ Settings) and a contextual "+" (new task). On iPad
     // regular the "+" merges with the sidebar's "···" in the tab bar; on iPhone
@@ -679,7 +767,7 @@ struct TaskListView: View {
     .modifier(TaskListStandaloneChrome(embedded: embedded,
                                        recentlyDeleted: filter == .recentlyDeleted || filter == .faded,
                                        showsViewOptions: filter == .today,
-                                       onNew: { openContextualQuickAdd() }))
+                                       onNew: { handleExternalCreateTrigger() }))
     // (Keyboard navigation — ↑↓ traversal, Return/Esc, focus reclaim —
     // is owned by `SelectableScrollList`; the `+` toolbar button and ⌘N still
     // open the composer via `shouldStartCreating` → `openContextualQuickAdd()`.)
@@ -687,6 +775,13 @@ struct TaskListView: View {
     // Embedded uses (Project / Area detail wraps) inherit chrome from parent
     // — adding modifiers here would create duplicate back buttons.
     .modifier(TopLevelChromeModifier(showChrome: !embedded))
+  }
+
+  // The modifier chain is split across `taskListChromed`, `taskListDialogs`,
+  // `taskListLoading` and `taskList` so each type-checks in reasonable time (one chain hit
+  // the compiler's limit on iOS).
+  private var taskListDialogs: some View {
+    taskListChromed
     .alert("Error", isPresented: Binding(
       get: { errorMessage != nil },
       set: { if !$0 { errorMessage = nil } }
@@ -733,6 +828,29 @@ struct TaskListView: View {
       }
       Button("Cancel", role: .cancel) { headingDeleteTarget = nil }
     }
+    .alert(
+      "Delete Permanently?",
+      isPresented: Binding(
+        get: { permanentDeleteConfirmTask != nil },
+        set: { if !$0 { permanentDeleteConfirmTask = nil } }
+      )
+    ) {
+      Button("Delete Permanently", role: .destructive) {
+        if let t = permanentDeleteConfirmTask {
+          Haptics.warning()
+          removeLocally(id: t.id)
+          mutator.purge(id: t.id)
+        }
+        permanentDeleteConfirmTask = nil
+      }
+      Button("Cancel", role: .cancel) { permanentDeleteConfirmTask = nil }
+    } message: {
+      Text("This task will be permanently deleted and cannot be undone.")
+    }
+  }
+
+  private var taskListLoading: some View {
+    taskListDialogs
     // Re-load on every appearance so completed tasks (kept visible in-place
     // while the user is on the screen) drop off when they return.
     .onAppear {
@@ -781,6 +899,7 @@ struct TaskListView: View {
       // Synced notice state (Get started, rolled-in dismissal) arrived from
       // another device — re-evaluate Today's notices immediately.
       noticeEpoch += 1
+      refreshTodayNotices()
     }
     // The moment an inline editor / quick-add / composer folds, catch up on any
     // background refresh we held back so the list never reshuffles under a
@@ -797,10 +916,15 @@ struct TaskListView: View {
     // Flipping the opt-in in Settings should land immediately — fetch on, clear
     // off — without waiting for the next load.
     .onChange(of: showCalendarEvents) { _, _ in refreshCalendarEvents() }
+    .onChange(of: showFadedInLists) { _, _ in Task { await load() } }
     .onChange(of: clock.today) { _, _ in
       guard filter == .today else { return }
       Task { await load() }
     }
+  }
+
+  private var taskList: some View {
+    taskListLoading
     // Filter swaps reuse this same view (no .id(route) at the App level for
     // .filter cases). `items` is a computed property that already returns
     // the right data for `filter` synchronously, so we only need to clear
@@ -837,6 +961,8 @@ struct TaskListView: View {
       // frame is the "weird rebuild between screens". Mirrors the synchronous
       // correctness the `items`/`storageFilter` getter already gives the rows.
       refreshCalendarEvents()
+      hydrateFilterStorageIfNeeded()
+      refreshTodayNotices()
       Task { await load() }
     }
     .onChange(of: nav.pendingTaskReveal) { _, _ in
@@ -852,8 +978,34 @@ struct TaskListView: View {
     .onChange(of: nav.shouldStartCreating) { _, _ in
       consumeStartCreatingRequest()
     }
+    .onChange(of: nav.shouldCreateHeading) { _, want in
+      guard want, isOnScreen, case .project(let pid) = filter else { return }
+      nav.shouldCreateHeading = false
+      headingDraftTitle = ""
+      headingCreateProject = pid
+    }
     .onAppear(perform: didAppearOnScreen)
-    .onDisappear { isOnScreen = false }
+    .onDisappear {
+      isOnScreen = false
+      #if os(iOS)
+      if isTouchSelecting {
+        nav.isTaskMultiSelectActive = false
+      }
+      #endif
+    }
+    #if os(iOS)
+    .toolbar {
+      if isTouchSelecting {
+        ToolbarItem(placement: .topBarTrailing) {
+          Button("Done") { clearSelection() }
+            .fontWeight(.semibold)
+        }
+      }
+    }
+    .onChange(of: isTouchSelecting) { _, _ in
+      syncMultiSelectChrome()
+    }
+    #endif
     .onChange(of: scenePhase) { _, phase in handleScenePhase(phase) }
     // The composer — used for BOTH create (tab + / ⌘N / sidebar) and edit (row
     // tap / (i) button). The app's standard adaptive edit drawer (sheet on
@@ -903,6 +1055,11 @@ struct TaskListView: View {
     // new task. This used to stop after the fold, so "+" while editing took
     // two presses.
     closeActiveEditIfNeeded()
+    if filter == .upcoming {
+      let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: clock.now) ?? clock.now
+      _ = createInlineDraftAtDrop(scheduledDate: tomorrow, fromDrag: false)
+      return
+    }
     guard allowsInlineCreate else {
       a11yAnimate(.snappy(duration: 0.25)) {
         expandedEditId = nil
@@ -965,8 +1122,39 @@ struct TaskListView: View {
   /// visible list (see `isOnScreen`).
   private func didAppearOnScreen() {
     isOnScreen = true
+    hydrateFilterStorageIfNeeded()
+    refreshTodayNotices()
+    flushDeferredReloadIfNeeded()
+    syncMultiSelectChrome()
     consumeStartCreatingRequest()
     consumePendingTaskReveal()
+  }
+
+  /// Hydrates `itemsStorage` once on filter arrival so the `items` getter never
+  /// re-runs `LocalCache.tasks(...)` multiple times per frame while waiting for
+  /// the coalesced async `load()`. Preserves the cold-launch Today snapshot (#82).
+  private func hydrateFilterStorageIfNeeded() {
+    guard storageFilter != filter else { return }
+    if filter == .today, !embedded, !LaunchPhase.shared.firstFrameDrawn,
+       let snap = TodaySnapshotStore.launchRows(day: clock.today) {
+      itemsStorage = snap.today
+      storageFilter = filter
+      return
+    }
+    itemsStorage = localTasks()
+    storageFilter = filter
+  }
+
+  private func refreshTodayNotices() {
+    guard filter == .today else {
+      if !cachedTodayNotices.isEmpty { cachedTodayNotices = [] }
+      return
+    }
+    let next = TaskNotices.today(pool: items, requiresSignIn: requiresSignIn,
+                                 today: clock.today, context: modelContext)
+    if next != cachedTodayNotices {
+      cachedTodayNotices = next
+    }
   }
 
   /// Backgrounding is where an empty inline-create placeholder gets stranded
@@ -983,14 +1171,13 @@ struct TaskListView: View {
     draftEditIds = draftEditIds.filter { $0 == open }
   }
 
-  /// Open the next new task after Return saved one, in the slot the saved one
-  /// was captured in (a Today area / project section, else the list default).
-  private func continueCreating(in target: QuickAddGroupTarget?) {
-    switch target {
-    case .area(let id)?:    startCreate(areaId: id)
-    case .project(let id)?: startCreate(projectId: id)
-    case .inbox?, nil:      openContextualQuickAdd()
-    }
+  /// External "+" / ⌘N trigger. On iOS, tapping "+" while an inline editor is
+  /// already open closes that editor instead of jumping into a new editor mode.
+  private func handleExternalCreateTrigger() {
+    #if os(iOS)
+    if closeActiveEditIfNeeded() { return }
+    #endif
+    openContextualQuickAdd()
   }
 
   /// Consume the app-global create request from both first appearance and
@@ -1003,7 +1190,7 @@ struct TaskListView: View {
     // An unanswered request expires on its own (`NavigationState.requestNewTask`).
     guard isOnScreen, nav.shouldStartCreating else { return }
     nav.shouldStartCreating = false
-    openContextualQuickAdd()
+    handleExternalCreateTrigger()
   }
 
   // MARK: - Inline editing
@@ -1167,15 +1354,29 @@ struct TaskListView: View {
     quickAddGroupTarget = nil
   }
 
-  /// True on grouped Today when area / project headers should expose a "+".
-  private var showsGroupedHeaderQuickAdd: Bool {
-    filter == .today && todayGroupByList && allowsInlineCreate
+  /// Area / project group headers on Today stay clean (no trailing `+` button —
+  /// capture happens via Magic Plus / New task / ⌘N, matching AppKit).
+  private var showsGroupedHeaderQuickAdd: Bool { false }
+
+  /// Compact iPhone Septena uses the floating Magic Plus orb instead of an idle
+  /// "New task" trigger row in Inbox — the capture slot mounts only while an
+  /// inline draft is actively open.
+  private var usesMagicPlusInsteadOfInboxTrigger: Bool {
+    #if os(iOS) && SEPTASK
+    !usesPushNavigation
+    #else
+    false
+    #endif
   }
 
-  /// Inbox foot quick-add: always visible on Today; only hosts the editor when
-  /// the capture draft targets Inbox (not a section opened from a header "+").
+  /// Inbox foot quick-add: always visible on Today (Mac/iPad); on iPhone
+  /// Septena, only mounts while an Inbox inline draft is actively open.
   private var showsQuickAddInInbox: Bool {
-    filter == .today && allowsInlineCreate
+    guard filter == .today && allowsInlineCreate else { return false }
+    if usesMagicPlusInsteadOfInboxTrigger {
+      return quickAddInInboxShowsEditor
+    }
+    return true
   }
 
   private var quickAddInInboxShowsEditor: Bool {
@@ -1210,10 +1411,9 @@ struct TaskListView: View {
       // whenever a field owns the keyboard: the open composer, an inline rename,
       // or the quick-add line.
       inputActive: listInputActive,
-      selectable: usesSelectionModel,
+      selectable: usesSelectionModel || touchSelectionActive,
+      toggleOnTap: touchSelectionActive,
       onActivate: activateRow,
-      // While an editor is open, one tap on another row moves it there (iPad).
-      activatesOnTap: expandedEditId != nil,
       onClear: { closeEditOrClearSelection() },
       onMoveShortcut: openMoveForSelected,
       scrollToTick: scrollToTargetTick,
@@ -1229,6 +1429,7 @@ struct TaskListView: View {
       // inside the open-task card via `cardedRows(appendQuickAdd:)`. Grouped
       // lists (Anytime) get a foot solo card here instead.
       if showsQuickAddAtFoot && !attachesQuickAddToVisibleCard { quickAddFootCard }
+      scopeFadedSection()
       scopeLoggedSection()
       taskListFooter
     }
@@ -1240,6 +1441,12 @@ struct TaskListView: View {
     // arrow keys are suppressed (`listInputActive`), so selection only moves via
     // an explicit click on a different row.
     .onChange(of: selection) { _, sel in
+      #if os(iOS)
+      if sel.isEmpty && isTouchSelecting {
+        isTouchSelecting = false
+      }
+      syncMultiSelectChrome()
+      #endif
       if let suppressed = suppressActivationAfterSelectionCloseId,
          !sel.contains(suppressed) {
         suppressActivationAfterSelectionCloseId = nil
@@ -1274,18 +1481,142 @@ struct TaskListView: View {
     }
     #endif
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      if usesSelectionModel, selectionScope.isMulti, filter != .recentlyDeleted {
+      if filter != .recentlyDeleted &&
+          ((touchSelectionActive && selectionScope.count > 0) ||
+           (usesSelectionModel && selectionScope.isMulti)) {
         taskBatchActionBar
       }
     }
   }
 
+  private var allSelectedAreToday: Bool {
+    let tasks = orderedActionIDs().compactMap { currentTask(id: $0) }
+    return !tasks.isEmpty && tasks.allSatisfy(\.isOnToday)
+  }
+
+  private var allSelectableVisibleSelected: Bool {
+    let selectableIDs = selectableVisibleTaskIDs
+    return !selectableIDs.isEmpty && selectableIDs.allSatisfy { selection.contains($0) }
+  }
+
+  private var selectableVisibleTaskIDs: [String] {
+    keyboardOrderedTaskIds.filter { id in
+      id != Self.quickAddScrollID && TaskNoticeStep.stepID(fromSelection: id) == nil
+    }
+  }
+
+  @ViewBuilder
   private var taskBatchActionBar: some View {
+    #if os(iOS)
+    if touchSelectionActive {
+      touchMultiSelectBar
+    } else {
+      desktopBatchActionBar
+    }
+    #else
+    desktopBatchActionBar
+    #endif
+  }
+
+  #if os(iOS)
+  private var touchMultiSelectBar: some View {
+    HStack(spacing: 4) {
+      Text("\(selectionScope.count) selected")
+        .font(.septenaMeta.weight(.semibold))
+        .monospacedDigit()
+        .foregroundStyle(Theme.inkSecondary)
+        .lineLimit(1)
+        .padding(.leading, 4)
+
+      Spacer(minLength: 4)
+
+      Button { openWhenForSelected() } label: {
+        Label("When", systemImage: "calendar")
+          .labelStyle(.iconOnly)
+          .frame(width: 40, height: 38)
+          .contentShape(Rectangle())
+      }
+      .accessibilityLabel("Schedule selected tasks")
+
+      Button { openMoveForSelected() } label: {
+        Label("Move", systemImage: "arrow.right.circle")
+          .labelStyle(.iconOnly)
+          .frame(width: 40, height: 38)
+          .contentShape(Rectangle())
+      }
+      .accessibilityLabel("Move selected tasks")
+
+      Button { toggleSelected() } label: {
+        Label("Complete", systemImage: "checkmark.circle")
+          .labelStyle(.iconOnly)
+          .frame(width: 40, height: 38)
+          .contentShape(Rectangle())
+      }
+      .accessibilityLabel("Complete selected tasks")
+
+      Button(role: .destructive) { deleteSelected() } label: {
+        Label("Delete", systemImage: "trash")
+          .labelStyle(.iconOnly)
+          .frame(width: 40, height: 38)
+          .contentShape(Rectangle())
+      }
+      .accessibilityLabel("Delete selected tasks")
+
+      Menu {
+        Button {
+          toggleTodayForSelected()
+        } label: {
+          Label(allSelectedAreToday ? "Remove from Today" : "Move to Today",
+                systemImage: allSelectedAreToday ? "sun.max" : "sun.max.fill")
+        }
+        Button {
+          copyTasks(orderedActionIDs())
+          clearSelection()
+        } label: {
+          Label("Copy", systemImage: "doc.on.doc")
+        }
+        Button {
+          selectAllOrClearVisibleTasks()
+        } label: {
+          Label(allSelectableVisibleSelected ? "Deselect All" : "Select All",
+                systemImage: allSelectableVisibleSelected ? "checklist.unchecked" : "checklist")
+        }
+        Divider()
+        Button(role: .destructive) {
+          cancelSelected()
+        } label: {
+          Label("Cancel Tasks", systemImage: "xmark.circle")
+        }
+      } label: {
+        Label("More", systemImage: "ellipsis.circle")
+          .labelStyle(.iconOnly)
+          .frame(width: 40, height: 38)
+          .contentShape(Rectangle())
+      }
+      .accessibilityLabel("More batch actions")
+    }
+    .font(.system(size: 18, weight: .regular))
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.regularMaterial, in: Capsule())
+    .overlay(
+      Capsule()
+        .strokeBorder(Theme.border, lineWidth: 0.5)
+    )
+    .shadow(color: .black.opacity(0.14), radius: 12, y: 4)
+    .padding(.horizontal, Theme.pageGutter)
+    .padding(.bottom, 8)
+    .transition(.move(edge: .bottom).combined(with: .opacity))
+  }
+  #endif
+
+  private var desktopBatchActionBar: some View {
     HStack(spacing: 16) {
       Text("\(selectionScope.count) selected")
         .font(.septenaMeta)
         .foregroundStyle(Theme.inkSecondary)
       Spacer(minLength: 0)
+      Button("When") { openWhenForSelected() }
       Button("Copy") { copyTasks(orderedActionIDs()) }
       Button("Move") { openMoveForSelected() }
       Button("Complete") { toggleSelected() }
@@ -1295,6 +1626,9 @@ struct TaskListView: View {
     .padding(.vertical, 10)
     .background(.bar)
   }
+
+  /// True while an inline task editor is expanded in this list.
+  private var isInlineEditing: Bool { expandedEditId != nil }
 
   /// True while a field/editor owns the keyboard — the composer drawer or an
   /// expanded inline editor. Drives the `SelectableScrollList`'s key-suppression
@@ -1348,6 +1682,14 @@ struct TaskListView: View {
   /// twin of clicking the row, so keyboard (Return) and pointer (double-click /
   /// tap) share one path.
   private func activateRow(_ id: String) {
+    #if os(iOS)
+    // On iOS, tapping outside an open inline editor only closes it — never
+    // transitions into another task editor or quick-add editor.
+    if expandedEditId != nil {
+      collapseEdit()
+      return
+    }
+    #endif
     if suppressActivationAfterSelectionCloseId == id {
       suppressActivationAfterSelectionCloseId = nil
       return
@@ -1375,13 +1717,19 @@ struct TaskListView: View {
   /// Inline quick-add under the title when a creatable list is empty. Today
   /// hosts capture in the Inbox section instead (see `triageSection`).
   private var showsQuickAddAtTop: Bool {
-    filter != .today && allowsInlineCreate && (showsEmptyTaskList || quickAddDraftAtTop)
+    if usesMagicPlusInsteadOfInboxTrigger && filter == .triage {
+      return quickAddDraftAtTop && quickAddDraftId != nil
+    }
+    return filter != .today && allowsInlineCreate && (showsEmptyTaskList || quickAddDraftAtTop)
   }
 
   /// Things-style foot quick-add once the list has content. Today captures
   /// through the Inbox card, not at the foot of the full day list.
   private var showsQuickAddAtFoot: Bool {
-    filter != .today && allowsInlineCreate && !showsEmptyTaskList && !quickAddDraftAtTop
+    if usesMagicPlusInsteadOfInboxTrigger && filter == .triage {
+      return !quickAddDraftAtTop && quickAddDraftId != nil
+    }
+    return filter != .today && allowsInlineCreate && !showsEmptyTaskList && !quickAddDraftAtTop
   }
 
   /// Project / area / triage pages render one open-task card — the foot
@@ -1421,14 +1769,15 @@ struct TaskListView: View {
     // always lives at the foot of this card (capture drops into the band).
     if filter == .today {
       let allInbox = renderedTodayInboxRows
-      if allowsInlineCreate || !allInbox.isEmpty || quickAddDraftId != nil {
+      if showsQuickAddInInbox || !allInbox.isEmpty {
         Section {
           if !inboxCollapsed {
             cardedRows(allInbox,
                        quickMenu: { model.filingSuggestions[$0.id] != nil },
                        appendQuickAdd: showsQuickAddInInbox,
                        quickAddShowsEditor: quickAddInInboxShowsEditor,
-                       moveDropTarget: .inbox)
+                       moveDropTarget: .inbox,
+                       magicContext: "Inbox")
           }
         } header: {
           inboxHeader(count: allInbox.count)
@@ -1445,6 +1794,10 @@ struct TaskListView: View {
       inboxCollapsed.toggle()
     }
     .modifier(todayMoveDrop(.inbox))
+    .magicPlusSectionDrop(id: "mp-inbox-header", kind: .taskSection(label: "New Task in Inbox")) {
+      _ = handleTodayMoveDrop(ids: TaskDragIDs.newTask.ids, target: .inbox)
+    }
+    .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
   }
 
   /// A foldable section header — same anatomy as the area `groupHeader` (icon
@@ -1513,11 +1866,112 @@ struct TaskListView: View {
   /// stack at launch on iPhone (EXC_BAD_ACCESS in swift_getTypeByMangledName,
   /// 2026-11-19). `AnyView` at this one seam caps the depth; the rows inside
   /// keep their concrete types.
+  private var showsStarFilterPill: Bool {
+    switch filter {
+    case .starred, .logbook, .recentlyDeleted, .faded:
+      return false
+    default:
+      return items.contains(where: \.starred)
+    }
+  }
+
+  /// Tags actually present on tasks in the current list — progressive
+  /// disclosure: zero tags on tasks in this list => zero tag bar chrome
+  /// (`docs/TAGS_SPEC.md` §3).
+  private var availableTagsInList: [TaskTag] {
+    guard filter != .recentlyDeleted else { return [] }
+    var presentIDs = Set<String>()
+    for task in items {
+      for tid in task.tags { presentIDs.insert(tid) }
+    }
+    if filter == .today {
+      for task in triageItems {
+        for tid in task.tags { presentIDs.insert(tid) }
+      }
+    }
+    guard !presentIDs.isEmpty else { return [] }
+    return presentIDs
+      .compactMap { tagsByID[$0] }
+      .sorted { lhs, rhs in
+        let lp = lhs.position ?? Int.max
+        let rp = rhs.position ?? Int.max
+        if lp != rp { return lp < rp }
+        let cmp = lhs.name.localizedCaseInsensitiveCompare(rhs.name)
+        if cmp != .orderedSame { return cmp == .orderedAscending }
+        return lhs.id < rhs.id
+      }
+  }
+
+  @ViewBuilder
+  private var starFilterBar: some View {
+    let listTags = availableTagsInList
+    let hasActiveFilter = (starredOnlyFilter && showsStarFilterPill) || !selectedTagIDs.isEmpty
+    if showsStarFilterPill || !listTags.isEmpty {
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 6) {
+          if showsStarFilterPill {
+            SelectableChip(isSelected: starredOnlyFilter, tint: Theme.todayAccent) {
+              Haptics.tick()
+              a11yAnimate(.snappy(duration: 0.18)) { starredOnlyFilter.toggle() }
+            } label: {
+              HStack(spacing: 4) {
+                Image(systemName: "star.fill")
+                  .scaledFont(size: 11)
+                Text("Starred")
+              }
+            }
+          }
+          ForEach(listTags) { tag in
+            let isOn = selectedTagIDs.contains(tag.id)
+            SelectableChip(isSelected: isOn,
+                           tint: tag.color != nil ? TagColorPalette.color(for: tag.color) : theme.color(for: "tasks")) {
+              Haptics.tick()
+              a11yAnimate(.snappy(duration: 0.18)) {
+                if isOn { selectedTagIDs.remove(tag.id) }
+                else { selectedTagIDs.insert(tag.id) }
+              }
+            } label: {
+              HStack(spacing: 4) {
+                if tag.color != nil {
+                  Circle()
+                    .fill(TagColorPalette.color(for: tag.color))
+                    .frame(width: 6, height: 6)
+                }
+                Text(tag.name)
+              }
+            }
+          }
+          if hasActiveFilter {
+            Button {
+              Haptics.tick()
+              a11yAnimate(.snappy(duration: 0.18)) {
+                starredOnlyFilter = false
+                selectedTagIDs.removeAll()
+              }
+            } label: {
+              Text("Clear")
+                .font(.septenaCaption)
+                .foregroundStyle(Theme.inkSecondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+          }
+        }
+        .padding(.horizontal, TaskCardMetrics.margin)
+      }
+      .padding(.top, 4)
+      .padding(.bottom, 6)
+    }
+  }
+
   private var taskListRows: AnyView {
     switch filter {
     case .today:
       if todayGroupByList {
         return AnyView(Group {
+          AnyView(starFilterBar)
           AnyView(triageSection)
           AnyView(groupedOpenItems)
           AnyView(todaySkeleton)
@@ -1527,20 +1981,36 @@ struct TaskListView: View {
       // stack (AnyView forwards the view list), so laziness and per-row
       // identity hold. No lifecycle modifiers hang off this Group.
       return AnyView(Group {
+        AnyView(starFilterBar)
         AnyView(triageSection)
         AnyView(ungroupedOpenItems)
         AnyView(todaySkeleton)
       })
-    case .unscheduled:
-      return AnyView(groupedOpenItems)
+    case .unscheduled, .starred:
+      return AnyView(Group {
+        AnyView(starFilterBar)
+        AnyView(groupedOpenItems)
+      })
     case .upcoming:
-      return AnyView(groupedUpcomingItems)
+      return AnyView(Group {
+        AnyView(starFilterBar)
+        AnyView(groupedUpcomingItems)
+      })
     case .project:
-      return AnyView(projectGroupedRows)
+      return AnyView(Group {
+        AnyView(starFilterBar)
+        AnyView(projectGroupedRows)
+      })
     case .review:
-      return AnyView(reviewRows)
+      return AnyView(Group {
+        AnyView(starFilterBar)
+        AnyView(reviewRows)
+      })
     default:
-      return AnyView(visibleRows)
+      return AnyView(Group {
+        AnyView(starFilterBar)
+        AnyView(visibleRows)
+      })
     }
   }
 
@@ -1562,6 +2032,7 @@ struct TaskListView: View {
       .padding(.horizontal, TaskCardMetrics.headerLeading)
       .padding(.vertical, 12)
       .asListRow()
+      .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
 
     Color.clear
@@ -1596,9 +2067,11 @@ struct TaskListView: View {
         Spacer(minLength: 0)
       }
       .plainListChrome()
+      .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     } else {
       embeddedHeader()
         .plainListChrome()
+        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
   }
 
@@ -1620,35 +2093,34 @@ struct TaskListView: View {
         }
         .transition(.opacity.combined(with: .move(edge: .top)))
         .plainListChrome()
+        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
         noticeStepRows(notice.steps)
       }
     } else if filter == .faded, !visibleItems.isEmpty {
+      let pile = TaskNotices.fadedPile
       TaskListNotice(
-        kind: .info,
-        symbol: "circle.dashed",
-        title: Text(String(localized: "Tasks untouched for 14 days wait here.",
-                           comment: "Faded pile top notice title")),
-        detail: Text(String(localized: "Tap Keep or open a task to bring it back, or run a sweep.",
-                            comment: "Faded pile top notice detail")),
+        kind: pile.kind,
+        symbol: pile.symbol,
+        title: Text(pile.title),
+        detail: pile.detail.map { Text($0) },
         onDismiss: nil
       ) {
-        Button(String(localized: "Sweep…", comment: "Faded pile sweep action")) {
+        Button(pile.primaryTitle ?? "") {
           sweepSheetTasks = visibleItems
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
       }
       .plainListChrome()
+      .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
   }
 
-  /// Today's notices, read once per render. `noticeEpoch` re-reads them after
-  /// a dismiss, a ticked step or a load.
+  /// Today's notices, cached outside `body` so rendering never runs synchronous
+  /// SwiftData queries on the main thread.
   private var todayNotices: [TaskNotice] {
     guard filter == .today else { return [] }
-    let _ = noticeEpoch
-    return TaskNotices.today(pool: items, requiresSignIn: requiresSignIn,
-                             today: clock.today, context: modelContext)
+    return cachedTodayNotices
   }
 
   /// The Get started steps on screen, in render order.
@@ -1671,6 +2143,7 @@ struct TaskListView: View {
         .taskCardChrome(position, isSelected: isSelected)
         .taskCardContextMenu(position) { noticeStepMenu(step) }
         .transition(.opacity.combined(with: .move(edge: .top)))
+        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
   }
 
@@ -1720,7 +2193,7 @@ struct TaskListView: View {
   @ViewBuilder
   private func noticeAction(_ notice: TaskNotice) -> some View {
     if notice.id == .weeklySweep {
-      Button(notice.primaryTitle ?? String(localized: "Review", comment: "Weekly sweep button")) {
+      Button(notice.primaryTitle ?? "") {
         let candidates = TaskNotices.sweepCandidates(context: modelContext)
         if !candidates.isEmpty { sweepSheetTasks = candidates }
       }
@@ -1736,7 +2209,7 @@ struct TaskListView: View {
   private func toggleNoticeStep(_ step: TaskNoticeStep) {
     Haptics.tick()
     TaskNotices.toggleStep(step)
-    motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1 }
+    motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1; refreshTodayNotices() }
   }
 
   /// Does a Get started step: opens the Settings page that sets it up, or
@@ -1747,13 +2220,10 @@ struct TaskListView: View {
       startCreate()
     case .connectAI, .importTasks:
       #if SEPTASK
-      #if os(macOS)
-      let dest: SeptaskSettingsView.Destination =
-        (id == .connectAI && TaskSyncEngine.shared.signedIn) ? .taskBackend : .connectionsAI
-      #else
-      let dest: SeptaskSettingsView.Destination = id == .connectAI ? .taskBackend : .connectionsAI
-      #endif
-      SeptaskSettingsLink.request(dest)
+      let pageID = id == .connectAI
+        ? RegistrySettings.PageID.claudePairing
+        : RegistrySettings.PageID.importExport
+      SeptaskSettingsLink.request(pageID)
       nav.showSettings = true
       #endif
     }
@@ -1761,7 +2231,7 @@ struct TaskListView: View {
 
   private func dismissNotice(_ id: TaskNotice.ID) {
     TaskNotices.dismiss(id, today: clock.today, context: modelContext)
-    motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1 }
+    motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1; refreshTodayNotices() }
   }
 
   @ViewBuilder
@@ -1774,6 +2244,7 @@ struct TaskListView: View {
       // (no setup CTAs here, so an unconfigured user sees nothing).
       RemindersInboxSection(onImported: { Task { await load() } }, showsSetupCTAs: false)
         .plainListChrome()
+        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
   }
 
@@ -1842,7 +2313,7 @@ struct TaskListView: View {
         ContentUnavailableView(
           "Nothing to review",
           systemImage: titleIcon,
-          description: Text("Tasks Claude finishes appear here so you can check and accept them.")
+          description: Text("Work an agent finished appears here so you can check and accept it.")
         )
         .frame(maxWidth: .infinity)
         .padding(.top, 40)
@@ -1851,7 +2322,7 @@ struct TaskListView: View {
         ContentUnavailableView(
           "No Faded Tasks",
           systemImage: titleIcon,
-          description: Text("Undated tasks untouched for 14 days appear here until you keep them or let them go.")
+          description: Text("Undated tasks without activity for 14 days appear here until you keep them or let them go.")
         )
         .frame(maxWidth: .infinity)
         .padding(.top, 40)
@@ -1898,22 +2369,39 @@ struct TaskListView: View {
       let position = TaskCardPosition(index: idx, count: rows.count)
       if expandedEditId == task.id {
         taskRow(task, quickMenu: false)
-          .taskCardChrome(position, isSelected: true)
+          .taskCardChrome(position, isSelected: false, isEditing: true)
+          .zIndex(1)
       } else {
         ReviewTaskRow(
           task: task,
           isSelected: selection.contains(task.id),
-          onOpen: { beginEdit(task) },
-          onAccept: { toggle(task) },
+          onOpen: {
+            #if os(iOS)
+            if closeActiveEditIfNeeded() { return }
+            #endif
+            beginEdit(task)
+          },
+          onAccept: {
+            Haptics.tick()
+            let previousNote = task.conversation.endStateNote
+            mutator.complete(id: task.id)
+            mutator.acknowledge(id: task.id)
+            TaskUndo.recordAcceptReview(id: task.id, previousNote: previousNote, mutator: mutator)
+            Task { await load() }
+          },
           onSendBack: { note in
             Haptics.tick()
+            let before = task.conversation
             mutator.sendBackConvo(id: task.id, note: note)
+            let after = mutator.conversation(id: task.id) ?? before
+            TaskUndo.recordSendBack(id: task.id, before: before, after: after, mutator: mutator)
             Task { await load() }
           }
         )
         .asListRow()
         .taskCardChrome(position, isSelected: selection.contains(task.id))
         .taskCardContextMenu(position) { taskContextMenu(for: task) }
+        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
       }
     }
   }
@@ -1980,8 +2468,73 @@ struct TaskListView: View {
   /// in that order, and each group is a run of it, so the global neighbours
   /// place the row right in its group too. A target outside that order (a
   /// triage-band row in the Inbox card) only files.
+  /// Spawn a deferred inline-create draft positioned directly at a Magic Plus
+  /// drop target (between two rows, under a project heading, in a Today group,
+  /// in an Anytime group, or on an Upcoming day) and open its inline composer
+  /// right on that spot.
+  private func createInlineDraftAtDrop(
+    areaId: String? = nil,
+    projectId: String? = nil,
+    headingId: String? = nil,
+    scheduledDate: Date? = nil,
+    insertInto sequence: [SeptenaTask]? = nil,
+    at insertion: Int? = nil,
+    fromDrag: Bool = true
+  ) -> Bool {
+    closeActiveEditIfNeeded()
+    var seed = TaskDraft(filter: filter)
+    if let projectId {
+      seed.projectId = projectId
+      seed.areaId = nil
+    } else if let areaId {
+      seed.areaId = areaId
+      seed.projectId = nil
+    }
+    if let scheduledDate {
+      seed.setScheduled(scheduledDate)
+    }
+    let draft = seed.create(via: mutator, deferPush: true, atBottom: true)
+    if let headingId {
+      mutator.setHeading(id: draft.id, heading: headingId)
+    }
+    if let sequence, let insertion {
+      applyManualOrder(ids: [draft.id], into: sequence, at: insertion)
+    }
+    model.noteCreated(draft.id)
+    draftEditIds.insert(draft.id)
+    Haptics.tick()
+    AddInfoSection.tasks.notifyTilesChanged()
+    Task {
+      await load()
+      if let loaded = items.first(where: { $0.id == draft.id }) {
+        beginEdit(loaded)
+      } else {
+        beginEdit(draft)
+      }
+      scrollToTargetID = draft.id
+      scrollToTargetTick += 1
+    }
+    return true
+  }
+
   private func handleReorderDrop(ids: [String], target: SeptenaTask, before: Bool,
                                  refileTo group: TodayDropTarget? = nil) -> Bool {
+    if TaskDragIDs.isNewTaskPayload(ids) {
+      let remaining = excludingQuickAddCapture(visibleItems)
+      let destination = group.map(todayDropDestination)
+      if let targetIdx = remaining.firstIndex(where: { $0.id == target.id }) {
+        return createInlineDraftAtDrop(
+          areaId: destination?.areaId,
+          projectId: destination?.projectId,
+          insertInto: remaining,
+          at: before ? targetIdx : targetIdx + 1
+        )
+      }
+      return createInlineDraftAtDrop(
+        areaId: destination?.areaId,
+        projectId: destination?.projectId
+      )
+    }
     let dragged = Set(ids)
     guard !ids.isEmpty, !dragged.contains(target.id) else { return false }
     let remaining = excludingQuickAddCapture(visibleItems).filter { !dragged.contains($0.id) }
@@ -1997,6 +2550,7 @@ struct TaskListView: View {
                      at: before ? targetIdx : targetIdx + 1)
     TaskUndo.recordReorder(undoBefore, context: modelContext, mutator: mutator)
     Haptics.tick()
+    if touchSelectionActive { clearSelection() }
     Task { await load() }
     return true
   }
@@ -2033,7 +2587,7 @@ struct TaskListView: View {
     ForEach(headings) { heading in
       headingRow(heading)
       let members = visibleItems.filter { $0.heading == heading.id }
-      cardedRows(members, reorderable: true, grouped: true)
+      cardedRows(members, reorderable: true, grouped: true, magicContext: heading.title)
     }
     addSectionButton
   }
@@ -2076,22 +2630,57 @@ struct TaskListView: View {
     .modifier(TaskReorderDrop(perform: { ids, before in
       handleHeadingDrop(ids: ids, targetHeading: heading, before: before)
     }))
+    .magicPlusSectionDrop(id: "mp-heading-\(heading.id)",
+                          kind: .taskSection(label: "New Task in \(heading.title)")) {
+      _ = handleHeadingDrop(ids: TaskDragIDs.newTask.ids, targetHeading: heading, before: true)
+    }
     .contextMenu { headingContextMenu(heading) }
+    .taskRowSwipeActions(
+      id: "heading-\(heading.id)",
+      enabled: !isInlineEditing && !selectionScope.isMulti && !isSwipeEditModeActive,
+      leading: [],
+      allowsLeadingFullSwipe: false,
+      trailing: [
+        TaskRowSwipeAction(
+          id: "delete-heading",
+          title: String(localized: "Delete", comment: "Swipe action delete section heading"),
+          systemImage: "trash",
+          tint: .red,
+          role: .destructive
+        ) {
+          headingDeleteTarget = heading
+        },
+        TaskRowSwipeAction(
+          id: "rename-heading",
+          title: String(localized: "Rename", comment: "Swipe action rename section heading"),
+          systemImage: "pencil",
+          tint: .blue
+        ) {
+          headingDraftTitle = heading.title
+          headingRenameTarget = heading
+        }
+      ],
+      allowsTrailingFullSwipe: false
+    )
+    .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
   }
 
   @ViewBuilder
   private func headingContextMenu(_ heading: SeptenaTask) -> some View {
-    Button {
-      headingDraftTitle = heading.title
-      headingRenameTarget = heading
-    } label: { Label("Rename Section", systemImage: "pencil") }
-    Button {
-      startCreateUnderHeading(heading)
-    } label: { Label("New Task in Section", systemImage: "plus") }
-    Divider()
-    Button(role: .destructive) {
-      headingDeleteTarget = heading
-    } label: { Label("Delete Section", systemImage: "trash") }
+    // Registry `project.heading`, the same menu the AppKit shell renders.
+    RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
+      RegistryActions.menu("project.heading")) { id in
+        switch id {
+        case "section.rename":
+          return .init {
+            headingDraftTitle = heading.title
+            headingRenameTarget = heading
+          }
+        case "section.newTask": return .init { startCreateUnderHeading(heading) }
+        case "section.delete": return .init { headingDeleteTarget = heading }
+        default: return nil
+        }
+      })
   }
 
   /// Quiet Things-style "+ Add Section" affordance at the foot of a project.
@@ -2114,6 +2703,7 @@ struct TaskListView: View {
     }
     .buttonStyle(PlainHoverRowButtonStyle())
     .asListRow()
+    .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
   }
 
   /// A reorder drop inside a project's grouped list. The drop target is a task
@@ -2121,6 +2711,17 @@ struct TaskListView: View {
   /// positions around the target within that group. Cross-group filing falls
   /// out of reading `target.heading` — no separate "move to section" gesture.
   private func handleGroupedTaskDrop(ids: [String], target: SeptenaTask, before: Bool) -> Bool {
+    if TaskDragIDs.isNewTaskPayload(ids) {
+      guard !projectHeadingIds.contains(target.id) else { return false }
+      let group = target.heading
+      let groupRows = visibleItems.filter { $0.heading == group }
+      let targetIdx = groupRows.firstIndex(where: { $0.id == target.id })
+      return createInlineDraftAtDrop(
+        headingId: group,
+        insertInto: targetIdx != nil ? groupRows : nil,
+        at: targetIdx.map { before ? $0 : $0 + 1 }
+      )
+    }
     let dragged = Set(ids)
     guard !ids.isEmpty, !dragged.contains(target.id) else { return false }
     // A heading dragged onto a task isn't meaningful — headings drop on headings.
@@ -2135,6 +2736,7 @@ struct TaskListView: View {
     applyManualOrder(ids: ids, into: groupRows,
                      at: before ? targetIdx : targetIdx + 1)
     Haptics.tick()
+    if touchSelectionActive { clearSelection() }
     Task { await load() }
     return true
   }
@@ -2142,6 +2744,14 @@ struct TaskListView: View {
   /// A drop landed on a heading row. Headings dragged here reorder among the
   /// project's headings; tasks dragged here file under the heading (at its top).
   private func handleHeadingDrop(ids: [String], targetHeading: SeptenaTask, before: Bool) -> Bool {
+    if TaskDragIDs.isNewTaskPayload(ids) {
+      let members = visibleItems.filter { $0.heading == targetHeading.id }
+      return createInlineDraftAtDrop(
+        headingId: targetHeading.id,
+        insertInto: members,
+        at: 0
+      )
+    }
     let dragged = Set(ids)
     guard !ids.isEmpty, !dragged.contains(targetHeading.id) else { return false }
     let headingIds = projectHeadingIds
@@ -2163,6 +2773,7 @@ struct TaskListView: View {
       TaskUndo.recordMove(before: undoBefore, context: modelContext, mutator: mutator)
     }
     Haptics.tick()
+    if touchSelectionActive { clearSelection() }
     Task { await load() }
     return true
   }
@@ -2200,6 +2811,55 @@ struct TaskListView: View {
   }
 
   /// Things-style footer on project / area pages: a quiet link that expands
+  /// Faded tasks for this project or area, shown when Settings ▸ Lists ▸ Show
+  /// faded tasks is on. Starts open; tapping the footer folds/unfolds per list.
+  @ViewBuilder
+  private func scopeFadedSection() -> some View {
+    if scopeLoggedFilterId != nil, !fadedScopeItems.isEmpty {
+      scopeFadedToggleRow
+      if isScopeFadedExpanded {
+        cardedRows(fadedScopeItems)
+      }
+    }
+  }
+
+  private var scopeFadedToggleLabel: String {
+    let count = fadedScopeItems.count
+    if isScopeFadedExpanded {
+      return count == 1
+        ? String(localized: "Hide 1 faded item",
+                 comment: "Project/area footer — collapse faded tasks (singular)")
+        : String(localized: "Hide \(count) faded items",
+                 comment: "Project/area footer — collapse faded tasks (plural)")
+    }
+    return count == 1
+      ? String(localized: "Show 1 faded item",
+               comment: "Project/area footer — expand faded tasks (singular)")
+      : String(localized: "Show \(count) faded items",
+               comment: "Project/area footer — expand faded tasks (plural)")
+  }
+
+  private var scopeFadedToggleRow: some View {
+    Button {
+      if closeActiveEditIfNeeded() { return }
+      toggleScopeFadedExpanded()
+    } label: {
+      Text(scopeFadedToggleLabel)
+        .font(.septenaMeta)
+        .monospacedDigit()
+        .foregroundStyle(Theme.inkSecondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, TaskCardMetrics.headerLeading)
+        .padding(.trailing, TaskCardMetrics.margin)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(PlainHoverRowButtonStyle())
+    .padding(.top, loggedFooterGap)
+    .asListRow()
+    .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
+  }
+
   /// completed tasks for this list. Reuses `row(_:)` so checkboxes and context
   /// menus match the open list.
   @ViewBuilder
@@ -2246,6 +2906,7 @@ struct TaskListView: View {
     // the button, so the gap isn't a tap target.
     .padding(.top, loggedFooterGap)
     .asListRow()
+    .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
   }
 
   /// Active project ids belonging to `areaId` — filing scope on area pages.
@@ -2279,11 +2940,9 @@ struct TaskListView: View {
 
   private func currentTask(id: String?) -> SeptenaTask? {
     guard let id else { return nil }
-    // Include `triageItems` — the Inbox rows on Today are real, selectable rows
-    // but live outside `items`. Omitting them meant a selected Inbox task
-    // couldn't be resolved, so keyboard commands fell back to the first row of
-    // the first project/area (the "Space/⌘T acts on the wrong task" bug).
-    return (triageItems + items).first(where: { $0.id == id })
+    // Include `triageItems` and `fadedScopeItems` — Inbox rows on Today and
+    // faded rows in projects/areas are real, selectable rows outside `items`.
+    return (triageItems + items + fadedScopeItems).first(where: { $0.id == id })
   }
 
   // MARK: - Keyboard navigation
@@ -2294,7 +2953,10 @@ struct TaskListView: View {
   /// sentinel id joins `keyboardOrderedTaskIds` at the trigger's render position
   /// so ↑/↓ can land on it and Return activates it (see `activateRow`).
   private var showsQuickAddTriggerRow: Bool {
-    allowsInlineCreate && quickAddDraftId == nil
+    if usesMagicPlusInsteadOfInboxTrigger && (filter == .today || filter == .triage) {
+      return false
+    }
+    return allowsInlineCreate && quickAddDraftId == nil
   }
 
   /// The sentinel id for the quick-add trigger, or empty when it isn't shown.
@@ -2353,14 +3015,17 @@ struct TaskListView: View {
       }
       // The Get started steps sit above everything, under their notice.
       return todayNoticeSteps.map(\.selectionID) + todayInboxKeyboardIDs + classifiedIds
-    case .unscheduled:
+    case .unscheduled, .starred:
       return orderedFromGroupedOpen(pool: items) + quickAddOrderedIds
     case .upcoming:
       // Upcoming has no inline trigger (`allowsInlineCreate` false) → sentinel empty.
       return upcomingBuckets().flatMap { $0.tasks.map(\.id) }
     case .project, .area:
-      // Foot-of-card quick-add sits after the open rows, before the logged scope.
+      // Foot-of-card quick-add sits after the open rows, before the faded & logged scopes.
       var ids = visibleItems.map(\.id) + quickAddOrderedIds
+      if isScopeFadedExpanded {
+        ids.append(contentsOf: fadedScopeItems.map(\.id))
+      }
       if isScopeLoggedExpanded {
         ids.append(contentsOf: loggedScopeItems.map(\.id))
       }
@@ -2474,7 +3139,7 @@ struct TaskListView: View {
       for step in steps {
         if reopen { TaskNotices.reopenStep(step.id) } else { TaskNotices.completeStep(step.id) }
       }
-      motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1 }
+      motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1; refreshTodayNotices() }
     }
     let ids = orderedActionIDs()
     guard !ids.isEmpty else { return }
@@ -2482,6 +3147,7 @@ struct TaskListView: View {
       guard let t = currentTask(id: id) else { continue }
       toggle(t)
     }
+    if touchSelectionActive { clearSelection() }
   }
 
   /// Resolve the row a single-target keyboard shortcut should act on: a
@@ -2513,6 +3179,7 @@ struct TaskListView: View {
       for id in ids { mutator.acknowledge(id: id) }
       Task { await load() }
     }
+    if touchSelectionActive { clearSelection() }
   }
 
   /// Context menu / ⌘T "Remove from Today" — clears every arrived Today signal
@@ -2593,6 +3260,7 @@ struct TaskListView: View {
     let ids = orderedActionIDs()
     guard !ids.isEmpty else { return }
     for id in ids { applyCancel(id) }
+    if touchSelectionActive { clearSelection() }
   }
 
   /// ⌘. — clear schedule + today, sending the row back to Anytime.
@@ -2619,6 +3287,15 @@ struct TaskListView: View {
     recordingSchedule(String(localized: "Change Repeat", comment: "Undo action name"),
                       [id]) {
       mutator.setRecurrence(id: id, recurrence: rule)
+    }
+    Task { await load() }
+  }
+
+  private func applyReminder(id: String, reminder: TaskReminder?) {
+    Haptics.tick()
+    recordingSchedule(String(localized: "Change Reminder", comment: "Undo action name"),
+                      [id]) {
+      mutator.setReminder(id: id, reminder: reminder)
     }
     Task { await load() }
   }
@@ -2727,11 +3404,19 @@ struct TaskListView: View {
     guard !ids.isEmpty else { return }
     Haptics.tick()
     let before = filingSnapshots(ids)
-    let moved = ids.filter { applyMoveCore(id: $0, areaId: areaId, projectId: projectId) }
+    // Apply in reverse so `TaskOrder.topPosition` lands `ids[0]` at the very
+    // top followed by `ids[1]`, `ids[2]`, ... preserving visible selection order.
+    var movedSet: Set<String> = []
+    for id in ids.reversed() {
+      if applyMoveCore(id: id, areaId: areaId, projectId: projectId) {
+        movedSet.insert(id)
+      }
+    }
+    let moved = ids.filter { movedSet.contains($0) }
     guard !moved.isEmpty else { return }
-    let movedSet = Set(moved)
     let undoBefore = before.filter { movedSet.contains($0.id) }
     TaskUndo.recordMove(before: undoBefore, context: modelContext, mutator: mutator)
+    if touchSelectionActive { clearSelection() }
     let ticket = TaskUndoTicket()
     Task { await load() }
     let destName = destinationName(areaId: areaId, projectId: projectId)
@@ -2772,6 +3457,19 @@ struct TaskListView: View {
 
   private func handleTodayMoveDrop(ids: [String], target: TodayDropTarget) -> Bool {
     guard filter == .today else { return false }
+    if TaskDragIDs.isNewTaskPayload(ids) {
+      if target == .inbox && inboxCollapsed {
+        a11yAnimate(.easeInOut(duration: 0.2)) { inboxCollapsed = false }
+      }
+      let destination = todayDropDestination(target)
+      let groupRows = excludingQuickAddCapture(visibleItems).filter { isTask($0, alreadyIn: target) }
+      return createInlineDraftAtDrop(
+        areaId: destination.areaId,
+        projectId: destination.projectId,
+        insertInto: groupRows.isEmpty ? nil : groupRows,
+        at: groupRows.isEmpty ? nil : 0
+      )
+    }
     let moving = ids.filter { id in
       guard let task = currentTask(id: id), !task.isHeading else { return false }
       return !isTask(task, alreadyIn: target)
@@ -2788,10 +3486,28 @@ struct TaskListView: View {
     })
   }
 
+  private func handleUpcomingDateDrop(ids: [String], dateKey: String) -> Bool {
+    guard filter == .upcoming, let date = SeptenaDate.parse(dateKey) else { return false }
+    if TaskDragIDs.isNewTaskPayload(ids) {
+      return createInlineDraftAtDrop(scheduledDate: date)
+    }
+    applyWhenToSelection(ids, kind: .scheduled, date: date)
+    return true
+  }
+
+  private func handleGroupedListMoveDrop(ids: [String], areaId: String?, projectId: String?) -> Bool {
+    if TaskDragIDs.isNewTaskPayload(ids) {
+      return createInlineDraftAtDrop(areaId: areaId, projectId: projectId)
+    }
+    applyMove(ids, areaId: areaId, projectId: projectId)
+    return true
+  }
+
   private func applyWhenToSelection(_ ids: [String], kind: WhenKind, date: Date?) {
     guard !ids.isEmpty else { return }
     guard kind == .scheduled, let date else {
       for id in ids { applyWhen(id: id, kind: kind, date: date) }
+      if touchSelectionActive { clearSelection() }
       return
     }
 
@@ -2802,9 +3518,11 @@ struct TaskListView: View {
     }
     if !movedFixedIDs.isEmpty {
       reschedulePrompt = FixedReschedulePrompt(taskIDs: ids, date: date)
+      if touchSelectionActive { clearSelection() }
       return
     }
     for id in ids { applyWhen(id: id, kind: kind, date: date) }
+    if touchSelectionActive { clearSelection() }
   }
 
   // MARK: - Row
@@ -2832,11 +3550,7 @@ struct TaskListView: View {
   /// scroll), on a neutral highlighted card. Folding it (Return, opening another
   /// row, leaving the list) autosaves via the card's `.onDisappear`.
   private func expandedEditorRow(_ task: SeptenaTask) -> some View {
-    // The capture slot this draft was opened in, read now (at render), because
-    // saving it clears `quickAddGroupTarget` before the chain can reuse it.
-    let captureTarget = quickAddGroupTarget
-    let isDraft = draftEditIds.contains(task.id)
-    return TaskComposerCard(
+    TaskComposerCard(
       mode: .edit(task),
       areas: areas,
       projects: projects,
@@ -2874,10 +3588,7 @@ struct TaskListView: View {
         guard draftEditIds.contains(task.id) else { return }
         draftEditIds.remove(task.id)
         purgeDraftIfEmpty(id: task.id)
-      },
-      // Return on a titled NEW task: it is already saved; open the next new
-      // task in the same slot (Things-style capture chain).
-      onSubmitNew: isDraft ? { continueCreating(in: captureTarget) } : nil
+      }
     )
     .frame(maxWidth: .infinity, alignment: .leading)
     // No own card or screen margin: the surrounding `TaskCardChrome` slice paints
@@ -2898,37 +3609,33 @@ struct TaskListView: View {
 
   @ViewBuilder
   private func row(_ task: SeptenaTask, quickMenu: Bool = false) -> some View {
-    // No swipe actions and no inline "⋯" button on task rows (removed by
-    // request — completion is the checkbox; everything else is the deep-press /
-    // right-click `.contextMenu`). `quickMenu` still gates the one-tap "file
-    // here" suggestion capsule, now threaded into the row as the inboard-most
-    // trailing accessory (left of the date) rather than appended at the edge.
+    // No inline "⋯" button on task rows (completion is the checkbox; iOS adds
+    // horizontal swipe actions via `.taskRowSwipeActions` in `cardedRows`; deep-
+    // press / right-click `.contextMenu` carries the full menu). `quickMenu`
+    // still gates the one-tap "file here" suggestion capsule, now threaded into
+    // the row as the inboard-most trailing accessory (left of the date).
     staticRow(task, accessory: filter == .faded
               ? keepFadedCapsule(for: task)
               : (quickMenu ? suggestionCapsule(for: task) : nil))
+    .taskRowSwipeToSelect(
+      enabled: allowsTouchMultiSelect,
+      isSelected: selection.contains(task.id)
+    ) {
+      toggleTouchSelection(task.id)
+    }
     // Drag a row (or the whole selection) to a sidebar area/project to re-home
-    // it, or between rows of a manually-ordered list to reorder. `.draggable`
-    // pairs with the sidebar's `.dropDestination(for:)` and `TaskReorderDrop`;
-    // the explicit preview is a compact title pill. On iOS the lift starts
-    // from the system long-press drag (UIKit arbitrates it against the tap
-    // and context-menu gestures).
+    // it, onto an Area's project card, or between rows of a manually-ordered
+    // list to reorder. `.draggable` pairs with `SidebarTaskDrop`, `TaskMoveDrop`,
+    // and `TaskReorderDrop`. On iOS the lift starts from the system long-press
+    // drag (UIKit arbitrates it against tap, horizontal swipe-to-select, and
+    // context-menu gestures).
     .draggable(dragPayload(for: task)) {
       let payload = dragPayload(for: task)
-      if payload.ids.count > 1 {
-        Text("\(payload.ids.count) tasks")
-          .scaledFont(size: 13, weight: .medium)
-          .lineLimit(1)
-          .padding(.horizontal, 10)
-          .padding(.vertical, 6)
-          .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-      } else {
-        Text(task.title)
-          .scaledFont(size: 13)
-          .lineLimit(1)
-          .padding(.horizontal, 10)
-          .padding(.vertical, 6)
-          .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-      }
+      TaskDragStackPreview(
+        title: task.title,
+        count: payload.ids.count,
+        accent: theme.color(for: "tasks")
+      )
     }
   }
 
@@ -3035,13 +3742,24 @@ struct TaskListView: View {
       suppressProject: suppressProject,
       suppressArea: suppressArea,
       showsTodayIndicator: filter != .today,
+      showsFadedIndicator: filter != .faded,
       isListSelected: selection.contains(task.id),
+      checkboxDimmed: touchSelectionActive,
       accessory: accessory,
+      checklistSummary: checklistCounts[task.id],
+      tagChips: LocalCache.resolvedTags(for: task, tagsByID: tagsByID),
       titleMatchID: "edit-title-\(task.id)",
       checkboxMatchID: "edit-checkbox-\(task.id)",
       heroMatchNS: nil, // hero-glide removed — see note by former `editTitleNS`
       heroMatchIsSource: expandedEditId != task.id,
-      onToggle: { toggle(task) },
+      onToggle: {
+        if touchSelectionActive {
+          Haptics.tap()
+          toggleTouchSelection(task.id)
+        } else {
+          toggle(task)
+        }
+      },
       onTap: nil
     )
     // Fade on insert/removal. The fade only plays inside an animated
@@ -3065,10 +3783,14 @@ struct TaskListView: View {
   @ViewBuilder
   private var quickAddFootCard: some View {
     if allowsInlineCreate {
+      let isEditingHere = quickAddCaptureTask.map { expandedEditId == $0.id } == true
       quickAddLine()
         .asListRow()
         .taskCardChrome(.solo,
-                        isSelected: selection.contains(Self.quickAddScrollID))
+                        isSelected: isEditingHere ? false : selection.contains(Self.quickAddScrollID),
+                        isEditing: isEditingHere)
+        .zIndex(isEditingHere ? 1 : 0)
+        .inlineEditDimmed(isInlineEditing && !isEditingHere, onDismiss: collapseEdit)
     }
   }
 
@@ -3076,13 +3798,19 @@ struct TaskListView: View {
   @ViewBuilder
   private var quickAddTopRow: some View {
     if allowsInlineCreate {
-      if usesSingleOpenTaskCard {
+      let isEditingHere = quickAddCaptureTask.map { expandedEditId == $0.id } == true
+      if usesSingleOpenTaskCard || isEditingHere {
         quickAddLine()
           .asListRow()
           .taskCardChrome(.solo,
-                          isSelected: selection.contains(Self.quickAddScrollID))
+                          isSelected: isEditingHere ? false : selection.contains(Self.quickAddScrollID),
+                          isEditing: isEditingHere)
+          .zIndex(isEditingHere ? 1 : 0)
+          .inlineEditDimmed(isInlineEditing && !isEditingHere, onDismiss: collapseEdit)
       } else {
-        quickAddLine().asListRow()
+        quickAddLine()
+          .asListRow()
+          .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
       }
     }
   }
@@ -3129,47 +3857,48 @@ struct TaskListView: View {
   @ViewBuilder
   private func rowActionsMenu(target: ActionTarget) -> some View {
     if filter == .recentlyDeleted {
-      // Recently Deleted: only Restore and Delete Permanently — no scheduling,
-      // no move, no normal task lifecycle actions apply to trashed rows.
-      Button {
-        for id in target.ids {
-          mutator.restore(id: id)
-          removeLocally(id: id)
-        }
-        Task { await load() }
-      } label: {
-        Label("Restore", systemImage: "arrow.uturn.backward")
-      }
-      Divider()
-      Button(role: .destructive) {
-        Haptics.warning()
-        for id in target.ids {
-          removeLocally(id: id)
-          mutator.purge(id: id)
-        }
-      } label: {
-        Label("Delete Permanently", systemImage: "trash")
-      }
-    } else if filter == .faded {
-      // Faded pile (`docs/TASK_FADE_SPEC.md` §4): Keep restores to the task's
-      // original list with undo; Let Go cancels with dropReason = "faded".
-      Button {
-        keepFadedTasks(target.ids)
-      } label: {
-        Label("Keep", systemImage: "arrow.uturn.backward")
-      }
-      Button {
-        dropFadedTasks(target.ids)
-      } label: {
-        Label("Let Go", systemImage: "wind")
-      }
-      Divider()
-      Button(role: .destructive) {
-        Haptics.warning()
-        for id in target.ids { applyDelete(id) }
-      } label: {
-        Label("Delete", systemImage: "trash")
-      }
+      // Recently Deleted (registry `task.recentlyDeleted`): only Restore and
+      // Delete Permanently — no scheduling, no move, no normal task lifecycle
+      // actions apply to trashed rows.
+      RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
+        RegistryActions.menu("task.recentlyDeleted")) { id in
+          switch id {
+          case "task.restore":
+            return .init {
+              for id in target.ids {
+                mutator.restore(id: id)
+                removeLocally(id: id)
+              }
+              Task { await load() }
+            }
+          case "task.deletePermanently":
+            return .init {
+              Haptics.warning()
+              for id in target.ids {
+                removeLocally(id: id)
+                mutator.purge(id: id)
+              }
+            }
+          default: return nil
+          }
+        })
+    } else if filter == .faded || (!target.tasks.isEmpty && target.tasks.allSatisfy(\.isFaded)) {
+      // Faded pile (registry `task.faded`, `docs/TASK_FADE_SPEC.md` §4): Keep
+      // restores to the task's original list with undo; Let Go cancels with
+      // dropReason = "faded".
+      RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
+        RegistryActions.menu("task.faded")) { id in
+          switch id {
+          case "task.keepFaded": return .init { keepFadedTasks(target.ids) }
+          case "task.letGoFaded": return .init { dropFadedTasks(target.ids) }
+          case "task.delete":
+            return .init(variant: target.count > 1 ? .plural : .base) {
+              Haptics.warning()
+              for id in target.ids { applyDelete(id) }
+            }
+          default: return nil
+          }
+        })
     } else {
       TaskListRowContextMenu(
         target: target,
@@ -3188,11 +3917,32 @@ struct TaskListView: View {
             applyRemoveFromToday(ids)
           }
         },
+        onToggleStar: { ids, starred in
+          Haptics.tick()
+          recordingSchedule(starred
+                            ? String(localized: "Star", comment: "Undo action name")
+                            : String(localized: "Remove Star", comment: "Undo action name"),
+                            ids) {
+            for id in ids { mutator.setStarred(id: id, starred: starred) }
+          }
+          Task { await load() }
+        },
+        onToggleComplete: { ids in
+          for id in ids {
+            if let task = currentTask(id: id) { toggle(task) }
+          }
+        },
         onOpenWhen: { target in
           whenSheet = WhenSheet(taskIds: target.ids, kind: .scheduled)
         },
         onOpenDeadline: { target in
           whenSheet = WhenSheet(taskIds: target.ids, kind: .deadline)
+        },
+        onOpenReminder: { task in
+          reminderTargetId = task.id
+        },
+        onOpenTags: { target in
+          tagsTargetIds = target.ids
         },
         onClearSchedule: { ids in
           for id in ids { applyWhen(id: id, kind: .scheduled, date: nil) }
@@ -3207,6 +3957,8 @@ struct TaskListView: View {
         },
         moveAreas: areas,
         moveTopProjects: projects.filter { $0.area == nil && $0.status == .active },
+        sections: sectionMoveTargets,
+        onMoveToSection: { heading in fileIntoHeading(target.ids, heading: heading) },
         onOpenRepeat: { task in
           repeatTargetId = task.id
           showingRepeatSheet = true
@@ -3234,33 +3986,130 @@ struct TaskListView: View {
 
   @ViewBuilder
   private func taskContextMenu(for task: SeptenaTask) -> some View {
-    Group {
-      rowActionsMenu(target: actionTarget(for: task))
-      sectionMoveMenu(for: task)
+    rowActionsMenu(target: actionTarget(for: task))
+  }
+
+  /// Leading iOS swipe actions (and VoiceOver accessibility actions) for a task
+  /// row, sharing the exact same mutator/undo/haptic paths as `rowActionsMenu`
+  /// (`docs/IOS_SWIPE_ACTIONS_SPEC.md` §2).
+  private func swipeLeadingActions(for task: SeptenaTask) -> [TaskRowSwipeAction] {
+    if filter == .recentlyDeleted {
+      return [
+        .registry("task.restore", tint: TaskRowSwipeAction.tint(for: "task.restore")) {
+          Haptics.tick()
+          mutator.restore(id: task.id)
+          removeLocally(id: task.id)
+          Task { await load() }
+        }
+      ]
+    }
+    if filter == .faded || task.isFaded {
+      return [
+        .registry("task.keepFaded", tint: TaskRowSwipeAction.tint(for: "task.keepFaded")) {
+          keepFadedTasks([task.id])
+        }
+      ]
+    }
+    let isProposal = task.source == TaskSource.mcp && task.acknowledgedAt == nil
+    // The registry's `swipeActions` slots; an agent proposal swaps the Today
+    // slot for Accept.
+    return TaskRowSwipeAction.leading { id in
+      switch id {
+      case "task.toggleToday":
+        if isProposal {
+          return TaskRowSwipeAction(
+            id: "accept",
+            title: String(localized: "Accept", comment: "Swipe action accept agent proposal"),
+            systemImage: "checkmark",
+            tint: .green
+          ) {
+            Haptics.tick()
+            promoteToToday([task.id])
+            mutator.acknowledge(id: task.id)
+            Task { await load() }
+          }
+        }
+        if task.isOnToday {
+          return .registry(id, variant: .remove,
+                           systemImage: RegistryIcons.sfSymbol(for: "action.today_remove"),
+                           tint: .gray) {
+            applyRemoveFromToday([task.id])
+          }
+        }
+        return .registry(id, tint: TaskRowSwipeAction.tint(for: id)) {
+          Haptics.tick()
+          promoteToToday([task.id])
+          mutator.acknowledge(id: task.id)
+          Task { await load() }
+        }
+      case "task.when":
+        return .registry(id, tint: TaskRowSwipeAction.tint(for: id)) {
+          whenSheet = WhenSheet(taskIds: [task.id], kind: .scheduled)
+        }
+      default:
+        return nil
+      }
     }
   }
 
-  /// "Move to Section ▸" — the reliable, standard-macOS way to file a task into
-  /// a project heading (drag-to-section also works, but pointer drag in a custom
-  /// scroll list is finicky on macOS). Shown only on a project page that has
-  /// headings; acts on the whole selection. Lands the task(s) at the foot of the
-  /// chosen section so the result is predictable.
-  @ViewBuilder
-  private func sectionMoveMenu(for task: SeptenaTask) -> some View {
-    let headings = projectHeadingList
-    if case .project = filter, !headings.isEmpty {
-      let ids = actionTarget(for: task).ids
-      Divider()
-      Menu {
-        Button("No Section") { fileIntoHeading(ids, heading: nil) }
-        Divider()
-        ForEach(headings) { h in
-          Button(h.title) { fileIntoHeading(ids, heading: h.id) }
+  /// Trailing iOS swipe actions (and VoiceOver accessibility actions) for a
+  /// task row. Full swipe is intentionally disabled on destructive actions
+  /// (`docs/IOS_SWIPE_ACTIONS_SPEC.md` §2).
+  private func swipeTrailingActions(for task: SeptenaTask) -> [TaskRowSwipeAction] {
+    if filter == .recentlyDeleted {
+      return [
+        .registry("task.deletePermanently", tint: TaskRowSwipeAction.tint(for: "task.deletePermanently")) {
+          permanentDeleteConfirmTask = task
         }
-      } label: {
-        Label("Move to Section", systemImage: "text.append")
+      ]
+    }
+    if filter == .faded || task.isFaded {
+      return [
+        .registry("task.delete", tint: TaskRowSwipeAction.tint(for: "task.delete")) {
+          Haptics.warning()
+          applyDelete(task.id)
+        },
+        .registry("task.letGoFaded", tint: TaskRowSwipeAction.tint(for: "task.letGoFaded")) {
+          dropFadedTasks([task.id])
+        }
+      ]
+    }
+    let isProposal = task.source == TaskSource.mcp && task.acknowledgedAt == nil
+    return TaskRowSwipeAction.trailing { id in
+      switch id {
+      case "task.delete":
+        let delete = {
+          Haptics.warning()
+          applyDelete(task.id)
+        }
+        if isProposal {
+          return TaskRowSwipeAction(
+            id: id,
+            title: String(localized: "Dismiss", comment: "Swipe action dismiss agent proposal"),
+            systemImage: RegistryActions.sfSymbols[id] ?? "trash",
+            tint: .red,
+            role: .destructive,
+            perform: delete)
+        }
+        return .registry(id, tint: TaskRowSwipeAction.tint(for: id), perform: delete)
+      case "task.move":
+        return .registry(id, tint: TaskRowSwipeAction.tint(for: id)) {
+          moveTargetIds = [task.id]
+          showingMoveSheet = true
+        }
+      default:
+        return nil
       }
     }
+  }
+
+  /// The headings Move to Section ▸ offers — the reliable, standard-macOS way
+  /// to file a task into a project heading (drag-to-section also works, but
+  /// pointer drag in a custom scroll list is finicky on macOS). Project pages
+  /// only; the registry drops the empty submenu elsewhere.
+  private var sectionMoveTargets: [SeptenaTask] {
+    if case .project = filter { return projectHeadingList }
+    return []
   }
 
   /// File `ids` under `heading` (nil = the un-headed block) at the foot of that
@@ -3329,12 +4178,55 @@ struct TaskListView: View {
     selection = [id]
   }
 
+  /// Swipe-to-select (or checkbox/row tap while touch-selecting): toggles `id`
+  /// in `selection`, entering touch multi-select mode if not already active and
+  /// auto-exiting when the last selected row is deselected.
+  private func toggleTouchSelection(_ id: String) {
+    #if os(iOS)
+    _ = closeActiveEditIfNeeded()
+    if selection.contains(id) {
+      selection.remove(id)
+      if selection.isEmpty {
+        isTouchSelecting = false
+      }
+    } else {
+      isTouchSelecting = true
+      selection.insert(id)
+    }
+    syncMultiSelectChrome()
+    #endif
+  }
+
+  private func selectAllOrClearVisibleTasks() {
+    let all = selectableVisibleTaskIDs
+    guard !all.isEmpty else { return }
+    if all.allSatisfy({ selection.contains($0) }) {
+      clearSelection()
+    } else {
+      #if os(iOS)
+      isTouchSelecting = true
+      #endif
+      selection = Set(all)
+      syncMultiSelectChrome()
+    }
+  }
+
+  private func syncMultiSelectChrome() {
+    #if os(iOS)
+    if isOnScreen {
+      nav.isTaskMultiSelectActive = isTouchSelecting && !selection.isEmpty
+    }
+    #endif
+  }
+
   /// Deselect everything — the single "clear selection" entry point used by
   /// every deselect path.
   private func clearSelection() {
     selection.removeAll()
     #if os(iOS)
+    isTouchSelecting = false
     editMode?.wrappedValue = .inactive
+    nav.isTaskMultiSelectActive = false
     #endif
   }
 
@@ -3454,13 +4346,17 @@ struct TaskListView: View {
     // Areas in sidebar order: direct-area tasks, then each project's tasks.
     ForEach(areas) { area in
       let areaDropTarget: TodayDropTarget? = filter == .today ? .area(area.id) : nil
+      let areaCustomDrop: (([String]) -> Bool)? = filter == .today
+        ? nil : { ids in handleGroupedListMoveDrop(ids: ids, areaId: area.id, projectId: nil) }
       let areaTasks = byArea[area.id] ?? []
       if !areaTasks.isEmpty {
         Section {
           cardedRows(areaTasks,
                      appendQuickAdd: showsQuickAddInArea(area.id),
                      quickAddShowsEditor: true,
-                     moveDropTarget: areaDropTarget)
+                     moveDropTarget: areaDropTarget,
+                     onDropIDs: areaCustomDrop,
+                     magicContext: area.title)
         } header: {
           groupHeader(icon: "square.stack.3d.up.fill",
                       title: area.title,
@@ -3471,17 +4367,23 @@ struct TaskListView: View {
                       },
                       onAdd: showsGroupedHeaderQuickAdd
                         ? { startCreate(areaId: area.id) } : nil,
-                      moveDropTarget: areaDropTarget)
+                      moveDropTarget: areaDropTarget,
+                      onDropIDs: areaCustomDrop,
+                      magicDropId: "mp-area-\(area.id)")
         }
       }
       ForEach(projects.filter { $0.area == area.id }) { project in
         let projectDropTarget: TodayDropTarget? = filter == .today ? .project(project.id) : nil
+        let projectCustomDrop: (([String]) -> Bool)? = filter == .today
+          ? nil : { ids in handleGroupedListMoveDrop(ids: ids, areaId: nil, projectId: project.id) }
         if let tasks = byProject[project.id], !tasks.isEmpty {
           Section {
             cardedRows(tasks,
                        appendQuickAdd: showsQuickAddInProject(project.id),
                        quickAddShowsEditor: true,
-                       moveDropTarget: projectDropTarget)
+                       moveDropTarget: projectDropTarget,
+                       onDropIDs: projectCustomDrop,
+                       magicContext: project.title)
           } header: {
             groupHeader(icon: nil,
                         title: project.title,
@@ -3492,7 +4394,9 @@ struct TaskListView: View {
                         },
                         onAdd: showsGroupedHeaderQuickAdd
                           ? { startCreate(projectId: project.id) } : nil,
-                        moveDropTarget: projectDropTarget)
+                        moveDropTarget: projectDropTarget,
+                        onDropIDs: projectCustomDrop,
+                        magicDropId: "mp-proj-\(project.id)")
           }
         }
       }
@@ -3501,12 +4405,16 @@ struct TaskListView: View {
     // Top-level projects (no area).
     ForEach(projects.filter { $0.area == nil }) { project in
       let projectDropTarget: TodayDropTarget? = filter == .today ? .project(project.id) : nil
+      let projectCustomDrop: (([String]) -> Bool)? = filter == .today
+        ? nil : { ids in handleGroupedListMoveDrop(ids: ids, areaId: nil, projectId: project.id) }
       if let tasks = byProject[project.id], !tasks.isEmpty {
         Section {
           cardedRows(tasks,
                      appendQuickAdd: showsQuickAddInProject(project.id),
                      quickAddShowsEditor: true,
-                     moveDropTarget: projectDropTarget)
+                     moveDropTarget: projectDropTarget,
+                     onDropIDs: projectCustomDrop,
+                     magicContext: project.title)
         } header: {
           groupHeader(icon: nil,
                       title: project.title,
@@ -3517,7 +4425,9 @@ struct TaskListView: View {
                       },
                       onAdd: showsGroupedHeaderQuickAdd
                         ? { startCreate(projectId: project.id) } : nil,
-                      moveDropTarget: projectDropTarget)
+                      moveDropTarget: projectDropTarget,
+                      onDropIDs: projectCustomDrop,
+                      magicDropId: "mp-proj-\(project.id)")
         }
       }
     }
@@ -3536,25 +4446,38 @@ struct TaskListView: View {
                           quickAddShowsEditor: Bool = true,
                           reorderable: Bool = false,
                           grouped: Bool = false,
-                          moveDropTarget: TodayDropTarget? = nil) -> some View {
+                          moveDropTarget: TodayDropTarget? = nil,
+                          onDropIDs: (([String]) -> Bool)? = nil,
+                          magicContext: String? = nil) -> some View {
     let rows = excludingQuickAddCapture(tasks)
     let cardCount = rows.count + (appendQuickAdd ? 1 : 0)
     // Today rows reorder in Today's own order (#66). The row's reorder drop
     // also files a row dragged in from another group, so the row-level
     // group drop steps aside (the group headers keep theirs).
     let todayReorder = filter == .today
+    let rowMoveDrop = onDropIDs.map { TaskMoveDrop(perform: $0) }
+      ?? todayMoveDrop(todayReorder ? nil : moveDropTarget)
+    let canMagicRowDrop = reorderable || todayReorder
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
       let position = TaskCardPosition(index: idx, count: cardCount)
+      let isExpanded = expandedEditId == task.id
       taskRow(task, quickMenu: quickMenu?(task) ?? false)
-        .modifier(todayMoveDrop(todayReorder ? nil : moveDropTarget))
+        .modifier(rowMoveDrop)
         .taskCardChrome(position,
-                        // The "active" row — the selected row OR the one open in
-                        // the inline editor — carries the neutral selection fill,
-                        // so opening a task to edit it keeps (rather than strips)
-                        // the "this is the row you're on" anchor. Subtle by design:
-                        // it's the same unemphasized gray as a plain selection,
-                        // Things/Reminders-style, never the section accent.
-                        isSelected: selection.contains(task.id) || expandedEditId == task.id)
+                        // An open inline editor keeps the clean card surface
+                        // instead of painting the whole editor in selection blue;
+                        // on iOS it lifts as a rounded focus card while siblings
+                        // fade back. Closed selected rows keep the selection fill.
+                        isSelected: isExpanded ? false : selection.contains(task.id),
+                        isEditing: isExpanded)
+        .taskRowSwipeActions(
+          id: task.id,
+          enabled: !isExpanded && !isInlineEditing && !selectionScope.isMulti && !isSwipeEditModeActive,
+          leading: swipeLeadingActions(for: task),
+          allowsLeadingFullSwipe: true,
+          trailing: swipeTrailingActions(for: task),
+          allowsTrailingFullSwipe: false
+        )
         // After the chrome, so the iOS lift preview includes the card
         // background, clipped to this row's slice of the card.
         .taskCardContextMenu(position) { taskContextMenu(for: task) }
@@ -3562,15 +4485,31 @@ struct TaskListView: View {
         // the full card slice the user sees, not just the inner row content.
         // In a project's grouped list a drop also re-files across headings
         // (`handleGroupedTaskDrop` reads the target row's group).
-        .modifier(TaskReorderDrop(perform: reorderable || todayReorder
+        .modifier(TaskReorderDrop(perform: canMagicRowDrop
           ? { ids, before in
               grouped
                 ? handleGroupedTaskDrop(ids: ids, target: task, before: before)
                 : handleReorderDrop(ids: ids, target: task, before: before,
                                     refileTo: todayReorder ? moveDropTarget : nil) }
           : nil))
+        .magicPlusRowDrop(id: "mp-row-\(task.id)", context: magicContext, enabled: canMagicRowDrop) { before in
+          let ids = TaskDragIDs.newTask.ids
+          _ = grouped
+            ? handleGroupedTaskDrop(ids: ids, target: task, before: before)
+            : handleReorderDrop(ids: ids, target: task, before: before,
+                                refileTo: todayReorder ? moveDropTarget : nil)
+        }
+        .modifier(MagicPlusOptionalSectionDrop(
+          id: "mp-row-sec-\(task.id)",
+          label: magicContext.map { "New Task · \($0)" } ?? "New Task",
+          onDropIDs: canMagicRowDrop ? nil : onDropIDs
+        ))
+        .zIndex(isExpanded ? 1 : 0)
+        .inlineEditDimmed(isInlineEditing && !isExpanded, onDismiss: collapseEdit)
     }
     if appendQuickAdd {
+      let isEditingQuickAdd = quickAddShowsEditor
+        && quickAddCaptureTask.map { expandedEditId == $0.id } == true
       quickAddLine(showsEditor: quickAddShowsEditor)
         .asListRow()
         // The quick-add trigger is a selectable row (it carries the sentinel id
@@ -3580,7 +4519,10 @@ struct TaskListView: View {
         // invisible for one row, which reads as "the New task line can't be
         // selected by keyboard" even though Return would have opened it.
         .taskCardChrome(TaskCardPosition(index: rows.count, count: cardCount),
-                        isSelected: selection.contains(Self.quickAddScrollID))
+                        isSelected: isEditingQuickAdd ? false : selection.contains(Self.quickAddScrollID),
+                        isEditing: isEditingQuickAdd)
+        .zIndex(isEditingQuickAdd ? 1 : 0)
+        .inlineEditDimmed(isInlineEditing && !isEditingQuickAdd, onDismiss: collapseEdit)
     }
   }
 
@@ -3600,6 +4542,12 @@ struct TaskListView: View {
     if hideHistoricalDone {
       result = result.filter { $0.status == .open || model.settle.isSettling($0.id) }
     }
+    if starredOnlyFilter && showsStarFilterPill {
+      result = result.filter(\.starred)
+    }
+    if !selectedTagIDs.isEmpty {
+      result = result.filter { selectedTagIDs.isSubset(of: Set($0.tags)) }
+    }
     return result
   }
 
@@ -3608,7 +4556,7 @@ struct TaskListView: View {
     // Every open-work list hides done tasks (a just-completed one lingers via
     // the settle exception in `visibleItems`, then fades). Only the Logbook and
     // Recently Deleted — whose whole job is showing finished/trashed tasks — keep them.
-    case .project, .area, .unscheduled, .upcoming, .triage, .repeating, .review, .faded: return true
+    case .project, .area, .unscheduled, .starred, .upcoming, .triage, .repeating, .review, .faded: return true
     case .today:
       return !todayShowCompleted
     case .logbook, .recentlyDeleted: return false
@@ -3624,12 +4572,25 @@ struct TaskListView: View {
                            projectProgress: Double? = nil,
                            onTap: (() -> Void)? = nil,
                            onAdd: (() -> Void)? = nil,
-                           moveDropTarget: TodayDropTarget? = nil) -> some View {
-    groupHeaderBody(icon: icon, title: title, areaEmoji: areaEmoji,
-                    projectProgress: projectProgress, onTap: onTap, onAdd: onAdd)
+                           moveDropTarget: TodayDropTarget? = nil,
+                           onDropIDs: (([String]) -> Bool)? = nil,
+                           magicDropId: String? = nil) -> some View {
+    let dropModifier = onDropIDs.map { TaskMoveDrop(perform: $0) }
+      ?? todayMoveDrop(moveDropTarget)
+    let resolvedMagicDrop: (([String]) -> Bool)? = onDropIDs ?? moveDropTarget.map { target in
+      { ids in handleTodayMoveDrop(ids: ids, target: target) }
+    }
+    return groupHeaderBody(icon: icon, title: title, areaEmoji: areaEmoji,
+                           projectProgress: projectProgress, onTap: onTap, onAdd: onAdd)
       .textCase(nil)
       .selectionDisabled()
-      .modifier(todayMoveDrop(moveDropTarget))
+      .modifier(dropModifier)
+      .modifier(MagicPlusOptionalSectionDrop(
+        id: magicDropId ?? "mp-header-\(title)",
+        label: "New Task · \(title)",
+        onDropIDs: resolvedMagicDrop
+      ))
+      .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
   }
 
   private func groupHeaderBody(icon: String?, title: String,
@@ -3766,6 +4727,7 @@ struct TaskListView: View {
         .padding(.horizontal, TaskCardMetrics.margin)
         .padding(.bottom, 8)
         .plainListChrome()
+        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
   }
 
@@ -3777,15 +4739,21 @@ struct TaskListView: View {
   private var groupedUpcomingItems: some View {
     let buckets = upcomingBuckets()
     ForEach(buckets, id: \.key) { bucket in
+      let dropOnDay: ([String]) -> Bool = { ids in
+        handleUpcomingDateDrop(ids: ids, dateKey: bucket.key)
+      }
       Section {
         // The day's calendar events frame it first (the agenda), then the tasks
         // scheduled for that day — matching Today, where the agenda sits on top.
         if !bucket.events.isEmpty {
-          calendarEventsBlock(bucket.events).taskCardChrome(.solo)
+          calendarEventsBlock(bucket.events)
+            .taskCardChrome(.solo)
+            .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
         }
-        cardedRows(bucket.tasks)
+        cardedRows(bucket.tasks, onDropIDs: dropOnDay, magicContext: bucket.label)
       } header: {
-        groupHeader(icon: "calendar", title: bucket.label)
+        groupHeader(icon: "calendar", title: bucket.label,
+                    onDropIDs: dropOnDay, magicDropId: "mp-upcoming-\(bucket.key)")
       }
     }
   }
@@ -4028,7 +4996,7 @@ struct TaskListView: View {
     func drop(_ list: inout [SeptenaTask]) {
       list.removeAll { $0.id == id }
     }
-    drop(&items); drop(&triageStorage)
+    drop(&items); drop(&triageStorage); drop(&fadedScopeStorage)
   }
 
   /// Replace a visible row wholesale — the same pattern as `flipStatus` /
@@ -4107,7 +5075,9 @@ struct TaskListView: View {
   /// `coalescing` waits the longer notification window (`notificationCoalesce`)
   /// so a burst of sync posts costs one rebuild.
   private func reloadOrDeferWhileEditing(coalescing: Bool = false) {
-    guard !listInputActive else { pendingReloadWhileEditing = true; return }
+    // Hidden tabs (e.g. Upcoming/Tasks while viewing Today) stay quiet until
+    // they return on screen (`didAppearOnScreen` flushes the deferred load).
+    guard isOnScreen, !listInputActive else { pendingReloadWhileEditing = true; return }
     Task { await load(delay: coalescing ? Self.notificationCoalesce : Self.loadCoalesce) }
   }
 
@@ -4141,6 +5111,13 @@ struct TaskListView: View {
     // Cache was already painted in init(); only show the loading state when
     // we have literally nothing to render (first ever launch, cache miss).
     if items.isEmpty { isLoading = true }
+    checklistCounts = LocalCache.checklistSummaryByTask(in: modelContext)
+    tagsByID = LocalCache.tagsByID(in: modelContext)
+    // Prune any selected tag filter whose tag was deleted or left this list.
+    if !selectedTagIDs.isEmpty {
+      let valid = Set(availableTagsInList.map(\.id))
+      selectedTagIDs = selectedTagIDs.intersection(valid)
+    }
     defer { isLoading = false }
 
     // CloudKit is the only backend. Pull fresh from CK via the engine
@@ -4157,8 +5134,10 @@ struct TaskListView: View {
     // we're still inside applyDidFinishBatch — CKSyncEngine asserts.
     // The mirror is already up to date by the time the notification
     // fires, so a plain re-read is correct.
+    // Today and its triage band share one fetch of the open rows.
+    let todayLists = filter == .today ? LocalCache.todayAndTriage(in: modelContext) : nil
     let outcome = model.merge(prior: items,
-                             fresh: localTasks(),
+                             fresh: todayLists?.today ?? localTasks(),
                              context: modelContext,
                              animateArrivals: loadedFilters.contains(filter),
                              ownCreations: ownCreateExclusions(),
@@ -4181,7 +5160,7 @@ struct TaskListView: View {
       // completed row — same preservation `items` gets above.
       let triageOutcome = model.merge(
         prior: triageStorage,
-        fresh: LocalCache.tasks(in: modelContext, filter: .triage),
+        fresh: todayLists?.triage ?? LocalCache.tasks(in: modelContext, filter: .triage),
         context: modelContext,
         animateArrivals: loadedFilters.contains(filter),
         ownCreations: ownCreateExclusions(),
@@ -4190,8 +5169,25 @@ struct TaskListView: View {
     } else {
       triageStorage = []
     }
+    fadedScopeStorage = (showFadedInLists && scopeLoggedFilterId != nil)
+      ? LocalCache.fadedTasks(in: modelContext, scope: filter)
+      : []
+    // Prune stale selection IDs (e.g. tasks moved out of this list via
+    // SidebarTaskDrop or AreaDetailView project drop) so selection chrome
+    // never lingers over vanished rows.
+    if !selection.isEmpty {
+      let visible = Set(keyboardOrderedTaskIds)
+      let pruned = selection.intersection(visible)
+      if pruned != selection {
+        selection = pruned
+        if pruned.isEmpty {
+          clearSelection()
+        }
+      }
+    }
     // A synced dismissal from another device lands on the next read.
     noticeEpoch &+= 1
+    refreshTodayNotices()
     // Filing suggestions and the calendar agenda come one frame after the
     // rows (scheduleDecorationPass, docs/LAUNCH_PERF.md).
     consumePendingTaskReveal()
@@ -4279,10 +5275,10 @@ struct TaskListView: View {
     model.refreshCalendarEvents(filter: filter, enabled: showCalendarEvents)
   }
 
-  /// Rebuild the per-row filing-suggestion snapshot (the "→ Suggested"
-  /// capsule). Owned by `TaskListModel`; the candidate set and the ranking
-  /// closure come from here so the snapshot and the on-demand context-menu
-  /// path stay one code path.
+  /// Rebuild the per-row filing-suggestion snapshot (the Inbox "→ Suggested"
+  /// capsule). Owned by `TaskListModel`; primes the engine for every creatable
+  /// list (so Area context menus still rank child projects on demand) while
+  /// snapshotting inline capsules strictly on Inbox via `capsuleTop`.
   private func refreshFilingSuggestions() {
     var seen = Set<String>()
     let candidates = (triageItems + items).filter {
@@ -4295,7 +5291,12 @@ struct TaskListView: View {
       projects: projects,
       areas: areas,
       candidates: candidates,
-      rankedTop: { filingRankedSuggestions(for: $0)?.first }
+      rankedTop: {
+        TaskFilingSuggestions.capsuleTop(
+          for: $0, filter: filter, engine: suggestionEngine,
+          childProjectIds: { childProjectIds(in: $0) }
+        )
+      }
     )
   }
 

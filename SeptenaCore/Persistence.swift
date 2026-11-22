@@ -31,8 +31,19 @@ final class TaskEntity {
   var statusRaw: String
   var created: String?
   var scheduled: String?
+  /// Optional 24-hour wall-clock start time (`HH:MM`, docs/TASK_TIMES_AND_ICAL_SPEC.md).
+  var startTime: String? = nil
+  /// Optional duration in minutes (`5..1440`).
+  var durationMinutes: Int? = nil
+  /// Optional IANA time zone (nil = floating local time).
+  var timeZone: String? = nil
   @Attribute(originalName: "due") var deadline: String?
   var today: Bool
+  /// Simple boolean Important / Star marker (docs/STAR_PRIORITY_SPEC.md, ST0).
+  /// Default `= false` required for lightweight SwiftData migration.
+  var starred: Bool = false
+  /// JSON-encoded `[String]` of canonical `TagEntity.id` values (max 20, docs/TAGS_SPEC.md).
+  var tagIDsJSON: String? = nil
   var todaySetOn: String?
   var completedAt: String?
   var area: String?
@@ -172,8 +183,13 @@ final class TaskEntity {
        statusRaw: String = TaskStatus.open.rawValue,
        created: String? = nil,
        scheduled: String? = nil,
+       startTime: String? = nil,
+       durationMinutes: Int? = nil,
+       timeZone: String? = nil,
        deadline: String? = nil,
        today: Bool = false,
+       starred: Bool = false,
+       tagIDsJSON: String? = nil,
        todaySetOn: String? = nil,
        completedAt: String? = nil,
        area: String? = nil,
@@ -213,8 +229,13 @@ final class TaskEntity {
     self.statusRaw = statusRaw
     self.created = created
     self.scheduled = scheduled
+    self.startTime = startTime
+    self.durationMinutes = durationMinutes
+    self.timeZone = timeZone
     self.deadline = deadline
     self.today = today
+    self.starred = starred
+    self.tagIDsJSON = tagIDsJSON
     self.todaySetOn = todaySetOn
     self.completedAt = completedAt
     self.area = area
@@ -266,11 +287,8 @@ final class TaskEntity {
   /// accessor only (de)serializes.
   var conversation: TaskConvo {
     get {
-      guard let json = conversationJSON,
-            let data = json.data(using: .utf8),
-            let convo = try? JSONDecoder.taskConvo.decode(TaskConvo.self, from: data)
-      else { return TaskConvo() }
-      return convo
+      guard let json = conversationJSON else { return TaskConvo() }
+      return TaskConvoDecodeCache.decode(json)
     }
     set {
       conversationJSON = (try? JSONEncoder.taskConvo.encode(newValue))
@@ -392,9 +410,6 @@ final class ProjectEntity {
   var notes: String?
   var context: String?
   var githubRepo: String?
-  /// JSON-encoded `AreaAttachment` (the one read-only context feed). Rides a
-  /// reserved CloudKit string slot. See [AreaAttachment.swift].
-  var attachmentJSON: String?
   /// Sidebar sort order (synced). `0` = unset (falls back to legacy device
   /// order / title); a reorder renumbers the whole group 1…N. Rides the
   /// reserved `reservedInt1` CK slot — additive in Prod, no record-type bump.
@@ -417,7 +432,6 @@ final class ProjectEntity {
        notes: String? = nil,
        context: String? = nil,
        githubRepo: String? = nil,
-       attachmentJSON: String? = nil,
        position: Int = 0,
        lastSyncedAt: Date = .distantPast,
        updatedAt: String? = nil,
@@ -432,7 +446,6 @@ final class ProjectEntity {
     self.notes = notes
     self.context = context
     self.githubRepo = githubRepo
-    self.attachmentJSON = attachmentJSON
     self.position = position
     self.lastSyncedAt = lastSyncedAt
     self.updatedAt = updatedAt
@@ -443,15 +456,6 @@ final class ProjectEntity {
   var status: ProjectStatus {
     get { ProjectStatus(rawValue: statusRaw) ?? .active }
     set { statusRaw = newValue.rawValue }
-  }
-
-  /// The decoded attachment, with a read-fallback that coerces a legacy
-  /// `githubRepo` pointer into a `.git` attachment so existing projects light
-  /// up without a migration pass.
-  var attachment: AreaAttachment? {
-    if let a = AreaAttachment.decode(attachmentJSON) { return a }
-    if let repo = githubRepo, !repo.isEmpty { return AreaAttachment(kind: .git, ref: repo) }
-    return nil
   }
 }
 
@@ -464,9 +468,6 @@ final class AreaEntity {
   /// dot wherever the area appears (sidebar, headers, pickers) — a Tier-3
   /// emoji in design-system terms. Nil ⇒ fall back to the dot.
   var emoji: String?
-  /// JSON-encoded `AreaAttachment` (the one read-only context feed). Rides a
-  /// reserved CloudKit string slot. See [AreaAttachment.swift].
-  var attachmentJSON: String?
   /// Sidebar sort order (synced). `0` = unset (falls back to legacy device
   /// order / title); a reorder renumbers the areas 1…N. Rides the reserved
   /// `reservedInt1` CK slot — additive in Prod, no record-type bump. See
@@ -478,22 +479,18 @@ final class AreaEntity {
   var cloudKitSystemFields: Data?
 
   init(id: String, title: String, context: String? = nil, emoji: String? = nil,
-       attachmentJSON: String? = nil, position: Int = 0,
+       position: Int = 0,
        lastSyncedAt: Date = .distantPast, updatedAt: String? = nil,
        cloudKitSystemFields: Data? = nil) {
     self.id = id
     self.title = title
     self.context = context
     self.emoji = emoji
-    self.attachmentJSON = attachmentJSON
     self.position = position
     self.lastSyncedAt = lastSyncedAt
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
   }
-
-  /// The decoded attachment (no legacy fallback — areas never had `githubRepo`).
-  var attachment: AreaAttachment? { AreaAttachment.decode(attachmentJSON) }
 }
 
 @Model
@@ -572,20 +569,30 @@ final class SectionEntity {
 
 extension SeptenaTask {
   init(_ e: TaskEntity) {
+    // Each of these getters decodes JSON. Read each one once: `recurrence`
+    // was read twice per row, and both go through the row-object build on
+    // every list repaint.
+    let recurrence = e.recurrenceUnit == nil ? nil : e.recurrence
+    let conversation = e.conversationJSON == nil ? TaskConvo() : e.conversation
     self.init(
       id: e.id,
       title: e.title,
       status: e.status,
       created: e.created,
       scheduled: e.scheduled,
+      startTime: e.startTime,
+      durationMinutes: e.durationMinutes,
+      timeZone: e.timeZone,
       deadline: e.deadline,
       today: e.today,
+      starred: e.starred,
+      tags: e.tagIDs,
       todaySetOn: e.todaySetOn,
       completedAt: e.completedAt,
       area: e.area,
       project: e.project,
       notes: e.notes,
-      recurrence: e.recurrence,
+      recurrence: recurrence,
       recurrencePaused: e.recurrencePaused,
       reminder: e.reminder,
       // Pass the series' LOGICAL slot, the way `complete` does — without it
@@ -594,7 +601,7 @@ extension SeptenaTask {
       // would match `complete` exactly, but this initializer is nonisolated;
       // the two differ only under time travel.)
       nextOccurrence: e.status == .open
-        ? e.recurrence?.nextDate(completedOn: SeptenaDate.today,
+        ? recurrence?.nextDate(completedOn: SeptenaDate.today,
                                  scheduled: e.scheduled,
                                  logicalScheduled: e.recurrenceAnchorDate)
         : nil,
@@ -613,7 +620,7 @@ extension SeptenaTask {
       effort: e.effort,
       kind: e.kind,
       heading: e.heading,
-      conversation: e.conversation
+      conversation: conversation
     )
   }
 
@@ -766,7 +773,6 @@ extension Project {
               notes: e.notes,
               context: e.context,
               githubRepo: e.githubRepo,
-              attachment: e.attachment,
               position: e.position,
               updatedAt: e.updatedAt,
               deletedAt: e.deletedAt)
@@ -776,7 +782,6 @@ extension Project {
 extension Area {
   init(_ e: AreaEntity) {
     self.init(id: e.id, title: e.title, context: e.context, emoji: e.emoji,
-              attachment: e.attachment,
               position: e.position,
               updatedAt: e.updatedAt)
   }
@@ -899,6 +904,8 @@ final class LocalStore {
   private init() {
     let schema = Schema([TaskEntity.self,
                          TaskAttachmentEntity.self,
+                         TaskChecklistItemEntity.self,
+                         TagEntity.self,
                          ProjectEntity.self,
                          AreaEntity.self,
                          SettingsEntity.self,
@@ -1084,6 +1091,47 @@ enum LocalCache {
     ))
   }
 
+  /// The same rows as `liveTasks`, left as entities. For counters and roll-ups
+  /// (sidebar badges, project rings) that read a few fields: building a row
+  /// object per task decodes its conversation and recurrence JSON, which a
+  /// count never needs.
+  @MainActor
+  static func liveAggregateEntities(in context: ModelContext) -> [TaskEntity] {
+    let dead = DeletedContainerLedger.snapshot()
+    return liveEntities(in: context)
+      .filter { !$0.pendingDeletion && !$0.isHeading
+        && !DeletedContainerLedger.hides(area: $0.area, project: $0.project, in: dead) }
+  }
+
+  /// Row count of the Recently Deleted list (`tasks(filter: .recentlyDeleted)`)
+  /// for the sidebar badge, without building a row object per deleted task.
+  /// Goes through `StoreHealth.fetch` so a failed read still counts as one.
+  @MainActor
+  static func recentlyDeletedCount(in context: ModelContext) -> Int {
+    var descriptor = FetchDescriptor<TaskEntity>(predicate: #Predicate { e in
+      e.deletedAt != nil && !e.pendingDeletion && e.kind != "heading"
+    })
+    descriptor.propertiesToFetch = [\.id]
+    return StoreHealth.fetch(context, descriptor).count
+  }
+
+  /// The `liveTasks` rows whose id is in `ids`, in store order. Use this, not
+  /// `liveTasks().filter { ids.contains($0.id) }`: undo snapshots run at every
+  /// gesture, and building a row object for each task in the store there put
+  /// the whole table on the tap path.
+  @MainActor
+  static func liveTasks(ids: some Collection<String>, in context: ModelContext) -> [SeptenaTask] {
+    guard !ids.isEmpty else { return [] }
+    let wanted = Array(Set(ids))
+    let dead = DeletedContainerLedger.snapshot()
+    return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { e in e.deletedAt == nil && wanted.contains(e.id) }
+    ))
+      .filter { !$0.pendingDeletion && !$0.isHeading
+        && !DeletedContainerLedger.hides(area: $0.area, project: $0.project, in: dead) }
+      .map(SeptenaTask.init)
+  }
+
   /// Every non-trashed task as a wire DTO — sidebar roll-ups, aggregates.
   /// Headings are dividers, not to-dos: excluded so they never inflate any
   /// count or aggregate (see `TaskEntity.isHeading`).
@@ -1140,14 +1188,29 @@ enum LocalCache {
   /// Completion ratios for project headers. Keep this as an entity aggregate
   /// so a normal task-list refresh does not allocate one DTO per historical
   /// task merely to compute two integer counters.
+  ///
+  /// The aggregate reads every project task, the logbook included, and three
+  /// surfaces ask for it after each change (the task list, the areas sidebar
+  /// and the area page, whose init SwiftUI re-runs on every parent render).
+  /// `ProjectProgressCache` makes the repeat reads free until the next task
+  /// change.
   @MainActor
   static func projectCompletionRatios(in context: ModelContext) -> [String: Double] {
-    let rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
+    ProjectProgressCache.ratios { computeProjectCompletionRatios(in: context) }
+  }
+
+  @MainActor
+  private static func computeProjectCompletionRatios(in context: ModelContext) -> [String: Double] {
+    var descriptor = FetchDescriptor<TaskEntity>(
       predicate: #Predicate { e in
         e.deletedAt == nil && !e.pendingDeletion
           && e.project != nil && e.kind != "heading"
       }
-    ))
+    )
+    // Only the three columns the counters read: the rest of each row
+    // (notes, conversation JSON, recurrence) stays a fault.
+    descriptor.propertiesToFetch = [\.project, \.statusRaw, \.fadedAt]
+    let rows = StoreHealth.fetch(context, descriptor)
     var done: [String: Int] = [:]
     var total: [String: Int] = [:]
     for row in rows {
@@ -1224,7 +1287,7 @@ enum LocalCache {
           e.deletedAt == nil && !e.pendingDeletion && e.area == areaId
         }
       ))
-    case .today, .triage, .review, .upcoming, .repeating, .unscheduled, .faded:
+    case .today, .triage, .review, .upcoming, .repeating, .unscheduled, .starred, .faded:
       return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
         predicate: #Predicate { e in
           e.deletedAt == nil && !e.pendingDeletion && e.statusRaw == "open"
@@ -1253,6 +1316,23 @@ enum LocalCache {
     // macOS click latency came from. Filtering first sorts only the rows
     // the view keeps, over plain tuple fields.
     let rows = fetchEntities(for: filter, limit: limit, in: context)
+    return sortedTasks(rows, filter: filter)
+  }
+
+  /// Today and its triage band (`.triage`) from ONE fetch of the open rows.
+  /// Both filters start from the same open-row fetch, and the Today repaint
+  /// (iOS and Mac) needs both lists, so reading them apart fetched and
+  /// faulted the whole open table twice.
+  @MainActor
+  static func todayAndTriage(in context: ModelContext) -> (today: [SeptenaTask], triage: [SeptenaTask]) {
+    let rows = fetchEntities(for: .today, in: context)
+    return (sortedTasks(rows, filter: .today), sortedTasks(rows, filter: .triage))
+  }
+
+  /// The filter, row-object build and manual-order sort `tasks(in:filter:)`
+  /// applies to fetched rows.
+  @MainActor
+  private static func sortedTasks(_ rows: [TaskEntity], filter: TaskFilter) -> [SeptenaTask] {
     let today = SeptenaDate.today
     let dead = DeletedContainerLedger.snapshot()
     let result = rows
@@ -1277,6 +1357,28 @@ enum LocalCache {
       }
     }
     return result
+  }
+
+  /// Logbook rows finished (or cancelled) on `day` (`YYYY-MM-DD`), newest
+  /// first. Same rows as filtering the whole `.logbook` read on
+  /// `completedAt.hasPrefix(day)`, but it pages the logbook newest-first and
+  /// stops at the first row older than `day`. So a Today repaint reads
+  /// today's completions, not the whole archive.
+  @MainActor
+  static func tasksCompleted(onDay day: String, in context: ModelContext) -> [SeptenaTask] {
+    var limit = 64
+    while true {
+      let rows = fetchEntities(for: .logbook, limit: limit, in: context)
+      let reachedOlder = rows.last.map { ($0.completedAt ?? "") < day } ?? true
+      if reachedOlder || rows.count < limit {
+        let today = SeptenaDate.today
+        let dead = DeletedContainerLedger.snapshot()
+        return rows
+          .filter { ($0.completedAt ?? "").hasPrefix(day) }
+          .compactMap { convert($0, filter: .logbook, today: today, dead: dead) }
+      }
+      limit *= 4
+    }
   }
 
   /// One task by id, straight from the store. The by-id read a view needs when
@@ -1361,7 +1463,7 @@ enum LocalCache {
       return e.isInTriageBand ? SeptenaTask(e) : nil
     case .review:
       // Agent-worked tasks awaiting the human's verification and acceptance (#87).
-      guard e.status == .open, e.conversation.endState == .needsVerify else { return nil }
+      guard e.status == .open, e.conversation.needsHumanReview else { return nil }
       return SeptenaTask(e)
     case .upcoming:
       guard e.status == .open, !e.today else { return nil }
@@ -1374,6 +1476,9 @@ enum LocalCache {
     case .unscheduled:
       guard e.status == .open, !e.today,
             e.scheduled == nil, e.deadline == nil else { return nil }
+      return SeptenaTask(e)
+    case .starred:
+      guard e.status == .open, e.starred else { return nil }
       return SeptenaTask(e)
     case .logbook:
       // The Logbook archives finished work — both completed and cancelled
@@ -1391,6 +1496,39 @@ enum LocalCache {
       // Handled by the early-returns above; unreachable here.
       return nil
     }
+  }
+
+  @MainActor
+  /// Open faded tasks belonging to a project or directly to an area, sorted
+  /// most-recently-faded-first. Used by project and area pages when the global
+  /// `tasksShowFaded` setting is on; kept separate from `tasks(in:filter:)` so
+  /// counts, progress rings, and open-list queries never include faded rows.
+  static func fadedTasks(in context: ModelContext, scope filter: TaskFilter) -> [SeptenaTask] {
+    let rows: [TaskEntity]
+    let areaDirectOnly: Bool
+    switch filter {
+    case .project(let pid):
+      rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
+        predicate: #Predicate { $0.project == pid }
+      ))
+      areaDirectOnly = false
+    case .area(let aid):
+      rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
+        predicate: #Predicate { $0.area == aid }
+      ))
+      areaDirectOnly = true
+    default:
+      return []
+    }
+    let dead = DeletedContainerLedger.snapshot()
+    return rows
+      .filter { e in
+        guard !e.pendingDeletion, e.deletedAt == nil, !e.isHeading, e.isFaded else { return false }
+        if areaDirectOnly, e.project != nil { return false }
+        return !DeletedContainerLedger.hides(area: e.area, project: e.project, in: dead)
+      }
+      .map(SeptenaTask.init)
+      .sorted { ($0.fadedAt ?? .distantPast) > ($1.fadedAt ?? .distantPast) }
   }
 
   @MainActor
@@ -1511,6 +1649,181 @@ enum LocalCache {
   }
 }
 
+@Model
+final class TaskChecklistItemEntity {
+  @Attribute(.unique) var id: String
+  var taskID: String
+  var title: String
+  var checked: Bool = false
+  var checkedAt: Date? = nil
+  var position: Double = 0
+  var createdAt: Date = Date()
+  var updatedAt: Date = Date()
+
+  init(id: String,
+       taskID: String,
+       title: String,
+       checked: Bool = false,
+       checkedAt: Date? = nil,
+       position: Double = 0,
+       createdAt: Date = Date(),
+       updatedAt: Date = Date()) {
+    self.id = id
+    self.taskID = taskID
+    self.title = title
+    self.checked = checked
+    self.checkedAt = checkedAt
+    self.position = position
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+  }
+}
+
+extension ChecklistItem {
+  private static let isoFormatter: ISO8601DateFormatter = {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime]
+    return f
+  }()
+
+  init(_ entity: TaskChecklistItemEntity) {
+    self.init(
+      id: entity.id,
+      taskId: entity.taskID,
+      title: entity.title,
+      checked: entity.checked,
+      checkedAt: entity.checkedAt.map { Self.isoFormatter.string(from: $0) },
+      position: entity.position,
+      createdAt: entity.createdAt == .distantPast ? nil : Self.isoFormatter.string(from: entity.createdAt)
+    )
+  }
+}
+
+extension LocalCache {
+  @MainActor
+  static func checklistItems(forTaskID taskID: String, in context: ModelContext) -> [ChecklistItem] {
+    let rows = StoreHealth.fetch(context, FetchDescriptor<TaskChecklistItemEntity>(
+      predicate: #Predicate { $0.taskID == taskID },
+      sortBy: [SortDescriptor(\.position), SortDescriptor(\.createdAt), SortDescriptor(\.id)]
+    ))
+    return rows.map(ChecklistItem.init)
+  }
+
+  @MainActor
+  static func checklistSummaryByTask(in context: ModelContext) -> [String: (done: Int, total: Int)] {
+    let rows = StoreHealth.fetch(context, FetchDescriptor<TaskChecklistItemEntity>())
+    var out: [String: (done: Int, total: Int)] = [:]
+    for r in rows {
+      var entry = out[r.taskID] ?? (0, 0)
+      entry.total += 1
+      if r.checked { entry.done += 1 }
+      out[r.taskID] = entry
+    }
+    return out
+  }
+}
+
+// MARK: - TagEntity & Tag helpers (docs/TAGS_SPEC.md)
+
+extension TaskEntity {
+  /// One decoder for every row: the row-object build reads `tagIDs` for each
+  /// task on every list repaint, and a new `JSONDecoder` per read is not free.
+  private static let tagIDsDecoder = JSONDecoder()
+
+  /// Typed view over `tagIDsJSON` (deduplicated, capped at `RegistryEntityLimits.maxTagsPerTask`).
+  var tagIDs: [String] {
+    get {
+      guard let raw = tagIDsJSON, let data = raw.data(using: .utf8),
+            let decoded = try? Self.tagIDsDecoder.decode([String].self, from: data)
+      else { return [] }
+      return decoded
+    }
+    set {
+      var seen = Set<String>()
+      var clean: [String] = []
+      for id in newValue where !id.isEmpty && seen.insert(id).inserted {
+        clean.append(id)
+        if clean.count >= RegistryEntityLimits.maxTagsPerTask { break }
+      }
+      if clean.isEmpty {
+        tagIDsJSON = nil
+      } else if let data = try? JSONEncoder().encode(clean),
+                let str = String(data: data, encoding: .utf8) {
+        tagIDsJSON = str
+      }
+    }
+  }
+}
+
+@Model
+final class TagEntity {
+  @Attribute(.unique) var id: String
+  var name: String
+  var color: String? = nil
+  var position: Int? = nil
+  var updatedAt: Date = Date()
+
+  init(id: String,
+       name: String,
+       color: String? = nil,
+       position: Int? = nil,
+       updatedAt: Date = Date()) {
+    self.id = id
+    self.name = name
+    self.color = color
+    self.position = position
+    self.updatedAt = updatedAt
+  }
+}
+
+extension TaskTag {
+  init(_ entity: TagEntity) {
+    self.init(
+      id: entity.id,
+      name: entity.name,
+      color: entity.color,
+      position: entity.position
+    )
+  }
+}
+
+extension LocalCache {
+  @MainActor
+  static func allTags(in context: ModelContext) -> [TaskTag] {
+    let rows = StoreHealth.fetch(context, FetchDescriptor<TagEntity>())
+    return rows
+      .map(TaskTag.init)
+      .sorted { lhs, rhs in
+        let lp = lhs.position ?? Int.max
+        let rp = rhs.position ?? Int.max
+        if lp != rp { return lp < rp }
+        let cmp = lhs.name.localizedCaseInsensitiveCompare(rhs.name)
+        if cmp != .orderedSame { return cmp == .orderedAscending }
+        return lhs.id < rhs.id
+      }
+  }
+
+  @MainActor
+  static func tagsByID(in context: ModelContext) -> [String: TaskTag] {
+    Dictionary(uniqueKeysWithValues: allTags(in: context).map { ($0.id, $0) })
+  }
+
+  @MainActor
+  static func tag(named name: String, in context: ModelContext) -> TaskTag? {
+    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    return allTags(in: context).first {
+      $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame
+    }
+  }
+
+  /// Resolves a task's tag IDs into live `TaskTag` values, silently skipping
+  /// deleted/dangling IDs per `docs/TAGS_SPEC.md` §2.
+  static func resolvedTags(for task: SeptenaTask, tagsByID: [String: TaskTag]) -> [TaskTag] {
+    task.tags.compactMap { tagsByID[$0] }
+  }
+}
+
 // MARK: - StructureCache (process-wide areas/projects memo)
 
 /// Areas / projects are read eagerly by `SidebarRootView.init` and
@@ -1554,6 +1867,70 @@ enum StructureCache {
       forName: .septenaStructureChanged, object: nil, queue: .main
     ) { _ in
       MainActor.assumeIsolated { cached = nil }
+    }
+  }
+}
+
+// MARK: - TaskConvoDecodeCache
+
+/// Decoded conversations by their JSON text. Every list repaint builds a row
+/// object per task, and each one with a conversation decoded its JSON again
+/// although the text had not changed. A hit costs one string hash. The JSON
+/// text is the key, so an edited conversation is a new key and can never
+/// return a stale decode. Bounded: the cache empties when it grows past
+/// `limit`. The lock makes it safe from the sync threads too.
+enum TaskConvoDecodeCache {
+  private static let limit = 512
+  private static let store = OSAllocatedUnfairLock(uncheckedState: [String: TaskConvo]())
+
+  static func decode(_ json: String) -> TaskConvo {
+    if let hit = store.withLockUnchecked({ $0[json] }) { return hit }
+    guard let data = json.data(using: .utf8),
+          let convo = try? JSONDecoder.taskConvo.decode(TaskConvo.self, from: data)
+    else { return TaskConvo() }
+    store.withLockUnchecked { cache in
+      if cache.count >= limit { cache.removeAll(keepingCapacity: true) }
+      cache[json] = convo
+    }
+    return convo
+  }
+}
+
+// MARK: - ProjectProgressCache (process-wide project ring memo)
+
+/// Memo for `LocalCache.projectCompletionRatios`. Any task, structure or
+/// unscoped data change bumps a generation, and the next read recomputes.
+///
+/// The observer runs on the posting thread (`queue: nil`), so the generation
+/// moves inside the `post` call itself. Every reader reloads after a coalesce
+/// delay, so no reader can see the old ratios after a change was posted. The
+/// generation sits behind a lock because a few posts come from sync threads.
+@MainActor
+enum ProjectProgressCache {
+  private static var cached: (generation: Int, ratios: [String: Double])?
+  private static var observersInstalled = false
+  nonisolated private static let generation = OSAllocatedUnfairLock(initialState: 0)
+
+  static func ratios(compute: () -> [String: Double]) -> [String: Double] {
+    installObserversIfNeeded()
+    let current = generation.withLock { $0 }
+    if let cached, cached.generation == current { return cached.ratios }
+    let token = StoreHealth.readToken()
+    let fresh = compute()
+    // Same rule as `StructureCache`: never memoize a failed (empty) read.
+    guard !StoreHealth.readsFailed(since: token) else { return fresh }
+    cached = (current, fresh)
+    return fresh
+  }
+
+  private static func installObserversIfNeeded() {
+    guard !observersInstalled else { return }
+    observersInstalled = true
+    for name in [Notification.Name.septenaTasksChanged, .septenaStructureChanged,
+                 .septenaDataChanged] {
+      NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { _ in
+        generation.withLock { $0 &+= 1 }
+      }
     }
   }
 }

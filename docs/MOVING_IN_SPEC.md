@@ -2,7 +2,7 @@
 
 Status: **building** (I0 landed 2026-11-21)
 
-Rests on [ADR 0019](adr/0019-one-import-engine-with-source-adapters.md).
+Rests on [ADR 0021](adr/0021-one-import-engine-with-source-adapters.md).
 Issues: #98 (coverage tracker), #99 (engine), #52 (Microsoft To Do), #100
 (Todoist, TickTick), #101 (Superlist), #102 (Any.do, OmniFocus). Field
 evidence per source: Starlings `/strategy/moving-in-data-access-research`.
@@ -170,7 +170,7 @@ task the batch did not create. The ledger state becomes `undone`.
 
 | Question | Default |
 |---|---|
-| Where does the engine run? | In the app (ADR 0019). |
+| Where does the engine run? | In the app (ADR 0021). |
 | Do cloud-source tokens touch our server? | No. In-app OAuth, dropped after the read. |
 | Merge areas and projects with matching titles? | Yes, shown in the preview, per-item override in I1. |
 | Checklists before #76 ships | Preserved, not written into notes, unless the user turns that on. |

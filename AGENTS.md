@@ -66,6 +66,16 @@ scripts/build.sh SeptaskMac 'platform=macOS'
 If the change *does* touch watch code, **stop and tell the user** — installing a
 multi-GB runtime is their call, never the agent's.
 
+**Building on mz-mini** (`remote-build`): the mini has no development
+certificate, so `SeptaskMac` fails before compiling ("requires signing with a
+development certificate"). Compile unsigned with `SEPTENA_NO_SIGNING=1`.
+`remote-build` copies uncommitted edits too, so run it from a clean worktree
+when you need to check exactly what is committed:
+
+```bash
+remote-build "xcodegen generate && SEPTENA_NO_SIGNING=1 ./scripts/build.sh SeptaskMac 'platform=macOS'"
+```
+
 **Do NOT test — the user tests.** The compile above is the ONLY verification an
 agent runs. Never launch the app, boot a simulator, run UI tests, screenshot, or
 otherwise "verify it works" — when the change is built, report it and **ask the
@@ -311,7 +321,10 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   menu shortcuts** for every keyboard action on the selected row (rename = `⌘R`,
   complete = `⌘K`, move = `⌘M` / `⌘⇧M`); double-click / right-click for mouse.
   Do NOT bind unmodified Space/Return. The shared shortcut map is
-  `TaskRowShortcuts` in `Septena/Shell/Tasks/TaskCommands.swift` — bare `⌘M`
+  the registry (`registry/actions.json`, `RegistryActions.shortcuts`): every
+  context menu, swipe and menu-bar item on both shells renders from it through
+  `RegistryMenuResolver` (`Septena/Shell/UI/RegistryMenu.swift`); a shell only
+  binds action IDs to handlers. Bare `⌘M`
   is intentionally reclaimed by the focused task list; bare `⌘.` remains the
   system Cancel equivalent and carries a `⇧` here.
   **Two sanctioned exceptions on the task surfaces** (both deliberate,
@@ -433,6 +446,18 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   getter and the setter. Enforced by the `model-reserved-name` lint rule
   (entity, entityName, objectID, description, isDeleted,
   managedObjectContext, isFault, hasChanges).
+- **Never build every task to read a few.** `LocalCache.allTasks` /
+  `liveTasks(in:)` build a row object for each live task, logbook included,
+  and each one decodes JSON. Every task change makes the open list, both
+  sidebars and the area page read the store again on the main actor, so a
+  whole-store read there runs on every tap and grows with the user's
+  history. Pick by id with `liveTasks(ids:in:)`. Count from
+  `liveAggregateEntities`. Read rings through `projectCompletionRatios`
+  (memoized). Fetch Today and its band once with `todayAndTriage`. Never read
+  the store in a view `body` or `init`. The full rules are in
+  `docs/LAUNCH_PERF.md` ("Interaction performance"). The id-lookup form is
+  enforced by the `whole-store-id-lookup` lint rule. The rest is not
+  greppable, so this note is the guardrail.
 - **A deep SwiftUI view type overflows the iOS main-thread stack at launch.**
   The crash is `EXC_BAD_ACCESS` in `swift_getTypeByMangledName`, before any
   view draws. `TaskListView.taskListRows` hit it: a large `@ViewBuilder`

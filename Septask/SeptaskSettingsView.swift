@@ -1,96 +1,118 @@
 import SwiftUI
 import SwiftData
 
-/// Septask's Settings — the full app's architecture (`SettingsView`) at
-/// task-app scale (docs/SEPTASK.md P3): the same root taxonomy as Septena,
-/// with a profile card, intent-grouped `ColoredGlyph` rows, and About set
-/// apart with a disc tile. The task app keeps its own focused sub-options,
-/// but the first level is deliberately identical so moving between the two
-/// apps feels natural. Shell-only composition: behavior lives in shared files
-/// (`TaskSettingsPane`, `ClaudeAISettingsPane`, `ThingsImportView`,
-/// `SettingsMirror`, `SettingsStore`, `SettingsChrome`, `ProfileAvatar`);
-/// only app-local surfaces (the About pages, task privacy copy) are here.
-/// Opens Settings on a given page, from outside Settings (the Get started
-/// checklist). The caller sets `pending` and opens Settings; the view reads it
-/// on appear, or on `didRequest` when it is already open.
+/// Opens Settings on a canonical registry page ID (`RegistrySettings.PageID.*`),
+/// from outside Settings (e.g. the Get Started checklist). The caller sets
+/// `pending` and opens Settings; the view reads it on appear, or on
+/// `didRequest` when Settings is already open.
 @MainActor
 enum SeptaskSettingsLink {
-  static var pending: SeptaskSettingsView.Destination?
+  static var pending: String?
   static let didRequest = Notification.Name("septask.settings.openPage")
 
-  static func request(_ destination: SeptaskSettingsView.Destination) {
-    pending = destination
+  static func request(_ pageID: String) {
+    pending = pageID
     NotificationCenter.default.post(name: didRequest, object: nil)
   }
 }
 
+/// Registry-driven Settings for Septena (iOS & macOS, docs/SETTINGS_UX_SPEC.md).
+///
+/// Structure, grouping, ordering, defaults, icons, and platform gates come
+/// from `registry/settings.json` (`RegistrySettings` in
+/// `SeptenaCore/Generated/RegistryConstants.swift`):
+///   • iOS: flat, scannable grouped root `Form` — everyday Lists & Appearance
+///     controls sit inline on screen 1; multi-step flows are 1 tap deep with
+///     live status badges; dev/diagnostic tools sit 2 taps deep under
+///     About ▸ Advanced.
+///   • macOS: 6-tab `NavigationSplitView` generated from
+///     `RegistrySettings.desktopTabs`, expanding `desktopInline: true` pages
+///     (Connect Claude + AI Preferences) directly into the AI & Agents tab.
 struct SeptaskSettingsView: View {
-  enum Destination: Hashable {
-    case account
-    // A short root: every row holds real settings (docs/SETTINGS_FLATTEN_SPEC.md).
-    // Text size and completion motion live on the Tasks pane, and feedback in
-    // About. Claude pairs through the task backend (About ▸ Advanced).
-    case tasks
-    case connectionsAI
-    case data
-    case privacy
-    case about
-    // Focused task-app sub-pages. These are intentionally not root entries.
-    case claudeAI
-    case calendar
-    case reminders
-    case thingsImport
-    case taskBackend   // sync account and status, connect Claude
-  }
-
   @Environment(\.dismiss) private var dismiss
-  @AppStorage(SettingsKey.welcomeName) private var welcomeName: String = ""
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
+  @Environment(SettingsStore.self) private var store
+  @Environment(SectionTheme.self) private var theme
+
+  @AppStorage(SettingsKey.welcomeName) private var welcomeName: String =
+    RegistrySettings.Defaults.welcomeName
   @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked: Bool = false
-  @State private var path: [Destination] = []
-  /// Detail selection for the macOS split view (a sidebar+detail Settings
-  /// window, matching `SettingsView`). Unused on iOS, which pushes via `path`.
-  @State private var selection: Destination? = .tasks
+  @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool =
+    RegistrySettings.Defaults.todayShowCompleted
+  @AppStorage(SettingsKey.todayGroupByList) private var todayGroupByList: Bool =
+    RegistrySettings.Defaults.todayGroupByList
+  @AppStorage(SettingsKey.tasksShowAging) private var showAging: Bool =
+    RegistrySettings.Defaults.tasksShowAging
+  @AppStorage(SettingsKey.tasksShowFaded) private var showFaded: Bool =
+    RegistrySettings.Defaults.tasksShowFaded
+  @AppStorage(SettingsKey.tasksFilingSuggestions) private var filingSuggestions: Bool =
+    RegistrySettings.Defaults.tasksFilingSuggestions
+  @AppStorage(SettingsKey.tasksShowCalendarEvents) private var showCalendarEvents: Bool =
+    RegistrySettings.Defaults.tasksShowCalendarEvents
+  @AppStorage(SettingsKey.badgeShowOverdue, store: SeptenaAppGroup.defaults)
+  private var taskBadge: Bool = RegistrySettings.Defaults.badgeShowOverdue
+  @AppStorage(SettingsKey.tasksTitleLines) private var titleLines: Int =
+    RegistrySettings.Defaults.tasksTitleLines
+  @AppStorage(SettingsKey.textSizeStep) private var textSizeStep: Int =
+    RegistrySettings.Defaults.textSizeStep
+  @AppStorage(SettingsKey.loggingAnimationsEnabled) private var completionAnimations: Bool =
+    RegistrySettings.Defaults.loggingAnimationsEnabled
+  @AppStorage(AIPolicy.modeKey) private var aiModeRaw: String =
+    RegistrySettings.Defaults.aiMode
+
+  @State private var path: [String] = []
+  #if os(macOS)
+  @State private var selectedTab: String? = RegistrySettings.TabID.general
+  #endif
+
+  private var currentPlatform: String {
+    #if os(macOS)
+    return "macos"
+    #else
+    return "ios"
+    #endif
+  }
 
   var body: some View {
     #if os(macOS)
-    // macOS: a NavigationSplitView (persistent sidebar + detail), sized and
-    // Escape-closable like SettingsView — hosted in a real Settings window
-    // (SeptaskApp), so it carries native traffic lights, not a Done button.
     NavigationSplitView {
-      // Let the native source-list material render — no gradient wash behind a
-      // macOS sidebar (matches SettingsView's macOS sidebar). The iOS branch
-      // below keeps the gradient, where it's a sheet, not a source list.
-      List(selection: $selection) { listContent(selectable: true) }
-        .navigationTitle("Settings")
-        .toolbar(removing: .sidebarToggle)
-        .navigationSplitViewColumnWidth(min: 220, ideal: 220, max: 220)
+      List(selection: $selectedTab) {
+        macSidebarContent
+      }
+      .navigationTitle("Settings")
+      .toolbar(removing: .sidebarToggle)
+      .navigationSplitViewColumnWidth(min: 220, ideal: 220, max: 220)
     } detail: {
-      NavigationStack {
-        pane(selection ?? .tasks)
-          .navigationDestination(for: Destination.self) { pane($0) }
+      NavigationStack(path: $path) {
+        macTabPane(selectedTab ?? RegistrySettings.TabID.general)
+          .navigationDestination(for: String.self) { page($0) }
       }
     }
     .frame(width: 820, height: 600)
+    .onChange(of: selectedTab) { _, _ in
+      // Switching sidebar tabs resets any pushed subpage cleanly.
+      path.removeAll()
+    }
     .onExitCommand { dismiss() }
     .onAppear(perform: consumeLink)
     .onReceive(NotificationCenter.default.publisher(for: SeptaskSettingsLink.didRequest)) { _ in consumeLink() }
     #else
-    // iOS/iPad: the same list, pushed in a NavigationStack sheet — matching
-    // SettingsView's compact presentation and its drag-to-dismiss affordance.
     NavigationStack(path: $path) {
-      List { listContent(selectable: false) }
-        .scrollContentBackground(.hidden)
-        .background(SettingsTopGradient())
-        .navigationTitle("Settings")
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(for: Destination.self) { pane($0) }
-        // A sheet needs a visible way out besides the drag (VoiceOver,
-        // keyboard, iPad form sheets that don't show the grabber).
-        .toolbar {
-          ToolbarItem(placement: .confirmationAction) {
-            Button("Done") { dismiss() }
-          }
+      Form {
+        iosRootContent
+      }
+      .formStyle(.grouped)
+      .scrollContentBackground(.hidden)
+      .background(SettingsTopGradient())
+      .navigationTitle("Settings")
+      .navigationBarTitleDisplayMode(.inline)
+      .navigationDestination(for: String.self) { page($0) }
+      .toolbar {
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Done") { dismiss() }
         }
+      }
     }
     .presentationDragIndicator(.visible)
     .onAppear(perform: consumeLink)
@@ -98,196 +120,507 @@ struct SeptaskSettingsView: View {
     #endif
   }
 
-  /// Opens the page a caller asked for (`SeptaskSettingsLink`), once.
+  /// Opens the canonical registry page ID requested via `SeptaskSettingsLink`.
   private func consumeLink() {
-    guard let destination = SeptaskSettingsLink.pending else { return }
+    guard let pageID = SeptaskSettingsLink.pending else { return }
     SeptaskSettingsLink.pending = nil
     #if os(macOS)
-    selection = destination
+    let targetTab = owningDesktopTab(for: pageID)
+    selectedTab = targetTab
+    // Pages marked `desktopInline: true` (or top-level tab pages) render
+    // directly inside the selected tab without pushing onto the detail stack.
+    let isTabRoot = (pageID == targetTab) || isDesktopInline(pageID: pageID)
+    if isTabRoot {
+      path = []
+    } else {
+      // Defer push one turn so `.onChange(of: selectedTab)` doesn't clear it.
+      DispatchQueue.main.async {
+        path = [pageID]
+      }
+    }
     #else
-    path = [destination]
+    if pageID == RegistrySettings.PageID.advanced {
+      path = [RegistrySettings.PageID.about, RegistrySettings.PageID.advanced]
+    } else {
+      path = [pageID]
+    }
     #endif
   }
 
-  /// The Settings root list — identical rows on both platforms. `selectable`
-  /// picks the navigation idiom: `.tag` for the macOS split view's
-  /// `List(selection:)`, a `NavigationLink(value:)` for the iOS push stack.
+  // MARK: - iOS Flat Root (from RegistrySettings.rootGroups)
+
+  #if !os(macOS)
   @ViewBuilder
-  private func listContent(selectable: Bool) -> some View {
-    // Identity card — the Apple-ID analogue, the full app's top-of-Settings
-    // row. The Septask account is the Sign in with Apple session with the
-    // task backend; signed out, the card says so.
-    Section {
-      entry(.account, selectable: selectable) {
-        HStack(spacing: 14) {
-          ProfileAvatar(name: welcomeName, isPlus: plusUnlocked, size: 56)
-          VStack(alignment: .leading, spacing: 3) {
-            Text(welcomeName.isEmpty ? "Your Profile" : welcomeName)
-              .font(.title3.weight(.semibold))
-              .foregroundStyle(.primary)
-            if TaskSyncEngine.shared.signedIn {
-              if plusUnlocked { SeptenaPlusBadge() } else { FreeAccountBadge() }
-            } else {
-              Text("On this device")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+  private var iosRootContent: some View {
+    ForEach(RegistrySettings.rootGroups) { group in
+      let visibleItems = group.items.filter(isItemVisible)
+      if !visibleItems.isEmpty {
+        if group.mobilePresentation == "card" {
+          Section {
+            NavigationLink(value: RegistrySettings.PageID.account) {
+              profileCardContent
             }
           }
-          Spacer(minLength: 0)
+        } else {
+          Section {
+            ForEach(visibleItems) { item in
+              registryItemRow(item, expandDesktopInline: false)
+            }
+          } header: {
+            if let header = group.header {
+              Text(header)
+            }
+          }
         }
-        .padding(.vertical, 8)
-      }
-    }
-
-    // Root rows in the life app's order and palette; only the rows that hold
-    // settings in the task app are shown.
-    Section {
-      ForEach(rootDestinations, id: \.self) { destination in
-        entry(destination, selectable: selectable) { rootRow(destination) }
-      }
-    }
-
-    // About is set apart below the intent groups exactly as it is in Septena.
-    // The white-on-gray discs are Septask's own mark.
-    Section {
-      entry(.about, selectable: selectable) {
-        Label { Text("About") } icon: { SeptenaDiscTile(size: glyphSize) }
       }
     }
   }
+  #endif
 
-  /// Root rows, in the same relative order as the life app's
-  /// `SettingsView.staticDestinations`.
-  private var rootDestinations: [Destination] {
-    [.tasks, .connectionsAI, .data, .privacy]
-  }
+  // MARK: - macOS 6-Tab Sidebar (from RegistrySettings.desktopTabs)
 
-  /// Septena's full root order, with `nil` where Septena shows Sections, so
-  /// each row takes the same palette color it has in Septena.
-  private static let septenaPaletteOrder: [Destination?] = [
-    .tasks, nil, nil, nil, .connectionsAI,
-    .data, .privacy, nil,
-  ]
-
-  /// One list row, as either a selectable tag (macOS split view) or a
-  /// value-based push link (iOS stack).
+  #if os(macOS)
   @ViewBuilder
-  private func entry<L: View>(_ dest: Destination, selectable: Bool,
-                              @ViewBuilder label: () -> L) -> some View {
-    if selectable {
-      #if os(macOS)
-      label().settingsSidebarRow(dest, selection: selection)
-      #else
-      label().tag(dest)
-      #endif
-    } else {
-      NavigationLink(value: dest) { label() }
+  private var macSidebarContent: some View {
+    let identityTabs = RegistrySettings.desktopTabs.filter { $0.group == "identity" }
+    let mainTabs = RegistrySettings.desktopTabs.filter { $0.group == "main" }
+    let aboutTabs = RegistrySettings.desktopTabs.filter { $0.group == "about" }
+
+    if !identityTabs.isEmpty {
+      Section {
+        ForEach(identityTabs) { tab in
+          profileCardContent
+            .settingsSidebarRow(tab.id, selection: selectedTab)
+        }
+      }
+    }
+
+    if !mainTabs.isEmpty {
+      Section {
+        ForEach(mainTabs) { tab in
+          macSidebarRow(tab)
+            .settingsSidebarRow(tab.id, selection: selectedTab)
+        }
+      }
+    }
+
+    if !aboutTabs.isEmpty {
+      Section {
+        ForEach(aboutTabs) { tab in
+          Label {
+            Text(tab.title)
+          } icon: {
+            SeptenaDiscTile(size: 20)
+          }
+          .settingsSidebarRow(tab.id, selection: selectedTab)
+        }
+      }
     }
   }
 
-  private var glyphSize: CGFloat {
-    #if os(macOS)
-    20
-    #else
-    29
-    #endif
-  }
-
-  /// The full app's static-row anatomy: label + `ColoredGlyph` tile, tinted
-  /// from the shared root palette by the identical root-row order.
-  private func rootRow(_ destination: Destination) -> some View {
-    let color = tint(for: destination)
-    return Label {
-      Text(title(for: destination))
+  /// Bare SF Symbol in the accent color, the platform sidebar standard. No
+  /// per-row rainbow tile.
+  private func macSidebarRow(_ tab: RegistrySettingsTab) -> some View {
+    Label {
+      Text(tab.title)
     } icon: {
-      #if os(macOS)
-      ColoredGlyph(icon: icon(for: destination), color: color, size: 20, glyphRatio: 0.48)
-      #else
-      ColoredGlyph(icon: icon(for: destination), color: color, size: 29, glyphRatio: 0.38)
-      #endif
-    }
-  }
-
-  private func title(for destination: Destination) -> String {
-    switch destination {
-    case .account:       return "Account"
-    case .connectionsAI: return "Connections & AI"
-    case .data:          return "Import & Export"
-    case .privacy:       return "Privacy"
-    case .about:         return "About"
-    case .tasks:         return "Tasks"
-    case .claudeAI:      return "Connections & AI"
-    case .calendar:      return "Calendar"
-    case .reminders:     return "Reminders"
-    case .thingsImport:  return "Import from Things"
-    case .taskBackend:   return "Task backend"
-    }
-  }
-
-  private func icon(for destination: Destination) -> String {
-    switch destination {
-    case .account:       return "person.crop.circle"
-    case .connectionsAI: return "brain.head.profile"
-    case .data:          return "square.and.arrow.up"
-    case .privacy:       return "hand.raised"
-    case .about:         return "info.circle"
-    case .tasks:         return "checklist"
-    case .claudeAI:      return "brain.head.profile"
-    case .calendar:      return "calendar"
-    case .reminders:     return "checklist"
-    case .thingsImport:  return "square.and.arrow.down"
-    case .taskBackend:   return "arrow.up.doc"
-    }
-  }
-
-  private func tint(for destination: Destination) -> Color {
-    guard let index = Self.septenaPaletteOrder.firstIndex(of: destination) else { return .gray }
-    return SettingsAccentPalette.colors[index % SettingsAccentPalette.colors.count]
-  }
-
-  /// Septask's navigation value for each linked row on the shared Tasks
-  /// pane. `.section` is Septena-only (Septask shows the accent inline).
-  private static func taskSettingsDestination(_ link: TaskSettingsLink) -> Destination {
-    switch link {
-    case .section:   return .tasks
-    case .reminders: return .reminders
-    case .calendar:  return .calendar
-    case .things:    return .thingsImport
-    case .claudeAI:  return .claudeAI
+      Image(systemName: tab.sfSymbol)
+        .foregroundStyle(Color.accentColor)
     }
   }
 
   @ViewBuilder
-  private func pane(_ destination: Destination) -> some View {
-    switch destination {
-    case .account:       SeptaskAccountPane()
-    case .connectionsAI: SeptaskConnectionsAISettingsPane()
-    case .data:          SeptaskImportExportPane()
-    case .privacy:       SeptaskPrivacyPane()
-    case .about:         SeptaskAboutPane()
-    case .tasks:         TaskSettingsPane(destination: Self.taskSettingsDestination)
-                           .navigationTitle(title(for: destination))
-    case .claudeAI:      SeptaskConnectionsAISettingsPane()
-    case .calendar:      CalendarDetail().navigationTitle(title(for: destination))
-    case .reminders:     RemindersInboxDetail().navigationTitle(title(for: destination))
-    case .thingsImport:  ThingsImportView().navigationTitle(title(for: destination))
-    case .taskBackend:   SeptaskBackendSettingsPane()
+  private func macTabPane(_ tabID: String) -> some View {
+    switch tabID {
+    case RegistrySettings.TabID.account:
+      SeptaskAccountPane()
+    case RegistrySettings.TabID.privacy:
+      SeptaskPrivacyPane()
+    case RegistrySettings.TabID.about:
+      SeptaskAboutPane()
+    case RegistrySettings.TabID.aiAgents:
+      Form {
+        let groups = RegistrySettings.rootGroups.filter { $0.desktopTab == tabID }
+        ForEach(groups) { group in
+          let visibleItems = group.items.filter(isItemVisible)
+          ForEach(visibleItems) { item in
+            if item.kind == "pageLink", item.desktopInline, let target = item.page {
+              inlineDesktopPageSections(target)
+            } else {
+              Section {
+                registryItemRow(item, expandDesktopInline: true)
+              } header: {
+                if item.key == "agentsPaused" {
+                  Text("Agents")
+                }
+              } footer: {
+                if item.key == "agentsPaused" {
+                  Text("While paused, no agent can pick up or work on a task. Stop one task from its conversation instead. Agents never close assigned tasks on their own — finished work lands in Review for you to accept or send back.")
+                }
+              }
+            }
+          }
+        }
+      }
+      .formStyle(.grouped)
+      .navigationTitle(RegistrySettings.tabById[tabID]?.title ?? "AI & Agents")
+    default:
+      Form {
+        let groups = RegistrySettings.rootGroups.filter { $0.desktopTab == tabID }
+        ForEach(groups) { group in
+          let visibleItems = group.items.filter(isItemVisible)
+          if !visibleItems.isEmpty {
+            Section {
+              ForEach(visibleItems) { item in
+                registryItemRow(item, expandDesktopInline: true)
+              }
+            } header: {
+              if let header = group.header {
+                Text(header)
+              }
+            }
+          }
+        }
+      }
+      .formStyle(.grouped)
+      .navigationTitle(RegistrySettings.tabById[tabID]?.title ?? "Settings")
+    }
+  }
+
+  @ViewBuilder
+  private func inlineDesktopPageSections(_ pageID: String) -> some View {
+    switch pageID {
+    case RegistrySettings.PageID.claudePairing:
+      SeptaskClaudePairingSections()
+    case RegistrySettings.PageID.aiPreferences:
+      SeptaskAIPreferencesSections()
+    default:
+      EmptyView()
+    }
+  }
+
+  private func owningDesktopTab(for pageID: String) -> String {
+    if RegistrySettings.tabById[pageID] != nil { return pageID }
+    if pageID == RegistrySettings.PageID.advanced { return RegistrySettings.TabID.about }
+    for group in RegistrySettings.rootGroups {
+      if let tab = group.desktopTab,
+         group.items.contains(where: { $0.kind == "pageLink" && $0.page == pageID }) {
+        return tab
+      }
+    }
+    return RegistrySettings.TabID.general
+  }
+
+  private func isDesktopInline(pageID: String) -> Bool {
+    RegistrySettings.rootGroups.contains { group in
+      group.items.contains { $0.kind == "pageLink" && $0.page == pageID && $0.desktopInline }
+    }
+  }
+  #endif
+
+  // MARK: - Profile & Sync Card
+
+  private var profileCardContent: some View {
+    HStack(spacing: 14) {
+      #if os(macOS)
+      ProfileAvatar(name: welcomeName, isPlus: plusUnlocked, size: 44)
+      #else
+      ProfileAvatar(name: welcomeName, isPlus: plusUnlocked, size: 54)
+      #endif
+      VStack(alignment: .leading, spacing: 3) {
+        Text(welcomeName.isEmpty ? "Your Profile" : welcomeName)
+          .font(.title3.weight(.semibold))
+          .foregroundStyle(.primary)
+        HStack(spacing: 6) {
+          if TaskSyncEngine.shared.signedIn {
+            if plusUnlocked { SeptenaPlusBadge() } else { FreeAccountBadge() }
+            Text("·")
+              .font(.caption)
+              .foregroundStyle(.tertiary)
+            Text(liveSyncSummary)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          } else {
+            Text("On this device · Sign in to sync")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        }
+      }
+      Spacer(minLength: 0)
+    }
+    .padding(.vertical, 6)
+  }
+
+  // MARK: - Generic Registry Item Renderer
+
+  private func isItemVisible(_ item: RegistrySettingsItem) -> Bool {
+    guard item.applies(to: currentPlatform) else { return false }
+    switch item.visibility {
+    case "signedIn":
+      return TaskSyncEngine.shared.signedIn
+    case "signedOut":
+      return !TaskSyncEngine.shared.signedIn
+    case "debugOnly":
+      #if DEBUG
+      return true
+      #else
+      return false
+      #endif
+    case "minAppleOS27":
+      return OnDeviceAI.pccStatus != nil
+    default:
+      return true
+    }
+  }
+
+  @ViewBuilder
+  private func registryItemRow(_ item: RegistrySettingsItem, expandDesktopInline: Bool) -> some View {
+    switch item.kind {
+    case "pageLink":
+      if let pageID = item.page {
+        NavigationLink(value: pageID) {
+          HStack(spacing: 12) {
+            pageLinkLabel(item)
+            Spacer(minLength: 8)
+            if let badge = statusText(for: item.statusKey) {
+              Text(badge)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+          }
+        }
+      }
+    case "setting":
+      if let key = item.key {
+        settingControl(for: key, item: item)
+      }
+    case "customSurface":
+      if let surface = item.surface {
+        inlineSurface(for: surface, item: item)
+      }
+    default:
+      EmptyView()
+    }
+  }
+
+  @ViewBuilder
+  private func pageLinkLabel(_ item: RegistrySettingsItem) -> some View {
+    let title = item.label ?? RegistrySettings.pageById[item.page ?? ""]?.title ?? ""
+    if item.iconId == "settings.claude" {
+      Label {
+        Text(title)
+      } icon: {
+        Image("ClaudeMark")
+          .renderingMode(.template)
+          .resizable()
+          .scaledToFit()
+          .frame(width: 20, height: 20)
+      }
+      .foregroundStyle(.primary)
+    } else if item.page == RegistrySettings.PageID.about {
+      Label {
+        Text(title)
+      } icon: {
+        SeptenaDiscTile(size: 24)
+      }
+    } else if let symbol = item.sfSymbol {
+      Label(title, systemImage: symbol)
+    } else {
+      Text(title)
+    }
+  }
+
+  @ViewBuilder
+  private func settingControl(for key: String, item: RegistrySettingsItem) -> some View {
+    let label = item.label ?? key
+    switch key {
+    case "todayGroupByList":
+      Toggle(isOn: TaskViewOptions.announcing($todayGroupByList)) {
+        rowLabel(label, detail: item.detail)
+      }
+    case "todayShowCompleted":
+      Toggle(label, isOn: TaskViewOptions.announcing($todayShowCompleted))
+    case "tasksShowAging":
+      Toggle(isOn: TaskViewOptions.announcing($showAging)) {
+        rowLabel(label, detail: item.detail)
+      }
+    case "tasksShowFaded":
+      Toggle(isOn: TaskViewOptions.announcing($showFaded)) {
+        rowLabel(label, detail: item.detail)
+      }
+    case "tasksFilingSuggestions":
+      Toggle(isOn: $filingSuggestions) {
+        rowLabel(label, detail: item.detail)
+      }
+    case "badgeShowOverdue":
+      Toggle(label, isOn: $taskBadge)
+    case "agentsPaused":
+      Toggle(isOn: Binding(
+        get: { store.agentsPaused },
+        set: { store.setAgentsPaused($0, context: modelContext, engine: ckEngine) }
+      )) {
+        rowLabel(label, detail: item.detail)
+      }
+    case "loggingAnimationsEnabled":
+      Toggle(isOn: $completionAnimations) {
+        if let symbol = item.sfSymbol {
+          Label(label, systemImage: symbol)
+        } else {
+          Text(label)
+        }
+      }
+    case "tasksTitleLines":
+      Picker(label, selection: $titleLines) {
+        ForEach(RegistrySettings.optionsByKey["tasksTitleLines"] ?? []) { opt in
+          if let intVal = Int(opt.value) {
+            Text(opt.title).tag(intVal)
+          }
+        }
+      }
+    case "textSizeStep":
+      inlineTextSizeRow(label: label)
+    default:
+      EmptyView()
+    }
+  }
+
+  @ViewBuilder
+  private func inlineSurface(for surface: String, item: RegistrySettingsItem) -> some View {
+    switch surface {
+    case "accent_color":
+      AppearancePickerView()
+    default:
+      EmptyView()
+    }
+  }
+
+  private func inlineTextSizeRow(label: String) -> some View {
+    let sliderBinding = Binding<Double>(
+      get: { Double(TextSizeStep.resolve(textSizeStep).rawValue) },
+      set: {
+        let step = Int($0.rounded())
+        textSizeStep = step
+        #if os(macOS)
+        FontScale.shared.setStep(step)
+        #endif
+      }
+    )
+    return VStack(alignment: .leading, spacing: 6) {
+      HStack {
+        Text(label)
+        Spacer()
+        Text(TextSizeStep.resolve(textSizeStep).label)
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+      }
+      Slider(value: sliderBinding, in: -2...2, step: 1) {
+        Text(label)
+      } minimumValueLabel: {
+        Image(systemName: "textformat.size.smaller")
+          .foregroundStyle(.secondary)
+      } maximumValueLabel: {
+        Image(systemName: "textformat.size.larger")
+          .foregroundStyle(.secondary)
+      }
+      .accessibilityValue(TextSizeStep.resolve(textSizeStep).label)
+    }
+    .padding(.vertical, 2)
+  }
+
+  @ViewBuilder
+  private func rowLabel(_ title: String, detail: String?) -> some View {
+    if let detail, !detail.isEmpty {
+      VStack(alignment: .leading, spacing: 1) {
+        Text(title)
+        Text(detail)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+    } else {
+      Text(title)
+    }
+  }
+
+  // MARK: - Live Status Badges (for Depth-0 Push Rows)
+
+  private var liveSyncSummary: String {
+    let sync = TaskSyncEngine.shared
+    if sync.isSyncing { return "Syncing" }
+    if sync.pendingOps > 0 { return "\(sync.pendingOps) to send" }
+    return sync.wsConnected ? "Live" : "Offline"
+  }
+
+  private func statusText(for statusKey: String?) -> String? {
+    guard let statusKey else { return nil }
+    switch statusKey {
+    case "syncStatus":
+      return TaskSyncEngine.shared.signedIn ? liveSyncSummary : "On this device"
+    case "claudeStatus":
+      guard TaskSyncEngine.shared.signedIn else { return "Sign in" }
+      let paired = SeptaskSyncedSettings.current().getStartedSteps?.contains(TaskNoticeStep.ID.connectAI.rawValue) == true
+      return paired ? "Connected" : "Set up"
+    case "aiMode":
+      return (AIMode(rawValue: aiModeRaw) ?? .auto).title
+    case "calendarStatus":
+      guard showCalendarEvents, CalendarBridge.shared.access == .granted else { return "Off" }
+      let visible = CalendarBridge.shared.allCalendars().filter { !CalendarBridge.shared.isHidden($0) }.count
+      return visible == 1 ? "1 calendar" : "\(visible) calendars"
+    case "remindersStatus":
+      let bridge = RemindersBridge.shared
+      guard bridge.access == .granted, let id = bridge.sourceListID else { return "Off" }
+      return bridge.reminderLists().first(where: { $0.calendarIdentifier == id })?.title ?? "On"
+    default:
+      return nil
+    }
+  }
+
+  // MARK: - Depth-1 & Depth-2 Pages
+
+  @ViewBuilder
+  private func page(_ pageID: String) -> some View {
+    switch pageID {
+    case RegistrySettings.PageID.account:
+      SeptaskAccountPane()
+    case RegistrySettings.PageID.claudePairing:
+      SeptaskClaudePairingPane()
+    case RegistrySettings.PageID.aiPreferences:
+      SeptaskAIPreferencesPane()
+    case RegistrySettings.PageID.calendar:
+      CalendarDetail()
+        .navigationTitle("Calendar")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    case RegistrySettings.PageID.reminders:
+      RemindersInboxDetail()
+        .navigationTitle("Reminders")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    case RegistrySettings.PageID.importExport:
+      SeptaskImportExportPane()
+    case RegistrySettings.PageID.privacy:
+      SeptaskPrivacyPane()
+    case RegistrySettings.PageID.about:
+      SeptaskAboutPane()
+    case RegistrySettings.PageID.advanced:
+      SeptaskAdvancedPane()
+    default:
+      EmptyView()
     }
   }
 }
 
-// MARK: - Account
+// MARK: - Account (Depth 1)
 
-/// The Apple-ID analogue: editable name + the task-backend sign-in and sync
-/// state. No membership section (the support flow is Septena's; Septask
-/// stays out of it for v1).
 private struct SeptaskAccountPane: View {
   @Environment(\.modelContext) private var modelContext
-  // Only the "push allowed" signal `SettingsStore` takes; in Septask the
-  // push goes to the task backend and this engine never starts.
   @Environment(CKEngine.self) private var ckEngine
   @Environment(SettingsStore.self) private var store
-  @AppStorage(SettingsKey.welcomeName) private var welcomeName: String = ""
+  @AppStorage(SettingsKey.welcomeName) private var welcomeName: String =
+    RegistrySettings.Defaults.welcomeName
   @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked: Bool = false
 
   var body: some View {
@@ -324,77 +657,27 @@ private struct SeptaskAccountPane: View {
       }
 
       SeptaskSyncAccountSection()
-
-      // Next to Sync because the two answer the same worry — "is my work
-      // actually stored?" — from opposite ends: Sync covers the trip to
-      // the server, this covers the local write that has to land first. Renders
-      // nothing when no save has failed this launch. Septask has no Data Tools
-      // pane (that lives in Septena ▸ Advanced), so this is its only home.
-      StoreHealthSettingsSection()
-
       SeptaskDeleteAccountSection()
     }
     .formStyle(.grouped)
     .navigationTitle("Account")
+    #if os(iOS)
+    .navigationBarTitleDisplayMode(.inline)
+    #endif
   }
 }
 
-// MARK: - Connections & AI
+// MARK: - Privacy (Depth 1)
 
-/// One page, not a hub: the shared AI + Claude sections (the Claude row opens
-/// the task backend pane), then Connected Apps (docs/SETTINGS_FLATTEN_SPEC.md).
-private struct SeptaskConnectionsAISettingsPane: View {
-  @Environment(\.modelContext) private var modelContext
-  @Environment(CKEngine.self) private var ckEngine
-  @Environment(SettingsStore.self) private var store
-
-  var body: some View {
-    ClaudeAISettingsPane {
-      Section {
-        Toggle("Pause all agents", isOn: Binding(
-          get: { store.agentsPaused },
-          set: { store.setAgentsPaused($0, context: modelContext, engine: ckEngine) }
-        ))
-      } header: {
-        Text("Agents")
-      } footer: {
-        Text("While paused, no agent can pick up or work on a task. Stop one task from its conversation instead.")
-      }
-      Section {
-        NavigationLink(value: SeptaskSettingsView.Destination.reminders) {
-          Label("Reminders", systemImage: "checklist")
-        }
-        NavigationLink(value: SeptaskSettingsView.Destination.calendar) {
-          Label("Calendar", systemImage: "calendar")
-        }
-        NavigationLink(value: SeptaskSettingsView.Destination.thingsImport) {
-          Label("Things", systemImage: "square.and.arrow.down")
-        }
-      } header: {
-        Text("Connected Apps")
-      } footer: {
-        Text("Bring Reminders into your Inbox, weave calendar events into Today and Upcoming, or make a one-time migration from Things. Your source data is never modified.")
-      }
-    }
-    .navigationTitle("Connections & AI")
-  }
-}
-
-// MARK: - Privacy (task-only)
-
-/// Telemetry transparency (the real level dial, via SettingsStore) plus a
-/// task-scoped data-locality explainer. App Lock is intentionally absent —
-/// Septask doesn't mount the lock cover yet, so the toggle would be a lie.
+/// Concise privacy overview + one canonical usage-data dial. Opt-in weekly
+/// diagnostics & Community Pulse live in Settings ▸ About ▸ Advanced so
+/// consumer Privacy stays unambiguous (docs/SETTINGS_UX_SPEC.md).
 private struct SeptaskPrivacyPane: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(CKEngine.self) private var ckEngine
   @Environment(SettingsStore.self) private var store
   @AppStorage(SettingsKey.telemetryLevel) private var levelRaw: String =
-    TelemetryClient.TelemetryLevel.balanced.rawValue
-  @AppStorage(SeptaskDiagnosticsCoordinator.enabledKey) private var diagnosticsEnabled = false
-  @State private var diagnosticsPreview: SeptaskDiagnosticsBatch?
-  @State private var diagnosticsPulse: SeptaskDiagnosticsPulse?
-  @State private var loadingPulse = false
+    RegistrySettings.Defaults.telemetryLevel
 
   private var level: TelemetryClient.TelemetryLevel {
     TelemetryClient.TelemetryLevel(rawValue: levelRaw) ?? .balanced
@@ -403,15 +686,9 @@ private struct SeptaskPrivacyPane: View {
   var body: some View {
     Form {
       Section {
-        Text("Septena keeps your tasks, areas, projects, task conversations and a few settings (your name, usage data level, hidden calendars) on your devices. When you sign in, they sync through Septena's own server, in a private store for your account. The server encrypts them at rest, but not end to end, because Claude has to be able to read them.")
+        Text("Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena's private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). Apple's on-device intelligence runs locally; you can connect Claude under AI & Agents.")
       } header: {
-        Text("Where your data lives")
-      }
-
-      Section {
-        Text("Once you sign in, your tasks go to Septena's server so your devices stay in sync. Apple's on-device intelligence runs locally. If you connect Claude, it can read and change your tasks on that server. You pair Claude in About, under Advanced ▸ Task backend.")
-      } header: {
-        Text("What leaves the device")
+        Text("Your data")
       }
 
       Section {
@@ -428,98 +705,23 @@ private struct SeptaskPrivacyPane: View {
       } header: {
         Text("Anonymous usage data")
       } footer: {
-        Text(level.summary)
-      }
-
-      Section {
-        Toggle("Share anonymous weekly diagnostics", isOn: Binding(
-          get: { diagnosticsEnabled },
-          set: { enabled in
-            diagnosticsEnabled = enabled
-            SeptaskDiagnosticsCoordinator.setEnabled(enabled)
-            diagnosticsPreview = enabled ? SeptaskDiagnosticsCoordinator.shared.preview() : nil
-            if enabled { refreshDiagnosticsPulse() }
-            else { diagnosticsPulse = nil }
-          }
-        ))
-
-        if diagnosticsEnabled {
-          DisclosureGroup("What would be shared") {
-            ForEach(SeptaskDiagnosticsBatch.dataCatalog, id: \.self) { item in
-              Label(item, systemImage: "checkmark.circle")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            }
-
-            Divider()
-
-            Text("Never: task text, titles, counts, account identity, or a device identifier.")
-              .font(.callout)
-              .foregroundStyle(.secondary)
-          }
-
-          if let diagnosticsPreview {
-            VStack(alignment: .leading, spacing: 4) {
-              Text("This week's preview")
-                .font(.callout.weight(.medium))
-              Text("\(diagnosticsPreview.period) · \(diagnosticsPreview.app.version) (\(diagnosticsPreview.app.build)) · \(diagnosticsPreview.app.platform)")
-              Text("Claude: \(diagnosticsPreview.features.claudeConnected ? "on" : "off") · Calendar: \(diagnosticsPreview.features.calendarAccess ? "on" : "off") · Reminders: \(diagnosticsPreview.features.remindersAccess ? "on" : "off")")
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-          }
-
-          if loadingPulse {
-            ProgressView("Loading Community Pulse…")
-          } else if let latest = diagnosticsPulse?.latest {
-            VStack(alignment: .leading, spacing: 4) {
-              Text("Community Pulse")
-                .font(.callout.weight(.medium))
-              Text("\(latest.reportingInstalls) anonymous Septena installs reported for \(latest.period).")
-              if let version = latest.versions.first {
-                Text("Most reported version: \(version.name) (\(version.installs))")
-              }
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-          } else {
-            Text("Community Pulse appears once at least five anonymous installs report.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-        }
-      } header: {
-        Text("Optional product diagnostics")
-      } footer: {
-        Text("This is a separate, opt-in weekly summary that helps improve Septena. You don't need it for updates, sync, or support.")
-      }
-
-      Section {
-        Text("Your tasks and their contents are never sent through analytics. Only anonymous, aggregate usage is sent, at the level you choose above. This setting syncs across your devices.")
+        Text("\(level.summary) Your task text and titles are never sent through analytics. This setting syncs across your devices.")
       }
     }
     .formStyle(.grouped)
     .navigationTitle("Privacy")
-    .onAppear {
-      diagnosticsPreview = diagnosticsEnabled ? SeptaskDiagnosticsCoordinator.shared.preview() : nil
-      if diagnosticsEnabled { refreshDiagnosticsPulse() }
-    }
-  }
-
-  private func refreshDiagnosticsPulse() {
-    guard !loadingPulse else { return }
-    loadingPulse = true
-    Task { @MainActor in
-      diagnosticsPulse = await SeptaskDiagnosticsCoordinator.shared.loadPulse()
-      loadingPulse = false
-    }
+    #if os(iOS)
+    .navigationBarTitleDisplayMode(.inline)
+    #endif
   }
 }
 
-// MARK: - About
+// MARK: - About (Depth 1)
 
 private struct SeptaskAboutPane: View {
   @Environment(\.openURL) private var openURL
+  @Environment(SettingsStore.self) private var settingsStore
+  @Environment(NavigationState.self) private var nav
 
   var body: some View {
     Form {
@@ -542,16 +744,37 @@ private struct SeptaskAboutPane: View {
       }
 
       Section {
-        Text("Septena is a task app that thinks with you: Inbox, Today, Upcoming, areas, projects, and conversations on any task that needs a moment of thought.")
-      } header: {
-        Text("A focused task app")
+        #if os(macOS)
+        Button("Check for Updates…") {
+          Task { @MainActor in SeptaskUpdater.shared.checkForUpdates() }
+        }
+        #if DEBUG
+        .disabled(true)
+        #else
+        .disabled(!SeptaskUpdater.isConfigured)
+        #endif
+        #endif
+        Button("Show Get Started Again") { TaskNotices.resetGetStarted() }
+        // This device only: the synced `onboardedAt` stays, so other devices
+        // are not asked again (`SettingsStore.resetWelcomeForTesting`).
+        Button("Show Welcome Again") {
+          settingsStore.resetWelcomeForTesting()
+          #if os(macOS)
+          SeptaskKitFirstRunWindow.present()
+          #else
+          nav.showSettings = false
+          #endif
+        }
+        Link(destination: URL(string: "mailto:mz@envisioning.com?subject=Septena%20feedback")!) {
+          Label("Send feedback", systemImage: RegistryIcons.sfSymbols["settings.feedback"] ?? "paperplane")
+        }
       }
 
       Section {
-        Text("Septena Life is the companion app for the rest of what you track: habits, training, food, sleep, mood, and health. It shows those pieces together over time.")
+        Text("Septena Life is the companion app for habits, training, food, sleep, mood, and health.")
+          .font(.callout)
+          .foregroundStyle(.secondary)
         Button {
-          // Open Septena Life when it is installed; otherwise point to the
-          // website so the link never turns into a dead end.
           openURL(URL(string: "septena://")!) { accepted in
             if !accepted {
               openURL(URL(string: "https://www.septena.app")!)
@@ -565,47 +788,16 @@ private struct SeptaskAboutPane: View {
       }
 
       Section {
-        if TaskSyncEngine.shared.signedIn {
-          Text("Deleting the app from a device does not delete your tasks. They stay in your sync and come back when you install it again.")
-        } else {
-          Text("Your tasks stay on this device until you sign in to sync. You can export a JSON backup anytime under Import & Export.")
+        NavigationLink(value: RegistrySettings.PageID.advanced) {
+          Label("Advanced", systemImage: RegistryIcons.sfSymbols["settings.advanced"] ?? "wrench.and.screwdriver")
         }
-      } header: {
-        Text("Always your choice")
-      }
-
-      Section {
-        #if os(macOS)
-        Button("Check for Updates…") {
-          Task { @MainActor in SeptaskUpdater.shared.checkForUpdates() }
-        }
-        #if DEBUG
-        .disabled(true)
-        #else
-        .disabled(!SeptaskUpdater.isConfigured)
-        #endif
-        #endif
-        Button("Show Get Started Again") { TaskNotices.resetGetStarted() }
-      }
-
-      Section {
-        Link(destination: URL(string: "mailto:mz@envisioning.com?subject=Septena%20feedback")!) {
-          Label("Send feedback", systemImage: "paperplane")
-        }
-      } footer: {
-        Text("Tell us what feels great, what gets in the way, or what would make the app more useful. Your email app opens with a feedback subject.")
-      }
-
-      Section {
-        NavigationLink(value: SeptaskSettingsView.Destination.taskBackend) {
-          Label("Task backend", systemImage: "arrow.up.doc")
-        }
-      } header: {
-        Text("Advanced")
       }
     }
     .formStyle(.grouped)
     .navigationTitle("About")
+    #if os(iOS)
+    .navigationBarTitleDisplayMode(.inline)
+    #endif
   }
 }
 

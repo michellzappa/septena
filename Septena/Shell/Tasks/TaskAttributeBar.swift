@@ -1,8 +1,9 @@
 import SwiftUI
 
-// The composer's elective-pill rail — the row of Today / When / Deadline /
-// Repeat / List / Notes capsules under the title — and the inline panels a
-// pill expands into. Split out of TaskComposer.swift.
+// The composer's elective-pill rail — a single row of circular icon buttons
+// under the title & notes, in the registry's `taskAttributes` order — and the
+// inline panels a button expands into. Split out of
+// TaskComposer.swift.
 //
 // `TaskAttributeBar` is the entry point; the pill and the three inline panels
 // are private to this file.
@@ -34,50 +35,50 @@ struct TaskAttributeBar: View {
   /// Written whenever `showsDiscuss` changes so the composer can Tab to the pill.
   @Binding var discussVisible: Bool
 
-  /// The electives, in rail order. Each is fully described by the enum (icon /
-  /// label / how it presents); per-attribute *values* are derived from the draft
-  /// in `value(for:)` / `isSet(_:)`, and each editor lives in its own panel. So
-  /// every pill is wired identically — one `ForEach`, one `select(_:)` — and the
-  /// rail grows by adding a case, not another hand-written call.
-  enum Attribute: Identifiable {
-    // Notes IS an elective, but a special one: its pill only shows while notes
-    // are empty/unrevealed; selecting it reveals the multi-line notes field
-    // above the rail (see `TaskComposerCard.showsNotesField`) rather than
-    // expanding an inline panel. Not part of `draftCases` — it's rendered
-    // conditionally, like `.attachments`.
-    case notes, when, deadline, repeatRule, list, attachments
-    /// Edit-mode AI kickoff — rendered separately, not part of `draftCases`.
+  /// The electives. Order, label and icon come from the registry
+  /// (`registry/surfaces.json` `taskAttributes`, ADR 0020) so the AppKit
+  /// composer and every other client show the same rail; per-attribute
+  /// *values* are derived from the draft in `value(for:)` / `isSet(_:)`, and
+  /// each editor lives in its own panel. So every pill is wired identically:
+  /// one `ForEach`, one `select(_:)`. The raw value is the registry id.
+  enum Attribute: String, Identifiable {
+    case when, deadline, reminder, repeatRule = "repeat", star, list, tags, checklist, attachments
+    /// Edit-mode AI kickoff — shown only before a conversation exists.
     case discuss
     var id: Self { self }
 
-    /// Scheduling / filing electives — the `ForEach` rail.
-    static let draftCases: [Attribute] = [.when, .deadline, .repeatRule, .list]
+    private var registry: RegistryTaskAttribute { RegistrySurfaces.taskAttribute(rawValue) }
 
-    var icon: String {
-      switch self {
-      case .notes:      "text.alignleft"
-      case .when:       "calendar"
-      case .deadline:   "flag"
-      case .repeatRule: "repeat"
-      case .list:       "folder"
-      case .attachments:"paperclip"
-      case .discuss:    "bubble.left.and.bubble.right"
-      }
-    }
-    var label: String {
-      switch self {
-      case .notes:      "Notes"
-      case .when:       "When"
-      case .deadline:   "Deadline"
-      case .repeatRule: "Repeat"
-      case .list:       "List"
-      case .attachments:"Attachments"
-      case .discuss:    "Discuss"
-      }
-    }
+    /// Every pill, in registry rail order.
+    static let rail: [Attribute] = RegistrySurfaces.taskAttributePills.compactMap { Attribute(rawValue: $0.id) }
+    /// The pills a draft without a saved task can use (registry `editOnly` false).
+    static let draftCases: [Attribute] = rail.filter { !$0.editOnly }
+
+    var icon: String { registry.sfSymbol }
+    var label: String { registry.label }
+    /// Needs a saved task (tags, checklist, attachments, discuss).
+    var editOnly: Bool { registry.editOnly }
     /// List opens a sheet — a rich, searchable area/project picker reused across
     /// the Tasks surfaces. Every other pill expands an inline panel under the rail.
     var presentsSheet: Bool { self == .list }
+  }
+
+  /// Edit-only pill values, read once per render from the live task.
+  private struct EditOnlyState {
+    let tagNames: [String]
+    let stepsDone: Int
+    let stepsTotal: Int
+    let attachments: Int
+
+    @MainActor init(task: SeptenaTask) {
+      let ctx = LocalStore.shared.container.mainContext
+      let live = LocalCache.liveTasks(ids: [task.id], in: ctx).first ?? task
+      tagNames = LocalCache.resolvedTags(for: live, tagsByID: LocalCache.tagsByID(in: ctx)).map(\.name)
+      let steps = LocalCache.checklistItems(forTaskID: task.id, in: ctx)
+      stepsDone = steps.filter(\.checked).count
+      stepsTotal = steps.count
+      attachments = SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: task.id)
+    }
   }
 
   /// The currently expanded inline pill (never `.list`, which presents a sheet).
@@ -104,47 +105,22 @@ struct TaskAttributeBar: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
-      // Pills wrap onto extra rows as needed (FlowLayout) so every elective
-      // stays visible — no offscreen horizontal scroll. "Today" isn't its own
-      // pill: it's the same stored state as When=Today, so it lives inside the
-      // When control (quick chip) instead of duplicating the rail. Flat
-      // capsule fills (no floating glass) — these sit inline on the form card.
-      FlowLayout(spacing: 8) {
-        // Notes lead the rail, but only while collapsed — once the field is
-        // revealed (notes present or focused) it hosts the notes instead, so
-        // the pill and the field are never both on screen.
-        if draft.notes.isEmpty, focus != .notes {
-          AttributePill(icon: Attribute.notes.icon, label: Attribute.notes.label,
-                        value: nil, isSet: false, isActive: false,
-                        isFocused: focus == .pill(.notes),
-                        accent: accent, neutral: neutral) { revealNotes() }
-            .focused($focus, equals: .pill(.notes))
-        }
-        ForEach(Attribute.draftCases) { attr in
-          AttributePill(icon: attr.icon, label: attr.label,
-                        value: value(for: attr), isSet: isSet(attr),
-                        isActive: expanded == attr, isFocused: focus == .pill(attr),
-                        accent: accent, neutral: neutral) { select(attr) }
-            .focused($focus, equals: .pill(attr))
-        }
-        if let task = discussTask {
-          let count = SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: task.id)
-          AttributePill(icon: Attribute.attachments.icon, label: Attribute.attachments.label,
-                        value: count == 0 ? nil : "\(count) file\(count == 1 ? "" : "s")",
-                        isSet: count > 0, isActive: expanded == .attachments,
-                        isFocused: focus == .pill(.attachments), accent: accent, neutral: neutral) {
-            select(.attachments)
+      // Single horizontal row of circular icon buttons — all 6 fit comfortably
+      // on one row even on compact iPhone widths. "Today" lives inside the When
+      // control rather than duplicating the rail.
+      HStack(spacing: 8) {
+        let edit = discussTask.map(EditOnlyState.init(task:))
+        ForEach(Attribute.rail) { attr in
+          if shows(attr) {
+            AttributePill(icon: attr.icon, label: attr.label,
+                          value: value(for: attr, edit: edit), isSet: isSet(attr, edit: edit),
+                          isActive: attr != .discuss && expanded == attr,
+                          isLoading: attr == .discuss && discussWorking,
+                          isFocused: focus == .pill(attr),
+                          accent: accent, neutral: neutral) { select(attr) }
+              .focused($focus, equals: .pill(attr))
+              .disabled(attr == .discuss && discussWorking)
           }
-          .focused($focus, equals: .pill(.attachments))
-        }
-        if showsDiscuss {
-          AttributePill(icon: Attribute.discuss.icon, label: Attribute.discuss.label,
-                        value: discussWorking ? "Thinking…" : nil,
-                        isSet: discussWorking, isActive: false,
-                        isFocused: focus == .pill(.discuss),
-                        accent: accent, neutral: neutral) { select(.discuss) }
-            .focused($focus, equals: .pill(.discuss))
-            .disabled(discussWorking)
         }
       }
 
@@ -175,22 +151,50 @@ struct TaskAttributeBar: View {
     discussTask != nil && !discussStarted && OnDeviceAI.isAvailable
   }
 
+  /// Whether a pill is on the rail: edit-only pills need a saved task, and
+  /// Discuss only shows before a conversation exists.
+  private func shows(_ attr: Attribute) -> Bool {
+    if attr == .discuss { return showsDiscuss }
+    return !attr.editOnly || discussTask != nil
+  }
+
   /// The value shown on a pill (its `nil` falls back to the plain label). All
   /// values are derived from the draft — the single read-side of the rail.
-  private func value(for attr: Attribute) -> String? {
+  private func value(for attr: Attribute, edit: EditOnlyState?) -> String? {
     switch attr {
-    case .notes: return nil
-    case .discuss: return nil
-    case .attachments: return nil
+    case .discuss:
+      return discussWorking ? RegistrySurfaces.taskAttribute(attr.rawValue).workingLabel : nil
+    case .tags:
+      guard let names = edit?.tagNames, !names.isEmpty else { return nil }
+      return names.count == 1 ? names[0] : RegistrySurfaces.taskAttributeCount(attr.rawValue, count: names.count)
+    case .checklist:
+      guard let edit, edit.stepsTotal > 0 else { return nil }
+      return "\(edit.stepsDone)/\(edit.stepsTotal)"
+    case .attachments:
+      guard let count = edit?.attachments, count > 0 else { return nil }
+      return RegistrySurfaces.taskAttributeCount(attr.rawValue, count: count)
     // "When" folds in Today: a task pinned to today (no date) reads "Today", a
     // future planning date reads its date, nothing set reads as Anytime (nil).
     case .when:
-      if let s = draft.scheduled { return Self.dateLabel(s) }
-      return draft.onToday ? "Today" : nil
+      let slot = TaskTimeSlot.format(startTime: draft.startTime, durationMinutes: draft.durationMinutes)
+      if let s = draft.scheduled {
+        let base = Self.dateLabel(s)
+        return slot.map { "\(base) · \($0)" } ?? base
+      }
+      if draft.onToday {
+        let today = String(localized: "Today", comment: "Relative date")
+        return slot.map { "\(today) · \($0)" } ?? today
+      }
+      return slot
     case .deadline:
       return draft.deadline.map(Self.dateLabel)
+    case .reminder:
+      return draft.reminder?.badgeText()?.text
     case .repeatRule:
       return draft.recurrence?.shortLabel
+    // The filled pill already says it; no second word for "starred".
+    case .star:
+      return nil
     // The List pill always names its destination — "Inbox" by default, the area
     // or project once filed (but tinted only when explicitly filed, see isSet).
     case .list:
@@ -199,16 +203,26 @@ struct TaskAttributeBar: View {
   }
 
   /// Whether a pill counts as "filled" — drives the accent tint.
-  private func isSet(_ attr: Attribute) -> Bool {
+  private func isSet(_ attr: Attribute, edit: EditOnlyState?) -> Bool {
     switch attr {
-    case .notes:      !draft.notes.isEmpty
-    case .discuss:    discussWorking
-    case .attachments: discussTask.map { SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: $0.id) > 0 } ?? false
-    case .when:       draft.scheduled != nil || draft.onToday
-    case .deadline:   draft.deadline != nil
-    case .repeatRule: draft.recurrence != nil
-    case .list:       draft.areaId != nil || draft.projectId != nil
+    case .discuss:     discussWorking
+    case .tags:        !(edit?.tagNames.isEmpty ?? true)
+    case .checklist:   (edit?.stepsTotal ?? 0) > 0
+    case .attachments: (edit?.attachments ?? 0) > 0
+    case .when:        draft.scheduled != nil || draft.onToday
+    case .deadline:    draft.deadline != nil
+    case .reminder:    draft.reminder != nil
+    case .repeatRule:  draft.recurrence != nil
+    case .star:        draft.starred
+    case .list:        draft.areaId != nil || draft.projectId != nil
     }
+  }
+
+  /// Inline cards already sit on `Theme.cardSurface` (`secondaryGroupedBackground`),
+  /// so expanded picker panels inside them step down to `Theme.mutedSurface` to
+  /// keep a distinct surface; the drawer sits on `groupedBackground`.
+  private var panelFill: Color {
+    neutral ? Theme.mutedSurface : Theme.secondaryGroupedBackground
   }
 
   @ViewBuilder
@@ -216,17 +230,31 @@ struct TaskAttributeBar: View {
     // One transition for every inline panel — they all slide down from the rail.
     Group {
       switch expanded {
-      case .when:       InlineWhenPanel(draft: $draft)
-      case .deadline:   InlineDatePanel(date: $draft.deadline)
-      case .repeatRule: InlineRepeatPanel(recurrence: $draft.recurrence,
-                                          hasScheduledDate: draft.scheduled != nil,
-                                          accent: accent) {
+      case .when:       InlineWhenPanel(draft: $draft, accent: accent, fill: panelFill)
+      case .deadline:   InlineDatePanel(date: $draft.deadline, fill: panelFill)
+      case .reminder:   InlineReminderPanel(reminder: $draft.reminder,
+                                            accent: accent,
+                                            fill: panelFill) {
         a11yAnimate(.snappy(duration: 0.22)) { expanded = nil }
       }
+      case .repeatRule: InlineRepeatPanel(recurrence: $draft.recurrence,
+                                          hasScheduledDate: draft.scheduled != nil,
+                                          scheduledDate: SeptenaDate.format(draft.scheduled),
+                                          accent: accent,
+                                          fill: panelFill) {
+        a11yAnimate(.snappy(duration: 0.22)) { expanded = nil }
+      }
+      case .tags:
+        if let task = discussTask {
+          TaskTagsPanel(taskID: task.id, accent: accent, fill: panelFill)
+        }
+      case .checklist:
+        if let task = discussTask {
+          TaskChecklistPanel(taskID: task.id, accent: accent, fill: panelFill)
+        }
       case .attachments:
         if let task = discussTask { TaskAttachmentsPanel(taskID: task.id) }
-      // Notes reveals a field above the rail, not an inline panel here.
-      case .notes, .discuss, .list, .none: EmptyView()
+      case .discuss, .star, .list, .none: EmptyView()
       }
     }
     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -234,11 +262,16 @@ struct TaskAttributeBar: View {
 
   /// The single dispatch for every pill: sheet-backed pills open their sheet,
   /// inline pills toggle the expanded panel. Per-attribute setup (Repeat seeding
-  /// a default, Notes autofocusing) lives in each panel's `onAppear`, so this
-  /// stays uniform.
+  /// a default) lives in each panel's `onAppear`, so this stays uniform.
   private func select(_ attr: Attribute) {
     if attr == .discuss {
       startDiscuss()
+      return
+    }
+    if attr == .star {
+      focus = .pill(.star)
+      Haptics.tick()
+      a11yAnimate(.snappy(duration: 0.18)) { draft.starred.toggle() }
       return
     }
     // Move the keyboard cursor onto the pill (also drops the title field's
@@ -252,13 +285,6 @@ struct TaskAttributeBar: View {
         expanded = (expanded == attr) ? nil : attr
       }
     }
-  }
-
-  /// Reveal the notes field above the rail and drop the keyboard cursor into
-  /// it. `showsNotesField` keys off `focus == .notes`, so this both shows the
-  /// field and focuses it in one move.
-  private func revealNotes() {
-    a11yAnimate(.snappy(duration: 0.22)) { focus = .notes }
   }
 
   private func startDiscuss() {
@@ -285,11 +311,9 @@ struct TaskAttributeBar: View {
   /// "Today" / "Tomorrow" / "May 14" for a pill value.
   static func dateLabel(_ d: Date) -> String {
     let cal = Calendar.current
-    if cal.isDateInToday(d) { return "Today" }
-    if cal.isDateInTomorrow(d) { return "Tomorrow" }
-    let f = DateFormatter()
-    f.setLocalizedDateFormatFromTemplate("MMMd")
-    return f.string(from: d)
+    if cal.isDateInToday(d) { return String(localized: "Today", comment: "Relative date") }
+    if cal.isDateInTomorrow(d) { return String(localized: "Tomorrow", comment: "Relative date") }
+    return SeptenaDate.monthDay(d)
   }
 }
 
@@ -301,46 +325,88 @@ private struct AttributePill: View {
   let value: String?
   let isSet: Bool
   let isActive: Bool
+  var isLoading: Bool = false
   /// The keyboard cursor is on this pill — draw the focus ring (the system ring
   /// never shows with macOS keyboard navigation off).
   var isFocused: Bool = false
   let accent: Color
-  /// Monochrome rail (inline editor): filled/active pills wear a neutral gray
-  /// capsule and the focus ring goes gray, so no section accent leaks into the
+  /// Monochrome rail (inline editor): filled/active circles wear a neutral gray
+  /// tint and the focus ring goes gray, so no section accent leaks into the
   /// open editor. See `TaskAttributeBar.neutral`.
   var neutral: Bool = false
   let action: () -> Void
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
-  /// Capsule fill — flat surface, no floating-glass elevation shadow.
-  private var capsuleFill: Color {
+  private static let diameter: CGFloat = 34
+
+  /// Circular fill — flat surface, no floating-glass elevation shadow.
+  private var circleFill: Color {
     guard isSet || isActive else { return Theme.mutedSurface }
-    return neutral ? Theme.inkPrimary.opacity(0.10) : accent.opacity(0.42)
+    if neutral {
+      return Theme.inkPrimary.opacity(isActive ? 0.16 : 0.11)
+    }
+    return accent.opacity(isActive ? 0.42 : 0.30)
   }
   private var ringColor: Color { neutral ? Theme.selectionNeutral : accent }
 
+  private var accessibleSummary: String {
+    if let value { return "\(label): \(value)" }
+    return label
+  }
+
   var body: some View {
     Button(action: action) {
-      HStack(spacing: 5) {
-        Image(systemName: icon)
-          .font(.system(size: 12, weight: .semibold))
-        // Text follows the value when one exists (so the List pill can read
-        // "Inbox" while still untinted); tint stays driven by `isSet`.
-        Text(value ?? label)
-          .font(.septenaLabel)
-          .lineLimit(1)
+      Group {
+        if isLoading {
+          ProgressView()
+            .controlSize(.mini)
+        } else {
+          Image(systemName: icon)
+            .font(.system(size: 14, weight: .semibold))
+        }
       }
-      .foregroundStyle(isSet ? Theme.inkPrimary : Theme.inkSecondary)
-      .padding(.horizontal, 12)
-      .padding(.vertical, 8)
-      .contentShape(Capsule())
+      .foregroundStyle((isSet || isActive) ? Theme.inkPrimary : Theme.inkSecondary)
+      .frame(width: Self.diameter, height: Self.diameter)
+      .contentShape(Circle())
     }
     .buttonStyle(.plain)
-    .background(Capsule().fill(capsuleFill))
+    .modifier(AttributePillGlassBackground(
+      circleFill: circleFill,
+      tint: (isSet || isActive) ? (neutral ? Theme.inkPrimary.opacity(isActive ? 0.20 : 0.12) : accent.opacity(isActive ? 0.36 : 0.22)) : nil,
+      reduceTransparency: reduceTransparency
+    ))
     .overlay {
-      Capsule()
+      Circle()
         .strokeBorder(ringColor, lineWidth: 2)
         .opacity(isFocused ? 1 : 0)
         .allowsHitTesting(false)
+    }
+    .accessibilityLabel(accessibleSummary)
+    .help(accessibleSummary)
+  }
+}
+
+private struct AttributePillGlassBackground: ViewModifier {
+  let circleFill: Color
+  let tint: Color?
+  let reduceTransparency: Bool
+
+  func body(content: Content) -> some View {
+    if reduceTransparency {
+      content.background(Circle().fill(circleFill))
+    } else {
+      #if os(iOS)
+      if let tint {
+        content.glassEffect(.regular.tint(tint).interactive(), in: .circle)
+      } else {
+        content.glassEffect(.regular.interactive(), in: .circle)
+      }
+      #else
+      content
+        .background(.thinMaterial, in: Circle())
+        .background(Circle().fill(tint ?? .clear))
+        .overlay(Circle().strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5))
+      #endif
     }
   }
 }
@@ -357,18 +423,98 @@ private struct AttributePill: View {
 /// keeps the task in Anytime.
 private struct InlineWhenPanel: View {
   @Binding var draft: TaskDraft
+  let accent: Color
+  let fill: Color
+  @State private var showTimeControls = false
 
   var body: some View {
-    TaskDateBoard(
-      selected: draft.scheduled,
-      todayActive: draft.onToday && draft.scheduled == nil,
-      clearLabel: (draft.scheduled != nil || draft.onToday) ? "No Date" : nil,
-      onToday: { a11yAnimate(.snappy(duration: 0.2)) { draft.setToday() } },
-      onPick: { d in a11yAnimate(.snappy(duration: 0.2)) { draft.setScheduled(d) } },
-      onClear: { a11yAnimate(.snappy(duration: 0.2)) { draft.clearWhen() } })
+    VStack(alignment: .leading, spacing: 10) {
+      TaskDateBoard(
+        selected: draft.scheduled,
+        todayActive: draft.onToday && draft.scheduled == nil,
+        clearLabel: (draft.scheduled != nil || draft.onToday || draft.startTime != nil) ? "No Date" : nil,
+        onToday: { a11yAnimate(.snappy(duration: 0.2)) { draft.setToday() } },
+        onPick: { d in a11yAnimate(.snappy(duration: 0.2)) { draft.setScheduled(d) } },
+        onClear: { a11yAnimate(.snappy(duration: 0.2)) { draft.clearWhen(); showTimeControls = false } })
+
+      Divider()
+
+      if showTimeControls || draft.startTime != nil {
+        VStack(alignment: .leading, spacing: 8) {
+          HStack {
+            Label("Time", systemImage: "clock")
+              .font(.septenaLabel)
+              .foregroundStyle(Theme.inkPrimary)
+            Spacer()
+            DatePicker(
+              "Start time",
+              selection: Binding(
+                get: { TaskTimeSlot.pickerDate(from: draft.startTime) },
+                set: { newDate in
+                  draft.startTime = TaskTimeSlot.hhmm(from: newDate)
+                  if !draft.onToday && draft.scheduled == nil { draft.setToday() }
+                }
+              ),
+              displayedComponents: .hourAndMinute
+            )
+            .labelsHidden()
+            Button("Clear") {
+              a11yAnimate(.snappy(duration: 0.18)) {
+                draft.startTime = nil
+                draft.durationMinutes = nil
+                showTimeControls = false
+              }
+            }
+            .buttonStyle(.plain)
+            .font(.septenaCaption)
+            .foregroundStyle(Theme.inkSecondary)
+            .contentShape(Rectangle())
+          }
+
+          HStack(spacing: 6) {
+            ForEach(TaskTimeSlot.quickDurations, id: \.minutes) { preset in
+              SelectableChip(preset.label,
+                             isSelected: draft.durationMinutes == preset.minutes,
+                             tint: accent) {
+                Haptics.tick()
+                a11yAnimate(.snappy(duration: 0.18)) {
+                  if draft.startTime == nil { draft.startTime = "09:00" }
+                  if !draft.onToday && draft.scheduled == nil { draft.setToday() }
+                  draft.durationMinutes = draft.durationMinutes == preset.minutes ? nil : preset.minutes
+                }
+              }
+            }
+            Spacer(minLength: 0)
+          }
+        }
+      } else {
+        Button {
+          a11yAnimate(.snappy(duration: 0.2)) {
+            showTimeControls = true
+            if draft.startTime == nil { draft.startTime = "09:00" }
+            if !draft.onToday && draft.scheduled == nil { draft.setToday() }
+          }
+        } label: {
+          HStack(spacing: 6) {
+            Image(systemName: "clock")
+              .scaledFont(size: 12)
+            Text("Add time")
+              .font(.septenaLabel)
+            Spacer(minLength: 0)
+          }
+          .foregroundStyle(Theme.inkSecondary)
+          .padding(.vertical, 2)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+      }
+    }
     .padding(12)
-    .background(Theme.secondaryGroupedBackground,
+    .background(fill,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .onAppear {
+      showTimeControls = draft.startTime != nil
+    }
   }
 }
 
@@ -380,6 +526,7 @@ private struct InlineWhenPanel: View {
 /// It used to be a bare month calendar with no relative choices at all.
 private struct InlineDatePanel: View {
   @Binding var date: Date?
+  let fill: Color
   @Environment(DayClock.self) private var clock
 
   private var cal: Calendar { Calendar.current }
@@ -396,8 +543,136 @@ private struct InlineDatePanel: View {
       onPick: { d in a11yAnimate(.snappy(duration: 0.2)) { date = cal.startOfDay(for: d) } },
       onClear: { a11yAnimate(.snappy(duration: 0.2)) { date = nil } })
     .padding(12)
-    .background(Theme.secondaryGroupedBackground,
+    .background(fill,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+  }
+}
+
+// MARK: - Inline reminder editor (TR2)
+
+private struct InlineReminderPanel: View {
+  @Binding var reminder: TaskReminder?
+  let accent: Color
+  let fill: Color
+  var onStop: () -> Void = {}
+
+  @State private var pickedDate: Date = DayClock.appNow.addingTimeInterval(3600)
+  @State private var mode: TaskReminderMode = .floating
+  @State private var showOptions = false
+  @State private var notificationsDenied = false
+
+  private func apply(date: Date, mode: TaskReminderMode) {
+    pickedDate = date
+    self.mode = mode
+    reminder = TaskReminder.make(date: date, mode: mode)
+    Task {
+      let granted = await TaskReminderScheduler.shared.requestAuthorizationIfNeeded()
+      notificationsDenied = !granted
+    }
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      if notificationsDenied {
+        Button {
+          TaskReminderScheduler.openNotificationSettings()
+        } label: {
+          HStack(spacing: 6) {
+            Image(systemName: "bell.slash")
+              .font(.caption.weight(.semibold))
+            Text("Notifications are off — Open Settings")
+              .font(.caption.weight(.medium))
+            Spacer(minLength: 0)
+          }
+          .foregroundStyle(Theme.overdueRed)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+      }
+
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 6) {
+          ForEach(TaskReminder.quickPresets(), id: \.title) { preset in
+            SelectableChip(preset.title, isSelected: false, tint: accent) {
+              apply(date: preset.date, mode: mode)
+            }
+          }
+        }
+      }
+
+      DatePicker(
+        "Remind at",
+        selection: Binding(
+          get: { pickedDate },
+          set: { apply(date: $0, mode: mode) }
+        ),
+        displayedComponents: [.date, .hourAndMinute]
+      )
+      .datePickerStyle(.compact)
+      .font(.septenaSidebarRow)
+
+      Button {
+        a11yAnimate(.snappy(duration: 0.2)) { showOptions.toggle() }
+      } label: {
+        HStack(spacing: 6) {
+          Image(systemName: showOptions ? "chevron.down" : "chevron.right")
+            .font(.caption.weight(.semibold))
+          Text(showOptions ? "Hide time zone options" : "Time zone options…")
+            .font(.caption.weight(.medium))
+          Spacer(minLength: 0)
+        }
+        .foregroundStyle(Theme.inkSecondary)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+
+      if showOptions {
+        Toggle(
+          "Fixed time zone",
+          isOn: Binding(
+            get: { mode == .fixed },
+            set: { isFixed in
+              let next: TaskReminderMode = isFixed ? .fixed : .floating
+              mode = next
+              if reminder != nil {
+                apply(date: pickedDate, mode: next)
+              }
+            }
+          )
+        )
+        .font(.septenaSidebarRow)
+        .tint(accent)
+      }
+
+      if reminder != nil {
+        Button(role: .destructive) {
+          reminder = nil
+          onStop()
+        } label: {
+          Label("Clear Reminder", systemImage: "xmark.circle")
+            .font(.septenaLabel)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Theme.overdueRed)
+      }
+    }
+    .padding(12)
+    .background(fill,
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .onAppear {
+      if let existing = reminder {
+        pickedDate = existing.effectiveFireDate() ?? DayClock.appNow.addingTimeInterval(3600)
+        mode = existing.mode
+        showOptions = existing.mode == .fixed
+      } else {
+        pickedDate = TaskReminder.quickPresets().first?.date ?? DayClock.appNow.addingTimeInterval(3600)
+        mode = .floating
+        showOptions = false
+      }
+    }
+    .task {
+      notificationsDenied = await TaskReminderScheduler.shared.authorizationStatus() == .denied
+    }
   }
 }
 
@@ -412,16 +687,42 @@ private struct InlineRepeatPanel: View {
   /// the completion day), so the toggle is held ON and explained rather than
   /// offering a choice that doesn't do what it says.
   let hasScheduledDate: Bool
+  var scheduledDate: String? = nil
   let accent: Color
+  let fill: Color
   /// Collapse the rail's expanded panel. "Don't Repeat" calls it (clear + close);
   /// owned by `TaskAttributeBar.expanded`.
   var onStop: () -> Void = {}
+
+  private enum MonthlyMode: Int { case anchor = 0, dayOfMonth = 1, ordinal = 2 }
+
+  private static let weekdayPills: [(day: Int, short: String, full: String)] = [
+    (2, "M", "Monday"), (3, "T", "Tuesday"), (4, "W", "Wednesday"),
+    (5, "T", "Thursday"), (6, "F", "Friday"), (7, "S", "Saturday"),
+    (1, "S", "Sunday"),
+  ]
+
+  private static let ordinalChoices: [(value: Int, label: String)] = [
+    (1, "1st"), (2, "2nd"), (3, "3rd"), (4, "4th"), (-1, "Last"),
+  ]
+
+  private static let fullWeekdays: [(value: Int, label: String)] = [
+    (1, "Sunday"), (2, "Monday"), (3, "Tuesday"), (4, "Wednesday"),
+    (5, "Thursday"), (6, "Friday"), (7, "Saturday"),
+  ]
+
+  private static let nextPreviewFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.setLocalizedDateFormatFromTemplate("EEEMMMd")
+    return f
+  }()
 
   /// True once the user actually picks a value here (or the task already
   /// repeated when the panel opened). A panel opened but left untouched reverts
   /// on close — so merely *peeking* at Repeat never commits a recurrence, and
   /// re-tapping the pill (or clicking away) cleanly undoes the open.
   @State private var confirmed = false
+  @State private var showCustom = false
 
   /// Every control write goes through here so any real interaction marks the
   /// recurrence as confirmed (and thus kept on close).
@@ -430,19 +731,47 @@ private struct InlineRepeatPanel: View {
   private var unit: Binding<Recurrence.Unit> {
     Binding(get: { recurrence?.unit ?? .week },
             set: { write(Recurrence(unit: $0, interval: recurrence?.interval ?? 1,
-                                    afterCompletion: recurrence?.afterCompletion ?? true)) })
+                                    afterCompletion: recurrence?.afterCompletion ?? true,
+                                    weekdays: recurrence?.weekdays,
+                                    monthDay: recurrence?.monthDay,
+                                    ordinalWeekday: recurrence?.ordinalWeekday)) })
   }
   private var interval: Binding<Int> {
     Binding(get: { recurrence?.interval ?? 1 },
             set: { write(Recurrence(unit: recurrence?.unit ?? .week, interval: $0,
-                                    afterCompletion: recurrence?.afterCompletion ?? true)) })
+                                    afterCompletion: recurrence?.afterCompletion ?? true,
+                                    weekdays: recurrence?.weekdays,
+                                    monthDay: recurrence?.monthDay,
+                                    ordinalWeekday: recurrence?.ordinalWeekday)) })
   }
   private var afterCompletion: Binding<Bool> {
     // Reads ON with no date because that IS the behavior — showing a stored
     // OFF the engine can't honor would misreport what the rule will do.
     Binding(get: { !hasScheduledDate || (recurrence?.afterCompletion ?? true) },
             set: { write(Recurrence(unit: recurrence?.unit ?? .week,
-                                    interval: recurrence?.interval ?? 1, afterCompletion: $0)) })
+                                    interval: recurrence?.interval ?? 1,
+                                    afterCompletion: $0,
+                                    weekdays: recurrence?.weekdays,
+                                    monthDay: recurrence?.monthDay,
+                                    ordinalWeekday: recurrence?.ordinalWeekday)) })
+  }
+
+  private var currentMonthlyMode: MonthlyMode {
+    if recurrence?.ordinalWeekday != nil { return .ordinal }
+    if recurrence?.monthDay != nil { return .dayOfMonth }
+    return .anchor
+  }
+
+  private var supportsCustomOptions: Bool {
+    guard hasScheduledDate, let r = recurrence, !r.afterCompletion else { return false }
+    return r.unit == .week || r.unit == .month || r.unit == .year
+  }
+
+  private var nextPreview: String? {
+    guard let r = recurrence,
+          let wire = r.nextDate(completedOn: DayClock.appToday, scheduled: scheduledDate),
+          let date = SeptenaDate.parse(wire) else { return nil }
+    return Self.nextPreviewFormatter.string(from: date)
   }
 
   var body: some View {
@@ -455,6 +784,17 @@ private struct InlineRepeatPanel: View {
       }
       .pickerStyle(.segmented)
 
+      if hasScheduledDate {
+        let isWeekdays = recurrence?.afterCompletion == false
+          && recurrence?.unit == .week
+          && recurrence?.interval == 1
+          && Set(recurrence?.weekdays ?? []) == Set([2, 3, 4, 5, 6])
+        SelectableChip("Weekdays (Mon–Fri)", isSelected: isWeekdays, tint: accent) {
+          write(Recurrence(unit: .week, interval: 1, afterCompletion: false,
+                           weekdays: [2, 3, 4, 5, 6]))
+        }
+      }
+
       Stepper(value: interval, in: 1...99) {
         Text("Every \(intervalLabel())")
           .font(.septenaSidebarRow)
@@ -465,6 +805,151 @@ private struct InlineRepeatPanel: View {
         .font(.septenaSidebarRow)
         .tint(accent)
         .disabled(!hasScheduledDate)
+
+      if supportsCustomOptions {
+        Button {
+          a11yAnimate(.snappy(duration: 0.2)) { showCustom.toggle() }
+        } label: {
+          HStack(spacing: 6) {
+            Image(systemName: showCustom ? "chevron.down" : "chevron.right")
+              .font(.caption.weight(.semibold))
+            Text(showCustom ? "Hide custom options" : "Custom options…")
+              .font(.caption.weight(.medium))
+            Spacer(minLength: 0)
+          }
+          .foregroundStyle(Theme.inkSecondary)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+
+        if showCustom {
+          if recurrence?.unit == .week {
+            let selectedDays = Set(recurrence?.weekdays ?? [])
+            HStack(spacing: 4) {
+              ForEach(Self.weekdayPills, id: \.day) { item in
+                SelectableChip(item.short,
+                               isSelected: selectedDays.contains(item.day),
+                               tint: accent,
+                               shape: .roundedRect,
+                               fillsWidth: true) {
+                  var next = selectedDays
+                  if next.contains(item.day) { next.remove(item.day) } else { next.insert(item.day) }
+                  write(Recurrence(unit: .week,
+                                   interval: recurrence?.interval ?? 1,
+                                   afterCompletion: false,
+                                   weekdays: next.isEmpty ? nil : next.sorted()))
+                }
+                .accessibilityLabel(item.full)
+              }
+            }
+          } else if recurrence?.unit == .month || recurrence?.unit == .year {
+            let anchor = scheduledDate.flatMap(SeptenaDate.parse) ?? DayClock.appNow
+            let cal = Calendar.current
+            let defaultDay = cal.component(.day, from: anchor)
+            let defaultOrd = min(4, max(1, (defaultDay - 1) / 7 + 1))
+            let defaultWeekday = cal.component(.weekday, from: anchor)
+
+            Picker("Monthly rule", selection: Binding(
+              get: { currentMonthlyMode },
+              set: { mode in
+                switch mode {
+                case .anchor:
+                  write(Recurrence(unit: recurrence?.unit ?? .month,
+                                   interval: recurrence?.interval ?? 1,
+                                   afterCompletion: false))
+                case .dayOfMonth:
+                  write(Recurrence(unit: recurrence?.unit ?? .month,
+                                   interval: recurrence?.interval ?? 1,
+                                   afterCompletion: false,
+                                   monthDay: recurrence?.monthDay ?? defaultDay))
+                case .ordinal:
+                  write(Recurrence(unit: recurrence?.unit ?? .month,
+                                   interval: recurrence?.interval ?? 1,
+                                   afterCompletion: false,
+                                   ordinalWeekday: recurrence?.ordinalWeekday
+                                     ?? RecurrenceOrdinalWeekday(ordinal: defaultOrd,
+                                                                 weekday: defaultWeekday)))
+                }
+              }
+            )) {
+              Text("Same day").tag(MonthlyMode.anchor)
+              Text("On day").tag(MonthlyMode.dayOfMonth)
+              Text("Ordinal").tag(MonthlyMode.ordinal)
+            }
+            .pickerStyle(.segmented)
+
+            if currentMonthlyMode == .dayOfMonth {
+              HStack(spacing: 8) {
+                Text("Day")
+                  .font(.caption)
+                  .foregroundStyle(Theme.inkSecondary)
+                Picker("Day of month", selection: Binding(
+                  get: { recurrence?.monthDay ?? defaultDay },
+                  set: { day in
+                    write(Recurrence(unit: recurrence?.unit ?? .month,
+                                     interval: recurrence?.interval ?? 1,
+                                     afterCompletion: false,
+                                     monthDay: day))
+                  }
+                )) {
+                  ForEach(1...31, id: \.self) { d in Text("\(d)").tag(d) }
+                  Text("Last day").tag(-1)
+                }
+                .pickerStyle(.menu)
+                .tint(Theme.inkPrimary)
+              }
+            } else if currentMonthlyMode == .ordinal {
+              let currentOW = recurrence?.ordinalWeekday
+                ?? RecurrenceOrdinalWeekday(ordinal: defaultOrd, weekday: defaultWeekday)
+              HStack(spacing: 6) {
+                Text("On the")
+                  .font(.caption)
+                  .foregroundStyle(Theme.inkSecondary)
+                Picker("Ordinal", selection: Binding(
+                  get: { currentOW.ordinal },
+                  set: { ord in
+                    write(Recurrence(unit: recurrence?.unit ?? .month,
+                                     interval: recurrence?.interval ?? 1,
+                                     afterCompletion: false,
+                                     ordinalWeekday: RecurrenceOrdinalWeekday(ordinal: ord,
+                                                                              weekday: currentOW.weekday)))
+                  }
+                )) {
+                  ForEach(Self.ordinalChoices, id: \.value) { item in
+                    Text(item.label).tag(item.value)
+                  }
+                }
+                .pickerStyle(.menu)
+                .tint(Theme.inkPrimary)
+
+                Picker("Weekday", selection: Binding(
+                  get: { currentOW.weekday },
+                  set: { wd in
+                    write(Recurrence(unit: recurrence?.unit ?? .month,
+                                     interval: recurrence?.interval ?? 1,
+                                     afterCompletion: false,
+                                     ordinalWeekday: RecurrenceOrdinalWeekday(ordinal: currentOW.ordinal,
+                                                                              weekday: wd)))
+                  }
+                )) {
+                  ForEach(Self.fullWeekdays, id: \.value) { item in
+                    Text(item.label).tag(item.value)
+                  }
+                }
+                .pickerStyle(.menu)
+                .tint(Theme.inkPrimary)
+              }
+            }
+          }
+        }
+      }
+
+      if let next = nextPreview, let r = recurrence {
+        Text("\(r.shortLabel) · Next: \(next)")
+          .font(.caption)
+          .foregroundStyle(Theme.inkSecondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
 
       if !hasScheduledDate {
         Text("Give the task a date to repeat on a fixed schedule.")
@@ -485,20 +970,28 @@ private struct InlineRepeatPanel: View {
       .foregroundStyle(Theme.overdueRed)
     }
     .padding(12)
-    .background(Theme.secondaryGroupedBackground,
+    .background(fill,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     // Opening shows a weekly preview so the controls have something to bind, but
     // it's only a peek: `confirmed` stays false until a real edit, and an
     // untouched panel reverts to "no repeat" on close (`onDisappear`). A task
     // that already repeated counts as confirmed, so editing never loses it.
     .onAppear {
-      if recurrence == nil { recurrence = Recurrence(unit: .week); confirmed = false }
-      else { confirmed = true }
+      if recurrence == nil {
+        recurrence = Recurrence(unit: .week)
+        confirmed = false
+        showCustom = false
+      } else {
+        confirmed = true
+        showCustom = recurrence?.weekdays != nil
+          || recurrence?.monthDay != nil
+          || recurrence?.ordinalWeekday != nil
+      }
     }
     .onDisappear { if !confirmed { recurrence = nil } }
   }
 
-  /// Pluralized "N days/weeks/months" via the String Catalog (one/other).
+  /// Pluralized "N days/weeks/months/years" via the String Catalog (one/other).
   private func intervalLabel() -> String {
     let n = interval.wrappedValue
     switch recurrence?.unit ?? .week {
@@ -510,9 +1003,363 @@ private struct InlineRepeatPanel: View {
   }
 }
 
-// MARK: - Inline notes editor
+// MARK: - Inline Checklist panel
 
-/// A multi-line notes field that writes `draft.notes`, expanded under the Notes
-/// pill. Autofocuses on appear (you tapped the pill to write), and offers a
-/// "Clear" when there's text — the same shape as the When / Deadline panels.
-// MARK: - Presentation
+/// Progressive-disclosure inline checklist editor inside the SwiftUI task editor
+/// (iOS/iPadOS & SwiftUI Mac sheet). Stays quiet until opened; supports inline
+/// add, Return-to-insert-below, multi-line paste split, reorder, and delete with
+/// shared `TaskUndo` recording.
+private struct TaskChecklistPanel: View {
+  let taskID: String
+  let accent: Color
+  let fill: Color
+
+  @State private var items: [ChecklistItem] = []
+  @State private var drafts: [String: String] = [:]
+  @FocusState private var focusedItemID: String?
+
+  private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
+        checklistRow(item: item, index: idx, total: items.count)
+      }
+
+      Button {
+        addStep()
+      } label: {
+        HStack(spacing: 6) {
+          Image(systemName: "plus")
+            .font(.system(size: 11, weight: .semibold))
+          Text("Add step")
+            .font(.septenaLabel)
+          Spacer(minLength: 0)
+        }
+        .foregroundStyle(Theme.inkSecondary)
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(Text("Add checklist step"))
+    }
+    .padding(12)
+    .background(fill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .onAppear {
+      reload()
+      if items.isEmpty { addStep() }
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+      reload()
+    }
+    .onDisappear {
+      flushAllDrafts()
+    }
+  }
+
+  private func checklistRow(item: ChecklistItem, index: Int, total: Int) -> some View {
+    let binding = Binding<String>(
+      get: { drafts[item.id] ?? item.title },
+      set: { newValue in
+        // Multi-line paste splits into 1 step per non-empty line.
+        if newValue.contains("\n") || newValue.contains("\r") {
+          let lines = newValue
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+          if lines.count > 1 {
+            splitPaste(item, lines: lines)
+            return
+          }
+          drafts[item.id] = lines.first ?? ""
+        } else {
+          drafts[item.id] = newValue
+        }
+      }
+    )
+
+    let spokenTitle = item.title.isEmpty ? "Untitled step" : item.title
+    let spokenState = item.checked ? "checked" : "unchecked"
+
+    return HStack(spacing: 8) {
+      Button {
+        toggle(item)
+      } label: {
+        Image(systemName: item.checked ? "checkmark.circle.fill" : "circle")
+          .font(.system(size: 15, weight: .regular))
+          .foregroundStyle(item.checked ? accent : Theme.inkSecondary)
+          .frame(width: 24, height: 24)
+          .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(Text("\(spokenTitle), checklist item \(index + 1) of \(total), \(spokenState)"))
+
+      TextField("Step", text: binding)
+        .textFieldStyle(.plain)
+        .font(.septenaLabel)
+        .foregroundStyle(item.checked ? Theme.inkSecondary : Theme.inkPrimary)
+        .strikethrough(item.checked, color: Theme.inkSecondary)
+        .focused($focusedItemID, equals: item.id)
+        .onSubmit {
+          commitTitle(item)
+          insertBelow(item)
+        }
+        .onChange(of: focusedItemID) { oldID, newID in
+          if oldID == item.id, newID != item.id {
+            commitTitle(item)
+          }
+        }
+        .accessibilityLabel(Text("\(spokenTitle), checklist item \(index + 1) of \(total), \(spokenState)"))
+
+      Menu {
+        if index > 0 {
+          Button {
+            moveOrder(itemID: item.id, delta: -1)
+          } label: {
+            Label("Move Up", systemImage: "arrow.up")
+          }
+        }
+        if index + 1 < total {
+          Button {
+            moveOrder(itemID: item.id, delta: 1)
+          } label: {
+            Label("Move Down", systemImage: "arrow.down")
+          }
+        }
+        Button(role: .destructive) {
+          delete(item)
+        } label: {
+          Label("Delete Step", systemImage: "trash")
+        }
+      } label: {
+        Image(systemName: "ellipsis")
+          .font(.system(size: 12, weight: .medium))
+          .foregroundStyle(Theme.inkSecondary)
+          .frame(width: 24, height: 24)
+          .contentShape(Rectangle())
+      }
+      #if os(macOS)
+      .menuStyle(.borderlessButton)
+      #endif
+      .fixedSize()
+      .accessibilityLabel(Text("Checklist item actions"))
+    }
+  }
+
+  private func reload() {
+    let loaded = LocalCache.checklistItems(forTaskID: taskID, in: LocalStore.shared.container.mainContext)
+    items = loaded
+    for item in loaded where focusedItemID != item.id {
+      drafts[item.id] = item.title
+    }
+  }
+
+  private func flushAllDrafts() {
+    for item in items { commitTitle(item) }
+  }
+
+  private func commitTitle(_ item: ChecklistItem) {
+    guard let raw = drafts[item.id] else { return }
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed != item.title else { return }
+    var after = item
+    after.title = trimmed
+    mutator.updateChecklistItem(id: item.id, title: trimmed)
+    TaskUndo.recordChecklistUpdate(before: item, after: after, mutator: mutator)
+    if let i = items.firstIndex(where: { $0.id == item.id }) { items[i].title = trimmed }
+  }
+
+  private func addStep() {
+    flushAllDrafts()
+    guard let created = mutator.addChecklistItem(taskID: taskID, title: "") else { return }
+    TaskUndo.recordChecklistAdd(created, mutator: mutator)
+    drafts[created.id] = ""
+    reload()
+    focusedItemID = created.id
+  }
+
+  private func insertBelow(_ item: ChecklistItem) {
+    flushAllDrafts()
+    let idx = items.firstIndex(where: { $0.id == item.id }) ?? (items.count - 1)
+    let pos: Double?
+    if idx + 1 < items.count {
+      let mid = (items[idx].position + items[idx + 1].position) / 2.0
+      pos = (mid > items[idx].position && mid < items[idx + 1].position) ? mid : nil
+    } else {
+      pos = nil
+    }
+    guard let created = mutator.addChecklistItem(taskID: taskID, title: "", position: pos) else { return }
+    TaskUndo.recordChecklistAdd(created, mutator: mutator)
+    drafts[created.id] = ""
+    reload()
+    focusedItemID = created.id
+  }
+
+  private func toggle(_ item: ChecklistItem) {
+    flushAllDrafts()
+    Haptics.tick()
+    var after = item
+    after.checked.toggle()
+    mutator.updateChecklistItem(id: item.id, checked: after.checked)
+    TaskUndo.recordChecklistUpdate(before: item, after: after, mutator: mutator)
+    a11yAnimate(.snappy(duration: 0.18)) { reload() }
+  }
+
+  private func moveOrder(itemID: String, delta: Int) {
+    flushAllDrafts()
+    guard let idx = items.firstIndex(where: { $0.id == itemID }) else { return }
+    let target = idx + delta
+    guard items.indices.contains(target) else { return }
+    let beforeIDs = items.map(\.id)
+    var afterIDs = beforeIDs
+    afterIDs.swapAt(idx, target)
+    mutator.reorderChecklistItems(taskID: taskID, orderedIDs: afterIDs)
+    TaskUndo.recordChecklistReorder(taskID: taskID, beforeIDs: beforeIDs, afterIDs: afterIDs, mutator: mutator)
+    a11yAnimate(.snappy(duration: 0.18)) { reload() }
+  }
+
+  private func delete(_ item: ChecklistItem) {
+    let idx = items.firstIndex(where: { $0.id == item.id })
+    let prevID = idx.flatMap { $0 > 0 ? items[$0 - 1].id : nil }
+    drafts.removeValue(forKey: item.id)
+    mutator.deleteChecklistItem(id: item.id)
+    TaskUndo.recordChecklistDelete(item, mutator: mutator)
+    a11yAnimate(.snappy(duration: 0.18)) { reload() }
+    if focusedItemID == item.id { focusedItemID = prevID }
+  }
+
+  private func splitPaste(_ item: ChecklistItem, lines: [String]) {
+    guard let first = lines.first else { return }
+    drafts[item.id] = first
+    commitTitle(item)
+    let rest = Array(lines.dropFirst())
+    guard !rest.isEmpty else { return }
+    let idx = items.firstIndex(where: { $0.id == item.id }) ?? (items.count - 1)
+    let belowPos = idx + 1 < items.count
+      ? items[idx + 1].position
+      : (items[idx].position + TaskOrder.gap * Double(rest.count + 1))
+    let span = belowPos - items[idx].position
+    var lastID = item.id
+    for (offset, text) in rest.enumerated() {
+      let pos = items[idx].position + span * Double(offset + 1) / Double(rest.count + 1)
+      if let created = mutator.addChecklistItem(taskID: taskID, title: text, position: pos) {
+        TaskUndo.recordChecklistAdd(created, mutator: mutator)
+        drafts[created.id] = text
+        lastID = created.id
+      }
+    }
+    reload()
+    focusedItemID = lastID
+  }
+}
+
+// MARK: - Inline Tags panel
+
+/// Progressive-disclosure inline tags editor inside the SwiftUI task editor
+/// (iOS/iPadOS & SwiftUI sheets). Shows tap-to-toggle chips, an inline
+/// "New tag…" field, and a quiet "Manage…" sheet trigger.
+private struct TaskTagsPanel: View {
+  let taskID: String
+  let accent: Color
+  let fill: Color
+
+  @State private var allTags: [TaskTag] = []
+  @State private var assignedIDs: [String] = []
+  @State private var newTagName: String = ""
+  @State private var showingManageTags = false
+
+  private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      if !allTags.isEmpty {
+        ScrollView(.horizontal, showsIndicators: false) {
+          HStack(spacing: 6) {
+            ForEach(allTags) { tag in
+              let assigned = assignedIDs.contains(tag.id)
+              SelectableChip(isSelected: assigned,
+                             tint: tag.color != nil ? TagColorPalette.color(for: tag.color) : accent) {
+                toggle(tag)
+              } label: {
+                HStack(spacing: 4) {
+                  if tag.color != nil {
+                    Circle()
+                      .fill(TagColorPalette.color(for: tag.color))
+                      .frame(width: 6, height: 6)
+                  }
+                  Text(tag.name)
+                }
+              }
+            }
+          }
+        }
+      }
+
+      HStack(spacing: 8) {
+        Image(systemName: "plus")
+          .font(.system(size: 11, weight: .semibold))
+          .foregroundStyle(Theme.inkSecondary)
+        TextField("New tag…", text: $newTagName)
+          .textFieldStyle(.plain)
+          .font(.septenaLabel)
+          .onSubmit { createAndAssign() }
+        if !newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+          Button("Add") { createAndAssign() }
+            .buttonStyle(.plain)
+            .font(.septenaLabel)
+            .foregroundStyle(Theme.inkPrimary)
+            .contentShape(Rectangle())
+        } else if !allTags.isEmpty {
+          Button("Manage…") { showingManageTags = true }
+            .buttonStyle(.plain)
+            .font(.septenaCaption)
+            .foregroundStyle(Theme.inkSecondary)
+            .contentShape(Rectangle())
+        }
+      }
+      .padding(.top, allTags.isEmpty ? 0 : 2)
+    }
+    .padding(12)
+    .background(fill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .sheet(isPresented: $showingManageTags, onDismiss: reload) {
+      ManageTagsSheet()
+    }
+    .onAppear { reload() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in reload() }
+  }
+
+  private func reload() {
+    let ctx = LocalStore.shared.container.mainContext
+    allTags = LocalCache.allTags(in: ctx)
+    assignedIDs = LocalCache.liveTasks(ids: [taskID], in: ctx).first?.tags ?? []
+  }
+
+  private func toggle(_ tag: TaskTag) {
+    let before = assignedIDs
+    let after = before.contains(tag.id)
+      ? before.filter { $0 != tag.id }
+      : before + [tag.id]
+    Haptics.tick()
+    mutator.setTaskTags(id: taskID, tagIDs: after)
+    TaskUndo.recordTaskTags(before: [taskID: before], after: [taskID: after], mutator: mutator)
+    a11yAnimate(.snappy(duration: 0.18)) { reload() }
+  }
+
+  private func createAndAssign() {
+    let trimmed = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    if let existing = allTags.first(where: { $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame }) {
+      if !assignedIDs.contains(existing.id) { toggle(existing) }
+      newTagName = ""
+      return
+    }
+    guard let created = mutator.createTag(name: trimmed) else { return }
+    TaskUndo.recordTagCreate(created, mutator: mutator)
+    let before = assignedIDs
+    let after = before + [created.id]
+    mutator.setTaskTags(id: taskID, tagIDs: after)
+    TaskUndo.recordTaskTags(before: [taskID: before], after: [taskID: after], mutator: mutator)
+    newTagName = ""
+    reload()
+  }
+}

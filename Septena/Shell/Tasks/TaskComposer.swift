@@ -100,10 +100,6 @@ struct TaskComposerCard: View {
   /// — but only once the save has definitely had its chance, so a just-typed
   /// title can never be purged out from under the (animation-delayed) autosave.
   var onVanish: (() -> Void)? = nil
-  /// Inline create only: Return on a titled NEW task saves it and asks the host
-  /// to open the next new task below (the Things capture chain). Nil means
-  /// Return saves and closes, the edit-mode behavior.
-  var onSubmitNew: (() -> Void)? = nil
 
   @Environment(TaskMutator.self) private var mutator
   @Environment(\.modelContext) private var modelContext
@@ -188,8 +184,7 @@ struct TaskComposerCard: View {
        heroMatchNS: Namespace.ID? = nil, heroMatchIsSource: Bool = true,
        showsTodayIndicator: Bool = true,
        onDone: @escaping () -> Void,
-       onVanish: (() -> Void)? = nil,
-       onSubmitNew: (() -> Void)? = nil) {
+       onVanish: (() -> Void)? = nil) {
     self.mode = mode
     self.areas = areas
     self.projects = projects
@@ -205,7 +200,6 @@ struct TaskComposerCard: View {
     self.showsTodayIndicator = showsTodayIndicator
     self.onDone = onDone
     self.onVanish = onVanish
-    self.onSubmitNew = onSubmitNew
     #if os(iOS)
     // Seed the iPhone sheet height before first presentation so editing opens
     // directly at half height instead of flashing full then snapping down.
@@ -228,13 +222,6 @@ struct TaskComposerCard: View {
     if isEditing, case .edit(let task) = mode { return task }
     return nil
   }
-
-  /// Whether the notes field is present. It starts collapsed so the composer
-  /// opens as a single title line (create *and* edit) and only appears once the
-  /// task actually has notes or the user reveals it via the Notes pill. When
-  /// hidden, the rail shows an elective "Notes" pill instead (see
-  /// `TaskAttributeBar`).
-  private var showsNotesField: Bool { !draft.notes.isEmpty || focus == .notes }
 
   private var headerTitle: String { isEditing ? "Edit To-Do" : "New Task" }
   private var saveTitle: String { isEditing ? "Save" : "Add" }
@@ -322,7 +309,7 @@ struct TaskComposerCard: View {
           draft.title = TaskTitleText.withoutLineBreaks(newValue)
             .trimmingCharacters(in: .whitespacesAndNewlines)
           if draft.canSave { commit(); return }
-          // Return on an empty NEW task ends the capture chain.
+          // Return on an empty NEW task closes it (its draft is then purged).
           if isCreating { close(); return }
         } else {
           draft.title = TaskTitleText.singleLine(newValue)
@@ -401,10 +388,7 @@ struct TaskComposerCard: View {
       titleNotesCard
 
       Group {
-        if showsNotesField {
-          notesField
-            .transition(.opacity.combined(with: .move(edge: .top)))
-        }
+        notesField
 
         quickEntryChips
 
@@ -451,16 +435,13 @@ struct TaskComposerCard: View {
     // composer — it fires a pill the user tabbed to, and nothing otherwise.
     .onKeyPress(.space) { activateFocused() }  // septena-lint:allow task-space-binding
     .onKeyPress(.return) { activateFocused() }
-    .a11yAnimation(.snappy(duration: 0.22), value: showsNotesField)
   }
 
   // MARK: - Title / notes
 
   @ViewBuilder
   private var titleNotesCard: some View {
-    // Title only — notes moved to an elective pill in the attribute bar so the
-    // card stays a single clean line; tapping the Notes pill expands an inline
-    // editor like the When / Deadline / Repeat controls.
+    // Title sits at the top; the notes field always sits directly below it.
     if presentation == .inline {
       // Mirror the static row: a baseline-aligned checkbox + the title as a
       // plain field, no boxed background — so the expanded row reads as the same
@@ -562,11 +543,9 @@ struct TaskComposerCard: View {
   }
 
   /// Notes — a multi-line field sitting directly under the title (Things-style),
-  /// no box and no Clear button. It's collapsed by default (`showsNotesField`)
-  /// so the composer opens on a single title line; it appears once the task has
-  /// notes or the Notes pill reveals it. Return inserts a newline here (it's
-  /// prose), so — unlike the title — there's no Return-to-save; Tab still
-  /// cycles focus.
+  /// always visible (no Notes pill) with a quiet "Notes" placeholder when empty.
+  /// Return inserts a newline here (it's prose), so — unlike the title — there's
+  /// no Return-to-save; Tab still cycles focus.
   private var notesField: some View {
     TaskMarkdownNotesEditor(
       text: $draft.notes, focus: $focus,
@@ -914,27 +893,24 @@ struct TaskComposerCard: View {
     guard draft.canSave else { return }
     Haptics.tick()
     persistOnce()
-    // A new inline task chains: the host saves this one (done above) and
-    // opens the next new task below. Edits, and the drawer, just close.
-    if isCreating, presentation == .inline, let onSubmitNew {
-      onSubmitNew()
-    } else {
-      close()
-    }
+    // Return saves and closes, for a new task too. A new task used to chain
+    // into a second blank draft below it (the Things capture chain); that
+    // blank row read as a leftover "New task" ghost, so it is gone.
+    close()
   }
 
   // MARK: - Keyboard focus traversal
 
-  /// Tab order: title → every pill (including Discuss when edit mode offers it).
+  /// Tab order: title → notes → every pill (including Discuss when edit mode offers it).
   private var focusOrder: [TaskEditFocus] {
-    // Notes is either the revealed field (`.notes`) or, when collapsed, the
-    // rail's elective pill (`.pill(.notes)`) — never both.
-    var order: [TaskEditFocus] = [.title]
-    order.append(showsNotesField ? .notes : .pill(.notes))
-    order += TaskAttributeBar.Attribute.draftCases.map { .pill($0) }
-    if isEditing { order.append(.pill(.attachments)) }
-    if discussKickoffVisible {
-      order.append(.pill(.discuss))
+    var order: [TaskEditFocus] = [.title, .notes]
+    // Rail order from the registry; edit-only pills join once a task exists.
+    for attr in TaskAttributeBar.Attribute.rail {
+      if attr == .discuss {
+        if discussKickoffVisible { order.append(.pill(.discuss)) }
+      } else if !attr.editOnly || isEditing {
+        order.append(.pill(attr))
+      }
     }
     return order
   }

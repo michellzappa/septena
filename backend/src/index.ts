@@ -3,6 +3,7 @@ import type { Env } from "./env.js";
 import { api } from "./api/routes.js";
 import * as oauth from "./shadow/oauth.js";
 import { previewMcpHandler } from "./shadow/mcp.js";
+import { ONBOARD_MARKDOWN } from "./shadow/prompts.js";
 import SKILL_MARKDOWN from "../skill.md";
 
 export { TaskStore } from "./store/TaskStore.js";
@@ -18,7 +19,7 @@ const RETIRED_HOST = "mcp.septena.app";
 app.use("*", async (c, next) => {
   if (new URL(c.req.url).host !== RETIRED_HOST) return next();
   return c.text(
-    "mcp.septena.app was retired on 2026-11-20. Septena tasks are at https://api.septena.app/mcp (pair it from Septask).",
+    "mcp.septena.app was retired on 2026-11-20. Septena tasks are at https://api.septena.app/mcp (pair it from Septena).",
     410,
   );
 });
@@ -37,6 +38,14 @@ app.get("/health", (c) => c.json({ ok: true }));
 // The agent brief for the task tools, as markdown.
 app.get("/skill.md", (c) =>
   c.text(SKILL_MARKDOWN, 200, {
+    "Content-Type": "text/markdown; charset=utf-8",
+    "Cache-Control": "public, max-age=300",
+  }),
+);
+
+// The onboarding script for bootstrapping areas, projects, notes and tasks (#124).
+app.get("/onboard.md", (c) =>
+  c.text(ONBOARD_MARKDOWN, 200, {
     "Content-Type": "text/markdown; charset=utf-8",
     "Cache-Control": "public, max-age=300",
   }),

@@ -104,14 +104,16 @@ shell work, and keep it current as items land.
 - **Lockstep with the SwiftUI task surface**, like the two MCP servers: a
   change to task interaction or presentation lands in both shells in the same
   change, until the SwiftUI shell is retired.
-- **Keyboard bindings come from `TaskRowShortcuts`** (`TaskCommands.swift`) so
-  the two shells never teach conflicting muscle memory. The Space trap applies
+- **Menus, titles and keyboard bindings come from the registry**
+  (`registry/actions.json`, rendered by `Septena/Shell/UI/RegistryMenu.swift`
+  in SwiftUI and `Septask/SeptaskKitRegistryMenu.swift` in AppKit) so the two
+  shells never teach conflicting muscle memory. The Space trap applies
   here too: never bind it, and the checkbox sets `refusesFirstResponder`.
 - **One menu bar, either shell.** The menus are still SwiftUI `Commands`.
   They act on the focused SwiftUI scene when there is one, and otherwise fall
   back to `SeptaskKitCommands`, which routes to the frontmost shell window.
-  Add a command in BOTH arms or it goes dead in one of the two shells. Row
-  commands keep the `TaskRowShortcuts` bindings on both paths.
+  Add the action to `registry/actions.json`, then bind its ID in BOTH arms
+  or it goes dead in one of the two shells.
 - **Settings and other form surfaces stay SwiftUI**, hosted in
   `NSHostingController` (⌘, → `SeptaskKitSettingsWindow`). They are not
   latency surfaces; porting them is pure drift. A hosted shared view still

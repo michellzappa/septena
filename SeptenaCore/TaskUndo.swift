@@ -116,7 +116,11 @@ enum TaskUndo {
   struct ScheduleSnapshot {
     let id: String
     let scheduled: Date?
+    let startTime: String?
+    let durationMinutes: Int?
+    let timeZone: String?
     let today: Bool
+    let starred: Bool
     let deadline: Date?
     let recurrence: Recurrence?
     let recurrencePaused: Bool
@@ -125,7 +129,11 @@ enum TaskUndo {
     init(_ task: SeptenaTask) {
       id = task.id
       scheduled = SeptenaDate.parse(task.scheduled)
+      startTime = task.startTime
+      durationMinutes = task.durationMinutes
+      timeZone = task.timeZone
       today = task.today
+      starred = task.starred
       deadline = SeptenaDate.parse(task.deadline)
       recurrence = task.recurrence
       recurrencePaused = task.recurrencePaused
@@ -151,12 +159,17 @@ enum TaskUndo {
                       using mutator: TaskMutator) {
     for snapshot in snapshots {
       mutator.schedule(id: snapshot.id, date: snapshot.scheduled)
+      mutator.setTimeSlot(id: snapshot.id,
+                          startTime: snapshot.startTime,
+                          durationMinutes: snapshot.durationMinutes,
+                          timeZone: snapshot.timeZone)
       mutator.setDeadline(id: snapshot.id, date: snapshot.deadline)
       mutator.setRecurrence(id: snapshot.id, recurrence: snapshot.recurrence)
       if snapshot.recurrence != nil {
         mutator.setRecurrencePaused(id: snapshot.id, paused: snapshot.recurrencePaused)
       }
       mutator.setReminder(id: snapshot.id, reminder: snapshot.reminder)
+      mutator.setStarred(id: snapshot.id, starred: snapshot.starred)
       mutator.moveToToday(id: snapshot.id, today: snapshot.today)
     }
   }
@@ -173,8 +186,7 @@ enum TaskUndo {
                                    mutator: TaskMutator) {
     guard !before.isEmpty else { return }
     let wanted = Set(before.map(\.id))
-    let after = LocalCache.allTasks(in: context)
-      .filter { wanted.contains($0.id) }
+    let after = LocalCache.liveTasks(ids: wanted, in: context)
       .map(ScheduleSnapshot.init)
     guard !after.isEmpty else { return }
     let beforeByID = Dictionary(before.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
@@ -240,6 +252,34 @@ enum TaskUndo {
            redo: {
              for id in ids { wasDone ? mutator.uncomplete(id: id) : mutator.complete(id: id) }
            })
+  }
+
+  /// Accept a task in Review (`needs_verify` → done + `agent_assisted_done`).
+  /// Undoing reopens the task AND puts it back in Review with its check note.
+  static func recordAcceptReview(id: String,
+                                 previousNote: String?,
+                                 mutator: TaskMutator) {
+    mutator.touch(id: id)
+    record(name: String(localized: "Accept Review", comment: "Undo action name"),
+           undo: {
+             mutator.uncomplete(id: id)
+             mutator.setConvoEndState(id: id, .needsVerify, note: previousNote)
+           },
+           redo: {
+             mutator.complete(id: id)
+           })
+  }
+
+  /// Send a task in Review back to the agent with a note. Undoing restores
+  /// the pre-send-back conversation snapshot (`needs_verify`).
+  static func recordSendBack(id: String,
+                             before: TaskConvo,
+                             after: TaskConvo,
+                             mutator: TaskMutator) {
+    mutator.touch(id: id)
+    record(name: String(localized: "Send Back", comment: "Undo action name"),
+           undo: { mutator.restoreConvo(id: id, before) },
+           redo: { mutator.restoreConvo(id: id, after) })
   }
 
   /// Cancel / reopen. Cancelling parks a task as "won't do" rather than
@@ -455,7 +495,7 @@ enum TaskUndo {
                                            _ field: KeyPath<SeptenaTask, Value>) -> [String: Value] {
     let wanted = Set(ids)
     var result: [String: Value] = [:]
-    for task in LocalCache.allTasks(in: context) where wanted.contains(task.id) {
+    for task in LocalCache.liveTasks(ids: wanted, in: context) {
       result[task.id] = task[keyPath: field]
     }
     return result
@@ -479,8 +519,7 @@ enum TaskUndo {
                          mutator: TaskMutator) {
     guard !before.isEmpty else { return }
     let wanted = Set(before.map(\.id))
-    let after = LocalCache.allTasks(in: context)
-      .filter { wanted.contains($0.id) }
+    let after = LocalCache.liveTasks(ids: wanted, in: context)
       .map(FilingSnapshot.init)
     guard !after.isEmpty else { return }
     // A move into the list the task already lives in changed nothing, so it
@@ -624,6 +663,115 @@ enum TaskUndo {
            redo: {
              let id = currentID
              Task { @MainActor in try? await areas.delete(id: id) }
+           })
+  }
+
+  // MARK: - Checklists (1-level subtasks, docs/CHECKLISTS_SPEC.md)
+
+  static func recordChecklistAdd(_ item: ChecklistItem, mutator: TaskMutator) {
+    mutator.touch(ids: [item.taskId])
+    var live = item
+    record(name: String(localized: "Add Checklist Item", comment: "Undo action name"),
+           undo: { mutator.deleteChecklistItem(id: live.id) },
+           redo: {
+             if let restored = mutator.restoreChecklistItem(live) { live = restored }
+           })
+  }
+
+  static func recordChecklistUpdate(before: ChecklistItem, after: ChecklistItem, mutator: TaskMutator) {
+    mutator.touch(ids: [before.taskId])
+    record(name: before.checked != after.checked
+             ? (after.checked
+                ? String(localized: "Check Item", comment: "Undo action name")
+                : String(localized: "Uncheck Item", comment: "Undo action name"))
+             : String(localized: "Edit Checklist Item", comment: "Undo action name"),
+           undo: {
+             mutator.updateChecklistItem(id: before.id,
+                                         title: before.title,
+                                         checked: before.checked,
+                                         position: before.position)
+           },
+           redo: {
+             mutator.updateChecklistItem(id: after.id,
+                                         title: after.title,
+                                         checked: after.checked,
+                                         position: after.position)
+           })
+  }
+
+  static func recordChecklistDelete(_ item: ChecklistItem, mutator: TaskMutator) {
+    mutator.touch(ids: [item.taskId])
+    var live = item
+    record(name: String(localized: "Delete Checklist Item", comment: "Undo action name"),
+           undo: {
+             if let restored = mutator.restoreChecklistItem(live) { live = restored }
+           },
+           redo: { mutator.deleteChecklistItem(id: live.id) })
+  }
+
+  static func recordChecklistReorder(taskID: String, beforeIDs: [String], afterIDs: [String], mutator: TaskMutator) {
+    guard beforeIDs != afterIDs else { return }
+    mutator.touch(ids: [taskID])
+    record(name: String(localized: "Reorder Checklist", comment: "Undo action name"),
+           undo: { mutator.reorderChecklistItems(taskID: taskID, orderedIDs: beforeIDs) },
+           redo: { mutator.reorderChecklistItems(taskID: taskID, orderedIDs: afterIDs) })
+  }
+
+  // MARK: - Tags (docs/TAGS_SPEC.md)
+
+  static func recordTaskTags(name: String = String(localized: "Change Tags", comment: "Undo action name"),
+                             before: [String: [String]],
+                             after: [String: [String]],
+                             mutator: TaskMutator) {
+    guard before != after else { return }
+    mutator.touch(ids: Array(before.keys))
+    record(name: name,
+           undo: {
+             for (id, tags) in before { mutator.setTaskTags(id: id, tagIDs: tags) }
+           },
+           redo: {
+             for (id, tags) in after { mutator.setTaskTags(id: id, tagIDs: tags) }
+           })
+  }
+
+  static func recordTagCreate(_ tag: TaskTag, mutator: TaskMutator) {
+    var live = tag
+    record(name: String(localized: "Create Tag", comment: "Undo action name"),
+           undo: { mutator.deleteTag(id: live.id) },
+           redo: {
+             if let restored = mutator.restoreTag(live) { live = restored }
+           })
+  }
+
+  static func recordTagUpdate(before: TaskTag, after: TaskTag, mutator: TaskMutator) {
+    guard before != after else { return }
+    record(name: String(localized: "Edit Tag", comment: "Undo action name"),
+           undo: { mutator.updateTag(id: before.id, name: before.name, color: .some(before.color), position: .some(before.position)) },
+           redo: { mutator.updateTag(id: after.id, name: after.name, color: .some(after.color), position: .some(after.position)) })
+  }
+
+  static func recordTagDelete(_ tag: TaskTag, mutator: TaskMutator) {
+    var live = tag
+    record(name: String(localized: "Delete Tag", comment: "Undo action name"),
+           undo: {
+             if let restored = mutator.restoreTag(live) { live = restored }
+           },
+           redo: { mutator.deleteTag(id: live.id) })
+  }
+
+  // MARK: - Attachments (docs/ATTACHMENTS_MAC_PARITY_SPEC.md)
+
+  static func recordAttachmentDelete(_ snapshot: TaskAttachmentSnapshot,
+                                     store: TaskAttachmentStore,
+                                     mutator: TaskMutator) {
+    mutator.touch(ids: [snapshot.taskID])
+    var live = snapshot
+    record(name: String(localized: "Delete Attachment", comment: "Undo action name"),
+           undo: {
+             if let restored = store.restore(live) { live = restored }
+           },
+           redo: {
+             if let next = store.removeForUndo(id: live.id) { live = next }
            })
   }
 }

@@ -4,6 +4,7 @@
     "id": "^[A-Za-z0-9._:-]{1,128}$",
     "clientOpId": "^[A-Za-z0-9_-]{8,64}$",
     "day": "^\\d{4}-\\d{2}-\\d{2}$",
+    "time24": "^([01]\\d|2[0-3]):[0-5]\\d$",
     "stamp": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}"
   },
   "limits": {
@@ -15,6 +16,9 @@
     "maxUserAttachmentBytes": 2147483648,
     "maxOpsPerPush": 500,
     "maxPull": 1000,
+    "maxChecklistItemsPerTask": 200,
+    "maxTagsPerTask": 20,
+    "tagNameMax": 64,
     "maxSubtasks": 500,
     "maxArtifactRefs": 100,
     "turnProviderMax": 32,
@@ -46,7 +50,13 @@
     "convoHandoffActionType": ["open_url", "compose", "call", "none"],
     "convoTurnRole": ["user", "provider"],
     "convoTurnStep": ["confirm", "ground", "scope", "decide", "work"],
-    "telemetryLevel": ["none", "minimal", "balanced", "full"]
+    "telemetryLevel": ["none", "minimal", "balanced", "full"],
+    "appearanceMode": ["system", "light", "dark"],
+    "accentColor": ["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "acai", "pitaya", "jabuticaba"],
+    "appIconFinish": ["obsidian", "ceramic", "framed", "stealth"],
+    "appIconColor": ["auto", "persimmon", "haskap", "tamarillo", "yuzu", "carambola", "acai", "pitaya", "mono"],
+    "canvasTexture": ["none", "topography", "fieldMatrix", "stippleDrift", "causticGlass", "ridges", "washiPaper"],
+    "textureMotion": ["still", "slowDrift"]
   },
   "entities": {
     "task": {
@@ -62,8 +72,13 @@
         "project": { "kind": "text", "format": "id", "nullable": true },
         "created": { "kind": "text", "format": "day", "nullable": true },
         "scheduled": { "kind": "text", "format": "day", "nullable": true },
+        "startTime": { "kind": "text", "format": "time24", "max": 5, "nullable": true },
+        "durationMinutes": { "kind": "int", "min": 5, "max": 1440, "nullable": true },
+        "timeZone": { "kind": "text", "max": 64, "nullable": true },
         "deadline": { "kind": "text", "format": "day", "nullable": true },
         "today": { "kind": "bool", "default": 0 },
+        "starred": { "kind": "bool", "default": 0 },
+        "tags": { "kind": "json", "maxJsonLength": 4000, "nullable": true },
         "todaySetOn": { "kind": "text", "format": "day", "nullable": true },
         "completedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
         "notes": { "kind": "text", "max": 100000, "nullable": true },
@@ -134,6 +149,31 @@
         "position": { "kind": "real", "nullable": true },
         "createdAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
         "uploadedAt": { "kind": "text", "serverOwned": true }
+      }
+    },
+    "checklistItem": {
+      "table": "checklist_items",
+      "deletable": true,
+      "requiredOnInsert": ["taskId", "title"],
+      "updatable": ["title", "checked", "checkedAt", "position"],
+      "columns": {
+        "taskId": { "kind": "text", "format": "id", "nullable": false },
+        "title": { "kind": "text", "max": 2000, "nullable": false },
+        "checked": { "kind": "bool", "default": 0 },
+        "checkedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "position": { "kind": "real", "nullable": true },
+        "createdAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true }
+      }
+    },
+    "tag": {
+      "table": "tags",
+      "deletable": true,
+      "requiredOnInsert": ["name"],
+      "updatable": ["name", "color", "position"],
+      "columns": {
+        "name": { "kind": "text", "max": 64, "nullable": false },
+        "color": { "kind": "text", "max": 32, "nullable": true },
+        "position": { "kind": "int", "nullable": true }
       }
     },
     "convo": {

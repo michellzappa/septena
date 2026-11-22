@@ -354,10 +354,25 @@ private struct IPadNavDepthReporter: ViewModifier {
 }
 #endif
 
+private struct IsInPushedDetailKey: EnvironmentKey {
+  static let defaultValue = false
+}
+
+extension EnvironmentValues {
+  /// True inside a compact `NavigationStack` destination pushed by `ContentView`.
+  /// Lets `.pageChrome` omit `.topBarLeading` so iOS keeps the native Back button
+  /// unobstructed while root tabs (`SidebarRootView`, Today, Upcoming) keep it.
+  var isInPushedDetail: Bool {
+    get { self[IsInPushedDetailKey.self] }
+    set { self[IsInPushedDetailKey.self] = newValue }
+  }
+}
+
 private struct PageChromeModifier: ViewModifier {
   @Environment(NavigationState.self) private var nav
   #if os(iOS)
   @Environment(\.usesPushNavigation) private var usesPushNavigation
+  @Environment(\.isInPushedDetail) private var isInPushedDetail
   @Environment(IPadChromeModel.self) private var iPadChrome
   #endif
 
@@ -443,12 +458,37 @@ private struct PageChromeModifier: ViewModifier {
   @ToolbarContentBuilder
   private var chromeToolbar: some ToolbarContent {
     #if os(iOS)
+    #if SEPTASK
+    if !usesPushNavigation {
+      // iPhone (compact) Septena: top-left is Settings only on root pages
+      // (pushed destinations keep the native Back button unobstructed);
+      // top-right shows page-local actions ("···", only when present) + Search.
+      // New Task (+) lives in the bottom tab bar.
+      if (showsGlobal || id == "tasks") && !isInPushedDetail {
+        ToolbarItem(placement: .topBarLeading) { SettingsToolbarButton() }
+      }
+      if let actions = localActions() {
+        ToolbarItem(placement: .topBarTrailing) {
+          OverflowMenu { actions }
+        }
+      }
+      ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }
+    } else {
+      if showsGlobal || id == "tasks" {
+        ToolbarItem(placement: .topBarLeading) { iosLeadingChrome }
+      }
+      if let run = addClosure {
+        ToolbarItem(placement: .topBarTrailing) { PageAddButton(perform: run) }
+      }
+    }
+    #else
     if showsGlobal || id == "tasks" {
       ToolbarItem(placement: .topBarLeading) { iosLeadingChrome }
     }
     if let run = addClosure {
       ToolbarItem(placement: .topBarTrailing) { PageAddButton(perform: run) }
     }
+    #endif
     #else
     if id == "tasks" {
       // macOS split-view Tasks: the SIDEBAR column (no "+" action) owns the one

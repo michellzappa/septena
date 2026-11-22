@@ -22,9 +22,9 @@ enum TaskBackendError: LocalizedError, Equatable {
 
   var errorDescription: String? {
     switch self {
-    case .notSignedIn: return "Not signed in to the task backend."
-    case .http(let status, let code): return "The backend answered \(status) (\(code))."
-    case .badResponse(let what): return "The backend sent a reply the app can't read (\(what))."
+    case .notSignedIn: return "Not signed in to Septena sync."
+    case .http(let status, let code): return "The server answered \(status) (\(code))."
+    case .badResponse(let what): return "The server sent a reply the app couldn’t read (\(what))."
     case .network(let what): return "Network error: \(what)"
     }
   }
@@ -167,9 +167,9 @@ actor TaskBackendClient {
   }
 
   func pull(since: Int, limit: Int = 1_000) async throws -> BackendPullResponse {
-    // `settings=1`: this client syncs the `setting` entity. Without it the
-    // server leaves setting rows out (older builds decode entities strictly).
-    let (data, status) = try await authed(path: "/v1/sync/pull?since=\(since)&limit=\(limit)&settings=1",
+    // `settings=1`, `checklists=1`, & `tags=1`: this client syncs those entities.
+    // Without them the server omits those rows so older builds decode cleanly.
+    let (data, status) = try await authed(path: "/v1/sync/pull?since=\(since)&limit=\(limit)&settings=1&checklists=1&tags=1",
                                           method: "GET", body: nil)
     guard status == 200 else { throw Self.httpError(status, data) }
     return try decode(BackendPullResponse.self, from: data, what: "pull")

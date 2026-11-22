@@ -39,7 +39,7 @@ user got done.
 | A count of how often a task was pushed later | §3 |
 | A fade rule and a Faded pile | §4 |
 | The weekly sweep | §5 |
-| Rollover modes for Today pins: Review and Clean slate | §6 |
+| Rollover modes for Today pins: Ask and Clean slate | §6 |
 | The stuck question | §7 |
 | A done-first weekly view | §8 |
 | An effort estimate and readiness-ordered Next | §9 |
@@ -125,7 +125,8 @@ Dropped tasks show in the logbook with a "let go" label, distinct from done.
 ## 6. Today at rollover
 
 ADR 0006 removes silent carry-over. ADR 0014 gives Today two rollover modes,
-one per account: **Review** (default) and **Clean slate** (My Day).
+one per account: **Ask** (default, renamed from "Review" so Review stays
+reserved for agent work awaiting acceptance) and **Clean slate** (My Day).
 
 ### 6.1 Scope: pins only
 
@@ -151,7 +152,7 @@ key (`DayClock.today`) and the account mode:
 
 | Mode | A stale pin shows |
 |---|---|
-| `review` | in the Inbox band as a carry-over row, and not in Today |
+| `ask` | in the Inbox band as a carry-over row, and not in Today |
 | `cleanSlate` | not in Today and not in the band; the task shows only in its area or project |
 
 Reasons:
@@ -173,7 +174,7 @@ Every other surface (Today, Next, widgets, the watch, Septask) calls it.
 clear it lazily on the next user write to that task, through the mutator.
 It never runs a sweep that writes every stale pin.
 
-### 6.3 Review (default)
+### 6.3 Ask (default)
 
 A carry-over row is a stale pin, shown in the Inbox band with a carry-over
 label. It is a second membership rule for the band, next to
@@ -204,12 +205,12 @@ defer. The user pins it again to bring it back.
 | | |
 |---|---|
 | Key | `todayRollover` in the synced settings registry (`SETTING_VALUES`, `backend/src/store/columns.ts`) |
-| Values | `"review"`, `"cleanSlate"` |
-| Default | `null` reads as `"review"` |
+| Values | `"ask"`, `"cleanSlate"` |
+| Default | `null` reads as `"ask"` |
 | Sync | Per account, through the `settings` table, so every device shows the same Today |
 | Septena | Settings ▸ Tasks, "At the start of each day" |
 | Septask | Settings ▸ General, "At the start of each day" |
-| Labels | "Ask me about unfinished tasks" (`review`), "Start with an empty Today" (`cleanSlate`) *(default copy, goes through the humanizer before it ships)* |
+| Labels | "Ask me about unfinished tasks" (`ask`), "Start with an empty Today" (`cleanSlate`) *(default copy, goes through the humanizer before it ships)* |
 
 Device-only storage is wrong for this key: two devices with different modes
 would show two different Todays.
@@ -219,7 +220,7 @@ would show two different Todays.
 Existing users have pins with `todaySetOn` from earlier days, or nil. On the
 first day key after the update, all of them are stale at once:
 
-- In Review, they all arrive in the band. A user with many old pins gets one
+- In Ask, they all arrive in the band. A user with many old pins gets one
   long band, once.
 - A one-time notice above the band explains it *(default)*: one line, a
   link to the setting, dismissed per account. Reuse the notice slot in
@@ -328,7 +329,7 @@ a year).
 | P1 | §3 fields, `TaskMutator.touch`, defer counting. No UI change. | — |
 | P2 | §4 fade pass + Faded pile, §5 sweep. | P1 |
 | R0 | §6.2 rule in `SeptenaCore` + `backend/` mirror, §6.5 `todayRollover` setting key, legacy-pin handling. Reads only; no UI change. Collapses the `isOnToday` copies (#77). | P1 |
-| R1 | §6.3 Review: carry-over rows in the band, Today / Not today pair, §6.6 one-time notice. Replaces P3. | R0 |
+| R1 | §6.3 Ask: carry-over rows in the band, Today / Not today pair, §6.6 one-time notice. Replaces P3. | R0 |
 | R2 | §6.4 Clean slate, §6.5 setting UI in Septena and Septask, §6.7 MCP Today read on both servers. | R0 |
 | P4 | §7 stuck question. | P1 |
 | P5 | §8 done-first view. | P2 |
@@ -353,7 +354,7 @@ Each phase touches shared task code: build all four schemes (`CLAUDE.md`,
 | What a dropped task becomes | status `cancelled` + `dropReason`, shown in the logbook |
 | Defers before the stuck question | 3 |
 | Carry-over on Saturday and Sunday too | Yes |
-| Rollover mode default for new and existing users | Review (ADR 0014, decided) |
+| Rollover mode default for new and existing users | Ask (ADR 0014, decided) |
 | Rollover as a read rule (no midnight write) | Yes (§6.2) |
 | One-time notice for the first long band | Yes (§6.6) |
 | Clean slate clears stale pins in storage | Lazily, on the next user write only |

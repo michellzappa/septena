@@ -56,7 +56,12 @@ final class KitCheckboxView: NSButton {
   }
 
   private var usesStandardBox: Bool {
-    isDone || (!isDashed && !isToday)
+    if isDone && !AppearancePreferences.shared.isColorful { return false }
+    return isDone || !isDashed
+  }
+
+  func refreshAppearance() {
+    syncDisplay()
   }
 
   override var intrinsicContentSize: NSSize {
@@ -216,6 +221,22 @@ final class KitCheckboxView: NSButton {
     let box = NSRect(x: (bounds.width - Self.boxSize) / 2,
                      y: (bounds.height - Self.boxSize) / 2,
                      width: Self.boxSize, height: Self.boxSize)
+    if isDone {
+      let path = NSBezierPath(roundedRect: box, xRadius: Self.corner, yRadius: Self.corner)
+      SeptaskKitTheme.checkboxFill.setFill()
+      path.fill()
+
+      let check = NSBezierPath()
+      check.lineWidth = 1.75
+      check.lineCapStyle = .round
+      check.lineJoinStyle = .round
+      check.move(to: NSPoint(x: box.minX + box.width * 0.23, y: box.minY + box.height * 0.53))
+      check.line(to: NSPoint(x: box.minX + box.width * 0.43, y: box.minY + box.height * 0.72))
+      check.line(to: NSPoint(x: box.minX + box.width * 0.78, y: box.minY + box.height * 0.30))
+      SeptaskKitTheme.checkboxCheck.setStroke()
+      check.stroke()
+      return
+    }
     let inset = box.insetBy(dx: Self.stroke / 2, dy: Self.stroke / 2)
     let path = NSBezierPath(roundedRect: inset, xRadius: Self.corner, yRadius: Self.corner)
     path.lineWidth = Self.stroke
@@ -223,11 +244,7 @@ final class KitCheckboxView: NSButton {
       // Unratified proposal — the readiness form from language v2.
       path.setLineDash([2.5, 2.0], count: 2, phase: 0)
     }
-    if isToday {
-      SeptaskKitTheme.todayAccent.setStroke()
-    } else {
-      SeptaskKitTheme.checkboxStroke.setStroke()
-    }
+    SeptaskKitTheme.checkboxStroke.setStroke()
     path.stroke()
   }
 }
@@ -274,19 +291,32 @@ private final class KitCheckboxCueOverlay: NSView {
 
 // MARK: - Chip
 
-/// A list-membership chip on a row ("# BFF", "📁 Admin") — AppKit rendering of
-/// the SwiftUI row's trailing list capsule. Symbols follow `Route.icon`:
-/// `number` for a project, `folder` for an area.
+/// Non-interactive `NSGlassEffectView` backdrop for macOS 26/27 pills/chips so
+/// clicks pass cleanly to the owning button or table row.
+@MainActor
+final class KitPassthroughGlassView: NSGlassEffectView {
+  override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+/// A list-membership or status pill on a row (`☀ Today`, `# BFF`, `📁 Admin`)
+/// — OS 26/27 frosted Liquid Glass capsule (falling back to solid `chipFill`
+/// under Reduce Transparency).
 @MainActor
 final class KitChipView: NSView {
+  private let glass = KitPassthroughGlassView()
   private let icon = NSImageView()
   private let label = NSTextField(labelWithString: "")
 
   init() {
     super.init(frame: .zero)
     wantsLayer = true
-    layer?.cornerRadius = 5
-    layer?.backgroundColor = SeptaskKitTheme.chipFill.cgColor
+    layer?.cornerRadius = 9
+    layer?.masksToBounds = false
+
+    glass.style = .regular
+    glass.cornerRadius = 9
+    glass.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(glass)
 
     icon.translatesAutoresizingMaskIntoConstraints = false
     icon.contentTintColor = SeptaskKitTheme.inkSecondary
@@ -297,15 +327,20 @@ final class KitChipView: NSView {
     addSubview(icon)
     addSubview(label)
     NSLayoutConstraint.activate([
-      icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
+      glass.leadingAnchor.constraint(equalTo: leadingAnchor),
+      glass.trailingAnchor.constraint(equalTo: trailingAnchor),
+      glass.topAnchor.constraint(equalTo: topAnchor),
+      glass.bottomAnchor.constraint(equalTo: bottomAnchor),
+      icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
       icon.centerYAnchor.constraint(equalTo: centerYAnchor),
       icon.widthAnchor.constraint(equalToConstant: 9),
       icon.heightAnchor.constraint(equalToConstant: 9),
       label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 3),
-      label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+      label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -7),
       label.centerYAnchor.constraint(equalTo: centerYAnchor),
-      heightAnchor.constraint(equalToConstant: 16),
+      heightAnchor.constraint(equalToConstant: 18),
     ])
+    syncGlass()
   }
 
   required init?(coder: NSCoder) { fatalError("KitChipView is code-only") }
@@ -316,6 +351,7 @@ final class KitChipView: NSView {
     icon.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
       .withSymbolConfiguration(config)
     label.stringValue = title
+    syncGlass()
   }
 
   /// A CGColor is a resolved snapshot, so the fill has to be re-resolved when
@@ -323,28 +359,28 @@ final class KitChipView: NSView {
   override var wantsUpdateLayer: Bool { true }
 
   override func updateLayer() {
-    layer?.backgroundColor = SeptaskKitTheme.chipFill.cgColor
+    syncGlass()
+  }
+
+  private func syncGlass() {
+    let reduce = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+    glass.isHidden = reduce
+    layer?.backgroundColor = reduce ? SeptaskKitTheme.chipFill.cgColor : NSColor.clear.cgColor
   }
 }
 
 /// The "→ Suggested" capsule — one tap files the row where the classifier
-/// thinks it belongs (`TaskFilingSuggestions`). Same metrics and fill as
-/// `KitChipView` so the two read as one family, but this one is a real
-/// `NSButton`: it is an ACTION, and the house rule here is that every click
-/// target is a button, never a gesture recognizer or a `mouseDown` override.
-///
-/// It wears the destination's own name rather than the word "Suggested" —
-/// "→ Kitchen" tells you what the tap will do; "→ Suggested" makes you open a
-/// menu to find out.
+/// thinks it belongs (`TaskFilingSuggestions`). Same OS 26/27 frosted Liquid
+/// Glass capsule as `KitChipView`.
 @MainActor
 final class KitSuggestionChipView: NSButton {
   var onApply: (() -> Void)?
+  private let glass = KitPassthroughGlassView()
 
   init() {
     super.init(frame: .zero)
     wantsLayer = true
-    layer?.cornerRadius = 5
-    layer?.backgroundColor = SeptaskKitTheme.chipFill.cgColor
+    layer?.cornerRadius = 9
     isBordered = false
     setButtonType(.momentaryChange)
     // Keyboard focus stays on the table, same contract as the checkbox — this
@@ -354,6 +390,12 @@ final class KitSuggestionChipView: NSButton {
     imageHugsTitle = true
     target = self
     action = #selector(fire)
+
+    glass.style = .regular
+    glass.cornerRadius = 9
+    glass.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(glass, positioned: .below, relativeTo: nil)
+
     // An NSButton has no natural width in a `.fill` NSStackView — it absorbs
     // every spare point and the capsule stretched the whole row. `KitChipView`
     // never showed this because it is a plain NSView whose width falls out of
@@ -362,11 +404,16 @@ final class KitSuggestionChipView: NSButton {
     setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
     (cell as? NSButtonCell)?.lineBreakMode = .byTruncatingTail
     NSLayoutConstraint.activate([
-      heightAnchor.constraint(equalToConstant: 16),
+      glass.leadingAnchor.constraint(equalTo: leadingAnchor),
+      glass.trailingAnchor.constraint(equalTo: trailingAnchor),
+      glass.topAnchor.constraint(equalTo: topAnchor),
+      glass.bottomAnchor.constraint(equalTo: bottomAnchor),
+      heightAnchor.constraint(equalToConstant: 18),
       // A long area name truncates rather than shoving the task title out of
       // the row — same contract as `KitChipView`'s truncating label.
       widthAnchor.constraint(lessThanOrEqualToConstant: 140),
     ])
+    syncGlass()
   }
 
   required init?(coder: NSCoder) { fatalError("KitSuggestionChipView is code-only") }
@@ -387,13 +434,20 @@ final class KitSuggestionChipView: NSButton {
       ])
     setAccessibilityLabel(String(localized: "File under \(title)",
                                  comment: "SeptaskKit: filing suggestion capsule"))
+    syncGlass()
     window?.invalidateCursorRects(for: self)
   }
 
   override var wantsUpdateLayer: Bool { true }
 
   override func updateLayer() {
-    layer?.backgroundColor = SeptaskKitTheme.chipFill.cgColor
+    syncGlass()
+  }
+
+  private func syncGlass() {
+    let reduce = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+    glass.isHidden = reduce
+    layer?.backgroundColor = reduce ? SeptaskKitTheme.chipFill.cgColor : NSColor.clear.cgColor
   }
 
   override func resetCursorRects() {
@@ -635,20 +689,6 @@ enum KitMoveMenu {
     let projectId: String?
   }
 
-  /// Context-menu / submenu targets — areas only. A long flat `NSMenu` of
-  /// every project is unwieldy; the type-to-filter modal
-  /// (`pickerDestinations`) is where projects live.
-  /// `emoji` rides alongside `title` rather than getting folded into it —
-  /// `build()` prefixes the menu title with it (a plain `NSMenuItem` has no
-  /// icon-column slot of its own); `SeptaskKitMovePicker` swaps its icon
-  /// column glyph for it instead, same "emoji replaces the generic glyph,
-  /// never both" rule `KitScreenTitleCell`/`SidebarCell` already follow.
-  static func destinations(areas: [Area], projects: [Project])
-    -> [(title: String, target: Destination, emoji: String?)] {
-    [(String(localized: "Inbox", comment: "SeptaskKit: move destination"), .none, nil)]
-      + areas.map { ($0.title, .area($0.id), $0.emoji) }
-  }
-
   /// Full Move picker list — Inbox, loose projects, then each area with
   /// its active projects nested. Mirrors `MovePickerSheet`'s hierarchy.
   static func pickerDestinations(areas: [Area], projects: [Project]) -> [PickerRow] {
@@ -670,27 +710,6 @@ enum KitMoveMenu {
       }
     }
     return rows
-  }
-
-  static func build(areas: [Area], projects: [Project],
-                    target: AnyObject, action: Selector) -> NSMenu {
-    let menu = NSMenu()
-    for (index, entry) in destinations(areas: areas, projects: projects).enumerated() {
-      let title = entry.emoji.map { "\($0)  \(entry.title)" } ?? entry.title
-      let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
-      item.target = target
-      item.tag = index
-      menu.addItem(item)
-      if index == 0 { menu.addItem(.separator()) }
-    }
-    return menu
-  }
-
-  static func destination(for item: NSMenuItem,
-                          areas: [Area], projects: [Project]) -> Destination? {
-    let all = destinations(areas: areas, projects: projects)
-    guard all.indices.contains(item.tag) else { return nil }
-    return all[item.tag].target
   }
 }
 
@@ -776,9 +795,9 @@ final class KitCardRowView: NSTableRowView {
   static let horizontalInset: CGFloat = SeptaskKitLayout.minInset
   static let corner: CGFloat = 11
 
-  var isCard = true
-  var isFirstInGroup = true
-  var isLastInGroup = true
+  var isCard = true { didSet { syncGlassBackdrop() } }
+  var isFirstInGroup = true { didSet { syncGlassBackdrop() } }
+  var isLastInGroup = true { didSet { syncGlassBackdrop() } }
 
   /// Contiguous selected neighbors on the same card. The list controller
   /// refreshes these on every selection change (and in `rowViewForRow`) so a
@@ -791,7 +810,7 @@ final class KitCardRowView: NSTableRowView {
   /// The inline composer is open on this row. Things drops the blue selection
   /// wash while editing — the expanded row stays on the white card so the
   /// title reads as integrated text, not a selected cell with a field on top.
-  var isComposing = false
+  var isComposing = false { didSet { syncGlassBackdrop() } }
 
   /// A bare title field editor (⌘N / ⌘R) is live on this row. Same reason as
   /// `isComposing`: the wash behind an active text field reads as a selected
@@ -799,7 +818,90 @@ final class KitCardRowView: NSTableRowView {
   /// the whole card behind the caret. The composer path already dropped the
   /// wash; the field-editor path did not, so creating a task left you typing
   /// into a full-width blue band.
-  var isEditingTitle = false
+  var isEditingTitle = false { didSet { syncGlassBackdrop() } }
+
+  /// Real hardware-accelerated frosted glass blur (`blendingMode = .withinWindow`)
+  /// behind translucent task card slices when a Header Wash texture is active.
+  private var glassBackdrop: NSVisualEffectView?
+  private var glassMaskLayer: CAShapeLayer?
+  private var glassOverlay: KitCardGlassOverlayView?
+
+  private var usesGlassBackdrop: Bool {
+    isCard
+      && AppearancePreferences.shared.hasActiveTexture
+      && !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+      && !isComposing
+  }
+
+  func refreshAppearance() {
+    syncGlassBackdrop()
+    needsDisplay = true
+  }
+
+  private func ensureGlassBackdrop() {
+    guard glassBackdrop == nil else { return }
+    let effect = KitCardGlassStyle.makeBackdrop()
+    let mask = CAShapeLayer()
+    effect.layer?.mask = mask
+    addSubview(effect, positioned: .below, relativeTo: nil)
+
+    let overlay = KitCardGlassOverlayView()
+    addSubview(overlay, positioned: .above, relativeTo: effect)
+
+    glassBackdrop = effect
+    glassMaskLayer = mask
+    glassOverlay = overlay
+  }
+
+  private func syncGlassBackdrop() {
+    let active = usesGlassBackdrop
+    if active {
+      ensureGlassBackdrop()
+    }
+    guard let effect = glassBackdrop, let mask = glassMaskLayer, let overlay = glassOverlay else {
+      return
+    }
+    effect.isHidden = !active
+    overlay.isHidden = !active
+    guard active, bounds.width > 1, bounds.height > 1 else { return }
+
+    let insetRect = bounds.insetBy(dx: SeptaskKitLayout.inset(for: bounds.width), dy: 0)
+    effect.frame = insetRect
+    // `NSVisualEffectView` is non-flipped (minY = bottom, maxY = top), so build
+    // the slice mask in `effect.bounds` coordinates directly.
+    let local = NSRect(origin: .zero, size: insetRect.size)
+    let maskPath: NSBezierPath
+    if !isFirstInGroup && !isLastInGroup {
+      maskPath = NSBezierPath(rect: local)
+    } else if isFirstInGroup && isLastInGroup {
+      maskPath = NSBezierPath(roundedRect: local, xRadius: Self.corner, yRadius: Self.corner)
+    } else {
+      var r = local
+      if !isLastInGroup {
+        r.origin.y -= Self.corner
+        r.size.height += Self.corner
+      }
+      if !isFirstInGroup {
+        r.size.height += Self.corner
+      }
+      maskPath = NSBezierPath(roundedRect: r, xRadius: Self.corner, yRadius: Self.corner)
+    }
+    mask.frame = local
+    mask.path = maskPath.cgPath
+
+    overlay.frame = bounds
+    overlay.slicePath = slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup)
+    overlay.isFirstInGroup = isFirstInGroup
+    overlay.showSelection = isSelected && !isComposing && !isEditingTitle
+    overlay.selectionEmphasized = septaskSelectionIsActive
+    overlay.promoteWash = promoteWash
+    overlay.needsDisplay = true
+  }
+
+  override func layout() {
+    super.layout()
+    syncGlassBackdrop()
+  }
 
   /// Insertion line while a task drag is hovering. `.top` / `.bottom` sit on
   /// this row's edge (the drop is `.above` a row, or after the last row).
@@ -820,11 +922,11 @@ final class KitCardRowView: NSTableRowView {
   /// stays off. These overrides keep the wash in sync when focus moves.
   override var isSelected: Bool {
     get { super.isSelected }
-    set { super.isSelected = newValue; needsDisplay = true }
+    set { super.isSelected = newValue; syncGlassBackdrop(); needsDisplay = true }
   }
   override var isEmphasized: Bool {
     get { super.isEmphasized }
-    set { super.isEmphasized = newValue; needsDisplay = true }
+    set { super.isEmphasized = newValue; syncGlassBackdrop(); needsDisplay = true }
   }
 
   /// Selection emphasis is computed at draw time (`septaskSelectionIsActive`),
@@ -832,6 +934,7 @@ final class KitCardRowView: NSTableRowView {
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
     septaskObserveKeyWindow()
+    syncGlassBackdrop()
     needsDisplay = true
   }
 
@@ -866,15 +969,21 @@ final class KitCardRowView: NSTableRowView {
       drawDropLine()
       return
     }
+    if usesGlassBackdrop {
+      syncGlassBackdrop()
+      drawDropLine()
+      return
+    }
     NSGraphicsContext.saveGraphicsState()
     NSBezierPath(rect: bounds).setClip()
+    let slice = slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup)
     SeptaskKitTheme.cardSurface.setFill()
-    slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup).fill()
+    slice.fill()
     // Selection rides on the card (same clip, selection-run rounding) so it
     // cannot overhang as a second rectangle. Composer owns the surface.
     if isSelected && !isComposing && !isEditingTitle {
       SeptaskKitTheme.listSelectionFill(emphasized: septaskSelectionIsActive).setFill()
-      slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup).fill()
+      slice.fill()
     }
     // Promote wash — SwiftUI's `playPromoteWash()`, same gold at the same
     // 0.22 peak, fading to nothing. It is NOT a second selection language:
@@ -882,14 +991,14 @@ final class KitCardRowView: NSTableRowView {
     // rather than the selection token, and it never persists on a row.
     if promoteWash > 0 {
       SeptaskKitTheme.todayAccent.withAlphaComponent(promoteWash).setFill()
-      slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup).fill()
+      slice.fill()
     }
     NSGraphicsContext.restoreGraphicsState()
     drawDropLine()
   }
 
   /// Current strength of the promote wash, 0 at rest.
-  private var promoteWash: CGFloat = 0
+  private var promoteWash: CGFloat = 0 { didSet { syncGlassBackdrop() } }
   private var promoteWashTimer: Timer?
 
   /// Play the one-shot gold wash for a task just pinned to Today. Stepped by a
@@ -1067,5 +1176,86 @@ final class KitSidebarRowView: NSTableRowView {
   }
 
   override var interiorBackgroundStyle: NSView.BackgroundStyle { .normal }
+}
+
+/// Shared frosted-glass recipe for EVERY card surface in the AppKit task list
+/// (grouped task cards in `KitCardRowView` and inline notices in
+/// `KitNoticeFill`). One definition so notices and task cards never diverge in
+/// material, veil opacity, or top specular rim — matching SwiftUI's unified
+/// `TaskCardChrome` / `TaskListNotice` recipe.
+@MainActor
+enum KitCardGlassStyle {
+  static let topRimHeight: CGFloat = 0.75
+
+  static func makeBackdrop() -> KitPassthroughVisualEffectView {
+    let effect = KitPassthroughVisualEffectView()
+    effect.blendingMode = .withinWindow
+    effect.state = .active
+    effect.material = .headerView
+    effect.wantsLayer = true
+    return effect
+  }
+
+  static func isDark(_ appearance: NSAppearance) -> Bool {
+    appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+  }
+
+  static func veilColor(isDark: Bool) -> NSColor {
+    SeptaskKitTheme.cardSurface.withAlphaComponent(isDark ? 0.28 : 0.38)
+  }
+
+  static func topRimColor(isDark: Bool) -> NSColor {
+    NSColor.white.withAlphaComponent(isDark ? 0.16 : 0.78)
+  }
+}
+
+/// Non-interactive frosted `NSVisualEffectView` used behind task cards and
+/// inline notices when a procedural Header Wash texture is active.
+@MainActor
+final class KitPassthroughVisualEffectView: NSVisualEffectView {
+  override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+/// Translucent card veil, top specular glass rim, selection wash, and promote
+/// flash drawn on top of `KitCardRowView`'s frosted `NSVisualEffectView` and
+/// beneath the cell's text/controls.
+@MainActor
+private final class KitCardGlassOverlayView: NSView {
+  var slicePath: NSBezierPath?
+  var isFirstInGroup = false
+  var showSelection = false
+  var selectionEmphasized = false
+  var promoteWash: CGFloat = 0
+
+  override var isFlipped: Bool { true }
+  override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+  override func draw(_ dirtyRect: NSRect) {
+    guard let slice = slicePath else { return }
+    let isDark = KitCardGlassStyle.isDark(effectiveAppearance)
+    NSGraphicsContext.saveGraphicsState()
+    NSBezierPath(rect: bounds).setClip()
+    // Light frosted veil so the Header Wash frosts through legibly.
+    KitCardGlassStyle.veilColor(isDark: isDark).setFill()
+    slice.fill()
+    if isFirstInGroup && !showSelection {
+      NSGraphicsContext.saveGraphicsState()
+      slice.addClip()
+      let rim = NSRect(x: bounds.minX, y: bounds.minY,
+                       width: bounds.width, height: KitCardGlassStyle.topRimHeight)
+      KitCardGlassStyle.topRimColor(isDark: isDark).setFill()
+      rim.fill()
+      NSGraphicsContext.restoreGraphicsState()
+    }
+    if showSelection {
+      SeptaskKitTheme.listSelectionFill(emphasized: selectionEmphasized).setFill()
+      slice.fill()
+    }
+    if promoteWash > 0 {
+      SeptaskKitTheme.todayAccent.withAlphaComponent(promoteWash).setFill()
+      slice.fill()
+    }
+    NSGraphicsContext.restoreGraphicsState()
+  }
 }
 #endif

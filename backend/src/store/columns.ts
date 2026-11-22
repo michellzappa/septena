@@ -29,6 +29,9 @@ const json = (schema: z.ZodTypeAny): Column => ({ kind: "json", zod: schema.null
 const NOTES_MAX = ENTITY_LIMITS.notesMax;
 const zDay = z.string().regex(new RegExp(ENTITY_PATTERNS.day), "expected YYYY-MM-DD").nullable();
 const day = (): Column => ({ kind: "text", zod: zDay });
+const zTime24 = z.string().regex(new RegExp(ENTITY_PATTERNS.time24), "expected HH:MM").nullable();
+const time24 = (): Column => ({ kind: "text", zod: zTime24 });
+const zIanaTz = z.string().max(64).refine(isValidTz, "unknown time zone").nullable();
 // ISO-8601 instant. The app's existing `completedAt` string shape
 // (yyyy-MM-dd'T'HH:mm:ss, no zone) also passes.
 const zStamp = z.string().regex(new RegExp(ENTITY_PATTERNS.stamp), "expected ISO time").max(ENTITY_LIMITS.stampMax).nullable();
@@ -43,7 +46,9 @@ const zNotesProposal = z.object({
   why: z.string().max(500).nullable(),
 }).strict();
 
-// `AreaAttachment` — opaque here; the app owns its shape. Size-capped only.
+// Retired (2026-11-21): legacy area/project context-feed pointer
+// (repo/calendar/feed). Kept on the wire so older clients' pushes still
+// validate; new clients never read or write it.
 const zAttachmentPointer = z.record(z.unknown()).refine(
   (v) => JSON.stringify(v).length <= ENTITY_LIMITS.attachmentPointerMax,
   "attachment pointer too large",
@@ -74,6 +79,17 @@ export const SETTING_VALUES = {
   getStartedDismissed: z.boolean(),
   /// "Get started" checklist steps completed (step raw IDs).
   getStartedSteps: z.array(z.string().max(64)).max(32),
+  /// When the first run (registry/surfaces.json `firstRun`) finished on any
+  /// device. Set once; a second device that signs in skips the first run.
+  onboardedAt: z.string().regex(new RegExp(ENTITY_PATTERNS.stamp), "expected ISO time").max(ENTITY_LIMITS.stampMax),
+  /// App accent color ID (ADR 0019: colorful default + 7 exotic fruits).
+  accentColor: z.enum(ENTITY_ENUMS.accentColor),
+  /// Procedural header-wash canvas texture ID (ADR 0019).
+  canvasTexture: z.enum(ENTITY_ENUMS.canvasTexture),
+  /// Header-wash intensity (15..100).
+  textureIntensity: z.number().int().min(15).max(100),
+  /// Header-wash motion mode ("still" | "slowDrift").
+  textureMotion: z.enum(ENTITY_ENUMS.textureMotion),
 } satisfies Record<string, z.ZodTypeAny>;
 
 export type SettingKey = keyof typeof SETTING_VALUES;
@@ -81,6 +97,9 @@ export const SETTING_KEYS = Object.keys(SETTING_VALUES) as SettingKey[];
 
 export const MAX_ATTACHMENT_BYTES = ENTITY_LIMITS.maxAttachmentBytes;
 export const MAX_USER_ATTACHMENT_BYTES = ENTITY_LIMITS.maxUserAttachmentBytes;
+export const MAX_CHECKLIST_ITEMS_PER_TASK = ENTITY_LIMITS.maxChecklistItemsPerTask;
+export const MAX_TAGS_PER_TASK = ENTITY_LIMITS.maxTagsPerTask;
+export const TAG_NAME_MAX = ENTITY_LIMITS.tagNameMax;
 
 export interface EntitySpec {
   table: string;
@@ -103,8 +122,13 @@ export const ENTITIES = {
       project: { kind: "text", zod: zId.nullable() },
       created: day(),
       scheduled: day(),
+      startTime: time24(),
+      durationMinutes: { kind: "int", zod: z.number().int().min(5).max(1440).nullable() },
+      timeZone: { kind: "text", zod: zIanaTz },
       deadline: day(),
       today: bool(),
+      starred: bool(),
+      tags: json(z.array(zId).max(MAX_TAGS_PER_TASK)),
       todaySetOn: day(),
       completedAt: stamp(),
       notes: text(NOTES_MAX),
@@ -151,6 +175,7 @@ export const ENTITIES = {
       noteRev: { kind: "int", zod: z.never() },
       notesProposal: json(zNotesProposal),
       emoji: text(16),
+      // Retired (2026-11-21): kept so older clients' pushes still validate.
       attachment: json(zAttachmentPointer),
       position: int(),
     },
@@ -172,6 +197,7 @@ export const ENTITIES = {
       noteRev: { kind: "int", zod: z.never() },
       notesProposal: json(zNotesProposal),
       githubRepo: text(200),
+      // Retired (2026-11-21): kept so older clients' pushes still validate.
       attachment: json(zAttachmentPointer),
       position: int(),
     },
@@ -193,6 +219,32 @@ export const ENTITIES = {
     // Bytes are bound to taskId/byteCount/contentType at upload; only the
     // display fields may change after that.
     updatable: ["filename", "position"],
+  },
+  // 1-level flat checklist items (subtasks) owned by a task (docs/CHECKLISTS_SPEC.md).
+  checklistItem: {
+    table: "checklist_items",
+    columns: {
+      taskId: { kind: "text", zod: zId },
+      title: { kind: "text", zod: z.string().max(ENTITY_LIMITS.textMax) },
+      checked: bool(),
+      checkedAt: stamp(),
+      position: real(),
+      createdAt: stamp(),
+    },
+    requiredOnInsert: ["taskId", "title"],
+    updatable: ["title", "checked", "checkedAt", "position"],
+  },
+  // Flat tags catalog (docs/TAGS_SPEC.md). Tasks reference canonical `tag.id`s
+  // in `task.tags`; renaming updates one row, soft-deleting never storms tasks.
+  tag: {
+    table: "tags",
+    columns: {
+      name: { kind: "text", zod: z.string().trim().min(1).max(TAG_NAME_MAX) },
+      color: text(32),
+      position: int(),
+    },
+    requiredOnInsert: ["name"],
+    updatable: ["name", "color", "position"],
   },
   // The non-turn half of `TaskConvo` (SeptenaCore/TaskConvo.swift), keyed by
   // the task id. Turns are their own append-only table (§5.3).

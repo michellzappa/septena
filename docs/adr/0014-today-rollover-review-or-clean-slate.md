@@ -29,7 +29,9 @@ Facts in the code today (2026-11-21):
 
 Today has two rollover modes. Silent carry-over is removed.
 
-- **Review (default).** At rollover, each open pin set before today moves to
+*(Naming note, 2026-11-21: the default mode was originally called "Review", which collided with the agent Review stage (`#87`). Renamed to **Ask** (`"ask"`) so **Review** means one thing everywhere — agent-finished work awaiting human acceptance.)*
+
+- **Ask (default).** At rollover, each open pin set before today moves to
   the Inbox band with one Today / Not today pair, as `TASK_FADE_SPEC.md` §6
   specifies. Today starts with only the tasks the user confirmed. This is
   the default for new users and for existing users.
@@ -40,7 +42,7 @@ Today has two rollover modes. Silent carry-over is removed.
   deadline has arrived stays on Today in both modes. The union rule is
   unchanged.
 - **Rollover is not a user gesture.** It does not record undo entries, does
-  not stamp `touchedAt` and does not count a defer. In Review, the user's tap
+  not stamp `touchedAt` and does not count a defer. In Ask, the user's tap
   on Today or Not today is the gesture, and records as §6 says.
 - **One mode per account, synced.** Every device shows the same Today.
 - **The rollover runs once per pin per day and is idempotent.** Two devices,
@@ -53,7 +55,7 @@ Today has two rollover modes. Silent carry-over is removed.
   old pins arrive in the band instead of staying on Today. A user with many
   stale pins gets a long band once. The spec decides whether a one-time note
   explains it.
-- Users who want Things behavior (pins stay) lose it. Review asks them each
+- Users who want Things behavior (pins stay) lose it. Ask prompts them each
   morning instead. This is the ADR 0006 trade: the list stays honest, and the
   user pays one tap per carried task.
 - Clean slate gives To Do switchers the habit they name. The To Do importer
@@ -69,7 +71,7 @@ Today has two rollover modes. Silent carry-over is removed.
 
 ## Links
 
-- #139 (spec issue), #54 (Review, fade P3), #77 (Today tech debt), #140 (day
+- #139 (spec issue), #54 (Ask mode, fade P3), #77 (Today tech debt), #140 (day
   start time), #52 (To Do importer)
 - `docs/TASK_FADE_SPEC.md` §6, `docs/TRIAGE_BAND_SPEC.md`
 - ADR 0006

@@ -80,10 +80,11 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [PROJECT_NOTES_SPEC.md](PROJECT_NOTES_SPEC.md) | accepted (ADR 0012) |
 | [TIMED_REMINDERS_SPEC.md](TIMED_REMINDERS_SPEC.md) | proposal (#97) |
 | [RECURRENCE_V2_SPEC.md](RECURRENCE_V2_SPEC.md) | proposal (#126) |
-| [MOVING_IN_SPEC.md](MOVING_IN_SPEC.md) | building (#99, ADR 0019): one import engine, source adapters |
+| [MOVING_IN_SPEC.md](MOVING_IN_SPEC.md) | building (#99, ADR 0021): one import engine, source adapters |
 | [CHECKLISTS_SPEC.md](CHECKLISTS_SPEC.md) | proposal (#76) |
 | [DATA_EXPORT_SPEC.md](DATA_EXPORT_SPEC.md) | proposal (#130) |
 | [IOS_SWIPE_ACTIONS_SPEC.md](IOS_SWIPE_ACTIONS_SPEC.md) | proposal (#132) |
+| [MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md](MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md) | proposal (touch swipe-to-select & multi-task drag to project) |
 | [TAGS_SPEC.md](TAGS_SPEC.md) | proposal (#96) |
 | [TASK_WIDGETS_SPEC.md](TASK_WIDGETS_SPEC.md) | proposal (#129) |
 | [STAR_PRIORITY_SPEC.md](STAR_PRIORITY_SPEC.md) | proposal (#127) |
@@ -95,6 +96,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [WEB_CLIENT_SPEC.md](WEB_CLIENT_SPEC.md) | proposal (#21) |
 | [CLOUDFLARE_ACCOUNT_MOVE.md](CLOUDFLARE_ACCOUNT_MOVE.md) | accepted; ADR 0018 |
 | [ANDROID_CLIENT_SPEC.md](ANDROID_CLIENT_SPEC.md) | accepted (#20); shared Kotlin core for Windows |
+| [REGISTRY_AUDIT.md](REGISTRY_AUDIT.md) | audit 2026-11-21; hard-coded copy vs registry, l10n proposal (#214–#219) |
 | [SEPTASK_ANDROID_PLAN.md](SEPTASK_ANDROID_PLAN.md) | superseded by ANDROID_CLIENT_SPEC.md |
 | [TASK_CONVERSATIONS_PLAN.md](TASK_CONVERSATIONS_PLAN.md) | shipped — historical, still the design rationale |
 | [TASK_CONVERSATIONS_PHASE0.md](TASK_CONVERSATIONS_PHASE0.md), [PHASE1](TASK_CONVERSATIONS_PHASE1.md), [SEPTASK_CONVERSATIONS_PLAN.md](SEPTASK_CONVERSATIONS_PLAN.md) | shipped — historical |
@@ -104,6 +106,13 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [RECENTLY_DELETED_SPEC.md](RECENTLY_DELETED_SPEC.md), [TASK_LIST_OBSERVATION_PLAN.md](TASK_LIST_OBSERVATION_PLAN.md) | proposal |
 | [SEPTASK_APPKIT_PARITY.md](SEPTASK_APPKIT_PARITY.md), [SEPTASK_APPKIT_SURFACES.md](SEPTASK_APPKIT_SURFACES.md), [SEPTASK_APPKIT_LOCALIZATION_HANDOFF.md](SEPTASK_APPKIT_LOCALIZATION_HANDOFF.md) | AppKit shell notes |
 | [APPSTORE-SEPTASK.md](APPSTORE-SEPTASK.md), [RELEASING-MAC.md](RELEASING-MAC.md) | current |
+
+### Registries
+
+| Doc | Status |
+|---|---|
+| [REGISTRY_PLAN.md](REGISTRY_PLAN.md) | accepted (ADR 0020): P0 translation pipeline → P4 reach |
+| [REGISTRY_AUDIT.md](REGISTRY_AUDIT.md) | audit 2026-11-21 |
 
 ### AI and MCP
 
@@ -122,6 +131,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [DesignSpec.md](DesignSpec.md) | canonical |
 | [PAGE_CHROME_SPEC.md](PAGE_CHROME_SPEC.md), [DRAWER_MODES_SPEC.md](DRAWER_MODES_SPEC.md), [GLASS_DOTS_SPEC.md](GLASS_DOTS_SPEC.md), [WAKING_DAY_WHEEL.md](WAKING_DAY_WHEEL.md) | mixed: see each status line |
 | [SETTINGS_UX_SPEC.md](SETTINGS_UX_SPEC.md) | proposal (task app Settings IA + `registry/settings.json` v2, S0–S3) |
+| [CUSTOMIZATION_SPEC.md](CUSTOMIZATION_SPEC.md) | building (#196, ADR 0021; procedural Header Wash textures + exotic-fruit accents, C0–C4) |
 | [SETTINGS_FLATTEN_SPEC.md](SETTINGS_FLATTEN_SPEC.md) | superseded by SETTINGS_UX_SPEC.md |
 | [SETTINGS_REORG_PROPOSAL.md](SETTINGS_REORG_PROPOSAL.md) | life app; mostly built |
 | [FRONT_DOOR_IDENTITY.md](FRONT_DOOR_IDENTITY.md) | roadmap |

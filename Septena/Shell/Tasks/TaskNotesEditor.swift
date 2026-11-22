@@ -70,9 +70,9 @@ struct TaskMarkdownNotesEditor: View {
       .frame(height: visibleHeight)
 
       if text.isEmpty {
-        Text("Notes")
+        Text(verbatim: RegistrySurfaces.taskAttribute("notes").label)
           .font(.septenaTaskTitle)
-          .foregroundStyle(Theme.inkSecondary)
+          .foregroundStyle(.tertiary)
           .allowsHitTesting(false)
       }
     }

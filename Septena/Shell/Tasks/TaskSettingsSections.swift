@@ -41,8 +41,11 @@ struct TaskSettingsPane<Destination: Hashable>: View {
   #endif
   @AppStorage(SettingsKey.tasksShowCalendarEvents) private var showCalendarEvents: Bool = RegistrySettings.Defaults.tasksShowCalendarEvents
   @AppStorage(SettingsKey.tasksShowAging) private var showAging: Bool = RegistrySettings.Defaults.tasksShowAging
+  @AppStorage(SettingsKey.tasksShowFaded) private var showFaded: Bool = RegistrySettings.Defaults.tasksShowFaded
   @AppStorage(SettingsKey.tasksFilingSuggestions) private var filingSuggestions: Bool = RegistrySettings.Defaults.tasksFilingSuggestions
   @AppStorage(SettingsKey.tasksTitleLines) private var titleLines: Int = RegistrySettings.Defaults.tasksTitleLines
+  @State private var showingManageTags = false
+  @State private var tagCount = 0
 
   #if SEPTASK
   @Environment(\.modelContext) private var modelContext
@@ -58,6 +61,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
       rowsSection
       #endif
       addingSection
+      tagsSection
       calendarSection
       remindersSection
       badgeSection
@@ -69,6 +73,38 @@ struct TaskSettingsPane<Destination: Hashable>: View {
       appearanceSection
     }
     .formStyle(.grouped)
+    .sheet(isPresented: $showingManageTags, onDismiss: refreshTagCount) {
+      ManageTagsSheet()
+    }
+    .onAppear { refreshTagCount() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in refreshTagCount() }
+  }
+
+  private var tagsSection: some View {
+    Section {
+      Button {
+        showingManageTags = true
+      } label: {
+        HStack {
+          Label("Manage Tags…", systemImage: "tag")
+          Spacer()
+          if tagCount > 0 {
+            Text("\(tagCount)")
+              .foregroundStyle(.secondary)
+          }
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+    } header: {
+      Text("Tags")
+    } footer: {
+      Text("Organize tasks with lightweight flat tags. Rename, color, merge, or delete tags here.")
+    }
+  }
+
+  private func refreshTagCount() {
+    tagCount = LocalCache.allTags(in: LocalStore.shared.container.mainContext).count
   }
 
   // MARK: Lists & Today
@@ -79,19 +115,23 @@ struct TaskSettingsPane<Destination: Hashable>: View {
       // AppKit Today reads the key from UserDefaults and must rebuild.
       Toggle("Show completed tasks", isOn: TaskViewOptions.announcing($todayShowCompleted))
       Toggle(isOn: TaskViewOptions.announcing($showAging)) {
-        rowLabel("Fade untouched tasks",
-                 detail: "Tasks untouched for 14 days fade out and move to Faded.")
+        rowLabel("Fade inactive tasks",
+                 detail: "Tasks without activity for 14 days fade out and move to Faded.")
+      }
+      Toggle(isOn: TaskViewOptions.announcing($showFaded)) {
+        rowLabel("Show faded tasks",
+                 detail: "Show faded tasks in projects and areas.")
       }
       // Same switch as View ▸ Group Today by List; `announcing` is what keeps
       // Septask's AppKit list in step when it's flipped from here.
       Toggle(isOn: TaskViewOptions.announcing($todayGroupByList)) {
         rowLabel("Group by area and project",
-                 detail: "Off shows one flat list, with each task's list as a subtitle.")
+                 detail: "When off, tasks appear in one list with their project or area underneath.")
       }
     } header: {
       Text("Today")
     } footer: {
-      Text("Undated, non-repeating tasks fade over 14 days without a touch and move to Faded until a weekly sweep lets you keep them or let them go. Touching a task restores full strength.")
+      Text("Undated, non-repeating tasks fade after 14 days without activity and move to Faded until you keep them or let them go. Open or edit a task to bring it back.")
     }
   }
 
@@ -106,7 +146,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
     } header: {
       Text("Task rows")
     } footer: {
-      Text("How far a long title wraps before it is cut off. Taller rows fit fewer tasks on screen.")
+      Text("Maximum lines shown for long titles. Taller rows fit fewer tasks on screen.")
     }
   }
   #endif
@@ -161,7 +201,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
     } header: {
       Text("Badge")
     } footer: {
-      Text("Marks the app icon while any task is overdue. Each device opts in on its own.")
+      Text("Marks the app icon while any task is overdue. Set separately on each device.")
     }
   }
 
@@ -189,7 +229,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
     } header: {
       Text("Import")
     } footer: {
-      Text("Move a Things database into Tasks once. Things is not changed.")
+      Text("Copy a Things database into Tasks once. Nothing in Things is changed.")
     }
   }
 
@@ -231,7 +271,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
     } header: {
       Text("Appearance")
     } footer: {
-      Text("The accent is shared with Septena Life. Changing it here recolors Tasks there too.")
+      Text("Sets the accent color used across Septena.")
     }
 
     // Text size and completion motion sit here, inline, instead of on a
@@ -243,7 +283,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
         Label("Completion animations", systemImage: "party.popper")
       }
     } footer: {
-      Text("The flourish when you clear Today or check off a task. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this.")
+      Text("Play a brief animation when you check off a task or clear Today. Off keeps haptic feedback only. Reduce Motion always overrides this.")
     }
     #else
     Section {

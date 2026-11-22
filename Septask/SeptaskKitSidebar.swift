@@ -293,6 +293,15 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     ) { [weak self] _ in
       MainActor.assumeIsolated { self?.refreshTextSize() }
     })
+    observers.append(NotificationCenter.default.addObserver(
+      forName: .septenaAppearanceChanged, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated {
+        self?.outlineView.enumerateAvailableRowViews { rowView, _ in
+          rowView.needsDisplay = true
+        }
+      }
+    })
   }
 
   deinit {
@@ -351,6 +360,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       node.children.contains { $0.key == key }
     }), collapsedKeys.contains(owner.key) {
       toggleFold(owner)
+    }
+    if key == KitSidebarDestination.key(for: .filter(.review)), row(forKey: key) == nil {
+      rebuild(preserving: key)
     }
     guard let row = row(forKey: key) else { return }
     outlineView.selectRowIndexes([row], byExtendingSelection: false)
@@ -442,22 +454,28 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
 
     // Counts come from one live-task pass. The filter semantics below mirror
     // `LocalCache.convert`, but sharing this snapshot avoids refetching the
-    // entire open table for every smart-list badge on every task edit.
-    let all = LocalCache.allTasks(in: context).filter { !$0.isHeading }
+    // entire open table for every smart-list badge on every task edit. The
+    // pass reads entities, not row objects: a badge never needs the
+    // conversation or recurrence JSON that building a row object decodes.
+    let all = LocalCache.liveAggregateEntities(in: context)
     // Faded open tasks leave every list count and project ratio (docs/TASK_FADE_SPEC.md §4).
     let open = all.filter { $0.status == .open && !$0.isFaded }
     let fadedCount = all.filter(\.isFaded).count
+    let starredCount = open.filter(\.starred).count
     let today = SeptenaDate.today
     let inboxCount = open.filter { $0.isInTriageBand }.count
     let todayCount = open.filter { $0.isOnToday && !$0.isInTriageBand }.count
+    let reviewCount = open.filter {
+      $0.conversationJSON != nil && $0.conversation.needsHumanReview
+    }.count
     let smartCounts: [TaskFilter: Int] = [
-      .review: open.filter { $0.conversation.endState == .needsVerify }.count,
+      .review: reviewCount,
       .upcoming: open.filter { task in
         guard !task.today else { return false }
         return task.scheduled.map { $0 > today } == true
           || task.deadline.map { $0 > today } == true
       }.count,
-      .repeating: open.filter { $0.recurrence != nil }.count,
+      .repeating: open.filter { $0.recurrenceUnit != nil && $0.recurrence != nil }.count,
       .unscheduled: open.filter {
         !$0.today && $0.scheduled == nil && $0.deadline == nil
       }.count,
@@ -506,13 +524,27 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
                                                           today: todayCount + inboxCount,
                                                           doneToday: doneTodayCount))
     }
-    // Faded pile & Recently Deleted: shown once non-empty, matching the SwiftUI sidebar.
+    // Review: progressively disclosed right below Today when non-empty (or
+    // while selected so accepting the last item does not yank the row away).
+    let reviewDestination = KitSidebarDestination.filter(.review,
+                                                         title: TaskFilter.review.title)
+    if reviewCount > 0 || key == reviewDestination.key {
+      let insertAt = views.firstIndex(where: { $0.key == KitSidebarDestination.key(for: .filter(.today)) })
+        .map { $0 + 1 } ?? 0
+      views.insert(Node(reviewDestination.nodeContent, count: reviewCount.nilIfZero), at: insertAt)
+    }
+    // Starred, Faded & Recently Deleted: shown once non-empty (progressive disclosure).
+    if starredCount > 0 {
+      let starred = KitSidebarDestination.filter(.starred,
+                                                 title: TaskFilter.starred.title)
+      views.append(Node(starred.nodeContent, count: starredCount))
+    }
     if fadedCount > 0 {
       let faded = KitSidebarDestination.filter(.faded,
                                                title: TaskFilter.faded.title)
       views.append(Node(faded.nodeContent, count: fadedCount))
     }
-    let recentlyDeletedCount = LocalCache.tasks(in: context, filter: .recentlyDeleted).count
+    let recentlyDeletedCount = LocalCache.recentlyDeletedCount(in: context)
     if recentlyDeletedCount > 0 {
       let deleted = KitSidebarDestination.filter(.recentlyDeleted,
                                                  title: TaskFilter.recentlyDeleted.title)
@@ -680,27 +712,32 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // shared undo stack (`TaskUndo`). Which kind of snapshot depends on what
     // the drop changed: the three smart lists move DATES, an area / project
     // row moves FILING.
-    let dropped = LocalCache.allTasks(in: context).filter { ids.contains($0.id) }
+    let dropped = LocalCache.liveTasks(ids: ids, in: context)
     let scheduleBefore = dropped.map(TaskUndo.ScheduleSnapshot.init)
     let filingBefore = dropped.map(TaskUndo.FilingSnapshot.init)
-    for id in ids {
-      switch action {
-      case .today:
-        mutator.moveToToday(id: id)
-      case .scheduleTomorrow:
-        mutator.schedule(id: id, date: KitDayFormat.tomorrow())
-        mutator.removeFromToday(id: id)
-      case .anytime:
-        mutator.schedule(id: id, date: nil)
-        mutator.removeFromToday(id: id)
-      case .area(let areaId):
-        mutator.moveToList(id: id, area: areaId, project: nil)
-      case .project(let projectId):
-        mutator.moveToList(id: id, area: nil, project: projectId)
+    switch action {
+    case .area(let areaId):
+      mutator.moveToList(ids: ids, area: areaId, project: nil, acknowledge: true)
+    case .project(let projectId):
+      mutator.moveToList(ids: ids, area: nil, project: projectId, acknowledge: true)
+    case .today, .scheduleTomorrow, .anytime:
+      for id in ids {
+        switch action {
+        case .today:
+          mutator.moveToToday(id: id)
+        case .scheduleTomorrow:
+          mutator.schedule(id: id, date: KitDayFormat.tomorrow())
+          mutator.removeFromToday(id: id)
+        case .anytime:
+          mutator.schedule(id: id, date: nil)
+          mutator.removeFromToday(id: id)
+        case .area, .project:
+          break
+        }
+        // A drop is a disposition, like filing from the list: it clears the
+        // agent cue, so a proposal leaves the Inbox once the user has placed it.
+        mutator.acknowledge(id: id)
       }
-      // A drop is a disposition, like filing from the list: it clears the
-      // agent cue, so a proposal leaves the Inbox once the user has placed it.
-      mutator.acknowledge(id: id)
     }
     switch action {
     case .today:
@@ -1221,66 +1258,69 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       outlineView.selectRowIndexes([row], byExtendingSelection: false)
     }
 
-    let menu = NSMenu()
+    // Registry menus (`sidebar.area`, `sidebar.project`, `sidebar.empty`) —
+    // the same trees the SwiftUI sidebar renders.
+    let menu: NSMenu
     switch node?.content {
-    case .area(let area):
-      menu.addItem(item(String(localized: "New Project in \(area.title)",
-                               comment: "SeptaskKit: sidebar context menu"),
-                        #selector(newProjectInSelectedArea)))
-      menu.addItem(.separator())
-      menu.addItem(item(String(localized: "Rename Area…", comment: "SeptaskKit: sidebar context menu"),
-                        #selector(renameSelected)))
-      menu.addItem(item(String(localized: "Delete Area…", comment: "SeptaskKit: sidebar context menu"),
-                        #selector(deleteSelected)))
+    case .area:
+      menu = KitRegistryMenu.build(RegistryActions.menu("sidebar.area")) { [weak self] id in
+        guard let self else { return nil }
+        switch id {
+        case "area.newProject": return .init { self.newProjectInSelectedArea() }
+        case "area.rename": return .init { self.renameSelected() }
+        case "area.delete": return .init { self.deleteSelected() }
+        default: return nil
+        }
+      }
     case .project(let project, _):
-      menu.addItem(item(String(localized: "Rename", comment: "SeptaskKit: sidebar context menu"),
-                        #selector(renameSelected)))
-      menu.addItem(moveToAreaItem(for: project))
-      menu.addItem(.separator())
-      menu.addItem(item(String(localized: "Mark Done", comment: "SeptaskKit: sidebar context menu"),
-                        #selector(markSelectedProjectDone)))
-      menu.addItem(item(String(localized: "Cancel Project", comment: "SeptaskKit: sidebar context menu"),
-                        #selector(cancelSelectedProject)))
-      menu.addItem(.separator())
-      menu.addItem(item(String(localized: "Delete Project…", comment: "SeptaskKit: sidebar context menu"),
-                        #selector(deleteSelected)))
+      menu = KitRegistryMenu.build(RegistryActions.menu("sidebar.project"), bind: { [weak self] id in
+        guard let self else { return nil }
+        switch id {
+        case "project.rename": return .init { self.renameSelected() }
+        case "project.markDone": return .init { self.markSelectedProjectDone() }
+        case "project.cancel": return .init { self.cancelSelectedProject() }
+        case "project.delete": return .init { self.deleteSelected() }
+        default: return nil
+        }
+      }, slot: { [weak self] id in
+        guard let self, id == "moveToAreaDestinations" else { return [] }
+        return self.areaDestinationNodes(for: project)
+      })
     case .filter(_, _, _), .none:
-      menu.addItem(item(String(localized: "New Area…", comment: "SeptaskKit: sidebar context menu"),
-                        #selector(newArea)))
-      menu.addItem(item(String(localized: "New Project…", comment: "SeptaskKit: sidebar context menu"),
-                        #selector(newProjectLoose)))
+      menu = KitRegistryMenu.build(RegistryActions.menu("sidebar.empty")) { [weak self] id in
+        guard let self else { return nil }
+        switch id {
+        case "sidebar.newArea": return .init { self.newArea() }
+        case "sidebar.newProject": return .init { self.newProjectLoose() }
+        default: return nil
+        }
+      }
     }
     menu.popUp(positioning: nil, at: point, in: outlineView)
   }
 
   /// "Move to Area ▸" — No Area, then every area; the current parent is
-  /// checked and inert.
-  private func moveToAreaItem(for project: Project) -> NSMenuItem {
-    let parent = NSMenuItem(title: String(localized: "Move to Area",
-                                          comment: "SeptaskKit: sidebar context menu"),
-                            action: nil, keyEquivalent: "")
-    let submenu = NSMenu()
-    let none = item(String(localized: "No Area", comment: "SeptaskKit: sidebar context menu"),
-                    #selector(moveSelectedProject(_:)))
-    none.representedObject = NSNull()
-    none.state = project.area == nil ? .on : .off
-    submenu.addItem(none)
+  /// checked and inert. The same slot the SwiftUI sidebar fills.
+  private func areaDestinationNodes(for project: Project) -> [RegistryMenuNode] {
     let areas = StructureCache.snapshot(in: context).areas
-    if !areas.isEmpty { submenu.addItem(.separator()) }
+    var nodes: [RegistryMenuNode] = [
+      RegistryMenuEntry.slot(
+        id: "area.none",
+        title: String(localized: "No Area", comment: "SeptaskKit: sidebar context menu"),
+        isOn: project.area == nil,
+        perform: project.area == nil ? nil : { [weak self] in self?.moveProject(project, toArea: nil) }),
+    ]
+    if !areas.isEmpty { nodes.append(.divider(id: "areas.divider")) }
     for area in areas {
-      let entry = item(area.title, #selector(moveSelectedProject(_:)))
-      entry.representedObject = area.id
-      entry.state = project.area == area.id ? .on : .off
-      submenu.addItem(entry)
+      nodes.append(RegistryMenuEntry.slot(
+        id: "area.\(area.id)", title: area.title, isOn: project.area == area.id,
+        perform: project.area == area.id ? nil : { [weak self] in self?.moveProject(project, toArea: area.id) }))
     }
-    parent.submenu = submenu
-    return parent
+    return nodes
   }
 
-  private func item(_ title: String, _ action: Selector) -> NSMenuItem {
-    let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
-    item.target = self
-    return item
+  private func moveProject(_ project: Project, toArea area: String?) {
+    moveProject(project, toArea: area, at: nil, snapshot: StructureCache.snapshot(in: context))
   }
 
   private var selectedNode: Node? {
@@ -1456,13 +1496,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// Context menu ▸ Move to Area — the keyboard-and-pointer twin of dragging
   /// a project onto an area row. `representedObject` is the area id, or
   /// `NSNull` for "No Area".
-  @objc private func moveSelectedProject(_ sender: NSMenuItem) {
-    guard case .project(let project, _) = selectedNode?.content else { return }
-    let target = sender.representedObject as? String
-    guard target != project.area else { return }
-    moveProject(project, toArea: target, at: nil, snapshot: StructureCache.snapshot(in: context))
-  }
-
   /// Matches `SidebarView.projectMenu` and `registry/actions.json` (`sidebar.project`).
   @objc private func markSelectedProjectDone() {
     setSelectedProjectStatus(.done)

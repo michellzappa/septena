@@ -30,6 +30,7 @@ enum SeptaskLaunch {
       SeptaskLegacyClaudeCleanup.runOnce()
       SeptaskDiagnosticsCoordinator.shared.start()
       BadgeManager.shared.start(context: localStore.container.mainContext)
+      TaskReminderScheduler.shared.start(context: localStore.container.mainContext)
       #if os(iOS)
       // The next cold launch draws Today from this file (#82). macOS draws
       // its AppKit list without `TaskListView`, so it has no reader.
@@ -40,6 +41,7 @@ enum SeptaskLaunch {
       await services.absorbRemoteChanges()
       let context = localStore.container.mainContext
       settings.reloadFromMirror(context: context)
+      AppearancePreferences.shared.adoptSynced(SeptaskSyncedSettings.current())
       settings.reconcileWelcomeName(context: context, engine: services.ckEngine)
       settings.reconcileTelemetryLevel(context: context, engine: services.ckEngine)
       settings.reconcileHiddenCalendars(context: context, engine: services.ckEngine)
@@ -68,6 +70,7 @@ enum SeptaskLaunch {
     // keep in parity with Septena's `.active` branch in App.swift.
     services.taskMutator.catchUpFixedSchedules()
     services.runFadePassIfDue()
+    TaskReminderScheduler.shared.scheduleReconcile()
   }
 
   /// iOS: hold deferred launch work until the first Today frame is drawn.
@@ -219,13 +222,16 @@ enum SeptaskMacRuntime {
 @MainActor
 final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
+    AppearancePreferences.shared.applyPlatformAppearance()
     // Global Quick Entry hotkey, ⌃⌥Space (Carbon RegisterEventHotKey: no
     // Accessibility permission, no event tap). ⌃Space is the system input
     // source switch and Moom's binding, so it is not used.
     SeptaskKitQuickEntry.installHotKey()
-    // No welcome screen: a fresh install lands on Today, where the Get
-    // started checklist and the sign-in notice (`TaskNotices`) take over.
+    // A fresh account gets the first run as a sheet on this window
+    // (`SeptaskKitFirstRun.swift`); after it, the Get started checklist and
+    // the sign-in notice (`TaskNotices`) hold whatever was skipped.
     SeptaskKitWindowController.show()
+    Task { @MainActor in await SeptaskKitFirstRunWindow.presentIfNeeded() }
     // Sparkle starts scheduled checks when the controller is created. Local
     // Debug builds intentionally have no update key and must not prompt.
     #if !DEBUG

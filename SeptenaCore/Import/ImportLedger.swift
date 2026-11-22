@@ -5,7 +5,7 @@ import Foundation
 // later plans skip on, the originals a `preserved` field is recovered from,
 // and the fingerprints undo uses to tell an untouched row from an edited one.
 // Plain JSON on purpose: a user (or support) can read what an import did.
-// Per device by design (ADR 0019): undo works where the import ran.
+// Per device by design (ADR 0021): undo works where the import ran.
 
 enum ImportBatchState: String, Codable, Sendable, Hashable {
   case applying

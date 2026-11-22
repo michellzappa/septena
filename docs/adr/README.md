@@ -19,12 +19,14 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0011](0011-self-hostable-backend.md) | Keep the backend self-hostable on the user's own Cloudflare account | accepted |
 | [0012](0012-project-notes-are-agent-context.md) | Project notes are the context agents read first | accepted |
 | [0013](0013-native-windows-app-on-the-android-code.md) | Build the Windows app on the Android client's Kotlin code | accepted |
-| [0014](0014-today-rollover-review-or-clean-slate.md) | Today rolls over by review or by clean slate; it never carries over silently | accepted |
+| [0014](0014-today-rollover-review-or-clean-slate.md) | Today rolls over by Ask (renamed from Review) or by Clean slate; it never carries over silently | accepted |
 | [0015](0015-shared-registries-for-cross-platform-clients.md) | Keep cross-platform task-app contracts in shared JSON registries | accepted |
 | [0016](0016-sign-in-beyond-apple.md) | Sign in beyond Apple: approve a new device, or use an email code | accepted |
 | [0017](0017-move-septena-life-out-of-repo.md) | Move Septena Life out of the Septena repo | accepted |
 | [0018](0018-septena-on-its-own-cloudflare-account.md) | Run Septena on its own Cloudflare account | accepted |
-| [0019](0019-one-import-engine-with-source-adapters.md) | One import engine, with source adapters behind a versioned bundle | accepted |
+| [0019](0019-generative-textures-and-fruit-accents.md) | Use procedural canvas textures and exotic-fruit accents over a Colorful default | accepted |
+| [0020](0020-registry-owns-copy-and-translations.md) | The registry owns shared copy and its translations; shells render it | accepted |
+| [0021](0021-one-import-engine-with-source-adapters.md) | One import engine, with source adapters behind a versioned bundle | accepted |
 
 ## Template
 

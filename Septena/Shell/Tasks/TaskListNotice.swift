@@ -31,6 +31,19 @@ struct TaskListNotice<Actions: View>: View {
   /// slice, with no gap under it, and the rows draw the rest.
   var headsCard: Bool = false
   @ViewBuilder var actions: Actions
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+  @Environment(\.colorScheme) private var colorScheme
+  #if SEPTASK
+  private let appearance = AppearancePreferences.shared
+  #endif
+
+  private var useLiquidGlass: Bool {
+    #if SEPTASK
+    return appearance.hasActiveTexture && !reduceTransparency
+    #else
+    return false
+    #endif
+  }
 
   var body: some View {
     header
@@ -98,11 +111,38 @@ struct TaskListNotice<Actions: View>: View {
     .accessibilityLabel(Text("Dismiss"))
   }
 
+  @ViewBuilder
   private var fill: some View {
     let shape = (headsCard ? TaskCardPosition.top : .solo).cardShape
-    return shape
-      .fill(Theme.cardSurface)
-      .overlay(shape.fill(kind == .warning ? Theme.noticeWarning.opacity(0.12) : Color.clear))
+    ZStack(alignment: .bottom) {
+      if useLiquidGlass {
+        ZStack(alignment: .top) {
+          #if os(iOS)
+          shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.78 : 0.80))
+          shape.strokeBorder(
+            Color.white.opacity(colorScheme == .dark ? 0.07 : 0.48),
+            lineWidth: 0.5
+          )
+          #else
+          shape.fill(.thinMaterial)
+          shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.28 : 0.36))
+          #endif
+          if kind == .warning {
+            shape.fill(Theme.noticeWarning.opacity(0.12))
+          }
+          Color.white.opacity(colorScheme == .dark ? 0.14 : 0.72)
+            .frame(height: 0.75)
+        }
+        .clipShape(shape)
+      } else {
+        shape
+          .fill(Theme.cardSurface)
+          .overlay(shape.fill(kind == .warning ? Theme.noticeWarning.opacity(0.12) : Color.clear))
+      }
+      if headsCard {
+        Rectangle().fill(Theme.border).frame(height: 0.5)
+      }
+    }
   }
 
   private var tint: Color {

@@ -44,7 +44,7 @@ struct TaskFadeSweepSheet: View {
         Divider()
         footer
       }
-      .navigationTitle(String(localized: "Weekly Sweep", comment: "Sweep sheet title"))
+      .navigationTitle(String(localized: "Faded Tasks", comment: "Sweep sheet title"))
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
@@ -64,7 +64,7 @@ struct TaskFadeSweepSheet: View {
   private var taskList: some View {
     ScrollView {
       LazyVStack(alignment: .leading, spacing: 0) {
-        Text(String(localized: "Tap Keep on anything you still want. The rest are let go to your Logbook and are never deleted.",
+        Text(String(localized: "Choose Keep for anything you still need. The rest move to your Logbook as let go, never deleted.",
                     comment: "Sweep sheet intro"))
           .font(.septenaMeta)
           .foregroundStyle(Theme.inkSecondary)
@@ -110,13 +110,15 @@ struct TaskFadeSweepSheet: View {
         .foregroundStyle(Theme.inkSecondary)
       Text(keptCount > 0
            ? String(localized: "You kept everything.", comment: "Sweep sheet empty after keeping all")
-           : String(localized: "Nothing to sweep.", comment: "Sweep sheet empty"))
+           : String(localized: "No faded tasks to check.", comment: "Sweep sheet empty"))
         .font(.septenaLabel)
         .foregroundStyle(Theme.inkPrimary)
-      Text(String(localized: "Kept tasks are back in their lists.",
-                  comment: "Sweep sheet empty detail"))
-        .font(.septenaMeta)
-        .foregroundStyle(Theme.inkSecondary)
+      if keptCount > 0 {
+        Text(String(localized: "Kept tasks are back in their lists.",
+                    comment: "Sweep sheet empty detail"))
+          .font(.septenaMeta)
+          .foregroundStyle(Theme.inkSecondary)
+      }
       Spacer()
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)

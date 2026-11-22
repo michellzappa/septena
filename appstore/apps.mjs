@@ -45,7 +45,7 @@ export const APPS = {
 
   septask: {
     key: "septask",
-    name: "Septask",
+    name: "Septena",
     metadataDoc: "docs/APPSTORE-SEPTASK.md",
     rawRoot: "raw-septask",
     screenshotsDir: "screenshots-septask",

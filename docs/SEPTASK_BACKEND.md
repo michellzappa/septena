@@ -103,10 +103,11 @@ iOS / Mac / Watch apps                 Claude (web, mobile, Code, agents)
 - `deletedAt` — tombstone. Rows are soft-deleted so a pull can carry the
   deletion. Tombstones are purged after 90 days.
 - Field names are the real names, not CloudKit reserved slots:
-  `Area.reservedString1` → `emoji`, `Area.reservedString2` /
-  `Project.reservedString1` → `attachment` (JSON `AreaAttachment`),
-  `reservedInt1` → `position`. Legacy encrypted `notes` is dropped; only
-  `notesText` migrates, as `notes`.
+  `Area.reservedString1` → `emoji`, `reservedInt1` → `position`. Legacy
+  encrypted `notes` is dropped; only `notesText` migrates, as `notes`.
+  (`Area.reservedString2` / `Project.reservedString1` → `attachment` was
+  retired 2026-11-21; the column stays on the wire only so older clients'
+  pushes still validate.)
 - Dates keep their current shapes (`YYYY-MM-DD` strings for `created`,
   `scheduled`, `deadline`, `todaySetOn`; the existing `completedAt` string).
   Changing them is a separate decision, not part of the move.

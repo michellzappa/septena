@@ -90,20 +90,6 @@ enum TaskBackendMapping {
       if !v.isFinite { problems.append("\(name) is not a finite number") }
       return .double(v)
     }
-    /// `AreaAttachment` JSON: must be an object, at most `attachmentPointerMax` characters.
-    mutating func pointer(_ name: String, _ json: String?) -> BackendJSON {
-      guard let json, !json.isEmpty else { return .null }
-      guard let data = json.data(using: .utf8),
-            let value = try? JSONDecoder().decode(BackendJSON.self, from: data),
-            case .object = value else {
-        problems.append("\(name) is not a JSON object")
-        return .null
-      }
-      if json.utf16.count > RegistryEntityLimits.attachmentPointerMax {
-        problems.append("\(name) longer than \(RegistryEntityLimits.attachmentPointerMax)")
-      }
-      return value
-    }
     mutating func rowID(_ v: String) {
       if v.wholeMatch(of: TaskBackendMapping.idPattern) == nil { problems.append("id is not valid") }
     }
@@ -128,7 +114,6 @@ enum TaskBackendMapping {
       "title": c.text("title", a.title),
       "context": c.text("context", a.context, max: notesMax),
       "emoji": c.text("emoji", a.emoji, max: 16),
-      "attachment": c.pointer("attachment", a.attachmentJSON),
       "position": .int(Int64(a.position)),
     ]
     return finish(.area, a.id, c, fields, deleted: false)
@@ -145,9 +130,10 @@ enum TaskBackendMapping {
       "created": c.day("created", p.created),
       "completedAt": c.stamp("completedAt", p.completedAt),
       "notes": c.text("notes", p.notes, max: notesMax),
-      "context": c.text("context", p.context, max: notesMax),
+      // No "context": retired (ADR 0012). The backend merged it into notes
+      // and refuses agent writes to it; pushing the stale local copy on
+      // every project change would bring the duplicate back.
       "githubRepo": c.text("githubRepo", p.githubRepo, max: 200),
-      "attachment": c.pointer("attachment", p.attachmentJSON),
       "position": .int(Int64(p.position)),
     ]
     return finish(.project, p.id, c, fields, deleted: p.deletedAt != nil)
@@ -167,8 +153,13 @@ enum TaskBackendMapping {
       "project": c.id("project", t.project),
       "created": c.day("created", t.created),
       "scheduled": c.day("scheduled", t.scheduled),
+      "startTime": c.text("startTime", t.startTime, max: 5),
+      "durationMinutes": t.durationMinutes.map { .int(Int64($0)) } ?? .null,
+      "timeZone": c.text("timeZone", t.timeZone, max: 64),
       "deadline": c.day("deadline", t.deadline),
       "today": .bool(t.today),
+      "starred": .bool(t.starred),
+      "tags": t.tagIDs.isEmpty ? .null : .array(t.tagIDs.map { .string($0) }),
       "todaySetOn": c.day("todaySetOn", t.todaySetOn),
       "completedAt": c.stamp("completedAt", t.completedAt),
       "notes": c.text("notes", t.notes, max: notesMax),
@@ -224,6 +215,33 @@ enum TaskBackendMapping {
       BackendAttachmentPlan(row: $0, fileURL: TaskAttachmentFiles.url(for: a),
                             contentType: a.contentType, byteCount: a.byteCount)
     }
+  }
+
+  @MainActor
+  static func checklistItem(_ item: TaskChecklistItemEntity) -> Result<BackendRowPlan, TaskBackendIssue> {
+    var c = Checker()
+    c.rowID(item.id)
+    let fields: [String: BackendJSON] = [
+      "taskId": c.id("taskId", item.taskID),
+      "title": c.text("title", item.title),
+      "checked": .bool(item.checked),
+      "checkedAt": item.checkedAt.map { .string(stamp($0)) } ?? .null,
+      "position": c.real("position", item.position),
+      "createdAt": item.createdAt == .distantPast ? .null : .string(stamp(item.createdAt)),
+    ]
+    return finish(.checklistItem, item.id, c, fields, deleted: false)
+  }
+
+  @MainActor
+  static func tag(_ tag: TagEntity) -> Result<BackendRowPlan, TaskBackendIssue> {
+    var c = Checker()
+    c.rowID(tag.id)
+    let fields: [String: BackendJSON] = [
+      "name": c.text("name", tag.name, max: RegistryEntityLimits.tagNameMax),
+      "color": c.text("color", tag.color, max: 32),
+      "position": tag.position.map { .int(Int64($0)) } ?? .null,
+    ]
+    return finish(.tag, tag.id, c, fields, deleted: false)
   }
 
   /// The non-turn half of the conversation (`convos` table, keyed by task id).

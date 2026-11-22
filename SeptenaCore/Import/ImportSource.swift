@@ -1,6 +1,6 @@
 import Foundation
 
-// Source adapters (ADR 0019, docs/MOVING_IN_SPEC.md §3). An adapter reads one
+// Source adapters (ADR 0021, docs/MOVING_IN_SPEC.md §3). An adapter reads one
 // source and returns one `ImportBundle`. It never writes Septena data, never
 // matches titles, and never knows what the user already has: that is the
 // engine's job (`ImportPlanner`). Adding a source = one adapter + its

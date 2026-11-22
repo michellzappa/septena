@@ -35,7 +35,7 @@ enum SeptaskSignIn {
             let data = credential.identityToken,
             let token = String(data: data, encoding: .utf8),
             let rawNonce else {
-        return String(localized: "Couldn't read the Apple sign-in.",
+        return String(localized: "Apple sign-in couldn’t be completed.",
                       comment: "Septask sign-in: Apple returned no identity token")
       }
       do {
@@ -277,7 +277,7 @@ final class SeptaskAppKitSignIn: NSObject, ASAuthorizationControllerDelegate,
     Task { @MainActor in
       if let error = await SeptaskSignIn.finish(result, rawNonce: nonce) {
         let alert = NSAlert()
-        alert.messageText = String(localized: "Sign in didn't finish",
+        alert.messageText = String(localized: "Couldn’t sign in",
                                    comment: "Septask sign-in: failure alert title")
         alert.informativeText = error
         alert.runModal()

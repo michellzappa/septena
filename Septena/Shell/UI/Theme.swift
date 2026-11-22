@@ -140,14 +140,21 @@ enum Theme {
     #endif
   }()
 
-  /// Done-checkbox fill — platform accent (System Settings accent on macOS,
-  /// system blue on iOS), matching native system checkboxes in both light and
-  /// dark appearances.
-  static var checkboxFill: Color { selectionAccent }
+  /// Done-checkbox fill — user's selected Septena accent in Septask
+  /// (`Colorful` default = system blue, or one of the 7 fruit accents),
+  /// matching native system checkboxes in both light and dark appearances.
+  @MainActor static var checkboxFill: Color { selectionAccent }
 
-  /// Ink for the check GLYPH inside a done checkbox. White reads crisply over
-  /// the platform accent fill in both light and dark appearances.
-  static let checkboxCheck: Color = .white
+  /// Ink for the check GLYPH inside a done checkbox. Resolves dynamically from
+  /// the active accent so light-valued dark-mode accents (Yuzu, Carambola,
+  /// Jabuticaba) switch to dark ink `#141518` instead of white-on-light.
+  @MainActor static var checkboxCheck: Color {
+    #if SEPTASK
+    return AppearancePreferences.shared.checkInkSwiftUIColor
+    #else
+    return .white
+    #endif
+  }
 
   /// Icon color when an icon should recede behind row text. `.tertiary`
   /// matches what Reminders uses for non-tinted glyphs (calendar, bell,
@@ -204,12 +211,14 @@ enum Theme {
   }
   #endif
 
-  /// Selection color: the user's accent (System Settings on macOS; iOS has
-  /// no user accent, so the system blue). Sections don't carry arbitrary
-  /// colors in the task app, so the accent is free to mean "selected"
-  /// (decided 2026-11-19).
-  static var selectionAccent: Color {
-    #if os(macOS)
+  /// Selection color: in Septask, the user's chosen accent (`Colorful` default
+  /// = blue, or one of the 7 fruit accents); in Septena, the platform accent.
+  /// Restrained reach (ADR 0019): selection wash, done checkboxes, active
+  /// chips/pills, active iOS tab, primary modal CTA, unread dot, header wash.
+  @MainActor static var selectionAccent: Color {
+    #if SEPTASK
+    return AppearancePreferences.shared.accentSwiftUIColor
+    #elseif os(macOS)
     return Color(nsColor: systemAccentNSColor)
     #elseif canImport(UIKit)
     return Color(uiColor: .systemBlue)
@@ -222,8 +231,10 @@ enum Theme {
   /// that the row keeps its normal ink (the wash-plus-ink rule `SelectableChip`
   /// uses), never a solid accent bar with white text. Painted via
   /// `listRowBackground` because `List(selection:)` ignores `.tint` on iPad.
-  static var listSelectionFill: Color {
-    #if os(macOS)
+  @MainActor static var listSelectionFill: Color {
+    #if SEPTASK
+    return AppearancePreferences.shared.selectionFillSwiftUIColor
+    #elseif os(macOS)
     let accent = systemAccentNSColor
     return Color(nsColor: NSColor(name: nil) { appearance in
       let isDark = appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil

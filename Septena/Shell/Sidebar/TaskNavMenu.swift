@@ -80,10 +80,12 @@ struct TaskNavMenu<Trigger: View>: View {
       ForEach(areaProjects) { destButton(.project(id: $0.id), title: $0.title) }
     }
 
+    let hasStarred = !LocalCache.tasks(in: modelContext, filter: .starred).isEmpty
     let hasFaded = !LocalCache.tasks(in: modelContext, filter: .faded).isEmpty
     let hasDeleted = !LocalCache.tasks(in: modelContext, filter: .recentlyDeleted).isEmpty
-    if hasFaded || hasDeleted {
+    if hasStarred || hasFaded || hasDeleted {
       Divider()
+      if hasStarred { destButton(.filter(.starred)) }
       if hasFaded { destButton(.filter(.faded)) }
       if hasDeleted { destButton(.filter(.recentlyDeleted)) }
     }

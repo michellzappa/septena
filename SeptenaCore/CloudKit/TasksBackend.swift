@@ -152,10 +152,15 @@ final class CloudKitTasksBackend {
       statusRaw: TaskStatus.open.rawValue,
       created: DayClock.appToday,
       scheduled: scheduled,
+      startTime: entity.startTime,
+      durationMinutes: entity.durationMinutes,
+      timeZone: entity.timeZone,
       // A deadline belongs to the completed occurrence. The generated task
       // gets its next scheduled date instead of inheriting an expired deadline.
       deadline: nil,
       today: false,
+      starred: entity.starred,
+      tagIDsJSON: entity.tagIDsJSON,
       todaySetOn: nil,
       completedAt: nil,
       area: entity.area,
@@ -193,6 +198,7 @@ final class CloudKitTasksBackend {
     context.insert(next)
     spawnedPositions[id] = next.position
     commitAndPush(next, op: "recurrence.create")
+    copyChecklistItems(from: entity.id, to: id, deterministic: true)
     return true
   }
 
@@ -273,7 +279,7 @@ final class CloudKitTasksBackend {
     commitAndPush(entity, op: "convo.handoff")
   }
 
-  /// Sends a task in Review (`needs_verify`) back to Claude with a note:
+  /// Sends a task in Review (`needs_verify`) back to the agent with a note:
   /// appends a user turn carrying the note, reopens `endState` to `.open`,
   /// clears `endStateNote` and `stoppedAt`, and assigns to `.claude`.
   @discardableResult
@@ -292,6 +298,13 @@ final class CloudKitTasksBackend {
     entity.conversation = convo
     commitAndPush(entity, op: "convo.sendBack")
     return turn.seq
+  }
+
+  /// Restores a full conversation snapshot (used by `TaskUndo` for Send back).
+  func restoreConvo(id: String, _ convo: TaskConvo) {
+    guard let entity = fetch(id: id) else { return }
+    entity.conversation = convo
+    commitAndPush(entity, op: "convo.restore")
   }
 
   /// Tasks awaiting reasoning: explicitly marked for Claude, OR whose last
@@ -424,6 +437,14 @@ final class CloudKitTasksBackend {
     )
     entity.statusRaw = TaskStatus.done.rawValue
     entity.completedAt = ckCompletionTimestamp()
+    // Accepting / completing a task awaiting review transitions its conversation
+    // out of `needs_verify` (keeping `endStateNote` intact for history), so
+    // reopening the task later from Logbook does not snap it back into Review.
+    if entity.conversation.needsHumanReview {
+      var convo = entity.conversation
+      convo.endState = .agentAssistedDone
+      entity.conversation = convo
+    }
     // Do NOT clear `today` (or `scheduled`/`deadline`): every visibility test
     // (`isOnToday`, `isInTriageBand`) and every count site already gate on
     // `status == .open`, so a done task is invisible regardless of the pin.
@@ -615,6 +636,7 @@ final class CloudKitTasksBackend {
   func purge(id: String) {
     guard let entity = fetch(id: id) else { return }
     purgeAttachments(taskID: id)
+    purgeChecklistItems(taskID: id)
     let neverPushed = engine.taskNeverSynced(id: id, systemFields: entity.cloudKitSystemFields)
     let staged = entity     // capture before we tell SwiftData to remove
     context.delete(entity)
@@ -635,6 +657,261 @@ final class CloudKitTasksBackend {
       context.delete(attachment)
       engine.noteTaskAttachmentDeletion(id: attachment.id)
     }
+  }
+
+  private func purgeChecklistItems(taskID: String) {
+    let rows = ((try? context.fetch(FetchDescriptor<TaskChecklistItemEntity>(
+      predicate: #Predicate { $0.taskID == taskID }
+    ))) ?? [])
+    for item in rows {
+      context.delete(item)
+      engine.noteChecklistItemDeletion(id: item.id)
+    }
+  }
+
+  // MARK: Checklists (1-level subtasks, docs/CHECKLISTS_SPEC.md)
+
+  private func fetchChecklistItem(id: String) -> TaskChecklistItemEntity? {
+    var d = FetchDescriptor<TaskChecklistItemEntity>(predicate: #Predicate { $0.id == id })
+    d.fetchLimit = 1
+    return try? context.fetch(d).first
+  }
+
+  @discardableResult
+  func addChecklistItem(taskID: String, title: String, position: Double? = nil) -> ChecklistItem? {
+    guard fetch(id: taskID) != nil else { return nil }
+    let existing = LocalCache.checklistItems(forTaskID: taskID, in: context)
+    guard existing.count < RegistryEntityLimits.maxChecklistItemsPerTask else { return nil }
+    let nextPos = position ?? ((existing.map(\.position).max() ?? 0) + TaskOrder.gap)
+    let id = "chk-\(UUID().uuidString.lowercased().prefix(12))"
+    let entity = TaskChecklistItemEntity(
+      id: id,
+      taskID: taskID,
+      title: title,
+      checked: false,
+      checkedAt: nil,
+      position: nextPos,
+      createdAt: Date(),
+      updatedAt: Date()
+    )
+    context.insert(entity)
+    guard StoreHealth.save(context, op: "checklist.add") else { return nil }
+    engine.noteChecklistItemChange(id: id)
+    TaskChange.post(taskID)
+    return ChecklistItem(entity)
+  }
+
+  func updateChecklistItem(id: String, title: String? = nil, checked: Bool? = nil, position: Double? = nil) {
+    guard let entity = fetchChecklistItem(id: id) else { return }
+    var changed = false
+    if let title, entity.title != title {
+      entity.title = title
+      changed = true
+    }
+    if let checked, entity.checked != checked {
+      entity.checked = checked
+      entity.checkedAt = checked ? Date() : nil
+      changed = true
+    }
+    if let position, entity.position != position {
+      entity.position = position
+      changed = true
+    }
+    guard changed else { return }
+    entity.updatedAt = Date()
+    guard StoreHealth.save(context, op: "checklist.update") else { return }
+    engine.noteChecklistItemChange(id: id)
+    TaskChange.post(entity.taskID)
+  }
+
+  func reorderChecklistItems(taskID: String, orderedIDs: [String]) {
+    let rows = (try? context.fetch(FetchDescriptor<TaskChecklistItemEntity>(
+      predicate: #Predicate { $0.taskID == taskID }
+    ))) ?? []
+    let byID = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
+    var touched: [String] = []
+    for (index, id) in orderedIDs.enumerated() {
+      guard let item = byID[id] else { continue }
+      let nextPos = Double(index + 1) * TaskOrder.gap
+      if item.position != nextPos {
+        item.position = nextPos
+        item.updatedAt = Date()
+        touched.append(id)
+      }
+    }
+    guard !touched.isEmpty else { return }
+    guard StoreHealth.save(context, op: "checklist.reorder") else { return }
+    for id in touched { engine.noteChecklistItemChange(id: id) }
+    TaskChange.post(taskID)
+  }
+
+  func deleteChecklistItem(id: String) {
+    guard let entity = fetchChecklistItem(id: id) else { return }
+    let taskID = entity.taskID
+    context.delete(entity)
+    guard StoreHealth.save(context, op: "checklist.delete") else { return }
+    engine.noteChecklistItemDeletion(id: id)
+    TaskChange.post(taskID)
+  }
+
+  /// Restores a deleted checklist item (used by `TaskUndo`). Reuses the same
+  /// ID when `TaskSyncEngine.canRevive(.checklistItem, item.id)` holds, else
+  /// mints a fresh ID so the backend never drops an upsert on a tombstoned row.
+  @discardableResult
+  func restoreChecklistItem(_ item: ChecklistItem) -> ChecklistItem? {
+    guard fetch(id: item.taskId) != nil else { return nil }
+    let canKeepID = TaskSyncEngine.shared.canRevive(.checklistItem, item.id)
+    let id = canKeepID ? item.id : "chk-\(UUID().uuidString.lowercased().prefix(12))"
+    if fetchChecklistItem(id: id) != nil { return item }
+    let iso = ISO8601DateFormatter()
+    let entity = TaskChecklistItemEntity(
+      id: id,
+      taskID: item.taskId,
+      title: item.title,
+      checked: item.checked,
+      checkedAt: item.checkedAt.flatMap { iso.date(from: $0) },
+      position: item.position,
+      createdAt: item.createdAt.flatMap { iso.date(from: $0) } ?? Date(),
+      updatedAt: Date()
+    )
+    context.insert(entity)
+    guard StoreHealth.save(context, op: "checklist.restore") else { return nil }
+    engine.noteChecklistItemChange(id: id)
+    TaskChange.post(item.taskId)
+    return ChecklistItem(entity)
+  }
+
+  /// Copies active checklist items from `sourceTaskID` onto `destinationTaskID`,
+  /// reset to unchecked. `deterministic: true` uses `ChecklistItem.occurrenceItemID`
+  /// so recurring completions on phone and agent converge without duplicates.
+  func copyChecklistItems(from sourceTaskID: String, to destinationTaskID: String, deterministic: Bool = false) {
+    let source = LocalCache.checklistItems(forTaskID: sourceTaskID, in: context)
+    guard !source.isEmpty else { return }
+    var createdIDs: [String] = []
+    for (idx, item) in source.enumerated() {
+      let id = deterministic
+        ? ChecklistItem.occurrenceItemID(newTaskID: destinationTaskID, index: idx, sourceItemID: item.id)
+        : "chk-\(UUID().uuidString.lowercased().prefix(12))"
+      guard fetchChecklistItem(id: id) == nil else { continue }
+      let entity = TaskChecklistItemEntity(
+        id: id,
+        taskID: destinationTaskID,
+        title: item.title,
+        checked: false,
+        checkedAt: nil,
+        position: item.position,
+        createdAt: Date(),
+        updatedAt: Date()
+      )
+      context.insert(entity)
+      createdIDs.append(id)
+    }
+    guard !createdIDs.isEmpty else { return }
+    guard StoreHealth.save(context, op: "checklist.copy") else { return }
+    for id in createdIDs { engine.noteChecklistItemChange(id: id) }
+    TaskChange.post(destinationTaskID)
+  }
+
+  // MARK: - Flat tags (docs/TAGS_SPEC.md)
+
+  private func fetchTag(id: String) -> TagEntity? {
+    var d = FetchDescriptor<TagEntity>(predicate: #Predicate { $0.id == id })
+    d.fetchLimit = 1
+    return (try? context.fetch(d))?.first
+  }
+
+  /// Replace a task's tag IDs (deduped, capped at `RegistryEntityLimits.maxTagsPerTask`).
+  func setTaskTags(id: String, tagIDs: [String]) {
+    guard let entity = fetch(id: id) else { return }
+    entity.tagIDs = tagIDs
+    entity.pendingSync = true
+    commitAndPush(entity, op: "setTaskTags")
+  }
+
+  /// Create a tag (or return the existing live tag if a case-insensitive match
+  /// already exists — docs/TAGS_SPEC.md §2).
+  @discardableResult
+  func createTag(name rawName: String, color: String? = nil) -> TaskTag? {
+    let trimmed = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    let clamped = String(trimmed.prefix(RegistryEntityLimits.tagNameMax))
+    if let existing = LocalCache.tag(named: clamped, in: context) {
+      return existing
+    }
+    let nextPos = (LocalCache.allTags(in: context).compactMap(\.position).max() ?? -1) + 1
+    let id = "tag-\(UUID().uuidString.lowercased())"
+    let entity = TagEntity(id: id, name: clamped, color: color, position: nextPos, updatedAt: Date())
+    context.insert(entity)
+    guard StoreHealth.save(context, op: "tag.create") else { return nil }
+    engine.noteTagChange(id: id)
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    return TaskTag(entity)
+  }
+
+  /// Update a tag's name, color, or position. Enforces case-insensitive name
+  /// uniqueness against other live tags.
+  @discardableResult
+  func updateTag(id: String, name: String? = nil, color: String?? = nil, position: Int?? = nil) -> Bool {
+    guard let entity = fetchTag(id: id) else { return false }
+    if let rawName = name {
+      let trimmed = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !trimmed.isEmpty else { return false }
+      let clamped = String(trimmed.prefix(RegistryEntityLimits.tagNameMax))
+      if let other = LocalCache.tag(named: clamped, in: context), other.id != id {
+        return false
+      }
+      entity.name = clamped
+    }
+    if let color { entity.color = color }
+    if let position { entity.position = position }
+    entity.updatedAt = Date()
+    guard StoreHealth.save(context, op: "tag.update") else { return false }
+    engine.noteTagChange(id: id)
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    return true
+  }
+
+  /// Delete a tag. Never storms tasks referencing it — readers silently skip
+  /// deleted tag IDs (`docs/TAGS_SPEC.md` §2).
+  func deleteTag(id: String) {
+    guard let entity = fetchTag(id: id) else { return }
+    context.delete(entity)
+    guard StoreHealth.save(context, op: "tag.delete") else { return }
+    engine.noteTagDeletion(id: id)
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+  }
+
+  /// Restore a deleted tag for undo (reviving its original ID while the delete
+  /// is still held in `deleteGrace`).
+  @discardableResult
+  func restoreTag(_ tag: TaskTag) -> TaskTag? {
+    if let existing = fetchTag(id: tag.id) { return TaskTag(existing) }
+    let id = TaskSyncEngine.shared.canRevive(.tag, tag.id)
+      ? tag.id
+      : "tag-\(UUID().uuidString.lowercased())"
+    let entity = TagEntity(id: id, name: tag.name, color: tag.color, position: tag.position, updatedAt: Date())
+    context.insert(entity)
+    guard StoreHealth.save(context, op: "tag.restore") else { return nil }
+    engine.noteTagChange(id: id)
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    return TaskTag(entity)
+  }
+
+  /// Merge `sourceID` into `targetID`: rewrites live tasks referencing
+  /// `sourceID` to `targetID` (deduped) and deletes `sourceID` (`docs/TAGS_SPEC.md` §4).
+  func mergeTag(sourceID: String, into targetID: String) {
+    guard sourceID != targetID, fetchTag(id: sourceID) != nil, fetchTag(id: targetID) != nil else { return }
+    let tasks = (try? context.fetch(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.deletedAt == nil && $0.tagIDsJSON != nil }
+    ))) ?? []
+    for task in tasks {
+      let ids = task.tagIDs
+      guard ids.contains(sourceID) else { continue }
+      task.tagIDs = ids.map { $0 == sourceID ? targetID : $0 }
+      task.pendingSync = true
+      commitAndPush(task, op: "tag.merge.task")
+    }
+    deleteTag(id: sourceID)
   }
 
   /// 30-day auto-purge: permanently delete all Recently Deleted tasks whose
@@ -945,6 +1222,24 @@ final class CloudKitTasksBackend {
     commitAndPush(entity, op: reminder == nil ? "setReminder(nil)" : "setReminder")
   }
 
+  /// Set or clear the optional wall-clock time slot (`startTime` `HH:MM`,
+  /// `durationMinutes` `5..1440`, optional `timeZone`). Clearing `startTime`
+  /// also clears `durationMinutes` and `timeZone`.
+  func setTimeSlot(id: String, startTime: String?, durationMinutes: Int?, timeZone: String? = nil) {
+    guard let entity = fetch(id: id) else { return }
+    if let start = startTime, !start.isEmpty {
+      entity.startTime = start
+      entity.durationMinutes = durationMinutes.map { min(1440, max(5, $0)) }
+      entity.timeZone = timeZone
+    } else {
+      entity.startTime = nil
+      entity.durationMinutes = nil
+      entity.timeZone = nil
+    }
+    entity.pendingSync = true
+    commitAndPush(entity, op: startTime == nil ? "setTimeSlot(nil)" : "setTimeSlot")
+  }
+
   func snoozeReminder(id: String, until: Date) {
     guard let entity = fetch(id: id), entity.reminderAt != nil else { return }
     entity.reminderSnoozedUntil = TaskBackendMapping.stamp(until)
@@ -959,6 +1254,13 @@ final class CloudKitTasksBackend {
     entity.reminderSnoozedUntil = nil
     entity.pendingSync = true
     commitAndPush(entity, op: "dismissReminder")
+  }
+
+  func setStarred(id: String, starred: Bool) {
+    guard let entity = fetch(id: id), entity.starred != starred else { return }
+    entity.starred = starred
+    entity.pendingSync = true
+    commitAndPush(entity, op: starred ? "setStarred(true)" : "setStarred(false)")
   }
 
   func setRecurrence(id: String, recurrence: Recurrence?) {
@@ -1089,6 +1391,20 @@ final class CloudKitTasksBackend {
     }
   }
 
+  /// Move a batch of tasks into an area, project, or Inbox while preserving
+  /// their relative `[0, 1, 2, ...]` order at the top of the destination.
+  /// `moveToList(id:...)` stamps `TaskOrder.topPosition(in:)` per call, so
+  /// iterating in reverse lands `ids[0]` at the very top followed by `ids[1]`,
+  /// `ids[2]`, etc.
+  func moveToList(ids: [String], area: String?, project: String?, acknowledge: Bool = true) {
+    for id in ids.reversed() {
+      moveToList(id: id, area: area, project: project)
+      if acknowledge {
+        self.acknowledge(id: id)
+      }
+    }
+  }
+
   func moveToProject(id: String, project: String?) {
     guard let entity = fetch(id: id) else { return }
     let ratifying = project != nil && entity.isInTriageBand
@@ -1193,6 +1509,7 @@ final class CloudKitTasksBackend {
         hasRecurrence: entity.recurrence != nil,
         isAgentTurn: isAgentTurn,
         isAssignedToClaude: isAssignedToClaude,
+        isAwaitingHuman: convo.awaitsHuman,
         touchedAt: entity.touchedAt,
         createdAt: entity.createdAt,
         created: entity.created,

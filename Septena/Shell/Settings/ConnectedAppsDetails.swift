@@ -18,7 +18,7 @@ struct RemindersInboxDetail: View {
   var body: some View {
     Form {
       Section {
-        Text("Pick a Reminders list. Its pending items show in your Inbox; tap to import (originals are removed from Reminders).")
+        Text("Choose a Reminders list. Its pending items appear in your Inbox so you can import them (originals are removed from Reminders).")
           .font(.callout)
           .foregroundStyle(.secondary)
       }
@@ -149,6 +149,8 @@ struct CalendarDetail: View {
   @Environment(\.modelContext)    private var modelContext
   @Environment(CKEngine.self)     private var ckEngine
   @Environment(SettingsStore.self) private var store
+  @AppStorage(SettingsKey.tasksShowCalendarEvents) private var showCalendarEvents: Bool =
+    RegistrySettings.Defaults.tasksShowCalendarEvents
   @State private var bridge = CalendarBridge.shared
   @State private var access: CalendarBridge.Access = .notDetermined
   @State private var calendars: [EKCalendar] = []
@@ -156,9 +158,9 @@ struct CalendarDetail: View {
   var body: some View {
     Form {
       Section {
-        Text("Pick which calendars contribute events to your day timeline and Next page. Hidden calendars stay untouched in iOS Calendar.")
-          .font(.callout)
-          .foregroundStyle(.secondary)
+        Toggle("Show calendar events", isOn: $showCalendarEvents)
+      } footer: {
+        Text("Show your calendar events in Today and Upcoming. Hidden calendars stay untouched in Calendar.")
       }
 
       switch access {
@@ -190,6 +192,7 @@ struct CalendarDetail: View {
               calendarRow(cal)
             }
           }
+          .disabled(!showCalendarEvents)
         }
       }
     }

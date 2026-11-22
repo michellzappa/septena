@@ -5,8 +5,18 @@ import UniformTypeIdentifiers
 
 /// Drag payload for re-homing one or more tasks onto a sidebar destination,
 /// or reordering them within a manually-ordered list (`TaskReorderDrop`).
+/// Also carries the floating Magic Plus sentinel (`newTask`) so native drag-
+/// and-drop from `+` reuses every existing row gap, heading, group, date, and
+/// sidebar drop target.
 struct TaskDragIDs: Codable, Hashable, Transferable {
+  static let newTaskSentinel = "__septena_magic_plus_new_task__"
+  static let newTask = TaskDragIDs(ids: [newTaskSentinel])
+
   let ids: [String]
+
+  static func isNewTaskPayload(_ ids: [String]) -> Bool {
+    ids == [newTaskSentinel]
+  }
 
   static var transferRepresentation: some TransferRepresentation {
     CodableRepresentation(contentType: .septenaTaskDragIDs)
@@ -180,23 +190,47 @@ extension VerticalAlignment {
   static let rowTitleCenter = VerticalAlignment(RowTitleCenter.self)
 }
 
-struct CheckableRow<Trailing: View>: View {
-  var tint: Color
-  var isDone: Bool
-  var isToday: Bool = false
-  /// Readiness form (language v2) forwarded to `TaskCheckbox`: dashed = proposal,
-  /// `cornerDot` = unread-context marker on a committed task.
-  var dashed: Bool = false
-  var cornerDot: Color? = nil
+/// Default leading slot for `CheckableRow`: the standard `TaskCheckbox` with
+/// its optional hero-animation anchor. Kept as a concrete wrapper type so
+/// `CheckableRow` can accept a custom leading control (such as the Reminders
+/// import arrow) without losing static typing or `AnyView` erasure.
+struct TaskCheckboxSlot: View {
+  let tint: Color
+  let isDone: Bool
+  let dashed: Bool
+  let cornerDot: Color?
+  let isToday: Bool
+  let tenureFill: Double?
+  let promoteFlashTrigger: Int
+  let feel: CheckFeel
+  let checkboxMatchID: String?
+  let heroMatchNS: Namespace.ID?
+  let heroMatchIsSource: Bool
+  let onToggle: () -> Void
+
+  var body: some View {
+    TaskCheckbox(
+      tint: tint,
+      isDone: isDone,
+      dashed: dashed,
+      cornerDot: cornerDot,
+      isToday: isToday,
+      tenureFill: tenureFill,
+      promotePulseTrigger: promoteFlashTrigger,
+      feel: feel,
+      onToggle: onToggle
+    )
+    .matchedHeroGeometry(checkboxMatchID, heroMatchNS, isSource: heroMatchIsSource)
+  }
+}
+
+struct CheckableRow<Leading: View, Trailing: View>: View {
   /// Days carried on Today as 0…1, or nil. Fades the row's text and trailing
-  /// cluster and checkbox, all by the same amount (`TaskFade`).
+  /// cluster and leading control, all by the same amount (`TaskFade`).
   var tenureFill: Double? = nil
-  /// The checkbox celebration this row plays on check (see `CheckFeel`).
-  /// Standardized to the default `.stamp` across every checkable row.
-  var feel: CheckFeel = .stamp
   /// Strikethrough + dimmed title. Usually `isDone`, but habits fold in
   /// skipped and chores fold in deferred, so the caller decides.
-  var isInactive: Bool
+  var isInactive: Bool = false
   /// Optional leading emoji (checklist sections). Off → the title sits next
   /// to the box. Tasks leave this nil; their agent cue rides the trailing slot.
   var leadingEmoji: String? = nil
@@ -222,6 +256,9 @@ struct CheckableRow<Trailing: View>: View {
   var isSelected: Bool = false
   /// Native `List(selection:)` cursor — keep title ink dark on the gray capsule.
   var isListSelected: Bool = false
+  /// Soften the leading checkbox while touch multi-select is active so the row
+  /// visually cues "tap anywhere to select" rather than "tap to complete".
+  var checkboxDimmed: Bool = false
   /// Rising-edge counter from `PromoteFlashStore` — plays a brief amber row wash.
   var promoteFlashTrigger: Int = 0
   /// Optional hero-animation anchors (`matchedGeometryEffect`): the Things-style
@@ -230,13 +267,12 @@ struct CheckableRow<Trailing: View>: View {
   /// instead of cross-fading into a new position. Shared namespace, distinct
   /// ids. Nil everywhere else.
   var titleMatchID: String? = nil
-  var checkboxMatchID: String? = nil
   var heroMatchNS: Namespace.ID? = nil
   /// Which endpoint of the hero glide is the `matchedGeometryEffect` source.
   /// Closed row and open editor must never both be `true` during a transition.
   var heroMatchIsSource: Bool = true
+  @ViewBuilder var leading: () -> Leading
   @ViewBuilder var trailing: () -> Trailing
-  let onToggle: () -> Void
   var onTap: (() -> Void)? = nil
 
   @Environment(\.rowHInset) private var rowHInset
@@ -267,22 +303,11 @@ struct CheckableRow<Trailing: View>: View {
 
   var body: some View {
     HStack(alignment: .rowTitleCenter, spacing: Theme.iconTextGap) {
-      TaskCheckbox(
-        tint: tint,
-        isDone: isDone,
-        dashed: dashed,
-        cornerDot: cornerDot,
-        isToday: isToday,
-        tenureFill: tenureFill,
-        promotePulseTrigger: promoteFlashTrigger,
-        feel: feel,
-        onToggle: onToggle
-      )
-      .matchedHeroGeometry(checkboxMatchID, heroMatchNS, isSource: heroMatchIsSource)
-      .alignmentGuide(.rowTitleCenter) { d in d[VerticalAlignment.center] }
-      // The checkbox fades with the row, by the same amount (mz, 2026-11-20),
-      // so a slipping task reads as one fading line. It stays tappable.
-      .opacity(TaskFade.rowOpacity(tenureFill))
+      leading()
+        .alignmentGuide(.rowTitleCenter) { d in d[VerticalAlignment.center] }
+        // The leading control fades with the row, by the same amount (mz, 2026-11-20),
+        // so a slipping task reads as one fading line. It stays tappable.
+        .opacity(TaskFade.rowOpacity(tenureFill) * (checkboxDimmed ? 0.45 : 1))
 
       if let leadingEmoji {
         Text(leadingEmoji).font(.body)
@@ -341,7 +366,73 @@ struct CheckableRow<Trailing: View>: View {
   }
 }
 
-extension CheckableRow where Trailing == EmptyView {
+extension CheckableRow where Leading == TaskCheckboxSlot {
+  init(
+    tint: Color,
+    isDone: Bool,
+    isToday: Bool = false,
+    dashed: Bool = false,
+    cornerDot: Color? = nil,
+    tenureFill: Double? = nil,
+    feel: CheckFeel = .stamp,
+    isInactive: Bool,
+    leadingEmoji: String? = nil,
+    title: String,
+    showsNotesGlyph: Bool = false,
+    subtitle: String? = nil,
+    titleBandHeight: CGFloat? = nil,
+    titleLineLimit: Int = 2,
+    isSelected: Bool = false,
+    isListSelected: Bool = false,
+    checkboxDimmed: Bool = false,
+    promoteFlashTrigger: Int = 0,
+    titleMatchID: String? = nil,
+    checkboxMatchID: String? = nil,
+    heroMatchNS: Namespace.ID? = nil,
+    heroMatchIsSource: Bool = true,
+    @ViewBuilder trailing: @escaping () -> Trailing,
+    onToggle: @escaping () -> Void,
+    onTap: (() -> Void)? = nil
+  ) {
+    self.init(
+      tenureFill: tenureFill,
+      isInactive: isInactive,
+      leadingEmoji: leadingEmoji,
+      title: title,
+      showsNotesGlyph: showsNotesGlyph,
+      subtitle: subtitle,
+      titleBandHeight: titleBandHeight,
+      titleLineLimit: titleLineLimit,
+      isSelected: isSelected,
+      isListSelected: isListSelected,
+      checkboxDimmed: checkboxDimmed,
+      promoteFlashTrigger: promoteFlashTrigger,
+      titleMatchID: titleMatchID,
+      heroMatchNS: heroMatchNS,
+      heroMatchIsSource: heroMatchIsSource,
+      leading: {
+        TaskCheckboxSlot(
+          tint: tint,
+          isDone: isDone,
+          dashed: dashed,
+          cornerDot: cornerDot,
+          isToday: isToday,
+          tenureFill: tenureFill,
+          promoteFlashTrigger: promoteFlashTrigger,
+          feel: feel,
+          checkboxMatchID: checkboxMatchID,
+          heroMatchNS: heroMatchNS,
+          heroMatchIsSource: heroMatchIsSource,
+          onToggle: onToggle
+        )
+      },
+      trailing: trailing,
+      onTap: onTap
+    )
+  }
+}
+
+extension CheckableRow where Leading == TaskCheckboxSlot, Trailing == EmptyView {
   init(tint: Color, isDone: Bool, isToday: Bool = false,
        isInactive: Bool, leadingEmoji: String? = nil,
        title: String, subtitle: String? = nil, isSelected: Bool = false,
@@ -403,16 +494,17 @@ struct TaskCheckboxModel {
   var cornerDot: Color?
   var tenureFill: Double?
 
-  init(task: SeptenaTask, accent: Color, showsTodayIndicator: Bool) {
+  init(task: SeptenaTask, accent: Color, showsTodayIndicator: Bool,
+       showsFadedIndicator: Bool = false) {
     // A volunteered, still-unratified agent proposal — the dashed "not a task
     // yet" form. Human captures stay solid; only MCP triage-band rows read so.
     let isProposal = task.isInTriageBand && task.source == TaskSource.mcp
     tint = accent
     isDone = task.status == .done
     // A row in Recently Deleted is out of every list, Today included, so it
-    // never shows the gold Today badge or the Today aging.
+    // never shows Today status or fading.
     let isDeleted = task.deletedAt != nil
-    isToday = task.isOnToday && showsTodayIndicator && !isDeleted
+    isToday = task.isOnToday && showsTodayIndicator && !isDeleted && !task.isFaded
     dashed = TaskRowFlags.languageV2 && isProposal
     // Accent corner dot for a committed task carrying unread agent context.
     // Proposals are excluded (they already read as dashed).
@@ -422,9 +514,15 @@ struct TaskCheckboxModel {
       return nil
     }()
     // Countdown toward the 14-day fade window in every open list
-    // (`docs/TASK_FADE_SPEC.md` §4). Already-faded tasks return nil from
-    // `fadeFill()` so rows in the Faded pile stay fully readable.
-    tenureFill = TaskRowFlags.agingEnabled && !isDeleted ? task.fadeFill() : nil
+    // (`docs/TASK_FADE_SPEC.md` §4). Inside the Faded pile itself
+    // (`showsFadedIndicator == false`), faded rows stay at full opacity; inside
+    // a project or area (`showsFadedIndicator == true`), they render visibly
+    // faded at `TaskFade.minOpacity`.
+    if task.isFaded && showsFadedIndicator && !isDeleted {
+      tenureFill = 1.0
+    } else {
+      tenureFill = TaskRowFlags.agingEnabled && !isDeleted ? task.fadeFill() : nil
+    }
   }
 }
 
@@ -470,18 +568,27 @@ struct TaskRow: View {
   /// only). The deep list maps these from its `TaskFilter`.
   var suppressProject: Bool = false
   var suppressArea: Bool = false
-  /// Show the "promoted to Today" accent in the checkbox, and the scheduled
-  /// date in the trailing. Pass `false` on Today / Next surfaces (where every
-  /// row is already today, so both are noise).
+  /// Show the trailing Today pill (and scheduled date) on off-Today surfaces.
+  /// Pass `false` on Today / Next surfaces (where every row is already Today).
   var showsTodayIndicator: Bool = true
+  /// Show a trailing Faded pill and faded row opacity when a faded task appears
+  /// inside a project or area. Pass `false` inside the Faded pile itself.
+  var showsFadedIndicator: Bool = false
   /// Highlight this row while its edit modal is open (see `CheckableRow`).
   var isSelected: Bool = false
   /// Native `List(selection:)` cursor on the deep task list.
   var isListSelected: Bool = false
+  /// Soften the checkbox during iOS touch multi-select mode.
+  var checkboxDimmed: Bool = false
   /// Optional inboard-most trailing accessory — the deep list passes the Inbox
   /// "file here" capsule here so it sits left of the date (a variable-width
   /// element kept inboard of the fixed glyphs). Nil on every other surface.
   var accessory: AnyView? = nil
+  /// Optional 1-level checklist progress summary (`done/total`). Zero extra
+  /// chrome when nil or `total == 0` (docs/CHECKLISTS_SPEC.md §4).
+  var checklistSummary: (done: Int, total: Int)? = nil
+  /// Resolved live tags on this task (empty when untagged -> zero chrome).
+  var tagChips: [TaskTag] = []
   /// Hero-animation anchors forwarded to `CheckableRow` so the closed row's
   /// title + checkbox glide into the inline editor. See `CheckableRow`.
   var titleMatchID: String? = nil
@@ -532,7 +639,8 @@ struct TaskRow: View {
     // The box is derived once, in `TaskCheckboxModel`, shared with the inline
     // editor's checkbox so view-row and edit-row can't drift.
     let box = TaskCheckboxModel(task: task, accent: accent,
-                                showsTodayIndicator: showsTodayIndicator)
+                                showsTodayIndicator: showsTodayIndicator,
+                                showsFadedIndicator: showsFadedIndicator)
     return CheckableRow(
       tint: box.tint,
       isDone: box.isDone,
@@ -551,6 +659,7 @@ struct TaskRow: View {
       titleLineLimit: titleLineLimit,
       isSelected: isSelected,
       isListSelected: isListSelected,
+      checkboxDimmed: checkboxDimmed,
       promoteFlashTrigger: promoteFlash.trigger(for: task.id),
       titleMatchID: titleMatchID,
       checkboxMatchID: checkboxMatchID,
@@ -564,17 +673,97 @@ struct TaskRow: View {
 
   // Right-side order (left → right): variable-width elements inboard, fixed-width
   // pinned to the right edge so the row's right margin stays stable.
-  //   accessory (Inbox "file here") · date  →  recurrence · notes · status-dot
-  // Accessory and date flex with their content; recurrence / notes / agent
-  // glyphs are fixed and anchor the trailing edge.
+  //   accessory (Inbox "file here") · issue · date  →  recurrence · notes · status-dot
+  // Accessory, issue chip and date flex with their content; recurrence / notes /
+  // agent glyphs are fixed and anchor the trailing edge.
   @ViewBuilder private var trailing: some View {
     if let accessory { accessory }
+    if let issue = task.linkedIssue {
+      TaskIssueChip(issue: issue)
+    }
+    if showsFadedIndicator && task.isFaded {
+      TaskStatusPill(symbol: "circle.dashed",
+                     title: String(localized: "Faded", comment: "Task row trailing pill when task is faded"))
+    } else if showsTodayIndicator && task.isOnToday && task.status == .open && task.deletedAt == nil && !task.isFaded {
+      TaskStatusPill(symbol: "sun.max.fill",
+                     title: String(localized: "Today", comment: "Task row trailing pill when task is on Today"))
+    }
     trailingDate
+    if task.status == .open, task.deletedAt == nil,
+       let slot = task.timeSlotLabel {
+      HStack(spacing: 3) {
+        Image(systemName: "clock")
+          .scaledFont(size: 11)
+        Text(slot)
+          .font(.septenaMeta)
+      }
+      .foregroundStyle(Theme.inkSecondary)
+      .accessibilityLabel(String(localized: "Scheduled time \(slot)", comment: "Task row time slot a11y"))
+    }
+    if let summary = checklistSummary, summary.total > 0 {
+      HStack(spacing: 3) {
+        Image(systemName: "checklist")
+          .scaledFont(size: 11)
+        Text("\(summary.done)/\(summary.total)")
+          .font(.septenaMeta)
+      }
+      .foregroundStyle(Theme.inkSecondary)
+      .accessibilityLabel(String(localized: "\(summary.done) of \(summary.total) checklist items complete",
+                                 comment: "Task row checklist progress a11y"))
+    }
+    if !tagChips.isEmpty {
+      let visibleLimit = 2
+      let shown = Array(tagChips.prefix(visibleLimit))
+      let overflow = max(0, tagChips.count - visibleLimit)
+      HStack(spacing: 4) {
+        ForEach(shown) { tag in
+          HStack(spacing: 3) {
+            if tag.color != nil {
+              Circle()
+                .fill(TagColorPalette.color(for: tag.color))
+                .frame(width: 5, height: 5)
+            }
+            Text(tag.name)
+              .font(.septenaCaption)
+              .lineLimit(1)
+          }
+          .foregroundStyle(Theme.inkSecondary)
+          .padding(.horizontal, 6)
+          .padding(.vertical, 2)
+          .overlay(
+            Capsule().strokeBorder(Theme.inkSecondary.opacity(0.28), lineWidth: 0.75)
+          )
+        }
+        if overflow > 0 {
+          Text("+\(overflow)")
+            .font(.septenaCaption)
+            .foregroundStyle(Theme.inkSecondary)
+        }
+      }
+      .accessibilityLabel(Text(tagChips.map(\.name).joined(separator: ", ")))
+    }
+    if task.status == .open, task.deletedAt == nil,
+       let badge = task.reminder?.badgeText() {
+      HStack(spacing: 3) {
+        Image(systemName: "bell.fill")
+          .scaledFont(size: 11)
+        Text(badge.text)
+          .font(.septenaMeta)
+      }
+      .foregroundStyle(badge.isPastDue ? Theme.overdueRed : Theme.inkSecondary)
+      .accessibilityLabel(String(localized: "Reminder \(badge.text)", comment: "Task row reminder a11y"))
+    }
     if task.recurrence != nil {
       Image(systemName: "arrow.clockwise")
         .scaledFont(size: 12)
         .foregroundStyle(Theme.inkSecondary)
         .accessibilityLabel(TaskA11y.recurring)
+    }
+    if task.starred {
+      Image(systemName: "star.fill")
+        .scaledFont(size: 11)
+        .foregroundStyle(Theme.todayAccent)
+        .accessibilityLabel(String(localized: "Starred", comment: "Task row star a11y"))
     }
     if hasNotes { TaskNotesGlyph.view }
     agentSignal
@@ -646,8 +835,10 @@ struct TaskRow: View {
     } else if let scheduled = task.scheduled.flatMap(SeptenaDate.parse) {
       let schedDay = cal.startOfDay(for: scheduled)
       // On Today / Next, past/today When dates are noise (the row is already
-      // on Today) — but a future When date should still read (sort + label).
-      if showsTodayIndicator || schedDay > today {
+      // on Today). On off-Today surfaces, when the Today pill is shown for an
+      // on-Today task, skip repeating today/past When dates beside it.
+      let coveredByTodayPill = showsTodayIndicator && task.isOnToday && task.status == .open && task.deletedAt == nil && !task.isFaded && schedDay <= today
+      if !coveredByTodayPill && (showsTodayIndicator || schedDay > today) {
         HStack(spacing: 4) {
           Image(systemName: "calendar").scaledFont(size: 11)
           Text(Self.shortDate(scheduled)).font(.septenaMeta)
@@ -655,17 +846,82 @@ struct TaskRow: View {
         .foregroundStyle(Theme.inkSecondary)
       }
     }
-    // Language v2: an on-Today task seen on an off-Today surface is signalled by
-    // the amber checkbox (see `boxStrokeColor`), not a right-edge "Today" chip.
   }
 
-  private static func shortDate(_ d: Date) -> String {
+  static func shortDate(_ d: Date) -> String {
     let cal = Calendar.current
     if cal.isDateInToday(d) { return "Today" }
     if cal.isDateInTomorrow(d) { return "Tomorrow" }
-    let f = DateFormatter()
-    f.setLocalizedDateFormatFromTemplate("MMMd")
-    return f.string(from: d)
+    return SeptenaDate.monthDay(d)
+  }
+}
+
+/// Quiet read-only status pill (`☀ Today`, `◌ Faded`) on the trailing edge of
+/// an off-Today / project task row. Uses OS 26/27 frosted Liquid Glass capsule
+/// material (falling back to solid `mutedSurface` under Reduce Transparency).
+private struct TaskStatusPill: View {
+  let symbol: String
+  let title: String
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+  var body: some View {
+    HStack(spacing: 3) {
+      Image(systemName: symbol)
+        .scaledFont(size: 10)
+      Text(title)
+        .font(.septenaMetaSmall)
+    }
+    .foregroundStyle(Theme.inkSecondary)
+    .padding(.horizontal, 7)
+    .padding(.vertical, 2.5)
+    .modifier(RowGlassPillSurface(reduceTransparency: reduceTransparency))
+    .accessibilityLabel(title)
+  }
+}
+
+/// Quiet read-only issue badge (`◉ #147`) on a task row when an agent has
+/// associated a GitHub issue or PR with the task. Non-interactive so row taps
+/// always open the task/conversation (where the clickable link lives).
+private struct TaskIssueChip: View {
+  let issue: ConvoIssueLink
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+  var body: some View {
+    HStack(spacing: 3) {
+      Image(systemName: issue.symbolName)
+        .scaledFont(size: 10)
+      Text(issue.shortLabel)
+        .font(.septenaMetaSmall)
+    }
+    .foregroundStyle(Theme.inkSecondary)
+    .padding(.horizontal, 7)
+    .padding(.vertical, 2.5)
+    .modifier(RowGlassPillSurface(reduceTransparency: reduceTransparency))
+    .accessibilityLabel(issue.fullLabel)
+  }
+}
+
+/// Shared OS 26/27 frosted glass capsule fill for neutral row pills/badges.
+private struct RowGlassPillSurface: ViewModifier {
+  let reduceTransparency: Bool
+
+  func body(content: Content) -> some View {
+    if reduceTransparency {
+      content.background(Theme.mutedSurface, in: Capsule())
+    } else {
+      #if os(iOS)
+      content
+        .background(.ultraThinMaterial, in: Capsule())
+        .glassEffect(.regular, in: .capsule)
+      #else
+      content
+        .background(.thinMaterial, in: Capsule())
+        .overlay(
+          Capsule()
+            .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
+        )
+      #endif
+    }
   }
 }
 

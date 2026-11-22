@@ -61,6 +61,7 @@ extension TaskSyncEngine {
     for p in (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? [] { context.delete(p) }
     // Attachment FILES stay on disk: re-pulled rows relink to them by id.
     for a in (try? context.fetch(FetchDescriptor<TaskAttachmentEntity>())) ?? [] { context.delete(a) }
+    for c in (try? context.fetch(FetchDescriptor<TaskChecklistItemEntity>())) ?? [] { context.delete(c) }
     _ = StoreHealth.save(context, op: "taskSync.reset")
     store.deleteAllShadows()
     since = 0
@@ -96,6 +97,20 @@ extension TaskSyncEngine {
                                        contentType: "application/octet-stream", byteCount: 0)
           main.insert(n)
           applyAttachmentFields(n, fields, skip: [])
+        }
+      case (TaskSyncOpKind.upsert, .checklistItem?):
+        if let item = fetchChecklistItem(op.rowID) { applyChecklistItemFields(item, fields, skip: []) }
+        else if let taskID = fields["taskId"]?.stringValue {
+          let n = TaskChecklistItemEntity(id: op.rowID, taskID: taskID, title: "")
+          main.insert(n)
+          applyChecklistItemFields(n, fields, skip: [])
+        }
+      case (TaskSyncOpKind.upsert, .tag?):
+        if let tag = fetchTag(op.rowID) { applyTagFields(tag, fields, skip: []) }
+        else if let name = fields["name"]?.stringValue, !name.isEmpty {
+          let n = TagEntity(id: op.rowID, name: name)
+          main.insert(n)
+          applyTagFields(n, fields, skip: [])
         }
       case (TaskSyncOpKind.delete, .task?):
         if let t = fetchTask(op.rowID), t.deletedAt == nil { t.deletedAt = Self.localStamp(Date()) }
@@ -223,6 +238,36 @@ extension TaskSyncEngine {
             }
           }
           let mapped = (try? TaskBackendMapping.attachment(a).get())?.row.fields ?? [:]
+          recordApplied(key, applied: applied, mapped: mapped, raw: change.row, shadow: shadows[key], store: store)
+        }
+        touchedTasks = true
+      case .checklistItem:
+        if tombstone {
+          if let item = fetchChecklistItem(id) { main.delete(item) }
+          markGone(.checklistItem, id, shadow: shadows[key], store: store)
+        } else if !pendingDelete.contains(key) {
+          let item = fetchChecklistItem(id) ?? {
+            let n = TaskChecklistItemEntity(id: id, taskID: change.row["taskId"]?.stringValue ?? "", title: "")
+            main.insert(n)
+            return n
+          }()
+          let applied = applyChecklistItemFields(item, change.row, skip: skip)
+          let mapped = (try? TaskBackendMapping.checklistItem(item).get())?.fields ?? [:]
+          recordApplied(key, applied: applied, mapped: mapped, raw: change.row, shadow: shadows[key], store: store)
+        }
+        touchedTasks = true
+      case .tag:
+        if tombstone {
+          if let tag = fetchTag(id) { main.delete(tag) }
+          markGone(.tag, id, shadow: shadows[key], store: store)
+        } else if !pendingDelete.contains(key) {
+          let tag = fetchTag(id) ?? {
+            let n = TagEntity(id: id, name: change.row["name"]?.stringValue ?? "")
+            main.insert(n)
+            return n
+          }()
+          let applied = applyTagFields(tag, change.row, skip: skip)
+          let mapped = (try? TaskBackendMapping.tag(tag).get())?.fields ?? [:]
           recordApplied(key, applied: applied, mapped: mapped, raw: change.row, shadow: shadows[key], store: store)
         }
         touchedTasks = true
@@ -361,6 +406,16 @@ extension TaskSyncEngine {
       markGone(.attachment, id, shadow: store.shadow("attachment:\(id)"), store: store)
       addIssue(.attachment, id, "change refused: the attachment is deleted on the backend")
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    case .checklistItem:
+      if let item = fetchChecklistItem(id) { main.delete(item) }
+      markGone(.checklistItem, id, shadow: store.shadow("checklistItem:\(id)"), store: store)
+      addIssue(.checklistItem, id, "change refused: the checklist item is deleted on the backend")
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    case .tag:
+      if let tag = fetchTag(id) { main.delete(tag) }
+      markGone(.tag, id, shadow: store.shadow("tag:\(id)"), store: store)
+      addIssue(.tag, id, "change refused: the tag is deleted on the backend")
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     case .setting:
       // Settings are never deleted on the backend; nothing to undo.
       break
@@ -470,8 +525,19 @@ extension TaskSyncEngine {
     take("project") { t.project = $0.stringValue }
     take("created") { t.created = $0.stringValue }
     take("scheduled") { t.scheduled = $0.stringValue }
+    take("startTime") { t.startTime = $0.stringValue }
+    take("durationMinutes") { t.durationMinutes = Self.int($0) }
+    take("timeZone") { t.timeZone = $0.stringValue }
     take("deadline") { t.deadline = $0.stringValue }
     take("today") { t.today = Self.bool($0) ?? false }
+    take("starred") { t.starred = Self.bool($0) ?? false }
+    take("tags") { v in
+      if case .array(let arr) = v {
+        t.tagIDs = arr.compactMap(\.stringValue)
+      } else {
+        t.tagIDs = []
+      }
+    }
     take("todaySetOn") { t.todaySetOn = $0.stringValue }
     take("completedAt") { t.completedAt = $0.stringValue }
     take("notes") { t.notes = $0.stringValue }
@@ -570,7 +636,6 @@ extension TaskSyncEngine {
     take("title") { a.title = $0.stringValue ?? a.title }
     take("context") { a.context = $0.stringValue }
     take("emoji") { a.emoji = $0.stringValue }
-    take("attachment") { a.attachmentJSON = Self.jsonText($0) }
     take("position") { a.position = Self.int($0) ?? 0 }
     return applied
   }
@@ -591,7 +656,6 @@ extension TaskSyncEngine {
     take("notes") { p.notes = $0.stringValue }
     take("context") { p.context = $0.stringValue }
     take("githubRepo") { p.githubRepo = $0.stringValue }
-    take("attachment") { p.attachmentJSON = Self.jsonText($0) }
     take("position") { p.position = Self.int($0) ?? 0 }
     return applied
   }
@@ -613,6 +677,39 @@ extension TaskSyncEngine {
     return applied
   }
 
+  @discardableResult
+  func applyChecklistItemFields(_ item: TaskChecklistItemEntity, _ fields: [String: BackendJSON], skip: Set<String>) -> [String] {
+    var applied: [String] = []
+    func take(_ name: String, _ write: (BackendJSON) -> Void) {
+      guard !skip.contains(name), let v = fields[name] else { return }
+      write(v)
+      applied.append(name)
+    }
+    take("taskId") { item.taskID = $0.stringValue ?? item.taskID }
+    take("title") { item.title = $0.stringValue ?? item.title }
+    take("checked") { item.checked = Self.bool($0) ?? false }
+    take("checkedAt") { item.checkedAt = Self.parseStamp($0.stringValue) }
+    take("position") { item.position = Self.double($0) ?? 0 }
+    take("createdAt") { item.createdAt = Self.parseStamp($0.stringValue) ?? item.createdAt }
+    item.updatedAt = Date()
+    return applied
+  }
+
+  @discardableResult
+  func applyTagFields(_ tag: TagEntity, _ fields: [String: BackendJSON], skip: Set<String>) -> [String] {
+    var applied: [String] = []
+    func take(_ name: String, _ write: (BackendJSON) -> Void) {
+      guard !skip.contains(name), let v = fields[name] else { return }
+      write(v)
+      applied.append(name)
+    }
+    take("name") { tag.name = $0.stringValue ?? tag.name }
+    take("color") { tag.color = $0.stringValue }
+    take("position") { tag.position = Self.int($0) }
+    tag.updatedAt = Date()
+    return applied
+  }
+
   // MARK: - Value helpers
 
   static func bool(_ v: BackendJSON) -> Bool? {
@@ -629,12 +726,6 @@ extension TaskSyncEngine {
     case .int(let i): return Double(i)
     default: return nil
     }
-  }
-
-  /// An `AreaAttachment` object back to the JSON text the entity stores.
-  static func jsonText(_ v: BackendJSON) -> String? {
-    guard case .object = v, let data = try? JSONEncoder().encode(v) else { return nil }
-    return String(data: data, encoding: .utf8)
   }
 
   /// ISO-8601 with or without fractions, or the app's zone-less

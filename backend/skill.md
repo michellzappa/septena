@@ -1,11 +1,11 @@
 ---
 name: septena-tasks
-description: Use the Septena tasks MCP at api.septena.app to read and write the user's tasks, areas, projects and task conversations. Triggers when the user asks about their tasks, today's plan, their inbox, or any Septask data.
+description: Use the Septena tasks MCP at api.septena.app to read and write the user's tasks, areas, projects and task conversations. Triggers when the user asks about their tasks, today's plan, their inbox, or any Septena data.
 ---
 
 # Septena tasks MCP
 
-The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, projects and task conversations, the same data the Septask app shows. The user pairs it from the Septask app. Changes reach the app within seconds.
+The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, projects and task conversations, the same data the Septena app shows. The user pairs it from the Septena app. Changes reach the app within seconds.
 
 ## Conventions
 
@@ -13,6 +13,9 @@ The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, 
 - **IDs** are short, opaque strings. Always echo back the `id` from a create call before referencing it in an update.
 
 ## Guidance
+
+### First-time setup (onboarding)
+- When helping a user populate a new or sparse Septena account, follow the onboarding guide at `https://api.septena.app/onboard.md` (also exposed as the MCP prompt `onboard_septena`). Draw from what you already know about their ongoing work, projects, and responsibilities — or interview them briefly if starting fresh — to propose real Areas (with context + emoji), Projects (with context briefs), and at least a few concrete Tasks, and confirm before writing.
 
 ### Context first: project and area notes
 - Every project and area has **notes**: what it is for, who is involved, what was decided, what holds. They are the context for every task inside. Read them before you decide anything about a task. `tasks_claim` returns the task's project and area notes; `tasks_get(id, include_notes: true)` and `tasks_project_get(id)` return them too.
@@ -130,7 +133,7 @@ tasks_list(view: "anytime")
 
 ## Errors to expect
 
-- 401 → the pairing expired or was revoked; the user re-pairs from Septask.
+- 401 → the pairing expired or was revoked; the user re-pairs from Septena.
 - A write tool that says the connection can only read → the pairing predates write access; the user removes and re-adds the connector.
 - `stale` on a notes write → the notes changed since you read them; the reply's `current` has the new text and noteRev.
 - `brief_is_users` → you tried to change the user's brief; log under `## Log` or propose instead.

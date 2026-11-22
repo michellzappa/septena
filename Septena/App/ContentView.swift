@@ -12,7 +12,11 @@ struct ContentView: View {
   var body: some View {
     @Bindable var nav = nav
     layout(path: $nav.path)
+      #if SEPTASK
+      .tint(AppearancePreferences.shared.accentSwiftUIColor)
+      #else
       .tint(theme.accent)
+      #endif
       // Settings / QuickFind / AddInfo sheets are mounted at the
       // RootTabView level (so they work from Week / Next, not just the
       // Tasks tab which hosts ContentView).
@@ -38,7 +42,10 @@ struct ContentView: View {
   private func stackLayout(path: Binding<[Route]>) -> some View {
     NavigationStack(path: path) {
       SidebarRootView()
-        .navigationDestination(for: Route.self) { destination(for: $0) }
+        .navigationDestination(for: Route.self) {
+          destination(for: $0)
+            .environment(\.isInPushedDetail, true)
+        }
     }
   }
 

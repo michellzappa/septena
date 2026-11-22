@@ -16,12 +16,16 @@ import SwiftData
 ///   • Text(AttributedString(markdown:)) overlays on top when the field
 ///     isn't focused and has content; tap forwards focus.
 ///   • Hit testing is gated on focus so taps go to the right layer.
+/// `selection` lets the project view drop the cursor under the first heading
+/// of a freshly inserted notes template (`ContainerNotes.template`).
 @ViewBuilder
 func notesField(_ text: Binding<String>,
+                placeholder: String,
+                selection: Binding<TextSelection?> = .constant(nil),
                 focused: FocusState<Bool>.Binding) -> some View {
   let showRender = !focused.wrappedValue && !text.wrappedValue.isEmpty
   ZStack(alignment: .topLeading) {
-    TextField("Notes", text: text, axis: .vertical)
+    TextField(placeholder, text: text, selection: selection, axis: .vertical)
       .textFieldStyle(.plain)
       .focusEffectDisabled()
       .font(.septenaNotes)
@@ -60,9 +64,16 @@ func markdownAttributed(_ raw: String) -> AttributedString {
     for run in attr.runs where run.presentationIntent != nil {
       for component in run.presentationIntent?.components ?? [] {
         if case .header(let level) = component.kind {
-          let size: CGFloat = level == 1 ? 18 : (level == 2 ? 16 : 15)
-          attr[run.range].font = .system(size: size, weight: .semibold)
-          attr[run.range].foregroundColor = Theme.inkPrimary
+          if level >= 3 {
+            // `### <day> · <agent>` is how an agent log entry starts
+            // (ContainerNotes): a quiet byline, not a section title.
+            attr[run.range].font = .septenaLabel
+            attr[run.range].foregroundColor = Theme.inkSecondary
+          } else {
+            let size: CGFloat = level == 1 ? 18 : 16
+            attr[run.range].font = .system(size: size, weight: .semibold)
+            attr[run.range].foregroundColor = Theme.inkPrimary
+          }
         }
       }
     }
@@ -79,6 +90,7 @@ struct AreaDetailView: View {
   @Environment(NavigationState.self) private var nav
   @Environment(\.usesPushNavigation) private var usesPushNavigation
   @Environment(AreasMutator.self) private var areasMutator
+  @Environment(TaskMutator.self) private var taskMutator
   @Environment(\.modelContext) private var modelContext
 
   @State private var draftName: String
@@ -87,12 +99,11 @@ struct AreaDetailView: View {
   @State private var draftEmoji: String
   @State private var originalEmoji: String
   @State private var showingEmojiEditor = false
-  @State private var draftAttachment: AreaAttachment?
-  @State private var showingAttachmentEditor = false
   @State private var areas: [Area]
   @State private var projects: [Project]
   @State private var projectProgress: [String: Double] = [:]
   @State private var errorMessage: String?
+  @State private var toastStore = SeptenaToastStore()
   @FocusState private var notesFocused: Bool
   /// Global task sort — read/written here so flipping it from this menu
   /// re-renders the embedded TaskListView, which reads the same key.
@@ -104,7 +115,6 @@ struct AreaDetailView: View {
     _originalNotes = State(initialValue: area.context ?? "")
     _draftEmoji = State(initialValue: area.emoji ?? "")
     _originalEmoji = State(initialValue: area.emoji ?? "")
-    _draftAttachment = State(initialValue: area.attachment)
     // Seed area + project lists from cache before first render so the
     // project rows are present immediately on navigate-in.
     let ctx = LocalStore.shared.container.mainContext
@@ -123,7 +133,9 @@ struct AreaDetailView: View {
   private static func cachedProjectProgress(areaId: String,
                                             context: ModelContext) -> [String: Double] {
     let ratios = LocalCache.projectCompletionRatios(in: context)
-    let ids = Set(LocalCache.projects(in: context)
+    // StructureCache, not a fresh fetch: SwiftUI re-runs this view's init on
+    // every parent render.
+    let ids = Set(StructureCache.snapshot(in: context).projects
       .filter { $0.area == areaId && $0.status == .active }
       .map(\.id))
     return ratios.filter { ids.contains($0.key) }
@@ -158,8 +170,7 @@ struct AreaDetailView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
           }
-          notesField($draftNotes, focused: $notesFocused)
-          AttachmentZone(attachment: draftAttachment) { showingAttachmentEditor = true }
+          notesField($draftNotes, placeholder: ContainerNotes.areaPlaceholder, focused: $notesFocused)
         }
         // Park the whole header on the task cards' content column so the area
         // glyph, notes, and the project rings / task checkboxes below all line
@@ -187,17 +198,23 @@ struct AreaDetailView: View {
               projectRow(project)
             }
             .buttonStyle(PlainHoverRowButtonStyle())
+            .modifier(TaskMoveDrop(perform: { ids in
+              handleProjectDrop(ids: ids, project: project)
+            }))
             .taskCardChrome(TaskCardPosition(index: idx, count: areaProjects.count))
           }
         }
       }
     }
+    .septenaToastOverlay(store: toastStore)
     .septenaInlineTitle()
-    .sheet(isPresented: $showingAttachmentEditor) {
-      AttachmentEditorSheet(initial: draftAttachment) { commitAttachment($0) }
-        .presentationDetents([.height(340), .large])
-        .septenaSheetChrome()
+    #if os(iOS) && SEPTASK
+    .toolbar {
+      if !usesPushNavigation {
+        ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }
+      }
     }
+    #endif
     .alert("Error", isPresented: Binding(
       get: { errorMessage != nil },
       set: { if !$0 { errorMessage = nil } }
@@ -237,6 +254,40 @@ struct AreaDetailView: View {
     #else
     nav.go(to: .project(id: project.id), push: !usesPushNavigation)
     #endif
+  }
+
+  /// Drop 1 or more dragged tasks onto one of this area's project rows:
+  /// re-home them in relative order, record one shared undo step, and show an
+  /// undoable confirmation toast (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §6.2).
+  private func handleProjectDrop(ids: [String], project: Project) -> Bool {
+    guard !ids.isEmpty else { return false }
+    if TaskDragIDs.isNewTaskPayload(ids) {
+      Haptics.tick()
+      openProject(project)
+      nav.requestNewTask()
+      return true
+    }
+    let moving: [SeptenaTask] = ids.compactMap { id in
+      guard let task = LocalCache.task(id: id, in: modelContext),
+            !task.isHeading,
+            task.project != project.id else { return nil }
+      return task
+    }
+    guard !moving.isEmpty else { return false }
+    Haptics.tick()
+    let undoBefore = moving.map(TaskUndo.FilingSnapshot.init)
+    taskMutator.moveToList(ids: moving.map(\.id), area: nil, project: project.id, acknowledge: true)
+    TaskUndo.recordMove(before: undoBefore, context: modelContext, mutator: taskMutator)
+    let ticket = TaskUndoTicket()
+    let message = moving.count == 1
+      ? "Moved to \(project.title)"
+      : "Moved \(moving.count) tasks to \(project.title)"
+    toastStore.show(message) {
+      ticket.undo { TaskUndo.restore(undoBefore, using: taskMutator) }
+      Task { await load() }
+    }
+    Task { await load() }
+    return true
   }
 
   /// Quiet "Projects" header over the project card — matches the group-header
@@ -309,13 +360,6 @@ struct AreaDetailView: View {
         draftEmoji = serverEmoji
       }
     }
-
-    // Same for the attachment pointer — refresh from the loaded record unless
-    // the editor is open (so we never clobber an in-flight edit).
-    if !showingAttachmentEditor, let fresh = areas.first(where: { $0.id == area.id }) {
-      draftAttachment = fresh.attachment
-    }
-
   }
 
   private func commitName(_ trimmed: String) {
@@ -350,14 +394,6 @@ struct AreaDetailView: View {
       }
     }
   }
-
-  private func commitAttachment(_ attachment: AreaAttachment?) {
-    draftAttachment = attachment
-    Task {
-      do { try await areasMutator.setAttachment(id: area.id, attachment: attachment) }
-      catch { errorMessage = error.localizedDescription }
-    }
-  }
 }
 
 // MARK: - Project detail (rename + notes + task list)
@@ -374,18 +410,18 @@ struct ProjectDetailView: View {
   @State private var draftNotes: String
   @State private var originalName: String
   @State private var originalNotes: String
-  @State private var draftAttachment: AreaAttachment?
   @State private var status: ProjectStatus
   @State private var errorMessage: String?
   @State private var showingDeleteConfirm = false
   @State private var showingMoveToArea = false
-  @State private var showingAttachmentEditor = false
   @State private var areas: [Area] = []
   /// Fraction of this project's tasks that are done (0...1). Drives the pie
   /// icon next to the project title — reloads whenever the page appears so it
   /// reflects completions made elsewhere too.
   @State private var progress: Double = 0
   @FocusState private var notesFocused: Bool
+  /// Cursor for the notes field; set when the template is inserted.
+  @State private var notesSelection: TextSelection?
   /// Global task sort — kept in sync via @AppStorage so flipping it from
   /// this menu instantly re-renders the embedded TaskListView (which reads
   /// the same key).
@@ -396,7 +432,6 @@ struct ProjectDetailView: View {
     _draftNotes = State(initialValue: project.notes ?? "")
     _originalName = State(initialValue: project.title)
     _originalNotes = State(initialValue: project.notes ?? "")
-    _draftAttachment = State(initialValue: project.attachment)
     _status = State(initialValue: project.status)
     // Seed the progress ring synchronously from the local cache so the very
     // first render already shows the right fraction — otherwise it paints an
@@ -410,17 +445,14 @@ struct ProjectDetailView: View {
   /// done / (done + open) for a project, computed synchronously from the local
   /// SwiftData mirror. `nil` when the project has no tasks cached yet (so the
   /// caller can keep whatever value it already has rather than reset to 0).
+  ///
+  /// Reads the memoized ratios (`ProjectProgressCache`), the same numbers the
+  /// sidebar ring draws. This runs from `init`, which SwiftUI re-runs on every
+  /// parent render; it used to build a row object for every project task in
+  /// the store, logbook included, each time.
   private static func cachedProgress(projectId: String,
                                      context: ModelContext) -> Double? {
-    var done = 0, total = 0
-    for t in LocalCache.tasksWithProject(in: context) where t.project == projectId {
-      switch t.status {
-      case .done: done += 1; total += 1
-      case .open: total += 1
-      case .cancelled: break
-      }
-    }
-    return total > 0 ? Double(done) / Double(total) : nil
+    LocalCache.projectCompletionRatios(in: context)[projectId]
   }
 
   var body: some View {
@@ -442,8 +474,8 @@ struct ProjectDetailView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
           }
-          notesField($draftNotes, focused: $notesFocused)
-          AttachmentZone(attachment: draftAttachment) { showingAttachmentEditor = true }
+          notesField($draftNotes, placeholder: ContainerNotes.projectPlaceholder,
+                     selection: $notesSelection, focused: $notesFocused)
         }
         // Match the area page: park the header on the task cards' content
         // column so the progress ring sits over the checkboxes below.
@@ -452,7 +484,19 @@ struct ProjectDetailView: View {
         .padding(.top, 12)
         .padding(.bottom, 16)
         .onChange(of: notesFocused) { _, focused in
-          if !focused { commitNotes() }
+          if focused {
+            // Empty notes start from the template headings, cursor under
+            // the first one (docs/PROJECT_NOTES_SPEC.md §6).
+            if draftNotes.isEmpty {
+              draftNotes = ContainerNotes.template
+              notesSelection = TextSelection(
+                insertionPoint: ContainerNotes.templateCursorIndex(in: draftNotes))
+            }
+          } else {
+            // A template nobody typed into is not notes: keep them empty.
+            if ContainerNotes.isUntouchedTemplate(draftNotes) { draftNotes = "" }
+            commitNotes()
+          }
         }
 
         Hairline()
@@ -466,11 +510,6 @@ struct ProjectDetailView: View {
       }
       .presentationDetents([.medium, .large])
       .septenaSheetChrome()
-    }
-    .sheet(isPresented: $showingAttachmentEditor) {
-      AttachmentEditorSheet(initial: draftAttachment) { commitAttachment($0) }
-        .presentationDetents([.height(340), .large])
-        .septenaSheetChrome()
     }
     .confirmationDialog(deleteCopy.title, isPresented: $showingDeleteConfirm,
                         titleVisibility: .visible) {
@@ -505,9 +544,6 @@ struct ProjectDetailView: View {
         draftNotes = notes
         originalNotes = notes
       }
-      if !showingAttachmentEditor, draftAttachment == old.attachment {
-        draftAttachment = fresh.attachment
-      }
       status = fresh.status
     }
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
@@ -536,6 +572,13 @@ struct ProjectDetailView: View {
     if !usesPushNavigation {
       ToolbarItem(placement: .primaryAction) { projectOverflowMenu }
     }
+    #elseif os(iOS) && SEPTASK
+    if !usesPushNavigation {
+      ToolbarItem(placement: .topBarTrailing) { projectOverflowMenu }
+      ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }
+    } else {
+      ToolbarItem(placement: .primaryAction) { projectOverflowMenu }
+    }
     #else
     ToolbarItem(placement: .primaryAction) { projectOverflowMenu }
     #endif
@@ -543,11 +586,6 @@ struct ProjectDetailView: View {
 
   private var projectOverflowMenu: some View {
     OverflowMenu {
-      Button {
-        showingAttachmentEditor = true
-      } label: {
-        Label("Attach…", systemImage: "paperclip")
-      }
       Button {
         showingMoveToArea = true
       } label: {
@@ -588,9 +626,6 @@ struct ProjectDetailView: View {
     if serverNotes != draftNotes {
       draftNotes = serverNotes
       originalNotes = serverNotes
-    }
-    if !showingAttachmentEditor {
-      draftAttachment = fresh.attachment
     }
   }
 
@@ -651,14 +686,6 @@ struct ProjectDetailView: View {
     }
   }
 
-  private func commitAttachment(_ attachment: AreaAttachment?) {
-    draftAttachment = attachment
-    Task {
-      do { try await projectsMutator.setAttachment(id: project.id, attachment: attachment) }
-      catch { errorMessage = error.localizedDescription }
-    }
-  }
-
   private func setStatus(_ newStatus: ProjectStatus) {
     switch newStatus {
     case .done: Haptics.success()
@@ -705,236 +732,6 @@ struct ProjectDetailView: View {
   }
 }
 
-
-// MARK: - Attachment (the one read-only context feed on an area/project)
-
-/// Inline zone under an area/project title: a tappable chip (kind glyph +
-/// name) with the attachment's live feed rows beneath it — upcoming events,
-/// recent commits, or latest feed entries. Muted "Attach…" affordance when
-/// none is set. Tapping the chip opens `AttachmentEditorSheet`. Paints the
-/// cached snapshot immediately, then refreshes from the network per-device.
-struct AttachmentZone: View {
-  let attachment: AreaAttachment?
-  let onTap: () -> Void
-
-  @State private var snapshot: AttachmentSnapshot?
-  @State private var didAttempt = false
-  @State private var failureReason: String?
-  @State private var expanded = false
-
-  /// Collapsed row count before the "Show all" expander kicks in.
-  private static let collapsedCount = 3
-  /// How many items to pull into the snapshot so the expander has something to
-  /// reveal without a refetch.
-  private static let fetchDepth = 25
-
-  var body: some View {
-    if let attachment {
-      let items = visibleItems(attachment)
-      let shown = expanded ? items : Array(items.prefix(Self.collapsedCount))
-      VStack(alignment: .leading, spacing: 5) {
-        Button(action: onTap) { chip(attachment) }
-          .buttonStyle(.plain)
-          .contentShape(Rectangle())
-
-        ForEach(shown) { item in
-          itemRow(item)
-        }
-
-        if items.count > Self.collapsedCount {
-          Button {
-            a11yAnimate(.easeInOut(duration: 0.18)) { expanded.toggle() }
-          } label: {
-            Text(expanded ? "Show less" : "Show all (\(items.count))")
-              .scaledFont(size: 11, weight: .medium)
-              .foregroundStyle(Theme.inkSecondary)
-              .padding(.leading, 17)
-          }
-          .buttonStyle(.plain)
-        }
-
-        // A failed fetch would otherwise look identical to "just a link" —
-        // make it legible, and name the reason (e.g. "HTTP 410") so a
-        // server-side block is diagnosable without a debugger.
-        if didAttempt && snapshot == nil {
-          Text(failureReason.map { "Couldn't load — \($0)" } ?? "Couldn't load — tap to check the URL")
-            .scaledFont(size: 11)
-            .foregroundStyle(Theme.iconMuted)
-            .padding(.leading, 17)
-        }
-      }
-      .task(id: attachment) {
-        didAttempt = false
-        failureReason = nil
-        expanded = false
-        snapshot = AttachmentFeedLoader.shared.cached(for: attachment)
-        let outcome = await AttachmentFeedLoader.shared.fetch(attachment, maxItems: Self.fetchDepth)
-        if let fresh = outcome.snapshot { snapshot = fresh }
-        failureReason = outcome.failureReason
-        didAttempt = true
-      }
-    } else {
-      Button(action: onTap) {
-        HStack(spacing: 6) {
-          Image(systemName: "paperclip")
-            .scaledFont(size: 11, weight: .medium)
-          Text("Attach…")
-            .font(.septenaNotes)
-        }
-        .foregroundStyle(Theme.iconMuted)
-      }
-      .buttonStyle(.plain)
-      .contentShape(Rectangle())
-    }
-  }
-
-  /// Snapshot items after the calendar's per-attachment all-day filter.
-  /// git/feed items are never all-day, so their lists pass through unchanged.
-  private func visibleItems(_ attachment: AreaAttachment) -> [AttachmentFeedItem] {
-    let items = snapshot?.items ?? []
-    guard attachment.kind == .calendar else { return items }
-    switch attachment.allDayFilter {
-    case .all:  return items
-    case .hide: return items.filter { !$0.isAllDay }
-    case .only: return items.filter { $0.isAllDay }
-    }
-  }
-
-  @ViewBuilder
-  private func chip(_ attachment: AreaAttachment) -> some View {
-    HStack(spacing: 6) {
-      Image(systemName: attachment.kind.glyph)
-        .scaledFont(size: 11, weight: .medium)
-        .foregroundStyle(Theme.inkSecondary)
-      Text(snapshot?.subtitle ?? attachment.displayName)
-        .font(.septenaNotes)
-        .foregroundStyle(Theme.inkSecondary)
-        .lineLimit(1)
-        .truncationMode(.middle)
-    }
-  }
-
-  @ViewBuilder
-  private func itemRow(_ item: AttachmentFeedItem) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: 8) {
-      Text(item.title)
-        .scaledFont(size: 13)
-        .foregroundStyle(Theme.inkPrimary)
-        .lineLimit(1)
-        .truncationMode(.tail)
-      Spacer(minLength: 4)
-      if let detail = item.detail {
-        Text(detail)
-          .scaledFont(size: 11)
-          .foregroundStyle(Theme.iconMuted)
-          .lineLimit(1)
-          .layoutPriority(1)
-      }
-    }
-    // Align event/commit text with the chip label (past the glyph column).
-    .padding(.leading, 17)
-  }
-}
-
-/// Intake for the one attachment: pick a kind (repo / calendar / feed), enter
-/// the ref, or remove. `onCommit(nil)` detaches.
-struct AttachmentEditorSheet: View {
-  let initial: AreaAttachment?
-  let onCommit: (AreaAttachment?) -> Void
-  @Environment(\.dismiss) private var dismiss
-  @State private var kind: AreaAttachment.Kind
-  @State private var ref: String
-  @State private var allDay: AreaAttachment.AllDayFilter
-  @FocusState private var focused: Bool
-
-  init(initial: AreaAttachment?, onCommit: @escaping (AreaAttachment?) -> Void) {
-    self.initial = initial
-    self.onCommit = onCommit
-    _kind = State(initialValue: initial?.kind ?? .calendar)
-    _ref = State(initialValue: initial?.ref ?? "")
-    _allDay = State(initialValue: initial?.allDayFilter ?? .all)
-  }
-
-  var body: some View {
-    NavigationStack {
-      VStack(alignment: .leading, spacing: 16) {
-        Picker("Kind", selection: $kind) {
-          ForEach(AreaAttachment.Kind.allCases, id: \.self) { k in
-            Text(k.label).tag(k)
-          }
-        }
-        .pickerStyle(.segmented)
-
-        HStack(spacing: 6) {
-          Image(systemName: kind.glyph)
-            .scaledFont(size: 11, weight: .medium)
-            .foregroundStyle(Theme.inkSecondary)
-          TextField(kind.refPlaceholder, text: $ref)
-            .textFieldStyle(.plain)
-            .focusEffectDisabled()
-            .font(.septenaNotes)
-            .foregroundStyle(Theme.inkSecondary)
-            .focused($focused)
-            #if os(iOS)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .keyboardType(kind == .git ? .default : .URL)
-            #endif
-            .onSubmit { commit() }
-        }
-
-        // Calendar-only: how to treat all-day events (trips, birthdays…).
-        if kind == .calendar {
-          VStack(alignment: .leading, spacing: 6) {
-            Text("All-day events")
-              .scaledFont(size: 11, weight: .medium)
-              .foregroundStyle(Theme.iconMuted)
-            Picker("All-day events", selection: $allDay) {
-              ForEach(AreaAttachment.AllDayFilter.allCases, id: \.self) { f in
-                Text(f.label).tag(f)
-              }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-          }
-        }
-
-        if initial != nil {
-          Button(role: .destructive) {
-            onCommit(nil)
-            dismiss()
-          } label: {
-            Label("Remove Attachment", systemImage: "trash")
-              .font(.septenaNotes)
-          }
-          .buttonStyle(.plain)
-        }
-
-        Spacer()
-      }
-      .padding(.horizontal, Theme.hPadding)
-      .padding(.top, 12)
-      .navigationTitle("Attachment")
-      .septenaInlineTitle()
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Done") { commit() }
-        }
-      }
-      .onAppear { focused = true }
-    }
-    .macSheetFrame(width: 460, height: kind == .calendar ? 320 : 260)
-  }
-
-  private func commit() {
-    onCommit(AreaAttachment(kind: kind, ref: ref,
-                            allDay: kind == .calendar ? allDay : nil).normalized)
-    dismiss()
-  }
-}
 
 // MARK: - Area picker (used by Project "Move to Area…")
 

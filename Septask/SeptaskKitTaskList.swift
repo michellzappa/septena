@@ -36,7 +36,7 @@ enum KitDrag {
 // loose projects (`orderedFromGroupedOpen` in TaskListView is the reference).
 // Flat Today sorts by due urgency instead, per the same setting's contract.
 //
-// Keyboard map — same bindings as `TaskRowShortcuts` (TaskCommands.swift),
+// Keyboard map — same bindings as the registry shortcuts (`RegistryActions`, registry/actions.json),
 // so the two shells never teach conflicting muscle memory:
 //   ↑/↓, ⇧-arrows, type-select, Home/End — native NSTableView
 //   ⌘K — toggle complete          ⌘T — toggle Today
@@ -87,9 +87,11 @@ final class SeptaskKitTaskListController: NSViewController {
   private enum Row: Equatable {
     case header(id: String, title: String, icon: GroupIcon, count: Int)
     case screenTitle(title: String, icon: GroupIcon)
+    case tagFilterBar(tags: [TaskTag], active: [String])
     case projectTarget(id: String, title: String, progress: Double)
     case task(SeptenaTask, chip: Chip?, suggestion: SuggestionEngine.Suggestion?)
     case event(Event)
+    case fadedFooter(count: Int, expanded: Bool)
     case loggedFooter(count: Int, expanded: Bool)
     /// Foot of Today's Inbox card — the clickable "New task" line, the AppKit
     /// counterpart of SwiftUI's `QuickAddTriggerRow`. It carries no task, so
@@ -115,14 +117,20 @@ final class SeptaskKitTaskListController: NSViewController {
     /// Return, ⌘K, type-select, right-click) that is never a task. Every task
     /// command reads `task`, which is nil here, so it does nothing.
     case noticeStep(TaskNoticeStep)
+    /// The project's or area's notes, under the page title
+    /// (`KitContainerNotesCell`, ADR 0012). Not selectable: it carries no
+    /// task, and a click opens its editor popover.
+    case containerNotes(isArea: Bool, id: String, text: String)
 
     var key: String {
       switch self {
       case .header(let id, _, _, _): return "h:" + id
       case .screenTitle: return "screen-title"
+      case .tagFilterBar: return "tag-filter-bar"
       case .projectTarget(let id, _, _): return "project-target:" + id
       case .task(let task, _, _): return task.id
       case .event(let event): return "e:" + event.id
+      case .fadedFooter: return "faded-footer"
       case .loggedFooter: return "logged-footer"
       case .newTask: return "new-task"
       case .addSection: return "add-section"
@@ -130,6 +138,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .notice(let notice): return "notice:" + notice.id.rawValue
       case .noticeStep(let step): return step.selectionID
       case .importAllReminders: return "import-all-reminders"
+      case .containerNotes: return "container-notes"
       }
     }
 
@@ -148,10 +157,11 @@ final class SeptaskKitTaskListController: NSViewController {
     /// so they break the card run the same way a Today area/project header does.
     var isCardRow: Bool {
       switch self {
-      case .header, .screenTitle, .loggedFooter, .addSection: return false
-      // A notice, not an item: it sits on the page like a header, NOT on a
-      // card. A statement about your list must not look like a row of it.
-      case .notice: return false
+      case .header, .screenTitle, .tagFilterBar, .fadedFooter, .loggedFooter, .addSection, .containerNotes: return false
+      // A standalone notice sits on the page with its own card fill. A notice
+      // with checklist steps (`Get started`) heads its steps' card so the
+      // header and rows share one seamless frosted surface (matching iOS).
+      case .notice(let notice): return !notice.steps.isEmpty
       // Rides the Inbox card with the reminder rows it acts on.
       case .importAllReminders: return true
       case .projectTarget, .event, .newTask, .reminder: return true
@@ -164,8 +174,11 @@ final class SeptaskKitTaskListController: NSViewController {
 
   private let tableView = SeptaskKitTableView()
   private let scrollView = NSScrollView()
+  private let headerWashView = KitHeaderWashView()
   private let emptyLabel = NSTextField(labelWithString: String(localized: "No Tasks",
                                                                 comment: "SeptaskKit: empty list"))
+  private let emptyDetailLabel = NSTextField(wrappingLabelWithString: "")
+  private let emptyStack = NSStackView()
   private var rows: [Row] = []
   private var filter: TaskFilter = .today
   private var observers: [NSObjectProtocol] = []
@@ -245,21 +258,10 @@ final class SeptaskKitTaskListController: NSViewController {
   /// until the whole batch lands; otherwise an intermediate diff can remove a
   /// row before the rest of the batch has been written.
   private var isApplyingMove = false
-  /// Held so its submenu can be refreshed from the live structure on open.
-  private let moveMenuItem = NSMenuItem()
-  /// Placement items — titles / visibility refresh on every open from the
-  /// current selection (see `refreshPlacementMenuItems`).
-  private let todayMenuItem = NSMenuItem()
-  /// Titled in `refreshPlacementMenuItems` — Show / Hide, so the row menu says
-  /// what ⌥⌘I will actually do next.
-  private let infoMenuItem = NSMenuItem()
-  private let clearScheduleMenuItem = NSMenuItem()
-  private let pauseRepeatMenuItem = NSMenuItem()
-  /// The filing pick offered as the first item of the context menu's Move
-  /// submenu ("Suggested: <List>"), read back by `tag` when chosen. Rebuilt
-  /// on every menu open, with the Move submenu, because the answer depends on
-  /// the selected row.
-  private var menuSuggestions: [SuggestionEngine.Suggestion] = []
+  private var checklistCounts: [String: (done: Int, total: Int)] = [:]
+  private var attachmentCounts: [String: Int] = [:]
+  private var tagsByID: [String: TaskTag] = [:]
+  private var activeTagFilterIDs: Set<String> = []
 
   /// The inspector follows the selection; the window owns the wiring.
   var onSelectionChange: ((SeptenaTask?) -> Void)?
@@ -365,11 +367,19 @@ final class SeptaskKitTaskListController: NSViewController {
     if sync.signedIn && sync.isSyncing && sync.lastPull == nil {
       emptyLabel.stringValue = String(localized: "Syncing…",
                                       comment: "SeptaskKit: empty list during the first task-backend pull")
+      emptyDetailLabel.stringValue = ""
+      emptyDetailLabel.isHidden = true
     } else if filter == .review {
       emptyLabel.stringValue = String(localized: "Nothing to review",
                                       comment: "SeptaskKit: empty review list")
+      emptyDetailLabel.stringValue = String(
+        localized: "Work an agent finished appears here so you can check and accept it.",
+        comment: "SeptaskKit: empty review list detail")
+      emptyDetailLabel.isHidden = false
     } else {
       emptyLabel.stringValue = String(localized: "No Tasks", comment: "SeptaskKit: empty list")
+      emptyDetailLabel.stringValue = ""
+      emptyDetailLabel.isHidden = true
     }
   }
 
@@ -454,6 +464,12 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.onDuplicate = { [weak self] in self?.duplicateSelection() }
     tableView.onMove = { [weak self] in self?.presentMoveMenu() }
     tableView.onFileSuggested = { [weak self] in self?.fileSuggestedSelection() }
+    tableView.onReminder = { [weak self] in self?.presentReminderPopover() }
+    tableView.onToggleStar = { [weak self] in self?.toggleStarSelection() }
+    tableView.onEditTags = { [weak self] in self?.presentTagPopover() }
+    tableView.onAddChecklistItem = { [weak self] in self?.addChecklistItemToSelection() }
+    tableView.onClearTagFilter = { [weak self] in self?.clearTagFilterIfActive() ?? false }
+    tableView.onPasteAttachment = { [weak self] in self?.pasteAttachmentToSelection() ?? false }
     tableView.onFocusSidebar = { [weak self] in self?.onFocusSidebar?() }
     tableView.onMoveSelection = { [weak self] up in self?.moveSelectionOneSlot(up: up) }
     tableView.isComposing = { [weak self] in self?.composingTaskId != nil }
@@ -469,9 +485,8 @@ final class SeptaskKitTaskListController: NSViewController {
     // menu" highlight UNDERNEATH our custom fill — a second, uncontrollable
     // selection language on top of `KitCardRowView`'s. Popping the menu up
     // manually from `rightMouseDown` bypasses that machinery entirely.
-    let contextMenu = buildContextMenu()
-    let recentlyDeletedMenu = buildRecentlyDeletedMenu()
-    let fadedMenu = buildFadedMenu()
+    // Every row menu is rendered from the registry (`registry/actions.json`)
+    // fresh on each click, from the current selection.
     tableView.onRightClick = { [weak self, weak tableView] event in
       guard let self, let tableView else { return }
       let point = tableView.convert(event.locationInWindow, from: nil)
@@ -503,22 +518,22 @@ final class SeptaskKitTaskListController: NSViewController {
       if let task = self.rows[row].task, task.isHeading {
         menu = self.buildHeadingContextMenu()
       } else if self.filter == .recentlyDeleted {
-        menu = recentlyDeletedMenu
-      } else if self.filter == .faded {
-        menu = fadedMenu
+        menu = self.buildRecentlyDeletedMenu()
+      } else if self.filter == .faded || (self.rows[row].task?.isFaded == true) {
+        menu = self.buildFadedMenu()
       } else {
-        menu = contextMenu
+        menu = self.buildContextMenu()
       }
       menu.popUp(positioning: nil, at: point, in: tableView)
     }
-    tableView.registerForDraggedTypes([.septaskTask])
+    tableView.registerForDraggedTypes([.septaskTask, .fileURL])
     tableView.setDraggingSourceOperationMask(.move, forLocal: true)
     tableView.onDragEnded = { [weak self] in self?.endDragHold() }
 
     scrollView.documentView = tableView
     scrollView.hasVerticalScroller = true
-    scrollView.drawsBackground = true
-    scrollView.backgroundColor = SeptaskKitTheme.pageBackground
+    scrollView.drawsBackground = false
+    scrollView.contentView.drawsBackground = false
     // Breathing room above the first card and below the last — Things-style;
     // without it the list runs flush to the window's top and bottom edges.
     // `contentInsets` (not a spacer row) is the standard way to do this: it
@@ -539,15 +554,48 @@ final class SeptaskKitTaskListController: NSViewController {
     // a bare strip of tasks. This is the standard NSWindow title reveal, driven
     // by the clip view's own bounds notification; no NSEvent monitor.
     scrollView.contentView.postsBoundsChangedNotifications = true
-    view = scrollView
+
+    // Backdrop hosts the solid page fill + top-bleed procedural Header Wash
+    // behind the transparent scroll view so geometry extends all the way up
+    // behind the unified title bar and breathes behind translucent top cards.
+    let container = KitPageBackdropView()
+    headerWashView.translatesAutoresizingMaskIntoConstraints = false
+    scrollView.translatesAutoresizingMaskIntoConstraints = false
+    container.addSubview(headerWashView)
+    container.addSubview(scrollView)
+    NSLayoutConstraint.activate([
+      headerWashView.topAnchor.constraint(equalTo: container.topAnchor),
+      headerWashView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+      headerWashView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+      headerWashView.heightAnchor.constraint(equalToConstant: 394),
+      scrollView.topAnchor.constraint(equalTo: container.topAnchor),
+      scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+      scrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+      scrollView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+    ])
+    view = container
 
     emptyLabel.font = SeptaskKitTheme.taskTitle
     emptyLabel.textColor = SeptaskKitTheme.iconMuted
-    emptyLabel.translatesAutoresizingMaskIntoConstraints = false
-    view.addSubview(emptyLabel)
+    emptyLabel.alignment = .center
+    emptyDetailLabel.font = SeptaskKitTheme.meta
+    emptyDetailLabel.textColor = SeptaskKitTheme.inkSecondary
+    emptyDetailLabel.alignment = .center
+    emptyDetailLabel.maximumNumberOfLines = 3
+    emptyDetailLabel.isHidden = true
+    emptyStack.orientation = .vertical
+    emptyStack.alignment = .centerX
+    emptyStack.spacing = 6
+    emptyStack.translatesAutoresizingMaskIntoConstraints = false
+    emptyStack.addArrangedSubview(emptyLabel)
+    emptyStack.addArrangedSubview(emptyDetailLabel)
+    view.addSubview(emptyStack)
     NSLayoutConstraint.activate([
-      emptyLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-      emptyLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+      emptyStack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      emptyStack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+      emptyStack.widthAnchor.constraint(lessThanOrEqualToConstant: 320),
+      emptyStack.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 24),
+      emptyStack.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -24),
     ])
     refreshEmptyLabel()
     // The bottom toast (move / defer / delete confirmations), on top of the
@@ -635,6 +683,43 @@ final class SeptaskKitTaskListController: NSViewController {
     ) { [weak self] _ in
       MainActor.assumeIsolated { self?.syncWindowTitle() }
     })
+    observers.append(NotificationCenter.default.addObserver(
+      forName: .septenaAppearanceChanged, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.refreshAppearance() }
+    })
+  }
+
+  /// Repaint the Header Wash, frosted glass cards/notices, selection washes,
+  /// and custom fruit checkboxes live when Appearance settings change.
+  private func refreshAppearance() {
+    view.needsDisplay = true
+    headerWashView.reloadConfig()
+    tableView.enumerateAvailableRowViews { rowView, _ in
+      if let cardRow = rowView as? KitCardRowView {
+        cardRow.refreshAppearance()
+      } else {
+        rowView.needsDisplay = true
+      }
+      for col in 0..<rowView.numberOfColumns {
+        if let cell = rowView.view(atColumn: col) as? NSView {
+          Self.refreshAppearanceSubviews(in: cell)
+        }
+      }
+    }
+  }
+
+  private static func refreshAppearanceSubviews(in view: NSView) {
+    if let checkbox = view as? KitCheckboxView {
+      checkbox.refreshAppearance()
+      return
+    }
+    if let noticeFill = view as? KitNoticeFill {
+      noticeFill.refreshAppearance()
+    }
+    for sub in view.subviews {
+      refreshAppearanceSubviews(in: sub)
+    }
   }
 
   /// Keep the first card clear of the title bar. The bar's height is the
@@ -655,6 +740,22 @@ final class SeptaskKitTaskListController: NSViewController {
     if abs(scrollView.contentInsets.top - top) > 0.5 {
       scrollView.contentInsets.top = top
     }
+    remeasureNotesRowIfWidthChanged()
+  }
+
+  /// The table width the notes row was last measured at.
+  private var notesRowMeasuredWidth: CGFloat = 0
+
+  /// The notes row wraps, so its height depends on the width: re-note it when
+  /// the width moves. Guarded on a real change, for the same re-entry reason
+  /// as the inset above.
+  private func remeasureNotesRowIfWidthChanged() {
+    let width = tableView.bounds.width
+    guard abs(width - notesRowMeasuredWidth) > 0.5 else { return }
+    notesRowMeasuredWidth = width
+    guard let index = rows.firstIndex(where: { if case .containerNotes = $0 { return true }; return false }),
+          index < tableView.numberOfRows else { return }
+    tableView.noteHeightOfRows(withIndexesChanged: [index])
   }
 
   deinit {
@@ -673,6 +774,7 @@ final class SeptaskKitTaskListController: NSViewController {
     let today = SeptenaDate.today
     guard force || today != renderedDay else { return }
     renderedDay = today
+    headerWashView.dayISO = today
     scheduleReload(locallyChanged: [])
   }
 
@@ -696,7 +798,13 @@ final class SeptaskKitTaskListController: NSViewController {
     // composer can never ride along (pinned) into a different list.
     commitOpenEdits()
     cancelSettle()
+    activeTagFilterIDs.removeAll()
     self.filter = filter
+    if case .project(let id) = filter {
+      headerWashView.projectID = id
+    } else {
+      headerWashView.projectID = nil
+    }
     reload(animated: false)
     if tableView.numberOfRows > 0 {
       tableView.scrollRowToVisible(0)
@@ -782,6 +890,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// View ▸ Text Size takes effect immediately in the main shell.
   func refreshTextSize() {
     emptyLabel.font = SeptaskKitTheme.taskTitle
+    emptyDetailLabel.font = SeptaskKitTheme.meta
     tableView.reloadData()
     if tableView.numberOfRows > 0 {
       tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<tableView.numberOfRows))
@@ -877,6 +986,9 @@ final class SeptaskKitTaskListController: NSViewController {
       return
     }
     heldReload = false
+    checklistCounts = LocalCache.checklistSummaryByTask(in: context)
+    attachmentCounts = SeptenaServices.shared.taskAttachmentStore.attachmentCountsByTask()
+    tagsByID = LocalCache.tagsByID(in: context)
 
     let locallyChanged = locallyChanged.union(takePendingReloadIDs())
     renderedDay = SeptenaDate.today
@@ -892,19 +1004,51 @@ final class SeptaskKitTaskListController: NSViewController {
     // falls to the next task by id instead of to nothing.
     let lastSelectedIndex = tableView.selectedRowIndexes.last
 
-    let pool = LocalCache.tasks(in: context, filter: filter)
+    // Today and its triage band come from one fetch of the open rows; the
+    // band feeds the suggestion snapshot, the tag bar and `triageBand(_:)`.
+    let todayLists = filter == .today ? LocalCache.todayAndTriage(in: context) : nil
+    let rawPool = todayLists?.today ?? LocalCache.tasks(in: context, filter: filter)
+    let rawTriage = todayLists?.triage ?? []
+    // Progressive disclosure: discover ONLY tags actually present in this list;
+    // when none exist, no tag filter bar appears (docs/TAGS_SPEC.md §3).
+    let listTags: [TaskTag] = {
+      guard filter != .recentlyDeleted else { return [] }
+      var ids = Set<String>()
+      for t in rawPool { for tid in t.tags { ids.insert(tid) } }
+      for t in rawTriage { for tid in t.tags { ids.insert(tid) } }
+      guard !ids.isEmpty else { return [] }
+      return ids
+        .compactMap { tagsByID[$0] }
+        .sorted { lhs, rhs in
+          let lp = lhs.position ?? Int.max
+          let rp = rhs.position ?? Int.max
+          if lp != rp { return lp < rp }
+          let cmp = lhs.name.localizedCaseInsensitiveCompare(rhs.name)
+          if cmp != .orderedSame { return cmp == .orderedAscending }
+          return lhs.id < rhs.id
+        }
+    }()
+    if !activeTagFilterIDs.isEmpty {
+      activeTagFilterIDs = activeTagFilterIDs.intersection(Set(listTags.map(\.id)))
+    }
+    let pool = activeTagFilterIDs.isEmpty
+      ? rawPool
+      : rawPool.filter { $0.isHeading || activeTagFilterIDs.isSubset(of: Set($0.tags)) }
     // Capsules first: `chipped()` reads the snapshot, so it has to be current
     // before any row is built. Includes the triage band, which `pool` omits on
     // Today — the band is exactly where most suggestions land.
-    refreshFilingSuggestions(
-      pool: pool + (filter == .today ? LocalCache.tasks(in: context, filter: .triage) : []))
+    refreshFilingSuggestions(pool: pool + rawTriage)
     // One standard title row, on every page — computed once here rather than
-    // duplicated into each branch below.
-    let titleRows: [Row] = screenTitleRow().map { [$0] } ?? []
+    // duplicated into each branch below, followed by the progressive-disclosure
+    // tag filter bar when tagged tasks exist in this list.
+    let tagBarRows: [Row] = listTags.isEmpty
+      ? []
+      : [.tagFilterBar(tags: listTags, active: Array(activeTagFilterIDs).sorted())]
+    let titleRows: [Row] = (screenTitleRow().map { [$0] } ?? []) + tagBarRows
     var newRows: [Row]
     switch filter {
     case .today where todayGroupsByList:
-      newRows = titleRows + noticeRows(pool) + agenda() + triageBand()
+      newRows = titleRows + noticeRows(pool) + agenda() + triageBand(rawTriage)
         + groupedByList(withoutTriage(pool), inboxFooter: newTaskLine)
         + todayLoggedRows()
     case .today:
@@ -936,14 +1080,14 @@ final class SeptaskKitTaskListController: NSViewController {
                               comment: "SeptaskKit: flat Today divider above tasks filed in an area or project"),
                 icon: .symbol("list.bullet"), count: classified.count)
       ]
-      newRows = titleRows + noticeRows(pool) + agenda() + triageBand()
+      newRows = titleRows + noticeRows(pool) + agenda() + triageBand(rawTriage)
         + loose.map(chipped) + newTaskLine
         + listsHeader
         + classified.map(chipped)
         + todayLoggedRows()
     case .upcoming:
       newRows = titleRows + upcomingBuckets(pool)
-    case .unscheduled:
+    case .unscheduled, .starred:
       newRows = titleRows + groupedByList(pool)
     case .project, .area:
       // Scoped reads return every live status; capture the done subset for
@@ -961,8 +1105,11 @@ final class SeptaskKitTaskListController: NSViewController {
       completed.sort { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
 
       let open = pool.filter { $0.status == .open }
+      let faded = showsFadedInLists ? LocalCache.fadedTasks(in: context, scope: filter) : []
+      let notesRows = containerNotesRows()
       if case .project(let projectId) = filter {
-        newRows = titleRows + projectGrouped(open: open, projectId: projectId)
+        newRows = titleRows + notesRows + projectGrouped(open: open, projectId: projectId)
+          + fadedFooterRows(faded: faded)
           + loggedFooterRows(completed: completed)
       } else {
         // Area: flat (headings only live inside a project), and only
@@ -990,8 +1137,10 @@ final class SeptaskKitTaskListController: NSViewController {
               }
           }
         }
-        newRows = titleRows + direct.map(unchipped)
-          + projectRows + loggedFooterRows(completed: completed)
+        newRows = titleRows + notesRows + direct.map(unchipped)
+          + projectRows
+          + fadedFooterRows(faded: faded)
+          + loggedFooterRows(completed: completed)
       }
     case .logbook:
       // Already most-recent-first from LocalCache; cap what one screen needs.
@@ -999,14 +1148,7 @@ final class SeptaskKitTaskListController: NSViewController {
     case .faded:
       var fadedRows = titleRows
       if !pool.isEmpty {
-        fadedRows.append(.notice(TaskNotice(
-          id: .weeklySweep, kind: .info, symbol: "circle.dashed",
-          title: String(localized: "Tasks untouched for 14 days wait here.",
-                        comment: "Faded pile top notice title"),
-          detail: String(localized: "Open a task or choose Keep to bring it back, or run a sweep.",
-                         comment: "Faded pile top notice detail"),
-          primaryTitle: String(localized: "Sweep…", comment: "Faded pile sweep button"),
-          dismissible: false)))
+        fadedRows.append(.notice(TaskNotices.fadedPile))
       }
       newRows = fadedRows + pool.map(chipped)
     default:
@@ -1038,7 +1180,11 @@ final class SeptaskKitTaskListController: NSViewController {
     let priorRows = rows
     let live = liveEditorIDs
     apply(pinned(newRows, liveEditors: live), animated: animated, preserving: live)
-    emptyLabel.isHidden = !rows.isEmpty
+    let hasContent = rows.contains { row in
+      if case .screenTitle = row { return false }
+      return true
+    }
+    emptyStack.isHidden = hasContent
     refreshEmptyLabel()
     onStoreChanged?()
 
@@ -1272,9 +1418,10 @@ final class SeptaskKitTaskListController: NSViewController {
     case .addTask:
       SeptaskKitQuickEntry.show()
     case .connectAI, .importTasks:
-      let dest: SeptaskSettingsView.Destination =
-        (id == .connectAI && TaskSyncEngine.shared.signedIn) ? .taskBackend : .connectionsAI
-      SeptaskSettingsLink.request(dest)
+      let pageID = id == .connectAI
+        ? RegistrySettings.PageID.claudePairing
+        : RegistrySettings.PageID.importExport
+      SeptaskSettingsLink.request(pageID)
       SeptaskKitSettingsWindow.show()
     }
   }
@@ -1496,8 +1643,10 @@ final class SeptaskKitTaskListController: NSViewController {
   /// capture slot whether or not anything sits in it. Matches
   /// `TaskListView.triageSection`, which shows the section whenever
   /// `allowsInlineCreate` regardless of row count.
-  private func triageBand() -> [Row] {
-    let band = LocalCache.tasks(in: context, filter: .triage)
+  private func triageBand(_ rawBand: [SeptenaTask]) -> [Row] {
+    let band = activeTagFilterIDs.isEmpty
+      ? rawBand
+      : rawBand.filter { activeTagFilterIDs.isSubset(of: Set($0.tags)) }
     let reminders = reminderRows()
     // The count includes pending reminders — they ARE Inbox items now, and a
     // header that excluded them would be lying about what sits below it. The
@@ -1546,8 +1695,8 @@ final class SeptaskKitTaskListController: NSViewController {
   /// rows are exactly why loose lists still need this — they can carry a
   /// project while sitting in the band.
   /// A row with no list-membership chip — scoped pages already name their
-  /// context. It still carries a filing capsule where the gate allows one
-  /// (an area page ranks area-direct rows against that area's projects).
+  /// context. Inline filing capsules live strictly on Inbox (never on Area or
+  /// Project pages — those keep their suggestion inside the Move submenu).
   private func unchipped(_ task: SeptenaTask) -> Row {
     .task(task, chip: nil, suggestion: filingSuggestions[task.id])
   }
@@ -1556,9 +1705,11 @@ final class SeptaskKitTaskListController: NSViewController {
     .task(task, chip: chip(for: task), suggestion: filingSuggestions[task.id])
   }
 
-  /// Per-row top filing pick, snapshotted each reload so the capsule paints on
-  /// the same frame as the row. The GATE is `TaskFilingSuggestions`, shared
-  /// with the SwiftUI list — this only decides when to ask.
+  /// Per-row top filing pick for the inline capsule, snapshotted each reload
+  /// so the capsule paints on the same frame as the row. The GATE is
+  /// `TaskFilingSuggestions.capsuleTop`, shared with the SwiftUI list — inline
+  /// pills appear strictly on Inbox while `prime` keeps the model warm for the
+  /// context menu's Move submenu on Area pages too.
   private func refreshFilingSuggestions(pool: [SeptenaTask]) {
     guard TaskRowFlags.filingSuggestionsEnabled else {
       if !filingSuggestions.isEmpty { filingSuggestions = [:] }
@@ -1571,9 +1722,9 @@ final class SeptaskKitTaskListController: NSViewController {
     let childIds = Self.childProjectIds(in: structure.projects)
     var fresh: [String: SuggestionEngine.Suggestion] = [:]
     for task in pool {
-      if let top = TaskFilingSuggestions.top(for: task, filter: filter,
-                                             engine: SuggestionEngine.shared,
-                                             childProjectIds: childIds) {
+      if let top = TaskFilingSuggestions.capsuleTop(for: task, filter: filter,
+                                                    engine: SuggestionEngine.shared,
+                                                    childProjectIds: childIds) {
         fresh[task.id] = top
       }
     }
@@ -1695,6 +1846,9 @@ final class SeptaskKitTaskListController: NSViewController {
     case .unscheduled:
       return .screenTitle(title: String(localized: "Anytime", comment: "Smart list title"),
                           icon: .symbol("rectangle.stack.fill"))
+    case .starred:
+      return .screenTitle(title: String(localized: "Starred", comment: "Smart list title"),
+                          icon: .symbol("star.fill"))
     case .logbook:
       return .screenTitle(title: String(localized: "Logbook", comment: "Smart list title"),
                           icon: .symbol("checkmark"))
@@ -1711,6 +1865,42 @@ final class SeptaskKitTaskListController: NSViewController {
     case .area(let id):
       guard let area = snapshot.areas.first(where: { $0.id == id }) else { return nil }
       return .screenTitle(title: area.title, icon: area.emoji.map(GroupIcon.emoji) ?? .areaDot)
+    }
+  }
+
+  /// The notes row under a project's or area's title — on every such page,
+  /// empty or not, so the notes are always one click away (ADR 0012).
+  private func containerNotesRows() -> [Row] {
+    let snapshot = StructureCache.snapshot(in: context)
+    switch filter {
+    case .project(let id):
+      guard let project = snapshot.projects.first(where: { $0.id == id }) else { return [] }
+      return [.containerNotes(isArea: false, id: id, text: project.notes ?? "")]
+    case .area(let id):
+      guard let area = snapshot.areas.first(where: { $0.id == id }) else { return [] }
+      return [.containerNotes(isArea: true, id: id, text: area.context ?? "")]
+    default:
+      return []
+    }
+  }
+
+  /// Opens the notes editor anchored to the notes row; closing it saves
+  /// through the same mutators the SwiftUI project and area pages use.
+  private func editContainerNotes(isArea: Bool, id: String, text: String, anchor: NSView) {
+    KitContainerNotesPopover.present(isArea: isArea, notes: text, relativeTo: anchor) { [weak self] newText in
+      let value: String? = newText.isEmpty ? nil : newText
+      Task { @MainActor in
+        do {
+          if isArea {
+            try await SeptenaServices.shared.areasMutator.setContext(id: id, context: value)
+          } else {
+            try await SeptenaServices.shared.projectsMutator.setNotes(id: id, notes: value)
+          }
+        } catch {
+          SeptenaLog.error("[notes] save failed for \(isArea ? "area" : "project") \(id)", error)
+        }
+        self?.reload()
+      }
     }
   }
 
@@ -1797,8 +1987,7 @@ final class SeptaskKitTaskListController: NSViewController {
   private func todayLoggedRows() -> [Row] {
     guard todayShowsCompleted else { return [] }
     let today = SeptenaDate.today
-    let done = LocalCache.tasks(in: context, filter: .logbook)
-      .filter { ($0.completedAt ?? "").hasPrefix(today) }
+    let done = LocalCache.tasksCompleted(onDay: today, in: context)
       .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
     return loggedFooterRows(completed: done)
   }
@@ -1813,6 +2002,42 @@ final class SeptaskKitTaskListController: NSViewController {
     // whole BLOCK of rows below the footer in one go, and an instant
     // reveal/collapse reads as correct disclosure behavior on its own —
     // no need to fight the diff machinery for what's an infrequent toggle.
+    reload(animated: false)
+  }
+
+  /// Mirrors SettingsKey.tasksShowFaded's contract: absent → on.
+  private var showsFadedInLists: Bool {
+    UserDefaults.standard.object(forKey: SettingsKey.tasksShowFaded) == nil
+      ? RegistrySettings.Defaults.tasksShowFaded
+      : UserDefaults.standard.bool(forKey: SettingsKey.tasksShowFaded)
+  }
+
+  private static let fadedCollapsedKey = "septena.tasks.projectFadedCollapsed"
+
+  private func fadedCollapsedIds() -> Set<String> {
+    guard let data = UserDefaults.standard.data(forKey: Self.fadedCollapsedKey) else { return [] }
+    return (try? JSONDecoder().decode(Set<String>.self, from: data)) ?? []
+  }
+
+  /// Collapsible faded-tasks section for projects & areas. Starts expanded
+  /// while Settings ▸ Lists ▸ Show faded tasks is on (mirrors Today's
+  /// completed footer); clicking folds or unfolds per list.
+  private func fadedFooterRows(faded: [SeptenaTask]) -> [Row] {
+    guard let key = scopeId, !faded.isEmpty else { return [] }
+    let expanded = !fadedCollapsedIds().contains(key)
+    var rows: [Row] = [.fadedFooter(count: faded.count, expanded: expanded)]
+    if expanded {
+      rows.append(contentsOf: faded.map(unchipped))
+    }
+    return rows
+  }
+
+  func toggleFadedExpanded() {
+    guard let key = scopeId else { return }
+    var ids = fadedCollapsedIds()
+    if ids.contains(key) { ids.remove(key) } else { ids.insert(key) }
+    UserDefaults.standard.set((try? JSONEncoder().encode(ids)) ?? Data(),
+                              forKey: Self.fadedCollapsedKey)
     reload(animated: false)
   }
 
@@ -2056,7 +2281,7 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   private func move(to destination: KitMoveMenu.Destination, taskIDs: [String]) {
-    let liveByID = Dictionary(LocalCache.allTasks(in: context).map { ($0.id, $0) },
+    let liveByID = Dictionary(LocalCache.liveTasks(ids: taskIDs, in: context).map { ($0.id, $0) },
                               uniquingKeysWith: { current, _ in current })
     // A task already filed at `destination` is a no-op: no write and no undo
     // step (⌘Z must not "undo" nothing and skip the real action behind it).
@@ -2157,6 +2382,92 @@ final class SeptaskKitTaskListController: NSViewController {
   private var selectedRowAnchor: KitSurfaceAnchor? {
     guard tableView.selectedRow >= 0 else { return nil }
     return .rect(tableView.rect(ofRow: tableView.selectedRow), tableView)
+  }
+
+  /// Open the Reminder popover (⌥⌘R) for the current selection, anchored to
+  /// the row or composer pill. Progressive disclosure — only sets/clears the
+  /// reminder without altering the task's `scheduled` date.
+  func presentReminderPopover(anchor: KitSurfaceAnchor? = nil) {
+    commitComposerTextIfOpen()
+    let selection = actionableSelection
+    guard !selection.isEmpty else { NSSound.beep(); return }
+    guard case .rect(let rect, let host)? = anchor ?? selectedRowAnchor else {
+      NSSound.beep()
+      return
+    }
+    let initial = selection.count == 1 ? selection[0].reminder : nil
+    let anyHasReminder = selection.contains { $0.reminder != nil }
+    SeptaskKitReminderPopover.present(
+      initial: initial,
+      anyHasReminder: anyHasReminder,
+      relativeTo: rect,
+      of: host
+    ) { [weak self] reminder in
+      guard let self else { return }
+      let before = selection.map(self.scheduleSnapshot)
+      for task in selection {
+        self.mutator.setReminder(id: task.id, reminder: reminder)
+        self.refreshComposerRow(taskId: task.id)
+      }
+      self.reload()
+      self.recordScheduleUndo(name: String(localized: "Change Reminder",
+                                           comment: "SeptaskKit: undo action"),
+                              before: before)
+      self.onStoreChanged?()
+    }
+  }
+
+  /// Open the type-to-filter/assign/create Tag popover (`⇧⌘T`) for the current
+  /// selection (single or multi-select), anchored to the row or composer pill.
+  func presentTagPopover(anchor: KitSurfaceAnchor? = nil) {
+    commitComposerTextIfOpen()
+    let selection = actionableSelection
+    guard !selection.isEmpty else { NSSound.beep(); return }
+    guard case .rect(let rect, let host)? = anchor ?? selectedRowAnchor else {
+      NSSound.beep()
+      return
+    }
+    let ids = selection.map(\.id)
+    SeptaskKitTagPopover.present(
+      taskIDs: ids,
+      relativeTo: rect,
+      of: host
+    ) { [weak self] in
+      guard let self else { return }
+      for id in ids { self.refreshComposerRow(taskId: id) }
+      self.reload()
+      self.onStoreChanged?()
+    }
+  }
+
+  private func toggleTagFilter(_ tagID: String) {
+    if activeTagFilterIDs.contains(tagID) {
+      activeTagFilterIDs.remove(tagID)
+    } else {
+      activeTagFilterIDs.insert(tagID)
+    }
+    reload(animated: true)
+  }
+
+  @discardableResult
+  private func clearTagFilterIfActive() -> Bool {
+    guard !activeTagFilterIDs.isEmpty else { return false }
+    activeTagFilterIDs.removeAll()
+    reload(animated: true)
+    return true
+  }
+
+  /// ⌘V on a selected task row (when not editing text): attach file(s) or a
+  /// clipboard image directly to the selected task (`docs/ATTACHMENTS_MAC_PARITY_SPEC.md` §3).
+  private func pasteAttachmentToSelection() -> Bool {
+    guard !isEditingText, let target = actionableSelection.first else { return false }
+    guard KitAttachmentPasteHelper.attachFromPasteboard(to: target.id, presentErrorIn: view.window) else {
+      return false
+    }
+    refreshComposerRow(taskId: target.id)
+    reload()
+    onStoreChanged?()
+    return true
   }
 
   /// Open the Repeat editor for the current selection, anchored to the row it
@@ -2531,8 +2842,31 @@ final class SeptaskKitTaskListController: NSViewController {
     case .deadline: KitDayFormat.date(fromWire: selection.first?.deadline)
     }
 
-    SeptaskKitDatePopover.present(kind: kind, initial: initial,
-                                  relativeTo: anchor, of: tableView) { [weak self] date, today in
+    SeptaskKitDatePopover.present(
+      kind: kind,
+      initial: initial,
+      initialStartTime: kind == .when && selection.count == 1 ? selection[0].startTime : nil,
+      initialDurationMinutes: kind == .when && selection.count == 1 ? selection[0].durationMinutes : nil,
+      relativeTo: anchor,
+      of: tableView,
+      onTimeSlotChange: kind == .when ? { [weak self] start, duration in
+        guard let self else { return }
+        let liveSel = selection.map { LocalCache.task(id: $0.id, in: self.context) ?? $0 }
+        let before = liveSel.map(self.scheduleSnapshot)
+        for task in liveSel {
+          self.mutator.setTimeSlot(id: task.id, startTime: start, durationMinutes: duration)
+          if start != nil, !task.today, task.scheduled == nil {
+            self.mutator.moveToToday(id: task.id)
+          }
+          self.refreshComposerRow(taskId: task.id)
+        }
+        self.reload()
+        self.recordScheduleUndo(
+          name: String(localized: "Change Time", comment: "SeptaskKit: undo action"),
+          before: before)
+        self.onStoreChanged?()
+      } : nil
+    ) { [weak self] date, today in
       guard let self else { return }
       let before = selection.map(self.scheduleSnapshot)
       var deferredTo: Date?
@@ -2587,11 +2921,11 @@ final class SeptaskKitTaskListController: NSViewController {
       title: String(localized: "Reschedule Repeating Task?",
                     comment: "SeptaskKit: fixed recurrence move"),
       message: String(localized:
-        "Make Exception moves only this copy. Update Rule moves the repeating schedule to the new date.",
+        "Move only this task, or update the repeating schedule to the new date?",
         comment: "SeptaskKit: fixed recurrence move"),
-      options: [String(localized: "Make Exception",
+      options: [String(localized: "Only This Task",
                        comment: "SeptaskKit: fixed recurrence move"),
-                String(localized: "Update Rule",
+                String(localized: "Update Schedule",
                        comment: "SeptaskKit: fixed recurrence move")])
     switch chosen {
     case 0: return .makeException
@@ -2601,7 +2935,7 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   /// ⌘⇧. — drop both the schedule and the Today pin, leaving the task in
-  /// Anytime. Matches `TaskRowShortcuts.clearSchedule`.
+  /// Anytime. Matches the registry shortcut of `task.clearSchedule`.
   func clearScheduleSelection() {
     let before = actionableSelection.map(scheduleSnapshot)
     for task in actionableSelection {
@@ -2635,6 +2969,48 @@ final class SeptaskKitTaskListController: NSViewController {
     recordScheduleUndo(name: String(localized: "Toggle Today",
                                     comment: "SeptaskKit: undo action"),
                        before: before)
+  }
+
+  /// ⌥⌘S — star or unstar the current selection (if all are starred, unstar
+  /// all; otherwise star all). Recorded on the shared `TaskUndo` stack.
+  func toggleStarSelection() {
+    commitComposerTextIfOpen()
+    let selection = actionableSelection
+    guard !selection.isEmpty else { NSSound.beep(); return }
+    let nextStarred = !selection.allSatisfy(\.starred)
+    let before = selection.map(scheduleSnapshot)
+    for task in selection {
+      mutator.setStarred(id: task.id, starred: nextStarred)
+      refreshComposerRow(taskId: task.id)
+    }
+    reload()
+    recordScheduleUndo(
+      name: nextStarred
+        ? String(localized: "Star", comment: "SeptaskKit: undo action")
+        : String(localized: "Remove Star", comment: "SeptaskKit: undo action"),
+      before: before
+    )
+    onStoreChanged?()
+  }
+
+  /// ⇧⌘C — reveal the checklist on the selected/composing task, insert a step,
+  /// and move focus into it (docs/CHECKLISTS_SPEC.md §4).
+  func addChecklistItemToSelection() {
+    if let composingTaskId,
+       let row = rows.firstIndex(where: { $0.task?.id == composingTaskId }),
+       let composer = tableView.view(atColumn: 0, row: row, makeIfNecessary: false) as? KitComposerCell {
+      composer.addChecklistItemAndFocus()
+      return
+    }
+    guard let task = actionableSelection.first else { NSSound.beep(); return }
+    beginComposing(id: task.id)
+    DispatchQueue.main.async { [weak self] in
+      guard let self,
+            let row = self.rows.firstIndex(where: { $0.task?.id == task.id }),
+            let composer = self.tableView.view(atColumn: 0, row: row, makeIfNecessary: false) as? KitComposerCell
+      else { return }
+      composer.addChecklistItemAndFocus()
+    }
   }
 
   func deleteSelection() {
@@ -2816,6 +3192,9 @@ final class SeptaskKitTaskListController: NSViewController {
                               scheduled: context.scheduled, today: context.today,
                               deferPush: true,
                               atBottom: landsInInboxRun)
+    if filter == .starred {
+      mutator.setStarred(id: task.id, starred: true)
+    }
     pendingNewTaskId = task.id
     if let anchor { place(newTaskId: task.id, below: anchor, context: context) }
     // Not gated by the settle window any more (it pins its rows instead of
@@ -2825,17 +3204,11 @@ final class SeptaskKitTaskListController: NSViewController {
     guard let row = rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
     tableView.selectRowIndexes([row], byExtendingSelection: false)
     tableView.scrollRowToVisible(row)
-    if inInbox {
-      // The foot-of-Inbox line is a deliberately light capture affordance —
-      // click, type, done. A pill rail there would be heavier than the
-      // gesture that opened it.
-      beginEditingRow(row)
-    } else {
-      // ⌘N opens the full composer, so a new task can be given its When /
-      // Deadline / List / Repeat without a second gesture. The bare field
-      // editor is still one keystroke away as ⌘R.
-      beginComposing(id: task.id)
-    }
+    // Every new task opens the full composer, the "New task" line included
+    // (#205), so it can be given its When / Deadline / List / Repeat without a
+    // second gesture, the same as SwiftUI's inline create. The bare field
+    // editor is still one keystroke away as ⌘R.
+    beginComposing(id: task.id)
   }
 
   /// Move a just-created task to sit directly below `anchor`, when it landed
@@ -2895,7 +3268,7 @@ final class SeptaskKitTaskListController: NSViewController {
         area = focused.area
         project = focused.project
       }
-    case .unscheduled:
+    case .unscheduled, .starred:
       if let focused = focusedTaskForCreate() {
         area = focused.area
         project = focused.project
@@ -2955,7 +3328,7 @@ final class SeptaskKitTaskListController: NSViewController {
     guard let row = rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
     tableView.selectRowIndexes([row], byExtendingSelection: false)
     tableView.scrollRowToVisible(row)
-    beginEditingRow(row)
+    beginComposing(id: task.id)
   }
 
   /// The task that should seed ⌘N's area/project — the table's focused row,
@@ -3373,7 +3746,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// value and would otherwise keep acting on a stale pre-edit snapshot.
   private func refreshComposerRow(taskId: String) {
     guard composingTaskId == taskId,
-          let fresh = LocalCache.allTasks(in: context).first(where: { $0.id == taskId }),
+          let fresh = LocalCache.liveTasks(ids: [taskId], in: context).first,
           let row = rows.firstIndex(where: { $0.task?.id == taskId }),
           let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false)
             as? KitComposerCell
@@ -3514,9 +3887,30 @@ final class SeptaskKitTaskListController: NSViewController {
         self.toggleTodaySelection()
 
       case .when(let anchor):
-        SeptaskKitDatePopover.present(kind: .when,
-                                      initial: KitDayFormat.date(fromWire: task.scheduled),
-                                      relativeTo: anchor.bounds, of: anchor) { [weak self] date, today in
+        let liveTask = LocalCache.task(id: task.id, in: self.context) ?? task
+        SeptaskKitDatePopover.present(
+          kind: .when,
+          initial: KitDayFormat.date(fromWire: liveTask.scheduled),
+          initialStartTime: liveTask.startTime,
+          initialDurationMinutes: liveTask.durationMinutes,
+          relativeTo: anchor.bounds,
+          of: anchor,
+          onTimeSlotChange: { [weak self] start, duration in
+            guard let self else { return }
+            let current = LocalCache.task(id: task.id, in: self.context) ?? task
+            let before = [current].map(self.scheduleSnapshot)
+            self.mutator.setTimeSlot(id: task.id, startTime: start, durationMinutes: duration)
+            if start != nil, !current.today, current.scheduled == nil {
+              self.mutator.moveToToday(id: task.id)
+            }
+            self.refreshComposerRow(taskId: task.id)
+            self.reload()
+            self.recordScheduleUndo(
+              name: String(localized: "Change Time", comment: "SeptaskKit: undo action"),
+              before: before)
+            self.onStoreChanged?()
+          }
+        ) { [weak self] date, today in
           guard let self else { return }
           // Capture at the gesture (from the STORE: an earlier pill may have
           // moved the captured `task` on), record after: the same undo step
@@ -3552,6 +3946,17 @@ final class SeptaskKitTaskListController: NSViewController {
             before: before)
         }
 
+      case .reminder(let anchor):
+        self.presentReminderPopover(anchor: .rect(anchor.bounds, anchor))
+        self.refreshComposerRow(taskId: task.id)
+
+      case .toggleStar:
+        self.toggleStarSelection()
+
+      case .tags(let anchor):
+        self.presentTagPopover(anchor: .rect(anchor.bounds, anchor))
+        self.refreshComposerRow(taskId: task.id)
+
       case .list(let anchor):
         // Reuses the exact destination list ⌘M / ⌘⇧M pops up — one picker, not a
         // second to keep in sync — anchored to the pill the user clicked. It
@@ -3567,117 +3972,199 @@ final class SeptaskKitTaskListController: NSViewController {
     }
   }
 
-  // MARK: - Context menu (same commands + equivalents as the Task menu)
+  // MARK: - Context menus (registry `task.row`, `task.recentlyDeleted`, `task.faded`)
 
-  /// Same commands, same order, same bindings as the menu bar's Task menu and
-  /// as `TaskRowCommands` in the SwiftUI shell — one vocabulary everywhere.
-  /// Terminal outcomes (complete / cancel / delete) share one submenu so the
-  /// three stay next to each other instead of Delete living alone at the bottom.
+  /// The row menu, rendered from the registry menu `task.row` — the same
+  /// tree the SwiftUI shell's `TaskListRowContextMenu` renders, so items,
+  /// order, titles and key equivalents match in both shells. Built fresh on
+  /// every click, so titles and visibility follow the current selection.
   private func buildContextMenu() -> NSMenu {
-    let menu = NSMenu()
-    menu.delegate = self
-    menu.addItem(item(String(localized: "Rename", comment: "SeptaskKit: context menu"),
-                      #selector(menuRename), "r", [.command]))
-    infoMenuItem.action = #selector(menuInspector)
-    infoMenuItem.target = self
-    infoMenuItem.keyEquivalent = "i"
-    infoMenuItem.keyEquivalentModifierMask = [.command, .option]
-    menu.addItem(infoMenuItem)
-    // No Copy item: ⌘C and Edit ▸ Copy copy the selection's titles. The row
-    // menu keeps to actions on the task itself (same as the SwiftUI menu).
-    menu.addItem(item(String(localized: "Duplicate", comment: "SeptaskKit: context menu"),
-                      #selector(menuDuplicate), "d", [.command]))
-    menu.addItem(.separator())
-
-    let completeItem = NSMenuItem(
-      title: String(localized: "Complete", comment: "SeptaskKit: context menu"),
-      action: nil, keyEquivalent: "")
-    let completeMenu = NSMenu()
-    completeMenu.addItem(item(String(localized: "Mark as Complete", comment: "SeptaskKit: context menu"),
-                              #selector(menuToggleComplete), "k", [.command]))
-    completeMenu.addItem(item(String(localized: "Cancel Task", comment: "SeptaskKit: context menu"),
-                              #selector(menuCancel), "", []))
-    completeMenu.addItem(.separator())
-    completeMenu.addItem(item(String(localized: "Delete", comment: "SeptaskKit: context menu"),
-                              #selector(menuDelete), "\u{8}", [.command]))
-    completeItem.submenu = completeMenu
-    menu.addItem(completeItem)
-
-    // Titles and visibility are set in `menuNeedsUpdate` — "Toggle Today" is
-    // never shown as a bare toggle; on the Today list the item is hidden
-    // entirely (Clear Schedule is the exit).
-    todayMenuItem.action = #selector(menuToggleToday)
-    todayMenuItem.target = self
-    todayMenuItem.keyEquivalent = "t"
-    todayMenuItem.keyEquivalentModifierMask = [.command]
-    menu.addItem(todayMenuItem)
-
-    // When and Deadline share one submenu, as in the SwiftUI menu. They open
-    // separate popovers (one date each), so a submenu is the native way to
-    // offer both from one entry. The key equivalents stay on the items.
-    let scheduleItem = NSMenuItem(
-      title: String(localized: "Schedule", comment: "SeptaskKit: context menu"),
-      action: nil, keyEquivalent: "")
-    scheduleItem.image = NSImage(systemSymbolName: "calendar", accessibilityDescription: nil)
-    let scheduleMenu = NSMenu()
-    scheduleMenu.addItem(item(String(localized: "When…", comment: "SeptaskKit: context menu"),
-                              #selector(menuWhen), "s", [.command]))
-    scheduleMenu.addItem(item(String(localized: "Deadline…", comment: "SeptaskKit: context menu"),
-                              #selector(menuDeadline), "d", [.command, .shift]))
-    scheduleItem.submenu = scheduleMenu
-    menu.addItem(scheduleItem)
-
-    clearScheduleMenuItem.title = String(localized: "Clear Schedule",
-                                         comment: "SeptaskKit: context menu")
-    clearScheduleMenuItem.action = #selector(menuClearSchedule)
-    clearScheduleMenuItem.target = self
-    clearScheduleMenuItem.keyEquivalent = "."
-    clearScheduleMenuItem.keyEquivalentModifierMask = [.command, .shift]
-    menu.addItem(clearScheduleMenuItem)
-
-    // Move remains a bounded destination submenu. Repeat is a full editor,
-    // however, so it opens a panel rather than forcing the rule through a
-    // preset submenu.
-    moveMenuItem.title = String(localized: "Move to", comment: "SeptaskKit: context menu")
-    moveMenuItem.keyEquivalent = "m"
-    moveMenuItem.keyEquivalentModifierMask = [.command, .shift]
-    menu.addItem(moveMenuItem)
-
-    menu.addItem(item(String(localized: "Repeat…", comment: "SeptaskKit: context menu"),
-                      #selector(menuRepeat), "", []))
-    pauseRepeatMenuItem.action = #selector(menuPauseResumeRepeat)
-    pauseRepeatMenuItem.target = self
-    pauseRepeatMenuItem.title = String(localized: "Pause Repeat", comment: "SeptaskKit: recurrence")
-    menu.addItem(pauseRepeatMenuItem)
-    menu.addItem(item(String(localized: "Create Next Copy", comment: "SeptaskKit: recurrence"),
-                      #selector(menuCreateNextCopy), "", []))
-    return menu
+    let selection = actionableSelection
+    let single = selection.count == 1 ? selection.first : nil
+    let plural: RegistryTitleVariant = selection.count > 1 ? .plural : .base
+    return KitRegistryMenu.build(RegistryActions.menu("task.row"), bind: { [weak self] id in
+      guard let self else { return nil }
+      switch id {
+      case "task.editDetails": return .init { self.beginEditSelectedRow() }
+      case "task.toggleInfo":
+        let visible = UserDefaults.standard.bool(forKey: SettingsKey.septaskInspectorVisible)
+        return .init(variant: visible ? .active : .base) { self.onToggleInspector?() }
+      case "task.duplicate": return .init(variant: plural) { self.duplicateSelection() }
+      case "task.toggleComplete": return .init { self.toggleCompleteSelection() }
+      case "task.cancel": return .init(variant: plural) { self.cancelSelection() }
+      case "task.delete": return .init(variant: plural) { self.deleteSelection() }
+      case "task.toggleToday":
+        // On Today every row is already "on Today", so a Today action just
+        // competes with Clear Schedule. Hide it; ⌘T still works via the key
+        // binding on the table.
+        guard self.filter != .today, !selection.isEmpty else { return nil }
+        let remove = selection.allSatisfy(\.isOnToday)
+        return .init(variant: remove ? .remove : .add) { self.toggleTodaySelection() }
+      case "task.toggleStar":
+        guard !selection.isEmpty else { return nil }
+        let allStarred = selection.allSatisfy(\.starred)
+        return .init(variant: allStarred ? .remove : .add) { self.toggleStarSelection() }
+      case "task.tags": return .init { self.presentTagPopover() }
+      case "task.when": return .init { self.presentDatePopover(kind: .when) }
+      case "task.deadline": return .init { self.presentDatePopover(kind: .deadline) }
+      case "task.reminder":
+        guard single != nil else { return nil }
+        return .init { self.presentReminderPopover() }
+      case "task.clearSchedule":
+        guard selection.contains(where: { $0.isOnToday || $0.scheduled != nil || $0.deadline != nil })
+        else { return nil }
+        return .init { self.clearScheduleSelection() }
+      case "task.move": return .init { self.presentMoveMenu() }
+      case "task.repeat":
+        guard single != nil else { return nil }
+        return .init { self.presentRecurrencePanel() }
+      case "task.pauseResumeRepeat":
+        guard !selection.isEmpty, selection.allSatisfy({ $0.recurrence != nil }) else { return nil }
+        let paused = selection.allSatisfy(\.recurrencePaused)
+        return .init(variant: paused ? .active : .base) { self.setRecurrencePaused(!paused) }
+      case "task.createNextCopy":
+        guard let single, single.recurrence != nil else { return nil }
+        return .init { self.createNextCopySelection() }
+      default:
+        return nil
+      }
+    }, slot: { [weak self] id in
+      guard let self else { return [] }
+      switch id {
+      case "moveDestinations": return self.moveDestinationNodes(selection: selection)
+      case "sectionDestinations": return self.sectionDestinationNodes(selection: selection)
+      default: return []
+      }
+    })
   }
 
-  /// The trash's own vocabulary — nothing else on the normal menu (rename,
-  /// complete, dates…) means anything for an already-deleted row.
+  /// The trash's own vocabulary (registry `task.recentlyDeleted`) — nothing
+  /// else on the normal menu means anything for an already-deleted row.
   private func buildRecentlyDeletedMenu() -> NSMenu {
-    let menu = NSMenu()
-    menu.addItem(item(String(localized: "Restore", comment: "SeptaskKit: context menu"),
-                      #selector(menuRestore), "", []))
-    menu.addItem(.separator())
-    menu.addItem(item(String(localized: "Delete Permanently", comment: "SeptaskKit: context menu"),
-                      #selector(menuDelete), "\u{8}", [.command]))
-    return menu
+    KitRegistryMenu.build(RegistryActions.menu("task.recentlyDeleted")) { [weak self] id in
+      guard let self else { return nil }
+      switch id {
+      case "task.restore": return .init { self.restoreTasks(self.actionableSelection.map(\.id)) }
+      case "task.deletePermanently": return .init { self.deleteSelection() }
+      default: return nil
+      }
+    }
   }
 
-  @objc private func menuRestore() { restoreTasks(actionableSelection.map(\.id)) }
-
+  /// The Faded pile's menu (registry `task.faded`).
   private func buildFadedMenu() -> NSMenu {
-    let menu = NSMenu()
-    menu.addItem(item(String(localized: "Keep", comment: "SeptaskKit: faded context menu"),
-                      #selector(menuKeepFaded), "", []))
-    menu.addItem(item(String(localized: "Let Go", comment: "SeptaskKit: faded context menu"),
-                      #selector(menuDropFaded), "", []))
-    menu.addItem(.separator())
-    menu.addItem(item(String(localized: "Delete", comment: "SeptaskKit: context menu"),
-                      #selector(menuDelete), "\u{8}", [.command]))
-    return menu
+    let plural: RegistryTitleVariant = actionableSelection.count > 1 ? .plural : .base
+    return KitRegistryMenu.build(RegistryActions.menu("task.faded")) { [weak self] id in
+      guard let self else { return nil }
+      switch id {
+      case "task.keepFaded": return .init { self.menuKeepFaded() }
+      case "task.letGoFaded": return .init { self.menuDropFaded() }
+      case "task.delete": return .init(variant: plural) { self.deleteSelection() }
+      default: return nil
+      }
+    }
+  }
+
+  /// The Move submenu's destinations — the same set the SwiftUI menu shows:
+  /// the filing suggestion first, then Inbox (unless every row is already in
+  /// it), every area and every top-level project.
+  private func moveDestinationNodes(selection: [SeptenaTask]) -> [RegistryMenuNode] {
+    let snapshot = StructureCache.snapshot(in: context)
+    var nodes: [RegistryMenuNode] = []
+    if let suggested = suggestedMoveNode(selection: selection, projects: snapshot.projects) {
+      nodes.append(suggested)
+      nodes.append(.divider(id: "suggested.divider"))
+    }
+    if !selection.allSatisfy(\.isInTriageBand) {
+      nodes.append(RegistryMenuEntry.slot(
+        id: "inbox", title: String(localized: "Inbox", comment: "SeptaskKit: move destination"),
+        sfSymbol: RegistryIcons.sfSymbol(for: "list.inbox")) { [weak self] in
+          self?.move(to: .none)
+        })
+    }
+    let topLevel = snapshot.projects.filter { $0.area == nil && $0.status == .active }
+    if !snapshot.areas.isEmpty || !topLevel.isEmpty {
+      nodes.append(.divider(id: "destinations.divider"))
+      for area in snapshot.areas {
+        let title = (area.emoji?.isEmpty == false) ? "\(area.emoji ?? "")  \(area.title)" : area.title
+        nodes.append(RegistryMenuEntry.slot(id: "area.\(area.id)", title: title) { [weak self] in
+          self?.move(to: .area(area.id))
+        })
+      }
+      for project in topLevel {
+        nodes.append(RegistryMenuEntry.slot(
+          id: "project.\(project.id)", title: project.title,
+          sfSymbol: RegistryIcons.sfSymbol(for: "place.project")) { [weak self] in
+            self?.move(to: .project(project.id))
+          })
+      }
+    }
+    return nodes
+  }
+
+  /// "Suggested: <List>" — the same pick the row's "→ Suggested" capsule
+  /// shows, so the menu and the capsule never name different lists. Single
+  /// selection only: a pick is ranked for one title.
+  private func suggestedMoveNode(selection: [SeptenaTask], projects: [Project]) -> RegistryMenuNode? {
+    guard selection.count == 1, let task = selection.first else { return nil }
+    // The capsule's snapshot first (Inbox); else the same GATE live
+    // (`TaskFilingSuggestions.top`) so Area pages still offer a suggested
+    // child project inside the Move submenu even without a row capsule.
+    guard let suggestion = filingSuggestions[task.id]
+      ?? TaskFilingSuggestions.top(
+        for: task, filter: filter, engine: SuggestionEngine.shared,
+        childProjectIds: Self.childProjectIds(in: projects))
+    else { return nil }
+    return RegistryMenuEntry.slot(
+      id: "suggested",
+      title: String(localized: "Suggested: \(suggestion.title)",
+                    comment: "SeptaskKit: Move submenu, the filing suggestion"),
+      sfSymbol: suggestion.kind == .project ? "number" : "folder") { [weak self] in
+        self?.applyFilingSuggestion(taskID: task.id, suggestion: suggestion)
+      }
+  }
+
+  /// Area → its active child projects, the shape `TaskFilingSuggestions` asks
+  /// for. One builder, so the capsule and the menu rank an area-direct row
+  /// against the same set of destinations.
+  private static func childProjectIds(in projects: [Project]) -> (String) -> Set<String> {
+    { areaId in
+      Set(projects.filter { $0.area == areaId && $0.status == .active }.map(\.id))
+    }
+  }
+
+  /// Move to Section ▸ — No Section, then every heading of the project page.
+  private func sectionDestinationNodes(selection: [SeptenaTask]) -> [RegistryMenuNode] {
+    guard case .project = filter, !selection.isEmpty else { return [] }
+    let headings = rows.compactMap(\.task).filter(\.isHeading)
+    guard !headings.isEmpty else { return [] }
+    let ids = selection.map(\.id)
+    var nodes: [RegistryMenuNode] = [
+      RegistryMenuEntry.slot(id: "section.none", title: String(localized: "No Section")) { [weak self] in
+        self?.fileIntoHeading(ids, heading: nil)
+      },
+      .divider(id: "sections.divider"),
+    ]
+    for heading in headings {
+      nodes.append(RegistryMenuEntry.slot(id: "section.\(heading.id)", title: heading.title) { [weak self] in
+        self?.fileIntoHeading(ids, heading: heading.id)
+      })
+    }
+    return nodes
+  }
+
+  /// File `ids` under `heading` (nil = the un-headed block) at the foot of
+  /// that group — the same rule as the SwiftUI project page.
+  private func fileIntoHeading(_ ids: [String], heading: String?) {
+    let members = rows.compactMap(\.task)
+      .filter { !$0.isHeading && $0.heading == heading && !ids.contains($0.id) }
+    let slots = TaskOrder.positions(count: ids.count,
+                                    above: members.last?.orderKey(in: orderLane), below: nil)
+    for (id, position) in zip(ids, slots) {
+      mutator.setHeading(id: id, heading: heading)
+      mutator.reorder(id: id, toPosition: position, in: orderLane)
+    }
+    reload()
   }
 
   @objc private func menuKeepFaded() {
@@ -3732,12 +4219,13 @@ final class SeptaskKitTaskListController: NSViewController {
   // shape as SwiftUI's `handleGroupedTaskDrop`/`handleHeadingDrop`.
 
   /// Right-click on blank list space, project pages only — where "New
-  /// Section" lives when there's no heading row to right-click yet.
+  /// Section" lives when there's no heading row to right-click yet
+  /// (registry `project.blankSpace`).
   private func buildBlankSpaceMenu() -> NSMenu {
-    let menu = NSMenu()
-    menu.addItem(item(String(localized: "New Section", comment: "SeptaskKit: heading CRUD"),
-                      #selector(menuNewSection), "", []))
-    return menu
+    KitRegistryMenu.build(RegistryActions.menu("project.blankSpace")) { [weak self] id in
+      guard let self, id == "section.new", case .project = self.filter else { return nil }
+      return .init { self.menuNewSection() }
+    }
   }
 
   /// The page title's own navigation dropdown — the AppKit counterpart of
@@ -3799,10 +4287,14 @@ final class SeptaskKitTaskListController: NSViewController {
       for project in areaProjects { menu.addItem(projectItem(project)) }
     }
 
+    let hasStarred = !LocalCache.tasks(in: context, filter: .starred).isEmpty
     let hasFaded = !LocalCache.tasks(in: context, filter: .faded).isEmpty
     let hasDeleted = !LocalCache.tasks(in: context, filter: .recentlyDeleted).isEmpty
-    if hasFaded || hasDeleted {
+    if hasStarred || hasFaded || hasDeleted {
       menu.addItem(.separator())
+      if hasStarred {
+        menu.addItem(destItem(.filter(.starred, title: TaskFilter.starred.title)))
+      }
       if hasFaded {
         menu.addItem(destItem(.filter(.faded, title: TaskFilter.faded.title)))
       }
@@ -3822,51 +4314,69 @@ final class SeptaskKitTaskListController: NSViewController {
     onNavigate?(destination)
   }
 
-  /// Right-click on a heading row: rename (same field-editor path as any
-  /// task) and delete — nothing else on the normal task menu applies to a
-  /// section divider.
+  /// Right-click on a heading row (registry `project.heading`): rename (same
+  /// field-editor path as any task), a new task in the section, and delete —
+  /// nothing else on the normal task menu applies to a section divider.
   private func buildHeadingContextMenu() -> NSMenu {
-    let menu = NSMenu()
-    menu.addItem(item(String(localized: "Rename", comment: "SeptaskKit: context menu"),
-                      #selector(menuRename), "r", [.command]))
-    menu.addItem(.separator())
-    menu.addItem(item(String(localized: "Delete Section", comment: "SeptaskKit: heading CRUD"),
-                      #selector(menuDeleteHeading), "", []))
-    return menu
+    KitRegistryMenu.build(RegistryActions.menu("project.heading")) { [weak self] id in
+      guard let self else { return nil }
+      switch id {
+      case "section.rename": return .init { self.beginEditSelectedRow() }
+      case "section.newTask": return .init { self.createTaskUnderSelectedHeading() }
+      case "section.delete": return .init { self.menuDeleteHeading() }
+      default: return nil
+      }
+    }
   }
 
-  /// Right-click on a Get started step: the same three things the keyboard
-  /// does (Return, ⌘K) plus hiding the checklist. Nothing from the task menu
-  /// applies to a step.
+  /// Right-click on a Get started step (registry `notice.getStartedStep`):
+  /// the same things the keyboard does (Return, ⌘K) plus hiding the
+  /// checklist. Nothing from the task menu applies to a step.
   private func buildNoticeStepMenu() -> NSMenu {
-    let menu = NSMenu()
-    menu.addItem(item(String(localized: "Open", comment: "SeptaskKit: Get started step menu"),
-                      #selector(menuOpenNoticeStep), "", []))
     let steps = selectedNoticeSteps
-    let toggleTitle = !steps.isEmpty && steps.allSatisfy(\.done)
-      ? String(localized: "Mark as Not Done", comment: "SeptaskKit: Get started step menu")
-      : String(localized: "Mark as Done", comment: "SeptaskKit: Get started step menu")
-    menu.addItem(item(toggleTitle, #selector(menuToggleNoticeStep), "k", [.command]))
-    menu.addItem(.separator())
-    menu.addItem(item(String(localized: "Hide Get Started", comment: "SeptaskKit: Get started step menu"),
-                      #selector(menuHideGetStarted), "", []))
-    return menu
+    let allDone = !steps.isEmpty && steps.allSatisfy(\.done)
+    return KitRegistryMenu.build(RegistryActions.menu("notice.getStartedStep")) { [weak self] id in
+      guard let self else { return nil }
+      switch id {
+      case "notice.openStep":
+        return .init(perform: steps.isEmpty ? nil : { self.menuOpenNoticeStep() })
+      case "notice.toggleStep":
+        return .init(variant: allDone ? .active : .base,
+                     perform: steps.isEmpty ? nil : { self.toggleSelectedNoticeSteps() })
+      case "notice.hideGetStarted": return .init { self.dismissNotice(.getStarted) }
+      default: return nil
+      }
+    }
   }
 
-  @objc private func menuOpenNoticeStep() {
+  /// New Task in Section: a titleless row filed under the selected heading,
+  /// open for typing — the same as the SwiftUI page's heading menu.
+  private func createTaskUnderSelectedHeading() {
+    let row = tableView.selectedRow
+    guard rows.indices.contains(row), let heading = rows[row].task, heading.isHeading,
+          case .project(let projectId) = filter else { return }
+    commitOpenEdits()
+    let task = mutator.create(title: "", area: nil, project: projectId,
+                              scheduled: nil, today: false, deferPush: true, atBottom: true)
+    mutator.setHeading(id: task.id, heading: heading.id)
+    pendingNewTaskId = task.id
+    reload(animated: false)
+    guard let newRow = rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
+    tableView.selectRowIndexes([newRow], byExtendingSelection: false)
+    tableView.scrollRowToVisible(newRow)
+    beginEditingRow(newRow)
+  }
+
+  private func menuOpenNoticeStep() {
     guard let step = selectedNoticeSteps.first else { return }
     openNoticeStep(step.id)
   }
-
-  @objc private func menuToggleNoticeStep() { toggleSelectedNoticeSteps() }
-
-  @objc private func menuHideGetStarted() { dismissNotice(.getStarted) }
 
   /// New Section lands as a named row and opens for editing, the way ⌘N lands
   /// a new task and the way Finder lands a new folder. It used to stop the app
   /// with a modal text prompt while the row it was about to create sat right
   /// there, editable.
-  @objc private func menuNewSection() {
+  private func menuNewSection() {
     guard case .project(let projectId) = filter else { return }
     let heading = mutator.createHeading(
       title: String(localized: "New Section", comment: "SeptaskKit: heading CRUD"),
@@ -3879,7 +4389,7 @@ final class SeptaskKitTaskListController: NSViewController {
     beginEditingRow(row)
   }
 
-  @objc private func menuDeleteHeading() {
+  private func menuDeleteHeading() {
     let row = tableView.selectedRow
     guard row >= 0, let heading = rows[row].task, heading.isHeading else { return }
     // Exact copy from TaskListView's confirmationDialog — same story either shell.
@@ -3896,184 +4406,20 @@ final class SeptaskKitTaskListController: NSViewController {
       self.reload()
     }
   }
-
-  private func item(_ title: String, _ action: Selector, _ key: String,
-                    _ modifiers: NSEvent.ModifierFlags) -> NSMenuItem {
-    let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
-    item.keyEquivalentModifierMask = modifiers
-    item.target = self
-    return item
-  }
-
-  @objc private func menuToggleComplete() { toggleCompleteSelection() }
-  @objc private func menuCancel() { cancelSelection() }
-  @objc private func menuToggleToday() { toggleTodaySelection() }
-  @objc private func menuRename() { beginEditSelectedRow() }
-  @objc private func menuInspector() { onToggleInspector?() }
-  @objc private func menuDuplicate() { duplicateSelection() }
-
-  @objc private func menuMoveTo(_ sender: NSMenuItem) {
-    let snapshot = StructureCache.snapshot(in: context)
-    guard let destination = KitMoveMenu.destination(for: sender,
-                                                    areas: snapshot.areas,
-                                                    projects: snapshot.projects)
-    else { return }
-    move(to: destination)
-  }
-
-  /// The Move submenu's "Suggested" item. The tag indexes `menuSuggestions`,
-  /// which `menuNeedsUpdate` rebuilt for the row that is still selected.
-  @objc private func menuApplySuggestion(_ sender: NSMenuItem) {
-    let selection = actionableSelection
-    guard selection.count == 1, let task = selection.first,
-          menuSuggestions.indices.contains(sender.tag) else { return }
-    applyFilingSuggestion(taskID: task.id, suggestion: menuSuggestions[sender.tag])
-  }
-
-  @objc private func menuWhen() { presentDatePopover(kind: .when) }
-  @objc private func menuDeadline() { presentDatePopover(kind: .deadline) }
-  @objc private func menuClearSchedule() { clearScheduleSelection() }
-
-  @objc private func menuRepeat() { presentRecurrencePanel() }
-
-  @objc private func menuPauseResumeRepeat() {
-    let selection = actionableSelection.filter { $0.recurrence != nil }
-    guard !selection.isEmpty else { return }
-    setRecurrencePaused(!selection.allSatisfy(\.recurrencePaused))
-  }
-  @objc private func menuCreateNextCopy() { createNextCopySelection() }
-  @objc private func menuDelete() { deleteSelection() }
 }
 
-// MARK: - Context menu validation
+// MARK: - Menu validation
 
 extension SeptaskKitTaskListController: NSMenuItemValidation {
-  /// The row menus are built once and reused, so every item is checked
-  /// against the REAL selection each time it opens — never left enabled for
-  /// a selection that no longer holds a task.
+  /// The page title's navigation dropdown is the one selector-based menu
+  /// left here; the row menus are registry menus whose items carry their own
+  /// enabled state (`KitRegistryMenu`).
   func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
     switch menuItem.action {
-    // Navigation and page-level items don't depend on a selected row.
     case #selector(navMenuSelect(_:)):
-      return true
-    case #selector(menuNewSection):
-      if case .project = filter { return true }
-      return false
-    case #selector(menuRename):
-      let row = tableView.selectedRow
-      return rows.indices.contains(row) && rows[row].task != nil
-    case #selector(menuDeleteHeading):
-      let row = tableView.selectedRow
-      return rows.indices.contains(row) && rows[row].task?.isHeading == true
-    case #selector(menuApplySuggestion(_:)):
-      return actionableSelection.count == 1 && menuSuggestions.indices.contains(menuItem.tag)
-    case #selector(menuPauseResumeRepeat), #selector(menuCreateNextCopy):
-      return actionableSelection.contains { $0.recurrence != nil }
-    case #selector(menuOpenNoticeStep), #selector(menuToggleNoticeStep):
-      return !selectedNoticeSteps.isEmpty
-    case #selector(menuHideGetStarted):
       return true
     default:
       return hasActionableSelection
-    }
-  }
-}
-
-// MARK: - Context menu freshness
-
-extension SeptaskKitTaskListController: NSMenuDelegate {
-  /// Refresh selection-dependent items each time the menu opens — move
-  /// destinations from live structure, and Today / Clear Schedule from the
-  /// current selection (see `refreshPlacementMenuItems`).
-  func menuNeedsUpdate(_ menu: NSMenu) {
-    let snapshot = StructureCache.snapshot(in: context)
-    let moveMenu = KitMoveMenu.build(areas: snapshot.areas,
-                                     projects: snapshot.projects,
-                                     target: self,
-                                     action: #selector(menuMoveTo(_:)))
-    insertSuggestedMoveItem(into: moveMenu, projects: snapshot.projects)
-    moveMenuItem.submenu = moveMenu
-    refreshPlacementMenuItems()
-  }
-
-  /// "Suggested: <List>" as the FIRST item of the Move submenu — the same
-  /// pick the row's "→ Suggested" capsule shows, so the menu and the capsule
-  /// never name different lists. Single selection only: a pick is ranked for
-  /// one title, so a multi-selection has no subject. Mirrors the SwiftUI
-  /// menu's Move submenu (`TaskListRowContextMenu`).
-  private func insertSuggestedMoveItem(into moveMenu: NSMenu, projects: [Project]) {
-    menuSuggestions = []
-    let selection = actionableSelection
-    guard selection.count == 1, let task = selection.first else { return }
-    // The capsule's snapshot first; else the same GATE live
-    // (`TaskFilingSuggestions`), so the two can never disagree.
-    guard let suggestion = filingSuggestions[task.id]
-      ?? TaskFilingSuggestions.top(
-        for: task, filter: filter, engine: SuggestionEngine.shared,
-        childProjectIds: Self.childProjectIds(in: projects))
-    else { return }
-
-    menuSuggestions = [suggestion]
-    let item = NSMenuItem(title: String(localized: "Suggested: \(suggestion.title)",
-                                        comment: "SeptaskKit: Move submenu, the filing suggestion"),
-                          action: #selector(menuApplySuggestion(_:)), keyEquivalent: "")
-    item.target = self
-    item.tag = 0
-    // ⌥⌘M files into this pick, so the item wears the binding: the menu is
-    // where a shortcut with no button of its own gets discovered. The table
-    // handles the key itself; this only advertises it.
-    item.keyEquivalent = "m"
-    item.keyEquivalentModifierMask = [.command, .option]
-    // Same glyph as the capsule.
-    item.image = NSImage(systemSymbolName: "arrow.turn.down.right", accessibilityDescription: nil)
-    moveMenu.insertItem(item, at: 0)
-    moveMenu.insertItem(.separator(), at: 1)
-  }
-
-  /// Area → its active child projects, the shape `TaskFilingSuggestions` asks
-  /// for. One builder, so the capsule and the menu rank an area-direct row
-  /// against the same set of destinations.
-  private static func childProjectIds(in projects: [Project]) -> (String) -> Set<String> {
-    { areaId in
-      Set(projects.filter { $0.area == areaId && $0.status == .active }.map(\.id))
-    }
-  }
-
-  /// Directional Today labels; hide the Today item on the Today list (you're
-  /// already there — Clear Schedule is the exit). Hide Clear Schedule when
-  /// nothing would change.
-  private func refreshPlacementMenuItems() {
-    let selection = actionableSelection
-
-    infoMenuItem.title = UserDefaults.standard.bool(forKey: SettingsKey.septaskInspectorVisible)
-      ? String(localized: "Hide Info", comment: "SeptaskKit: context menu")
-      : String(localized: "Show Info", comment: "SeptaskKit: context menu")
-
-    // On Today: every row is already "on Today", so a Today action just
-    // competes with Clear Schedule. Hide it; ⌘T still works via the key
-    // binding on the table.
-    if filter == .today || selection.isEmpty {
-      todayMenuItem.isHidden = true
-    } else if selection.allSatisfy(\.isOnToday) {
-      todayMenuItem.isHidden = false
-      todayMenuItem.title = String(localized: "Remove from Today",
-                                   comment: "SeptaskKit: context menu")
-    } else {
-      todayMenuItem.isHidden = false
-      todayMenuItem.title = String(localized: "Move to Today",
-                                   comment: "SeptaskKit: context menu")
-    }
-
-    let canClear = selection.contains { $0.isOnToday || $0.scheduled != nil }
-    clearScheduleMenuItem.isHidden = !canClear
-
-    let repeating = !selection.isEmpty && selection.allSatisfy { $0.recurrence != nil }
-    pauseRepeatMenuItem.isHidden = !repeating
-    if repeating {
-      let paused = selection.allSatisfy(\.recurrencePaused)
-      pauseRepeatMenuItem.title = paused
-        ? String(localized: "Resume Repeat", comment: "SeptaskKit: recurrence")
-        : String(localized: "Pause Repeat", comment: "SeptaskKit: recurrence")
     }
   }
 }
@@ -4148,6 +4494,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // The page's own title — noticeably taller than an in-list header, the
     // same visual weight a big navigation title would carry.
     case .screenTitle: return SeptenaTypeScale.size(.title2) + 40
+    case .tagFilterBar: return 34
     case .projectTarget: return SeptaskKitTheme.rowHeight
     case .task(let task, _, _):
       if task.isHeading {
@@ -4165,10 +4512,16 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     case .event: return SeptaskKitTheme.rowHeight
     // Blank band above it as tall as a group title, so the footer reads as
     // its own section, not glued to the last task (mz, 2026-11-20).
-    case .loggedFooter: return KitLoggedFooterCell.topGap + SeptenaTypeScale.size(.footnote) + 24
+    case .fadedFooter, .loggedFooter:
+      return KitLoggedFooterCell.topGap + SeptenaTypeScale.size(.footnote) + 24
     case .newTask: return SeptaskKitTheme.rowHeight
     // Same band as the logged footer — both are quiet meta-font page footers.
     case .addSection: return SeptenaTypeScale.size(.footnote) + 24
+    case .containerNotes(let isArea, _, let text):
+      return KitContainerNotes.height(
+        text: text,
+        placeholder: isArea ? ContainerNotes.areaPlaceholder : ContainerNotes.projectPlaceholder,
+        rowWidth: tableView.bounds.width)
     // Reminder rows read as task rows (they become tasks on click); their
     // header sits on the page like every other group header.
     case .reminder: return SeptaskKitTheme.rowHeight
@@ -4360,7 +4713,22 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
                  proposedRow row: Int,
                  proposedDropOperation operation: NSTableView.DropOperation)
     -> NSDragOperation {
-    guard allowsReorder, !KitDrag.ids(from: info).isEmpty else {
+    if KitDrag.ids(from: info).isEmpty {
+      // External Finder file drop onto a task row (`docs/ATTACHMENTS_MAC_PARITY_SPEC.md` §3).
+      if rows.indices.contains(row),
+         let targetTask = rows[row].task, !targetTask.isHeading,
+         let urls = info.draggingPasteboard.readObjects(
+           forClasses: [NSURL.self],
+           options: [.urlReadingFileURLsOnly: true]
+         ) as? [URL], !urls.isEmpty {
+        dropAboveRow = nil
+        tableView.setDropRow(row, dropOperation: .on)
+        return .copy
+      }
+      dropAboveRow = nil
+      return []
+    }
+    guard allowsReorder else {
       dropAboveRow = nil
       return []
     }
@@ -4389,7 +4757,21 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // Every exit (a refused drop included) lets a held sync reload through.
     defer { flushHeldReload() }
     let ids = KitDrag.ids(from: info)
-    guard !ids.isEmpty else { return false }
+    if ids.isEmpty {
+      guard rows.indices.contains(row),
+            let targetTask = rows[row].task, !targetTask.isHeading,
+            let urls = info.draggingPasteboard.readObjects(
+              forClasses: [NSURL.self],
+              options: [.urlReadingFileURLsOnly: true]
+            ) as? [URL], !urls.isEmpty else { return false }
+      let added = KitAttachmentPasteHelper.attachFiles(urls, to: targetTask.id, presentErrorIn: view.window)
+      if added > 0 {
+        refreshComposerRow(taskId: targetTask.id)
+        reload()
+        onStoreChanged?()
+      }
+      return added > 0
+    }
     let insertAt = clampDropRow(row) ?? row
 
     // Project pages: group-aware drop (file under a heading + reorder
@@ -4497,8 +4879,10 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   /// already valid (so validateDrop can avoid a redundant setDropRow).
   private func clampDropRow(_ row: Int) -> Int? {
     guard let footer = rows.firstIndex(where: {
-      if case .loggedFooter = $0 { return true }
-      return false
+      switch $0 {
+      case .fadedFooter, .loggedFooter: return true
+      default: return false
+      }
     }), row > footer else { return nil }
     return footer
   }
@@ -4658,7 +5042,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     let grouped: Bool
     switch filter {
     case .today: grouped = todayGroupsByList
-    case .unscheduled: grouped = true
+    case .unscheduled, .starred: grouped = true
     default: grouped = false
     }
     guard grouped else { return false }
@@ -4720,6 +5104,15 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.onOpenNavMenu = { [weak self] in self?.buildNavMenu() }
       return cell
 
+    case .tagFilterBar(let tags, let active):
+      let identifier = NSUserInterfaceItemIdentifier("tagFilterBarCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitTagFilterBarCell
+        ?? KitTagFilterBarCell(identifier: identifier)
+      cell.configure(tags: tags, activeIDs: Set(active))
+      cell.onToggleTag = { [weak self] id in self?.toggleTagFilter(id) }
+      cell.onClear = { [weak self] in _ = self?.clearTagFilterIfActive() }
+      return cell
+
     case .projectTarget(let id, let title, let progress):
       let identifier = NSUserInterfaceItemIdentifier("projectTargetCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil)
@@ -4731,11 +5124,19 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       }
       return cell
 
+    case .fadedFooter(let count, let expanded):
+      let identifier = NSUserInterfaceItemIdentifier("loggedFooterCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitLoggedFooterCell
+        ?? KitLoggedFooterCell(identifier: identifier)
+      cell.configure(count: count, expanded: expanded, kind: .faded)
+      cell.onTap = { [weak self] in self?.toggleFadedExpanded() }
+      return cell
+
     case .loggedFooter(let count, let expanded):
       let identifier = NSUserInterfaceItemIdentifier("loggedFooterCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitLoggedFooterCell
         ?? KitLoggedFooterCell(identifier: identifier)
-      cell.configure(count: count, expanded: expanded)
+      cell.configure(count: count, expanded: expanded, kind: .logged)
       cell.onTap = { [weak self] in self?.toggleLoggedExpanded() }
       return cell
 
@@ -4751,6 +5152,17 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitAddSectionCell
         ?? KitAddSectionCell(identifier: identifier)
       cell.onTap = { [weak self] in self?.menuNewSection() }
+      return cell
+
+    case .containerNotes(let isArea, let id, let text):
+      let identifier = NSUserInterfaceItemIdentifier("containerNotesCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitContainerNotesCell
+        ?? KitContainerNotesCell(identifier: identifier)
+      cell.configure(text: text,
+                     placeholder: isArea ? ContainerNotes.areaPlaceholder : ContainerNotes.projectPlaceholder)
+      cell.onEdit = { [weak self] anchor in
+        self?.editContainerNotes(isArea: isArea, id: id, text: text, anchor: anchor)
+      }
       return cell
 
     case .importAllReminders(let count, let importing):
@@ -4816,7 +5228,10 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? SeptaskKitTaskCell
         ?? SeptaskKitTaskCell(identifier: identifier)
       cell.configure(with: task, filter: filter, chip: chip,
-                     contextText: taskContextText(for: task))
+                     contextText: taskContextText(for: task),
+                     checklistSummary: checklistCounts[task.id],
+                     attachmentCount: attachmentCounts[task.id] ?? 0,
+                     tags: LocalCache.resolvedTags(for: task, tagsByID: tagsByID))
       cell.configureSuggestion(suggestion) { [weak self] in
         self?.applyFilingSuggestion(taskID: task.id)
       }
@@ -4870,20 +5285,27 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     return nil
   }
 
-  /// Accept a `needs_verify` task from the Review stage: completes it via the
-  /// normal completion path (undo + acknowledge + sync).
+  /// Accept a `needs_verify` task from the Review stage: completes it with
+  /// lossless undo back into Review (`needs_verify` + check note).
   private func acceptReviewTask(id: String) {
     guard let task = LocalCache.task(id: id, in: context), task.status == .open else { return }
-    apply(completing: [task], reopening: [])
+    let previousNote = task.conversation.endStateNote
+    mutator.complete(id: id)
+    mutator.acknowledge(id: id)
+    TaskUndo.recordAcceptReview(id: id, previousNote: previousNote, mutator: mutator)
+    reload()
   }
 
-  /// Send a `needs_verify` task back to Claude with a user turn note.
+  /// Send a `needs_verify` task back to the agent with a user turn note (with undo).
   private func presentSendBackPopover(taskID: String, anchor: NSView) {
     sendBackPopover = KitSendBackPopover.present(
       relativeTo: anchor,
       onSend: { [weak self] note in
         guard let self else { return }
+        let before = self.mutator.conversation(id: taskID) ?? TaskConvo()
         self.mutator.sendBackConvo(id: taskID, note: note)
+        let after = self.mutator.conversation(id: taskID) ?? before
+        TaskUndo.recordSendBack(id: taskID, before: before, after: after, mutator: self.mutator)
         self.reload()
       },
       onClose: { [weak self] in
@@ -4930,10 +5352,20 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let title = NSTextField(labelWithString: "")
   private let notesGlyph = NSImageView()
   private let chip = KitChipView()
+  private let statusChip = KitChipView()
+  private let issueChip = KitChipView()
   private let suggestionChip = KitSuggestionChipView()
   private let scheduleGlyph = NSImageView()
   private let detail = NSTextField(labelWithString: "")
+  private let reminderGlyph = NSImageView()
+  private let reminderLabel = NSTextField(labelWithString: "")
+  private let checklistGlyph = NSImageView()
+  private let checklistLabel = NSTextField(labelWithString: "")
+  private let attachmentGlyph = NSImageView()
+  private let attachmentLabel = NSTextField(labelWithString: "")
+  private let tagStack = NSStackView()
   private let repeatGlyph = NSImageView()
+  private let starGlyph = NSImageView()
   private var taskId = ""
   private var plainTitle = ""
   private var editing = false
@@ -4997,6 +5429,44 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     scheduleGlyph.setContentHuggingPriority(.required, for: .horizontal)
     scheduleGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
 
+    reminderGlyph.translatesAutoresizingMaskIntoConstraints = false
+    reminderGlyph.image = NSImage(systemSymbolName: "bell.fill", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+    reminderGlyph.contentTintColor = SeptaskKitTheme.inkSecondary
+    reminderGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    reminderGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
+    reminderGlyph.kitA11yIgnore()
+    reminderGlyph.isHidden = true
+
+    reminderLabel.font = SeptaskKitTheme.meta
+    reminderLabel.textColor = SeptaskKitTheme.inkSecondary
+    reminderLabel.lineBreakMode = .byClipping
+    reminderLabel.isEditable = false
+    reminderLabel.isSelectable = false
+    reminderLabel.setContentHuggingPriority(.required, for: .horizontal)
+    reminderLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+    reminderLabel.kitA11yIgnore()
+    reminderLabel.isHidden = true
+
+    checklistGlyph.translatesAutoresizingMaskIntoConstraints = false
+    checklistGlyph.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+    checklistGlyph.contentTintColor = SeptaskKitTheme.inkSecondary
+    checklistGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    checklistGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
+    checklistGlyph.kitA11yIgnore()
+    checklistGlyph.isHidden = true
+
+    checklistLabel.font = SeptaskKitTheme.meta
+    checklistLabel.textColor = SeptaskKitTheme.inkSecondary
+    checklistLabel.lineBreakMode = .byClipping
+    checklistLabel.isEditable = false
+    checklistLabel.isSelectable = false
+    checklistLabel.setContentHuggingPriority(.required, for: .horizontal)
+    checklistLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+    checklistLabel.kitA11yIgnore()
+    checklistLabel.isHidden = true
+
     // The repeat marker is the SAME SF Symbol the SwiftUI row uses, in its own
     // glyph view rather than a "↻" concatenated onto the date string — per the
     // DesignSpec, a glyph is a view, never baked into a formatted label.
@@ -5009,6 +5479,40 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     repeatGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
     repeatGlyph.kitA11yIgnore()
 
+    starGlyph.translatesAutoresizingMaskIntoConstraints = false
+    starGlyph.contentTintColor = SeptaskKitTheme.todayAccent
+    starGlyph.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+    starGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    starGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
+    starGlyph.kitA11yIgnore()
+    starGlyph.isHidden = true
+
+    tagStack.orientation = .horizontal
+    tagStack.alignment = .centerY
+    tagStack.spacing = 4
+    tagStack.translatesAutoresizingMaskIntoConstraints = false
+    tagStack.setContentHuggingPriority(.required, for: .horizontal)
+    tagStack.setContentCompressionResistancePriority(.required, for: .horizontal)
+    tagStack.isHidden = true
+
+    attachmentGlyph.translatesAutoresizingMaskIntoConstraints = false
+    attachmentGlyph.image = NSImage(systemSymbolName: "paperclip", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+    attachmentGlyph.contentTintColor = SeptaskKitTheme.inkSecondary
+    attachmentGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    attachmentGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
+    attachmentGlyph.kitA11yIgnore()
+    attachmentGlyph.isHidden = true
+
+    attachmentLabel.translatesAutoresizingMaskIntoConstraints = false
+    attachmentLabel.font = SeptaskKitTheme.meta
+    attachmentLabel.textColor = SeptaskKitTheme.inkSecondary
+    attachmentLabel.setContentHuggingPriority(.required, for: .horizontal)
+    attachmentLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+    attachmentLabel.kitA11yIgnore()
+    attachmentLabel.isHidden = true
+
     // Trailing cluster hugs the row's right edge. Order matches the row language
     // spec: variable meta inboard, micro-glyphs outboard
     // (chip · date · recurrence · notes). A leading spacer absorbs any extra
@@ -5018,8 +5522,10 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     let trailingShove = NSView()
     trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
     trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
-    let trailing = NSStackView(views: [trailingShove, suggestionChip, chip, scheduleGlyph,
-                                      detail, repeatGlyph, notesGlyph])
+    let trailing = NSStackView(views: [trailingShove, suggestionChip, issueChip, chip, statusChip,
+                                      tagStack, attachmentGlyph, attachmentLabel,
+                                      checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
+                                      scheduleGlyph, detail, repeatGlyph, starGlyph, notesGlyph])
     trailing.orientation = .horizontal
     trailing.alignment = .centerY
     trailing.distribution = .fill
@@ -5040,6 +5546,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     shoveCollapsed.isActive = true
     trailing.kitA11yIgnore()
     chip.kitA11yIgnore()
+    statusChip.kitA11yIgnore()
+    issueChip.kitA11yIgnore()
 
     addSubview(checkbox)
     addSubview(title)
@@ -5121,7 +5629,10 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
 
   func configure(with task: SeptenaTask, filter: TaskFilter,
                  chip chipValue: SeptaskKitTaskListController.Chip?,
-                 contextText: String?) {
+                 contextText: String?,
+                 checklistSummary: (done: Int, total: Int)? = nil,
+                 attachmentCount: Int = 0,
+                 tags: [TaskTag] = []) {
     taskId = task.id
     plainTitle = task.title
     editing = false
@@ -5132,7 +5643,18 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       checkbox.kitA11yIgnore()
       notesGlyph.isHidden = true
       chip.isHidden = true
+      statusChip.isHidden = true
+      issueChip.isHidden = true
+      tagStack.isHidden = true
+      attachmentGlyph.isHidden = true
+      attachmentLabel.isHidden = true
+      checklistGlyph.isHidden = true
+      checklistLabel.isHidden = true
+      reminderGlyph.isHidden = true
+      reminderLabel.isHidden = true
       scheduleGlyph.isHidden = true
+      repeatGlyph.isHidden = true
+      starGlyph.isHidden = true
       detail.stringValue = ""
       title.font = SeptaskKitTheme.heading
       title.attributedStringValue = NSAttributedString(
@@ -5163,22 +5685,22 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // `isOnToday`, not the raw `today` field) it shows solid.
     // Recently Deleted rows are out of every list, Today included: no gold
     // Today badge there.
-    checkbox.isToday = task.isOnToday && filter != .today && task.deletedAt == nil
-    // The remaining cue vocabulary, matching `TaskCheckboxModel`: the row
-    // fade for days carried on Today (`TaskFade`), corner dot for unread agent context on a
-    // committed row (proposals are excluded — they already read as dashed),
-    // and the cue ring while an agent row is fresh and unengaged.
-    // Gated on Settings ▸ Tasks ▸ Today ▸ "Show aging on Today", the same
-    // flag the SwiftUI row reads (`TaskCheckboxModel`) — without it the AppKit
-    // Today list kept drawing gold after the user turned aging off.
+    let showFadedInScope = task.isFaded && filter != .faded
+    checkbox.isToday = task.isOnToday && filter != .today && task.deletedAt == nil && !task.isFaded
     // Countdown toward the 14-day fade window in every open list
-    // (`docs/TASK_FADE_SPEC.md` §4). Already-faded tasks return nil from
-    // `fadeFill()` so rows in the Faded pile stay fully readable.
-    checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled || filter == .recentlyDeleted || filter == .faded)
-      ? nil : task.fadeFill()
+    // (`docs/TASK_FADE_SPEC.md` §4). Inside the Faded pile itself rows stay at
+    // full opacity; inside projects and areas faded rows render visibly faded.
+    if showFadedInScope {
+      checkbox.tenureFill = 1.0
+    } else {
+      checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled || filter == .recentlyDeleted || filter == .faded)
+        ? nil : task.fadeFill()
+    }
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
-    for view in [checkbox, title, notesGlyph, chip, suggestionChip, scheduleGlyph, detail, repeatGlyph] as [NSView] {
+    for view in [checkbox, title, notesGlyph, chip, statusChip, issueChip, suggestionChip,
+                 tagStack, attachmentGlyph, attachmentLabel, checklistGlyph, checklistLabel,
+                 reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, starGlyph] as [NSView] {
       view.alphaValue = fade
     }
     checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted
@@ -5217,11 +5739,77 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // list is this in" — so a row never wears both. The suffix wins where it
     // is shown (flat Today): it sits on the title line where the eye already
     // is, and a pill repeating it on the far right is noise, not emphasis.
+    if let issue = task.linkedIssue {
+      issueChip.isHidden = false
+      issueChip.configure(symbol: issue.symbolName, title: issue.shortLabel)
+      issueChip.toolTip = "\(issue.fullLabel) (\(issue.owner)/\(issue.repo))"
+    } else {
+      issueChip.isHidden = true
+      issueChip.toolTip = nil
+    }
     if let chipValue, contextText == nil {
       chip.isHidden = false
       chip.configure(symbol: chipValue.symbol, title: chipValue.title)
     } else {
       chip.isHidden = true
+    }
+
+    if showFadedInScope {
+      statusChip.isHidden = false
+      statusChip.configure(symbol: "circle.dashed",
+                           title: String(localized: "Faded", comment: "Task row trailing pill when task is faded"))
+    } else if !done && task.isOnToday && filter != .today && task.deletedAt == nil && !task.isFaded {
+      statusChip.isHidden = false
+      statusChip.configure(symbol: "sun.max.fill",
+                           title: String(localized: "Today", comment: "Task row trailing pill when task is on Today"))
+    } else {
+      statusChip.isHidden = true
+    }
+
+    if attachmentCount > 0 {
+      attachmentGlyph.isHidden = false
+      if attachmentCount > 1 {
+        attachmentLabel.stringValue = "\(attachmentCount)"
+        attachmentLabel.isHidden = false
+      } else {
+        attachmentLabel.stringValue = ""
+        attachmentLabel.isHidden = true
+      }
+    } else {
+      attachmentGlyph.isHidden = true
+      attachmentLabel.stringValue = ""
+      attachmentLabel.isHidden = true
+    }
+
+    if let summary = checklistSummary, summary.total > 0 {
+      checklistLabel.stringValue = "\(summary.done)/\(summary.total)"
+      checklistGlyph.isHidden = false
+      checklistLabel.isHidden = false
+    } else {
+      checklistLabel.stringValue = ""
+      checklistGlyph.isHidden = true
+      checklistLabel.isHidden = true
+    }
+
+    for v in tagStack.arrangedSubviews {
+      tagStack.removeArrangedSubview(v)
+      v.removeFromSuperview()
+    }
+    if !tags.isEmpty {
+      let shown = Array(tags.prefix(3))
+      let overflow = max(0, tags.count - shown.count)
+      for tag in shown {
+        tagStack.addArrangedSubview(KitTagChipView(name: tag.name, colorToken: tag.color))
+      }
+      if overflow > 0 {
+        let more = NSTextField(labelWithString: "+\(overflow)")
+        more.font = .systemFont(ofSize: SeptenaTypeScale.size(.caption1))
+        more.textColor = SeptaskKitTheme.inkSecondary
+        tagStack.addArrangedSubview(more)
+      }
+      tagStack.isHidden = false
+    } else {
+      tagStack.isHidden = true
     }
 
     configureDetail(with: task, filter: filter, done: done)
@@ -5248,6 +5836,23 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // a weekly task is in on its own day — hit the branch that hides the date
     // and lost its repeat marker entirely.
     repeatGlyph.isHidden = task.recurrence == nil
+    starGlyph.isHidden = !task.starred
+
+    // Quiet trailing bell + time badge only when an open task has an active
+    // reminder (progressive disclosure: zero chrome otherwise).
+    if !done && task.status == .open && task.deletedAt == nil,
+       let badge = task.reminder?.badgeText() {
+      let tint = badge.isPastDue ? SeptaskKitTheme.overdueRed : SeptaskKitTheme.inkSecondary
+      reminderGlyph.contentTintColor = tint
+      reminderLabel.textColor = tint
+      reminderLabel.stringValue = badge.text
+      reminderGlyph.isHidden = false
+      reminderLabel.isHidden = false
+    } else {
+      reminderGlyph.isHidden = true
+      reminderLabel.isHidden = true
+      reminderLabel.stringValue = ""
+    }
 
     if task.status == .done, let completedAt = task.completedAt {
       let day = String(completedAt.prefix(10))
@@ -5293,14 +5898,24 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       let today = KitDayFormat.todayDate() ?? Date()
       let scheduledDay = Calendar.current.startOfDay(for: date)
       let todayDay = Calendar.current.startOfDay(for: today)
-      // Today already communicates its own current-day membership. Match
-      // SwiftUI by hiding past/today When dates there, while future dates and
-      // all scheduled dates on other surfaces remain visible.
-      if filter != .today || scheduledDay > todayDay {
+      // Today already communicates its own current-day membership, and off-Today
+      // surfaces show a trailing Today pill for on-Today tasks. Hide redundant
+      // today/past When dates in both cases while keeping future When dates.
+      let coveredByTodayPill = !done && task.isOnToday && filter != .today && task.deletedAt == nil && !task.isFaded && scheduledDay <= todayDay
+      if !coveredByTodayPill && (filter != .today || scheduledDay > todayDay) {
         configureScheduleGlyph(named: "calendar", color: SeptaskKitTheme.inkSecondary)
-        detail.stringValue = KitDayFormat.taskDate(scheduled)
+        let dateText = KitDayFormat.taskDate(scheduled)
+        detail.stringValue = task.timeSlotLabel.map { "\(dateText) · \($0)" } ?? dateText
+        detail.isHidden = false
+      } else if let slot = task.timeSlotLabel, !done {
+        configureScheduleGlyph(named: "clock", color: SeptaskKitTheme.inkSecondary)
+        detail.stringValue = slot
         detail.isHidden = false
       }
+    } else if let slot = task.timeSlotLabel, !done {
+      configureScheduleGlyph(named: "clock", color: SeptaskKitTheme.inkSecondary)
+      detail.stringValue = slot
+      detail.isHidden = false
     }
   }
 
@@ -5810,12 +6425,32 @@ final class KitLoggedFooterCell: NSTableCellView {
     super.layout()
   }
 
-  func configure(count: Int, expanded: Bool) {
-    let text = expanded
-      ? String(localized: "Hide \(count) logged items",
-               comment: "Project/area footer — collapse completed tasks (plural)")
-      : String(localized: "Show \(count) logged items",
-               comment: "Project/area footer — expand completed tasks (plural)")
+  enum Kind { case logged, faded }
+
+  func configure(count: Int, expanded: Bool, kind: Kind = .logged) {
+    let text: String
+    switch kind {
+    case .logged:
+      text = expanded
+        ? String(localized: "Hide \(count) logged items",
+                 comment: "Project/area footer — collapse completed tasks (plural)")
+        : String(localized: "Show \(count) logged items",
+                 comment: "Project/area footer — expand completed tasks (plural)")
+    case .faded:
+      if expanded {
+        text = count == 1
+          ? String(localized: "Hide 1 faded item",
+                   comment: "Project/area footer — collapse faded tasks (singular)")
+          : String(localized: "Hide \(count) faded items",
+                   comment: "Project/area footer — collapse faded tasks (plural)")
+      } else {
+        text = count == 1
+          ? String(localized: "Show 1 faded item",
+                   comment: "Project/area footer — expand faded tasks (singular)")
+          : String(localized: "Show \(count) faded items",
+                   comment: "Project/area footer — expand faded tasks (plural)")
+      }
+    }
     label.stringValue = text
     kitA11yButton(label: text)
   }
@@ -6183,7 +6818,7 @@ final class KitImportAllRemindersCell: NSTableCellView {
   func configure(count: Int, importing: Bool) {
     let title = importing
       ? String(localized: "Importing…", comment: "SeptaskKit: reminders import in flight")
-      : String(localized: "Import all \(count) from Reminders — removes them there",
+      : String(localized: "Move all \(count) from Reminders (removes originals)",
                comment: "SeptaskKit: bulk import action line")
     label.stringValue = title
     hit.isEnabled = !importing
@@ -6319,9 +6954,7 @@ final class KitReminderCell: NSTableCellView {
     if cal.isDateInTomorrow(date) {
       return String(localized: "Tomorrow", comment: "Relative day label")
     }
-    let f = DateFormatter()
-    f.setLocalizedDateFormatFromTemplate("MMMd")
-    return f.string(from: date)
+    return SeptenaDate.monthDay(date)
   }
 
   /// Reads `SeptenaDate.today` rather than `Date()`, so time travel moves this
@@ -6690,7 +7323,7 @@ enum KitDayFormat {
 
 // MARK: - Table subclass (keyboard)
 
-/// Keyboard seam: the `TaskRowShortcuts` equivalents intercept on the
+/// Keyboard seam: the registry shortcut equivalents intercept on the
 /// responder chain ahead of the menu bar (whose SwiftUI items are disabled in
 /// this window anyway — no focused task-list publisher), Return opens the
 /// rename field editor. Everything else — arrows, type-select, ⇧-extension —
@@ -6734,6 +7367,12 @@ final class SeptaskKitTableView: NSTableView {
   var onMove: (() -> Void)?
   /// ⌥⌘M — file the selection into its suggested list (the row capsule's pick).
   var onFileSuggested: (() -> Void)?
+  var onReminder: (() -> Void)?
+  var onToggleStar: (() -> Void)?
+  var onEditTags: (() -> Void)?
+  var onAddChecklistItem: (() -> Void)?
+  var onClearTagFilter: (() -> Bool)?
+  var onPasteAttachment: (() -> Bool)?
   var onCopy: (() -> Void)?
   var canCopy: (() -> Bool)?
   var onPaste: (() -> Void)?
@@ -6843,7 +7482,8 @@ final class SeptaskKitTableView: NSTableView {
       } else if (commandShift && key == "f") || (commandOption && key == "i") {
         allowed = true            // Quick Find, inspector: window-level, no row write
       } else if (command && ["k", "t", "s", "m"].contains(key))
-                  || (commandShift && ["m", "d"].contains(key)) {
+                  || (commandShift && ["m", "d", "c"].contains(key))
+                  || (commandOption && ["r", "s"].contains(key)) {
         allowed = composer        // act on the composing row (text saved first)
       } else {
         allowed = false
@@ -6870,12 +7510,16 @@ final class SeptaskKitTableView: NSTableView {
       // suggested one commits without a picker, so it must be impossible to
       // hit by accident. Same relationship ⌥⌘K has to ⌘K.
       case "m": onFileSuggested?(); return true
+      // ⌥⌘R — set/edit timed reminder (docs/TIMED_REMINDERS_SPEC.md §5).
+      case "r": onReminder?(); return true
+      // ⌥⌘S — star / unstar selected tasks (docs/STAR_PRIORITY_SPEC.md §3).
+      case "s": onToggleStar?(); return true
       default: return super.performKeyEquivalent(with: event)
       }
     }
 
     // ⌘⇧D / ⌘⇧. — deliberately the shifted forms (bare ⌘. is the system
-    // Cancel equivalent), matching TaskRowShortcuts. ⌘⇧F is Quick Find, the
+    // Cancel equivalent), matching the registry shortcuts. ⌘⇧F is Quick Find, the
     // same binding the SwiftUI window uses.
     if flags == [.command, .shift] {
       switch key {
@@ -6883,6 +7527,10 @@ final class SeptaskKitTableView: NSTableView {
       case ".": onClearSchedule?(); return true
       case "f": onQuickFind?(); return true
       case "m": onMove?(); return true
+      // ⇧⌘C — reveal checklist & insert a step (docs/CHECKLISTS_SPEC.md §4).
+      case "c": onAddChecklistItem?(); return true
+      // ⇧⌘T — open type-to-assign/create Tag popover (docs/TAGS_SPEC.md §4).
+      case "t": onEditTags?(); return true
       default: return super.performKeyEquivalent(with: event)
       }
     }
@@ -6908,8 +7556,9 @@ final class SeptaskKitTableView: NSTableView {
     case "s": onWhen?(); return true
     case "d": onDuplicate?(); return true
     case "m": onMove?(); return true
+    case "v": if onPasteAttachment?() == true { return true }; return super.performKeyEquivalent(with: event)
     case ",": SeptaskKitSettingsWindow.show(); return true
-    case "\u{7f}": onDelete?(); return true   // ⌘⌫, matching TaskRowShortcuts.delete
+    case "\u{7f}": onDelete?(); return true   // ⌘⌫, matching registry task.delete
     default: return super.performKeyEquivalent(with: event)
     }
   }
@@ -6940,6 +7589,7 @@ final class SeptaskKitTableView: NSTableView {
   /// Editing takes priority: while a field editor is live it owns Escape (it
   /// cancels the edit) and this never fires.
   override func cancelOperation(_ sender: Any?) {
+    if onClearTagFilter?() == true { return }
     guard !selectedRowIndexes.isEmpty else { return }
     deselectAll(nil)
   }
@@ -6964,6 +7614,124 @@ final class SeptaskKitTableView: NSTableView {
   override func draggingEnded(_ sender: any NSDraggingInfo) {
     super.draggingEnded(sender)
     onDragEnded?()
+  }
+}
+
+// MARK: - Quiet hairline tag capsule & visual in-list tag filter bar (docs/TAGS_SPEC.md)
+
+@MainActor
+private final class KitTagChipView: NSView {
+  init(name: String, colorToken: String?) {
+    super.init(frame: .zero)
+    translatesAutoresizingMaskIntoConstraints = false
+    wantsLayer = true
+    layer?.cornerRadius = 8
+    layer?.borderWidth = 0.75
+    layer?.borderColor = NSColor.secondaryLabelColor.withAlphaComponent(0.28).cgColor
+
+    let stack = NSStackView()
+    stack.orientation = .horizontal
+    stack.alignment = .centerY
+    stack.spacing = 4
+    stack.translatesAutoresizingMaskIntoConstraints = false
+
+    if colorToken != nil {
+      let dot = NSView()
+      dot.wantsLayer = true
+      dot.layer?.cornerRadius = 2.5
+      dot.layer?.backgroundColor = TagColorPalette.nsColor(for: colorToken).cgColor
+      dot.translatesAutoresizingMaskIntoConstraints = false
+      dot.widthAnchor.constraint(equalToConstant: 5).isActive = true
+      dot.heightAnchor.constraint(equalToConstant: 5).isActive = true
+      stack.addArrangedSubview(dot)
+    }
+
+    let label = NSTextField(labelWithString: name)
+    label.font = .systemFont(ofSize: SeptenaTypeScale.size(.caption1))
+    label.textColor = SeptaskKitTheme.inkSecondary
+    label.lineBreakMode = .byTruncatingTail
+    label.maximumNumberOfLines = 1
+    stack.addArrangedSubview(label)
+
+    addSubview(stack)
+    NSLayoutConstraint.activate([
+      stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+      stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+      stack.topAnchor.constraint(equalTo: topAnchor, constant: 1.5),
+      stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -1.5),
+    ])
+    setContentHuggingPriority(.required, for: .horizontal)
+    setContentCompressionResistancePriority(.required, for: .horizontal)
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitTagChipView is code-only") }
+}
+
+@MainActor
+private final class KitTagFilterBarCell: NSTableCellView {
+  var onToggleTag: ((String) -> Void)?
+  var onClear: (() -> Void)?
+
+  private let stack = NSStackView()
+  private var leadingConstraint: NSLayoutConstraint!
+  private var trailingConstraint: NSLayoutConstraint!
+
+  init(identifier: NSUserInterfaceItemIdentifier) {
+    super.init(frame: .zero)
+    self.identifier = identifier
+
+    stack.orientation = .horizontal
+    stack.alignment = .centerY
+    stack.spacing = 6
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(stack)
+
+    leadingConstraint = stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: SeptaskKitLayout.rowLeadingPad)
+    trailingConstraint = stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -8)
+    NSLayoutConstraint.activate([
+      leadingConstraint,
+      trailingConstraint,
+      stack.centerYAnchor.constraint(equalTo: centerYAnchor),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitTagFilterBarCell is code-only") }
+
+  override func layout() {
+    let inset = SeptaskKitLayout.inset(for: bounds.width)
+    leadingConstraint.constant = inset + SeptaskKitLayout.rowLeadingPad
+    trailingConstraint.constant = -(inset + 8)
+    super.layout()
+  }
+
+  func configure(tags: [TaskTag], activeIDs: Set<String>) {
+    for v in stack.arrangedSubviews {
+      stack.removeArrangedSubview(v)
+      v.removeFromSuperview()
+    }
+    for tag in tags {
+      let isOn = activeIDs.contains(tag.id)
+      let pill = KitPillButton()
+      pill.title = tag.name
+      pill.isOn = isOn
+      pill.onPress = { [weak self] _ in self?.onToggleTag?(tag.id) }
+      stack.addArrangedSubview(pill)
+    }
+    if !activeIDs.isEmpty {
+      let clear = NSButton()
+      clear.isBordered = false
+      clear.bezelStyle = .inline
+      clear.title = String(localized: "Clear", comment: "SeptaskKit: clear tag filter")
+      clear.font = .systemFont(ofSize: SeptenaTypeScale.size(.caption1))
+      clear.contentTintColor = SeptaskKitTheme.inkSecondary
+      clear.target = self
+      clear.action = #selector(clearPressed)
+      stack.addArrangedSubview(clear)
+    }
+  }
+
+  @objc private func clearPressed() {
+    onClear?()
   }
 }
 #endif

@@ -1,5 +1,7 @@
 #if os(macOS)
 import AppKit
+import SwiftData
+import SwiftUI
 
 // The AppKit shell's date pickers: ⌘S "When" and ⌘⇧D "Deadline". TIER 1
 // surfaces (SeptaskKitSurface.swift): each edits one attribute of one row, so
@@ -55,10 +57,18 @@ enum SeptaskKitDatePopover {
   /// Anchor to `rect` in `view` and show. The handler fires on choice, and the
   /// popover closes itself. Chrome, material and radius come from
   /// `KitPopover` — this type owns the board, not the glass.
-  static func present(kind: Kind, initial: Date?, relativeTo rect: NSRect,
-                      of view: NSView, handler: @escaping Handler) {
+  static func present(kind: Kind, initial: Date?,
+                      initialStartTime: String? = nil,
+                      initialDurationMinutes: Int? = nil,
+                      relativeTo rect: NSRect,
+                      of view: NSView,
+                      onTimeSlotChange: ((String?, Int?) -> Void)? = nil,
+                      handler: @escaping Handler) {
     let handle = KitPopoverHandle()
-    let board = KitDateBoard(kind: kind, initial: initial) { date, today in
+    let board = KitDateBoard(kind: kind, initial: initial,
+                             initialStartTime: initialStartTime,
+                             initialDurationMinutes: initialDurationMinutes,
+                             onTimeSlotChange: onTimeSlotChange) { date, today in
       handler(date, today)
       handle.close()
     } onCancel: {
@@ -83,6 +93,12 @@ struct SeptaskKitRepeatSelection {
   var interval: Int?
   var afterCompletion: Bool?
   var paused: Bool?
+  /// Agreed V2 schedule details across the selection (nil when absent or mixed).
+  var weekdays: [Int]?
+  var monthDay: Int?
+  var ordinalWeekday: RecurrenceOrdinalWeekday?
+  /// Single-row (or agreed) scheduled date used purely for live "Next: …" preview.
+  var sampleScheduled: String?
   /// At least one selected row already repeats — gates the Pause / Don't
   /// Repeat rows.
   var anyRepeats: Bool
@@ -93,6 +109,10 @@ struct SeptaskKitRepeatSelection {
   /// like an after-completion one and never catches up.
   var canUseFixedSchedule: Bool
 
+  var hasCustomRule: Bool {
+    weekdays != nil || monthDay != nil || ordinalWeekday != nil
+  }
+
   init(_ tasks: [SeptenaTask]) {
     let rules = tasks.map(\.recurrence)
     count = tasks.count
@@ -100,6 +120,10 @@ struct SeptaskKitRepeatSelection {
     interval = Self.agreed(rules.map { $0?.interval })
     afterCompletion = Self.agreed(rules.map { $0?.afterCompletion })
     paused = Self.agreed(tasks.map { $0.recurrence == nil ? nil : $0.recurrencePaused })
+    weekdays = Self.agreed(rules.map { $0?.weekdays })
+    monthDay = Self.agreed(rules.map { $0?.monthDay })
+    ordinalWeekday = Self.agreed(rules.map { $0?.ordinalWeekday })
+    sampleScheduled = Self.agreed(tasks.map(\.scheduled))
     anyRepeats = rules.contains { $0 != nil }
     canUseFixedSchedule = !tasks.isEmpty && tasks.allSatisfy {
       $0.scheduled != nil || $0.recurrence?.afterCompletion == false
@@ -133,6 +157,12 @@ struct SeptaskKitRecurrencePanelResult {
   var interval: Int?
   var afterCompletion: Bool?
   var paused: Bool?
+  /// True when the user explicitly edited a V2 fixed-schedule detail (weekday
+  /// set, day of month, or ordinal weekday) or chose the Weekdays preset.
+  var setsScheduleDetail = false
+  var weekdays: [Int]?
+  var monthDay: Int?
+  var ordinalWeekday: RecurrenceOrdinalWeekday?
 
   /// Overlay the patch on one row's existing rule. A row with no rule yet
   /// starts from the editor's own defaults, so a bare "make these monthly"
@@ -140,7 +170,10 @@ struct SeptaskKitRecurrencePanelResult {
   func applied(to current: Recurrence?) -> Recurrence {
     Recurrence(unit: unit ?? current?.unit ?? .week,
                interval: interval ?? current?.interval ?? 1,
-               afterCompletion: afterCompletion ?? current?.afterCompletion ?? true)
+               afterCompletion: afterCompletion ?? current?.afterCompletion ?? true,
+               weekdays: setsScheduleDetail ? weekdays : current?.weekdays,
+               monthDay: setsScheduleDetail ? monthDay : current?.monthDay,
+               ordinalWeekday: setsScheduleDetail ? ordinalWeekday : current?.ordinalWeekday)
   }
 }
 
@@ -228,6 +261,14 @@ private final class KitRepeatBoard: NSView {
   private var unit: Recurrence.Unit?
   private var afterCompletion: Bool?
   private var paused: Bool?
+  private var weekdays: Set<Int>
+  private enum MonthlyMode: Int { case anchor = 0, dayOfMonth = 1, ordinal = 2 }
+  private var monthlyMode: MonthlyMode
+  private var monthDay: Int
+  private var ordinal: Int
+  private var ordinalWeekdayNum: Int
+  private var customExpanded: Bool
+  private var didEditScheduleDetail = false
   /// True once a cell or the stepper actually answered the question. Nothing
   /// is written without it — see the commit contract above.
   private var didEdit = false
@@ -237,13 +278,25 @@ private final class KitRepeatBoard: NSView {
   private let intervalStepper = NSStepper()
   private let cadenceDescription = NSTextField(labelWithString: "")
   private var unitCells: [KitDateCell] = []
+  private var weekdaysPresetCell: KitDateCell?
   private var anchorCells: [KitDateCell] = []
+  private var customToggleCell: KitDateCell?
+  private let customContainer = NSStackView()
+  private let weekdaySection = NSStackView()
+  private var weekdayCells: [(weekday: Int, cell: KitDateCell)] = []
+  private let monthlySection = NSStackView()
+  private var monthlyModeCells: [(mode: MonthlyMode, cell: KitDateCell)] = []
+  private let monthDayRow = NSStackView()
+  private let monthDayPopUp = NSPopUpButton(frame: .zero, pullsDown: false)
+  private let ordinalRow = NSStackView()
+  private let ordinalPopUp = NSPopUpButton(frame: .zero, pullsDown: false)
+  private let ordinalWeekdayPopUp = NSPopUpButton(frame: .zero, pullsDown: false)
   private var pauseCell: KitDateCell?
+  private var stopCell: KitDateCell?
 
-  /// Every focusable cell in reading order: the three units, the two anchors,
-  /// then Pause and Don't Repeat. A cell the board cannot offer (the fixed
-  /// schedule with no date on the task) is built but left OUT of this list,
-  /// so the walk never lands somewhere that does nothing.
+  /// Every currently visible focusable cell in reading order. Rebuilt whenever
+  /// progressive-disclosure sections expand or collapse so arrow navigation
+  /// never lands on a hidden control.
   private var cells: [KitDateCell] = []
   private var focusIndex = 0
 
@@ -254,6 +307,7 @@ private final class KitRepeatBoard: NSView {
   private static let padding: CGFloat = 8
   private static let rowHeight: CGFloat = 32
   private static let unitHeight: CGFloat = 36
+  private static let pillHeight: CGFloat = 30
   private static let unitSpacing: CGFloat = 6
 
   private static let unitOptions: [(unit: Recurrence.Unit, title: String)] = [
@@ -262,6 +316,46 @@ private final class KitRepeatBoard: NSView {
     (.month, String(localized: "month", comment: "Repeat unit")),
     (.year, String(localized: "year", comment: "Repeat unit")),
   ]
+
+  /// ISO Monday-first order for weekday pills (matching `Recurrence.shortLabel`).
+  private static let weekdayOptions: [(weekday: Int, short: String, full: String)] = [
+    (2, "M", String(localized: "Monday", comment: "Weekday name")),
+    (3, "T", String(localized: "Tuesday", comment: "Weekday name")),
+    (4, "W", String(localized: "Wednesday", comment: "Weekday name")),
+    (5, "T", String(localized: "Thursday", comment: "Weekday name")),
+    (6, "F", String(localized: "Friday", comment: "Weekday name")),
+    (7, "S", String(localized: "Saturday", comment: "Weekday name")),
+    (1, "S", String(localized: "Sunday", comment: "Weekday name")),
+  ]
+
+  private static let ordinalOptions: [(value: Int, title: String)] = [
+    (1, String(localized: "1st", comment: "Ordinal position")),
+    (2, String(localized: "2nd", comment: "Ordinal position")),
+    (3, String(localized: "3rd", comment: "Ordinal position")),
+    (4, String(localized: "4th", comment: "Ordinal position")),
+    (-1, String(localized: "Last", comment: "Ordinal position")),
+  ]
+
+  private static let fullWeekdayOptions: [(value: Int, title: String)] = [
+    (1, String(localized: "Sunday", comment: "Weekday name")),
+    (2, String(localized: "Monday", comment: "Weekday name")),
+    (3, String(localized: "Tuesday", comment: "Weekday name")),
+    (4, String(localized: "Wednesday", comment: "Weekday name")),
+    (5, String(localized: "Thursday", comment: "Weekday name")),
+    (6, String(localized: "Friday", comment: "Weekday name")),
+    (7, String(localized: "Saturday", comment: "Weekday name")),
+  ]
+
+  private static let nextPreviewFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.setLocalizedDateFormatFromTemplate("EEEMMMd")
+    return f
+  }()
+
+  private static func anchorDate(for scheduled: String?) -> Date {
+    if let scheduled, let d = KitDayFormat.date(fromWire: scheduled) { return d }
+    return KitDayFormat.todayDate() ?? DayClock.appNow
+  }
 
   init(selection: SeptaskKitRepeatSelection) {
     self.selection = selection
@@ -274,6 +368,26 @@ private final class KitRepeatBoard: NSView {
     self.unit = selection.unit
     self.afterCompletion = selection.afterCompletion
     self.paused = selection.paused
+    self.weekdays = Set(selection.weekdays ?? [])
+    let sampleDate = Self.anchorDate(for: selection.sampleScheduled)
+    let cal = Calendar.current
+    if let ow = selection.ordinalWeekday {
+      self.monthlyMode = .ordinal
+      self.ordinal = ow.ordinal
+      self.ordinalWeekdayNum = ow.weekday
+      self.monthDay = cal.component(.day, from: sampleDate)
+    } else if let md = selection.monthDay {
+      self.monthlyMode = .dayOfMonth
+      self.monthDay = md
+      self.ordinal = min(4, max(1, (cal.component(.day, from: sampleDate) - 1) / 7 + 1))
+      self.ordinalWeekdayNum = cal.component(.weekday, from: sampleDate)
+    } else {
+      self.monthlyMode = .anchor
+      self.monthDay = cal.component(.day, from: sampleDate)
+      self.ordinal = min(4, max(1, (cal.component(.day, from: sampleDate) - 1) / 7 + 1))
+      self.ordinalWeekdayNum = cal.component(.weekday, from: sampleDate)
+    }
+    self.customExpanded = selection.hasCustomRule
     super.init(frame: .zero)
     build()
   }
@@ -289,6 +403,28 @@ private final class KitRepeatBoard: NSView {
   /// converts it.
   private var canPickFixedSchedule: Bool { selection.canUseFixedSchedule }
 
+  private var resolvedWeekdays: [Int]? {
+    guard afterCompletion == false, unit == .week, !weekdays.isEmpty else { return nil }
+    return weekdays.sorted()
+  }
+
+  private var resolvedMonthDay: Int? {
+    guard afterCompletion == false, unit == .month || unit == .year,
+          monthlyMode == .dayOfMonth else { return nil }
+    return monthDay
+  }
+
+  private var resolvedOrdinalWeekday: RecurrenceOrdinalWeekday? {
+    guard afterCompletion == false, unit == .month || unit == .year,
+          monthlyMode == .ordinal else { return nil }
+    return RecurrenceOrdinalWeekday(ordinal: ordinal, weekday: ordinalWeekdayNum)
+  }
+
+  private var supportsCustomOptions: Bool {
+    canPickFixedSchedule && afterCompletion == false
+      && (unit == .week || unit == .month || unit == .year)
+  }
+
   /// What dismissal should commit — nil once a terminal row has answered (so
   /// closing never writes twice), nil when nothing was chosen (so looking at
   /// the editor and closing it is not an edit), and nil when the draft still
@@ -300,15 +436,28 @@ private final class KitRepeatBoard: NSView {
     // popover's close does not end editing for us.
     window?.endEditing(for: nil)
     guard didEdit else { return nil }
+    let nextWeekdays = didEditScheduleDetail ? resolvedWeekdays : selection.weekdays
+    let nextMonthDay = didEditScheduleDetail ? resolvedMonthDay : selection.monthDay
+    let nextOrdinal = didEditScheduleDetail ? resolvedOrdinalWeekday : selection.ordinalWeekday
     // Axis by axis against what was opened, so re-picking a value the
     // selection already carries pushes no CloudKit change and no undo entry.
     guard unit != selection.unit
             || interval != selection.interval
             || afterCompletion != selection.afterCompletion
-            || paused != selection.paused else { return nil }
-    return SeptaskKitRecurrencePanelResult(unit: unit, interval: interval,
-                                           afterCompletion: afterCompletion,
-                                           paused: paused)
+            || paused != selection.paused
+            || nextWeekdays != selection.weekdays
+            || nextMonthDay != selection.monthDay
+            || nextOrdinal != selection.ordinalWeekday else { return nil }
+    return SeptaskKitRecurrencePanelResult(
+      unit: unit,
+      interval: interval,
+      afterCompletion: afterCompletion,
+      paused: paused,
+      setsScheduleDetail: didEditScheduleDetail,
+      weekdays: resolvedWeekdays,
+      monthDay: resolvedMonthDay,
+      ordinalWeekday: resolvedOrdinalWeekday
+    )
   }
 
   // MARK: Build
@@ -316,14 +465,43 @@ private final class KitRepeatBoard: NSView {
   private func build() {
     var views: [NSView] = [buildIntervalRow(), buildUnitStrip()]
 
+    if canPickFixedSchedule {
+      let preset = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+        self?.chooseWeekdaysPreset()
+      }
+      preset.fillRow(
+        symbol: "briefcase",
+        tint: SeptaskKitTheme.inkSecondary,
+        title: String(localized: "Weekdays (Mon–Fri)", comment: "Repeat quick preset")
+      )
+      weekdaysPresetCell = preset
+      views.append(preset)
+    }
+
     cadenceDescription.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
     cadenceDescription.textColor = SeptaskKitTheme.inkSecondary
     cadenceDescription.lineBreakMode = .byWordWrapping
-    cadenceDescription.maximumNumberOfLines = 3
+    cadenceDescription.maximumNumberOfLines = 4
     views.append(cadenceDescription)
 
     views.append(KitSurface.separator())
     views.append(contentsOf: buildAnchorCells())
+
+    if canPickFixedSchedule {
+      let toggle = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+        self?.toggleCustomOptions()
+      }
+      toggle.fillRow(
+        symbol: customExpanded ? "chevron.down" : "chevron.right",
+        tint: SeptaskKitTheme.inkSecondary,
+        title: String(localized: "Custom options…", comment: "Repeat progressive disclosure toggle")
+      )
+      customToggleCell = toggle
+      views.append(toggle)
+
+      buildCustomContainer()
+      views.append(customContainer)
+    }
 
     // Terminal rows — only a task that already repeats can be paused or
     // stopped. Same row shape and same highlight as the date board's Clear.
@@ -336,21 +514,21 @@ private final class KitRepeatBoard: NSView {
       pause.fillRow(symbol: pauseSymbol, tint: SeptaskKitTheme.iconMuted, title: pauseTitle)
       pauseCell = pause
       views.append(pause)
-      cells.append(pause)
 
       let stop = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
         self?.stopRepeating()
       }
       stop.fillRow(symbol: "xmark.circle", tint: SeptaskKitTheme.iconMuted,
                    title: String(localized: "Don’t Repeat", comment: "Repeat editor stop"))
+      stopCell = stop
       views.append(stop)
-      cells.append(stop)
     }
 
     let stack = NSStackView(views: views)
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.spacing = 8
+    stack.detachesHiddenViews = true
     stack.setCustomSpacing(6, after: views[0])
     stack.translatesAutoresizingMaskIntoConstraints = false
     addSubview(stack)
@@ -372,10 +550,130 @@ private final class KitRepeatBoard: NSView {
     focusIndex = unit.flatMap { current in
       Self.unitOptions.firstIndex { $0.unit == current }
     } ?? 0
-    for cell in cells {
-      cell.onHover = { [weak self] hovered in self?.focus(cell: hovered) }
-    }
     updateValues()
+  }
+
+  private func buildCustomContainer() {
+    customContainer.orientation = .vertical
+    customContainer.alignment = .leading
+    customContainer.spacing = 8
+    customContainer.detachesHiddenViews = true
+
+    // Weekly: 7 compact weekday pills (Mon..Sun).
+    weekdaySection.orientation = .vertical
+    weekdaySection.alignment = .leading
+    weekdaySection.spacing = 6
+
+    let pillStrip = NSStackView()
+    pillStrip.orientation = .horizontal
+    pillStrip.spacing = 4
+    pillStrip.distribution = .fillEqually
+    for option in Self.weekdayOptions {
+      let cell = KitDateCell(radius: 8, height: Self.pillHeight) { [weak self] in
+        self?.toggleWeekday(option.weekday)
+      }
+      cell.fillTitle(option.short)
+      cell.setAccessibilityTitle(option.full)
+      pillStrip.addArrangedSubview(cell)
+      weekdayCells.append((option.weekday, cell))
+    }
+    weekdaySection.addArrangedSubview(pillStrip)
+    pillStrip.widthAnchor.constraint(equalTo: weekdaySection.widthAnchor).isActive = true
+
+    // Monthly / Yearly: Same day | On day | Ordinal
+    monthlySection.orientation = .vertical
+    monthlySection.alignment = .leading
+    monthlySection.spacing = 8
+    monthlySection.detachesHiddenViews = true
+
+    let modeStrip = NSStackView()
+    modeStrip.orientation = .horizontal
+    modeStrip.spacing = Self.unitSpacing
+    modeStrip.distribution = .fillEqually
+    let modes: [(MonthlyMode, String)] = [
+      (.anchor, String(localized: "Same day", comment: "Monthly repeat mode")),
+      (.dayOfMonth, String(localized: "On day", comment: "Monthly repeat mode")),
+      (.ordinal, String(localized: "Ordinal", comment: "Monthly repeat mode")),
+    ]
+    for (mode, title) in modes {
+      let cell = KitDateCell(radius: 8, height: Self.pillHeight) { [weak self] in
+        self?.chooseMonthlyMode(mode)
+      }
+      cell.fillTitle(title)
+      modeStrip.addArrangedSubview(cell)
+      monthlyModeCells.append((mode, cell))
+    }
+    monthlySection.addArrangedSubview(modeStrip)
+    modeStrip.widthAnchor.constraint(equalTo: monthlySection.widthAnchor).isActive = true
+
+    // Day-of-month selector (1..31 or Last day)
+    let dayLabel = NSTextField(labelWithString: String(localized: "Day", comment: "Monthly day label"))
+    dayLabel.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+    dayLabel.textColor = SeptaskKitTheme.inkSecondary
+    dayLabel.setContentHuggingPriority(.required, for: .horizontal)
+
+    monthDayPopUp.controlSize = .small
+    monthDayPopUp.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+    for d in 1...31 {
+      monthDayPopUp.addItem(withTitle: "\(d)")
+      monthDayPopUp.lastItem?.tag = d
+    }
+    monthDayPopUp.addItem(withTitle: String(localized: "Last day", comment: "Monthly last day option"))
+    monthDayPopUp.lastItem?.tag = -1
+    monthDayPopUp.target = self
+    monthDayPopUp.action = #selector(monthDayChanged)
+
+    let daySpacer = NSView()
+    daySpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    monthDayRow.orientation = .horizontal
+    monthDayRow.alignment = .centerY
+    monthDayRow.spacing = 8
+    monthDayRow.addArrangedSubview(dayLabel)
+    monthDayRow.addArrangedSubview(monthDayPopUp)
+    monthDayRow.addArrangedSubview(daySpacer)
+    monthlySection.addArrangedSubview(monthDayRow)
+    monthDayRow.widthAnchor.constraint(equalTo: monthlySection.widthAnchor).isActive = true
+
+    // Ordinal weekday selector (1st..4th / Last + Sunday..Saturday)
+    let ordLabel = NSTextField(labelWithString: String(localized: "On the", comment: "Ordinal repeat prefix"))
+    ordLabel.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+    ordLabel.textColor = SeptaskKitTheme.inkSecondary
+    ordLabel.setContentHuggingPriority(.required, for: .horizontal)
+
+    ordinalPopUp.controlSize = .small
+    ordinalPopUp.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+    for item in Self.ordinalOptions {
+      ordinalPopUp.addItem(withTitle: item.title)
+      ordinalPopUp.lastItem?.tag = item.value
+    }
+    ordinalPopUp.target = self
+    ordinalPopUp.action = #selector(ordinalChanged)
+
+    ordinalWeekdayPopUp.controlSize = .small
+    ordinalWeekdayPopUp.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+    for item in Self.fullWeekdayOptions {
+      ordinalWeekdayPopUp.addItem(withTitle: item.title)
+      ordinalWeekdayPopUp.lastItem?.tag = item.value
+    }
+    ordinalWeekdayPopUp.target = self
+    ordinalWeekdayPopUp.action = #selector(ordinalChanged)
+
+    let ordSpacer = NSView()
+    ordSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    ordinalRow.orientation = .horizontal
+    ordinalRow.alignment = .centerY
+    ordinalRow.spacing = 6
+    ordinalRow.addArrangedSubview(ordLabel)
+    ordinalRow.addArrangedSubview(ordinalPopUp)
+    ordinalRow.addArrangedSubview(ordinalWeekdayPopUp)
+    ordinalRow.addArrangedSubview(ordSpacer)
+    monthlySection.addArrangedSubview(ordinalRow)
+    ordinalRow.widthAnchor.constraint(equalTo: monthlySection.widthAnchor).isActive = true
+
+    customContainer.addArrangedSubview(weekdaySection)
+    customContainer.addArrangedSubview(monthlySection)
+    weekdaySection.widthAnchor.constraint(equalTo: customContainer.widthAnchor).isActive = true
+    monthlySection.widthAnchor.constraint(equalTo: customContainer.widthAnchor).isActive = true
   }
 
   /// "Every [2] ⬍" — the number is the one typed value on the board.
@@ -423,8 +721,8 @@ private final class KitRepeatBoard: NSView {
     return row
   }
 
-  /// day / week / month as three choice cells — the repeat board's answer to
-  /// the date board's day strip, in the same cell, wash, and walk.
+  /// day / week / month / year as four choice cells — the repeat board's
+  /// answer to the date board's day strip, in the same cell, wash, and walk.
   private func buildUnitStrip() -> NSView {
     let strip = NSStackView()
     strip.orientation = .horizontal
@@ -437,7 +735,6 @@ private final class KitRepeatBoard: NSView {
       cell.fillTitle(option.title)
       strip.addArrangedSubview(cell)
       unitCells.append(cell)
-      cells.append(cell)
     }
     return strip
   }
@@ -465,14 +762,42 @@ private final class KitRepeatBoard: NSView {
       tint: offerable ? SeptaskKitTheme.inkSecondary : SeptaskKitTheme.iconMuted,
       title: offerable
         ? String(localized: "On the scheduled date", comment: "Repeat anchor mode")
-        : String(localized: "On the scheduled date — needs a date",
+        : String(localized: "On the scheduled date (set a When date first)",
                  comment: "Repeat anchor mode, unavailable"),
       titleColor: offerable ? SeptaskKitTheme.inkPrimary : SeptaskKitTheme.iconMuted)
 
     anchorCells = [completion, scheduled]
-    cells.append(completion)
-    if offerable { cells.append(scheduled) }
     return anchorCells
+  }
+
+  private func rebuildWalkableCells() {
+    var walkable: [KitDateCell] = []
+    walkable.append(contentsOf: unitCells)
+    if let preset = weekdaysPresetCell { walkable.append(preset) }
+    walkable.append(anchorCells[0])
+    if canPickFixedSchedule { walkable.append(anchorCells[1]) }
+    if let toggle = customToggleCell, !toggle.isHidden {
+      walkable.append(toggle)
+      if !customContainer.isHidden {
+        if !weekdaySection.isHidden {
+          walkable.append(contentsOf: weekdayCells.map(\.cell))
+        }
+        if !monthlySection.isHidden {
+          walkable.append(contentsOf: monthlyModeCells.map(\.cell))
+        }
+      }
+    }
+    if let pause = pauseCell { walkable.append(pause) }
+    if let stop = stopCell { walkable.append(stop) }
+    cells = walkable
+    for cell in cells {
+      cell.onHover = { [weak self] hovered in self?.focus(cell: hovered) }
+    }
+    if !cells.isEmpty {
+      focusIndex = min(cells.count - 1, max(0, focusIndex))
+    } else {
+      focusIndex = 0
+    }
   }
 
   // MARK: Values
@@ -508,8 +833,39 @@ private final class KitRepeatBoard: NSView {
     for (index, cell) in unitCells.enumerated() {
       cell.isCurrentValue = unit != nil && Self.unitOptions[index].unit == unit
     }
+    let isWeekdaysPreset = unit == .week
+      && (interval ?? selection.interval) == 1
+      && afterCompletion == false
+      && weekdays == Set([2, 3, 4, 5, 6])
+    weekdaysPresetCell?.isCurrentValue = isWeekdaysPreset
     anchorCells[0].isCurrentValue = afterCompletion == true
     anchorCells[1].isCurrentValue = afterCompletion == false
+
+    let showCustom = supportsCustomOptions
+    customToggleCell?.isHidden = !showCustom
+    customToggleCell?.updateRow(
+      symbol: customExpanded ? "chevron.down" : "chevron.right",
+      title: customExpanded
+        ? String(localized: "Hide custom options", comment: "Repeat progressive disclosure collapse")
+        : String(localized: "Custom options…", comment: "Repeat progressive disclosure expand")
+    )
+    customContainer.isHidden = !showCustom || !customExpanded
+    weekdaySection.isHidden = unit != .week
+    monthlySection.isHidden = !(unit == .month || unit == .year)
+
+    for (day, cell) in weekdayCells {
+      cell.isCurrentValue = weekdays.contains(day)
+    }
+    for (mode, cell) in monthlyModeCells {
+      cell.isCurrentValue = monthlyMode == mode
+    }
+    monthDayRow.isHidden = monthlyMode != .dayOfMonth
+    ordinalRow.isHidden = monthlyMode != .ordinal
+    monthDayPopUp.selectItem(withTag: monthDay)
+    ordinalPopUp.selectItem(withTag: ordinal)
+    ordinalWeekdayPopUp.selectItem(withTag: ordinalWeekdayNum)
+
+    rebuildWalkableCells()
     applyFocus()
     updateDescription()
   }
@@ -522,10 +878,18 @@ private final class KitRepeatBoard: NSView {
     let rows = selection.count
     guard let unit, let afterCompletion, let count = interval ?? selection.interval else {
       cadenceDescription.stringValue = String(
-        localized: "\(rows) tasks with different repeat settings. Only what you change is written.",
+        localized: "\(rows) tasks with different repeat settings. Only the settings you change will be updated.",
         comment: "Repeat editor summary, mixed selection")
       return
     }
+    let candidate = Recurrence(
+      unit: unit,
+      interval: count,
+      afterCompletion: afterCompletion,
+      weekdays: resolvedWeekdays,
+      monthDay: resolvedMonthDay,
+      ordinalWeekday: resolvedOrdinalWeekday
+    )
     let unitName: String
     switch unit {
     case .day:
@@ -545,15 +909,30 @@ private final class KitRepeatBoard: NSView {
         ? String(localized: "year", comment: "Repeat cadence unit")
         : String(localized: "years", comment: "Repeat cadence unit, plural")
     }
-    let sentence = afterCompletion
-      ? String(localized: "A new copy \(count) \(unitName) after this one is checked off.",
-               comment: "Repeat editor summary, after completion")
-      : String(localized: "A new copy \(count) \(unitName) after the previous scheduled date.",
-               comment: "Repeat editor summary, fixed schedule")
-    cadenceDescription.stringValue = rows > 1
-      ? sentence + " " + String(localized: "Applies to \(rows) tasks.",
-                                comment: "Repeat editor multi-selection footnote")
-      : sentence
+    let sentence: String
+    if !afterCompletion && (candidate.weekdays != nil || candidate.monthDay != nil || candidate.ordinalWeekday != nil) {
+      sentence = String(localized: "Repeats: \(candidate.shortLabel).",
+                        comment: "Repeat editor summary, custom fixed schedule")
+    } else {
+      sentence = afterCompletion
+        ? String(localized: "A new copy appears \(count) \(unitName) after this one is checked off.",
+                 comment: "Repeat editor summary, after completion")
+        : String(localized: "A new copy appears \(count) \(unitName) after the scheduled date.",
+                 comment: "Repeat editor summary, fixed schedule")
+    }
+    var parts = [sentence]
+    if let nextWire = candidate.nextDate(completedOn: DayClock.appToday,
+                                         scheduled: selection.sampleScheduled),
+       let nextDate = KitDayFormat.date(fromWire: nextWire) {
+      let formatted = Self.nextPreviewFormatter.string(from: nextDate)
+      parts.append(String(localized: "Next: \(formatted).",
+                          comment: "Repeat editor live next occurrence preview"))
+    }
+    if rows > 1 {
+      parts.append(String(localized: "Applies to \(rows) tasks.",
+                          comment: "Repeat editor multi-selection footnote"))
+    }
+    cadenceDescription.stringValue = parts.joined(separator: " ")
   }
 
   // MARK: Focus
@@ -590,6 +969,56 @@ private final class KitRepeatBoard: NSView {
     updateValues()
   }
 
+  private func chooseWeekdaysPreset() {
+    didEdit = true
+    didEditScheduleDetail = true
+    unit = .week
+    intervalField.integerValue = 1
+    intervalStepper.integerValue = 1
+    afterCompletion = false
+    weekdays = Set([2, 3, 4, 5, 6])
+    monthlyMode = .anchor
+    updateValues()
+  }
+
+  private func toggleCustomOptions() {
+    customExpanded.toggle()
+    updateValues()
+  }
+
+  private func toggleWeekday(_ day: Int) {
+    didEdit = true
+    didEditScheduleDetail = true
+    if weekdays.contains(day) {
+      weekdays.remove(day)
+    } else {
+      weekdays.insert(day)
+    }
+    updateValues()
+  }
+
+  private func chooseMonthlyMode(_ mode: MonthlyMode) {
+    didEdit = true
+    didEditScheduleDetail = true
+    monthlyMode = mode
+    updateValues()
+  }
+
+  @objc private func monthDayChanged() {
+    didEdit = true
+    didEditScheduleDetail = true
+    monthDay = monthDayPopUp.selectedTag()
+    updateDescription()
+  }
+
+  @objc private func ordinalChanged() {
+    didEdit = true
+    didEditScheduleDetail = true
+    ordinal = ordinalPopUp.selectedTag()
+    ordinalWeekdayNum = ordinalWeekdayPopUp.selectedTag()
+    updateDescription()
+  }
+
   @objc private func intervalChanged() {
     didEdit = true
     // Clearing the field is how a mixed selection stays mixed on this axis.
@@ -597,12 +1026,20 @@ private final class KitRepeatBoard: NSView {
       intervalStepper.integerValue = value
       intervalField.integerValue = value
     }
+    weekdaysPresetCell?.isCurrentValue = unit == .week
+      && (interval ?? selection.interval) == 1
+      && afterCompletion == false
+      && weekdays == Set([2, 3, 4, 5, 6])
     updateDescription()
   }
 
   @objc private func stepperChanged() {
     didEdit = true
     intervalField.integerValue = intervalStepper.integerValue
+    weekdaysPresetCell?.isCurrentValue = unit == .week
+      && (interval ?? selection.interval) == 1
+      && afterCompletion == false
+      && weekdays == Set([2, 3, 4, 5, 6])
     updateDescription()
   }
 
@@ -640,6 +1077,296 @@ private final class KitRepeatBoard: NSView {
   }
 }
 
+// MARK: - Reminder editor (TR2)
+
+/// Progressive-disclosure Reminder popover — the fourth TIER 1 anchored
+/// popover in the date-board family (`When`, `Deadline`, `Repeat`, `Reminder`).
+@MainActor
+enum SeptaskKitReminderPopover {
+  static func present(initial: TaskReminder?,
+                      anyHasReminder: Bool? = nil,
+                      relativeTo rect: NSRect,
+                      of view: NSView,
+                      onCommit: @escaping (TaskReminder?) -> Void) {
+    let board = KitReminderBoard(initial: initial,
+                                 anyHasReminder: anyHasReminder ?? (initial != nil))
+    let handle = KitPopoverHandle()
+    board.onCommit = { reminder in
+      onCommit(reminder)
+      handle.close()
+    }
+    board.onCancel = { handle.close() }
+    KitPopover.present(board, relativeTo: rect, of: view, focus: board, handle: handle)
+  }
+}
+
+@MainActor
+private final class KitReminderBoard: NSView {
+
+  var onCommit: ((TaskReminder?) -> Void)?
+  var onCancel: (() -> Void)?
+
+  private let initial: TaskReminder?
+  private let anyHasReminder: Bool
+  private var mode: TaskReminderMode
+  private var optionsExpanded: Bool
+
+  private let datePicker = NSDatePicker()
+  private var optionsToggleCell: KitDateCell?
+  private var modeToggleCell: KitDateCell?
+  private var deniedNoticeCell: KitDateCell?
+  private var setCell: KitDateCell?
+  private var clearCell: KitDateCell?
+  private var presetCells: [KitDateCell] = []
+
+  private var cells: [KitDateCell] = []
+  private var focusIndex = 0
+
+  private static let width: CGFloat = 360
+  private static let padding: CGFloat = 8
+  private static let rowHeight: CGFloat = 32
+
+  init(initial: TaskReminder?, anyHasReminder: Bool) {
+    self.initial = initial
+    self.anyHasReminder = anyHasReminder
+    self.mode = initial?.mode ?? .floating
+    self.optionsExpanded = (initial?.mode == .fixed)
+    super.init(frame: .zero)
+    build()
+    checkNotificationAuth()
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitReminderBoard is code-only") }
+
+  override var acceptsFirstResponder: Bool { true }
+  override func becomeFirstResponder() -> Bool { true }
+
+  private func build() {
+    var views: [NSView] = []
+
+    // Non-blocking denied-permission notice (hidden unless OS auth == .denied).
+    let denied = KitDateCell(radius: 8, height: Self.rowHeight) {
+      TaskReminderScheduler.openNotificationSettings()
+    }
+    denied.fillRow(
+      symbol: "bell.slash",
+      tint: SeptaskKitTheme.overdueRed,
+      title: String(localized: "Notifications are off — Open Settings",
+                    comment: "Reminder denied permission notice"),
+      titleColor: SeptaskKitTheme.overdueRed
+    )
+    denied.isHidden = true
+    deniedNoticeCell = denied
+    views.append(denied)
+
+    // Quick presets — one click sets & closes.
+    for preset in TaskReminder.quickPresets() {
+      let cell = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+        guard let self else { return }
+        self.commit(TaskReminder.make(date: preset.date, mode: self.mode))
+      }
+      cell.fillRow(symbol: "bell", tint: SeptaskKitTheme.inkSecondary, title: preset.title)
+      presetCells.append(cell)
+      views.append(cell)
+    }
+
+    views.append(KitSurface.separator())
+
+    // Custom date & time picker row
+    let customLabel = NSTextField(labelWithString: String(localized: "Custom",
+                                                          comment: "Custom reminder time label"))
+    customLabel.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+    customLabel.textColor = SeptaskKitTheme.inkSecondary
+    customLabel.setContentHuggingPriority(.required, for: .horizontal)
+
+    datePicker.datePickerStyle = .textFieldAndStepper
+    datePicker.datePickerElements = [.yearMonthDay, .hourMinute]
+    datePicker.font = .systemFont(ofSize: SeptenaTypeScale.size(.body))
+    datePicker.dateValue = initial?.effectiveFireDate()
+      ?? TaskReminder.quickPresets().first?.date
+      ?? DayClock.appNow.addingTimeInterval(3600)
+
+    let spacer = NSView()
+    spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    let customRow = NSStackView(views: [customLabel, datePicker, spacer])
+    customRow.orientation = .horizontal
+    customRow.alignment = .centerY
+    customRow.spacing = 8
+    customRow.edgeInsets = NSEdgeInsets(top: 2, left: 6, bottom: 2, right: 6)
+    views.append(customRow)
+
+    let setButton = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+      guard let self else { return }
+      self.window?.endEditing(for: nil)
+      self.commit(TaskReminder.make(date: self.datePicker.dateValue, mode: self.mode))
+    }
+    setButton.fillRow(
+      symbol: "checkmark.circle",
+      tint: SeptaskKitTheme.inkPrimary,
+      title: String(localized: "Set Custom Reminder", comment: "Commit custom reminder date/time")
+    )
+    setCell = setButton
+    views.append(setButton)
+
+    // Progressive-disclosure timezone mode option (floating default, fixed opt-in).
+    let toggle = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+      self?.toggleOptions()
+    }
+    toggle.fillRow(
+      symbol: optionsExpanded ? "chevron.down" : "chevron.right",
+      tint: SeptaskKitTheme.inkSecondary,
+      title: String(localized: "Time zone options…", comment: "Reminder options disclosure")
+    )
+    optionsToggleCell = toggle
+    views.append(toggle)
+
+    let modeCell = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+      self?.toggleMode()
+    }
+    modeCell.fillRow(
+      symbol: "globe",
+      tint: SeptaskKitTheme.inkSecondary,
+      title: modeTitle
+    )
+    modeCell.isHidden = !optionsExpanded
+    modeToggleCell = modeCell
+    views.append(modeCell)
+
+    if anyHasReminder {
+      views.append(KitSurface.separator())
+      let clear = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+        self?.commit(nil)
+      }
+      clear.fillRow(
+        symbol: "xmark.circle",
+        tint: SeptaskKitTheme.iconMuted,
+        title: String(localized: "Clear Reminder", comment: "Remove task reminder")
+      )
+      clearCell = clear
+      views.append(clear)
+    }
+
+    let stack = NSStackView(views: views)
+    stack.orientation = .vertical
+    stack.alignment = .leading
+    stack.spacing = 6
+    stack.detachesHiddenViews = true
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(stack)
+
+    let pad = Self.padding
+    NSLayoutConstraint.activate([
+      widthAnchor.constraint(equalToConstant: Self.width),
+      stack.topAnchor.constraint(equalTo: topAnchor, constant: pad),
+      stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: pad),
+      stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -pad),
+      stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -pad),
+    ])
+    for view in views {
+      view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+    }
+
+    updateUI()
+  }
+
+  private var modeTitle: String {
+    mode == .fixed
+      ? String(localized: "Fixed time zone (fires at exact instant)", comment: "Reminder fixed timezone mode")
+      : String(localized: "Floating local time (follows device time zone)", comment: "Reminder floating timezone mode")
+  }
+
+  private func checkNotificationAuth() {
+    Task { @MainActor [weak self] in
+      let status = await TaskReminderScheduler.shared.authorizationStatus()
+      guard let self else { return }
+      self.deniedNoticeCell?.isHidden = (status != .denied)
+      self.rebuildWalkableCells()
+      self.applyFocus()
+    }
+  }
+
+  private func toggleOptions() {
+    optionsExpanded.toggle()
+    updateUI()
+  }
+
+  private func toggleMode() {
+    mode = (mode == .floating) ? .fixed : .floating
+    updateUI()
+  }
+
+  private func updateUI() {
+    optionsToggleCell?.updateRow(
+      symbol: optionsExpanded ? "chevron.down" : "chevron.right",
+      title: optionsExpanded
+        ? String(localized: "Hide time zone options", comment: "Reminder options collapse")
+        : String(localized: "Time zone options…", comment: "Reminder options expand")
+    )
+    modeToggleCell?.isHidden = !optionsExpanded
+    modeToggleCell?.updateRow(symbol: "globe", title: modeTitle)
+    modeToggleCell?.isCurrentValue = (mode == .fixed)
+    rebuildWalkableCells()
+    applyFocus()
+  }
+
+  private func rebuildWalkableCells() {
+    var walkable: [KitDateCell] = []
+    if let denied = deniedNoticeCell, !denied.isHidden { walkable.append(denied) }
+    walkable.append(contentsOf: presetCells)
+    if let setCell { walkable.append(setCell) }
+    if let toggle = optionsToggleCell { walkable.append(toggle) }
+    if let modeCell = modeToggleCell, !modeCell.isHidden { walkable.append(modeCell) }
+    if let clearCell { walkable.append(clearCell) }
+    cells = walkable
+    for cell in cells {
+      cell.onHover = { [weak self] hovered in self?.focus(cell: hovered) }
+    }
+    if !cells.isEmpty {
+      focusIndex = min(cells.count - 1, max(0, focusIndex))
+    } else {
+      focusIndex = 0
+    }
+  }
+
+  private func commit(_ reminder: TaskReminder?) {
+    if reminder != nil {
+      Task { await TaskReminderScheduler.shared.requestAuthorizationIfNeeded() }
+    }
+    onCommit?(reminder)
+  }
+
+  private func focus(cell: KitDateCell) {
+    guard let index = cells.firstIndex(where: { $0 === cell }) else { return }
+    focusIndex = index
+    applyFocus()
+  }
+
+  private func step(_ delta: Int) {
+    guard !cells.isEmpty else { return }
+    focusIndex = min(cells.count - 1, max(0, focusIndex + delta))
+    applyFocus()
+  }
+
+  private func applyFocus() {
+    for (index, cell) in cells.enumerated() { cell.isFocused = index == focusIndex }
+  }
+
+  override func keyDown(with event: NSEvent) {
+    switch event.keyCode {
+    case 126, 123: step(-1)
+    case 125, 124: step(1)
+    case 36, 76:
+      guard cells.indices.contains(focusIndex) else { return }
+      cells[focusIndex].activate()
+    default: super.keyDown(with: event)
+    }
+  }
+
+  override func cancelOperation(_ sender: Any?) {
+    onCancel?()
+  }
+}
+
 // MARK: - Board
 
 /// The popover's body: a seven-day strip starting today, "Pick another date",
@@ -656,6 +1383,13 @@ private final class KitDateBoard: NSView {
   private let kind: SeptaskKitDatePopover.Kind
   private let onPick: (Date?, Bool) -> Void
   private let onCancel: () -> Void
+  private let onTimeSlotChange: ((String?, Int?) -> Void)?
+  private var startTime: String?
+  private var durationMinutes: Int?
+  private let timeDisclosureButton = NSButton()
+  private let timeControlsContainer = NSStackView()
+  private let startTimePicker = NSDatePicker()
+  private var durationPills: [(minutes: Int, pill: KitPillButton)] = []
 
   /// Every focusable cell in time order: the seven days, then Pick another
   /// date, then Clear.
@@ -700,8 +1434,14 @@ private final class KitDateBoard: NSView {
   }
 
   init(kind: SeptaskKitDatePopover.Kind, initial: Date?,
+       initialStartTime: String? = nil,
+       initialDurationMinutes: Int? = nil,
+       onTimeSlotChange: ((String?, Int?) -> Void)? = nil,
        onPick: @escaping (Date?, Bool) -> Void, onCancel: @escaping () -> Void) {
     self.kind = kind
+    self.startTime = initialStartTime
+    self.durationMinutes = initialDurationMinutes
+    self.onTimeSlotChange = onTimeSlotChange
     self.onPick = onPick
     self.onCancel = onCancel
     super.init(frame: .zero)
@@ -803,11 +1543,89 @@ private final class KitDateBoard: NSView {
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.spacing = 6
+    stack.detachesHiddenViews = true
     stack.setCustomSpacing(8, after: typedLabel)
     stack.setCustomSpacing(8, after: strip)
     stack.setCustomSpacing(4, after: topSeparator)
     stack.setCustomSpacing(8, after: calendarCell)
     stack.setCustomSpacing(4, after: bottomSeparator)
+
+    // Progressive-disclosure optional start/end time section (`.when` only,
+    // docs/TASK_TIMES_AND_ICAL_SPEC.md §2).
+    if kind == .when, onTimeSlotChange != nil {
+      let timeSep = NSBox()
+      timeSep.boxType = .separator
+      stack.addArrangedSubview(timeSep)
+      timeSep.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
+
+      timeDisclosureButton.isBordered = false
+      timeDisclosureButton.bezelStyle = .inline
+      timeDisclosureButton.imagePosition = .imageLeading
+      timeDisclosureButton.image = NSImage(systemSymbolName: "clock", accessibilityDescription: nil)?
+        .withSymbolConfiguration(.init(pointSize: 11, weight: .regular))
+      timeDisclosureButton.title = String(localized: "Add time", comment: "SeptaskKit: add start time disclosure")
+      timeDisclosureButton.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+      timeDisclosureButton.contentTintColor = SeptaskKitTheme.inkSecondary
+      timeDisclosureButton.target = self
+      timeDisclosureButton.action = #selector(revealTimeControls)
+      stack.addArrangedSubview(timeDisclosureButton)
+
+      timeControlsContainer.orientation = .vertical
+      timeControlsContainer.alignment = .leading
+      timeControlsContainer.spacing = 6
+      timeControlsContainer.translatesAutoresizingMaskIntoConstraints = false
+
+      let topRow = NSStackView()
+      topRow.orientation = .horizontal
+      topRow.alignment = .centerY
+      topRow.spacing = 8
+
+      let lbl = NSTextField(labelWithString: String(localized: "Time", comment: "SeptaskKit: start time label"))
+      lbl.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote), weight: .medium)
+      lbl.textColor = .labelColor
+
+      startTimePicker.datePickerStyle = .textFieldAndStepper
+      startTimePicker.datePickerElements = .hourMinute
+      startTimePicker.dateValue = TaskTimeSlot.pickerDate(from: startTime)
+      startTimePicker.target = self
+      startTimePicker.action = #selector(startTimeChanged)
+
+      let clearTimeBtn = NSButton()
+      clearTimeBtn.isBordered = false
+      clearTimeBtn.bezelStyle = .inline
+      clearTimeBtn.title = String(localized: "Clear", comment: "SeptaskKit: clear start time")
+      clearTimeBtn.font = .systemFont(ofSize: SeptenaTypeScale.size(.caption1))
+      clearTimeBtn.contentTintColor = SeptaskKitTheme.inkSecondary
+      clearTimeBtn.target = self
+      clearTimeBtn.action = #selector(clearTimePressed)
+
+      topRow.addArrangedSubview(lbl)
+      topRow.addArrangedSubview(startTimePicker)
+      topRow.addArrangedSubview(clearTimeBtn)
+
+      let durRow = NSStackView()
+      durRow.orientation = .horizontal
+      durRow.alignment = .centerY
+      durRow.spacing = 6
+      durationPills = []
+      for preset in TaskTimeSlot.quickDurations {
+        let pill = KitPillButton()
+        pill.title = preset.label
+        pill.isOn = durationMinutes == preset.minutes
+        pill.onPress = { [weak self] _ in self?.toggleDuration(preset.minutes) }
+        durRow.addArrangedSubview(pill)
+        durationPills.append((preset.minutes, pill))
+      }
+
+      timeControlsContainer.addArrangedSubview(topRow)
+      timeControlsContainer.addArrangedSubview(durRow)
+      stack.addArrangedSubview(timeControlsContainer)
+      timeControlsContainer.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
+
+      let hasTime = startTime != nil
+      timeDisclosureButton.isHidden = hasTime
+      timeControlsContainer.isHidden = !hasTime
+    }
 
     // The strip sets the width; the single-cell rows match it so every
     // highlight spans the same column.
@@ -953,6 +1771,39 @@ private final class KitDateBoard: NSView {
     } else {
       onPick(date, false)
     }
+  }
+
+  @objc private func revealTimeControls() {
+    if startTime == nil {
+      startTime = "09:00"
+      startTimePicker.dateValue = TaskTimeSlot.pickerDate(from: startTime)
+      onTimeSlotChange?(startTime, durationMinutes)
+    }
+    timeDisclosureButton.isHidden = true
+    timeControlsContainer.isHidden = false
+  }
+
+  @objc private func startTimeChanged() {
+    startTime = TaskTimeSlot.hhmm(from: startTimePicker.dateValue)
+    onTimeSlotChange?(startTime, durationMinutes)
+  }
+
+  private func toggleDuration(_ minutes: Int) {
+    if startTime == nil {
+      startTime = TaskTimeSlot.hhmm(from: startTimePicker.dateValue)
+    }
+    durationMinutes = durationMinutes == minutes ? nil : minutes
+    for entry in durationPills { entry.pill.isOn = entry.minutes == durationMinutes }
+    onTimeSlotChange?(startTime, durationMinutes)
+  }
+
+  @objc private func clearTimePressed() {
+    startTime = nil
+    durationMinutes = nil
+    for entry in durationPills { entry.pill.isOn = false }
+    timeControlsContainer.isHidden = true
+    timeDisclosureButton.isHidden = false
+    onTimeSlotChange?(nil, nil)
   }
 
   // MARK: Focus
@@ -1278,5 +2129,357 @@ private final class KitDateCell: NSView {
     formatter.setLocalizedDateFormatFromTemplate("EEEEMMMd")
     return formatter
   }()
+}
+
+// MARK: - Tag popover (⇧⌘T, docs/TAGS_SPEC.md §4)
+
+/// Lightweight AppKit type-to-filter/assign/create tag popover anchored to a
+/// task row, composer pill, or inspector button. Supports single & multi-select
+/// with shared `TaskUndo`, plus a "Manage Tags…" modal sheet.
+@MainActor
+enum SeptaskKitTagPopover {
+  static func present(taskIDs: [String],
+                      relativeTo rect: NSRect,
+                      of positioningView: NSView,
+                      onChanged: @escaping () -> Void) {
+    guard !taskIDs.isEmpty else { return }
+    let handle = KitPopoverHandle()
+    let board = KitTagBoard(taskIDs: taskIDs,
+                            hostWindow: positioningView.window,
+                            onChanged: onChanged,
+                            onClose: { handle.close() })
+    KitPopover.present(board, relativeTo: rect, of: positioningView,
+                       focus: board.searchField, handle: handle)
+  }
+}
+
+@MainActor
+private final class KitTagBoard: NSView, NSTextFieldDelegate {
+  private let taskIDs: [String]
+  private weak var hostWindow: NSWindow?
+  private let onChanged: () -> Void
+  private let onClose: () -> Void
+
+  let searchField = NSTextField()
+  private let listStack = NSStackView()
+  private let emptyLabel = NSTextField(labelWithString: "")
+  private let manageButton = NSButton()
+  private var allTags: [TaskTag] = []
+
+  private var context: ModelContext { LocalStore.shared.container.mainContext }
+  private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
+
+  init(taskIDs: [String],
+       hostWindow: NSWindow?,
+       onChanged: @escaping () -> Void,
+       onClose: @escaping () -> Void) {
+    self.taskIDs = taskIDs
+    self.hostWindow = hostWindow
+    self.onChanged = onChanged
+    self.onClose = onClose
+    super.init(frame: NSRect(x: 0, y: 0, width: 256, height: 268))
+    translatesAutoresizingMaskIntoConstraints = false
+
+    searchField.placeholderString = String(localized: "Filter or create tag…",
+                                           comment: "SeptaskKit: tag popover search/create field")
+    searchField.font = .systemFont(ofSize: SeptenaTypeScale.size(.callout))
+    searchField.isBordered = true
+    searchField.bezelStyle = .roundedBezel
+    searchField.delegate = self
+    searchField.translatesAutoresizingMaskIntoConstraints = false
+
+    let scroll = NSScrollView()
+    scroll.drawsBackground = false
+    scroll.borderType = .noBorder
+    scroll.hasVerticalScroller = true
+    scroll.autohidesScrollers = true
+    scroll.translatesAutoresizingMaskIntoConstraints = false
+
+    let doc = KitTagFlippedView()
+    doc.translatesAutoresizingMaskIntoConstraints = false
+    listStack.orientation = .vertical
+    listStack.alignment = .leading
+    listStack.spacing = 2
+    listStack.translatesAutoresizingMaskIntoConstraints = false
+    doc.addSubview(listStack)
+    scroll.documentView = doc
+
+    emptyLabel.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+    emptyLabel.textColor = SeptaskKitTheme.inkSecondary
+    emptyLabel.alignment = .center
+    emptyLabel.lineBreakMode = .byWordWrapping
+    emptyLabel.maximumNumberOfLines = 2
+    emptyLabel.translatesAutoresizingMaskIntoConstraints = false
+
+    manageButton.isBordered = false
+    manageButton.bezelStyle = .inline
+    manageButton.title = String(localized: "Manage Tags…", comment: "SeptaskKit: manage tags button")
+    manageButton.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+    manageButton.contentTintColor = SeptaskKitTheme.inkSecondary
+    manageButton.target = self
+    manageButton.action = #selector(openManageTags)
+    manageButton.translatesAutoresizingMaskIntoConstraints = false
+
+    let divider = NSBox()
+    divider.boxType = .separator
+    divider.translatesAutoresizingMaskIntoConstraints = false
+
+    addSubview(searchField)
+    addSubview(scroll)
+    addSubview(emptyLabel)
+    addSubview(divider)
+    addSubview(manageButton)
+
+    let clip = scroll.contentView
+    NSLayoutConstraint.activate([
+      widthAnchor.constraint(equalToConstant: 256),
+      heightAnchor.constraint(equalToConstant: 268),
+      searchField.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+      searchField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+      searchField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+      scroll.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 8),
+      scroll.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+      scroll.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+      scroll.bottomAnchor.constraint(equalTo: divider.topAnchor, constant: -6),
+      doc.topAnchor.constraint(equalTo: clip.topAnchor),
+      doc.leadingAnchor.constraint(equalTo: clip.leadingAnchor),
+      doc.widthAnchor.constraint(equalTo: clip.widthAnchor),
+      listStack.topAnchor.constraint(equalTo: doc.topAnchor),
+      listStack.leadingAnchor.constraint(equalTo: doc.leadingAnchor),
+      listStack.trailingAnchor.constraint(equalTo: doc.trailingAnchor),
+      listStack.bottomAnchor.constraint(equalTo: doc.bottomAnchor),
+      emptyLabel.centerXAnchor.constraint(equalTo: scroll.centerXAnchor),
+      emptyLabel.centerYAnchor.constraint(equalTo: scroll.centerYAnchor),
+      emptyLabel.widthAnchor.constraint(lessThanOrEqualTo: scroll.widthAnchor, constant: -16),
+      divider.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+      divider.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+      divider.bottomAnchor.constraint(equalTo: manageButton.topAnchor, constant: -6),
+      manageButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+      manageButton.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
+    ])
+
+    reload()
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitTagBoard is code-only") }
+
+  private func currentTagSets() -> [String: [String]] {
+    let tasks = LocalCache.allTasks(in: context)
+    var out: [String: [String]] = [:]
+    for id in taskIDs {
+      if let t = tasks.first(where: { $0.id == id }) { out[id] = t.tags }
+    }
+    return out
+  }
+
+  private func filteredTags() -> [TaskTag] {
+    let q = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !q.isEmpty else { return allTags }
+    return allTags.filter { $0.name.localizedCaseInsensitiveContains(q) }
+  }
+
+  private func reload() {
+    allTags = LocalCache.allTags(in: context)
+    for v in listStack.arrangedSubviews {
+      listStack.removeArrangedSubview(v)
+      v.removeFromSuperview()
+    }
+    let query = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    let matches = filteredTags()
+    let sets = currentTagSets()
+
+    for tag in matches {
+      let count = sets.values.filter { $0.contains(tag.id) }.count
+      let state: Int = count == 0 ? 0 : (count == sets.count ? 2 : 1)
+      let row = makeRowButton(tag: tag, state: state)
+      listStack.addArrangedSubview(row)
+      row.widthAnchor.constraint(equalTo: listStack.widthAnchor).isActive = true
+    }
+
+    let exactExists = allTags.contains { $0.name.localizedCaseInsensitiveCompare(query) == .orderedSame }
+    if !query.isEmpty, !exactExists {
+      let createBtn = NSButton()
+      createBtn.isBordered = false
+      createBtn.bezelStyle = .inline
+      createBtn.alignment = .left
+      createBtn.font = .systemFont(ofSize: SeptenaTypeScale.size(.callout), weight: .medium)
+      createBtn.title = String(localized: "Create \"\(query)\"", comment: "SeptaskKit: create tag option")
+      createBtn.contentTintColor = NSColor.labelColor
+      createBtn.target = self
+      createBtn.action = #selector(createFromSearch)
+      createBtn.translatesAutoresizingMaskIntoConstraints = false
+      createBtn.heightAnchor.constraint(equalToConstant: 26).isActive = true
+      listStack.addArrangedSubview(createBtn)
+      createBtn.widthAnchor.constraint(equalTo: listStack.widthAnchor).isActive = true
+    }
+
+    if matches.isEmpty && query.isEmpty {
+      emptyLabel.stringValue = String(localized: "Type a name and press Return to create a tag.",
+                                      comment: "SeptaskKit: empty tag popover hint")
+      emptyLabel.isHidden = false
+    } else {
+      emptyLabel.isHidden = true
+    }
+  }
+
+  private func makeRowButton(tag: TaskTag, state: Int) -> NSView {
+    let row = KitTagPopoverRow(tag: tag, state: state) { [weak self] in
+      self?.toggle(tag)
+    }
+    row.heightAnchor.constraint(equalToConstant: 26).isActive = true
+    return row
+  }
+
+  private func toggle(_ tag: TaskTag) {
+    let before = currentTagSets()
+    guard !before.isEmpty else { return }
+    let allHave = before.values.allSatisfy { $0.contains(tag.id) }
+    var after: [String: [String]] = [:]
+    for (id, tags) in before {
+      let next = allHave ? tags.filter { $0 != tag.id } : (tags.contains(tag.id) ? tags : tags + [tag.id])
+      after[id] = next
+      mutator.setTaskTags(id: id, tagIDs: next)
+    }
+    TaskUndo.recordTaskTags(before: before, after: after, mutator: mutator)
+    reload()
+    onChanged()
+  }
+
+  @objc private func createFromSearch() {
+    commitSearchReturn()
+  }
+
+  private func commitSearchReturn() {
+    let query = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !query.isEmpty else { onClose(); return }
+    if let exact = allTags.first(where: { $0.name.localizedCaseInsensitiveCompare(query) == .orderedSame }) {
+      toggle(exact)
+      searchField.stringValue = ""
+      reload()
+      return
+    }
+    let matches = filteredTags()
+    if matches.count == 1 {
+      toggle(matches[0])
+      searchField.stringValue = ""
+      reload()
+      return
+    }
+    guard let created = mutator.createTag(name: query) else { return }
+    TaskUndo.recordTagCreate(created, mutator: mutator)
+    toggle(created)
+    searchField.stringValue = ""
+    reload()
+  }
+
+  @objc private func openManageTags() {
+    let window = hostWindow ?? self.window?.parent
+    let notify = onChanged
+    onClose()
+    guard let window else { return }
+    let hosting = NSHostingController(
+      rootView: ManageTagsSheet()
+        .modelContainer(LocalStore.shared.container)
+    )
+    let sheetWindow = NSWindow(contentViewController: hosting)
+    sheetWindow.title = String(localized: "Manage Tags", comment: "Manage tags sheet title")
+    sheetWindow.styleMask = [.titled, .closable]
+    window.beginSheet(sheetWindow) { _ in notify() }
+  }
+
+  func controlTextDidChange(_ obj: Notification) {
+    reload()
+  }
+
+  func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+    if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+      commitSearchReturn()
+      return true
+    }
+    if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+      onClose()
+      return true
+    }
+    return false
+  }
+}
+
+@MainActor
+private final class KitTagFlippedView: NSView {
+  override var isFlipped: Bool { true }
+}
+
+@MainActor
+private final class KitTagPopoverRow: NSView {
+  private let onTap: () -> Void
+  private var hovered = false
+  private var tracking: NSTrackingArea?
+
+  init(tag: TaskTag, state: Int, onTap: @escaping () -> Void) {
+    self.onTap = onTap
+    super.init(frame: .zero)
+    translatesAutoresizingMaskIntoConstraints = false
+
+    let dot = NSView()
+    dot.wantsLayer = true
+    dot.layer?.cornerRadius = 3.5
+    dot.layer?.backgroundColor = TagColorPalette.nsColor(for: tag.color).cgColor
+    dot.translatesAutoresizingMaskIntoConstraints = false
+
+    let label = NSTextField(labelWithString: tag.name)
+    label.font = .systemFont(ofSize: SeptenaTypeScale.size(.callout))
+    label.textColor = .labelColor
+    label.lineBreakMode = .byTruncatingTail
+    label.translatesAutoresizingMaskIntoConstraints = false
+
+    let mark = NSImageView()
+    mark.translatesAutoresizingMaskIntoConstraints = false
+    if state == 2 {
+      mark.image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: nil)?
+        .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
+      mark.contentTintColor = .labelColor
+    } else if state == 1 {
+      mark.image = NSImage(systemSymbolName: "minus", accessibilityDescription: nil)?
+        .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
+      mark.contentTintColor = SeptaskKitTheme.inkSecondary
+    }
+
+    addSubview(dot)
+    addSubview(label)
+    addSubview(mark)
+    NSLayoutConstraint.activate([
+      dot.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+      dot.centerYAnchor.constraint(equalTo: centerYAnchor),
+      dot.widthAnchor.constraint(equalToConstant: 7),
+      dot.heightAnchor.constraint(equalToConstant: 7),
+      label.leadingAnchor.constraint(equalTo: dot.trailingAnchor, constant: 8),
+      label.centerYAnchor.constraint(equalTo: centerYAnchor),
+      mark.leadingAnchor.constraint(greaterThanOrEqualTo: label.trailingAnchor, constant: 8),
+      mark.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+      mark.centerYAnchor.constraint(equalTo: centerYAnchor),
+      mark.widthAnchor.constraint(equalToConstant: 14),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitTagPopoverRow is code-only") }
+
+  override func draw(_ dirtyRect: NSRect) {
+    guard hovered else { return }
+    SeptaskKitTheme.listSelectionFill(emphasized: true).setFill()
+    NSBezierPath(roundedRect: bounds, xRadius: 5, yRadius: 5).fill()
+  }
+
+  override func updateTrackingAreas() {
+    super.updateTrackingAreas()
+    if let tracking { removeTrackingArea(tracking) }
+    let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow],
+                              owner: self, userInfo: nil)
+    addTrackingArea(area)
+    tracking = area
+  }
+
+  override func mouseEntered(with event: NSEvent) { hovered = true; needsDisplay = true }
+  override func mouseExited(with event: NSEvent) { hovered = false; needsDisplay = true }
+  override func mouseUp(with event: NSEvent) { onTap() }
 }
 #endif

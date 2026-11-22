@@ -1,5 +1,8 @@
 import type { Tool } from "../rpc.js";
 import {
+  checklistAddJsonSchema,
+  checklistDeleteJsonSchema,
+  checklistUpdateJsonSchema,
   completeTaskJsonSchema,
   createTaskJsonSchema,
   deferTaskJsonSchema,
@@ -26,10 +29,10 @@ export const listTasksJsonSchema = {
   properties: {
     view: {
       type: "string",
-      enum: ["today", "inbox", "anytime", "upcoming", "completed"],
+      enum: ["today", "inbox", "review", "anytime", "upcoming", "completed"],
       default: "today",
       description:
-        "Which task list to read. 'today' = the whole Today page as the app shows it: the Inbox section first, then every task due today. 'inbox' = only the Inbox section: tasks the user has not filed yet (no area or project) and your proposals they have not accepted. 'anytime' is the single home for open, dateless tasks. Rows carry `inbox: true` when they sit in the Inbox, and `daysOnToday: N` when they have carried over on Today undone for N days (the app darkens their checkbox; 7+ is long overdue for a decision).",
+        "Which task list to read. 'today' = the whole Today page as the app shows it: the Inbox section first, then every task due today. 'inbox' = only the Inbox section: tasks the user has not filed yet (no area or project) and your proposals they have not accepted. 'review' = open tasks awaiting the user's verification (`endState = needs_verify`). 'anytime' is the single home for open, dateless tasks. Rows carry `inbox: true` when they sit in the Inbox, and `daysOnToday: N` when they have carried over on Today undone for N days (the app darkens their checkbox; 7+ is long overdue for a decision).",
     },
     limit: {
       type: "integer",
@@ -37,7 +40,20 @@ export const listTasksJsonSchema = {
       maximum: 500,
       default: 100,
     },
+    tag: {
+      oneOf: [
+        { type: "string", minLength: 1 },
+        { type: "array", items: { type: "string", minLength: 1 } },
+      ],
+      description:
+        "Optional tag name (or array of tag names) to filter by, case-insensitive, AND semantics (tasks must carry every listed tag).",
+    },
   },
+} as const;
+
+export const listTagsJsonSchema = {
+  type: "object",
+  properties: {},
 } as const;
 
 export const listAreasJsonSchema = {
@@ -60,7 +76,7 @@ export const TASK_TOOLS: Tool[] = [
     name: "tasks_list",
     title: "List tasks",
     description:
-      "List Septena tasks for a given view (today, inbox, upcoming, anytime, completed). 'today' is the whole Today page the user sees: the Inbox section first, then the filed tasks due today. 'inbox' is that Inbox section alone: unfiled tasks (no area or project) plus your proposals the user has not accepted. The user sees ONE Inbox; never describe it as two piles. Each row carries `inbox: true` when it sits in the Inbox, and `daysOnToday: N` when it has carried over on Today undone for N days (the app darkens its checkbox; flag rows at 7+ as stuck). Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
+      "List Septena tasks for a given view (today, inbox, review, upcoming, anytime, completed). 'today' is the whole Today page the user sees: the Inbox section first, then the filed tasks due today. 'inbox' is that Inbox section alone: unfiled tasks (no area or project) plus your proposals the user has not accepted. 'review' lists open tasks waiting for the user to check and accept (`needs_verify`). The user sees ONE Inbox; never describe it as two piles. Each row carries `inbox: true` when it sits in the Inbox, and `daysOnToday: N` when it has carried over on Today undone for N days (the app darkens its checkbox; flag rows at 7+ as stuck). Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
     inputSchema: listTasksJsonSchema,
     annotations: { title: "List tasks", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
@@ -85,6 +101,13 @@ export const TASK_TOOLS: Tool[] = [
     description: "List Septena areas available for task assignment (top-level containers like 'home', 'envisioning'). Each area carries its notes and noteRev.",
     inputSchema: listAreasJsonSchema,
     annotations: { title: "List areas", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "tasks_list_tags",
+    title: "List tags",
+    description: "List the user's existing tags with open task counts so you reuse their vocabulary instead of inventing synonyms.",
+    inputSchema: listTagsJsonSchema,
+    annotations: { title: "List tags", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
     name: "tasks_create",
@@ -176,5 +199,26 @@ export const TASK_TOOLS: Tool[] = [
     description: "List tasks awaiting reasoning: marked for Claude, or whose last provider turn was low-confidence, and not yet terminal.",
     inputSchema: pendingReasoningJsonSchema,
     annotations: { title: "List tasks awaiting reasoning", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "tasks_checklist_add",
+    title: "Add checklist items",
+    description: "Append one or more 1-level checklist steps to a task.",
+    inputSchema: checklistAddJsonSchema,
+    annotations: { title: "Add checklist items", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  {
+    name: "tasks_checklist_update",
+    title: "Update checklist item",
+    description: "Rename, check/uncheck, or reorder a checklist item on a task. Checking all items does not auto-complete the parent task.",
+    inputSchema: checklistUpdateJsonSchema,
+    annotations: { title: "Update checklist item", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "tasks_checklist_delete",
+    title: "Delete checklist item",
+    description: "Delete a checklist item from a task.",
+    inputSchema: checklistDeleteJsonSchema,
+    annotations: { title: "Delete checklist item", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   },
 ];

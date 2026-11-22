@@ -136,6 +136,7 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDisplayName: Septena
+        CFBundleName: Septena
         CFBundleLocalizations:
           - en
           - fr
@@ -145,8 +146,8 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         # The app glyph, small and subtle, centered on the system background
         # (white / black). Both are Septask/Assets.xcassets assets with light
-        # and dark variants; the glyph PDFs are generated from the icon's own
-        # discs by scripts/render-launch-glyph.swift (#82).
+        # and dark variants; the monochrome compass glyph PDFs are generated
+        # by scripts/render-launch-glyph.swift (#82).
         UILaunchScreen:
           UIImageName: LaunchGlyph
           UIColorName: LaunchBackground
@@ -183,8 +184,10 @@ targets:
       Release: Config/Base.xcconfig
     settings:
       base:
+        PRODUCT_NAME: Septena
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.tasks
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
         # No global accent: controls, toggles, selection and menus use the
         # platform accent (the user's System Settings accent on macOS).
         GENERATE_INFOPLIST_FILE: NO
@@ -203,11 +206,13 @@ targets:
     platform: iOS
     sources:
       - path: ShareExtension/ShareViewController.swift
+      - path: ShareExtension/PrivacyInfo.xcprivacy
       - path: SeptenaCore/SharedTaskCapture.swift
     info:
       path: ShareExtension/SeptaskShare-Info.plist
       properties:
         CFBundleDisplayName: Septena
+        CFBundleName: Septena
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
@@ -305,9 +310,9 @@ targets:
       Release: Config/Base.xcconfig
     settings:
       base:
-        # Target name disambiguates from the iOS target; the shipped bundle
-        # is Septask.app (same pattern as SeptenaMac → Septena.app).
-        PRODUCT_NAME: Septask
+        # Target name stays `SeptaskMac` internally; the shipped app bundle
+        # is `Septena.app` (ADR 0007).
+        PRODUCT_NAME: Septena
         # Same bundle ID as iOS: one App Store record per product, one purchase
         # on both platforms (ADR 0007). Was com.septena.tasks.mac until 2026-11-19.
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.tasks
@@ -344,6 +349,7 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDisplayName: Septena
+        CFBundleName: Septena
         WKApplication: true
         WKCompanionAppBundleIdentifier: com.septena.tasks
     configFiles:
@@ -351,6 +357,7 @@ targets:
       Release: Config/Base.xcconfig
     settings:
       base:
+        PRODUCT_NAME: Septena
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.tasks.watchkitapp
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: NO
@@ -375,6 +382,8 @@ targets:
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDisplayName: Septena
+        CFBundleName: Septena
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     configFiles:

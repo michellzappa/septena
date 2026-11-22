@@ -7,14 +7,19 @@ import { DOMAIN_RULES, VIEW_ALIASES } from "../generated/registries.js";
 // disagree on what "Today" or "pending reasoning" means.
 
 export type TaskView =
-  | "today" | "inbox" | "anytime" | "upcoming" | "completed";
+  | "today" | "inbox" | "review" | "anytime" | "upcoming" | "completed";
 
 export interface TaskOut {
   id: string;
   title: string;
   status: string;
   today: boolean;
+  starred?: boolean;
+  tags?: string[];
   scheduled?: string;
+  startTime?: string;
+  durationMinutes?: number;
+  timeZone?: string;
   deadline?: string;
   area?: string;
   project?: string;
@@ -45,12 +50,15 @@ export interface TaskOut {
   reminderAt?: string;
   reminderMode?: "floating" | "fixed";
   reminderSnoozedUntil?: string;
+  checklistCount?: number;
+  checklistDoneCount?: number;
   // Derived on output by `annotate` (absent = false / 0):
   // `inbox` = the row sits in Today's Inbox section in the app.
   // `daysOnToday` = days the row has carried over on Today undone; the app
   // darkens the checkbox one seventh per day (SeptenaCore todayTenureFill).
   inbox?: true;
   daysOnToday?: number;
+  reviewNote?: string;
 }
 
 /// Retired view names stay accepted so existing agent calls keep working:

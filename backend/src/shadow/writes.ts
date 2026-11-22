@@ -2,10 +2,10 @@ import { z } from "zod";
 import type { Env } from "../env.js";
 import { randomId } from "../util.js";
 import { localServerTimestamp, todayYMD } from "../tz.js";
-import { nextScheduledDate, occurrenceID } from "../recurrence.js";
+import { checklistOccurrenceID, nextScheduledDate, occurrenceID } from "../recurrence.js";
 import { shiftReminderForRecurrence, shiftReminderOnReschedule } from "../reminders.js";
 import { storeFor } from "../api/session.js";
-import { zId } from "../store/columns.js";
+import { MAX_TAGS_PER_TASK, TAG_NAME_MAX, zId } from "../store/columns.js";
 import { zPushBody, type Op, type OpResult } from "../store/ops.js";
 import { AGENT_WRITE_RULES, type Row, type TaskStore } from "../store/TaskStore.js";
 import {
@@ -57,7 +57,9 @@ const ORDER_GAP = 1024;
 /// The DO's methods as plain async calls. Typed from TaskStore's own
 /// declarations: the generated RPC stub type recurses too deep on JSON rows.
 type StoreMethod =
-  | "readTasks" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates"
+  | "readTasks" | "readReviewTasks" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates"
+  | "readChecklistItems" | "readChecklistItem" | "readChecklistCounts"
+  | "readTags" | "readTagByName"
   | "readOrderTop" | "readSetting" | "push" | "claim" | "release" | "agentEvents" | "history" | "head"
   | "readNote" | "noteRevisions" | "readContainer" | "readContainerTasks";
 export type StoreRpc = {
@@ -68,6 +70,8 @@ export const rpcStoreFor = (env: Env, userId: string) => storeFor(env, userId) a
 // ---- argument schemas (validated before anything reaches the store) ----
 
 const zDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD");
+const zTime24 = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "expected HH:MM");
+const zTime24OrClear = z.union([zTime24, z.literal("")]).nullable();
 /// "" clears, as on the live connector, which writes "" to CloudKit.
 const zDayOrClear = z.union([zDay, z.literal("")]).nullable();
 const zOrdinalWeekday = z.object({
@@ -90,7 +94,14 @@ export const zWriteArgs = {
   tasks_create: z.object({
     title: z.string().min(1),
     today: z.boolean().optional(),
+    starred: z.boolean().optional(),
     scheduled: zDay.optional(),
+    start_time: zTime24.nullable().optional(),
+    startTime: zTime24.nullable().optional(),
+    duration_minutes: z.number().int().min(5).max(1440).nullable().optional(),
+    durationMinutes: z.number().int().min(5).max(1440).nullable().optional(),
+    time_zone: z.string().max(64).nullable().optional(),
+    timeZone: z.string().max(64).nullable().optional(),
     deadline: zDay.optional(),
     due: zDay.optional(),
     area: z.string().optional(),
@@ -101,6 +112,8 @@ export const zWriteArgs = {
     reminderAt: z.string().nullable().optional(),
     reminder_mode: z.enum(["floating", "fixed"]).nullable().optional(),
     reminderMode: z.enum(["floating", "fixed"]).nullable().optional(),
+    checklist: z.array(z.string().min(1).max(2000)).max(200).optional(),
+    tags: z.array(z.string().trim().min(1).max(TAG_NAME_MAX)).max(MAX_TAGS_PER_TASK).optional(),
     origin: z.enum(["user_request", "agent_suggestion"]).optional(),
   }),
   tasks_complete: z.object({ id: zId }),
@@ -108,7 +121,14 @@ export const zWriteArgs = {
     id: zId,
     title: z.string().optional(),
     today: z.boolean().optional(),
+    starred: z.boolean().optional(),
     scheduled: zDayOrClear.optional(),
+    start_time: zTime24OrClear.optional(),
+    startTime: zTime24OrClear.optional(),
+    duration_minutes: z.number().int().min(5).max(1440).nullable().optional(),
+    durationMinutes: z.number().int().min(5).max(1440).nullable().optional(),
+    time_zone: z.string().max(64).nullable().optional(),
+    timeZone: z.string().max(64).nullable().optional(),
     deadline: zDayOrClear.optional(),
     due: zDayOrClear.optional(),
     area: z.string().nullable().optional(),
@@ -120,6 +140,7 @@ export const zWriteArgs = {
     reminderAt: z.string().nullable().optional(),
     reminder_mode: z.enum(["floating", "fixed"]).nullable().optional(),
     reminderMode: z.enum(["floating", "fixed"]).nullable().optional(),
+    tags: z.array(z.string().trim().min(1).max(TAG_NAME_MAX)).max(MAX_TAGS_PER_TASK).nullable().optional(),
   }),
   tasks_defer: z.object({ id: zId, until: zDay }),
   tasks_move_to_today: z.object({ id: zId }),
@@ -165,6 +186,19 @@ export const zWriteArgs = {
       actionType: z.enum(["open_url", "compose", "call", "none"]).optional(),
       payload: z.string().optional(),
     }),
+  }),
+  tasks_checklist_add: z.object({
+    task_id: zId,
+    items: z.array(z.string().min(1).max(2000)).min(1).max(200),
+  }),
+  tasks_checklist_update: z.object({
+    id: zId,
+    title: z.string().min(1).max(2000).optional(),
+    checked: z.boolean().optional(),
+    position: z.number().finite().optional(),
+  }),
+  tasks_checklist_delete: z.object({
+    id: zId,
   }),
 };
 export type WriteToolName = keyof typeof zWriteArgs;
@@ -218,6 +252,12 @@ export async function runWriteTool(ctx: WriteContext, name: WriteToolName, args:
       await writeConvo(ctx, args.id as string, { handoff: dropUndefined(normalizeHandoff(h)) });
       return { id: args.id, handoff: h.instruction };
     }
+    case "tasks_checklist_add":
+      return checklistAdd(ctx, args.task_id as string, args.items as string[]);
+    case "tasks_checklist_update":
+      return checklistUpdate(ctx, args as { id: string; title?: string; checked?: boolean; position?: number });
+    case "tasks_checklist_delete":
+      return checklistDelete(ctx, args.id as string);
   }
 }
 
@@ -247,7 +287,7 @@ function requireApplied(r: OpResult | undefined, id: string): void {
     throw new Error(`Task not found: ${id}`);
   }
   if (r?.status === "rejected" && r.reason === "stopped") {
-    throw new Error(`Task ${id} was not changed: the user stopped agent work on it. Only the user can resume it in Septask.`);
+    throw new Error(`Task ${id} was not changed: the user stopped agent work on it. Only the user can resume it in Septena.`);
   }
   if (r?.status === "rejected" && r.reason === "human_accepts") {
     throw new Error(`Task ${id} was not completed (human_accepts): ${r.rule ?? AGENT_WRITE_RULES.human_accepts}`);
@@ -264,6 +304,45 @@ async function assertKnownContainer(store: StoreRpc, kind: "area" | "project", i
   const rows = kind === "area" ? await store.readAreas(500) : await store.readProjects("all", 500);
   const message = unknownContainerMessage(kind, id, rows.map((r) => ({ id: r.id as string, title: str(r.title) ?? "" })));
   if (message) throw new Error(message);
+}
+
+/// Resolve human tag names case-insensitively against the store's live tags,
+/// producing `tag` upsert ops for any missing tags (unless `allowCreate` is
+/// false). Deduplicates case-insensitively and caps at `MAX_TAGS_PER_TASK`.
+async function resolveTagNames(
+  store: StoreRpc,
+  rawNames: string[],
+  allowCreate: boolean,
+): Promise<{ tagIds: string[]; tagNames: string[]; tagOps: NewOp[] }> {
+  const existing = await store.readTags();
+  const byLower = new Map<string, { id: string; name: string }>();
+  for (const r of existing) {
+    const name = str(r.name);
+    if (name) byLower.set(name.toLowerCase(), { id: r.id as string, name });
+  }
+  const tagIds: string[] = [];
+  const tagNames: string[] = [];
+  const tagOps: NewOp[] = [];
+  const seenIds = new Set<string>();
+  for (const raw of rawNames) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    let entry = byLower.get(key);
+    if (!entry) {
+      if (!allowCreate) continue;
+      const id = `tag-${randomId(10)}`;
+      entry = { id, name: trimmed };
+      byLower.set(key, entry);
+      tagOps.push({ op: "upsert", entity: "tag", id, fields: { name: trimmed } });
+    }
+    if (!seenIds.has(entry.id) && tagIds.length < MAX_TAGS_PER_TASK) {
+      seenIds.add(entry.id);
+      tagIds.push(entry.id);
+      tagNames.push(entry.name);
+    }
+  }
+  return { tagIds, tagNames, tagOps };
 }
 
 /// The app's `TaskEntity.isOnToday`: pinned, or scheduled / deadline arrived.
@@ -319,11 +398,17 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     source: "mcp",
     sourceClient: "Claude",
     today: input.today === true,
+    starred: input.starred === true,
     position,
   };
   if (input.today) fields.todaySetOn = today;
   if (plan.committed) fields.acknowledgedAt = now;
   if (input.scheduled) fields.scheduled = input.scheduled;
+  if (plan.startTime) {
+    fields.startTime = plan.startTime;
+    if (plan.durationMinutes !== null) fields.durationMinutes = plan.durationMinutes;
+    if (plan.timeZone) fields.timeZone = plan.timeZone;
+  }
   if (plan.deadline) fields.deadline = plan.deadline;
   // A project implies its area: the app stores one or the other.
   if (input.project) fields.project = input.project;
@@ -340,9 +425,45 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
   }
   if (onToday(fields, today)) fields.todayPosition = position;
 
-  const [r] = await push(store, [{ op: "upsert", entity: "task", id, fields }]);
+  const ops: NewOp[] = [];
+  let resolvedTagNames: string[] = [];
+  if (input.tags && input.tags.length > 0) {
+    const paused = (await store.readSetting("agentsPaused")) === true;
+    const resolved = await resolveTagNames(store, input.tags, !paused);
+    ops.push(...resolved.tagOps);
+    if (resolved.tagIds.length > 0) fields.tags = resolved.tagIds;
+    resolvedTagNames = resolved.tagNames;
+  }
+  const taskOpIdx = ops.length;
+  ops.push({ op: "upsert", entity: "task", id, fields });
+  const createdChecklist: Array<{ id: string; title: string; position: number }> = [];
+  if (input.checklist && input.checklist.length > 0) {
+    for (let i = 0; i < input.checklist.length; i++) {
+      const stepTitle = input.checklist[i].trim();
+      if (!stepTitle) continue;
+      const itemId = `chk-${randomId(10)}`;
+      const pos = (createdChecklist.length + 1) * ORDER_GAP;
+      ops.push({
+        op: "upsert",
+        entity: "checklistItem",
+        id: itemId,
+        fields: { taskId: id, title: stepTitle, checked: false, position: pos, createdAt: now },
+      });
+      createdChecklist.push({ id: itemId, title: stepTitle, position: pos });
+    }
+  }
+
+  const results = await push(store, ops);
+  const r = results[taskOpIdx];
   if (!applied(r)) throw new Error(`Task was not created: ${r?.status === "rejected" ? r.reason : r?.status ?? "no result"}`);
-  return { id, title: input.title, placement: plan.placement, ...plan.echo };
+  return {
+    id,
+    title: input.title,
+    placement: plan.placement,
+    ...plan.echo,
+    ...(resolvedTagNames.length > 0 ? { tags: resolvedTagNames } : {}),
+    ...(createdChecklist.length > 0 ? { checklist: createdChecklist } : {}),
+  };
 }
 
 async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
@@ -354,7 +475,8 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
   const old = current.task;
   const storedScheduled = updateNeedsStoredSchedule(input) ? (str(old.scheduled) ?? null) : undefined;
   const { fields: p, updated } = planUpdate(input, storedScheduled);
-  if (updated.length === 0) return { id: input.id, updated: [] };
+  const hasTagChange = input.tags !== undefined;
+  if (updated.length === 0 && !hasTagChange) return { id: input.id, updated: [] };
 
   const today = todayYMD(ctx.timeZone);
   const clear = (v: string | null) => (v === "" ? null : v);
@@ -364,6 +486,7 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
     fields.today = p.today;
     fields.todaySetOn = p.today ? today : null;
   }
+  if (p.starred !== undefined) fields.starred = p.starred;
   if (p.scheduled !== undefined) {
     const nextSched = clear(p.scheduled);
     fields.scheduled = nextSched;
@@ -387,6 +510,9 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
     fields.reminderDismissedAt = null;
   }
   if (p.deadline !== undefined) fields.deadline = clear(p.deadline);
+  if (p.startTime !== undefined) fields.startTime = p.startTime;
+  if (p.durationMinutes !== undefined) fields.durationMinutes = p.durationMinutes;
+  if (p.timeZone !== undefined) fields.timeZone = p.timeZone;
   if (p.area !== undefined) fields.area = clear(p.area);
   if (p.project !== undefined) fields.project = clear(p.project);
   if (p.heading !== undefined) fields.heading = null;
@@ -414,8 +540,25 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
     fields.todayPosition = (fields.position as number | undefined) ?? num(old.position) ?? (await topPosition(store));
   }
 
-  const [r] = await push(store, [{ op: "upsert", entity: "task", id: input.id, fields }]);
-  requireApplied(r, input.id);
+  const ops: NewOp[] = [];
+  if (input.tags !== undefined) {
+    updated.push("tags");
+    if (input.tags === null || input.tags.length === 0) {
+      fields.tags = null;
+    } else {
+      // Never auto-create tags when the task is stopped or agents are paused;
+      // the task op itself still hits TaskStore so the store refuses cleanly.
+      const allowCreate = !current.convo?.stoppedAt && (await store.readSetting("agentsPaused")) !== true;
+      const resolved = await resolveTagNames(store, input.tags, allowCreate);
+      if (allowCreate) ops.push(...resolved.tagOps);
+      fields.tags = resolved.tagIds.length > 0 ? resolved.tagIds : null;
+    }
+  }
+  const taskOpIdx = ops.length;
+  ops.push({ op: "upsert", entity: "task", id: input.id, fields });
+
+  const results = await push(store, ops);
+  requireApplied(results[taskOpIdx], input.id);
   return { id: input.id, updated };
 }
 
@@ -478,15 +621,18 @@ async function completeTask(ctx: WriteContext, id: string) {
           scheduled: next,
           // A deadline belonged to the completed occurrence.
           today: false,
+          starred: src.starred === true,
+          ...(Array.isArray(src.tags) && src.tags.length > 0 ? { tags: src.tags } : {}),
           ...recurrenceColumns({ unit, interval, afterCompletion, weekdays, monthDay, ordinalWeekday }),
           recurrenceSeriesID: str(src.recurrenceSeriesID) ?? id,
           recurrenceAnchorDate: afterCompletion ? null : next,
           position,
           createdAt: now,
         };
-        for (const k of ["area", "project", "heading", "kind", "notes", "sourceClient"] as const) {
+        for (const k of ["area", "project", "heading", "kind", "notes", "sourceClient", "startTime", "timeZone"] as const) {
           if (str(src[k])) fields[k] = src[k];
         }
+        if (typeof src.durationMinutes === "number") fields.durationMinutes = src.durationMinutes;
         const shiftedReminder = shiftReminderForRecurrence({
           sourceReminderAt: str(src.reminderAt),
           sourceScheduled: str(src.recurrenceAnchorDate) ?? str(src.scheduled),
@@ -504,6 +650,27 @@ async function completeTask(ctx: WriteContext, id: string) {
         if (onToday(fields, today)) fields.todayPosition = position;
         occurrenceOp = ops.length;
         ops.push({ op: "upsert", entity: "task", id: occId, fields });
+
+        // Copy active checklist items onto the spawned occurrence, reset to
+        // unchecked with deterministic IDs so phone + agent completions converge.
+        const sourceItems = await store.readChecklistItems(id);
+        for (let i = 0; i < sourceItems.length; i++) {
+          const item = sourceItems[i];
+          const itemId = checklistOccurrenceID(occId, i, item.id as string);
+          ops.push({
+            op: "upsert",
+            entity: "checklistItem",
+            id: itemId,
+            fields: {
+              taskId: occId,
+              title: str(item.title) ?? "",
+              checked: false,
+              checkedAt: null,
+              position: num(item.position) ?? (i + 1) * ORDER_GAP,
+              createdAt: now,
+            },
+          });
+        }
       }
     }
   }
@@ -524,6 +691,71 @@ async function completeTask(ctx: WriteContext, id: string) {
     recurrence = { recurrenceWarning: recurrenceWarning.createFailed(id, recurrence.nextOccurrence.scheduled) };
   }
   return { id, status: "done", completedAt, ...recurrence };
+}
+
+// ---- checklists ----
+
+async function checklistAdd(ctx: WriteContext, taskId: string, items: string[]) {
+  const { store } = ctx;
+  const current = await store.readTask(taskId);
+  if (!current) throw new Error(`Task not found: ${taskId}`);
+  const existing = await store.readChecklistItems(taskId);
+  let maxPos = 0;
+  for (const row of existing) {
+    const p = num(row.position);
+    if (p !== undefined && p > maxPos) maxPos = p;
+  }
+  const now = new Date().toISOString();
+  const ops: NewOp[] = [];
+  const added: Array<{ id: string; title: string; position: number }> = [];
+  for (const raw of items) {
+    const title = raw.trim();
+    if (!title) continue;
+    maxPos += ORDER_GAP;
+    const id = `chk-${randomId(10)}`;
+    ops.push({
+      op: "upsert",
+      entity: "checklistItem",
+      id,
+      fields: { taskId, title, checked: false, position: maxPos, createdAt: now },
+    });
+    added.push({ id, title, position: maxPos });
+  }
+  if (ops.length === 0) return { task_id: taskId, added: [] };
+  const results = await push(store, ops);
+  for (let i = 0; i < results.length; i++) {
+    requireApplied(results[i], added[i].id);
+  }
+  return { task_id: taskId, added };
+}
+
+async function checklistUpdate(
+  ctx: WriteContext,
+  input: { id: string; title?: string; checked?: boolean; position?: number },
+) {
+  const { store } = ctx;
+  const current = await store.readChecklistItem(input.id);
+  if (!current) throw new Error(`Checklist item not found: ${input.id}`);
+  const fields: Record<string, unknown> = {};
+  if (input.title !== undefined) fields.title = input.title.trim();
+  if (input.checked !== undefined) {
+    fields.checked = input.checked;
+    fields.checkedAt = input.checked ? new Date().toISOString() : null;
+  }
+  if (input.position !== undefined) fields.position = input.position;
+  if (Object.keys(fields).length === 0) return { id: input.id, updated: [] };
+  const [r] = await push(store, [{ op: "upsert", entity: "checklistItem", id: input.id, fields }]);
+  requireApplied(r, input.id);
+  return { id: input.id, updated: Object.keys(fields) };
+}
+
+async function checklistDelete(ctx: WriteContext, id: string) {
+  const { store } = ctx;
+  const current = await store.readChecklistItem(id);
+  if (!current) throw new Error(`Checklist item not found: ${id}`);
+  const [r] = await push(store, [{ op: "delete", entity: "checklistItem", id }]);
+  requireApplied(r, id);
+  return { id, deleted: true };
 }
 
 // ---- conversations ----

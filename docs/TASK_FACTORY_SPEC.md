@@ -63,6 +63,39 @@ Septask gets one smart list, **Agent**, grouped by these stages
 *(default)*. The Today list shows only **Your turn** and **Review** items, as
 today's ball-in-court dot already does.
 
+### 3.1 Review — canonical contract (shipped, `#87`)
+
+**Review** is the ONE surface by this name across the app, backend, MCP tools,
+and docs (Today rollover's default mode was renamed to **Ask** in ADR 0014, and
+the Faded sweep uses **Sweep**).
+
+- **Membership (single source of truth):** Open, non-heading, non-faded tasks
+  with `conversation.endState == "needs_verify"` (`TaskConvo.needsHumanReview`
+  in `SeptenaCore/ConvoDerived.swift`, mirrored by `TaskStore.readReviewTasks`
+  and MCP `tasks_list(view: "review")`).
+- **Sidebar visibility:** Progressive disclosure (`visibility: "whenNonEmpty"` in
+  `registry/destinations.json`). Appears right below **Today** when non-empty
+  (or while selected); always reachable via **Go ▸ Review** and **Quick Find**.
+- **Store enforcement (`human_accepts`, `TaskStore.ts`):** Agents cannot set
+  `status = "done"` on a task assigned to an agent (`claude`), already in
+  Review (`needs_verify`), or held under a live claim. The store rejects with
+  `human_accepts` and instructs the agent to call
+  `tasks_set_endstate("needs_verify", note)`. Setting `needs_verify`
+  automatically releases the agent's active claim. Plain tasks with no agent
+  assignment/claim stay completable by agents; humans can always complete any
+  task.
+- **Human actions:** Each Review row shows title, `endStateNote`, linked
+  issue/PR or artifact title, and two actions — **Accept** (completes task,
+  transitions `endState` to `agent_assisted_done` so reopening later does not
+  snap back into Review, with lossless `⌘Z` undo back to `needs_verify`) and
+  **Send back** (appends a user turn with a note, reopens `endState` to `open`,
+  assigns to `claude`, with lossless `⌘Z` undo).
+- **Fade exemption:** Tasks awaiting human review (`needs_verify`) or an open
+  choice card (`awaitsHuman`) never fade (`TaskFade.isEligible`).
+- **Explanation & Settings:** Zero toggles. Explained in-place via the empty
+  state (*"Work an agent finished appears here so you can check and accept
+  it."*) and one footer sentence under **Settings ▸ AI & Agents**.
+
 ## 4. Runner
 
 The runner is a process that drains the queue.
@@ -206,9 +239,21 @@ queue for team work)*. Then all of mz's agent questions are in one app.
   question. The notification offers the options as actions on iOS and the
   watch *(default: up to 3 options as notification actions)*, so mz answers
   without opening the app.
-- **Wake:** when the backend commits a user turn that answers an open card on
-  an agent task, it calls the runner's wake hook. Without a wake hook, the
-  next scheduled run picks it up.
+- **Wake (multi-user transport, decided 2026-11-21):** the wake plumbing on
+  `api.septena.app` is built multi-user from day one, with `mz-mini` as the
+  first runner and Settings UI added later. Two transports share the same
+  `tasks_agent_events` event stream (`assigned`, `user_turn`, `resumed`):
+  1. **Outbound webhook URL** attached to an agent key or pairing (HMAC-signed
+     POST with event payload) — works for cloud routines, OpenClaw, n8n, and
+     tunneled hosts.
+  2. **Outbound SSE / WebSocket event stream** opened by the runner to
+     `api.septena.app` — works behind home NAT/firewalls (Macs / `mz-mini`)
+     with zero inbound ports or tunnels.
+  Without either connected, the next 15-minute scheduled run picks the task up.
+- **Onboarding vs. Settings (decided 2026-11-21):** first-run onboarding
+  (`#103`) stays focused on connecting an interactive agent. "Always-on /
+  Background agent" (webhooks, cloud routines, local runner setup) lives in
+  **Settings ▸ AI & Agents** later, never blocking initial setup.
 - **Batching:** the runner groups several questions on one task into one card
   when they do not depend on each other. At most one open card per task.
 - **Quiet hours:** notifications respect Focus. No custom quiet-hours logic.
@@ -252,20 +297,24 @@ links (issue, PR, commit).
 | Phase | What | Exit check |
 |---|---|---|
 | F0 | Claims (`tasks_claim` / `tasks_release`), stage derivation, Agent smart list. Runner as a manual command on the mini. | mz assigns a `research` task; a manual run produces an artifact; the stage moves Queued → Working → Done. |
-| F1 | Scheduled runner on the mini, push notification on questions, notification actions, wake on answer. | mz answers a card on the phone; the next turn appears without opening the Mac. |
+| F1a | Multi-user wake transport (signed webhook URL + SSE/WebSocket stream on `api.septena.app`) and scheduled/waking runner on `mz-mini` (15 min, max 2 parallel). | mz answers a card on the phone; `mz-mini` wakes immediately and posts the next turn with no interactive session open. |
+| F1b | APNs push notifications when a provider turn with options commits + up to 3 option actions on iOS and watch (requires mz's APNs `.p8` key in Cloudflare). | A question arrives as a notification on iPhone/watch; mz taps an option from the lock screen and the turn commits. |
 | F2 | Work profiles and approval cards. `errand` workflow. Kill switch. | An outward action waits for Approve; nothing outward happens without it. |
 | F3 | `code` workflow on linked repos (needs linked projects L0–L1). Run log and inspector list. | A note becomes an issue, a PR and a merge on this repo; mz tests from the `needs_verify` list. |
 | F4 | `factory-day` questions route to Septask; daily digest from the run log; cloud-routine host. | One morning report and one question inbox for all of mz's personal factories. |
 
 ## 12. Open questions for mz
 
-| Question | Default in this spec |
+| Question | Decision |
 |---|---|
-| Runner host | Mac mini first; cloud routines later for non-toolchain work. |
-| Run cadence | Every 15 minutes, plus wake on answer. |
-| Parallel tasks per run | 2. |
-| Profile scope | Project, with area as fallback. |
-| Auto-intake without assigning | Off in v1. |
-| Notification actions | Up to 3 options as actions. |
-| Where `factory-day` asks for personal projects | Septask. Starlings stays for team work. |
-| Agent merges on `ship` | Yes, per your global merge rule. |
+| Runner host | Decided (default, 2026-11-21): Mac mini first; cloud routines later for non-toolchain work. |
+| Run cadence | Decided (default, 2026-11-21): Every 15 minutes, plus wake on answer. |
+| Parallel tasks per run | Decided (default, 2026-11-21): 2. |
+| Profile scope | Decided (default, 2026-11-21): Project, with area as fallback. |
+| Auto-intake without assigning | Decided (default, 2026-11-21): Off in v1. |
+| Notification actions | Decided (default, 2026-11-21): Up to 3 options as actions. |
+| Where `factory-day` asks for personal projects | Decided (default, 2026-11-21): Septask. Starlings stays for team work. |
+| Agent merges on `ship` | Decided (default, 2026-11-21): Yes, per your global merge rule. |
+| F1 runner scope & wake transport | Decided (2026-11-21): Multi-user transport on `api.septena.app` (signed outbound webhook URL + SSE/WebSocket stream for NAT'd Macs); `mz-mini` is the first runner. |
+| Background runner in onboarding | Decided (2026-11-21): Keep onboarding (`#103`) interactive-only; put "Always-on / Background agent" in Settings ▸ AI & Agents later. |
+| F1 split | Decided (2026-11-21): Split into F1a (wake transport + runner, `#5`) and F1b (APNs push + notification actions, gated on mz's APNs `.p8` key). |

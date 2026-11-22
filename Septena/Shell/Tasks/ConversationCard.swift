@@ -19,6 +19,8 @@ struct ConversationCard: View {
   @State private var otherText = ""
   @State private var showSendBack = false
   @State private var sendBackNote = ""
+  @State private var showReply = false
+  @State private var replyText = ""
   @State private var showInfo = false
 
   /// Seed `convo` from the already-loaded task so the card paints on the FIRST
@@ -45,9 +47,14 @@ struct ConversationCard: View {
           // Agent deliverable (agent_assisted) — what Claude produced.
           if let artifact = convo.artifact { artifactBlock(artifact) }
 
+          // Associated GitHub issue/PR when not already shown inside an artifact block.
+          if convo.artifact?.linkedIssue == nil, let issue = convo.linkedIssue {
+            issueLinkPill(issue)
+          }
+
           if let q = openQuestion {
             questionBlock(q)
-          } else if convo.endState == .needsVerify {
+          } else if convo.needsHumanReview || (convo.endState == .agentAssistedDone && !isTaskOpen) {
             reviewBlock
           } else if let handoff = convo.handoff {
             handoffButton(handoff)            // human last-mile — show even when the agent's side is done
@@ -55,6 +62,10 @@ struct ConversationCard: View {
             terminalRow
           } else {
             agentRow
+          }
+
+          if openQuestion == nil, isTaskOpen, !convo.needsHumanReview {
+            followUpBlock
           }
 
           // The agent-done bar (distinct from task completion = human-done).
@@ -123,14 +134,38 @@ struct ConversationCard: View {
         AIModelTagBadge(tag: AIModelTag(q.provider))
       }
 
-      // Options as content-width pills (wrap), with "Other" opening a field.
-      FlowLayout(spacing: 8) {
-        ForEach(q.options ?? [], id: \.self) { option in
-          Button { choose(option, replyTo: q.seq, step: q.step) } label: { Text(option) }
-            .buttonStyle(.bordered).buttonBorderShape(.capsule).tint(accent)
+      // Short choices flow as compact capsule chips; longer options stack as
+      // full-width wrapped rounded cards so text never clips off-screen.
+      let options = q.options ?? []
+      if options.contains(where: { $0.count > 22 }) {
+        VStack(alignment: .leading, spacing: 8) {
+          ForEach(options, id: \.self) { option in
+            Button { choose(option, replyTo: q.seq, step: q.step) } label: {
+              Text(option)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.roundedRectangle(radius: 12))
+            .tint(accent)
+          }
+          Button { a11yAnimate { showOther.toggle() } } label: { Text("Other…") }
+            .buttonStyle(.bordered).buttonBorderShape(.capsule)
         }
-        Button { a11yAnimate { showOther.toggle() } } label: { Text("Other…") }
-          .buttonStyle(.bordered).buttonBorderShape(.capsule)
+      } else {
+        FlowLayout(spacing: 8) {
+          ForEach(options, id: \.self) { option in
+            Button { choose(option, replyTo: q.seq, step: q.step) } label: {
+              Text(option)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .buttonStyle(.bordered).buttonBorderShape(.capsule).tint(accent)
+          }
+          Button { a11yAnimate { showOther.toggle() } } label: { Text("Other…") }
+            .buttonStyle(.bordered).buttonBorderShape(.capsule)
+        }
       }
 
       if showOther {
@@ -206,6 +241,27 @@ struct ConversationCard: View {
     }
   }
 
+  @ViewBuilder private var followUpBlock: some View {
+    if showReply {
+      HStack(spacing: 6) {
+        TextField("Reply to thread", text: $replyText)
+          .textFieldStyle(.roundedBorder)
+          .onSubmit(submitReply)
+        Button("Send", action: submitReply)
+          .buttonStyle(.borderedProminent)
+          .controlSize(.small)
+          .disabled(replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+      }
+    } else {
+      Button { a11yAnimate { showReply = true } } label: {
+        Label("Reply…", systemImage: "arrowshape.turn.up.left")
+          .font(.septenaCaption)
+      }
+      .buttonStyle(.borderless)
+      .foregroundStyle(.secondary)
+    }
+  }
+
   @ViewBuilder private var terminalRow: some View {
     let wontDo = convo.endState == .wontDo
     HStack(alignment: .top, spacing: 6) {
@@ -223,19 +279,54 @@ struct ConversationCard: View {
   // MARK: Artifact + handoff (agent_assisted)
 
   @ViewBuilder private func artifactBlock(_ a: ConvoArtifact) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Label(a.title, systemImage: "doc.text").font(.subheadline).fontWeight(.medium)
-      Text(a.body).font(.caption).foregroundStyle(.primary)
+    VStack(alignment: .leading, spacing: 6) {
+      Label(a.title, systemImage: a.linkedIssue?.symbolName ?? "doc.text")
+        .font(.septenaLabel)
+      if !a.body.isEmpty {
+        Text(a.body).font(.septenaCaption).foregroundStyle(.primary)
+      }
       if let refs = a.refs, !refs.isEmpty {
         ForEach(refs, id: \.self) { ref in
-          Text(ref).font(.caption2).foregroundStyle(.secondary)
+          artifactRefRow(ref)
         }
+      } else if let issue = a.linkedIssue {
+        issueLinkPill(issue)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(10)
     .background(Theme.paperBackground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.quaternary))
+  }
+
+  @ViewBuilder private func artifactRefRow(_ ref: String) -> some View {
+    if let issue = ConvoIssueLink.parse(in: ref) {
+      issueLinkPill(issue)
+    } else if let url = ConvoIssueLink.parseURL(ref) {
+      Link(destination: url) {
+        Label(ref, systemImage: "arrow.up.right.square")
+          .font(.septenaCaption)
+          .lineLimit(1)
+          .truncationMode(.middle)
+      }
+    } else {
+      Text(ref).font(.septenaMetaMicro).foregroundStyle(.secondary)
+    }
+  }
+
+  @ViewBuilder private func issueLinkPill(_ issue: ConvoIssueLink) -> some View {
+    Link(destination: issue.url) {
+      HStack(spacing: 5) {
+        Image(systemName: issue.symbolName)
+        Text("Open \(issue.fullLabel)")
+        Image(systemName: "arrow.up.right")
+      }
+      .font(.septenaLabel)
+    }
+    .buttonStyle(.bordered)
+    .buttonBorderShape(.capsule)
+    .controlSize(.small)
+    .tint(accent)
   }
 
   @ViewBuilder private func handoffButton(_ h: ConvoHandoff) -> some View {
@@ -291,9 +382,10 @@ struct ConversationCard: View {
 
   private func acceptReview() {
     let mutator = SeptenaServices.shared.taskMutator
+    let previousNote = convo.endStateNote
     mutator.complete(id: taskID)
     mutator.acknowledge(id: taskID)
-    TaskUndo.recordCompletion(ids: [taskID], wasDone: false, mutator: mutator)
+    TaskUndo.recordAcceptReview(id: taskID, previousNote: previousNote, mutator: mutator)
     Haptics.tick()
     showSendBack = false
     reload()
@@ -302,7 +394,11 @@ struct ConversationCard: View {
   private func submitSendBack() {
     let text = sendBackNote.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { return }
-    SeptenaServices.shared.taskMutator.sendBackConvo(id: taskID, note: text)
+    let mutator = SeptenaServices.shared.taskMutator
+    let before = convo
+    mutator.sendBackConvo(id: taskID, note: text)
+    let after = mutator.conversation(id: taskID) ?? before
+    TaskUndo.recordSendBack(id: taskID, before: before, after: after, mutator: mutator)
     Haptics.tick()
     sendBackNote = ""
     showSendBack = false
@@ -319,6 +415,15 @@ struct ConversationCard: View {
     append(ConvoTurn(seq: 0, role: .user, step: step, otherText: text, inReplyTo: replyTo, ts: Date()))
     otherText = ""
     showOther = false
+  }
+
+  private func submitReply() {
+    let text = replyText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return }
+    append(ConvoTurn(seq: 0, role: .user, step: .work, note: text, ts: Date()))
+    Haptics.tick()
+    replyText = ""
+    showReply = false
   }
 
   private func setStopped(_ stopped: Bool) {
@@ -358,7 +463,7 @@ struct AIExplainerView: View {
     NavigationStack {
       ScrollView {
         VStack(alignment: .leading, spacing: 18) {
-          Text("Some to-dos need a moment of thinking before you can act. \(AppDisplayName.current) can talk that through with AI — right on the task.")
+          Text("Some tasks need a moment of thinking before you can act. \(AppDisplayName.current) can talk them through with AI, right on the task.")
             .font(.headline)
 
           VStack(alignment: .leading, spacing: 0) {
@@ -367,35 +472,35 @@ struct AIExplainerView: View {
             ForEach(Array(steps.enumerated()), id: \.offset) { i, s in
               stepRow(s, isLast: i == steps.count - 1)
             }
-            Text("On Automatic, every step runs on your device first — it leaves only for the steps on-device can't do (↗), never wholesale.")
+            Text("On Automatic, every step runs on your device first. It only escalates for steps the on-device model can’t handle (↗).")
               .font(.caption2).foregroundStyle(.secondary).padding(.top, 6)
           }
 
           VStack(alignment: .leading, spacing: 6) {
             Text("Whose turn?").font(.subheadline).fontWeight(.semibold)
-            legend(.yellow, "Your turn — a question is waiting")
-            legend(.blue, "AI's turn — it's working")
+            legend(.yellow, "Your turn: a question is waiting")
+            legend(.blue, "AI’s turn: it’s working")
             legend(.green, "Done")
           }
 
           VStack(alignment: .leading, spacing: 6) {
             Label("Some help is always on your device", systemImage: "iphone")
               .font(.subheadline).fontWeight(.semibold)
-            Text("Beyond conversations, \(AppDisplayName.current) learns small things locally — like the “Move to…” suggestion that figures out where a task belongs from your own history. That model trains on your device and never leaves it.")
+            Text("Beyond conversations, \(AppDisplayName.current) learns small patterns locally, like the “Move to…” suggestion that predicts where a task belongs from your own history. That model trains on your device and never leaves it.")
               .font(.callout).foregroundStyle(.secondary)
           }
 
           VStack(alignment: .leading, spacing: 6) {
-            Label("It's your AI — we never see your data", systemImage: "lock.fill")
+            Label("Your AI, never our servers", systemImage: "lock.fill")
               .font(.subheadline).fontWeight(.semibold)
-            Text("\(AppDisplayName.current) never runs AI on your tasks and never reads them. The intelligence is your own — your Claude, or on-device — connected by you. Your tasks live only in your private iCloud. Turn the AI off and the app works exactly the same, minus the conversations.")
+            Text("\(AppDisplayName.current) never runs AI on your tasks and never reads them. The intelligence is your own (on-device or your Claude), connected by you. Your tasks stay on your device, and sync through Septena’s private server only if you sign in. Turn AI off and the app works the same, minus the conversations.")
               .font(.callout).foregroundStyle(.secondary)
           }
           .padding(12)
           .frame(maxWidth: .infinity, alignment: .leading)
           .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-          Text("Nothing important happens on its own. The AI fills in small, reversible stuff; anything that's a real decision or can't be undone always waits for your tap.")
+          Text("Nothing important happens on its own. AI can fill in small, reversible details; any real decision or action that can’t be undone waits for your confirmation.")
             .font(.callout).foregroundStyle(.secondary)
         }
         .padding(20)
@@ -409,11 +514,11 @@ struct AIExplainerView: View {
   private struct Step { let icon: String; let title: String; let desc: String; let runs: String; let tint: Color }
   private var steps: [Step] {
     [
-      Step(icon: "square.and.pencil", title: "Capture", desc: "You jot the task — a few words is fine.", runs: "You", tint: .gray),
-      Step(icon: "questionmark.bubble", title: "Confirm", desc: "AI asks what you actually mean. Nothing happens until you tap.", runs: "On-device", tint: .green),
-      Step(icon: "doc.text.magnifyingglass", title: "Ground", desc: "It pulls the relevant context from your own data.", runs: "On-device", tint: .green),
-      Step(icon: "checklist", title: "Decide", desc: "It offers a few options; you pick. A hard call may use the cloud.", runs: "On-device ↗", tint: .blue),
-      Step(icon: "hammer", title: "Work", desc: "It does what it can — a draft, a comparison. Web / your Claude only if a step needs it.", runs: "On-device ↗", tint: .blue),
+      Step(icon: "square.and.pencil", title: "Capture", desc: "Jot down the task. A few words are enough.", runs: "You", tint: .gray),
+      Step(icon: "questionmark.bubble", title: "Confirm", desc: "AI asks what you mean. Nothing happens until you answer.", runs: "On-device", tint: .green),
+      Step(icon: "doc.text.magnifyingglass", title: "Ground", desc: "Pulls relevant context from your own data.", runs: "On-device", tint: .green),
+      Step(icon: "checklist", title: "Decide", desc: "Offers a few options for you to pick. A harder call may use the cloud.", runs: "On-device ↗", tint: .blue),
+      Step(icon: "hammer", title: "Work", desc: "Does what it can: a draft, a comparison. Uses the web or your Claude only when needed.", runs: "On-device ↗", tint: .blue),
       Step(icon: "hand.point.right", title: "Hand off", desc: "Anything only you can do (pay, send) becomes one clear button.", runs: "You", tint: .gray),
     ]
   }

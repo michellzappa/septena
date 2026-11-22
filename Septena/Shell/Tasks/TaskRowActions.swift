@@ -37,6 +37,8 @@ struct TaskRowActions: ViewModifier {
   @State private var moveTargetIds: [String] = []
   @State private var showingRepeatSheet = false
   @State private var repeatTargetId: String?
+  @State private var reminderTargetId: String?
+  @State private var tagsTargetIds: [String] = []
 
   @Environment(PromoteFlashStore.self) private var promoteFlash
   @Environment(\.septenaToast) private var toastStore
@@ -55,8 +57,7 @@ struct TaskRowActions: ViewModifier {
   /// source `TaskUndo.recordScheduleChange` re-reads for the redo side, so the
   /// two halves can't disagree.
   private func scheduleSnapshots(_ ids: [String]) -> [TaskUndo.ScheduleSnapshot] {
-    LocalCache.allTasks(in: modelContext)
-      .filter { ids.contains($0.id) }
+    LocalCache.liveTasks(ids: ids, in: modelContext)
       .map(TaskUndo.ScheduleSnapshot.init)
   }
 
@@ -70,6 +71,13 @@ struct TaskRowActions: ViewModifier {
 
   func body(content: Content) -> some View {
     content
+      .taskRowSwipeActions(
+        id: task.id,
+        leading: swipeLeadingActions,
+        allowsLeadingFullSwipe: true,
+        trailing: swipeTrailingActions,
+        allowsTrailingFullSwipe: false
+      )
       .contextMenu {
         TaskListRowContextMenu(
           target: .single(task),
@@ -99,11 +107,37 @@ struct TaskRowActions: ViewModifier {
             }
             onChange?()
           },
+          onToggleStar: { ids, starred in
+            Haptics.tick()
+            recordingSchedule(starred
+                              ? String(localized: "Star", comment: "Undo action name")
+                              : String(localized: "Remove Star", comment: "Undo action name"),
+                              ids) {
+              for id in ids { mutator.setStarred(id: id, starred: starred) }
+            }
+            onChange?()
+          },
+          onToggleComplete: { ids in
+            let wasDone = task.status == .done
+            Haptics.tick()
+            for id in ids {
+              if wasDone { mutator.uncomplete(id: id) } else { mutator.complete(id: id) }
+              mutator.acknowledge(id: id)
+            }
+            TaskUndo.recordCompletion(ids: ids, wasDone: wasDone, mutator: mutator)
+            onChange?()
+          },
           onOpenWhen: { target in
             whenSheet = .init(taskIds: target.ids, kind: .scheduled)
           },
           onOpenDeadline: { target in
             whenSheet = .init(taskIds: target.ids, kind: .deadline)
+          },
+          onOpenReminder: { t in
+            reminderTargetId = t.id
+          },
+          onOpenTags: { target in
+            tagsTargetIds = target.ids
           },
           onClearSchedule: { ids in
             Haptics.tick()
@@ -162,6 +196,8 @@ struct TaskRowActions: ViewModifier {
         moveTargetIds: $moveTargetIds,
         showingRepeatSheet: $showingRepeatSheet,
         repeatTargetId: $repeatTargetId,
+        reminderTargetId: $reminderTargetId,
+        tagsTargetIds: $tagsTargetIds,
         areas: areas,
         projects: projects,
         currentTask: { _ in task },
@@ -187,6 +223,14 @@ struct TaskRowActions: ViewModifier {
           recordingSchedule(String(localized: "Change Repeat", comment: "Undo action name"),
                             [id]) {
             mutator.setRecurrencePaused(id: id, paused: paused)
+          }
+          onChange?()
+        },
+        applyReminder: { id, reminder in
+          Haptics.tick()
+          recordingSchedule(String(localized: "Change Reminder", comment: "Undo action name"),
+                            [id]) {
+            mutator.setReminder(id: id, reminder: reminder)
           }
           onChange?()
         }
@@ -237,8 +281,7 @@ struct TaskRowActions: ViewModifier {
   // Mirrors `TaskListView.applyMove`, minus the Inbox suggestion-rejection
   // bookkeeping (no classifier on surfaces that use this).
   private func applyMove(id: String, areaId: String?, projectId: String?) {
-    let undoBefore = LocalCache.allTasks(in: modelContext)
-      .filter { $0.id == id }
+    let undoBefore = LocalCache.liveTasks(ids: [id], in: modelContext)
       .map(TaskUndo.FilingSnapshot.init)
     // Already there: a no-op, so no write, no toast and no undo step.
     guard let current = undoBefore.first else { return }
@@ -262,6 +305,82 @@ struct TaskRowActions: ViewModifier {
     toastStore?.show(SeptenaToastCopy.moved(to: destName)) {
       ticket.undo { TaskUndo.restore(undoBefore, using: mutator) }
       onChange?()
+    }
+  }
+
+  /// Agent proposals swap the Today slot for Accept and Delete for Dismiss;
+  /// everything else is the registry's `swipeActions` slots.
+  private var isProposal: Bool {
+    task.source == TaskSource.mcp && task.acknowledgedAt == nil
+  }
+
+  private var swipeLeadingActions: [TaskRowSwipeAction] {
+    TaskRowSwipeAction.leading { id in
+      switch id {
+      case "task.toggleToday":
+        if isProposal {
+          return TaskRowSwipeAction(
+            id: "accept",
+            title: String(localized: "Accept", comment: "Swipe action accept agent proposal"),
+            systemImage: "checkmark",
+            tint: .green
+          ) { moveToToday() }
+        }
+        if task.isOnToday {
+          return .registry(id, variant: .remove,
+                           systemImage: RegistryIcons.sfSymbol(for: "action.today_remove"),
+                           tint: .gray) {
+            Haptics.tick()
+            recordingSchedule(RegistryActions.title(id, .remove), [task.id]) {
+              mutator.removeFromToday(id: task.id)
+              mutator.acknowledge(id: task.id)
+            }
+            onChange?()
+          }
+        }
+        return .registry(id, tint: TaskRowSwipeAction.tint(for: id)) { moveToToday() }
+      case "task.when":
+        return .registry(id, tint: TaskRowSwipeAction.tint(for: id)) {
+          whenSheet = .init(taskIds: [task.id], kind: .scheduled)
+        }
+      default:
+        return nil
+      }
+    }
+  }
+
+  private func moveToToday() {
+    Haptics.tick()
+    recordingSchedule(RegistryActions.title("task.toggleToday", .add), [task.id]) {
+      mutator.moveToToday(id: task.id, today: true)
+      mutator.acknowledge(id: task.id)
+      promoteFlash.flash(task.id)
+    }
+    onChange?()
+  }
+
+  private var swipeTrailingActions: [TaskRowSwipeAction] {
+    TaskRowSwipeAction.trailing { id in
+      switch id {
+      case "task.delete":
+        if isProposal {
+          return TaskRowSwipeAction(
+            id: id,
+            title: String(localized: "Dismiss", comment: "Swipe action dismiss agent proposal"),
+            systemImage: RegistryActions.sfSymbols[id] ?? "trash",
+            tint: .red,
+            role: .destructive
+          ) { applyDelete(task) }
+        }
+        return .registry(id, tint: TaskRowSwipeAction.tint(for: id)) { applyDelete(task) }
+      case "task.move":
+        return .registry(id, tint: TaskRowSwipeAction.tint(for: id)) {
+          moveTargetIds = [task.id]
+          showingMoveSheet = true
+        }
+      default:
+        return nil
+      }
     }
   }
 
@@ -342,3 +461,337 @@ final class TaskUndoTicket {
     isNewest = false
   }
 }
+
+// MARK: - iOS task-row swipe actions (docs/IOS_SWIPE_ACTIONS_SPEC.md)
+
+/// A single swipe action button revealed when swiping a task row on iOS/iPadOS,
+/// and mirrored as a VoiceOver `.accessibilityAction` on all platforms.
+struct TaskRowSwipeAction: Identifiable {
+  let id: String
+  let title: String
+  let systemImage: String
+  let tint: Color
+  var role: ButtonRole? = nil
+  let perform: () -> Void
+}
+
+extension TaskRowSwipeAction {
+  /// A swipe button for a registry action: its title (the short swipe title
+  /// when the registry has one), icon and role come from `registry/actions.json`.
+  /// The shell supplies only the tint and the handler.
+  static func registry(_ id: String, variant: RegistryTitleVariant? = nil,
+                       systemImage: String? = nil, tint: Color,
+                       perform: @escaping () -> Void) -> TaskRowSwipeAction {
+    let title = variant.map { RegistryActions.title(id, $0) }
+      ?? RegistryActions.alternateTitles[id]?[RegistryTitleVariant.short.rawValue]
+      ?? RegistryActions.title(id)
+    return TaskRowSwipeAction(
+      id: id,
+      title: title,
+      systemImage: systemImage ?? RegistryActions.sfSymbols[id] ?? "circle",
+      tint: tint,
+      role: RegistryActions.destructive.contains(id) ? .destructive : nil,
+      perform: perform)
+  }
+
+  /// The leading swipe buttons the registry slots name, outermost first.
+  static func leading(_ make: (String) -> TaskRowSwipeAction?) -> [TaskRowSwipeAction] {
+    RegistryActions.swipeLeading.compactMap(make)
+  }
+
+  /// The trailing swipe buttons, outermost first. The registry lists them in
+  /// screen order, so the outermost (the right edge) is the last one.
+  static func trailing(_ make: (String) -> TaskRowSwipeAction?) -> [TaskRowSwipeAction] {
+    RegistryActions.swipeTrailing.reversed().compactMap(make)
+  }
+
+  /// The swipe tint for a registry action, one per action on every surface.
+  static func tint(for id: String) -> Color {
+    switch id {
+    case "task.toggleToday": return .orange
+    case "task.when": return .indigo
+    case "task.move": return .blue
+    case "task.delete", "task.deletePermanently": return .red
+    case "task.restore": return .green
+    case "task.keepFaded": return .blue
+    case "task.letGoFaded": return .orange
+    default: return .gray
+    }
+  }
+}
+
+extension Notification.Name {
+  /// Posted with the opened row's `id` (`String`) so any other revealed row
+  /// snaps closed when a new row is swiped open.
+  static let septenaSwipeRowOpened = Notification.Name("septenaSwipeRowOpened")
+}
+
+extension View {
+  /// Attach iOS/iPadOS horizontal swipe actions to a row hosted inside
+  /// `SelectableScrollList` (a `ScrollView`/`LazyVStack`, where SwiftUI's
+  /// `List`-only `.swipeActions` does not attach) and mirror every action as a
+  /// VoiceOver `.accessibilityAction` across all platforms.
+  func taskRowSwipeActions(id: String,
+                           enabled: Bool = true,
+                           leading: [TaskRowSwipeAction] = [],
+                           allowsLeadingFullSwipe: Bool = true,
+                           trailing: [TaskRowSwipeAction] = [],
+                           allowsTrailingFullSwipe: Bool = false) -> some View {
+    modifier(TaskRowSwipeActionsModifier(
+      rowID: id,
+      enabled: enabled,
+      leading: leading,
+      allowsLeadingFullSwipe: allowsLeadingFullSwipe,
+      trailing: trailing,
+      allowsTrailingFullSwipe: allowsTrailingFullSwipe
+    ))
+  }
+}
+
+private struct TaskRowSwipeActionsModifier: ViewModifier {
+  let rowID: String
+  let enabled: Bool
+  let leading: [TaskRowSwipeAction]
+  let allowsLeadingFullSwipe: Bool
+  let trailing: [TaskRowSwipeAction]
+  let allowsTrailingFullSwipe: Bool
+
+  func body(content: Content) -> some View {
+    let base = content
+      .modifier(SwipeAccessibilityActionsModifier(
+        enabled: enabled,
+        actions: leading + trailing
+      ))
+    #if os(iOS)
+    if enabled && (!leading.isEmpty || !trailing.isEmpty) {
+      TaskRowSwipeContainer(
+        rowID: rowID,
+        leading: leading,
+        allowsLeadingFullSwipe: allowsLeadingFullSwipe,
+        trailing: trailing,
+        allowsTrailingFullSwipe: allowsTrailingFullSwipe
+      ) {
+        base
+      }
+    } else {
+      base
+    }
+    #else
+    base
+    #endif
+  }
+}
+
+/// Mirrors swipe actions as VoiceOver `.accessibilityAction(named:)` entries on
+/// all platforms so every swipe gesture has full assistive-tech parity.
+private struct SwipeAccessibilityActionsModifier: ViewModifier {
+  let enabled: Bool
+  let actions: [TaskRowSwipeAction]
+
+  func body(content: Content) -> some View {
+    if enabled, !actions.isEmpty {
+      content.accessibilityActions {
+        ForEach(actions) { action in
+          Button(action.title, role: action.role) {
+            action.perform()
+          }
+        }
+      }
+    } else {
+      content
+    }
+  }
+}
+
+#if os(iOS)
+/// Horizontal swipe container for rows inside `SelectableScrollList` on
+/// iOS/iPadOS. Yields to vertical scrolling unless horizontal translation
+/// clearly dominates; enforces `allowsTrailingFullSwipe = false` on destructive
+/// actions so accidental deletes cannot happen on a sloppy swipe.
+private struct TaskRowSwipeContainer<Content: View>: View {
+  let rowID: String
+  let leading: [TaskRowSwipeAction]
+  let allowsLeadingFullSwipe: Bool
+  let trailing: [TaskRowSwipeAction]
+  let allowsTrailingFullSwipe: Bool
+  @ViewBuilder let content: () -> Content
+
+  private static var buttonWidth: CGFloat { 74 }
+
+  @State private var settledOffset: CGFloat = 0
+  @State private var dragDelta: CGFloat = 0
+  @State private var dragAxis: DragAxis? = nil
+  @State private var crossedFullSwipe = false
+
+  private enum DragAxis { case horizontal, vertical }
+
+  private var leadingWidth: CGFloat { CGFloat(leading.count) * Self.buttonWidth }
+  private var trailingWidth: CGFloat { CGFloat(trailing.count) * Self.buttonWidth }
+  private var leadingFullThreshold: CGFloat { max(144, leadingWidth + 36) }
+  private var trailingFullThreshold: CGFloat { max(144, trailingWidth + 36) }
+
+  private var rawOffset: CGFloat { settledOffset + dragDelta }
+
+  private var effectiveOffset: CGFloat {
+    let raw = rawOffset
+    if raw > 0 {
+      guard !leading.isEmpty else { return 0 }
+      if allowsLeadingFullSwipe { return min(raw, leadingFullThreshold + 48) }
+      let overflow = max(0, raw - leadingWidth)
+      return min(raw, leadingWidth) + overflow * 0.25
+    } else if raw < 0 {
+      guard !trailing.isEmpty else { return 0 }
+      let absRaw = -raw
+      if allowsTrailingFullSwipe { return -min(absRaw, trailingFullThreshold + 48) }
+      let overflow = max(0, absRaw - trailingWidth)
+      return -(min(absRaw, trailingWidth) + overflow * 0.25)
+    }
+    return 0
+  }
+
+  private var isLeadingFullSwipeArmed: Bool {
+    allowsLeadingFullSwipe && !leading.isEmpty && effectiveOffset >= leadingFullThreshold
+  }
+
+  private var isTrailingFullSwipeArmed: Bool {
+    allowsTrailingFullSwipe && !trailing.isEmpty && -effectiveOffset >= trailingFullThreshold
+  }
+
+  var body: some View {
+    ZStack {
+      if effectiveOffset > 0.5, !leading.isEmpty {
+        HStack(spacing: 0) {
+          if isLeadingFullSwipeArmed, let primary = leading.first {
+            swipeButton(primary, width: effectiveOffset)
+          } else {
+            ForEach(leading) { action in
+              swipeButton(action, width: Self.buttonWidth)
+            }
+          }
+          Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
+
+      if effectiveOffset < -0.5, !trailing.isEmpty {
+        HStack(spacing: 0) {
+          Spacer(minLength: 0)
+          if isTrailingFullSwipeArmed, let primary = trailing.first {
+            swipeButton(primary, width: -effectiveOffset)
+          } else {
+            // Trailing primary sits outermost (right edge); secondary sits to its left.
+            ForEach(Array(trailing.reversed())) { action in
+              swipeButton(action, width: Self.buttonWidth)
+            }
+          }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
+
+      content()
+        .offset(x: effectiveOffset)
+        .allowsHitTesting(settledOffset == 0)
+        .overlay {
+          if settledOffset != 0 {
+            Color.clear
+              .contentShape(Rectangle())
+              .onTapGesture { close() }
+          }
+        }
+    }
+    .clipped()
+    .simultaneousGesture(
+      DragGesture(minimumDistance: 12, coordinateSpace: .local)
+        .onChanged { value in
+          let dx = value.translation.width
+          let dy = value.translation.height
+          if dragAxis == nil {
+            if abs(dx) > abs(dy) * 1.25, abs(dx) > 12 {
+              dragAxis = .horizontal
+              NotificationCenter.default.post(name: .septenaSwipeRowOpened, object: rowID)
+            } else if abs(dy) > 10 {
+              dragAxis = .vertical
+              return
+            } else {
+              return
+            }
+          }
+          guard dragAxis == .horizontal else { return }
+          dragDelta = dx
+          let armed = isLeadingFullSwipeArmed || isTrailingFullSwipeArmed
+          if armed && !crossedFullSwipe {
+            crossedFullSwipe = true
+            Haptics.tick()
+          } else if !armed && crossedFullSwipe {
+            crossedFullSwipe = false
+          }
+        }
+        .onEnded { value in
+          defer {
+            dragAxis = nil
+            dragDelta = 0
+            crossedFullSwipe = false
+          }
+          guard dragAxis == .horizontal else { return }
+          let finalOffset = effectiveOffset
+          if allowsLeadingFullSwipe, finalOffset >= leadingFullThreshold, let primary = leading.first {
+            a11yAnimate(.snappy(duration: 0.22)) { settledOffset = 0 }
+            primary.perform()
+            return
+          }
+          if allowsTrailingFullSwipe, -finalOffset >= trailingFullThreshold, let primary = trailing.first {
+            a11yAnimate(.snappy(duration: 0.22)) { settledOffset = 0 }
+            primary.perform()
+            return
+          }
+          let projected = finalOffset + value.predictedEndTranslation.width * 0.2
+          a11yAnimate(.snappy(duration: 0.22)) {
+            if projected > 44, !leading.isEmpty {
+              settledOffset = leadingWidth
+              NotificationCenter.default.post(name: .septenaSwipeRowOpened, object: rowID)
+            } else if projected < -44, !trailing.isEmpty {
+              settledOffset = -trailingWidth
+              NotificationCenter.default.post(name: .septenaSwipeRowOpened, object: rowID)
+            } else {
+              settledOffset = 0
+            }
+          }
+        }
+    )
+    .onReceive(NotificationCenter.default.publisher(for: .septenaSwipeRowOpened)) { note in
+      if let openedID = note.object as? String, openedID != rowID, settledOffset != 0 {
+        close()
+      }
+    }
+  }
+
+  private func swipeButton(_ action: TaskRowSwipeAction, width: CGFloat) -> some View {
+    Button(role: action.role) {
+      close()
+      action.perform()
+    } label: {
+      VStack(spacing: 3) {
+        Image(systemName: action.systemImage)
+          .font(.system(size: 15, weight: .semibold))
+        Text(action.title)
+          .font(.septenaCaption)
+          .lineLimit(1)
+      }
+      .foregroundStyle(Color.white)
+      .frame(width: max(width, Self.buttonWidth))
+      .frame(maxHeight: .infinity)
+      .background(action.tint)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(Text(action.title))
+  }
+
+  private func close() {
+    a11yAnimate(.snappy(duration: 0.2)) {
+      settledOffset = 0
+      dragDelta = 0
+    }
+  }
+}
+#endif

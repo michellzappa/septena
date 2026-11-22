@@ -91,7 +91,11 @@ export const createTaskJsonSchema = {
   properties: {
     title: { type: "string", minLength: 1 },
     today: { type: "boolean", default: false },
+    starred: { type: "boolean", default: false, description: "Optional simple Important / Star marker." },
     scheduled: { type: "string", description: "YYYY-MM-DD" },
+    start_time: { type: "string", description: "Optional local start time HH:MM (24-hour)." },
+    duration_minutes: { type: "integer", minimum: 5, maximum: 1440, description: "Optional duration in minutes (5..1440)." },
+    time_zone: { type: "string", description: "Optional IANA time zone (omit for floating local time)." },
     deadline: { type: "string", description: "YYYY-MM-DD (hard deadline)" },
     area: { type: "string", description: "Area id (e.g. 'envisioning')" },
     project: { type: "string", description: "Project id (e.g. 'septena')" },
@@ -105,6 +109,17 @@ export const createTaskJsonSchema = {
       type: "string",
       enum: ["floating", "fixed"],
       description: "Timezone mode for reminder_at: floating (device local wall-clock, default) or fixed (exact UTC instant).",
+    },
+    checklist: {
+      type: "array",
+      items: { type: "string", minLength: 1 },
+      description: "Optional 1-level checklist step titles created in order on the new task.",
+    },
+    tags: {
+      type: "array",
+      items: { type: "string", minLength: 1, maxLength: 64 },
+      maxItems: 20,
+      description: "Optional flat tag names (resolved case-insensitively to existing tags; missing tags are created).",
     },
     origin: {
       type: "string",
@@ -128,7 +143,11 @@ export const updateTaskJsonSchema = {
     id: { type: "string" },
     title: { type: "string" },
     today: { type: "boolean" },
+    starred: { type: "boolean", description: "Set or clear the Important / Star marker." },
     scheduled: { type: ["string", "null"], description: "YYYY-MM-DD, or null to clear" },
+    start_time: { type: ["string", "null"], description: "Optional start time HH:MM (24-hour), or null to clear." },
+    duration_minutes: { type: ["integer", "null"], minimum: 5, maximum: 1440, description: "Optional duration in minutes (5..1440), or null to clear." },
+    time_zone: { type: ["string", "null"], description: "Optional IANA time zone, or null for floating local time." },
     deadline: { type: ["string", "null"], description: "YYYY-MM-DD, or null to clear" },
     area: { type: ["string", "null"] },
     project: { type: ["string", "null"] },
@@ -143,6 +162,12 @@ export const updateTaskJsonSchema = {
       type: ["string", "null"],
       enum: ["floating", "fixed", null],
       description: "Timezone mode for reminder_at: floating or fixed.",
+    },
+    tags: {
+      type: ["array", "null"],
+      items: { type: "string", minLength: 1, maxLength: 64 },
+      maxItems: 20,
+      description: "Replace the task's tags by name (case-insensitive; creates missing tags). Pass [] or null to clear.",
     },
   },
 } as const;
@@ -162,7 +187,14 @@ export const moveToTodayJsonSchema = {
 export interface CreateTaskInput {
   title: string;
   today?: boolean;
+  starred?: boolean;
   scheduled?: string;
+  start_time?: string | null;
+  startTime?: string | null;
+  duration_minutes?: number | null;
+  durationMinutes?: number | null;
+  time_zone?: string | null;
+  timeZone?: string | null;
   deadline?: string;
   /** Legacy alias for `deadline` — still accepted on input for back-compat. */
   due?: string;
@@ -174,6 +206,8 @@ export interface CreateTaskInput {
   reminderAt?: string | null;
   reminder_mode?: ReminderMode | null;
   reminderMode?: ReminderMode | null;
+  checklist?: string[];
+  tags?: string[];
   /**
    * Provenance (docs/TASK_ROW_LANGUAGE_SPEC.md §3.4). `user_request` commits the
    * task (placed where specified); `agent_suggestion` (or omitted — the gateway's
@@ -186,7 +220,14 @@ export interface UpdateTaskInput {
   id: string;
   title?: string;
   today?: boolean;
+  starred?: boolean;
   scheduled?: string | null;
+  start_time?: string | null;
+  startTime?: string | null;
+  duration_minutes?: number | null;
+  durationMinutes?: number | null;
+  time_zone?: string | null;
+  timeZone?: string | null;
   deadline?: string | null;
   /** Legacy alias for `deadline` — still accepted on input for back-compat. */
   due?: string | null;
@@ -199,6 +240,7 @@ export interface UpdateTaskInput {
   reminderAt?: string | null;
   reminder_mode?: ReminderMode | null;
   reminderMode?: ReminderMode | null;
+  tags?: string[] | null;
 }
 
 /** Wire form of a repeat rule. `afterCompletion` is accepted as an alias for
@@ -348,13 +390,21 @@ export function planCreate(input: CreateTaskInput) {
   const committed = input.origin === "user_request";
   const placement: "committed" | "inbox_proposal" = committed ? "committed" : "inbox_proposal";
   const deadline = input.deadline ?? input.due;
+  const startTime = (input.start_time !== undefined ? input.start_time : input.startTime) ?? null;
+  const durationMinutes = (input.duration_minutes !== undefined ? input.duration_minutes : input.durationMinutes) ?? null;
+  const timeZone = (input.time_zone !== undefined ? input.time_zone : input.timeZone) ?? null;
   const echo: Record<string, unknown> = {};
   if (rule) echo.recurrence = recurrenceEcho(rule);
   if (reminder?.reminderAt) {
     echo.reminder_at = reminder.reminderAt;
     echo.reminder_mode = reminder.reminderMode;
   }
-  return { rule, reminder, committed, placement, deadline, echo };
+  if (startTime) {
+    echo.start_time = startTime;
+    if (durationMinutes !== null) echo.duration_minutes = durationMinutes;
+    if (timeZone) echo.time_zone = timeZone;
+  }
+  return { rule, reminder, committed, placement, deadline, startTime, durationMinutes, timeZone, echo };
 }
 
 /**
@@ -366,7 +416,11 @@ export interface TaskUpdatePlan {
   fields: {
     title?: string;
     today?: boolean;
+    starred?: boolean;
     scheduled?: string | null;
+    startTime?: string | null;
+    durationMinutes?: number | null;
+    timeZone?: string | null;
     deadline?: string | null;
     area?: string | null;
     project?: string | null;
@@ -401,7 +455,27 @@ export function planUpdate(input: UpdateTaskInput, storedScheduled?: string | nu
   const updated: string[] = [];
   if (input.title !== undefined) { f.title = input.title; updated.push("title"); }
   if (input.today !== undefined) { f.today = input.today; updated.push("today"); }
+  if (input.starred !== undefined) { f.starred = input.starred; updated.push("starred"); }
   if (input.scheduled !== undefined) { f.scheduled = input.scheduled ?? null; updated.push("scheduled"); }
+  const updStart = input.start_time !== undefined ? input.start_time : input.startTime;
+  if (updStart !== undefined) {
+    f.startTime = updStart === "" ? null : updStart;
+    if (f.startTime === null) {
+      f.durationMinutes = null;
+      f.timeZone = null;
+    }
+    updated.push("start_time");
+  }
+  const updDur = input.duration_minutes !== undefined ? input.duration_minutes : input.durationMinutes;
+  if (updDur !== undefined) {
+    f.durationMinutes = updDur;
+    updated.push("duration_minutes");
+  }
+  const updTz = input.time_zone !== undefined ? input.time_zone : input.timeZone;
+  if (updTz !== undefined) {
+    f.timeZone = updTz === "" ? null : updTz;
+    updated.push("time_zone");
+  }
   const updDeadline = input.deadline !== undefined ? input.deadline : input.due;
   if (updDeadline !== undefined) { f.deadline = updDeadline ?? null; updated.push("deadline"); }
   // Re-home clears BOTH the cross-field container AND any stale project section
@@ -582,5 +656,39 @@ export const setHandoffJsonSchema = {
         payload: { type: "string", description: "URL / email / phone for the action" },
       },
     },
+  },
+} as const;
+
+export const checklistAddJsonSchema = {
+  type: "object",
+  required: ["task_id", "items"],
+  properties: {
+    task_id: { type: "string", description: "Owning task id." },
+    items: {
+      type: "array",
+      minItems: 1,
+      maxItems: 200,
+      items: { type: "string", minLength: 1 },
+      description: "Checklist step titles to append in order.",
+    },
+  },
+} as const;
+
+export const checklistUpdateJsonSchema = {
+  type: "object",
+  required: ["id"],
+  properties: {
+    id: { type: "string", description: "Checklist item id." },
+    title: { type: "string", minLength: 1 },
+    checked: { type: "boolean" },
+    position: { type: "number" },
+  },
+} as const;
+
+export const checklistDeleteJsonSchema = {
+  type: "object",
+  required: ["id"],
+  properties: {
+    id: { type: "string", description: "Checklist item id." },
   },
 } as const;

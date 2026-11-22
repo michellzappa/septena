@@ -36,6 +36,21 @@ struct RemindersInboxSection: View {
   @State private var importingID: String?
   @State private var bulkImporting = false
 
+  /// Matches `TaskRow`: honor Settings ▸ Tasks ▸ Rows ▸ "Title lines" on iOS.
+  @AppStorage(SettingsKey.tasksTitleLines) private var titleLinesSetting: Int = 2
+
+  private var titleLineLimit: Int {
+    #if os(iOS)
+    return min(3, max(1, titleLinesSetting))
+    #else
+    return 2
+    #endif
+  }
+
+  private var todayAnchor: Date {
+    Calendar.current.startOfDay(for: SeptenaDate.parse(clock.today) ?? clock.now)
+  }
+
   var body: some View {
     // A VStack, not a Group: a modifier on a Group attaches to each child, so
     // when every branch renders nothing (no pending reminders) the `.task` and
@@ -47,15 +62,13 @@ struct RemindersInboxSection: View {
         if sourceList == nil {
           if showsSetupCTAs { pickListCTA }
         } else if !pairs.isEmpty {
-          VStack(alignment: .leading, spacing: 8) {
+          VStack(alignment: .leading, spacing: 0) {
             header
-            ForEach(pairs, id: \.view.id) { pair in
+            ForEach(Array(pairs.enumerated()), id: \.element.view.id) { idx, pair in
               reminderRow(pair)
+                .taskCardChrome(TaskCardPosition(index: idx, count: pairs.count))
             }
           }
-          .padding(.horizontal, Theme.hPadding)
-          .padding(.top, 8)
-          .padding(.bottom, 16)
         }
         // If sourceList is set but pairs is empty, render nothing — list
         // is nominated and just has no pending reminders. Don't clutter.
@@ -83,7 +96,8 @@ struct RemindersInboxSection: View {
              title: "Pick a Reminders list",
              subtitle: "Mirror items from Apple Reminders into your Inbox.")
     }
-    .buttonStyle(PlainHoverRowButtonStyle())
+    .buttonStyle(.plain)
+    .taskCardChrome(.solo)
   }
 
   @ViewBuilder
@@ -93,7 +107,8 @@ struct RemindersInboxSection: View {
              title: "Connect Apple Reminders",
              subtitle: "Grant access to mirror reminders into your Inbox.")
     }
-    .buttonStyle(PlainHoverRowButtonStyle())
+    .buttonStyle(.plain)
+    .taskCardChrome(.solo)
   }
 
   @ViewBuilder
@@ -101,15 +116,17 @@ struct RemindersInboxSection: View {
     ctaRow(icon: "exclamationmark.triangle",
            title: "Reminders access blocked",
            subtitle: "Enable \(AppDisplayName.current) in System Settings → Privacy → Reminders.")
+      .taskCardChrome(.solo)
   }
 
   @ViewBuilder
   private func ctaRow(icon: String, title: String, subtitle: String) -> some View {
-    HStack(alignment: .top, spacing: 12) {
+    HStack(alignment: .top, spacing: Theme.iconTextGap) {
       Image(systemName: icon)
-        .scaledFont(size: 14, weight: .semibold)
+        .scaledFont(size: 16)
         .foregroundStyle(theme.accent)
-        .frame(width: 18)
+        .frame(width: Theme.checkboxTap, alignment: .center)
+        .offset(x: -Theme.checkboxLeadingNudge)
       VStack(alignment: .leading, spacing: 2) {
         Text(title)
           .font(.septenaTaskTitle)
@@ -118,17 +135,10 @@ struct RemindersInboxSection: View {
           .font(.septenaMeta)
           .foregroundStyle(Theme.inkSecondary)
       }
-      Spacer()
+      Spacer(minLength: 0)
     }
-    .padding(.horizontal, 12)
+    .padding(.horizontal, TaskCardMetrics.contentInset)
     .padding(.vertical, 10)
-    .background(
-      Color.gray.opacity(0.08),
-      in: RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
-    )
-    .padding(.horizontal, Theme.hPadding)
-    .padding(.top, 8)
-    .padding(.bottom, 16)
     .contentShape(Rectangle())
   }
 
@@ -136,30 +146,48 @@ struct RemindersInboxSection: View {
 
   @ViewBuilder
   private var header: some View {
-    HStack {
+    #if os(macOS)
+    let headerTopPadding: CGFloat = 24
+    #else
+    let headerTopPadding: CGFloat = 18
+    #endif
+    HStack(spacing: Theme.iconTextGap) {
+      Image(systemName: "checklist")
+        .scaledFont(size: 16)
+        .foregroundStyle(Theme.iconMuted)
+        .frame(width: Theme.checkboxTap, alignment: .center)
+        .offset(x: -Theme.checkboxLeadingNudge)
       Text("From Reminders")
-        .scaledFont(size: 15, weight: .semibold)
-        .foregroundStyle(Theme.inkPrimary)
+        .sectionGroupHeaderTitleStyle()
       Spacer()
-      Button {
-        Task { await importAll() }
-      } label: {
-        HStack(spacing: 4) {
-          if bulkImporting {
-            ProgressView().scaleEffect(0.6)
-          } else {
-            Image(systemName: "arrow.down")
-              .scaledFont(size: 11, weight: .semibold)
+      // Bulk import only earns a button when there is more than one item waiting.
+      if pairs.count > 1 {
+        Button {
+          Haptics.tick()
+          Task { await importAll() }
+        } label: {
+          HStack(spacing: 4) {
+            if bulkImporting {
+              ProgressView().scaleEffect(0.6)
+            } else {
+              Image(systemName: "arrow.down")
+                .scaledFont(size: 11, weight: .semibold)
+            }
+            Text(bulkImporting ? "Importing…" : "Import All")
+              .scaledFont(size: 13, weight: .semibold)
           }
-          Text(bulkImporting ? "Importing…" : "Import All")
-            .scaledFont(size: 13, weight: .semibold)
+          .foregroundStyle(Color.accentColor)
+          .contentShape(Rectangle())
         }
-        .foregroundStyle(Color.accentColor)
+        .buttonStyle(.plain)
+        .inlineHover(capsule: true)
+        .disabled(bulkImporting || importingID != nil)
       }
-      .buttonStyle(.plain)
-      .disabled(bulkImporting || importingID != nil)
     }
-    .padding(.bottom, 2)
+    .padding(.leading, TaskCardMetrics.headerLeading)
+    .padding(.trailing, TaskCardMetrics.margin)
+    .padding(.top, headerTopPadding)
+    .padding(.bottom, 8)
   }
 
   // MARK: - Row
@@ -167,55 +195,80 @@ struct RemindersInboxSection: View {
   @ViewBuilder
   private func reminderRow(_ pair: (reminder: EKReminder, view: ImportedReminder)) -> some View {
     let isImporting = importingID == pair.view.id
+    let hasNotes = !(pair.view.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     Button {
+      Haptics.tick()
       Task { await importOne(pair) }
     } label: {
-      HStack(spacing: 10) {
-        if isImporting {
-          ProgressView().scaleEffect(0.5).frame(width: 16, height: 16)
-        } else {
-          Image(systemName: "arrow.down")
-            .scaledFont(size: 12, weight: .semibold)
-            .foregroundStyle(Theme.iconMuted)
-            .frame(width: 16, height: 16)
+      CheckableRow(
+        title: pair.view.title,
+        showsNotesGlyph: hasNotes,
+        titleBandHeight: Theme.checkboxTap,
+        titleLineLimit: titleLineLimit,
+        leading: {
+          importGlyph(isImporting: isImporting)
+        },
+        trailing: {
+          reminderTrailing(dueDate: pair.view.dueDate, hasNotes: hasNotes)
         }
-        Text(pair.view.title)
-          .font(.septenaTaskTitle)
-          .foregroundStyle(Theme.inkPrimary)
-          .lineLimit(1)
-          .truncationMode(.tail)
-        Spacer()
-        if let due = pair.view.dueDate {
-          Text(shortDate(due))
-            .font(.septenaMeta)
-            .foregroundStyle(isOverdue(due) ? Theme.overdueRed : Theme.inkSecondary)
-        }
-      }
-      .padding(.horizontal, 12)
-      .padding(.vertical, 10)
-      .background(
-        Color.gray.opacity(0.08),
-        in: RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
       )
       .contentShape(Rectangle())
       .opacity(isImporting ? 0.5 : 1)
     }
-    .buttonStyle(PlainHoverRowButtonStyle(cornerRadius: Theme.cornerRadiusSmall))
+    .buttonStyle(.plain)
     .disabled(isImporting || bulkImporting)
+    .accessibilityLabel(String(localized: "Import “\(pair.view.title)” from Reminders",
+                               comment: "Reminder row import accessibility label"))
   }
 
-  private func isOverdue(_ d: Date) -> Bool {
-    let today = SeptenaDate.startOfDay(for: clock.today) ?? Calendar.current.startOfDay(for: clock.now)
-    return Calendar.current.startOfDay(for: d) <= today
+  /// Sits in the checkbox slot (`Theme.checkboxTap`, nudged to the shared
+  /// leading grid): importing a reminder takes the place of checking a task.
+  @ViewBuilder
+  private func importGlyph(isImporting: Bool) -> some View {
+    Group {
+      if isImporting {
+        ProgressView()
+          #if os(macOS)
+          .controlSize(.small)
+          .scaleEffect(0.65)
+          #else
+          .scaleEffect(0.7)
+          #endif
+      } else {
+        Image(systemName: "arrow.down")
+          #if os(macOS)
+          .scaledFont(size: 12, weight: .semibold)
+          #else
+          .scaledFont(size: 14, weight: .semibold)
+          #endif
+          .foregroundStyle(Theme.checkboxStroke)
+      }
+    }
+    .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
+    .offset(x: -Theme.checkboxLeadingNudge)
   }
 
-  private func shortDate(_ d: Date) -> String {
-    let cal = Calendar.current
-    if cal.isDateInToday(d) { return "Today" }
-    if cal.isDateInTomorrow(d) { return "Tomorrow" }
-    let f = DateFormatter()
-    f.setLocalizedDateFormatFromTemplate("MMMd")
-    return f.string(from: d)
+  /// Same deadline + notes treatment as `TaskRow.trailing`.
+  @ViewBuilder
+  private func reminderTrailing(dueDate: Date?, hasNotes: Bool) -> some View {
+    if let due = dueDate {
+      let cal = Calendar.current
+      let dueDay = cal.startOfDay(for: due)
+      if dueDay <= todayAnchor {
+        Text(cal.isDateInToday(due) ? "Today" : TaskRow.shortDate(due))
+          .font(.septenaMeta.weight(.semibold))
+          .foregroundStyle(Theme.overdueRed)
+      } else {
+        HStack(spacing: 4) {
+          Image(systemName: "flag.fill").scaledFont(size: 12)
+          Text(TaskRow.shortDate(due)).font(.septenaMeta)
+        }
+        .foregroundStyle(Theme.inkSecondary)
+      }
+    }
+    if hasNotes {
+      TaskNotesGlyph.view
+    }
   }
 
   // MARK: - Load / import
@@ -234,7 +287,7 @@ struct RemindersInboxSection: View {
   private func importOne(_ pair: (reminder: EKReminder, view: ImportedReminder)) async {
     importingID = pair.view.id
     defer { importingID = nil }
-    mutator.create(
+    let created = mutator.create(
       title: pair.view.title,
       deadline: pair.view.dueDate,
       notes: pair.view.notes
@@ -242,20 +295,31 @@ struct RemindersInboxSection: View {
     try? bridge.delete([pair.reminder])
     pairs.removeAll { $0.view.id == pair.view.id }
     TaskNotices.completeStep(.importTasks)
+    TaskUndo.recordCreate(
+      name: String(localized: "Import Reminder", comment: "Undo action"),
+      ids: [created.id], mutator: mutator,
+      rebuild: { [mutator] in
+        [mutator.create(title: pair.view.title,
+                        deadline: pair.view.dueDate,
+                        notes: pair.view.notes).id]
+      })
     onImported()
   }
 
   private func importAll() async {
     bulkImporting = true
     defer { bulkImporting = false }
+    let batch = pairs
+    var createdIDs: [String] = []
     var succeeded: [EKReminder] = []
     var succeededIDs: Set<String> = []
-    for pair in pairs {
-      mutator.create(
+    for pair in batch {
+      let created = mutator.create(
         title: pair.view.title,
         deadline: pair.view.dueDate,
         notes: pair.view.notes
       )
+      createdIDs.append(created.id)
       succeeded.append(pair.reminder)
       succeededIDs.insert(pair.view.id)
     }
@@ -263,6 +327,16 @@ struct RemindersInboxSection: View {
       try? bridge.delete(succeeded)
       pairs.removeAll { succeededIDs.contains($0.view.id) }
       TaskNotices.completeStep(.importTasks)
+      TaskUndo.recordCreate(
+        name: String(localized: "Import Reminders", comment: "Undo action"),
+        ids: createdIDs, mutator: mutator,
+        rebuild: { [mutator] in
+          batch.map { pair in
+            mutator.create(title: pair.view.title,
+                           deadline: pair.view.dueDate,
+                           notes: pair.view.notes).id
+          }
+        })
       onImported()
     }
   }

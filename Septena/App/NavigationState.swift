@@ -71,11 +71,13 @@ extension Route {
 /// See `docs/DRAG_AND_DROP.md` §5.
 @MainActor
 enum TaskDestinations {
-  /// Smart lists, in display order. Next is intentionally absent here — on
+  /// Always-visible smart lists, in display order (`visibility: "always"` in
+  /// `registry/destinations.json`). Next is intentionally absent here — on
   /// Septena it's a top-level tab; Septask has no Next (removed 2026-11-19).
+  /// Review, Starred, Faded, and Recently Deleted are progressively disclosed
+  /// by each sidebar when non-empty (or currently selected).
   static let smartListRoutes: [Route] = [
     .filter(.today),
-    .filter(.review),
     .filter(.upcoming),
     .filter(.repeating),
     .filter(.unscheduled),
@@ -140,6 +142,14 @@ final class NavigationState {
   /// so these stay false there.
   var shouldCreateProject = false
   var shouldCreateArea = false
+  /// One-shot trigger for the active Project's "Add Section" heading prompt
+  /// (used by the iPhone Magic Plus quick menu when viewing a project).
+  var shouldCreateHeading = false
+
+  /// True while the on-screen iOS `TaskListView` is in touch multi-select mode
+  /// (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §5.2). Used by `SeptaskRootView`
+  /// to hide the floating Magic Plus orb while the bottom selection bar is up.
+  var isTaskMultiSelectActive = false
 
   /// One-shot trigger from a Home Screen Quick Action (long-press app
   /// icon). ContentView dispatches the route change + `shouldStartCreating`

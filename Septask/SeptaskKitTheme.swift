@@ -76,11 +76,12 @@ enum SeptaskKitTheme {
 
   /// Theme.checkboxStroke (open box).
   static let checkboxStroke: NSColor = .secondaryLabelColor
-  /// Theme.checkboxFill (done box / completion pulse) — dynamic platform accent,
-  /// matching the standard macOS checkbox in both light and dark appearances.
-  static var checkboxFill: NSColor { systemAccentColor }
-  /// Theme.checkboxCheck — crisp white check over the accent fill.
-  static let checkboxCheck: NSColor = .white
+  /// Theme.checkboxFill (done box / completion pulse) — user's active Septena
+  /// accent (`Colorful` = blue, or one of the 7 fruit accents, ADR 0019).
+  static var checkboxFill: NSColor { AppearancePreferences.shared.accentNSColor }
+  /// Theme.checkboxCheck — high-contrast check ink over the active accent fill
+  /// (white on deep fills, dark `#141518` on bright dark-mode accents).
+  static var checkboxCheck: NSColor { AppearancePreferences.shared.checkInkNSColor }
   /// Theme.todayAccent — the gold "promoted to Today" cue on the checkbox.
   static let todayAccent = NSColor(Theme.todayAccent)
   /// Theme.overdueRed — late deadlines, platform red.
@@ -147,23 +148,7 @@ enum SeptaskKitTheme {
   /// `.unemphasizedSelectedContentBackgroundColor` so it doesn't fight the
   /// shell's light gray page / white cards.
   static func listSelectionFill(emphasized: Bool) -> NSColor {
-    NSColor(name: nil) { appearance in
-      let isDark = appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
-      // The accent where the keyboard is, gray elsewhere: the standard Mac
-      // focus cue (Finder, Mail). Decided 2026-11-19.
-      if emphasized {
-        let alpha: CGFloat = isDark
-          ? CGFloat(RegistryTokens.Selection.emphasizedAlphaDark)
-          : CGFloat(RegistryTokens.Selection.emphasizedAlphaLight)
-        return systemAccentColor.withAlphaComponent(alpha)
-      }
-      // A tint over the background, not an opaque gray: white 0.93 at 0.5
-      // matched the sidebar material, so an unfocused sidebar selection was
-      // invisible (2026-11-20). Black in light, white in dark, like Finder.
-      return isDark
-        ? NSColor(white: 1, alpha: CGFloat(RegistryTokens.Selection.unemphasizedAlphaDark))
-        : NSColor(white: 0, alpha: CGFloat(RegistryTokens.Selection.unemphasizedAlphaLight))
-    }
+    AppearancePreferences.shared.selectionFillNSColor(emphasized: emphasized)
   }
 
   /// User's System Settings accent, bypassing the app's AccentColor asset

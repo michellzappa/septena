@@ -140,14 +140,14 @@ final class TasksWatchStore {
     } catch FetchError.iCloudUnavailable(let label) {
       errorMessage = "iCloud not available on watch (status: \(label))"
     } catch FetchError.unreadableSnapshot {
-      errorMessage = "Couldn't read the watch snapshot. Open Septask on your iPhone."
+      errorMessage = "Couldn't read the watch snapshot. Open Septena on your iPhone."
     } catch let ckError as CKError where ckError.code == .operationCancelled {
     } catch let ckError as CKError where ckError.code == .unknownItem {
-      errorMessage = "No data yet. Open Septask on your iPhone to sync your watch."
+      errorMessage = "No data yet. Open Septena on your iPhone to sync your watch."
     } catch let ckError as CKError {
       switch ckError.code {
       case .unknownItem:
-        errorMessage = "No data yet. Open Septask on your iPhone to sync your watch."
+        errorMessage = "No data yet. Open Septena on your iPhone to sync your watch."
       case .networkUnavailable, .networkFailure, .serviceUnavailable:
         errorMessage = "No network. Try again in a moment."
       case .notAuthenticated, .permissionFailure:
@@ -155,13 +155,13 @@ final class TasksWatchStore {
       default:
         let msg = ckError.localizedDescription.lowercased()
         if msg.contains("fetch") || msg.contains("unknown") || msg.contains("not found") {
-          errorMessage = "No data yet. Open Septask on your iPhone to sync your watch."
+          errorMessage = "No data yet. Open Septena on your iPhone to sync your watch."
         } else {
           errorMessage = ckError.localizedDescription
         }
       }
     } catch let err as NSError where err.domain == "SeptaskWatch" && err.code == -1000 {
-      errorMessage = "Timed out — open Septask on your iPhone, then try again."
+      errorMessage = "Timed out — open Septena on your iPhone, then try again."
     } catch {
       errorMessage = error.localizedDescription
     }

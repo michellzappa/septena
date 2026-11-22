@@ -27,7 +27,7 @@ enum TaskJSONTransfer {
     var attachmentCount: Int { tables["task_attachment"]?.count ?? 0 }
     var supportedRowCount: Int { areaCount + projectCount + taskCount + attachmentCount }
     var skippedRowCount: Int {
-      let supported: Set<String> = ["area", "project", "task", "task_attachment"]
+      let supported: Set<String> = ["area", "project", "task", "task_attachment", "checklist_item", "tag"]
       return tables.reduce(0) { acc, pair in
         supported.contains(pair.key) ? acc : acc + pair.value.count
       }
@@ -87,12 +87,16 @@ enum TaskJSONTransfer {
     let projects = try context.fetch(FetchDescriptor<ProjectEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
     let tasks = try context.fetch(FetchDescriptor<TaskEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
     let attachments = try context.fetch(FetchDescriptor<TaskAttachmentEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
+    let checklistItems = try context.fetch(FetchDescriptor<TaskChecklistItemEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
+    let tags = try context.fetch(FetchDescriptor<TagEntity>(sortBy: [SortDescriptor(\.id)]))
 
     let tables: [String: [[String: Any]]] = [
       "area": areas.map(areaDict),
       "project": projects.map(projectDict),
       "task": tasks.map(taskDict),
       "task_attachment": attachments.compactMap(attachmentDict),
+      "checklist_item": checklistItems.map(checklistItemDict),
+      "tag": tags.map(tagDict),
     ]
 
     let envelope: [String: Any] = [
@@ -119,7 +123,7 @@ enum TaskJSONTransfer {
   private static func areaDict(_ e: AreaEntity) -> [String: Any] {
     compact([
       "id": e.id, "title": e.title, "context": e.context,
-      "emoji": e.emoji, "attachmentJSON": e.attachmentJSON,
+      "emoji": e.emoji,
       "position": e.position, "updatedAt": e.updatedAt,
     ])
   }
@@ -128,8 +132,7 @@ enum TaskJSONTransfer {
     compact([
       "id": e.id, "title": e.title, "status": e.statusRaw, "area": e.area,
       "created": e.created, "completedAt": e.completedAt,
-      "notes": e.notes, "context": e.context, "githubRepo": e.githubRepo,
-      "attachmentJSON": e.attachmentJSON,
+      "notes": e.notes, "githubRepo": e.githubRepo,
       "position": e.position, "updatedAt": e.updatedAt, "deletedAt": e.deletedAt,
     ])
   }
@@ -138,8 +141,12 @@ enum TaskJSONTransfer {
     let iso = ISO8601DateFormatter()
     return compact([
       "id": e.id, "title": e.title, "status": e.statusRaw,
-      "created": e.created, "scheduled": e.scheduled, "deadline": e.deadline,
-      "today": e.today, "todaySetOn": e.todaySetOn, "completedAt": e.completedAt,
+      "created": e.created, "scheduled": e.scheduled,
+      "startTime": e.startTime, "durationMinutes": e.durationMinutes, "timeZone": e.timeZone,
+      "deadline": e.deadline,
+      "today": e.today, "starred": e.starred ? true : nil,
+      "tags": e.tagIDs.isEmpty ? nil : e.tagIDs,
+      "todaySetOn": e.todaySetOn, "completedAt": e.completedAt,
       "area": e.area, "project": e.project, "notes": e.notes,
       "conversationJSON": e.conversationJSON,
       "recurrenceUnit": e.recurrenceUnit,
@@ -180,6 +187,19 @@ enum TaskJSONTransfer {
       "contentType": e.contentType, "byteCount": e.byteCount,
       "createdAt": ISO8601DateFormatter().string(from: e.createdAt),
       "position": e.position, "dataBase64": data.base64EncodedString(),
+    ])
+  }
+
+  private static func checklistItemDict(_ e: TaskChecklistItemEntity) -> [String: Any] {
+    let iso = ISO8601DateFormatter()
+    return compact([
+      "id": e.id,
+      "taskID": e.taskID,
+      "title": e.title,
+      "checked": e.checked,
+      "checkedAt": e.checkedAt.map { iso.string(from: $0) },
+      "position": e.position,
+      "createdAt": e.createdAt == .distantPast ? nil : iso.string(from: e.createdAt),
     ])
   }
 
@@ -231,9 +251,19 @@ enum TaskJSONTransfer {
     var projectIDs: [String] = []
     var taskIDs: [String] = []
     var attachmentIDs: [String] = []
+    var checklistIDs: [String] = []
+    var tagIDs: [String] = []
+    var tagIDRemap: [String: String] = [:]
 
-    // Order: areas → projects → tasks (headings first) → attachments so FK
-    // references resolve cleanly if synced later.
+    // Order: tags → areas → projects → tasks (headings first) → attachments → checklist_item
+    // so FK references resolve cleanly and case-insensitive tag merges remap task.tags.
+    if let rows = doc.tables["tag"] {
+      for r in rows {
+        let (oldID, canonicalID) = try upsertTag(r, context: context)
+        tagIDRemap[oldID] = canonicalID
+        tagIDs.append(canonicalID)
+      }
+    }
     if let rows = doc.tables["area"] {
       for r in rows {
         let id = try upsertArea(r, context: context)
@@ -253,7 +283,7 @@ enum TaskJSONTransfer {
         (($0["kind"] as? String) == TaskKind.heading) && (($1["kind"] as? String) != TaskKind.heading)
       }
       for r in ordered {
-        let id = try upsertTask(r, context: context)
+        let id = try upsertTask(r, tagIDRemap: tagIDRemap, context: context)
         taskIDs.append(id)
         result.tasks += 1
       }
@@ -265,18 +295,26 @@ enum TaskJSONTransfer {
         result.attachments += 1
       }
     }
+    if let rows = doc.tables["checklist_item"] {
+      for r in rows {
+        let id = try upsertChecklistItem(r, context: context)
+        checklistIDs.append(id)
+      }
+    }
 
     try StoreHealth.saveOrThrow(context, op: "TaskJSONTransfer.apply")
 
+    for id in tagIDs { engine.noteTagChange(id: id) }
     for id in areaIDs { engine.noteAreaChange(id: id) }
     for id in projectIDs { engine.noteProjectChange(id: id) }
     for id in taskIDs { engine.noteTaskChange(id: id) }
     for id in attachmentIDs { engine.noteTaskAttachmentChange(id: id) }
+    for id in checklistIDs { engine.noteChecklistItemChange(id: id) }
 
     if !areaIDs.isEmpty || !projectIDs.isEmpty {
       NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
     }
-    if !taskIDs.isEmpty || !attachmentIDs.isEmpty {
+    if !taskIDs.isEmpty || !attachmentIDs.isEmpty || !checklistIDs.isEmpty || !tagIDs.isEmpty {
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     }
     return result
@@ -294,7 +332,6 @@ enum TaskJSONTransfer {
     entity.title = title
     entity.context = r["context"] as? String
     entity.emoji = r["emoji"] as? String
-    entity.attachmentJSON = nonEmptyString(r["attachmentJSON"])
     if let pos = intValue(r["position"]) { entity.position = pos }
     if let updated = r["updatedAt"] as? String { entity.updatedAt = updated }
     return id
@@ -315,17 +352,22 @@ enum TaskJSONTransfer {
     entity.area = nonEmptyString(r["area"])
     entity.created = r["created"] as? String
     entity.completedAt = r["completedAt"] as? String
-    entity.notes = r["notes"] as? String
-    entity.context = r["context"] as? String
+    // Files written before ADR 0012 carry a separate project "context":
+    // fold it into notes the way the backend's one-time merge did.
+    entity.notes = ContainerNotes.mergingLegacyContext(
+      notes: r["notes"] as? String, context: r["context"] as? String,
+      day: SeptenaDate.today)
+    entity.context = nil
     entity.githubRepo = r["githubRepo"] as? String
-    entity.attachmentJSON = nonEmptyString(r["attachmentJSON"])
     if let pos = intValue(r["position"]) { entity.position = pos }
     entity.updatedAt = r["updatedAt"] as? String
     entity.deletedAt = r["deletedAt"] as? String
     return id
   }
 
-  private static func upsertTask(_ r: [String: Any], context: ModelContext) throws -> String {
+  private static func upsertTask(_ r: [String: Any],
+                                 tagIDRemap: [String: String] = [:],
+                                 context: ModelContext) throws -> String {
     guard let id = nonEmptyString(r["id"]), let title = r["title"] as? String else {
       throw TransferError.malformed("A task row is missing id or title.")
     }
@@ -339,8 +381,17 @@ enum TaskJSONTransfer {
     entity.statusRaw = statusRaw
     entity.created = r["created"] as? String
     entity.scheduled = nonEmptyString(r["scheduled"])
+    entity.startTime = nonEmptyString(r["startTime"])
+    entity.durationMinutes = intValue(r["durationMinutes"]).map { min(1440, max(5, $0)) }
+    entity.timeZone = nonEmptyString(r["timeZone"])
     entity.deadline = nonEmptyString(r["deadline"])
     entity.today = (r["today"] as? Bool) ?? false
+    entity.starred = (r["starred"] as? Bool) ?? false
+    if let rawTags = r["tags"] as? [Any] {
+      entity.tagIDs = rawTags.compactMap { nonEmptyString($0) }.map { tagIDRemap[$0] ?? $0 }
+    } else {
+      entity.tagIDs = []
+    }
     entity.todaySetOn = nonEmptyString(r["todaySetOn"])
     entity.completedAt = nonEmptyString(r["completedAt"])
     entity.area = nonEmptyString(r["area"])
@@ -433,6 +484,72 @@ enum TaskJSONTransfer {
     return id
   }
 
+  private static func upsertChecklistItem(_ r: [String: Any], context: ModelContext) throws -> String {
+    guard let id = nonEmptyString(r["id"]),
+          let taskID = nonEmptyString(r["taskID"] ?? r["taskId"]),
+          let title = r["title"] as? String else {
+      throw TransferError.malformed("A checklist item row is missing id, taskID, or title.")
+    }
+    var desc = FetchDescriptor<TaskChecklistItemEntity>(predicate: #Predicate { $0.id == id })
+    desc.fetchLimit = 1
+    let existing = try context.fetch(desc).first
+    let entity = existing ?? TaskChecklistItemEntity(id: id, taskID: taskID, title: title)
+    if existing == nil { context.insert(entity) }
+    entity.taskID = taskID
+    entity.title = title
+    entity.checked = (r["checked"] as? Bool) ?? false
+    let iso = ISO8601DateFormatter()
+    entity.checkedAt = (r["checkedAt"] as? String).flatMap { iso.date(from: $0) }
+    entity.position = doubleValue(r["position"]) ?? 0
+    if let stamp = r["createdAt"] as? String, let date = iso.date(from: stamp) {
+      entity.createdAt = date
+    }
+    entity.updatedAt = Date()
+    return id
+  }
+
+  private static func tagDict(_ e: TagEntity) -> [String: Any] {
+    compact([
+      "id": e.id,
+      "name": e.name,
+      "color": e.color,
+      "position": e.position,
+    ])
+  }
+
+  private static func upsertTag(_ r: [String: Any], context: ModelContext) throws -> (oldID: String, canonicalID: String) {
+    guard let id = nonEmptyString(r["id"]),
+          let rawName = r["name"] as? String else {
+      throw TransferError.malformed("A tag row is missing id or name.")
+    }
+    let name = String(rawName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(RegistryEntityLimits.tagNameMax))
+    guard !name.isEmpty else {
+      throw TransferError.malformed("A tag row has an empty name.")
+    }
+    // Match by ID first, else case-insensitively by name to avoid duplicates on re-import.
+    var byID = FetchDescriptor<TagEntity>(predicate: #Predicate { $0.id == id })
+    byID.fetchLimit = 1
+    if let existing = try context.fetch(byID).first {
+      existing.name = name
+      existing.color = nonEmptyString(r["color"])
+      if let pos = intValue(r["position"]) { existing.position = pos }
+      existing.updatedAt = Date()
+      return (id, existing.id)
+    }
+    if let matched = LocalCache.tag(named: name, in: context) {
+      return (id, matched.id)
+    }
+    let entity = TagEntity(
+      id: id,
+      name: name,
+      color: nonEmptyString(r["color"]),
+      position: intValue(r["position"]),
+      updatedAt: Date()
+    )
+    context.insert(entity)
+    return (id, entity.id)
+  }
+
   private static func nonEmptyString(_ raw: Any?) -> String? {
     guard let s = raw as? String, !s.isEmpty else { return nil }
     return s
@@ -522,6 +639,7 @@ enum TaskJSONTransfer {
 
   static func exportMarkdown(context: ModelContext? = nil, includeCompleted: Bool = true) throws -> String {
     let context = context ?? LocalStore.shared.container.mainContext
+    let tagsByID = LocalCache.tagsByID(in: context)
     let areas = try context.fetch(FetchDescriptor<AreaEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
     let projects = try context.fetch(FetchDescriptor<ProjectEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
       .filter { $0.deletedAt == nil }
@@ -550,7 +668,21 @@ enum TaskJSONTransfer {
       }
       var meta: [String] = []
       if t.today && t.status == .open { meta.append("today") }
-      if let s = t.scheduled { meta.append("when: \(s)") }
+      if t.starred { meta.append("★") }
+      let tagNames = t.tagIDs.compactMap { tagsByID[$0]?.name }
+      for tagName in tagNames {
+        let token = tagName.contains(" ") ? "#\"\(tagName)\"" : "#\(tagName)"
+        meta.append(token)
+      }
+      if let s = t.scheduled {
+        if let slot = TaskTimeSlot.format(startTime: t.startTime, durationMinutes: t.durationMinutes) {
+          meta.append("when: \(s) \(slot)")
+        } else {
+          meta.append("when: \(s)")
+        }
+      } else if let slot = TaskTimeSlot.format(startTime: t.startTime, durationMinutes: t.durationMinutes) {
+        meta.append("time: \(slot)")
+      }
       if let d = t.deadline { meta.append("deadline: \(d)") }
       if let r = t.recurrence { meta.append("repeat: \(r.shortLabel)") }
       if let rem = t.reminderAt { meta.append("reminder: \(rem)") }
@@ -561,6 +693,11 @@ enum TaskJSONTransfer {
         for noteLine in notes.components(separatedBy: .newlines) {
           lines.append("\(indent)  > \(noteLine)")
         }
+      }
+      let steps = LocalCache.checklistItems(forTaskID: t.id, in: context)
+      for step in steps {
+        let stepBox = step.checked ? "[x]" : "[ ]"
+        lines.append("\(indent)  - \(stepBox) \(step.title)")
       }
     }
 
@@ -628,19 +765,21 @@ enum TaskJSONTransfer {
     let context = context ?? LocalStore.shared.container.mainContext
     let areas = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<AreaEntity>()).map { ($0.id, $0.title) })
     let projects = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<ProjectEntity>()).map { ($0.id, $0) })
+    let tagsByID = LocalCache.tagsByID(in: context)
     let allTasks = try context.fetch(FetchDescriptor<TaskEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
       .filter { $0.deletedAt == nil }
     let headings = Dictionary(uniqueKeysWithValues: allTasks.filter(\.isHeading).map { ($0.id, $0.title) })
     let rows = allTasks.filter { !$0.isHeading && (includeCompleted || $0.status == .open) }
 
     var out: [String] = [
-      "\u{FEFF}id,title,status,area,project,section,today,scheduled,deadline,reminder_at,recurrence,notes,created,completed_at"
+      "\u{FEFF}id,title,status,area,project,section,today,starred,tags,scheduled,start_time,duration_minutes,deadline,reminder_at,recurrence,notes,created,completed_at"
     ]
     for t in rows {
       let projectEntity = t.project.flatMap { projects[$0] }
       let areaName = (t.area ?? projectEntity?.area).flatMap { areas[$0] } ?? ""
       let projectName = projectEntity?.title ?? ""
       let sectionName = t.heading.flatMap { headings[$0] } ?? ""
+      let tagList = t.tagIDs.compactMap { tagsByID[$0]?.name }.joined(separator: ", ")
       let cols: [String] = [
         t.id,
         t.title,
@@ -649,7 +788,11 @@ enum TaskJSONTransfer {
         projectName,
         sectionName,
         t.today ? "true" : "false",
+        t.starred ? "true" : "false",
+        tagList,
         t.scheduled ?? "",
+        t.startTime ?? "",
+        t.durationMinutes.map(String.init) ?? "",
         t.deadline ?? "",
         t.reminderAt ?? "",
         t.recurrence?.shortLabel ?? "",
@@ -726,20 +869,22 @@ struct SeptaskImportExportPane: View {
   @State private var exportError: String?
 
   @State private var showingFilePicker = false
-  @State private var showingPaste = false
-  @State private var pasteBuffer = ""
   @State private var importDoc: TaskJSONTransfer.Envelope?
   @State private var importMessage: String?
   @State private var importIsError = false
 
   var body: some View {
     Form {
+      moveInSection
       storageSection
       exportSection
       importSection
     }
     .formStyle(.grouped)
     .navigationTitle("Import & Export")
+    #if os(iOS)
+    .navigationBarTitleDisplayMode(.inline)
+    #endif
     .fileExporter(
       isPresented: $showingFileExporter,
       document: exportDocument,
@@ -758,7 +903,21 @@ struct SeptaskImportExportPane: View {
       allowedContentTypes: [.json],
       allowsMultipleSelection: false
     ) { handleFileImport($0) }
-    .sheet(isPresented: $showingPaste) { pasteSheet }
+  }
+
+  private var moveInSection: some View {
+    Section {
+      NavigationLink {
+        ThingsImportView()
+          .navigationTitle("Import from Things")
+      } label: {
+        Label("Import from Things", systemImage: RegistryIcons.sfSymbols["settings.import"] ?? "square.and.arrow.down")
+      }
+    } header: {
+      Text("Move from another app")
+    } footer: {
+      Text("Copy a Things database into Septena once. Nothing in Things is changed.")
+    }
   }
 
   private var storageSection: some View {
@@ -838,13 +997,6 @@ struct SeptaskImportExportPane: View {
       } label: {
         Label("Choose JSON File…", systemImage: "doc.badge.plus")
       }
-      Button {
-        pasteBuffer = ""
-        importMessage = nil
-        showingPaste = true
-      } label: {
-        Label("Paste JSON…", systemImage: "doc.on.clipboard")
-      }
 
       if let doc = importDoc {
         importPreview(doc)
@@ -856,7 +1008,7 @@ struct SeptaskImportExportPane: View {
           .foregroundStyle(importIsError ? .red : .secondary)
       }
     } header: {
-      Text("Import")
+      Text("Restore backup")
     } footer: {
       Text("Imports a Septena JSON backup into this device. Matching IDs update in place; non-task records are skipped.")
     }
@@ -884,6 +1036,96 @@ struct SeptaskImportExportPane: View {
       .padding(.top, 2)
     }
     .padding(.vertical, 4)
+  }
+
+  private func handleFileImport(_ result: Result<[URL], Error>) {
+    do {
+      guard let url = try result.get().first else { return }
+      let access = url.startAccessingSecurityScopedResource()
+      defer { if access { url.stopAccessingSecurityScopedResource() } }
+      let data = try Data(contentsOf: url)
+      importDoc = try TaskJSONTransfer.parseEnvelope(data)
+      importMessage = nil
+      importIsError = false
+    } catch {
+      importDoc = nil
+      importMessage = error.localizedDescription
+      importIsError = true
+    }
+  }
+
+  private func applyImport(_ doc: TaskJSONTransfer.Envelope) {
+    do {
+      let result = try TaskJSONTransfer.apply(doc, context: modelContext)
+      importDoc = nil
+      importIsError = false
+      if result.skipped > 0 {
+        importMessage = "Imported \(result.applied) records (\(result.skipped) non-task rows skipped)."
+      } else {
+        importMessage = "Imported \(result.applied) records."
+      }
+      TaskNotices.completeStep(.importTasks, context: modelContext)
+    } catch {
+      importIsError = true
+      importMessage = error.localizedDescription
+    }
+  }
+}
+
+/// Raw JSON paste utility, hosted in Settings ▸ About ▸ Advanced (`paste_json_import`,
+/// docs/SETTINGS_UX_SPEC.md) so everyday Import & Export stays focused on files.
+struct SeptaskPasteJSONSection: View {
+  @Environment(\.modelContext) private var modelContext
+  @State private var showingPaste = false
+  @State private var pasteBuffer = ""
+  @State private var importDoc: TaskJSONTransfer.Envelope?
+  @State private var importMessage: String?
+  @State private var importIsError = false
+
+  var body: some View {
+    Section {
+      Button {
+        pasteBuffer = ""
+        importMessage = nil
+        showingPaste = true
+      } label: {
+        Label("Paste JSON Backup…", systemImage: "doc.on.clipboard")
+      }
+      .sheet(isPresented: $showingPaste) { pasteSheet }
+
+      if let doc = importDoc {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Ready to import")
+            .font(.septenaLabel)
+          Text("\(doc.taskCount) tasks · \(doc.projectCount) projects · \(doc.areaCount) areas · \(doc.attachmentCount) attachments")
+            .font(.septenaCaption)
+            .foregroundStyle(.secondary)
+          if doc.skippedRowCount > 0 {
+            Text("\(doc.skippedRowCount) non-task rows will be skipped.")
+              .font(.septenaCaption)
+              .foregroundStyle(.secondary)
+          }
+          HStack(spacing: 12) {
+            Button("Import") { applyImport(doc) }
+              .buttonStyle(.borderedProminent)
+              .disabled(doc.supportedRowCount == 0)
+            Button("Cancel", role: .cancel) { importDoc = nil }
+          }
+          .padding(.top, 2)
+        }
+        .padding(.vertical, 4)
+      }
+
+      if let importMessage {
+        Text(importMessage)
+          .font(.septenaCaption)
+          .foregroundStyle(importIsError ? .red : .secondary)
+      }
+    } header: {
+      Text("Data tools")
+    } footer: {
+      Text("Paste raw Septena JSON directly from the clipboard to restore or merge records.")
+    }
   }
 
   private var pasteSheet: some View {
@@ -929,22 +1171,6 @@ struct SeptaskImportExportPane: View {
     #if os(macOS)
     .frame(width: 480, height: 340)
     #endif
-  }
-
-  private func handleFileImport(_ result: Result<[URL], Error>) {
-    do {
-      guard let url = try result.get().first else { return }
-      let access = url.startAccessingSecurityScopedResource()
-      defer { if access { url.stopAccessingSecurityScopedResource() } }
-      let data = try Data(contentsOf: url)
-      importDoc = try TaskJSONTransfer.parseEnvelope(data)
-      importMessage = nil
-      importIsError = false
-    } catch {
-      importDoc = nil
-      importMessage = error.localizedDescription
-      importIsError = true
-    }
   }
 
   private func applyImport(_ doc: TaskJSONTransfer.Envelope) {

@@ -47,11 +47,9 @@ struct SelectableRowActions {
   /// Whether rows should wire click-selection at all (false on iPhone compact,
   /// which has no multi-select chrome — there a tap just activates).
   var selectable: Bool = true
-  /// iOS: a plain tap on an UNselected row activates it directly instead of
-  /// selecting first. The host sets this while an inline editor is open, so one
-  /// tap on another row moves the editor there. Ignored on macOS, where a
-  /// click must keep meaning "select" (double-click opens).
-  var activatesOnTap: Bool = false
+  /// iOS touch multi-select mode: tapping any row toggles its membership in
+  /// `selection` instead of opening the inline editor.
+  var toggleOnTap: Bool = false
 }
 
 private struct SelectableRowActionsKey: EnvironmentKey {
@@ -66,6 +64,12 @@ private struct SelectableRowFrameKey: PreferenceKey {
   static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
     value.merge(nextValue(), uniquingKeysWith: { _, new in new })
   }
+}
+
+/// Non-observed storage for row frames so preference updates during scrolling
+/// NEVER invalidate `SelectableScrollList.body` or re-diff `content()`.
+private final class SelectableRowFrameStore {
+  var frames: [String: CGRect] = [:]
 }
 
 /// Visible height of the scroll view's clip rect.
@@ -134,12 +138,18 @@ private struct SelectableScrollRowModifier: ViewModifier {
       // (`TaskCardChrome`) paints BOTH the card surface and the selected-cell
       // fill, edge-to-edge within the card and with the card's own corners.
       // A second fill at row level used to float as an inset bar on top of it.
+      // Only measure row frames when keyboard selection/clipping is active
+      // (macOS / iPad regular). Compact iPhone never uses `rowFrames`, so
+      // skipping the GeometryReader eliminates per-row layout/preference work
+      // on every scroll frame.
       .background {
-        GeometryReader { geo in
-          Color.clear.preference(
-            key: SelectableRowFrameKey.self,
-            value: [id: geo.frame(in: .named(SelectableScrollListMetrics.coordinateSpace))]
-          )
+        if actions.selectable {
+          GeometryReader { geo in
+            Color.clear.preference(
+              key: SelectableRowFrameKey.self,
+              value: [id: geo.frame(in: .named(SelectableScrollListMetrics.coordinateSpace))]
+            )
+          }
         }
       }
       .id(id)
@@ -191,8 +201,7 @@ private struct SelectableRowGestures: ViewModifier {
 /// iPad tap model. Select-first (first tap selects, second opens) is a pointer
 /// and keyboard idiom; on glass it reads as "my tap was ignored". So:
 ///   • touch tap → opens the row (like iPhone),
-///   • trackpad / mouse click → selects first, as on the Mac,
-///   • any tap while an editor is open (`activatesOnTap`) → opens that row.
+///   • trackpad / mouse click → selects first, as on the Mac.
 ///
 /// SwiftUI's tap gesture does not say which device produced it. The standard
 /// signal that a pointer is present is hover: `onContinuousHover` reports
@@ -205,22 +214,37 @@ private struct TouchOrPointerTap: ViewModifier {
   @State private var pointerOver = false
 
   func body(content: Content) -> some View {
-    content
-      .onContinuousHover { phase in
-        switch phase {
-        case .active: pointerOver = true
-        case .ended:  pointerOver = false
+    if actions.selectable {
+      content
+        .onContinuousHover { phase in
+          switch phase {
+          case .active: pointerOver = true
+          case .ended:  pointerOver = false
+          }
         }
-      }
-      .onTapGesture {
-        // Compact iPhone passes `selectable: false`: a tap always opens.
-        guard actions.selectable else { actions.activate(id); return }
-        if isSelected || actions.activatesOnTap || !pointerOver {
-          actions.activate(id)
+        .onTapGesture {
+          if actions.toggleOnTap {
+            Haptics.tap()
+            actions.click(id, .command)
+            return
+          }
+          if isSelected || !pointerOver {
+            actions.activate(id)
+          } else {
+            actions.click(id, [])
+          }
+        }
+    } else {
+      // Compact iPhone: skip `onContinuousHover` (no per-row UIHoverGestureRecognizer).
+      content.onTapGesture {
+        if actions.toggleOnTap {
+          Haptics.tap()
+          actions.click(id, .command)
         } else {
-          actions.click(id, [])
+          actions.activate(id)
         }
       }
+    }
   }
 }
 #endif
@@ -247,11 +271,10 @@ struct SelectableScrollList<Content: View>: View {
   var isActive: Bool = true
   /// Whether rows wire click-selection (false on iPhone compact).
   var selectable: Bool = true
+  /// iOS touch multi-select mode: tapping a row toggles membership in `selection`.
+  var toggleOnTap: Bool = false
   /// Return / double-click / single-tap(iOS) on a row.
   var onActivate: (String) -> Void = { _ in }
-  /// iOS: a plain tap on an unselected row activates it (see
-  /// `SelectableRowActions.activatesOnTap`).
-  var activatesOnTap: Bool = false
   /// Esc with a selection, or a click on the empty paper behind the rows.
   var onClear: () -> Void = {}
   /// ⌘M / ⌘⇧M — task-surface alias for the Move command. This is optional so
@@ -281,7 +304,7 @@ struct SelectableScrollList<Content: View>: View {
   /// Anchor for ⇧-click / ⇧-arrow range selection.
   @State private var anchor: String?
   @State private var viewportHeight: CGFloat = 0
-  @State private var rowFrames: [String: CGRect] = [:]
+  @State private var frameStore = SelectableRowFrameStore()
   @State private var scrollRequest: SelectableScrollRequest?
 
   var body: some View {
@@ -290,7 +313,18 @@ struct SelectableScrollList<Content: View>: View {
         LazyVStack(alignment: .leading, spacing: 0) {
           content()
         }
+        #if os(iOS)
+        .frame(maxWidth: .infinity,
+               minHeight: inputActive && viewportHeight > 0 ? viewportHeight : nil,
+               alignment: .topLeading)
+        .background {
+          Color.clear
+            .contentShape(Rectangle())
+            .onTapGesture { onClear() }
+        }
+        #else
         .frame(maxWidth: .infinity, alignment: .leading)
+        #endif
       }
       #if os(iOS)
       .septenaTabScrollInsets(
@@ -301,13 +335,12 @@ struct SelectableScrollList<Content: View>: View {
       #endif
       .coordinateSpace(name: SelectableScrollListMetrics.coordinateSpace)
       .onPreferenceChange(SelectableRowFrameKey.self) { newFrames in
-        // Defer one run-loop turn — many rows report frames in the same layout
-        // pass; writing @State synchronously triggers "updated multiple times
-        // per frame" and can cascade extra layout.
-        Task { @MainActor in
-          guard !rowFrames.isApproximatelyEqual(to: newFrames) else { return }
-          rowFrames = newFrames
-          fulfillPendingScroll(proxy: proxy)
+        guard selectable else { return }
+        frameStore.frames = newFrames
+        if scrollRequest != nil {
+          Task { @MainActor in
+            fulfillPendingScroll(proxy: proxy)
+          }
         }
       }
       .background {
@@ -340,17 +373,22 @@ struct SelectableScrollList<Content: View>: View {
       .frame(maxWidth: .infinity, alignment: .topLeading)
       #endif
       .background {
-        canvasFill
-          .ignoresSafeArea()
-          .contentShape(Rectangle())
-          .onTapGesture { onClear() }
+        ZStack(alignment: .top) {
+          canvasFill
+          #if SEPTASK
+          HeaderWashView()
+          #endif
+        }
+        .ignoresSafeArea()
+        .contentShape(Rectangle())
+        .onTapGesture { onClear() }
       }
       .softTopScrollEdgeEffectCompat()
       .environment(\.selectableRowActions, SelectableRowActions(
         click: handleClick,
         activate: onActivate,
         selectable: selectable,
-        activatesOnTap: activatesOnTap
+        toggleOnTap: toggleOnTap
       ))
       // Focusable for native key delivery; the blue focus ring is suppressed —
       // the selection capsule is indicator enough (same call the List makes).
@@ -514,7 +552,7 @@ struct SelectableScrollList<Content: View>: View {
       // reveal it so SwiftUI realizes that row; otherwise long Mac lists never
       // follow selection past the visible region.
       guard viewportHeight > 0 else { return }
-      guard !rowFrames.isEmpty else { return }
+      guard !frameStore.frames.isEmpty else { return }
       proxy.scrollTo(request.id, anchor: request.scrollDown ? .bottom : .top)
       scrollRequest = nil
     }
@@ -543,7 +581,7 @@ struct SelectableScrollList<Content: View>: View {
   /// `nil` when layout isn't ready — treat as visible so we don't spuriously
   /// scroll on the first arrow after a click.
   private func rowClipStatus(_ id: String, scrollDown: Bool) -> SelectableRowClip? {
-    guard viewportHeight > 0, let frame = rowFrames[id] else { return nil }
+    guard viewportHeight > 0, let frame = frameStore.frames[id] else { return nil }
     let slack: CGFloat = 2
     let above = frame.minY < -slack
     let below = frame.maxY > viewportHeight + slack

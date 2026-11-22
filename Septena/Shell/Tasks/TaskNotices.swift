@@ -271,9 +271,18 @@ enum TaskNotices {
                                           engine: SeptenaServices.shared.ckEngine)
       }
     }
+    let headingKind = TaskKind.heading
     func done(_ id: TaskNoticeStep.ID, source: String) -> Bool {
       if latched.contains(id.rawValue) { return true }
-      let descriptor = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.source == source })
+      // Inline capture inserts an untitled placeholder (`title == ""`) as soon
+      // as the user taps "New task" and fills `title` only on save (or purges
+      // it if abandoned). Exclude blank drafts and project headings so a step
+      // — especially `.addTask` — concludes only once a real task is saved.
+      let descriptor = FetchDescriptor<TaskEntity>(
+        predicate: #Predicate {
+          $0.source == source && $0.title != "" && $0.kind != headingKind
+        }
+      )
       guard ((try? context.fetchCount(descriptor)) ?? 0) > 0 else { return false }
       completeStep(id, context: context)
       return true
@@ -282,16 +291,16 @@ enum TaskNotices {
       TaskNoticeStep(
         id: .connectAI,
         title: String(localized: "Connect your AI",
-                      comment: "Get started step: connect Claude or another agent"),
-        detail: String(localized: "Claude, ChatGPT, Claude Code and more",
-                       comment: "Get started step detail: which agents can connect"),
+                      comment: "Get started step: connect an AI assistant or agent"),
+        detail: String(localized: "Connect an assistant to your tasks",
+                       comment: "Get started step detail: connect an AI assistant to your tasks"),
         done: done(.connectAI, source: TaskSource.mcp)),
       TaskNoticeStep(
         id: .importTasks,
         title: String(localized: "Bring in your tasks",
                       comment: "Get started step: import tasks from another app"),
-        detail: String(localized: "From Reminders or Things",
-                       comment: "Get started step detail: where tasks can be imported from"),
+        detail: String(localized: "Import from another app",
+                       comment: "Get started step detail: import tasks from another app"),
         done: done(.importTasks, source: TaskSource.things)),
       TaskNoticeStep(
         id: .addTask,
@@ -321,7 +330,7 @@ enum TaskNotices {
     String(localized: "Or press ⌃⌥Space anywhere on your Mac",
            comment: "Get started step detail: the Quick Entry shortcut on Mac")
     #else
-    String(localized: "It lands in your Inbox until you decide",
+    String(localized: "It lands in your Inbox until you schedule or file it",
            comment: "Get started step detail: where a new task goes")
     #endif
   }
@@ -342,17 +351,27 @@ enum TaskNotices {
                               lastSweepAt: TaskFade.lastSweepAt,
                               dismissedWeek: TaskFade.dismissedSweepWeek,
                               fadedDates: dates) else { return nil }
-    let count = candidates.count
+    let copy = RegistryNotices.byId["weeklySweep"]
     return TaskNotice(
-      id: .weeklySweep, kind: .info, symbol: "circle.dashed",
-      title: count == 1
-        ? String(localized: "1 task faded this week. Still want it?",
-                 comment: "Weekly sweep notice title: singular")
-        : String(localized: "\(count) tasks faded this week. Still want any?",
-                 comment: "Weekly sweep notice title: plural"),
+      id: .weeklySweep, kind: .info, symbol: copy?.sfSymbol ?? "circle.dashed",
+      title: RegistryNotices.weeklySweepTitle(count: candidates.count),
       detail: nil,
-      primaryTitle: String(localized: "Review", comment: "Weekly sweep notice action button"),
-      dismissible: true)
+      primaryTitle: copy?.primaryTitle,
+      dismissible: copy?.dismissible ?? true)
+  }
+
+  /// The notice on top of the Faded pile. Its action opens the same sweep
+  /// sheet as the weekly prompt, so it shares the `weeklySweep` id. Copy comes
+  /// from the registry (`registry/surfaces.json` `fadedPile`), so the Mac and
+  /// iOS shells cannot drift.
+  static var fadedPile: TaskNotice {
+    let copy = RegistryNotices.byId["fadedPile"]
+    return TaskNotice(
+      id: .weeklySweep, kind: .info, symbol: copy?.sfSymbol ?? "circle.dashed",
+      title: copy?.title ?? "",
+      detail: copy?.detail,
+      primaryTitle: copy?.primaryTitle,
+      dismissible: copy?.dismissible ?? false)
   }
 
   // MARK: - Explainers
@@ -367,9 +386,9 @@ enum TaskNotices {
        pool.contains(where: { $0.fadeFill() != nil }) {
       out.append(TaskNotice(
         id: .fadeIntro, kind: .info, symbol: "circle.lefthalf.filled",
-        title: String(localized: "Untouched tasks start to fade",
+        title: String(localized: "Inactive tasks start to fade",
                       comment: "Explainer notice title: task fade, shown the first time a task fades"),
-        detail: String(localized: "An undated task fades over 14 days without a touch, then moves to Faded. Touch or edit it to restore full strength. You can turn this off in Settings.",
+        detail: String(localized: "Undated tasks fade after 14 days without activity and move to Faded. Open or edit a task to bring it back. You can turn this off in Settings.",
                        comment: "Explainer notice detail: how task fade works and how to undo or disable it"),
         primaryTitle: nil, dismissible: true))
     }

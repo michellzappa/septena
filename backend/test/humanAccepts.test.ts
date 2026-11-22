@@ -250,4 +250,109 @@ describe("TaskStore human_accepts rule (#87)", () => {
     assert.equal(result.results[0].status, "applied");
     assert.equal(store.readTask("task-human-accept")?.task.status, "done");
   });
+
+  it("auto-releases an agent claim when the agent sets endState=needs_verify", async () => {
+    const { store } = await createTestTaskStore();
+
+    store.push([
+      {
+        clientOpId: opId("create"),
+        op: "upsert",
+        entity: "task",
+        id: "task-claim-release",
+        fields: { title: "Ship feature", status: "open" },
+      },
+      {
+        clientOpId: opId("assign"),
+        op: "upsert",
+        entity: "convo",
+        id: "task-claim-release",
+        fields: { assignee: "claude" },
+      },
+    ], HUMAN_ACTOR);
+
+    const claim = store.claim("task-claim-release", "runner:mz-mini@1", 30 * 60_000, "start work", RUNNER_ACTOR);
+    assert.equal(claim.ok, true);
+    assert.equal(store.readTask("task-claim-release")?.convo?.claimedBy, "runner:mz-mini@1");
+
+    const verify = store.push([
+      {
+        clientOpId: opId("verify"),
+        op: "upsert",
+        entity: "convo",
+        id: "task-claim-release",
+        fields: { endState: "needs_verify", endStateNote: "Please eyeball the diff" },
+      },
+    ], RUNNER_ACTOR);
+    assert.equal(verify.result.results[0].status, "applied");
+
+    const after = store.readTask("task-claim-release")?.convo;
+    assert.equal(after?.endState, "needs_verify");
+    assert.equal(after?.claimedBy, null);
+    assert.equal(after?.claimUntil, null);
+  });
+
+  it("refuses agent completion on a needs_verify or claimed task even when assignee is cleared", async () => {
+    const { store } = await createTestTaskStore();
+
+    store.push([
+      {
+        clientOpId: opId("create-nv"),
+        op: "upsert",
+        entity: "task",
+        id: "task-nv-no-assignee",
+        fields: { title: "Verify copy", status: "open" },
+      },
+      {
+        clientOpId: opId("convo-nv"),
+        op: "upsert",
+        entity: "convo",
+        id: "task-nv-no-assignee",
+        fields: { assignee: null, endState: "needs_verify", endStateNote: "Check headline" },
+      },
+      {
+        clientOpId: opId("create-claimed"),
+        op: "upsert",
+        entity: "task",
+        id: "task-claimed-no-assignee",
+        fields: { title: "Claimed work", status: "open" },
+      },
+    ], HUMAN_ACTOR);
+
+    const claim = store.claim("task-claimed-no-assignee", "runner:mz-mini@1", 30 * 60_000, "working", RUNNER_ACTOR);
+    assert.equal(claim.ok, true);
+
+    for (const id of ["task-nv-no-assignee", "task-claimed-no-assignee"]) {
+      const { result } = store.push([
+        {
+          clientOpId: opId("done"),
+          op: "upsert",
+          entity: "task",
+          id,
+          fields: { status: "done", completedAt: "2026-11-21T12:00:00Z" },
+        },
+      ], AGENT_ACTOR);
+      assert.equal(result.results[0].status, "rejected", `expected ${id} to reject agent completion`);
+      assert.equal(result.results[0].reason, "human_accepts");
+    }
+  });
+
+  it("readReviewTasks returns only open non-heading needs_verify tasks with their notes", async () => {
+    const { store } = await createTestTaskStore();
+
+    store.push([
+      { clientOpId: opId("c1"), op: "upsert", entity: "task", id: "t-review", fields: { title: "Check PR", status: "open" } },
+      { clientOpId: opId("v1"), op: "upsert", entity: "convo", id: "t-review", fields: { assignee: "claude", endState: "needs_verify", endStateNote: "Inspect tests" } },
+      { clientOpId: opId("c2"), op: "upsert", entity: "task", id: "t-done", fields: { title: "Already done", status: "done" } },
+      { clientOpId: opId("v2"), op: "upsert", entity: "convo", id: "t-done", fields: { assignee: "claude", endState: "needs_verify", endStateNote: "Old" } },
+      { clientOpId: opId("c3"), op: "upsert", entity: "task", id: "t-open", fields: { title: "Still working", status: "open" } },
+      { clientOpId: opId("v3"), op: "upsert", entity: "convo", id: "t-open", fields: { assignee: "claude", endState: "open" } },
+    ], HUMAN_ACTOR);
+
+    const review = store.readReviewTasks(50);
+    assert.equal(review.total, 1);
+    assert.equal(review.rows.length, 1);
+    assert.equal(review.rows[0].id, "t-review");
+    assert.equal(review.notes["t-review"], "Inspect tests");
+  });
 });

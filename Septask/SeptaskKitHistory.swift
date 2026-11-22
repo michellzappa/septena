@@ -101,7 +101,7 @@ final class KitHistoryView: NSStackView {
       case .success(let changes): self.render(TaskHistory.rows(changes, listTitle: self.listTitle))
       case .failure:
         self.render([])
-        self.status.stringValue = String(localized: "History did not load.", comment: "SeptaskKit: history error")
+        self.status.stringValue = String(localized: "Couldn’t load history.", comment: "SeptaskKit: history error")
         self.status.isHidden = false
       }
     }

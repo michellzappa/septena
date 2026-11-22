@@ -181,6 +181,10 @@ final class TaskMutator {
     return cloudBackend.sendBackConvo(id: id, note: note)
   }
 
+  func restoreConvo(id: String, _ convo: TaskConvo) {
+    cloudBackend?.restoreConvo(id: id, convo)
+  }
+
   func pendingReasoning(limit: Int) -> [TaskEntity] {
     cloudBackend?.pendingReasoning(limit: limit) ?? []
   }
@@ -233,6 +237,14 @@ final class TaskMutator {
     cloudBackend.setReminder(id: id, reminder: reminder)
   }
 
+  func setTimeSlot(id: String, startTime: String?, durationMinutes: Int?, timeZone: String? = nil) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setTimeSlot called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.setTimeSlot(id: id, startTime: startTime, durationMinutes: durationMinutes, timeZone: timeZone)
+  }
+
   func snoozeReminder(id: String, until: Date) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] snoozeReminder called before CK bound — dropping", nil)
@@ -247,6 +259,107 @@ final class TaskMutator {
       return
     }
     cloudBackend.dismissReminder(id: id, at: date)
+  }
+
+  func setStarred(id: String, starred: Bool) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setStarred called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.setStarred(id: id, starred: starred)
+  }
+
+  @discardableResult
+  func addChecklistItem(taskID: String, title: String, position: Double? = nil) -> ChecklistItem? {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] addChecklistItem called before CK bound — dropping", nil)
+      return nil
+    }
+    return cloudBackend.addChecklistItem(taskID: taskID, title: title, position: position)
+  }
+
+  func updateChecklistItem(id: String, title: String? = nil, checked: Bool? = nil, position: Double? = nil) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] updateChecklistItem called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.updateChecklistItem(id: id, title: title, checked: checked, position: position)
+  }
+
+  func reorderChecklistItems(taskID: String, orderedIDs: [String]) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] reorderChecklistItems called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.reorderChecklistItems(taskID: taskID, orderedIDs: orderedIDs)
+  }
+
+  func deleteChecklistItem(id: String) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] deleteChecklistItem called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.deleteChecklistItem(id: id)
+  }
+
+  @discardableResult
+  func restoreChecklistItem(_ item: ChecklistItem) -> ChecklistItem? {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] restoreChecklistItem called before CK bound — dropping", nil)
+      return nil
+    }
+    return cloudBackend.restoreChecklistItem(item)
+  }
+
+  func setTaskTags(id: String, tagIDs: [String]) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setTaskTags called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.setTaskTags(id: id, tagIDs: tagIDs)
+  }
+
+  @discardableResult
+  func createTag(name: String, color: String? = nil) -> TaskTag? {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] createTag called before CK bound — dropping", nil)
+      return nil
+    }
+    return cloudBackend.createTag(name: name, color: color)
+  }
+
+  @discardableResult
+  func updateTag(id: String, name: String? = nil, color: String?? = nil, position: Int?? = nil) -> Bool {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] updateTag called before CK bound — dropping", nil)
+      return false
+    }
+    return cloudBackend.updateTag(id: id, name: name, color: color, position: position)
+  }
+
+  func deleteTag(id: String) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] deleteTag called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.deleteTag(id: id)
+  }
+
+  @discardableResult
+  func restoreTag(_ tag: TaskTag) -> TaskTag? {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] restoreTag called before CK bound — dropping", nil)
+      return nil
+    }
+    return cloudBackend.restoreTag(tag)
+  }
+
+  func mergeTag(sourceID: String, into targetID: String) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] mergeTag called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.mergeTag(sourceID: sourceID, into: targetID)
   }
 
   func setRecurrence(id: String, recurrence: Recurrence?) {
@@ -303,6 +416,16 @@ final class TaskMutator {
       return
     }
     cloudBackend.moveToList(id: id, area: area, project: project)
+  }
+
+  /// Batch list move preserving the caller's `[0, 1, ...]` relative order at
+  /// the top of the destination (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §7.1).
+  func moveToList(ids: [String], area: String?, project: String?, acknowledge: Bool = true) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] moveToList(ids:) called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.moveToList(ids: ids, area: area, project: project, acknowledge: acknowledge)
   }
 
   func moveToProject(id: String, project: String?) {
@@ -393,6 +516,11 @@ final class TaskMutator {
       source: source
     )
     if let heading = task.heading { setHeading(id: copy.id, heading: heading) }
+    if task.starred { setStarred(id: copy.id, starred: true) }
+    if !task.tags.isEmpty { setTaskTags(id: copy.id, tagIDs: task.tags) }
+    if let start = task.startTime {
+      setTimeSlot(id: copy.id, startTime: start, durationMinutes: task.durationMinutes, timeZone: task.timeZone)
+    }
     if let rule = task.recurrence {
       setRecurrence(id: copy.id, recurrence: rule)
       // `setRecurrence` resets the pause across the series it writes, so a
@@ -403,6 +531,7 @@ final class TaskMutator {
       // re-asserted here rather than inherited.)
       if task.recurrencePaused { setRecurrencePaused(id: copy.id, paused: true) }
     }
+    cloudBackend?.copyChecklistItems(from: task.id, to: copy.id, deterministic: false)
     return copy
   }
 

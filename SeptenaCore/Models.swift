@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // Mirror of Septena api/routers/tasks.py — tasks/projects/areas only.
 
@@ -60,6 +61,17 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   var status: TaskStatus
   var created: String?         // YYYY-MM-DD
   var scheduled: String?       // YYYY-MM-DD
+  /// Optional 24-hour wall-clock start time (`HH:MM`, docs/TASK_TIMES_AND_ICAL_SPEC.md).
+  var startTime: String? = nil
+  /// Optional duration in minutes (`5..1440`).
+  var durationMinutes: Int? = nil
+  /// Optional IANA time zone (nil = floating local time).
+  var timeZone: String? = nil
+
+  /// Quiet human-readable time range (`14:00–15:00` or `14:00`), nil when date-only.
+  var timeSlotLabel: String? {
+    TaskTimeSlot.format(startTime: startTime, durationMinutes: durationMinutes)
+  }
   /// Hard date the task is owed by. Things-style: rendering only — the
   /// server unions deadline-today rows into Today.items at view time, no
   /// mutation. Reschedule the deadline forward and the task drops out of
@@ -68,6 +80,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// `due` as a mirror for the transition window, so we read either.
   var deadline: String?
   var today: Bool
+  var starred: Bool = false
+  /// Canonical `TagEntity.id` values assigned to this task (max 20, flat tags, docs/TAGS_SPEC.md).
+  var tags: [String] = []
   var todaySetOn: String?      // YYYY-MM-DD
   var completedAt: String?     // YYYY-MM-DDTHH:MM:SS
   var area: String?
@@ -149,6 +164,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
       hasRecurrence: recurrence != nil,
       isAgentTurn: deriveConvo(conversation).badge == .working,
       isAssignedToClaude: conversation.assignee == .claude,
+      isAwaitingHuman: conversation.awaitsHuman,
       showsAgentCue: showsAgentCue(now: now),
       touchedAt: touchedAt,
       createdAt: createdAt,
@@ -330,8 +346,13 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     status: TaskStatus,
     created: String?,
     scheduled: String?,
+    startTime: String? = nil,
+    durationMinutes: Int? = nil,
+    timeZone: String? = nil,
     deadline: String?,
     today: Bool,
+    starred: Bool = false,
+    tags: [String] = [],
     todaySetOn: String?,
     completedAt: String?,
     area: String?,
@@ -363,8 +384,13 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     self.status = status
     self.created = created
     self.scheduled = scheduled
+    self.startTime = startTime
+    self.durationMinutes = durationMinutes
+    self.timeZone = timeZone
     self.deadline = deadline
     self.today = today
+    self.starred = starred
+    self.tags = tags
     self.todaySetOn = todaySetOn
     self.completedAt = completedAt
     self.area = area
@@ -393,7 +419,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   }
 
   enum CodingKeys: String, CodingKey {
-    case id, title, status, created, scheduled, deadline, today
+    case id, title, status, created, scheduled, startTime, durationMinutes, timeZone, deadline, today, starred, tags
     case todaySetOn = "today_set_on"
     case completedAt = "completed_at"
     case area, project, notes, recurrence, reminder
@@ -416,6 +442,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     status = (try? c.decode(TaskStatus.self, forKey: .status)) ?? .open
     created = try c.decodeIfPresent(String.self, forKey: .created)
     scheduled = try c.decodeIfPresent(String.self, forKey: .scheduled)
+    startTime = try c.decodeIfPresent(String.self, forKey: .startTime)
+    durationMinutes = try c.decodeIfPresent(Int.self, forKey: .durationMinutes)
+    timeZone = try c.decodeIfPresent(String.self, forKey: .timeZone)
     // Prefer the canonical `deadline`; fall back to legacy `due` for old
     // payloads (cached responses, old server builds).
     if let dl = try c.decodeIfPresent(String.self, forKey: .deadline) {
@@ -425,6 +454,8 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
       deadline = try legacy.decodeIfPresent(String.self, forKey: .due)
     }
     today = (try? c.decode(Bool.self, forKey: .today)) ?? false
+    starred = (try? c.decode(Bool.self, forKey: .starred)) ?? false
+    tags = (try? c.decodeIfPresent([String].self, forKey: .tags)) ?? []
     todaySetOn = try c.decodeIfPresent(String.self, forKey: .todaySetOn)
     completedAt = try c.decodeIfPresent(String.self, forKey: .completedAt)
     area = try c.decodeIfPresent(String.self, forKey: .area)
@@ -435,6 +466,124 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     nextOccurrence = try c.decodeIfPresent(String.self, forKey: .nextOccurrence)
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     deletedAt = try c.decodeIfPresent(String.self, forKey: .deletedAt)
+  }
+}
+
+// MARK: - Optional task start/end time helper (docs/TASK_TIMES_AND_ICAL_SPEC.md)
+
+enum TaskTimeSlot {
+  /// Quick duration presets shown behind progressive disclosure.
+  static let quickDurations: [(minutes: Int, label: String)] = [
+    (15, "15m"),
+    (30, "30m"),
+    (60, "1h"),
+    (120, "2h"),
+  ]
+
+  /// Parse `"HH:MM"` into `(hour, minute)`.
+  static func parse(_ hhmm: String?) -> (hour: Int, minute: Int)? {
+    guard let hhmm, hhmm.count == 5 else { return nil }
+    let parts = hhmm.split(separator: ":")
+    guard parts.count == 2,
+          let h = Int(parts[0]), let m = Int(parts[1]),
+          (0...23).contains(h), (0...59).contains(m) else { return nil }
+    return (h, m)
+  }
+
+  /// Format `(hour, minute)` into canonical 24-hour `"HH:MM"`.
+  static func hhmm(hour: Int, minute: Int) -> String {
+    String(format: "%02d:%02d", max(0, min(23, hour)), max(0, min(59, minute)))
+  }
+
+  /// Format `Date`'s local wall-clock hour/minute into `"HH:MM"`.
+  static func hhmm(from date: Date, calendar: Calendar = .current) -> String {
+    let comps = calendar.dateComponents([.hour, .minute], from: date)
+    return hhmm(hour: comps.hour ?? 9, minute: comps.minute ?? 0)
+  }
+
+  /// Convert `"HH:MM"` to a `Date` on today's calendar day for date pickers.
+  static func pickerDate(from hhmm: String?, calendar: Calendar = .current) -> Date {
+    let parsed = parse(hhmm) ?? (9, 0)
+    var comps = calendar.dateComponents([.year, .month, .day], from: Date())
+    comps.hour = parsed.hour
+    comps.minute = parsed.minute
+    comps.second = 0
+    return calendar.date(from: comps) ?? Date()
+  }
+
+  /// Format quiet display range (`"14:00–15:00"` when duration present, else `"14:00"`).
+  static func format(startTime: String?, durationMinutes: Int?) -> String? {
+    guard let (h, m) = parse(startTime) else { return nil }
+    let start = hhmm(hour: h, minute: m)
+    guard let dur = durationMinutes, dur >= 5 else { return start }
+    let total = (h * 60 + m + dur) % (24 * 60)
+    let end = hhmm(hour: total / 60, minute: total % 60)
+    return "\(start)–\(end)"
+  }
+}
+
+// MARK: - Flat tags (docs/TAGS_SPEC.md)
+
+struct TaskTag: Identifiable, Codable, Hashable, Sendable {
+  let id: String
+  var name: String
+  var color: String?
+  var position: Int?
+
+  init(id: String, name: String, color: String? = nil, position: Int? = nil) {
+    self.id = id
+    self.name = name
+    self.color = color
+    self.position = position
+  }
+}
+
+// MARK: - Checklist item (1-level subtask, docs/CHECKLISTS_SPEC.md)
+
+struct ChecklistItem: Identifiable, Codable, Hashable, Sendable {
+  let id: String
+  let taskId: String
+  var title: String
+  var checked: Bool
+  var checkedAt: String?
+  var position: Double
+  var createdAt: String?
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case taskId = "task_id"
+    case title, checked
+    case checkedAt = "checked_at"
+    case position
+    case createdAt = "created_at"
+  }
+
+  init(id: String,
+       taskId: String,
+       title: String,
+       checked: Bool = false,
+       checkedAt: String? = nil,
+       position: Double = 0,
+       createdAt: String? = nil) {
+    self.id = id
+    self.taskId = taskId
+    self.title = title
+    self.checked = checked
+    self.checkedAt = checkedAt
+    self.position = position
+    self.createdAt = createdAt
+  }
+
+  /// Deterministic ID for a checklist item copied onto a spawned recurring
+  /// occurrence: FNV-1a 64 over `"<newTaskID>|chk|<index>|<sourceItemID>"`
+  /// (`chk-` + 16 hex), LOCKSTEP with `backend/src/recurrence.ts` `checklistOccurrenceID`.
+  static func occurrenceItemID(newTaskID: String, index: Int, sourceItemID: String) -> String {
+    var hash: UInt64 = 14695981039346656037
+    for byte in "\(newTaskID)|chk|\(index)|\(sourceItemID)".utf8 {
+      hash ^= UInt64(byte)
+      hash &*= 1099511628211
+    }
+    return "chk-\(String(format: "%016llx", hash))"
   }
 }
 
@@ -624,10 +773,6 @@ struct Project: Identifiable, Codable, Hashable {
   /// Optional "owner/repo" pointer. Source of truth for agentic tooling that
   /// needs to know which GitHub repo a project's tasks live against.
   var githubRepo: String?
-  /// The one read-only context feed (repo / calendar / feed). See
-  /// [AreaAttachment.swift]. Carries the legacy `githubRepo` as a `.git`
-  /// attachment via the entity-level read-fallback.
-  var attachment: AreaAttachment?
   /// Sidebar sort order (synced, from `ProjectEntity.position`). Populated by
   /// the entity init only — intentionally NOT a `CodingKey`, so the MCP/wire
   /// JSON stays unchanged. See `docs/DRAG_AND_DROP.md` §5 gap #2.
@@ -636,7 +781,7 @@ struct Project: Identifiable, Codable, Hashable {
   var deletedAt: String?
 
   enum CodingKeys: String, CodingKey {
-    case id, title, status, area, created, notes, context, attachment
+    case id, title, status, area, created, notes, context
     case completedAt = "completed_at"
     case githubRepo = "github_repo"
     case updatedAt = "updated_at"
@@ -646,12 +791,12 @@ struct Project: Identifiable, Codable, Hashable {
   init(id: String, title: String, status: ProjectStatus = .active,
        area: String? = nil, created: String? = nil, completedAt: String? = nil,
        notes: String? = nil, context: String? = nil, githubRepo: String? = nil,
-       attachment: AreaAttachment? = nil, position: Int = 0,
+       position: Int = 0,
        updatedAt: String? = nil, deletedAt: String? = nil) {
     self.id = id; self.title = title; self.status = status
     self.area = area; self.created = created; self.completedAt = completedAt
     self.notes = notes; self.context = context; self.githubRepo = githubRepo
-    self.attachment = attachment; self.position = position
+    self.position = position
     self.updatedAt = updatedAt; self.deletedAt = deletedAt
   }
 
@@ -666,7 +811,6 @@ struct Project: Identifiable, Codable, Hashable {
     notes = try c.decodeIfPresent(String.self, forKey: .notes)
     context = try c.decodeIfPresent(String.self, forKey: .context)
     githubRepo = try c.decodeIfPresent(String.self, forKey: .githubRepo)
-    attachment = try c.decodeIfPresent(AreaAttachment.self, forKey: .attachment)
     position = 0   // not on the wire; set via ProjectEntity init
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     deletedAt = try c.decodeIfPresent(String.self, forKey: .deletedAt)
@@ -681,9 +825,6 @@ struct Area: Identifiable, Codable, Hashable {
   var context: String?
   /// Optional user-assigned glyph; nil ⇒ the area renders its filler dot.
   var emoji: String?
-  /// The one read-only context feed (repo / calendar / feed). See
-  /// [AreaAttachment.swift].
-  var attachment: AreaAttachment?
   /// Sidebar sort order (synced, from `AreaEntity.position`). Populated by the
   /// entity init only — intentionally NOT a `CodingKey`, so the MCP/wire JSON
   /// stays unchanged. See `docs/DRAG_AND_DROP.md` §5 gap #2.
@@ -694,10 +835,10 @@ struct Area: Identifiable, Codable, Hashable {
   // field by design (delete-by-omission from the local mirror).
 
   init(id: String, title: String, context: String? = nil, emoji: String? = nil,
-       attachment: AreaAttachment? = nil, position: Int = 0,
+       position: Int = 0,
        updatedAt: String? = nil) {
     self.id = id; self.title = title; self.context = context; self.emoji = emoji
-    self.attachment = attachment; self.position = position
+    self.position = position
     self.updatedAt = updatedAt
   }
 
@@ -707,13 +848,12 @@ struct Area: Identifiable, Codable, Hashable {
     title = try c.decodeIfPresent(String.self, forKey: .title) ?? id
     context = try c.decodeIfPresent(String.self, forKey: .context)
     emoji = try c.decodeIfPresent(String.self, forKey: .emoji)
-    attachment = try c.decodeIfPresent(AreaAttachment.self, forKey: .attachment)
     position = 0   // not on the wire; set via AreaEntity init
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
   }
 
   enum CodingKeys: String, CodingKey {
-    case id, title, context, emoji, attachment
+    case id, title, context, emoji
     case updatedAt = "updated_at"
   }
 }
@@ -812,6 +952,7 @@ enum TaskFilter: Equatable, Hashable {
   case upcoming
   case repeating
   case unscheduled
+  case starred
   case logbook
   /// Tasks that faded untouched (`docs/TASK_FADE_SPEC.md` §4).
   case faded
@@ -827,6 +968,7 @@ enum TaskFilter: Equatable, Hashable {
     case .upcoming: return "upcoming"
     case .repeating: return "all"
     case .unscheduled: return "unscheduled"
+    case .starred: return "all"
     case .logbook: return "logbook"
     case .faded: return "all"
     case .recentlyDeleted: return "all"
@@ -844,6 +986,7 @@ enum TaskFilter: Equatable, Hashable {
     case .upcoming: return "upcoming"
     case .repeating: return "repeating"
     case .unscheduled: return "unscheduled"
+    case .starred: return "starred"
     case .logbook: return "logbook"
     case .faded: return "faded"
     case .recentlyDeleted: return "recentlyDeleted"
@@ -863,6 +1006,7 @@ enum TaskFilter: Equatable, Hashable {
     case .upcoming: return String(localized: "Upcoming", comment: "Task filter")
     case .repeating: return String(localized: "Repeating", comment: "Task filter")
     case .unscheduled: return String(localized: "Anytime", comment: "Task filter")
+    case .starred: return String(localized: "Starred", comment: "Task filter")
     case .logbook: return String(localized: "Logbook", comment: "Task filter")
     case .faded: return String(localized: "Faded", comment: "Task filter")
     case .recentlyDeleted: return String(localized: "Recently Deleted", comment: "Task filter")
@@ -1040,6 +1184,13 @@ struct AppSettings: Codable {
   /// synced across devices so progress carries over. Nil → none recorded.
   var getStartedSteps: [String]? = nil
 
+  /// Appearance customization (ADR 0019 / docs/CUSTOMIZATION_SPEC.md). Synced
+  /// across devices when device-local `syncTheme` is enabled.
+  var accentColor: String? = nil
+  var canvasTexture: String? = nil
+  var textureIntensity: Int? = nil
+  var textureMotion: String? = nil
+
   /// When the first-run welcome (section picker + chained onboarding) was
   /// completed. The durable, cross-device "this account has been welcomed"
   /// marker: synced so a returning user's *new* device never re-shows the
@@ -1180,7 +1331,27 @@ enum SeptenaDate {
     return cal.date(from: c)
   }
 
-  static var today: String { formatter.string(from: Date()) }
+  /// Today's `yyyy-MM-dd`. Row filters read this several times per task on
+  /// every list repaint (`isOnToday`, triage, the row-object build), so the
+  /// string is formatted once per day, not once per read. The memo holds the
+  /// day's bounds in the formatter's own time zone, and a clock that moves
+  /// outside them (midnight, a manual clock change) formats again.
+  static var today: String {
+    let now = Date()
+    if let hit = todayMemo.withLock({ m in
+      m.flatMap { now >= $0.start && now < $0.end ? $0.day : nil }
+    }) { return hit }
+    let day = formatter.string(from: now)
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = formatter.timeZone
+    let start = cal.startOfDay(for: now)
+    let end = cal.date(byAdding: .day, value: 1, to: start) ?? now
+    todayMemo.withLock { $0 = (day, start, end) }
+    return day
+  }
+
+  private static let todayMemo =
+    OSAllocatedUnfairLock<(day: String, start: Date, end: Date)?>(initialState: nil)
 
   /// ISO date `n` calendar days after `iso` (negative = before).
   static func offsetDays(_ n: Int, from iso: String) -> String? {
@@ -1217,6 +1388,10 @@ enum SeptenaDate {
   /// weekday name within the last week, else "MMM d". Returns the raw
   /// string unchanged if it can't be parsed. Single home for the
   /// browse/backfill sheet titles that each carried a copy of this.
+  /// Localized short month + day ("May 14"). One shared formatter: row date
+  /// labels used to build a new `DateFormatter` on every render.
+  static func monthDay(_ d: Date) -> String { monthDayFormatter.string(from: d) }
+
   static func friendlyLabel(_ iso: String) -> String {
     guard let d = parse(iso) else { return iso }
     let cal = Calendar.current

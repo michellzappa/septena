@@ -51,7 +51,7 @@ DIST="$ROOT/dist"
 rm -rf "$DIST"
 mkdir -p "$DIST"
 
-echo "Building Septask $VERSION ($BUILD) [$CONFIG]"
+echo "Building Septena $VERSION ($BUILD) [$CONFIG]"
 xcodebuild \
   -project "$ROOT/Septena.xcodeproj" \
   -scheme SeptaskMac \
@@ -64,8 +64,8 @@ xcodebuild \
   SPARKLE_PUBLIC_ED_KEY="${SPARKLE_PUBLIC_ED_KEY:-}" \
   build
 
-APP="$DERIVED/Build/Products/$CONFIG/Septask.app"
-[[ -d "$APP" ]] || { echo "error: Septask.app not found at $APP" >&2; exit 1; }
+APP="$DERIVED/Build/Products/$CONFIG/Septena.app"
+[[ -d "$APP" ]] || { echo "error: Septena.app not found at $APP" >&2; exit 1; }
 
 expanded_entitlements() {
   local out
@@ -119,7 +119,7 @@ else
   codesign --force --deep --sign - "$APP"
 fi
 
-ditto -c -k --sequesterRsrc --keepParent "$APP" "$DIST/Septask-macOS.zip"
+ditto -c -k --sequesterRsrc --keepParent "$APP" "$DIST/Septena-macOS.zip"
 cat > "$DIST/version.txt" <<EOF
 version=$VERSION
 build=$BUILD
@@ -140,13 +140,13 @@ if [[ "$NOTARIZE" -eq 1 ]]; then
   [[ -n "${APPLE_API_KEY_ID:-}" && -n "${APPLE_API_ISSUER_ID:-}" ]] || {
     echo "error: APPLE_API_KEY_ID and APPLE_API_ISSUER_ID are required" >&2; exit 1;
   }
-  xcrun notarytool submit "$DIST/Septask-macOS.zip" \
+  xcrun notarytool submit "$DIST/Septena-macOS.zip" \
     --key "$KEY_PATH" --key-id "$APPLE_API_KEY_ID" \
     --issuer "$APPLE_API_ISSUER_ID" --wait
   xcrun stapler staple "$APP"
   xcrun stapler validate "$APP"
   rm -f "$TEMP_KEY"
-  ditto -c -k --sequesterRsrc --keepParent "$APP" "$DIST/Septask-macOS.zip"
+  ditto -c -k --sequesterRsrc --keepParent "$APP" "$DIST/Septena-macOS.zip"
 fi
 
-echo "Built $DIST/Septask-macOS.zip ($VERSION+$BUILD)"
+echo "Built $DIST/Septena-macOS.zip ($VERSION+$BUILD)"

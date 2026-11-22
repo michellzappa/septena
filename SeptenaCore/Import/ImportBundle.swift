@@ -1,6 +1,6 @@
 import Foundation
 
-// The internal API of the import engine (ADR 0019, docs/MOVING_IN_SPEC.md §2).
+// The internal API of the import engine (ADR 0021, docs/MOVING_IN_SPEC.md §2).
 // Every source adapter produces one `ImportBundle`; the engine accepts nothing
 // else. The Codable shape IS the wire shape: plain JSON, camelCase, versioned,
 // so a bundle written by one client (or a future TypeScript port) decodes in

@@ -121,13 +121,16 @@ final class KitConversationView: NSView {
     }
     if let open { stack.addArrangedSubview(questionBlock(open)) }
     if let meta = metaRow() { stack.addArrangedSubview(meta) }
-    if convo.endState == .needsVerify {
+    if convo.needsHumanReview || (convo.endState == .agentAssistedDone && !isTaskOpen) {
       stack.addArrangedSubview(reviewBlock())
     } else if convo.isTerminal {
       stack.addArrangedSubview(terminalRow())
     }
     if let agent = agentRow() { stack.addArrangedSubview(agent) }
     if let artifact = convo.artifact { stack.addArrangedSubview(artifactBlock(artifact)) }
+    if convo.artifact?.linkedIssue == nil, let issue = convo.linkedIssue {
+      stack.addArrangedSubview(issueLinkButton(issue))
+    }
     if let handoff = convo.handoff { stack.addArrangedSubview(handoffView(handoff)) }
 
     for view in stack.arrangedSubviews {
@@ -194,11 +197,13 @@ final class KitConversationView: NSView {
     title.textColor = SeptaskKitTheme.inkPrimary
     title.isSelectable = true
 
+    let rawOptions = question.options ?? []
+    let stackVertically = rawOptions.contains(where: { $0.count > 22 }) || rawOptions.count > 3
     let options = NSStackView()
-    options.orientation = .horizontal
-    options.alignment = .centerY
+    options.orientation = stackVertically ? .vertical : .horizontal
+    options.alignment = stackVertically ? .leading : .centerY
     options.spacing = 6
-    for option in question.options ?? [] {
+    for option in rawOptions {
       let pill = KitPillButton()
       pill.title = option
       pill.onPress = { [weak self] _ in
@@ -385,35 +390,71 @@ final class KitConversationView: NSView {
   }
 
   /// What the agent produced. Selectable on purpose — an artifact is usually
-  /// meant to be copied out.
+  /// meant to be copied out. URL refs (especially GitHub issues/PRs) render as
+  /// clickable buttons so the user can jump straight to the issue.
   private func artifactBlock(_ artifact: ConvoArtifact) -> NSView {
     let heading = NSTextField(labelWithString: artifact.title)
     heading.font = NSFont.systemFont(ofSize: SeptenaTypeScale.size(.body), weight: .medium)
     heading.textColor = SeptaskKitTheme.inkPrimary
     heading.isSelectable = true
 
-    let body = NSTextField(wrappingLabelWithString: artifact.body)
-    body.font = SeptaskKitTheme.meta
-    body.textColor = SeptaskKitTheme.inkPrimary
-    body.isSelectable = true
-
-    let block = NSStackView(views: [heading, body])
+    let block = NSStackView(views: [heading])
     block.orientation = .vertical
     block.alignment = .leading
-    block.spacing = 4
+    block.spacing = 6
     block.edgeInsets = NSEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
-    for ref in artifact.refs ?? [] {
-      let line = NSTextField(wrappingLabelWithString: ref)
-      line.font = SeptaskKitTheme.chip
-      line.textColor = SeptaskKitTheme.inkSecondary
-      line.isSelectable = true
-      block.addArrangedSubview(line)
+    if !artifact.body.isEmpty {
+      let body = NSTextField(wrappingLabelWithString: artifact.body)
+      body.font = SeptaskKitTheme.meta
+      body.textColor = SeptaskKitTheme.inkPrimary
+      body.isSelectable = true
+      block.addArrangedSubview(body)
+    }
+    if let refs = artifact.refs, !refs.isEmpty {
+      for ref in refs {
+        if let issue = ConvoIssueLink.parse(in: ref) {
+          block.addArrangedSubview(issueLinkButton(issue))
+        } else if let url = ConvoIssueLink.parseURL(ref) {
+          block.addArrangedSubview(urlLinkButton(title: ref, symbol: "arrow.up.right.square", url: url))
+        } else {
+          let line = NSTextField(wrappingLabelWithString: ref)
+          line.font = SeptaskKitTheme.chip
+          line.textColor = SeptaskKitTheme.inkSecondary
+          line.isSelectable = true
+          block.addArrangedSubview(line)
+        }
+      }
+    } else if let issue = artifact.linkedIssue {
+      block.addArrangedSubview(issueLinkButton(issue))
     }
     block.wantsLayer = true
     block.layer?.cornerRadius = 12
     block.layer?.cornerCurve = .continuous
     block.layer?.backgroundColor = SeptaskKitTheme.chipFill.cgColor
     return block
+  }
+
+  private func issueLinkButton(_ issue: ConvoIssueLink) -> NSButton {
+    let title = String(localized: "Open \(issue.fullLabel)",
+                       comment: "SeptaskKit: open linked GitHub issue or pull request")
+    let button = urlLinkButton(title: title, symbol: issue.symbolName, url: issue.url)
+    button.toolTip = issue.url.absoluteString
+    return button
+  }
+
+  private func urlLinkButton(title: String, symbol: String, url: URL) -> NSButton {
+    let button = NSButton(title: title, target: nil, action: nil)
+    button.bezelStyle = .rounded
+    button.controlSize = .small
+    button.refusesFirstResponder = true
+    button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+    button.imagePosition = .imageLeading
+    button.alignment = .left
+    button.setAccessibilityLabel(title)
+    button.target = KitHandoffOpener.shared
+    button.action = #selector(KitHandoffOpener.open(_:))
+    KitHandoffOpener.shared.register(url, for: button)
+    return button
   }
 
   /// The human last mile. A real button when there's somewhere to go, plain
@@ -501,11 +542,11 @@ final class KitConversationView: NSView {
 
   @objc private func acceptReview() {
     guard let taskID else { return }
+    let previousNote = convo.endStateNote
     mutator.complete(id: taskID)
     mutator.acknowledge(id: taskID)
-    let id = taskID
-    let mutator = self.mutator
-    TaskUndo.recordCompletion(ids: [id], wasDone: false, mutator: mutator)
+    TaskUndo.recordAcceptReview(id: taskID, previousNote: previousNote, mutator: mutator)
+    convo = mutator.conversation(id: taskID) ?? convo
     isTaskOpen = false
     showSendBack = false
     rebuild()
@@ -524,8 +565,11 @@ final class KitConversationView: NSView {
     guard !text.isEmpty else { return }
     sendBackField.stringValue = ""
     showSendBack = false
+    let before = convo
     mutator.sendBackConvo(id: taskID, note: text)
-    convo = mutator.conversation(id: taskID) ?? convo
+    let after = mutator.conversation(id: taskID) ?? before
+    TaskUndo.recordSendBack(id: taskID, before: before, after: after, mutator: mutator)
+    convo = after
     rebuild()
     onAppend?()
   }

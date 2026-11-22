@@ -53,4 +53,33 @@ import Testing
     withHandoff.handoff = ConvoHandoff(instruction: "Send the email", actionType: .compose, payload: nil)
     #expect(withHandoff.hasStarted == true)
   }
+
+  @Test func awaitingHumanReviewTasksNeverFade() {
+    var reviewConvo = TaskConvo()
+    reviewConvo.assignee = nil
+    reviewConvo.endState = .needsVerify
+    #expect(reviewConvo.needsHumanReview == true)
+    #expect(reviewConvo.awaitsHuman == true)
+
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let thirtyDaysAgo = now.addingTimeInterval(-30 * 86_400)
+    let shouldFade = TaskFade.shouldFade(
+      isOpen: true,
+      isHeading: false,
+      isDeleted: false,
+      isFaded: false,
+      deadline: nil,
+      scheduled: nil,
+      hasRecurrence: false,
+      isAgentTurn: false,
+      isAssignedToClaude: false,
+      isAwaitingHuman: reviewConvo.awaitsHuman,
+      touchedAt: thirtyDaysAgo,
+      createdAt: thirtyDaysAgo,
+      created: "2026-10-01",
+      now: now,
+      today: "2026-11-21"
+    )
+    #expect(shouldFade == false)
+  }
 }

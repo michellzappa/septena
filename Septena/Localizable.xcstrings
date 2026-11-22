@@ -29,7 +29,14 @@
 
     },
     "\"%@\" deleted" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" apagada"
+          }
+        }
+      }
     },
     "“%@” is overdue — mark it if you’ve done it." : {
       "localizations" : {
@@ -712,6 +719,48 @@
         }
       }
     },
+    "%lld files" : {
+      "comment" : "Generated from registry surfaces.taskAttributes.attachments.countLabel. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld file"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld files"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld arquivo"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld arquivos"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld habits left today" : {
       "localizations" : {
         "en" : {
@@ -785,6 +834,258 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld meses"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld projects" : {
+      "comment" : "Generated from registry surfaces.prompts.countPhrases.projects.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "1 project"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld projects"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "1 projeto"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld projetos"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld tags" : {
+      "comment" : "Generated from registry surfaces.taskAttributes.tags.countLabel. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tag"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tags"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tag"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tags"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld tasks" : {
+      "comment" : "Generated from registry surfaces.prompts.countPhrases.tasks.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "1 task"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tasks"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "1 tarefa"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tarefas"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld tasks deleted" : {
+      "comment" : "Generated from registry surfaces.toasts.templates.deletedBulk.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Task deleted"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tasks deleted"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Tarefa apagada"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tarefas apagadas"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld tasks faded this week" : {
+      "comment" : "Generated from registry surfaces.notices.items.weeklySweep.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "1 task faded this week"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tasks faded this week"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "1 tarefa esmaeceu esta semana"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tarefas esmaeceram esta semana"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld tasks rolled into Today" : {
+      "comment" : "Generated from registry surfaces.notices.items.rolledIn.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "1 task rolled into Today"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tasks rolled into Today"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "1 tarefa entrou em Hoje"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tarefas entraram em Hoje"
                 }
               }
             }
@@ -1016,11 +1317,61 @@
         }
       }
     },
+    "A task list you share with your AI." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.welcome.body. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma lista de tarefas que você compartilha com sua IA."
+          }
+        }
+      }
+    },
     "About" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sobre"
+          }
+        }
+      }
+    },
+    "Açaí" : {
+      "comment" : "Generated from registry tokens.fruitAccents.acai.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Açaí"
+          }
+        }
+      }
     },
     "Accent" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Destaque"
+          }
+        }
+      }
+    },
+    "Account" : {
+      "comment" : "Generated from registry settings.desktopTabs.account.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conta"
+          }
+        }
+      }
     },
     "Account ID" : {
 
@@ -1311,6 +1662,30 @@
         }
       }
     },
+    "Add a task or move one here when you want to work on it today." : {
+      "comment" : "Generated from registry destinations.destinations.today.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione uma tarefa ou mova uma para cá quando quiser trabalhar nela hoje."
+          }
+        }
+      }
+    },
+    "Add Checklist Item" : {
+      "comment" : "Generated from registry actions.actions.task.addChecklistItem.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar item à checklist"
+          }
+        }
+      }
+    },
     "Add Chore" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1368,6 +1743,18 @@
     "Add medications in Settings first." : {
 
     },
+    "Add Reminder…" : {
+      "comment" : "Generated from registry actions.actions.task.reminder.addTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar lembrete…"
+          }
+        }
+      }
+    },
     "Add Section" : {
 
     },
@@ -1396,12 +1783,36 @@
         }
       }
     },
+    "Add tasks as they come up." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.moveIn.choices.fresh.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione tarefas conforme elas surgirem."
+          }
+        }
+      }
+    },
     "Add to Claude" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Adicionar ao Claude"
+          }
+        }
+      }
+    },
+    "Add your first task" : {
+      "comment" : "Generated from registry surfaces.notices.items.getStarted.steps.addTask.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione sua primeira tarefa"
           }
         }
       }
@@ -1446,6 +1857,18 @@
     "Adjusts text size everywhere in the app. This nudges your device’s system text size — it doesn’t replace it, so any accessibility text size you’ve set is respected. Set your device’s base size in Settings ▸ Accessibility ▸ Display & Text Size." : {
 
     },
+    "Advanced" : {
+      "comment" : "Generated from registry settings.pages.about.sections.advanced_link.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avançado"
+          }
+        }
+      }
+    },
     "After 1 minute" : {
 
     },
@@ -1481,11 +1904,71 @@
     "Agenda" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
+    "Agent tools" : {
+      "comment" : "Generated from registry settings.pages.advanced.sections.agent_tools.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferramentas de agente"
+          }
+        }
+      }
+    },
     "Aging starts the day after a task lands on Today and deepens over a week — a quiet signal that you keep deferring it. Resets when you move it off Today or check it off. A flat Today list keeps the same area and project order, under a single divider, with each task's list shown as a subtitle instead of a heading." : {
 
     },
+    "AI & Agents" : {
+      "comment" : "Generated from registry settings.desktopTabs.ai_agents.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IA e agentes"
+          }
+        }
+      }
+    },
     "AI & MCP" : {
 
+    },
+    "AI diagnostics" : {
+      "comment" : "Generated from registry settings.pages.advanced.sections.beta_ai.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnóstico de IA"
+          }
+        }
+      }
+    },
+    "AI Mode" : {
+      "comment" : "Generated from registry settings.pages.ai_preferences.sections.reach.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modo de IA"
+          }
+        }
+      }
+    },
+    "AI Preferences" : {
+      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preferências de IA"
+          }
+        }
+      }
     },
     "AI provider override" : {
 
@@ -1620,7 +2103,14 @@
       }
     },
     "Anonymous usage data" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dados de uso anônimos"
+          }
+        }
+      }
     },
     "Anxious" : {
       "localizations" : {
@@ -1665,6 +2155,18 @@
     "App Lock" : {
 
     },
+    "Appearance" : {
+      "comment" : "Generated from registry settings.rootGroups.appearance_root.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aparência"
+          }
+        }
+      }
+    },
     "Appended to how this coach talks." : {
       "localizations" : {
         "pt-BR" : {
@@ -1708,7 +2210,15 @@
       }
     },
     "Area name" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome da área"
+          }
+        }
+      }
     },
     "area: %@   project: %@   status: %@" : {
       "localizations" : {
@@ -1796,6 +2306,18 @@
     "Attach…" : {
 
     },
+    "Attachments" : {
+      "comment" : "Generated from registry surfaces.taskAttributes.attachments.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anexos"
+          }
+        }
+      }
+    },
     "Attachments are private, synced through iCloud, and included in Everything and Tasks exports." : {
 
     },
@@ -1805,6 +2327,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "renovação automática em %@"
+          }
+        }
+      }
+    },
+    "Automatic" : {
+      "comment" : "Generated from registry settings.keys.aiMode.options.1.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automático"
           }
         }
       }
@@ -1844,6 +2378,18 @@
     },
     "Badge" : {
 
+    },
+    "Balanced" : {
+      "comment" : "Generated from registry settings.keys.pccReasoning.options.1.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Equilibrado"
+          }
+        }
+      }
     },
     "Based on %@ signals" : {
       "localizations" : {
@@ -2048,6 +2594,18 @@
         }
       }
     },
+    "Bring in your tasks" : {
+      "comment" : "Generated from registry surfaces.notices.items.getStarted.steps.importTasks.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traga suas tarefas"
+          }
+        }
+      }
+    },
     "Bring Reminders into your Inbox, weave calendar events into Today and Upcoming, or make a one-time migration from Things. Your source data is never modified." : {
 
     },
@@ -2058,6 +2616,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Traga seus passos e movimento do Apple Saúde"
+          }
+        }
+      }
+    },
+    "Bring your tasks" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.moveIn.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traga suas tarefas"
           }
         }
       }
@@ -2121,7 +2691,14 @@
       }
     },
     "Calendar" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calendário"
+          }
+        }
+      }
     },
     "Calm" : {
       "localizations" : {
@@ -2144,10 +2721,50 @@
       }
     },
     "Cancel" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelar"
+          }
+        }
+      }
+    },
+    "Cancel Project" : {
+      "comment" : "Generated from registry actions.actions.project.cancel.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelar projeto"
+          }
+        }
+      }
     },
     "Cancel Task" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelar tarefa"
+          }
+        }
+      }
+    },
+    "Cancel Tasks" : {
+      "comment" : "Generated from registry actions.actions.task.cancel.pluralTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelar tarefas"
+          }
+        }
+      }
     },
     "Capabilities that could become offers, services, products, or roles." : {
       "localizations" : {
@@ -2155,6 +2772,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Capacidades que podem virar ofertas, serviços, produtos ou funções."
+          }
+        }
+      }
+    },
+    "Carambola" : {
+      "comment" : "Generated from registry tokens.fruitAccents.carambola.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carambola"
           }
         }
       }
@@ -2202,6 +2831,18 @@
     "Carry over missed items" : {
 
     },
+    "Caustic Glass" : {
+      "comment" : "Generated from registry tokens.textures.causticGlass.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vidro cáustico"
+          }
+        }
+      }
+    },
     "Changing the unit doesn't rewrite past entries — history reads in the new unit." : {
 
     },
@@ -2222,6 +2863,18 @@
     },
     "Checking iCloud…" : {
 
+    },
+    "Checklist" : {
+      "comment" : "Generated from registry surfaces.taskAttributes.checklist.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checklist"
+          }
+        }
+      }
     },
     "Chest" : {
       "localizations" : {
@@ -2320,6 +2973,18 @@
         }
       }
     },
+    "Classic Window" : {
+      "comment" : "Generated from registry actions.actions.app.classicWindow.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Janela clássica"
+          }
+        }
+      }
+    },
     "Claude" : {
       "localizations" : {
         "pt-BR" : {
@@ -2330,8 +2995,32 @@
         }
       }
     },
+    "Claude can take a task, ask you a question, and hand back the result." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.1.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Claude pode pegar uma tarefa, fazer uma pergunta e devolver o resultado."
+          }
+        }
+      }
+    },
     "Claude connection" : {
 
+    },
+    "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.connectClaude.body. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Claude lê e altera suas tarefas pela sua conta Septena. Você decide em quais tarefas ele trabalha."
+          }
+        }
+      }
     },
     "Claude reads and writes your data through the hosted gateway at mcp.septena.app. MCP Server is shown here for discoverability, but hosting it requires the Mac app." : {
 
@@ -2364,7 +3053,27 @@
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
     "Clear Schedule" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpar agendamento"
+          }
+        }
+      }
+    },
+    "Click + or double-click below to add a task." : {
+      "comment" : "Generated from registry destinations.genericEmptyState.pointerDetail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clique em + ou dê um clique duplo abaixo para adicionar uma tarefa."
+          }
+        }
+      }
     },
     "Closing keeps the conversation but stops the user from replying. Internal notes are visible only to maintainers." : {
 
@@ -2382,6 +3091,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Café, grãos, métodos de preparo"
+          }
+        }
+      }
+    },
+    "Colorful" : {
+      "comment" : "Generated from registry tokens.fruitAccents.colorful.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colorido"
           }
         }
       }
@@ -2430,7 +3151,15 @@
 
     },
     "Complete" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Concluir"
+          }
+        }
+      }
     },
     "Complete Chore" : {
       "extractionState" : "manual",
@@ -2446,6 +3175,42 @@
     "Complete Task" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
+    "Completed and let-go tasks are archived here." : {
+      "comment" : "Generated from registry destinations.destinations.logbook.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas concluídas e descartadas ficam arquivadas aqui."
+          }
+        }
+      }
+    },
+    "Completion animations" : {
+      "comment" : "Generated from registry settings.rootGroups.appearance_root.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Animações ao concluir"
+          }
+        }
+      }
+    },
+    "Connect an assistant to your tasks" : {
+      "comment" : "Generated from registry surfaces.notices.items.getStarted.steps.connectAI.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conecte um assistente às suas tarefas"
+          }
+        }
+      }
+    },
     "Connect Apple Health in Settings → Integrations to turn this on." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2453,6 +3218,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Conecte o Apple Health em Ajustes → Integrações para ativar isto."
+          }
+        }
+      }
+    },
+    "Connect Claude" : {
+      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectar o Claude"
           }
         }
       }
@@ -2486,6 +3263,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Conecte o Withings em Ajustes › Integrações."
+          }
+        }
+      }
+    },
+    "Connect your AI" : {
+      "comment" : "Generated from registry surfaces.notices.items.getStarted.steps.connectAI.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conecte sua IA"
           }
         }
       }
@@ -2530,6 +3319,18 @@
     "Connections" : {
 
     },
+    "Connections & Data" : {
+      "comment" : "Generated from registry settings.desktopTabs.connections_data.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conexões e dados"
+          }
+        }
+      }
+    },
     "Connector address" : {
       "localizations" : {
         "pt-BR" : {
@@ -2549,6 +3350,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Contente"
+          }
+        }
+      }
+    },
+    "Continue" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.welcome.primary.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar"
           }
         }
       }
@@ -2576,8 +3389,28 @@
         }
       }
     },
+    "Copies your areas, projects and tasks. Nothing in Things changes." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.moveIn.choices.things.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia suas áreas, projetos e tarefas. Nada muda no Things."
+          }
+        }
+      }
+    },
     "Copy" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar"
+          }
+        }
+      }
     },
     "Copy a prompt and paste it into an LLM along with the source data you want to import. The model returns JSON that pastes straight into Import above." : {
       "localizations" : {
@@ -2585,6 +3418,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Copie um prompt e cole em um LLM junto com os dados de origem que você quer importar. O modelo retorna um JSON que cola direto em Importar acima."
+          }
+        }
+      }
+    },
+    "Copy first prompt" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.connectClaude.tertiary.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar primeiro prompt"
+          }
+        }
+      }
+    },
+    "Copy setup prompt" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.connectClaude.primary.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar prompt de configuração"
+          }
+        }
+      }
+    },
+    "Copy the setup prompt and paste it into Claude." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.connectClaude.instructions.0. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copie o prompt de configuração e cole no Claude."
           }
         }
       }
@@ -2651,7 +3520,15 @@
 
     },
     "Create" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Criar"
+          }
+        }
+      }
     },
     "Create a Personal Access Token at cloud.ouraring.com/personal-access-tokens, then paste it here. The token is kept in your Keychain, syncs to your other devices via iCloud Keychain, and is never sent to any Septena server." : {
 
@@ -2683,6 +3560,18 @@
     },
     "Create new" : {
 
+    },
+    "Create Next Copy" : {
+      "comment" : "Generated from registry actions.actions.task.createNextCopy.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Criar próxima cópia"
+          }
+        }
+      }
     },
     "Creates %@ with recordName `%@:%@`. Existing dangling references will resolve on next fetch." : {
       "localizations" : {
@@ -2806,6 +3695,18 @@
         }
       }
     },
+    "Data tools" : {
+      "comment" : "Generated from registry settings.pages.advanced.sections.data_tools.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferramentas de dados"
+          }
+        }
+      }
+    },
     "Database file" : {
 
     },
@@ -2849,13 +3750,41 @@
 
     },
     "Deadline" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prazo"
+          }
+        }
+      }
     },
     "Deadline: %@" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
     "Deadline…" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prazo…"
+          }
+        }
+      }
+    },
+    "Decrease Text Size" : {
+      "comment" : "Generated from registry actions.actions.app.textSizeDecrease.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diminuir texto"
+          }
+        }
+      }
     },
     "Default" : {
       "localizations" : {
@@ -2883,32 +3812,239 @@
         }
       }
     },
+    "Deferred to %@" : {
+      "comment" : "Generated from registry surfaces.toasts.templates.deferred.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adiada para %@"
+          }
+        }
+      }
+    },
     "Delete" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagar"
+          }
+        }
+      }
+    },
+    "Delete “%@” and its %@?" : {
+      "comment" : "Generated from registry surfaces.prompts.items.deleteArea.variants.tasksOnly.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagar “%@” e suas %@?"
+          }
+        }
+      }
+    },
+    "Delete “%@” and its %@? (projects only)" : {
+      "comment" : "Generated from registry surfaces.prompts.items.deleteArea.variants.projectsOnly.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete “%@” and its %@?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagar “%@” e seus %@?"
+          }
+        }
+      }
+    },
+    "Delete “%@”, its %@ and %@?" : {
+      "comment" : "Generated from registry surfaces.prompts.items.deleteArea.variants.projectsAndTasks.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagar “%@”, seus %@ e %@?"
+          }
+        }
+      }
+    },
+    "Delete “%@”?" : {
+      "comment" : "Generated from registry surfaces.prompts.items.deleteArea.variants.empty.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagar “%@”?"
+          }
+        }
+      }
     },
     "Delete %@?" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
+    },
+    "Delete %lld tasks permanently?" : {
+      "comment" : "Generated from registry surfaces.prompts.items.deletePermanently.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete this task permanently?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete %lld tasks permanently?"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apagar esta tarefa permanentemente?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apagar %lld tarefas permanentemente?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Delete Account" : {
+      "comment" : "Generated from registry surfaces.prompts.items.deleteAccount.confirmTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagar conta"
+          }
+        }
+      }
+    },
+    "Delete Account?" : {
+      "comment" : "Generated from registry surfaces.prompts.items.deleteAccount.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagar conta?"
+          }
+        }
+      }
+    },
+    "Delete Area" : {
+      "comment" : "Generated from registry actions.actions.area.delete.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagar área"
+          }
+        }
+      }
     },
     "Delete Area…" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
     "Delete Permanently" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagar permanentemente"
+          }
+        }
+      }
+    },
+    "Delete Project" : {
+      "comment" : "Generated from registry actions.actions.project.delete.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagar projeto"
+          }
+        }
+      }
     },
     "Delete Project…" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
     "Delete Section" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagar seção"
+          }
+        }
+      }
     },
     "Delete Task" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
+    "Delete Tasks" : {
+      "comment" : "Generated from registry actions.actions.task.delete.pluralTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagar tarefas"
+          }
+        }
+      }
+    },
     "Delete this section?" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagar esta seção?"
+          }
+        }
+      }
     },
     "Deleted tasks appear here for 30 days before being permanently removed." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas apagadas ficam aqui por 30 dias antes de serem removidas de vez."
+          }
+        }
+      }
     },
     "Despondent" : {
       "localizations" : {
@@ -2927,7 +4063,14 @@
 
     },
     "Diagnostics" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnóstico"
+          }
+        }
+      }
     },
     "Difficulty" : {
 
@@ -3007,6 +4150,18 @@
     },
     "Discover more" : {
 
+    },
+    "Discuss" : {
+      "comment" : "Generated from registry surfaces.taskAttributes.discuss.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discutir"
+          }
+        }
+      }
     },
     "Dismiss" : {
       "localizations" : {
@@ -3126,7 +4281,27 @@
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
     "Duplicate" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicar"
+          }
+        }
+      }
+    },
+    "Duplicate Tasks" : {
+      "comment" : "Generated from registry actions.actions.task.duplicate.pluralTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicar tarefas"
+          }
+        }
+      }
     },
     "Duty to others" : {
       "localizations" : {
@@ -3156,6 +4331,18 @@
     },
     "Each note is dotted with the color of the section it belongs to." : {
 
+    },
+    "Each project has notes, so you and Claude know what it's for." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.2.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada projeto tem notas, para você e o Claude saberem para que ele serve."
+          }
+        }
+      }
     },
     "Each row fires the same renderer and haptic a real log uses. Under Reduce Motion the visual is suppressed (by design) — you'll still feel the haptic." : {
       "localizations" : {
@@ -3218,6 +4405,18 @@
         }
       }
     },
+    "Edit Details…" : {
+      "comment" : "Generated from registry actions.actions.task.editDetails.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar detalhes…"
+          }
+        }
+      }
+    },
     "Effort scale" : {
 
     },
@@ -3254,6 +4453,18 @@
         }
       }
     },
+    "Elevation" : {
+      "comment" : "Generated from registry tokens.textures.ridges.tag. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elevação"
+          }
+        }
+      }
+    },
     "Email goes straight to me — I make Septena Life alone. In-app tickets tie to your Apple ID; sign in to iCloud to use them, or email any time." : {
 
     },
@@ -3286,6 +4497,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Furioso"
+          }
+        }
+      }
+    },
+    "Error" : {
+      "comment" : "Generated from registry surfaces.prompts.error.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erro"
           }
         }
       }
@@ -3472,6 +4695,30 @@
         }
       }
     },
+    "Fade inactive tasks" : {
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esmaecer tarefas inativas"
+          }
+        }
+      }
+    },
+    "Faded" : {
+      "comment" : "Generated from registry destinations.destinations.faded.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esmaecidas"
+          }
+        }
+      }
+    },
     "Fasting" : {
       "localizations" : {
         "pt-BR" : {
@@ -3508,6 +4755,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fibra"
+          }
+        }
+      }
+    },
+    "Field Matrix" : {
+      "comment" : "Generated from registry tokens.textures.fieldMatrix.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matriz de campo"
+          }
+        }
+      }
+    },
+    "File" : {
+      "comment" : "Generated from registry actions.menuBar.file.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arquivo"
           }
         }
       }
@@ -3667,6 +4938,18 @@
     "From the maker" : {
 
     },
+    "From Things" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.moveIn.choices.things.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Do Things"
+          }
+        }
+      }
+    },
     "Frustrated" : {
       "localizations" : {
         "pt-BR" : {
@@ -3698,6 +4981,18 @@
         }
       }
     },
+    "General" : {
+      "comment" : "Generated from registry settings.desktopTabs.general.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geral"
+          }
+        }
+      }
+    },
     "Generating insights" : {
 
     },
@@ -3715,12 +5010,36 @@
     "Get Started" : {
 
     },
+    "Get started with Septena" : {
+      "comment" : "Generated from registry surfaces.notices.items.getStarted.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comece a usar o Septena"
+          }
+        }
+      }
+    },
     "GitHub" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "GitHub"
+          }
+        }
+      }
+    },
+    "Give any task a Repeat rule and it will show up here." : {
+      "comment" : "Generated from registry destinations.destinations.repeating.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dê uma regra de repetição a qualquer tarefa e ela aparece aqui."
           }
         }
       }
@@ -3744,6 +5063,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Glúteos"
+          }
+        }
+      }
+    },
+    "Go" : {
+      "comment" : "Generated from registry actions.menuBar.go.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ir"
           }
         }
       }
@@ -3883,6 +5214,18 @@
     "Group by area and project" : {
 
     },
+    "Group Today by list" : {
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrupar Hoje por lista"
+          }
+        }
+      }
+    },
     "Guided local-AI reflections that turn into real goals." : {
       "localizations" : {
         "pt-BR" : {
@@ -3990,6 +5333,30 @@
         }
       }
     },
+    "Height Map" : {
+      "comment" : "Generated from registry tokens.textures.topography.tag. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mapa de altura"
+          }
+        }
+      }
+    },
+    "Help" : {
+      "comment" : "Generated from registry actions.menuBar.help.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajuda"
+          }
+        }
+      }
+    },
     "Helps us understand which features people use, so we improve the right things." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -4043,6 +5410,54 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "Hide Get Started" : {
+      "comment" : "Generated from registry actions.actions.notice.hideGetStarted.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar Primeiros passos"
+          }
+        }
+      }
+    },
+    "Hide Info" : {
+      "comment" : "Generated from registry actions.actions.task.toggleInfo.activeTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar informações"
+          }
+        }
+      }
+    },
+    "Hide Sidebar" : {
+      "comment" : "Generated from registry actions.actions.app.toggleSidebar.removeTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar barra lateral"
+          }
+        }
+      }
+    },
+    "Hide Sidebar Counts" : {
+      "comment" : "Generated from registry actions.actions.app.toggleSidebarCounts.activeTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar contagens da barra lateral"
           }
         }
       }
@@ -4138,6 +5553,18 @@
     "How a task conversation moves" : {
 
     },
+    "How AI helps with your tasks" : {
+      "comment" : "Generated from registry settings.pages.ai_preferences.sections.explainer.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Como a IA ajuda nas suas tarefas"
+          }
+        }
+      }
+    },
     "How far a long task title wraps before it truncates. Taller rows fit fewer tasks on screen." : {
 
     },
@@ -4212,6 +5639,18 @@
         }
       }
     },
+    "If you skip this, your tasks stay on this device until you sign in." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.account.footnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se você pular isto, suas tarefas ficam neste dispositivo até você entrar."
+          }
+        }
+      }
+    },
     "If you think an entry got moved here by mistake, check nearby days too." : {
       "localizations" : {
         "pt-BR" : {
@@ -4238,6 +5677,18 @@
         }
       }
     },
+    "Import & Export" : {
+      "comment" : "Generated from registry settings.rootGroups.connections_data_root.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar e exportar"
+          }
+        }
+      }
+    },
     "Import %@ task%@" : {
       "localizations" : {
         "en" : {
@@ -4250,6 +5701,30 @@
     },
     "Import complete" : {
 
+    },
+    "Import from another app" : {
+      "comment" : "Generated from registry surfaces.notices.items.getStarted.steps.importTasks.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importe de outro app"
+          }
+        }
+      }
+    },
+    "Import from Things" : {
+      "comment" : "Generated from registry settings.pages.import_export.sections.move_in.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar do Things"
+          }
+        }
+      }
     },
     "Importing…" : {
 
@@ -4290,6 +5765,18 @@
         }
       }
     },
+    "Inactive tasks start to fade" : {
+      "comment" : "Generated from registry surfaces.notices.items.fadeIntro.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas inativas começam a esmaecer"
+          }
+        }
+      }
+    },
     "Inbox" : {
       "comment" : "Phase 0 spike — test string, not a real translation pass",
       "localizations" : {
@@ -4315,6 +5802,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Caixa de entrada"
+          }
+        }
+      }
+    },
+    "Inbox is empty" : {
+      "comment" : "Generated from registry destinations.destinations.inbox.emptyState.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A caixa de entrada está vazia"
           }
         }
       }
@@ -4359,12 +5858,36 @@
         }
       }
     },
+    "Increase Text Size" : {
+      "comment" : "Generated from registry actions.actions.app.textSizeIncrease.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aumentar texto"
+          }
+        }
+      }
+    },
     "Indigo" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Índigo"
+          }
+        }
+      }
+    },
+    "Industrial" : {
+      "comment" : "Generated from registry tokens.textures.fieldMatrix.tag. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Industrial"
           }
         }
       }
@@ -4448,8 +5971,40 @@
         }
       }
     },
+    "It lands in your Inbox until you schedule or file it" : {
+      "comment" : "Generated from registry surfaces.notices.items.getStarted.steps.addTask.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ela fica na caixa de entrada até você agendar ou arquivar"
+          }
+        }
+      }
+    },
     "Its tasks stay in the project." : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As tarefas dela ficam no projeto."
+          }
+        }
+      }
+    },
+    "Jabuticaba" : {
+      "comment" : "Generated from registry tokens.fruitAccents.jabuticaba.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jabuticaba"
+          }
+        }
+      }
     },
     "Joyful" : {
       "localizations" : {
@@ -4510,6 +6065,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Kcal"
+          }
+        }
+      }
+    },
+    "Keep" : {
+      "comment" : "Generated from registry actions.actions.task.keepFaded.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manter"
           }
         }
       }
@@ -4595,6 +6162,18 @@
         }
       }
     },
+    "Keyboard Shortcuts" : {
+      "comment" : "Generated from registry actions.actions.app.keyboardShortcuts.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atalhos de teclado"
+          }
+        }
+      }
+    },
     "kg" : {
       "shouldTranslate" : false
     },
@@ -4638,8 +6217,32 @@
         }
       }
     },
+    "Largest" : {
+      "comment" : "Generated from registry tokens.textScale.steps.xLarge.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maior"
+          }
+        }
+      }
+    },
     "last 7 days" : {
 
+    },
+    "Later" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.connectClaude.secondary.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depois"
+          }
+        }
+      }
     },
     "Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, Rings, or Wheel. Insights tunes the cross-section correlation explorer." : {
       "extractionState" : "stale",
@@ -4657,6 +6260,18 @@
     },
     "Learn on-device where you usually file similar tasks." : {
 
+    },
+    "Learn where you usually file similar tasks." : {
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.4.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aprende onde você costuma arquivar tarefas parecidas."
+          }
+        }
+      }
     },
     "Learned, time-of-day nudge cards at the top of the Next list — they appear around when you usually do the thing and go quiet once you log it. Turn the lot off, or just the kinds you don't want." : {
 
@@ -4685,6 +6300,18 @@
         }
       }
     },
+    "Let Go" : {
+      "comment" : "Generated from registry actions.actions.task.letGoFaded.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deixar ir"
+          }
+        }
+      }
+    },
     "Let Siri and Apple Intelligence find this section's entries in search." : {
 
     },
@@ -4697,6 +6324,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vitalício — por estar aqui desde cedo"
+          }
+        }
+      }
+    },
+    "Light" : {
+      "comment" : "Generated from registry settings.keys.pccReasoning.options.0.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leve"
           }
         }
       }
@@ -4728,10 +6367,30 @@
       }
     },
     "List" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lista"
+          }
+        }
+      }
     },
     "List: %@" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
+    },
+    "Lists" : {
+      "comment" : "Generated from registry settings.rootGroups.lists_root.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listas"
+          }
+        }
+      }
     },
     "Loading session types…" : {
       "extractionState" : "stale",
@@ -4848,6 +6507,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Registro"
+          }
+        }
+      }
+    },
+    "Logbook is empty" : {
+      "comment" : "Generated from registry destinations.destinations.logbook.emptyState.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O registro está vazio"
           }
         }
       }
@@ -4975,7 +6646,51 @@
       }
     },
     "Mark as Complete" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar como concluída"
+          }
+        }
+      }
+    },
+    "Mark as Done" : {
+      "comment" : "Generated from registry actions.actions.notice.toggleStep.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar como feito"
+          }
+        }
+      }
+    },
+    "Mark as Not Done" : {
+      "comment" : "Generated from registry actions.actions.notice.toggleStep.activeTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar como não feito"
+          }
+        }
+      }
+    },
+    "Mark Done" : {
+      "comment" : "Generated from registry actions.actions.project.markDone.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar como feito"
+          }
+        }
+      }
     },
     "Mark Grocery Low" : {
       "extractionState" : "manual",
@@ -5046,6 +6761,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "MCP"
+          }
+        }
+      }
+    },
+    "MCP Skills" : {
+      "comment" : "Generated from registry settings.pages.advanced.sections.agent_tools.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skills MCP"
           }
         }
       }
@@ -5275,19 +7002,197 @@
 
     },
     "Move" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover"
+          }
+        }
+      }
     },
     "Move %lld Tasks" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
+    "Move Down" : {
+      "comment" : "Generated from registry actions.actions.area.moveDown.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover para baixo"
+          }
+        }
+      }
+    },
+    "Move from another app" : {
+      "comment" : "Generated from registry settings.pages.import_export.sections.move_in.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trazer de outro app"
+          }
+        }
+      }
+    },
+    "Move only this task, or update the repeating schedule to the new date?" : {
+      "comment" : "Generated from registry surfaces.prompts.items.rescheduleFixedRepeat.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover só esta tarefa ou atualizar a repetição para a nova data?"
+          }
+        }
+      }
+    },
     "Move Task" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
+    },
+    "Move Tasks" : {
+      "comment" : "Generated from registry actions.actions.task.move.pluralTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover tarefas"
+          }
+        }
+      }
     },
     "Move to" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
+    "Move to Area" : {
+      "comment" : "Generated from registry actions.contextMenus.sidebar.project.moveToArea.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover para área"
+          }
+        }
+      }
+    },
+    "Move to Section" : {
+      "comment" : "Generated from registry actions.contextMenus.task.row.moveToSection.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover para seção"
+          }
+        }
+      }
+    },
+    "Move to Suggested List" : {
+      "comment" : "Generated from registry actions.actions.task.moveSuggested.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover para a lista sugerida"
+          }
+        }
+      }
+    },
     "Move to Today" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover para Hoje"
+          }
+        }
+      }
+    },
+    "Move Up" : {
+      "comment" : "Generated from registry actions.actions.area.moveUp.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover para cima"
+          }
+        }
+      }
+    },
+    "Move…" : {
+      "comment" : "Generated from registry actions.actions.task.move.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover…"
+          }
+        }
+      }
+    },
+    "Moved %lld tasks to %@" : {
+      "comment" : "Generated from registry surfaces.toasts.templates.movedBulk.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Moved to %2$@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Moved %lld tasks to %@"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Movida para %2$@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tarefas movidas para %@"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Moved to %@" : {
+      "comment" : "Generated from registry surfaces.toasts.templates.moved.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Movida para %@"
+          }
+        }
+      }
     },
     "n < %@ — too noisy to plot" : {
       "localizations" : {
@@ -5332,7 +7237,15 @@
 
     },
     "New Area" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nova área"
+          }
+        }
+      }
     },
     "New Area…" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
@@ -5351,10 +7264,30 @@
 
     },
     "New Project" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Novo projeto"
+          }
+        }
+      }
     },
     "New Project in %@" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
+    },
+    "New Project in Area" : {
+      "comment" : "Generated from registry actions.actions.area.newProject.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Novo projeto na área"
+          }
+        }
+      }
     },
     "New Project…" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
@@ -5363,7 +7296,15 @@
 
     },
     "New Section" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nova seção"
+          }
+        }
+      }
     },
     "New task" : {
 
@@ -5378,8 +7319,44 @@
         }
       }
     },
+    "New Task in Section" : {
+      "comment" : "Generated from registry actions.actions.section.newTask.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nova tarefa na seção"
+          }
+        }
+      }
+    },
     "New task…" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
+    },
+    "New tasks wait here until you schedule or file them." : {
+      "comment" : "Generated from registry destinations.destinations.inbox.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Novas tarefas esperam aqui até você agendar ou arquivar."
+          }
+        }
+      }
+    },
+    "New To-Do" : {
+      "comment" : "Generated from registry actions.actions.app.newTask.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nova tarefa"
+          }
+        }
+      }
     },
     "Next" : {
       "localizations" : {
@@ -5439,6 +7416,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sem anúncios, sem investidores, sem venda de dados. O Septena responde a quem o usa, e isso só funciona se algumas dessas pessoas contribuírem."
+          }
+        }
+      }
+    },
+    "No agent can claim or work on a task while paused." : {
+      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.1.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enquanto estiver pausado, nenhum agente pode pegar ou trabalhar numa tarefa."
           }
         }
       }
@@ -5522,6 +7511,18 @@
         }
       }
     },
+    "No Faded Tasks" : {
+      "comment" : "Generated from registry destinations.destinations.faded.emptyState.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma tarefa esmaecida"
+          }
+        }
+      }
+    },
     "No goals yet. Tag a goal with sections so your coaches have context for what you're working toward." : {
 
     },
@@ -5597,6 +7598,30 @@
         }
       }
     },
+    "No Recently Deleted Tasks" : {
+      "comment" : "Generated from registry destinations.destinations.recentlyDeleted.emptyState.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma tarefa apagada recentemente"
+          }
+        }
+      }
+    },
+    "No repeating tasks" : {
+      "comment" : "Generated from registry destinations.destinations.repeating.emptyState.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma tarefa recorrente"
+          }
+        }
+      }
+    },
     "No rhythm yet — the schedule above drives the next-due date until there's a pattern to learn from." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5665,6 +7690,18 @@
         }
       }
     },
+    "No Starred Tasks" : {
+      "comment" : "Generated from registry destinations.destinations.starred.emptyState.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma tarefa com estrela"
+          }
+        }
+      }
+    },
     "No stocked items" : {
 
     },
@@ -5722,12 +7759,36 @@
     "Not enough logged yet to read a rhythm — keep at it and a 30-day pattern shows here." : {
 
     },
+    "Not now" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.account.secondary.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agora não"
+          }
+        }
+      }
+    },
     "Not now? Genuinely fine — the app stays exactly the same. You can support any time from Settings." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Agora não? Tudo bem mesmo — o app continua exatamente igual. Você pode apoiar quando quiser nos Ajustes."
+          }
+        }
+      }
+    },
+    "Not signed in" : {
+      "comment" : "Generated from registry surfaces.notices.items.signIn.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem sessão iniciada"
           }
         }
       }
@@ -5752,7 +7813,26 @@
 
     },
     "Notes" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notas"
+          }
+        }
+      }
+    },
+    "Notes keep the context" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.2.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As notas guardam o contexto"
+          }
+        }
+      }
     },
     "Nothing due today" : {
 
@@ -5792,6 +7872,18 @@
     },
     "Nothing important happens on its own. The AI fills in small, reversible stuff; anything that's a real decision or can't be undone always waits for your tap." : {
 
+    },
+    "Nothing in Anytime" : {
+      "comment" : "Generated from registry destinations.destinations.anytime.emptyState.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada em A qualquer momento"
+          }
+        }
+      }
     },
     "Nothing leaves your devices unless you connect an AI. Apple's on-device intelligence runs locally; connecting Claude routes requests through your own gateway token, which you can disconnect any time in AI & Claude." : {
 
@@ -5839,6 +7931,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nada em Hoje"
+          }
+        }
+      }
+    },
+    "Nothing to review" : {
+      "comment" : "Generated from registry destinations.destinations.review.emptyState.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada para revisar"
+          }
+        }
+      }
+    },
+    "Nothing upcoming" : {
+      "comment" : "Generated from registry destinations.destinations.upcoming.emptyState.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada em breve"
           }
         }
       }
@@ -5923,10 +8039,30 @@
 
     },
     "OK" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      },
       "shouldTranslate" : false
     },
     "On Automatic, every step runs on your device first — it leaves only for the steps on-device can't do (↗), never wholesale." : {
 
+    },
+    "On every device" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.0.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Em todos os dispositivos"
+          }
+        }
+      }
     },
     "On iPhone or iPad: Things → Settings → General → Diagnostics → Enter Code → 491348 → Send Things Database. Save the file, then pick it here." : {
 
@@ -5941,7 +8077,26 @@
 
     },
     "On-device intelligence" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inteligência no dispositivo"
+          }
+        }
+      }
+    },
+    "On-device only" : {
+      "comment" : "Generated from registry settings.keys.aiMode.options.0.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Só no dispositivo"
+          }
+        }
+      }
     },
     "On, but nothing to nudge about right now — today's done, nothing's pending, or it's quiet hours." : {
       "extractionState" : "manual",
@@ -5969,7 +8124,14 @@
 
     },
     "One" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma"
+          }
+        }
+      }
     },
     "One app for every corner of your life" : {
       "localizations" : {
@@ -6007,12 +8169,40 @@
         }
       }
     },
+    "Only This Task" : {
+      "comment" : "Generated from registry surfaces.prompts.items.rescheduleFixedRepeat.options.exception.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Só esta tarefa"
+          }
+        }
+      }
+    },
     "Open" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Abrir"
+          }
+        }
+      }
+    },
+    "Open a task or choose Keep to bring it back, or sweep the list to let the rest go." : {
+      "comment" : "Generated from registry surfaces.notices.items.fadedPile.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Open tasks without a date live here." : {
+      "comment" : "Generated from registry destinations.destinations.anytime.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas em aberto sem data ficam aqui."
           }
         }
       }
@@ -6027,12 +8217,36 @@
         }
       }
     },
+    "Open Today" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.done.primary.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir Hoje"
+          }
+        }
+      }
+    },
     "Opens the Shortcuts app with every Septena Life action ready to drop into a shortcut, Home Screen tile, or automation." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Abre o app Atalhos com cada ação do Septena Life pronta para entrar em um atalho, bloco da Tela de Início ou automação."
+          }
+        }
+      }
+    },
+    "Optical" : {
+      "comment" : "Generated from registry tokens.textures.causticGlass.tag. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Óptico"
           }
         }
       }
@@ -6048,6 +8262,18 @@
     },
     "Options" : {
 
+    },
+    "Or press ⌃⌥Space anywhere on your Mac" : {
+      "comment" : "Generated from registry surfaces.notices.items.getStarted.steps.addTask.platformDetails.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ou pressione ⌃⌥Espaço em qualquer lugar do Mac"
+          }
+        }
+      }
     },
     "Orange" : {
       "localizations" : {
@@ -6078,6 +8304,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nossa gratidão sincera"
+          }
+        }
+      }
+    },
+    "Overdue app icon badge" : {
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.5.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indicador de atrasadas no ícone"
           }
         }
       }
@@ -6128,6 +8366,54 @@
     "Paste into a model's context to teach it the task tools without connecting MCP." : {
 
     },
+    "Paste JSON Backup…" : {
+      "comment" : "Generated from registry settings.pages.advanced.sections.data_tools.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colar backup JSON…"
+          }
+        }
+      }
+    },
+    "Paste the first prompt. Claude sets up your areas and projects with you." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.connectClaude.instructions.2. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cole o primeiro prompt. O Claude monta suas áreas e projetos com você."
+          }
+        }
+      }
+    },
+    "Pause all agents" : {
+      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausar todos os agentes"
+          }
+        }
+      }
+    },
+    "Pause Repeat" : {
+      "comment" : "Generated from registry actions.actions.task.pauseResumeRepeat.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausar repetição"
+          }
+        }
+      }
+    },
     "Per day" : {
 
     },
@@ -6150,6 +8436,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "por ano"
+          }
+        }
+      }
+    },
+    "Persimmon" : {
+      "comment" : "Generated from registry tokens.fruitAccents.persimmon.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caqui"
           }
         }
       }
@@ -6186,6 +8484,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Escolha uma data…"
+          }
+        }
+      }
+    },
+    "Pick a Reminders list. Its items wait in your Inbox until you bring them in." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.moveIn.choices.reminders.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha uma lista dos Lembretes. Os itens esperam na caixa de entrada até você trazê-los."
           }
         }
       }
@@ -6252,6 +8562,18 @@
     "Pins every reasoning step to one provider — for testing only. Leave Off in normal use." : {
 
     },
+    "Pitaya" : {
+      "comment" : "Generated from registry tokens.fruitAccents.pitaya.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pitaya"
+          }
+        }
+      }
+    },
     "Pleased" : {
       "localizations" : {
         "pt-BR" : {
@@ -6302,8 +8624,44 @@
         }
       }
     },
+    "Print / Ink" : {
+      "comment" : "Generated from registry tokens.textures.stippleDrift.tag. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impressão / Tinta"
+          }
+        }
+      }
+    },
+    "Privacy" : {
+      "comment" : "Generated from registry settings.desktopTabs.privacy.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacidade"
+          }
+        }
+      }
+    },
     "Private Cloud Compute" : {
 
+    },
+    "Private Cloud Compute reasoning" : {
+      "comment" : "Generated from registry settings.pages.advanced.sections.beta_ai.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raciocínio no Private Cloud Compute"
+          }
+        }
+      }
     },
     "PROGRESS" : {
       "localizations" : {
@@ -6326,7 +8684,15 @@
       }
     },
     "Project name" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome do projeto"
+          }
+        }
+      }
     },
     "Projects" : {
 
@@ -6363,6 +8729,18 @@
     },
     "Pulls your highlights into the daily-message rotation. The token is kept in your Keychain, syncs to your other devices via iCloud Keychain, and is never sent to any Septena server." : {
 
+    },
+    "Pure Canvas" : {
+      "comment" : "Generated from registry tokens.textures.none.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tela pura"
+          }
+        }
+      }
     },
     "Purple" : {
       "localizations" : {
@@ -6409,6 +8787,42 @@
     },
     "Quick add" : {
 
+    },
+    "Quick Add…" : {
+      "comment" : "Generated from registry actions.actions.app.quickAdd.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adição rápida…"
+          }
+        }
+      }
+    },
+    "Quick Entry" : {
+      "comment" : "Generated from registry actions.actions.app.quickEntry.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entrada rápida"
+          }
+        }
+      }
+    },
+    "Quick Find…" : {
+      "comment" : "Generated from registry actions.actions.app.quickFind.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Busca rápida…"
+          }
+        }
+      }
     },
     "Quiet" : {
       "localizations" : {
@@ -6518,7 +8932,15 @@
       }
     },
     "Recently Deleted" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagadas recentemente"
+          }
+        }
+      }
     },
     "Recently sent from this device" : {
 
@@ -6606,6 +9028,42 @@
         }
       }
     },
+    "Remind" : {
+      "comment" : "Generated from registry surfaces.taskAttributes.reminder.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lembrar"
+          }
+        }
+      }
+    },
+    "Reminder…" : {
+      "comment" : "Generated from registry actions.actions.task.reminder.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lembrete…"
+          }
+        }
+      }
+    },
+    "Reminders" : {
+      "comment" : "Generated from registry settings.rootGroups.connections_data_root.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lembretes"
+          }
+        }
+      }
+    },
     "Remove" : {
       "localizations" : {
         "pt-BR" : {
@@ -6617,25 +9075,81 @@
       }
     },
     "Remove from Today" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remover de Hoje"
+          }
+        }
+      }
+    },
+    "Remove Star" : {
+      "comment" : "Generated from registry actions.actions.task.toggleStar.removeTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remover estrela"
+          }
+        }
+      }
     },
     "Removes the token and the imported highlights from the rotation. Your own quotes are untouched." : {
 
     },
     "Rename" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renomear"
+          }
+        }
+      }
     },
     "Rename Area" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renomear área"
+          }
+        }
+      }
     },
     "Rename Area…" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
     "Rename Project" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renomear projeto"
+          }
+        }
+      }
     },
     "Rename Project…" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
+    },
+    "Rename Section" : {
+      "comment" : "Generated from registry surfaces.prompts.text.renameSection.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renomear seção"
+          }
+        }
+      }
     },
     "Rename Task" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
@@ -6678,10 +9192,42 @@
 
     },
     "Repeat" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repetir"
+          }
+        }
+      }
     },
     "Repeat: %@" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
+    },
+    "Repeat…" : {
+      "comment" : "Generated from registry actions.actions.task.repeat.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repetir…"
+          }
+        }
+      }
+    },
+    "Repeating" : {
+      "comment" : "Generated from registry destinations.destinations.repeating.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recorrentes"
+          }
+        }
+      }
     },
     "Required" : {
       "localizations" : {
@@ -6693,8 +9239,32 @@
         }
       }
     },
+    "Reschedule repeating task?" : {
+      "comment" : "Generated from registry surfaces.prompts.items.rescheduleFixedRepeat.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reagendar tarefa recorrente?"
+          }
+        }
+      }
+    },
     "Research" : {
 
+    },
+    "Reset Text Size" : {
+      "comment" : "Generated from registry actions.actions.app.textSizeReset.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redefinir tamanho do texto"
+          }
+        }
+      }
     },
     "Restless" : {
       "localizations" : {
@@ -6707,7 +9277,15 @@
       }
     },
     "Restore" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar"
+          }
+        }
+      }
     },
     "Restore purchases" : {
       "localizations" : {
@@ -6722,12 +9300,48 @@
     "Restore Task" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
+    "Resume Repeat" : {
+      "comment" : "Generated from registry actions.actions.task.pauseResumeRepeat.activeTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retomar repetição"
+          }
+        }
+      }
+    },
+    "Review" : {
+      "comment" : "Generated from registry destinations.destinations.review.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revisar"
+          }
+        }
+      }
+    },
     "Review your values" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Revise seus valores"
+          }
+        }
+      }
+    },
+    "Ridge Lines" : {
+      "comment" : "Generated from registry tokens.textures.ridges.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linhas de crista"
           }
         }
       }
@@ -6807,6 +9421,18 @@
         }
       }
     },
+    "Schedule" : {
+      "comment" : "Generated from registry actions.actions.task.when.shortTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agendar"
+          }
+        }
+      }
+    },
     "Schema prompts" : {
       "localizations" : {
         "pt-BR" : {
@@ -6821,7 +9447,15 @@
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
     "Section name" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome da seção"
+          }
+        }
+      }
     },
     "Section off" : {
       "localizations" : {
@@ -6940,15 +9574,24 @@
     "Send" : {
 
     },
-    "Septask" : {
-
-    },
     "Septena" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Septena"
+          }
+        }
+      }
+    },
+    "Septena Life" : {
+      "comment" : "Generated from registry settings.pages.about.sections.companion.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena Life"
           }
         }
       }
@@ -7058,6 +9701,18 @@
         }
       }
     },
+    "Septena Window" : {
+      "comment" : "Generated from registry actions.actions.app.septenaWindow.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Janela do Septena"
+          }
+        }
+      }
+    },
     "Septena writes your logged data to Apple Health so it appears alongside data from your other apps and devices." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -7141,6 +9796,30 @@
     "Set a few starting targets" : {
 
     },
+    "Set up my Septena areas, projects, and tasks by following https://api.septena.app/onboard.md" : {
+      "comment" : "Generated from registry surfaces.firstRun.prompts.first. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configure minhas áreas, projetos e tarefas no Septena seguindo https://api.septena.app/onboard.md"
+          }
+        }
+      }
+    },
+    "Set up Septena for me using https://septena.app/agents.md" : {
+      "comment" : "Generated from registry surfaces.firstRun.prompts.setup. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configure o Septena para mim usando https://septena.app/agents.md"
+          }
+        }
+      }
+    },
     "Set when each part of your day begins. These boundaries drive the Morning / Afternoon / Evening groups in Habits and Supplements, the “Now” marker, what the Next list surfaces, and the welcome greeting." : {
       "localizations" : {
         "pt-BR" : {
@@ -7199,6 +9878,18 @@
         }
       }
     },
+    "Settings…" : {
+      "comment" : "Generated from registry actions.actions.app.settings.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes…"
+          }
+        }
+      }
+    },
     "Seven-disc open" : {
 
     },
@@ -7250,6 +9941,18 @@
         }
       }
     },
+    "Show / Hide Sidebar" : {
+      "comment" : "Generated from registry actions.actions.app.toggleSidebar.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar / ocultar barra lateral"
+          }
+        }
+      }
+    },
     "Show %lld logged items" : {
       "localizations" : {
         "en" : {
@@ -7293,8 +9996,44 @@
     "Show aging on Today" : {
 
     },
+    "Show completed tasks" : {
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar tarefas concluídas"
+          }
+        }
+      }
+    },
     "Show each section's goals and live progress toward target (read-only)." : {
 
+    },
+    "Show faded tasks" : {
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar tarefas esmaecidas"
+          }
+        }
+      }
+    },
+    "Show faded tasks in projects and areas." : {
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.3.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra tarefas esmaecidas em projetos e áreas."
+          }
+        }
+      }
     },
     "Show in daily message" : {
 
@@ -7313,13 +10052,76 @@
 
     },
     "Show Info" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar informações"
+          }
+        }
+      }
     },
     "Show model labels" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar nomes dos modelos"
+          }
+        }
+      }
+    },
+    "Show Sidebar" : {
+      "comment" : "Generated from registry actions.actions.app.toggleSidebar.addTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar barra lateral"
+          }
+        }
+      }
+    },
+    "Show Sidebar Counts" : {
+      "comment" : "Generated from registry actions.actions.app.toggleSidebarCounts.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar contagens da barra lateral"
+          }
+        }
+      }
     },
     "Show this goal at the top of the Week dashboard. Goals with a metric show live progress; habit goals show their streak." : {
 
+    },
+    "Show Welcome Again" : {
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar boas-vindas de novo"
+          }
+        }
+      }
+    },
+    "Show which model answered next to each AI reply." : {
+      "comment" : "Generated from registry settings.pages.advanced.sections.beta_ai.items.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra qual modelo respondeu ao lado de cada resposta da IA."
+          }
+        }
+      }
     },
     "Shown next to your contributions. Up to 80 characters." : {
 
@@ -7338,8 +10140,51 @@
         }
       }
     },
+    "Sign in to sync" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.account.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entre para sincronizar"
+          }
+        }
+      }
+    },
     "Sign in with Apple" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciar sessão com a Apple"
+          }
+        }
+      }
+    },
+    "Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.account.body. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicie sessão com a Apple para ter suas tarefas em todos os dispositivos e deixar o Claude se conectar. O Septena nunca vê sua senha da Apple."
+          }
+        }
+      }
+    },
+    "Sign in…" : {
+      "comment" : "Generated from registry surfaces.notices.items.signIn.primaryTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entrar…"
+          }
+        }
+      }
     },
     "Signing in…" : {
 
@@ -7443,6 +10288,18 @@
         }
       }
     },
+    "Smallest" : {
+      "comment" : "Generated from registry tokens.textScale.steps.xSmall.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menor"
+          }
+        }
+      }
+    },
     "Snack" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7509,6 +10366,42 @@
         }
       }
     },
+    "Star" : {
+      "comment" : "Generated from registry actions.actions.task.toggleStar.addTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar com estrela"
+          }
+        }
+      }
+    },
+    "Star important tasks to keep them one tap away." : {
+      "comment" : "Generated from registry destinations.destinations.starred.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marque tarefas importantes com estrela para tê-las a um toque."
+          }
+        }
+      }
+    },
+    "Starred" : {
+      "comment" : "Generated from registry destinations.destinations.starred.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Com estrela"
+          }
+        }
+      }
+    },
     "Start day at wake rolls the dial over when you wake rather than at midnight, so a late night stays on the same day." : {
 
     },
@@ -7519,6 +10412,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Iniciar o dia ao acordar gira o mostrador quando você acorda, em vez de à meia-noite, para que uma noite longa permaneça no mesmo dia. Abrir na semana completa começa nos últimos 7 dias em vez de hoje — toque em qualquer roda para alternar."
+          }
+        }
+      }
+    },
+    "Start empty" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.moveIn.choices.fresh.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Começar do zero"
+          }
+        }
+      }
+    },
+    "Start from the list you already have, or start empty." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.moveIn.body. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comece pela lista que você já tem ou do zero."
           }
         }
       }
@@ -7567,6 +10484,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Passos e movimento (HealthKit)"
+          }
+        }
+      }
+    },
+    "Stipple Drift" : {
+      "comment" : "Generated from registry tokens.textures.stippleDrift.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pontilhado à deriva"
           }
         }
       }
@@ -7632,6 +10561,18 @@
     },
     "Suggest filing destinations" : {
 
+    },
+    "Suggest where to file" : {
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sugerir onde arquivar"
+          }
+        }
+      }
     },
     "Suggested" : {
       "localizations" : {
@@ -7754,11 +10695,46 @@
         }
       }
     },
+    "Sweep" : {
+      "comment" : "Generated from registry surfaces.notices.items.weeklySweep.primaryTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Varrer"
+          }
+        }
+      }
+    },
+    "Sweep…" : {
+      "comment" : "Generated from registry surfaces.notices.items.fadedPile.primaryTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Symptoms" : {
 
     },
+    "Sync & storage diagnostics" : {
+      "comment" : "Generated from registry settings.pages.advanced.sections.diagnostics.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnóstico de sincronização e armazenamento"
+          }
+        }
+      }
+    },
     "Syncing…" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizando…"
+          }
+        }
+      }
     },
     "Synthesize your map" : {
       "localizations" : {
@@ -7766,6 +10742,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sintetize seu mapa"
+          }
+        }
+      }
+    },
+    "Tactile" : {
+      "comment" : "Generated from registry tokens.textures.washiPaper.tag. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tátil"
           }
         }
       }
@@ -7790,6 +10778,30 @@
         }
       }
     },
+    "Tags" : {
+      "comment" : "Generated from registry surfaces.taskAttributes.tags.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tags"
+          }
+        }
+      }
+    },
+    "Tags…" : {
+      "comment" : "Generated from registry actions.actions.task.tags.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tags…"
+          }
+        }
+      }
+    },
     "Taken" : {
 
     },
@@ -7803,12 +10815,36 @@
         }
       }
     },
+    "Tamarillo" : {
+      "comment" : "Generated from registry tokens.fruitAccents.tamarillo.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tamarilho"
+          }
+        }
+      }
+    },
     "Tap + to add a supplement." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Toque em + para adicionar um suplemento."
+          }
+        }
+      }
+    },
+    "Tap + to add a task." : {
+      "comment" : "Generated from registry destinations.genericEmptyState.touchDetail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque em + para adicionar uma tarefa."
           }
         }
       }
@@ -7897,12 +10933,48 @@
     "Task Data" : {
 
     },
+    "Task deleted" : {
+      "comment" : "Generated from registry surfaces.toasts.templates.deletedSingle.emptyTitleFormat. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefa apagada"
+          }
+        }
+      }
+    },
+    "Task list" : {
+      "comment" : "Generated from registry actions.shortcutsSheet.taskList.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lista de tarefas"
+          }
+        }
+      }
+    },
     "Tasks" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tarefas"
+          }
+        }
+      }
+    },
+    "Tasks Claude finishes appear here so you can check and accept them." : {
+      "comment" : "Generated from registry destinations.destinations.review.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas que o Claude termina aparecem aqui para você conferir e aceitar."
           }
         }
       }
@@ -7939,6 +11011,34 @@
     },
     "Tasks Today" : {
 
+    },
+    "Tasks with a future When or Deadline date appear here." : {
+      "comment" : "Generated from registry destinations.destinations.upcoming.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas com data futura em Quando ou Prazo aparecem aqui."
+          }
+        }
+      }
+    },
+    "Tasks without activity for 14 days" : {
+      "comment" : "Generated from registry surfaces.notices.items.fadedPile.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Tasks without activity for 14 days fade out and move to Faded." : {
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.2.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas sem atividade por 14 dias esmaecem e vão para Esmaecidas."
+          }
+        }
+      }
     },
     "Teal" : {
       "localizations" : {
@@ -7984,7 +11084,14 @@
 
     },
     "Text Size" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tamanho do texto"
+          }
+        }
+      }
     },
     "Thank you" : {
       "localizations" : {
@@ -8109,6 +11216,18 @@
     "The seven discs unfurl in the rainbow — everyday, in-app" : {
 
     },
+    "The tasks move to Recently Deleted. You can undo this." : {
+      "comment" : "Generated from registry surfaces.prompts.items.deleteArea.variants.tasksOnly.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As tarefas vão para Apagadas recentemente. Você pode desfazer."
+          }
+        }
+      }
+    },
     "These controls are shared across Septena Life. Open one to change its canonical setting without leaving this section's context." : {
 
     },
@@ -8131,6 +11250,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pensando…"
+          }
+        }
+      }
+    },
+    "This account is already set up. Your tasks are syncing to this device." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.done.returningBody. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta conta já está configurada. Suas tarefas estão sincronizando com este dispositivo."
           }
         }
       }
@@ -8207,8 +11338,27 @@
     "This week's preview" : {
 
     },
+    "Thorough" : {
+      "comment" : "Generated from registry settings.keys.pccReasoning.options.2.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Minucioso"
+          }
+        }
+      }
+    },
     "Three" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Três"
+          }
+        }
+      }
     },
     "Three gold rings — the previous thank-you, for comparison" : {
 
@@ -8264,6 +11414,18 @@
     "Tint the checkbox as a task carries over day after day." : {
 
     },
+    "Title lines" : {
+      "comment" : "Generated from registry settings.rootGroups.appearance_root.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linhas do título"
+          }
+        }
+      }
+    },
     "today" : {
       "localizations" : {
         "pt-BR" : {
@@ -8306,6 +11468,42 @@
     "TODAY" : {
 
     },
+    "Today shows what to do now. Anything you skipped stays on the Get started list." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.done.body. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoje mostra o que fazer agora. O que você pulou fica na lista Primeiros passos."
+          }
+        }
+      }
+    },
+    "Toggle Star" : {
+      "comment" : "Generated from registry actions.actions.task.toggleStar.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alternar estrela"
+          }
+        }
+      }
+    },
+    "Toggle Today" : {
+      "comment" : "Generated from registry actions.actions.task.toggleToday.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alternar Hoje"
+          }
+        }
+      }
+    },
     "Token" : {
       "localizations" : {
         "pt-BR" : {
@@ -8338,6 +11536,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tom"
+          }
+        }
+      }
+    },
+    "Topography" : {
+      "comment" : "Generated from registry tokens.textures.topography.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Topografia"
           }
         }
       }
@@ -8475,7 +11685,14 @@
 
     },
     "Two" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duas"
+          }
+        }
+      }
     },
     "Two months free" : {
       "localizations" : {
@@ -8509,6 +11726,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Digite acima para adicionar sua primeira tarefa."
+          }
+        }
+      }
+    },
+    "Undated tasks fade after 14 days without activity and move to Faded. Open or edit a task to bring it back. You can turn this off in Settings." : {
+      "comment" : "Generated from registry surfaces.notices.items.fadeIntro.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas sem data esmaecem após 14 dias sem atividade e vão para Esmaecidas. Abra ou edite uma tarefa para trazê-la de volta. Você pode desativar isso nos Ajustes."
+          }
+        }
+      }
+    },
+    "Undated tasks without activity for 14 days appear here until you keep them or let them go." : {
+      "comment" : "Generated from registry destinations.destinations.faded.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas sem data e sem atividade por 14 dias aparecem aqui até você mantê-las ou descartá-las."
           }
         }
       }
@@ -8568,6 +11809,18 @@
         }
       }
     },
+    "Update Schedule" : {
+      "comment" : "Generated from registry surfaces.prompts.items.rescheduleFixedRepeat.options.updateRule.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atualizar repetição"
+          }
+        }
+      }
+    },
     "Updates will show up here." : {
 
     },
@@ -8595,14 +11848,45 @@
     "Upper must be greater than the lower bound." : {
 
     },
+    "Usage data" : {
+      "comment" : "Generated from registry settings.pages.privacy.sections.telemetry.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dados de uso"
+          }
+        }
+      }
+    },
     "Use custom medication for exact prescription names and strengths." : {
 
     },
     "Use generic placeholders when exact prescriptions should be entered manually later." : {
 
     },
+    "Use my Claude" : {
+      "comment" : "Generated from registry settings.keys.aiMode.options.2.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar meu Claude"
+          }
+        }
+      }
+    },
     "Use Private Cloud Compute" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar o Private Cloud Compute"
+          }
+        }
+      }
     },
     "Used to personalize the greeting. With Apple Intelligence it's freshly written through the day." : {
       "extractionState" : "stale",
@@ -8669,6 +11953,18 @@
         }
       }
     },
+    "View" : {
+      "comment" : "Generated from registry actions.menuBar.view.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visualizar"
+          }
+        }
+      }
+    },
     "View previous days" : {
 
     },
@@ -8722,6 +12018,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Caloroso"
+          }
+        }
+      }
+    },
+    "Washi Paper" : {
+      "comment" : "Generated from registry tokens.textures.washiPaper.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Papel washi"
           }
         }
       }
@@ -8808,8 +12116,27 @@
         }
       }
     },
+    "Welcome back" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.done.returningTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bem-vindo de volta"
+          }
+        }
+      }
+    },
     "Welcome to Septena" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Boas-vindas ao Septena"
+          }
+        }
+      }
     },
     "What are you good at?" : {
       "localizations" : {
@@ -8875,7 +12202,39 @@
 
     },
     "When" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando"
+          }
+        }
+      }
+    },
+    "When Claude shows a code, enter it below." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.connectClaude.instructions.1. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando o Claude mostrar um código, digite-o abaixo."
+          }
+        }
+      }
+    },
+    "When off, tasks appear in one list with their project or area underneath." : {
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desativado, as tarefas aparecem numa só lista com o projeto ou a área embaixo."
+          }
+        }
+      }
     },
     "When on, every book and article is included — and anything new you add to Readwise joins automatically." : {
 
@@ -8907,7 +12266,27 @@
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
     "When…" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando…"
+          }
+        }
+      }
+    },
+    "Where AI runs" : {
+      "comment" : "Generated from registry settings.pages.ai_preferences.sections.reach.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onde a IA roda"
+          }
+        }
+      }
     },
     "Where your data lives" : {
 
@@ -8976,6 +12355,30 @@
     "Withings sign-in expires periodically. Disconnect and connect again to re-authorize — the weigh-ins backfill on the next refresh." : {
 
     },
+    "Work an agent finished appears here so you can check and accept it." : {
+      "comment" : "Generated from registry destinations.destinations.review.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O trabalho concluído por um agente aparece aqui para você conferir e aceitar."
+          }
+        }
+      }
+    },
+    "Work with Claude" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.1.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trabalhe com o Claude"
+          }
+        }
+      }
+    },
     "Working…" : {
 
     },
@@ -9042,6 +12445,30 @@
         }
       }
     },
+    "You can undo this." : {
+      "comment" : "Generated from registry surfaces.prompts.items.deleteArea.variants.empty.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você pode desfazer."
+          }
+        }
+      }
+    },
+    "You can't undo this." : {
+      "comment" : "Generated from registry surfaces.prompts.items.deletePermanently.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não é possível desfazer."
+          }
+        }
+      }
+    },
     "You have " : {
       "extractionState" : "stale",
       "localizations" : {
@@ -9073,6 +12500,18 @@
         }
       }
     },
+    "You're all set" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.done.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tudo pronto"
+          }
+        }
+      }
+    },
     "You’re at %lld of %lld ml — log a glass?" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -9099,6 +12538,66 @@
     },
     "Your anonymous community identity. Useful when granting maintainer access from the server." : {
 
+    },
+    "Your changes stay on this device until you sign in." : {
+      "comment" : "Generated from registry surfaces.notices.items.signIn.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suas alterações ficam neste dispositivo até você entrar."
+          }
+        }
+      }
+    },
+    "Your changes stay on this iPad until you sign in." : {
+      "comment" : "Generated from registry surfaces.notices.items.signIn.platformDetails.1.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suas alterações ficam neste iPad até você entrar."
+          }
+        }
+      }
+    },
+    "Your changes stay on this iPhone until you sign in." : {
+      "comment" : "Generated from registry surfaces.notices.items.signIn.platformDetails.2.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suas alterações ficam neste iPhone até você entrar."
+          }
+        }
+      }
+    },
+    "Your changes stay on this Mac until you sign in." : {
+      "comment" : "Generated from registry surfaces.notices.items.signIn.platformDetails.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suas alterações ficam neste Mac até você entrar."
+          }
+        }
+      }
+    },
+    "Your data" : {
+      "comment" : "Generated from registry settings.pages.privacy.sections.data_locality.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seus dados"
+          }
+        }
+      }
     },
     "Your data stays in your private iCloud. Connecting an AI just opens a door into it — one you control and can revoke." : {
       "localizations" : {
@@ -9156,6 +12655,30 @@
     "Your tasks and their contents are never sent through analytics — only anonymous, aggregate usage at the level you choose above. This setting syncs across your devices via iCloud." : {
 
     },
+    "Your tasks stay in step on iPhone, iPad and Mac." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suas tarefas ficam em sincronia no iPhone, iPad e Mac."
+          }
+        }
+      }
+    },
+    "Your tasks, areas, projects, and conversations are erased from the server and this device." : {
+      "comment" : "Generated from registry surfaces.prompts.items.deleteAccount.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suas tarefas, áreas, projetos e conversas são apagados do servidor e deste dispositivo."
+          }
+        }
+      }
+    },
     "Your testimonial" : {
 
     },
@@ -9167,6 +12690,18 @@
     },
     "Your unsaved changes will be lost." : {
 
+    },
+    "Yuzu" : {
+      "comment" : "Generated from registry tokens.fruitAccents.yuzu.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yuzu"
+          }
+        }
+      }
     },
     "Zone 2 cardio" : {
       "localizations" : {

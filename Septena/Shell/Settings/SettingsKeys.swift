@@ -171,6 +171,10 @@ enum SettingsKey {
   /// (`SeptenaTask.todayTenureFill` → `TaskFade.rowOpacity`).
   /// Absent → on. Read by `TaskCheckboxModel`.
   static let tasksShowAging = RegistrySettings.StorageKey.tasksShowAging
+  /// Whether faded tasks appear as a collapsible faded section inside
+  /// projects and areas. Absent → on. Read by `TaskListView` and
+  /// `SeptaskKitTaskListController`.
+  static let tasksShowFaded = RegistrySettings.StorageKey.tasksShowFaded
   /// How many lines a task row's title may occupy before it truncates, on
   /// iPhone / iPad. 1 = the old single line, 2 = the default, 3 = long titles
   /// stay readable at the cost of taller rows. Absent → 2. Read by `TaskRow`.
