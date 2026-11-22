@@ -320,6 +320,11 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
         val sentWriteMayExist = rowOps.any { it.sent != 0L }
         if (!remoteKnown && !sentWriteMayExist) {
             queries.deleteUnsentRowOutbox(operation.entity, operation.id)
+            queries.deleteRecord(operation.entity, operation.id)
+            if (operation.entity == RegistryEntityNames.TASK) {
+                queries.deleteUnsentRowOutbox("turn", operation.id)
+                queries.deleteLocalTurns(operation.id)
+            }
             return
         }
         queries.deleteUnsentRowOutbox(operation.entity, operation.id)
@@ -512,7 +517,10 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
             }
             queries.deleteOutbox(row.clientOpId)
         }
-        if (entity == RegistryEntityNames.TASK) queries.deleteLocalTurns(id)
+        if (entity == RegistryEntityNames.TASK) {
+            queries.deleteLocalTurns(id)
+            queries.deleteTurns(id)
+        }
     }
 
     private fun encodeObject(fields: Map<String, JsonValue>): String = JsonValue.ObjectValue(fields).canonicalJson()

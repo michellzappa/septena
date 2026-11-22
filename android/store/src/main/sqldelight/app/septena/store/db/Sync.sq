@@ -93,6 +93,9 @@ UPDATE sync_local_turn SET client_op_id = ? WHERE client_op_id = ?;
 deleteLocalTurns:
 DELETE FROM sync_local_turn WHERE task_id = ?;
 
+deleteTurns:
+DELETE FROM sync_turn WHERE task_id = ?;
+
 upsertTurn:
 INSERT INTO sync_turn(task_id, sequence, fields_json) VALUES (?, ?, ?)
 ON CONFLICT(task_id, sequence) DO UPDATE SET fields_json = excluded.fields_json;
