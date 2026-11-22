@@ -62,7 +62,7 @@ object RegistryCatalog {
         document("settings").objectAt("keys")?.get(key) as? JsonValue.ObjectValue
 
     fun syncedSettingKeys(platform: String = RegistryPlatformIds.ANDROID): List<String> =
-        document("settings").objectAt("keys")?.mapNotNull { (key, raw) ->
+        document("settings").objectAt("keys")?.fields?.mapNotNull { (key, raw) ->
             val definition = raw as? JsonValue.ObjectValue ?: return@mapNotNull null
             val scope = definition.stringAt("scope")
             val platforms = (definition.fields["platforms"] as? JsonValue.ArrayValue)
@@ -93,7 +93,7 @@ object RegistryCatalog {
             ?: translations.fields.keys.firstOrNull {
                 it.substringBefore('-').equals(languageTag.substringBefore('-'), ignoreCase = true)
             }
-        val selected = locale?.let(translations::objectAt)
+        val selected = locale?.let { translations.objectAt(it) }
         fun text(value: JsonValue?): String? = when (value) {
             is JsonValue.StringValue -> value.value
             is JsonValue.ObjectValue -> value.stringAt("text")

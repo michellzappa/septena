@@ -8,9 +8,9 @@ import java.time.ZoneId
 
 /** Pure fade calculation shared with registry/conformance/task-fade.json. */
 object TaskFadeRules {
-    private val window = Duration.ofDays(RegistryRules.fadeWindowDays)
-    private val grace = Duration.ofDays(RegistryRules.fadeGraceDays)
-    val minOpacity: Double = RegistryRules.fadeMinOpacity
+    private val window = Duration.ofDays(RegistryRules.FADE_WINDOW_DAYS)
+    private val grace = Duration.ofDays(RegistryRules.FADE_GRACE_DAYS)
+    val minOpacity: Double = RegistryRules.FADE_MIN_OPACITY
 
     fun rowOpacity(fill: Double?): Double {
         if (fill == null || !fill.isFinite() || fill <= 0.0) return 1.0

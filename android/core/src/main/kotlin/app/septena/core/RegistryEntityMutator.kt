@@ -54,7 +54,7 @@ class RegistryEntityMutator(
         store.writeLocalAndEnqueue(
             deleted,
             SyncOperation.Delete(ids.nextClientOpId(), entity, id),
-            now.plus(Duration.ofSeconds(RegistryRules.deleteGraceSeconds)),
+            now.plus(Duration.ofSeconds(RegistryRules.DELETE_GRACE_SECONDS)),
         )
         return deleted
     }

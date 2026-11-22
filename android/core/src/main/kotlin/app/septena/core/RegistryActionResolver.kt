@@ -13,7 +13,7 @@ object RegistryActionResolver {
     fun availableActionIds(context: RegistryActionContext): List<String> {
         require(context.selectedCount >= 0) { "Selection count cannot be negative" }
         val actions = RegistryCatalog.document("actions").objectAt("actions") ?: return emptyList()
-        return actions.mapNotNull { (id, raw) ->
+        return actions.fields.mapNotNull { (id, raw) ->
             val action = raw as? JsonValue.ObjectValue ?: return@mapNotNull null
             val availability = action.objectAt("availability") ?: JsonValue.ObjectValue(emptyMap())
             if (matches(availability, context)) id else null

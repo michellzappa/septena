@@ -8,7 +8,7 @@ plugins {
 kotlin {
     android {
         namespace = "app.septena.ui"
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 29
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)

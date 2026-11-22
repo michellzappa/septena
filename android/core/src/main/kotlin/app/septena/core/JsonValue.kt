@@ -8,7 +8,7 @@ sealed interface JsonValue {
     data class DecimalValue(val value: Double) : JsonValue
     data class StringValue(val value: String) : JsonValue
     data class ArrayValue(val values: List<JsonValue>) : JsonValue
-    data class ObjectValue(val fields: Map<String, JsonValue>) : JsonValue
+    data class ObjectValue(val fields: Map<String, JsonValue>) : JsonValue, Map<String, JsonValue> by fields
 
     fun canonicalJson(): String = when (this) {
         Null -> "null"

@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "app.septena.android"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "app.septena.android"

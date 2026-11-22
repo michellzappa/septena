@@ -118,7 +118,7 @@ object TaskViewRules {
     private fun isFreshAgentProposal(task: TaskSnapshot, now: Instant): Boolean {
         if (task.source != "mcp") return false
         val createdAt = instant(task.createdAt) ?: return false
-        return Duration.between(createdAt, now) < Duration.ofDays(RegistryRules.cueDecayDays)
+        return Duration.between(createdAt, now) < Duration.ofDays(RegistryRules.CUE_DECAY_DAYS)
     }
 
     private fun carriedDays(

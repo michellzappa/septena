@@ -160,7 +160,7 @@ class TaskMutator(
         val deletedAt = WireTimestamp.format(now)
         val updated = existing.copy(deletedAt = deletedAt)
         val operation = SyncOperation.Delete(ids.nextClientOpId(), RegistryEntityNames.TASK, id)
-        val grace = Duration.ofSeconds(app.septena.core.generated.RegistryRules.deleteGraceSeconds)
+        val grace = Duration.ofSeconds(app.septena.core.generated.RegistryRules.DELETE_GRACE_SECONDS)
         store.writeLocalAndEnqueue(updated.asSyncRecord(), operation, now.plus(grace))
         return updated
     }
