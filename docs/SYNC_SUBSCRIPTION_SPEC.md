@@ -164,8 +164,9 @@ launch.
   refund, grace period, billing retry).
 - Every server path checks the user's **plan** in one place: a Hono
   middleware on `/v1` routes, and the same check in the gateway before it
-  reaches the DO. The plan is `paid` when any entitlement row is active,
-  `trial` during the reverse trial, else `free`.
+  reaches the DO. The plan is `plus` when any entitlement row is active,
+  else `free`. `trial` (the reverse trial) is not built yet; it will resolve
+  to the Plus limits.
 - **Plan table (ADR 0010).** One table in `backend/` maps each plan to its
   limits: device count, sync mode (live / poll), change-log window, Logbook
   window, Recently Deleted window, R2 attachments on/off and quota, connector
@@ -188,7 +189,7 @@ row per source of access: `id` (`apple:<originalTransactionId>` or
 `grant:<name>`), `source`, `productId`, `expiresAt` (ms; null = no expiry),
 `originalTransactionId`, `status` (`active` / `grace` / `billing_retry` /
 `expired` / `revoked`), `environment`, `note`, `signedAt`, `updatedAt`. The
-user has sync when any row is active. An older Apple payload (`signedDate`)
+user is on Plus when any row is active. An older Apple payload (`signedDate`)
 never overwrites a newer one. KV `TOKENS` maps `ent-otx:<originalTransactionId>`
 and `ent-aat:<appAccountToken>` to the user, so a webhook finds its user.
 Account deletion removes the rows with the rest of the Durable Object.
@@ -203,7 +204,8 @@ does not cut sync); `grace` until the grace period end + 24 h;
 
 | Route | Auth | Does |
 |---|---|---|
-| `GET /v1/entitlement` | bearer | `userId`, `appAccountToken`, `active`, `enforced`, the rows |
+| `GET /v1/entitlement` | bearer | `userId`, `appAccountToken`, `active`, `enforced`, the rows, and (P1.5, §6.3) `plan`, `limits`, `usage`, `device` |
+| `POST /v1/entitlement/device` | bearer | moves the sync slot to the calling device (P1.5, §6.3) |
 | `POST /v1/entitlement/apple` | bearer | body `{signedTransaction, signedRenewalInfo?}`; verifies, checks `appAccountToken`, bundle, environment, product; writes the row |
 | `POST /v1/webhooks/apple` | Apple JWS | App Store Server Notifications V2 `{signedPayload}`; 200 for any verified payload |
 | `POST /v1/admin/grants` | `X-Admin-Token` | body `{userId, name, note?, expiresAt?}`; writes `grant:<name>` |
@@ -236,18 +238,16 @@ anything else → by `expiresDate`. A transaction with `revocationDate` is
 revoked. A transaction the app posts never moves a `grace` or
 `billing_retry` row to `expired`; only Apple's notifications do.
 
-**Enforcement.** One check, `hasSyncEntitlement` in
-`backend/src/entitlement/entitlement.ts`, used by the `/v1` middleware
-(`/sync/*`, `/attachments/*`, `/changes`) and by the api.septena.app
-connector's write tools (`tasks_*` writes, `tasks_claim`,
-`tasks_release`). Worker var `ENTITLEMENT_ENFORCE`:
+**Enforcement.** P1.5 replaced the yes/no check with the plan table; see
+§6.3. Worker var `ENTITLEMENT_ENFORCE`:
 
-- `"false"` (the default in `wrangler.toml`): the check runs and logs
-  `entitlement_would_block` with the user id. Nothing is refused. A failed
-  check lets the call through.
-- `"true"`: no active row → 402 `{"error":"subscription_required"}` on
-  sync, a tool error on connector writes. A failed check blocks (fail
-  closed).
+- `"false"` (the default in `wrangler.toml`): every gate runs and logs
+  `entitlement_would_block` with the user id, the plan and the limit.
+  Nothing is refused, and reads show everything. A failed plan check lets
+  the call through with no limits.
+- `"true"`: a call past a limit is refused (§6.3). A failed plan check
+  blocks (fail closed): 503 `plan_check_failed` on `/v1`, a tool error on
+  the connector.
 
 The live connector on mcp.septena.app (CloudKit) is not gated.
 
@@ -266,10 +266,10 @@ Run from `~/Dev/septena/backend` after this code is deployed.
    ```
 
 2. Find your user id. Start the tail, then open Septena on a device that
-   syncs. Copy `userId` from the first `entitlement_would_block` line.
+   syncs. Copy `userId` from the first `entitlement_free_account` line.
 
    ```
-   ./node_modules/.bin/wrangler tail septena-mcp-gateway --search entitlement_would_block
+   ./node_modules/.bin/wrangler tail septena-mcp-gateway --search entitlement_free_account
    ```
 
 3. Write the grant (put your token and user id in):
@@ -278,13 +278,82 @@ Run from `~/Dev/septena/backend` after this code is deployed.
    curl -sS -X POST https://api.septena.app/v1/admin/grants -H "X-Admin-Token: TOKEN" -H "Content-Type: application/json" -d '{"userId":"u_YOURID","name":"mz","note":"owner"}'
    ```
 
-   The answer shows `"active": true`. The `entitlement_would_block` lines
+   The answer shows `"active": true`. The `entitlement_free_account` lines
    for your user id stop.
 
 4. Only then set `ENTITLEMENT_ENFORCE = "true"` in `backend/wrangler.toml`
    and deploy. A tester gets the same grant with their own `name`; give an
    `expiresAt` (ISO 8601) for a time-limited grant. Remove one with
    `curl -X DELETE https://api.septena.app/v1/admin/grants/u_ID/NAME -H "X-Admin-Token: TOKEN"`.
+
+### 6.3 Plan table and free-account limits (P1.5, `backend/`)
+
+**Plan table.** `PLAN_TABLE` in `backend/src/entitlement/entitlement.ts`
+maps `free` → `PLAN_LIMITS.account` and `plus` → `PLAN_LIMITS.plus`
+(generated from `registry/plans.json` `limits`; null = no cap).
+`resolvePlan` gives `plus` when any entitlement row is active, else `free`.
+`planFor` reads the rows and the usage counters a gate needs in one call to
+the user's Durable Object. Every gate reads a limit through `decide`, never
+the plan name. Refusals quote the registry's upsell copy (`PLAN_UPSELLS`,
+generated from `plans.json` `upsells`), so the words match the app.
+
+**Device.** A device is a session: one sign-in on one install. The access
+token carries the session id (`sid`), which survives refresh-token rotation.
+Table `devices` in the DO records each session that called a sync route and
+its `slotAt`. The slot holders are the `devices` count of live sessions with
+the newest `slotAt`.
+
+- A device that may sync refreshes its `slotAt`. On Plus (no cap) every
+  device does, so after a lapse the device used last keeps the slot (§7).
+- A device takes a free slot by itself on its first sync. It never pushes
+  out a holder: the second device stays local and gets the
+  `second_device` upsell. *(default 2026-11-22: §3.2's "the device works
+  locally; moving the slot is offered" wins over ADR 0023's "the new device
+  takes the slot". mz can overrule; then sign-in would call the claim.)*
+- `POST /v1/entitlement/device` moves the slot to the calling device; the
+  old device stops syncing and keeps its local data. Free on every plan.
+- Signing out (`/v1/auth/signout`) or an expired session frees its slot.
+- A device past the count gets 402 `device_not_syncing` on `/v1/sync/*`,
+  `/v1/attachments/*` and `/v1/changes`. A token from before session ids
+  (at most one hour after deploy) names no device and is let through.
+
+**Other limits.**
+
+| Limit | Where | Over the limit (enforce mode) |
+|---|---|---|
+| `liveSync` | `GET /v1/sync/ws` | 402 `live_sync_not_in_plan`; the app polls `/v1/sync/pull` |
+| `changeLogDays` | `GET /v1/changes`, `tasks_history`, `tasks_activity` | Older rows are not shown. `/v1/changes` adds `windowDays` and `hiddenOlder` (count, or null while more pages follow) for the `history_edge` upsell |
+| `attachmentsGB` | `PUT /v1/attachments/:id` | 402 `attachments_not_in_plan` (free: 0) or `attachment_quota` (Plus: 10 GB of live uploaded bytes). Downloads of bytes already stored still work |
+| `connectorWritesPerDay` | connector write tools and notes writes | Tool error with the `connector_cap` words. Reads always work |
+| `agentRunsPerMonth` | `tasks_claim` (a new claim; a renewal is not a run) | Claim refused with the `agent_runs` words. `tasks_release` always works |
+| `logbookDays`, `recentlyDeletedDays`, `createShares`, `linkedProjects` | Apps (read from `GET /v1/entitlement`) | The server has no Logbook, Recently Deleted, sharing or linked-project surface yet |
+
+Every 402 body is `{error, limit, upsell, message}`: `upsell` is the
+moment id from `plans.json` (null for live sync), `message` its words.
+
+**Counters.** Table `usage` in the DO: `cw:YYYY-MM-DD` (connector writes,
+UTC day) and `ar:YYYY-MM` (agent runs, UTC month). A call counts after it
+ran. The daily alarm drops counters older than 62 days and `devices` rows
+whose session is gone.
+
+**`GET /v1/entitlement` adds:** `plan` (`free` / `plus`), `limits` (the
+plan table row), `usage` (`connectorWritesToday`, `agentRunsThisMonth`),
+`device` (`syncing` for the caller, `syncingDevices`, `knownDevices`).
+
+**Not built in P1.5:**
+
+- The reverse trial (§3). It needs an account start date that the server
+  does not record for existing accounts; existing testers would all get a
+  trial from deploy day. Next step: record the first sign-in, resolve
+  `trial` for 14 days, give it the Plus limits.
+- Per-plan pruning of the change log. The alarm still prunes every account
+  at 365 days; the free window only hides. This follows "a limit hides" and
+  the 12-month lapse rule; the cost is a few MB per free account.
+- Recently Deleted on Plus cannot reach 365 days while tombstones are purged
+  at 90 days on every plan (§3.1). Open question in §11.
+- App work: the second-device upsell and the "sync this device" button,
+  poll-only sync on free, the 402 bodies. The app reads all of it from
+  `GET /v1/entitlement` and the 402 body.
 
 ## 7. App behavior
 
@@ -324,7 +393,7 @@ to the backend.
 |---|---|---|
 | P0 | Entitlement row, Apple JWS verify, webhook, `grant` rows, middleware on `/v1` and the gateway. mz has a `grant`. | A user without a row gets 402 on sync; mz syncs. |
 | P1 | Products in App Store Connect, StoreKit purchase + restore in the task app, account link, paywall sheet, lapsed state. Remove the tip jar from the task app. | A sandbox purchase turns on sync; a sandbox expiry stops it, and local data stays. |
-| P1.5 | Plan table and free-account limits (ADR 0010): device count, poll-only sync, history windows, local-only attachments, connector and agent caps, reverse trial, upsell moments (§3.2). | A free account syncs 1 device; a second device stays local and shows the upsell; a paid account lifts every limit. |
+| P1.5 | Server side built 2026-11-22 (§6.3), except the reverse trial. Plan table and free-account limits (ADR 0010): device count, poll-only sync, history windows, local-only attachments, connector and agent caps, reverse trial, upsell moments (§3.2). | A free account syncs 1 device; a second device stays local and shows the upsell; a paid account lifts every limit. |
 | P2 | Free-mode audit: every free feature works with no account and no network. | Fresh install, airplane mode, every free feature works. |
 | P3 | Stripe for the web client. | A web purchase turns on sync on iPhone. |
 
@@ -347,4 +416,6 @@ before any public release that uses the backend.
 | Does the code stay open source? | Yes; the paid product is the hosted service |
 | Free server tier | Decided 2026-11-20: yes, a free account with limits (ADR 0010) |
 | Attachments on the free account | Decided 2026-11-20: none on the server; files stay on the device that added them |
+| Recently Deleted on Plus is 1 year, but tombstones are purged at 90 days on every plan (§3.1) | Open (2026-11-22): keep deleted rows 365 days on Plus, or cut Plus's Recently Deleted to 90 days |
+| A free account's second device: take the slot at sign-in (ADR 0023) or stay local and offer the move (§3.2) | Default 2026-11-22: stay local, offer the move (§6.3) |
 | Limit values ("a few" connector writes, agent runs, hosted-AI allowance) | Decided 2026-11-22: free account gets connector reads plus 25 writes a day and 10 agent runs a month. Hosted-AI allowance still open. The values live in `registry/plans.json` `limits` (generated to `PLAN_LIMITS` for the backend) |

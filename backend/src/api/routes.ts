@@ -4,6 +4,7 @@ import type { Env } from "../env.js";
 import { logEvent } from "../util.js";
 import { MAX_ATTACHMENT_BYTES, zId } from "../store/columns.js";
 import { zPushBody, type Op } from "../store/ops.js";
+import type { ChangeEntry } from "../store/TaskStore.js";
 import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from "./appleIdentity.js";
 import { issueSession, refreshSession, revokeSession, storeFor, verifyAccessToken } from "./session.js";
 import {
@@ -18,9 +19,17 @@ import {
 } from "../shadow/oauth.js";
 import {
   appAccountTokenFor,
-  entitlementGate,
+  attachmentQuotaBytes,
+  decide,
+  historyCutoff,
   isEnforcing,
   isRowActive,
+  planCheckFailed,
+  planFor,
+  upsellLine,
+  usageKeys,
+  type LimitBreach,
+  type PlanState,
   rememberAppAccountToken,
   rememberOriginalTransaction,
   userForTransaction,
@@ -37,7 +46,18 @@ import { appleRow, rejectReason } from "../entitlement/apple.js";
 // Task backend API, mounted at /v1 (docs/SEPTASK_BACKEND.md in the app repo).
 // Phase 0: no app or MCP tool calls this yet. The live connector is unchanged.
 
-type Vars = { userId: string; actor: string };
+type Vars = {
+  userId: string;
+  actor: string;
+  /// The session id from the access token (null for a token from before
+  /// session ids). One session = one device for the sync slot.
+  sid: string | null;
+  /// `X-Septena-Client`, when valid. Labels the device.
+  client: string | null;
+  /// Set by `loadPlan`. null when the check failed in log-only mode: the call
+  /// then runs with no limits.
+  plan: PlanState | null;
+};
 type Ctx = Context<{ Bindings: Env; Variables: Vars }>;
 
 export const api = new Hono<{ Bindings: Env; Variables: Vars }>();
@@ -120,19 +140,52 @@ api.post("/auth/device/poll", async (c) => {
 async function requireUser(c: Ctx, next: Next) {
   const header = c.req.header("Authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
-  const userId = token ? await verifyAccessToken(c.env, token) : null;
-  if (!userId) return c.json({ error: "unauthorized" }, 401, { "WWW-Authenticate": "Bearer" });
+  const claims = token ? await verifyAccessToken(c.env, token) : null;
+  if (!claims) return c.json({ error: "unauthorized" }, 401, { "WWW-Authenticate": "Bearer" });
   const client = zClientName.safeParse(c.req.header("X-Septena-Client"));
-  c.set("userId", userId);
+  c.set("userId", claims.userId);
+  c.set("sid", claims.sid);
+  c.set("client", client.success ? client.data : null);
   c.set("actor", `app:${client.success ? client.data : "unknown"}`);
   await next();
 }
 
-/// Paid paths (docs/SYNC_SUBSCRIPTION_SPEC.md §6). Runs after requireUser.
-/// With ENTITLEMENT_ENFORCE != "true" it only logs; see entitlementGate.
-async function requireSyncEntitlement(c: Ctx, next: Next) {
-  if ((await entitlementGate(c.env, c.get("userId"), "sync")) === "block") {
-    return c.json({ error: "subscription_required" }, 402);
+/// A refusal for a broken limit (enforce mode only): 402 with the limit, the
+/// upsell moment (spec §3.2) and its words.
+function limitRefusal(c: Ctx, error: string, breach: LimitBreach) {
+  return c.json({
+    error, limit: breach.limit, upsell: breach.upsell, message: breach.upsell ? upsellLine(breach.upsell) : null,
+  }, 402);
+}
+
+/// The caller's plan (docs/SYNC_SUBSCRIPTION_SPEC.md §6). Runs after
+/// requireUser. A failed check blocks only in enforce mode.
+async function loadPlan(c: Ctx, next: Next) {
+  try {
+    const plan = await planFor(c.env, c.get("userId"));
+    c.set("plan", plan);
+    // Before enforcement, every free-account sync call says so, as the old
+    // yes/no gate's would-block line did: spec §6.2 finds the user id here.
+    if (plan.plan === "free" && !isEnforcing(c.env)) logEvent("entitlement_free_account", { userId: c.get("userId") });
+  } catch (e) {
+    if (planCheckFailed(c.env, c.get("userId"), "plan", e) === "block") return c.json({ error: "plan_check_failed" }, 503);
+    c.set("plan", null);
+  }
+  await next();
+}
+
+/// Server sync for this device (ADR 0023): the plan's device count. A device
+/// past the count keeps its local data and stops syncing until it takes the
+/// slot (`POST /v1/entitlement/device`). Runs after loadPlan.
+async function requireSyncDevice(c: Ctx, next: Next) {
+  const plan = c.get("plan");
+  const sid = c.get("sid");
+  // A token from before session ids names no device; it refreshes within
+  // the hour and carries one from then on.
+  if (plan && sid) {
+    const { syncing } = await storeFor(c.env, c.get("userId")).deviceAccess(sid, c.get("client"), plan.limits.devices);
+    const breach: LimitBreach | null = syncing ? null : { limit: "devices", upsell: "second_device" };
+    if (decide(c.env, c.get("userId"), "sync_device", plan, breach) === "block") return limitRefusal(c, "device_not_syncing", breach!);
   }
   await next();
 }
@@ -144,10 +197,10 @@ async function apiHostOnly(c: Ctx, next: Next) {
   await next();
 }
 
-api.use("/sync/*", requireUser, requireSyncEntitlement);
-api.use("/attachments/*", requireUser, requireSyncEntitlement);
+api.use("/sync/*", requireUser, loadPlan, requireSyncDevice);
+api.use("/attachments/*", requireUser, loadPlan, requireSyncDevice);
 api.use("/account", requireUser);
-api.use("/changes", requireUser, requireSyncEntitlement);
+api.use("/changes", requireUser, loadPlan, requireSyncDevice);
 api.use("/pair/*", requireUser);
 api.use("/entitlement", apiHostOnly, requireUser);
 api.use("/entitlement/*", apiHostOnly, requireUser);
@@ -188,6 +241,12 @@ api.get("/sync/pull", async (c) => {
 
 api.get("/sync/ws", async (c) => {
   if (c.req.header("Upgrade") !== "websocket") return c.json({ error: "expected_websocket" }, 426);
+  // Without live sync the app polls `/sync/pull` (spec §3).
+  const plan = c.get("plan");
+  if (plan && !plan.limits.liveSync) {
+    const breach: LimitBreach = { limit: "liveSync", upsell: null };
+    if (decide(c.env, c.get("userId"), "sync_live", plan, breach) === "block") return limitRefusal(c, "live_sync_not_in_plan", breach);
+  }
   return storeFor(c.env, c.get("userId")).fetch(c.req.raw);
 });
 
@@ -201,10 +260,23 @@ api.get("/changes", async (c) => {
     limit: z.coerce.number().int().min(1).max(500).default(100),
   }).safeParse(c.req.query());
   if (!q.success) return c.json({ error: "invalid_request" }, 400);
-  const changes = await storeFor(c.env, c.get("userId")).history(
-    q.data.entity ?? null, q.data.id ?? null, q.data.before ?? null, q.data.limit,
-  );
-  return c.json({ changes });
+  const plan = c.get("plan");
+  const store = storeFor(c.env, c.get("userId"));
+  const entity = q.data.entity ?? null;
+  const id = q.data.id ?? null;
+  // The plan's history window hides older changes; it never deletes them.
+  const since = historyCutoff(c.env, plan?.limits ?? null);
+  const changes = (await store.history(entity, id, q.data.before ?? null, q.data.limit, since)) as unknown as ChangeEntry[];
+  if (since === null) {
+    const days = plan?.limits.changeLogDays ?? null;
+    if (plan && days !== null) {
+      const edge = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      if (changes.some((e) => e.at < edge)) decide(c.env, c.get("userId"), "history", plan, { limit: "changeLogDays", upsell: "history_edge" });
+    }
+    return c.json({ changes });
+  }
+  const hidden = changes.length < q.data.limit ? await store.historyHidden(entity, id, since) : null;
+  return c.json({ changes, windowDays: plan!.limits.changeLogDays, hiddenOlder: hidden });
 });
 
 // ---- attachments (bytes proxied through the Worker; §10 limits) ----
@@ -217,6 +289,16 @@ api.put("/attachments/:id", async (c) => {
   if (length > MAX_ATTACHMENT_BYTES) return c.json({ error: "too_large", max: MAX_ATTACHMENT_BYTES }, 413);
   const userId = c.get("userId");
   const store = storeFor(c.env, userId);
+  // Server attachments are a plan limit: none on the free account (files
+  // stay on the device that added them), a quota on Plus.
+  const plan = c.get("plan");
+  const quota = plan ? attachmentQuotaBytes(plan.limits) : null;
+  if (plan && quota !== null && (quota === 0 || (await store.attachmentBytes()) + length > quota)) {
+    const breach: LimitBreach = { limit: "attachmentsGB", upsell: "file_elsewhere" };
+    if (decide(c.env, userId, "attachment_upload", plan, breach) === "block") {
+      return limitRefusal(c, quota === 0 ? "attachments_not_in_plan" : "attachment_quota", breach);
+    }
+  }
   const problem = await store.checkUpload(id.data, length);
   if (problem === "not_found") return c.json({ error: "push_metadata_first" }, 404);
   if (problem === "size_mismatch") return c.json({ error: "size_mismatch" }, 409);
@@ -278,15 +360,45 @@ api.get("/entitlement", async (c) => {
   const userId = c.get("userId");
   const appAccountToken = await appAccountTokenFor(userId);
   c.executionCtx.waitUntil(rememberAppAccountToken(c.env, userId, appAccountToken));
-  const rows = await storeFor(c.env, userId).entitlements();
+  const keys = { connectorWrites: usageKeys.connectorWrites(), agentRuns: usageKeys.agentRuns() };
+  const state = await planFor(c.env, userId, [keys.connectorWrites, keys.agentRuns]);
+  const store = storeFor(c.env, userId);
+  const sid = c.get("sid");
+  const devices = await store.deviceSummary(state.limits.devices);
   const now = Date.now();
   return c.json({
     userId,
     appAccountToken,
-    active: rows.some((r) => isRowActive(r, now)),
+    active: state.rows.some((r) => isRowActive(r, now)),
     enforced: isEnforcing(c.env),
-    entitlements: rows.map((r) => ({ ...r, active: isRowActive(r, now) })),
+    entitlements: state.rows.map((r) => ({ ...r, active: isRowActive(r, now) })),
+    // The plan table row the server enforces (spec §6). Apps read limits
+    // here and never hardcode them.
+    plan: state.plan,
+    limits: state.limits,
+    usage: {
+      connectorWritesToday: state.usage[keys.connectorWrites],
+      agentRunsThisMonth: state.usage[keys.agentRuns],
+    },
+    device: {
+      // A device that never synced yet takes a free slot on its first sync.
+      syncing: sid ? (devices.find((d) => d.sid === sid)?.syncing ?? devices.filter((d) => d.syncing).length < (state.limits.devices ?? Infinity)) : true,
+      syncingDevices: devices.filter((d) => d.syncing).length,
+      knownDevices: devices.length,
+    },
   });
+});
+
+/// Moves the sync slot to this device ("sync this device instead", spec
+/// §3.2). On a capped plan the device used least recently stops syncing and
+/// keeps its local data. Free on every plan.
+api.post("/entitlement/device", async (c) => {
+  const sid = c.get("sid");
+  if (!sid) return c.json({ error: "refresh_token_first" }, 409);
+  const store = storeFor(c.env, c.get("userId"));
+  await store.claimDeviceSlot(sid, c.get("client"));
+  logEvent("device_slot_claimed", { userId: c.get("userId") });
+  return c.json({ syncing: true });
 });
 
 /// A StoreKit 2 transaction the app holds (after purchase, and for every item
