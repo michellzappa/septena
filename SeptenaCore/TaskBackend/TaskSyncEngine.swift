@@ -92,7 +92,7 @@ final class TaskSyncEngine {
   /// restores the row) cancels it before the backend sees it. The backend
   /// never revives a deleted row (§6.4).
   static let deleteGrace: TimeInterval = TimeInterval(RegistryRules.deleteGraceSeconds)
-  static let batchLimit = 500
+  static let batchLimit = RegistryEntityLimits.maxOpsPerPush
   static let sinceKey = "septena.taskSync.since"
   /// True once a pull that asked for settings finished. Until then a local
   /// setting is not sent, so a value another device already pushed wins.

@@ -552,7 +552,7 @@ struct RecurrencePickerSheet: View {
               paused.toggle()
               onPauseChanged(paused)
             } label: {
-              Label(paused ? "Resume Repeat" : "Pause Repeat",
+              Label(paused ? RegistryActions.title("task.pauseResumeRepeat", .active) : RegistryActions.title("task.pauseResumeRepeat"),
                     systemImage: paused ? "play.circle" : "pause.circle")
             }
             .buttonStyle(.bordered)
@@ -628,8 +628,8 @@ struct MovePickerSheet: View {
       ScrollView {
         LazyVStack(alignment: .leading, spacing: 4) {
           // Inbox first — drop both area and project.
-          if !hidesInboxTarget && matches("Inbox") {
-            row(.inbox, title: "Inbox",
+          if !hidesInboxTarget && matches(TaskFilter.triage.title) {
+            row(.inbox, title: TaskFilter.triage.title,
                 selected: showCurrentSelection && currentAreaId == nil && currentProjectId == nil) {
               onPick(nil, nil); dismiss()
             }

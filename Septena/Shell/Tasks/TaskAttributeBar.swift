@@ -49,8 +49,9 @@ struct TaskAttributeBar: View {
 
     private var registry: RegistryTaskAttribute { RegistrySurfaces.taskAttribute(rawValue) }
 
-    /// Every pill, in registry rail order.
-    static let rail: [Attribute] = RegistrySurfaces.taskAttributePills.compactMap { Attribute(rawValue: $0.id) }
+    /// Every pill that ships on this platform, in registry rail order.
+    static let rail: [Attribute] = RegistrySurfaces.taskAttributePills(on: RegistryPlatform.current)
+      .compactMap { Attribute(rawValue: $0.id) }
     /// The pills a draft without a saved task can use (registry `editOnly` false).
     static let draftCases: [Attribute] = rail.filter { !$0.editOnly }
 

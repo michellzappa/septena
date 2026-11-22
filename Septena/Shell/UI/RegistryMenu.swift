@@ -65,10 +65,14 @@ extension RegistryActions {
     return shortcut
   }
 
-  /// True when the action exists on this platform (`availability.platforms`).
+  /// True when the action exists on this platform: `availability.platforms`
+  /// lists it and its capability ships here (`registry/capabilities.json`,
+  /// ADR 0015). A planned feature shows no menu item.
   static func isAvailableOnPlatform(_ id: String) -> Bool {
-    guard let platforms = availability[id]?.platforms, !platforms.isEmpty else { return true }
-    return platforms.contains(RegistryPlatform.current)
+    guard let availability = availability[id] else { return true }
+    let platform = RegistryPlatform.current
+    if !availability.platforms.isEmpty, !availability.platforms.contains(platform) { return false }
+    return RegistryCapabilities.isAvailable(availability.featureId, on: platform)
   }
 
   static func menu(_ id: String) -> [RegistryMenuItem] {

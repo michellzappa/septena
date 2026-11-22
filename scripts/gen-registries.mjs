@@ -12,6 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as L10N from "./registry-l10n.mjs";
+import { checkReaders } from "./registry-readers.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, "..");
@@ -569,6 +570,16 @@ function validateConformance() {
 const swiftStr = (s) => JSON.stringify(s);
 // Localized registry copy (ADR 0020). Set once the strings are collected.
 let BY_KEY = null;
+
+// Rules, limits and patterns that only the server enforces. The Apple client
+// never reads them, so Swift does not get them (the reader check in
+// `scripts/registry-readers.mjs` fails on generated code nobody reads).
+// TypeScript and Kotlin still get every key.
+const SERVER_ONLY = new Set([
+  "agentRunBudget", "claimTtlDefaultSeconds", "claimTtlMaxSeconds",
+  "tombstoneTtlDays", "clientOpTtlDays", "changeLogTtlDays",
+  "attachmentPointerMax", "maxUserAttachmentBytes", "time24",
+]);
 const L = (s, obj, field) => L10N.swiftLookup(BY_KEY, s, obj?.l10nKeys?.[field] ?? s);
 const LOpt = (s, obj, field) => (s === undefined || s === null ? "nil" : L(s, obj, field));
 const swiftOptStr = (s) => (s === undefined || s === null ? "nil" : JSON.stringify(s));
@@ -599,6 +610,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("/// Wire schema size and count limits shared with the backend (`registry/entities.json`).");
   lines.push("enum RegistryEntityLimits {");
   for (const [k, v] of Object.entries(entities.limits)) {
+    if (SERVER_ONLY.has(k)) continue;
     const type = v > 2_000_000_000 || k.endsWith("Bytes") ? "Int64" : "Int";
     lines.push(`  static let ${k}: ${type} = ${v}`);
   }
@@ -607,6 +619,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("/// Wire schema regex strings shared with the backend (`registry/entities.json`).");
   lines.push("enum RegistryEntityPatterns {");
   for (const [k, v] of Object.entries(entities.patterns)) {
+    if (SERVER_ONLY.has(k)) continue;
     lines.push(`  static let ${k} = ${swiftStr(v)}`);
   }
   lines.push("}");
@@ -632,7 +645,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("/// Domain thresholds and retention constants shared across platforms (`registry/rules.json`).");
   lines.push("enum RegistryRules {");
   for (const [k, v] of Object.entries(rules)) {
-    if (k === "version") continue;
+    if (k === "version" || SERVER_ONLY.has(k)) continue;
     const type = Number.isInteger(v) ? "Int" : "Double";
     lines.push(`  static let ${k}: ${type} = ${v}`);
   }
@@ -742,10 +755,15 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     }
     return LOpt(v, item, field);
   };
-  const emitItem = (item) => {
+  // An item's capability: its own, else its setting key's, else the page it
+  // opens, else the page it sits on (ADR 0015 gating).
+  const pageFeature = Object.fromEntries(settings.pages.map((pg) => [pg.id, pg.featureId]));
+  const itemFeature = (item, onPage) =>
+    item.featureId ?? (item.key ? settings.keys[item.key]?.featureId : undefined) ?? (item.page ? pageFeature[item.page] : undefined) ?? onPage?.featureId ?? null;
+  const emitItem = (item, onPage) => {
     const iconId = item.icon ?? null;
     const sf = iconId ? icons.icons[iconId].sfSymbol : null;
-    return `RegistrySettingsItem(kind: ${swiftStr(item.kind)}, key: ${optStr(item.key)}, page: ${optStr(item.page)}, surface: ${optStr(item.surface)}, label: ${itemText(item, "label")}, detail: ${itemText(item, "detail")}, iconId: ${optStr(iconId)}, sfSymbol: ${optStr(sf)}, statusKey: ${optStr(item.statusKey)}, desktopInline: ${Boolean(item.desktopInline)}, visibility: ${swiftStr(item.visibility ?? "always")}, platforms: ${optArr(item.platforms)})`;
+    return `RegistrySettingsItem(kind: ${swiftStr(item.kind)}, key: ${optStr(item.key)}, page: ${optStr(item.page)}, surface: ${optStr(item.surface)}, label: ${itemText(item, "label")}, detail: ${itemText(item, "detail")}, iconId: ${optStr(iconId)}, sfSymbol: ${optStr(sf)}, statusKey: ${optStr(item.statusKey)}, desktopInline: ${Boolean(item.desktopInline)}, visibility: ${swiftStr(item.visibility ?? "always")}, platforms: ${optArr(item.platforms)}, featureId: ${optStr(itemFeature(item, onPage))})`;
   };
 
   lines.push("/// Desktop Settings sidebar tab descriptor (`registry/settings.json`).");
@@ -757,6 +775,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let group: String");
   lines.push("  let paletteSlot: Int?");
   lines.push("  let featureId: String");
+  lines.push("  /// The tab shows on `platform` when its capability ships (ADR 0015).");
+  lines.push("  func applies(to platform: String) -> Bool { RegistryCapabilities.isAvailable(featureId, on: platform) }");
   lines.push("}");
   lines.push("");
   lines.push("/// Choice option descriptor for enum/bounded settings (`registry/settings.json`).");
@@ -780,8 +800,10 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let desktopInline: Bool");
   lines.push("  let visibility: String");
   lines.push("  let platforms: [String]?");
+  lines.push("  let featureId: String?");
   lines.push("  var id: String { \"\\(kind):\\(key ?? page ?? surface ?? label ?? \"item\")\" }");
-  lines.push("  func applies(to platform: String) -> Bool { platforms?.contains(platform) ?? true }");
+  lines.push("  /// The item shows on `platform`: listed there and its capability ships (ADR 0015).");
+  lines.push("  func applies(to platform: String) -> Bool { (platforms?.contains(platform) ?? true) && featureId.map { RegistryCapabilities.isAvailable($0, on: platform) } != false }");
   lines.push("}");
   lines.push("");
   lines.push("/// One root-level group in mobile Settings (`registry/settings.json`).");
@@ -813,7 +835,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let platforms: [String]?");
   lines.push("  let featureId: String");
   lines.push("  let sections: [RegistrySettingsSection]");
-  lines.push("  func applies(to platform: String) -> Bool { platforms?.contains(platform) ?? true }");
+  lines.push("  /// The page shows on `platform`: listed there and its capability ships (ADR 0015).");
+  lines.push("  func applies(to platform: String) -> Bool { (platforms?.contains(platform) ?? true) && RegistryCapabilities.isAvailable(featureId, on: platform) }");
   lines.push("}");
   lines.push("");
   lines.push("/// Unified task-app settings keys, defaults, synced-key list, and taxonomy (`registry/settings.json`).");
@@ -867,7 +890,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const grp of settings.rootGroups) {
     lines.push(`    RegistrySettingsGroup(id: ${swiftStr(grp.id)}, header: ${LOpt(grp.header, grp, "header")}, mobilePresentation: ${swiftStr(grp.mobilePresentation)}, desktopTab: ${optStr(grp.desktopTab)}, items: [`);
     for (const item of grp.items) {
-      lines.push(`      ${emitItem(item)},`);
+      lines.push(`      ${emitItem(item, null)},`);
     }
     lines.push("    ]),");
   }
@@ -879,7 +902,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     for (const sec of page.sections) {
       lines.push(`      RegistrySettingsSection(id: ${swiftStr(sec.id)}, header: ${LOpt(sec.header, sec, "header")}, footer: ${LOpt(sec.footer, sec, "footer")}, platforms: ${optArr(sec.platforms)}, items: [`);
       for (const item of sec.items) {
-        lines.push(`        ${emitItem(item)},`);
+        lines.push(`        ${emitItem(item, page)},`);
       }
       lines.push("      ]),");
     }
@@ -918,6 +941,9 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let shortcutKeycaps: [String]?");
   lines.push("  let emptyTitle: String");
   lines.push("  let emptyDetail: String");
+  lines.push("  let featureId: String");
+  lines.push("  /// The list shows on `platform` when its capability ships (ADR 0015).");
+  lines.push("  func applies(to platform: String) -> Bool { RegistryCapabilities.isAvailable(featureId, on: platform) }");
   lines.push("}");
   lines.push("");
   lines.push("/// One ordered section of a grouped smart list (`groups` in destinations.json).");
@@ -939,7 +965,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const d of dests.destinations) {
     const capsList = d.shortcut ? `[${appleKeycaps(d.shortcut).map(swiftStr).join(", ")}]` : "nil";
     lines.push(
-      `    RegistryDestination(id: ${swiftStr(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, visibility: ${swiftStr(d.visibility)}, canHide: ${d.canHide ? "true" : "false"}, shortcutKeycaps: ${capsList}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}),`
+      `    RegistryDestination(id: ${swiftStr(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, visibility: ${swiftStr(d.visibility)}, canHide: ${d.canHide ? "true" : "false"}, shortcutKeycaps: ${capsList}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}, featureId: ${swiftStr(d.featureId)}),`
     );
   }
   lines.push("  ]");
@@ -994,6 +1020,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let excludeDestinations: [String]");
   lines.push("  let onlyDestinations: [String]");
   lines.push("  let requiresRecurrence: Bool");
+  lines.push("  /// The action's capability (`featureId`); a menu hides it where it does not ship.");
+  lines.push("  let featureId: String");
   lines.push("}");
   lines.push("");
   lines.push("/// One item in a context menu or menu-bar menu (`registry/actions.json`).");
@@ -1075,7 +1103,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const [id, a] of Object.entries(actions.actions)) {
     const av = a.availability ?? {};
     const arr = (v) => `[${(v ?? []).map(swiftStr).join(", ")}]`;
-    lines.push(`    ${swiftStr(id)}: RegistryActionAvailability(selection: ${swiftStr(av.selection ?? "any")}, platforms: ${arr(av.platforms)}, excludeDestinations: ${arr(av.excludeDestinations)}, onlyDestinations: ${arr(av.onlyDestinations)}, requiresRecurrence: ${av.requiresRecurrence === true}),`);
+    lines.push(`    ${swiftStr(id)}: RegistryActionAvailability(selection: ${swiftStr(av.selection ?? "any")}, platforms: ${arr(av.platforms)}, excludeDestinations: ${arr(av.excludeDestinations)}, onlyDestinations: ${arr(av.onlyDestinations)}, requiresRecurrence: ${av.requiresRecurrence === true}, featureId: ${swiftStr(a.featureId)}),`);
   }
   lines.push("  ]");
   lines.push("");
@@ -1257,7 +1285,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
 
   lines.push("/// Snackbar copy (`registry/surfaces.json` `toasts`).");
   lines.push("enum RegistryToasts {");
-  lines.push(`  static let durationSeconds: Double = ${surfaces.toasts.durationSeconds}`);
+  lines.push("  /// How long a snackbar stays (`registry/rules.json` `toastDurationSeconds`).");
+  lines.push("  static let durationSeconds: Double = Double(RegistryRules.toastDurationSeconds)");
   for (const [id, t] of Object.entries(surfaces.toasts.templates)) {
     const tmpl = L10N.swiftTemplate(BY_KEY, tmplKey(t.format, t, "format"));
     if (t.emptyTitleFormat !== undefined) {
@@ -1286,18 +1315,21 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  /// Pill text while the attribute's work runs (Discuss).");
   lines.push("  let workingLabel: String?");
   lines.push("  var isPill: Bool { surfaceTier == \"inline\" || surfaceTier == \"popover\" }");
+  lines.push("  /// The attribute shows on `platform` when its capability ships (ADR 0015).");
+  lines.push("  func applies(to platform: String) -> Bool { RegistryCapabilities.isAvailable(featureId, on: platform) }");
   lines.push("}");
   lines.push("");
   lines.push("enum RegistrySurfaces {");
-  lines.push(`  static let taskAttributeOrder: [String] = [${surfaces.taskAttributes.map((a) => swiftStr(a.id)).join(", ")}]`);
   lines.push("  static let taskAttributes: [RegistryTaskAttribute] = [");
   for (const a of surfaces.taskAttributes) {
     lines.push(`    RegistryTaskAttribute(id: ${swiftStr(a.id)}, label: ${L(a.label, a, "label")}, iconId: ${swiftStr(a.icon)}, sfSymbol: ${swiftStr(icons.icons[a.icon].sfSymbol)}, commitContract: ${swiftStr(a.commitContract)}, surfaceTier: ${swiftStr(a.surfaceTier)}, featureId: ${swiftStr(a.featureId)}, editOnly: ${a.editOnly === true}, workingLabel: ${LOpt(a.workingLabel, a, "workingLabel")}),`);
   }
   lines.push("  ]");
-  lines.push("  /// The pills, in rail order (every attribute except fields and chips).");
-  lines.push("  static let taskAttributePills: [RegistryTaskAttribute] = taskAttributes.filter(\\.isPill)");
-  lines.push("  static let taskAttributeLabels: [String: String] = Dictionary(uniqueKeysWithValues: taskAttributes.map { ($0.id, $0.label) })");
+  lines.push("  /// The pills that show on `platform`, in rail order (every attribute except");
+  lines.push("  /// fields and chips, whose capability ships there).");
+  lines.push("  static func taskAttributePills(on platform: String) -> [RegistryTaskAttribute] {");
+  lines.push("    taskAttributes.filter { $0.isPill && $0.applies(to: platform) }");
+  lines.push("  }");
   lines.push("  /// The attribute with `id`. Traps on an unknown id: the ids are a closed set.");
   lines.push("  static func taskAttribute(_ id: String) -> RegistryTaskAttribute {");
   lines.push("    guard let a = taskAttributes.first(where: { $0.id == id }) else { preconditionFailure(\"unknown task attribute \\(id)\") }");
@@ -1491,8 +1523,18 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   }
   lines.push("  ]");
   lines.push("");
-  lines.push("  static func isShipped(_ featureId: String, on platform: String) -> Bool {");
-  lines.push('    byPlatform[platform]?[featureId] == "ships"');
+  lines.push("  /// `ships`, `partial`, `planned` or `not_applicable`; nil for an unknown platform or ID.");
+  lines.push("  static func status(_ featureId: String, on platform: String) -> String? {");
+  lines.push("    byPlatform[platform]?[featureId]");
+  lines.push("  }");
+  lines.push("");
+  lines.push("  /// A surface for `featureId` renders on `platform` only when it ships there");
+  lines.push("  /// (fully or partly). Planned and not-applicable features show no dead UI (ADR 0015).");
+  lines.push("  static func isAvailable(_ featureId: String, on platform: String) -> Bool {");
+  lines.push("    switch status(featureId, on: platform) {");
+  lines.push('    case "ships", "partial": return true');
+  lines.push("    default: return false");
+  lines.push("    }");
   lines.push("  }");
   lines.push("}");
   lines.push("");
@@ -1890,6 +1932,11 @@ for (const [lang, rep] of Object.entries(l10nReport)) {
 }
 
 if (CHECK) {
+  // Every generated member needs a reader (ADR 0020 P3).
+  const { problems } = checkReaders(REPO);
+  if (problems.length) {
+    throw new Error(`generated registry code without a reader:\n  ${problems.join("\n  ")}`);
+  }
   console.log("registries: ok (all 10 registries valid and generated files up to date)");
 } else if (changed === 0) {
   console.log("registries: already up to date");

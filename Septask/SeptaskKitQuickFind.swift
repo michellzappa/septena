@@ -41,8 +41,8 @@ final class SeptaskKitQuickFind {
     var subtitle: String {
       switch self {
       case .task(_, let subtitle): return subtitle
-      case .project: return String(localized: "Project", comment: "SeptaskKit: quick find kind")
-      case .area: return String(localized: "Area", comment: "SeptaskKit: quick find kind")
+      case .project: return TaskFilter.project("").title
+      case .area: return TaskFilter.area("").title
       case .list: return String(localized: "List", comment: "SeptaskKit: quick find kind")
       }
     }
@@ -135,8 +135,8 @@ final class SeptaskKitQuickFind {
       let home = task.project.flatMap { projectTitles[$0] }
         ?? task.area.flatMap { areaTitles[$0] }
         ?? (task.isOnToday || task.isInTriageBand
-            ? String(localized: "Today", comment: "Smart list title")
-            : String(localized: "Anytime", comment: "Smart list title"))
+            ? TaskFilter.today.title
+            : TaskFilter.unscheduled.title)
       let state = task.status == .open
         ? home
         : String(localized: "\(home) · Completed",
@@ -177,8 +177,8 @@ final class SeptaskKitQuickFind {
       let home = task.project.flatMap { projectTitles[$0] }
         ?? task.area.flatMap { areaTitles[$0] }
         ?? (task.isOnToday || task.isInTriageBand
-            ? String(localized: "Today", comment: "Smart list title")
-            : String(localized: "Anytime", comment: "Smart list title"))
+            ? TaskFilter.today.title
+            : TaskFilter.unscheduled.title)
       let base = names.isEmpty ? home : "\(names) · \(home)"
       let state = task.status == .open
         ? base

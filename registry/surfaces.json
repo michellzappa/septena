@@ -191,7 +191,6 @@
     "error": { "title": "Error", "confirmTitle": "OK" }
   },
   "toasts": {
-    "durationSeconds": 7,
     "templates": {
       "deferred": { "format": "Deferred to {date}", "undoable": false },
       "moved": { "format": "Moved to {destination}", "undoable": true },

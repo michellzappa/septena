@@ -543,12 +543,12 @@ struct SidebarRootView: View {
       showingNewArea = true
       newAreaName = ""
     } label: {
-      Label("New Area", systemImage: "square.stack.3d.up")
+      Label(RegistryActions.title("sidebar.newArea"), systemImage: "square.stack.3d.up")
     }
     Button {
       showingNewProject = true
     } label: {
-      Label("New Project", systemImage: "number")
+      Label(RegistryActions.title("sidebar.newProject"), systemImage: "number")
     }
     #if SEPTASK
     Divider()
@@ -1813,8 +1813,8 @@ private struct SidebarSheets: ViewModifier {
     content
       .confirmationDialog("Create", isPresented: $showingCreateMenu, titleVisibility: .hidden) {
         Button("New To-Do")   { onNewTodo() }
-        Button("New Project") { showingNewProject = true }
-        Button("New Area")    { newAreaName = ""; showingNewArea = true }
+        Button(RegistryActions.title("sidebar.newProject")) { showingNewProject = true }
+        Button(RegistryActions.title("sidebar.newArea"))    { newAreaName = ""; showingNewArea = true }
         Button(RegistryPrompts.cancelTitle, role: .cancel) {}
       }
       .sheet(isPresented: $showingNewProject, onDismiss: { newProjectInArea = nil }) {

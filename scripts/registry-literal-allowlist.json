@@ -1,0 +1,395 @@
+{
+  "description": "Known registry-owned literals in shared shell files (scripts/lint-registry-literals.py). Each entry names why it is still a literal and the issue that removes it. An entry that no longer matches fails the lint, so this list only shrinks.",
+  "entries": [
+    {
+      "file": "Septask/SeptaskKitComposer.swift",
+      "literal": "Today",
+      "reason": "Relative date or quick pick; the registry has no datePickers block yet.",
+      "issue": "#218"
+    },
+    {
+      "file": "Septask/SeptaskKitDatePopover.swift",
+      "literal": "Today",
+      "reason": "Relative date or quick pick; the registry has no datePickers block yet.",
+      "issue": "#218"
+    },
+    {
+      "file": "Septask/SeptaskKitTaskList.swift",
+      "literal": "Today",
+      "reason": "Relative date or quick pick; the registry has no datePickers block yet.",
+      "issue": "#218"
+    },
+    {
+      "file": "Septena/Shell/Tasks/AddTaskPage.swift",
+      "literal": "Today",
+      "reason": "Relative date or quick pick; the registry has no datePickers block yet.",
+      "issue": "#218"
+    },
+    {
+      "file": "Septena/Shell/Tasks/RemindersInboxSection.swift",
+      "literal": "Today",
+      "reason": "Relative date or quick pick; the registry has no datePickers block yet.",
+      "issue": "#218"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskAttributeBar.swift",
+      "literal": "Today",
+      "reason": "Relative date or quick pick; the registry has no datePickers block yet.",
+      "issue": "#218"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskComponents.swift",
+      "literal": "Today",
+      "reason": "Relative date or quick pick; the registry has no datePickers block yet.",
+      "issue": "#218"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskDraft.swift",
+      "literal": "Today",
+      "reason": "Relative date or quick pick; the registry has no datePickers block yet.",
+      "issue": "#218"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
+      "literal": "Repeat",
+      "reason": "Repeat editor copy; belongs to the datePickers block.",
+      "issue": "#218"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TasksQuickAddMenu.swift",
+      "literal": "Today",
+      "reason": "Relative date or quick pick; the registry has no datePickers block yet.",
+      "issue": "#218"
+    },
+    {
+      "file": "Septask/SeptaskApp.swift",
+      "literal": "Septena",
+      "reason": "App name in a window title.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskClaudePairingPane.swift",
+      "literal": "Connect Claude",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskDataTransfer.swift",
+      "literal": "Attachments",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskDataTransfer.swift",
+      "literal": "On this device",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskDataTransfer.swift",
+      "literal": "Review",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskKitComposer.swift",
+      "literal": "Move Down",
+      "reason": "Checklist or tag picker copy; actions.json has no checklist or tag-picker actions yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskKitComposer.swift",
+      "literal": "Move Up",
+      "reason": "Checklist or tag picker copy; actions.json has no checklist or tag-picker actions yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskKitFirstRun.swift",
+      "literal": "Septena",
+      "reason": "App name in a window title.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskKitQuickFind.swift",
+      "literal": "List",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskKitTaskList.swift",
+      "literal": "Lists",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskKitWindow.swift",
+      "literal": "Septena",
+      "reason": "App name in a window title.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskNavigationCommands.swift",
+      "literal": "Check for Updates…",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskNavigationCommands.swift",
+      "literal": "Task",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskSettingsView.swift",
+      "literal": "Live",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskSettingsView.swift",
+      "literal": "Off",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskSettingsView.swift",
+      "literal": "On this device",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskSettingsView.swift",
+      "literal": "Smart Lists",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskSignIn.swift",
+      "literal": "Live",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/TasksSkillPane.swift",
+      "literal": "MCP Skills",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Settings/AISettingsPane.swift",
+      "literal": "Off",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Sidebar/AreasProjectsView.swift",
+      "literal": "Area",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Sidebar/AreasProjectsView.swift",
+      "literal": "Move to Area",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Sidebar/AreasProjectsView.swift",
+      "literal": "Project",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Sidebar/SidebarView.swift",
+      "literal": "Area",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Sidebar/SidebarView.swift",
+      "literal": "Create",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Sidebar/SidebarView.swift",
+      "literal": "New To-Do",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/ConversationCard.swift",
+      "literal": "How AI helps with your tasks",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/ImportFlowView.swift",
+      "literal": "File",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/ImportFlowView.swift",
+      "literal": "Planned",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/ImportFlowView.swift",
+      "literal": "Reminders",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/ImportFlowView.swift",
+      "literal": "Tags",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/RemindersInboxSection.swift",
+      "literal": "From Reminders",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskA11y.swift",
+      "literal": "Task",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskAttributeBar.swift",
+      "literal": "Move Down",
+      "reason": "Checklist or tag picker copy; actions.json has no checklist or tag-picker actions yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskAttributeBar.swift",
+      "literal": "Move Up",
+      "reason": "Checklist or tag picker copy; actions.json has no checklist or tag-picker actions yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskFadeSweepSheet.swift",
+      "literal": "Not now",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskListChrome.swift",
+      "literal": "Task",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskListView.swift",
+      "literal": "Complete",
+      "reason": "iOS bulk toolbar or swipe title with no registry action title yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskListView.swift",
+      "literal": "Dismiss",
+      "reason": "iOS bulk toolbar or swipe title with no registry action title yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskListView.swift",
+      "literal": "Inbox",
+      "reason": "iOS bulk toolbar or swipe title with no registry action title yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
+      "literal": "Rename",
+      "reason": "Checklist or tag picker copy; actions.json has no checklist or tag-picker actions yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
+      "literal": "Tags",
+      "reason": "Checklist or tag picker copy; actions.json has no checklist or tag-picker actions yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskRowActions.swift",
+      "literal": "Dismiss",
+      "reason": "iOS bulk toolbar or swipe title with no registry action title yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/AppearancePickerView.swift",
+      "literal": "Accent",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/AppearancePickerView.swift",
+      "literal": "Appearance",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/AppearancePickerView.swift",
+      "literal": "Balanced",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/KeyboardShortcutsView.swift",
+      "literal": "General",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/KeyboardShortcutsView.swift",
+      "literal": "Task list",
+      "reason": "Placeholder, section title or label with no registry field yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/ProfileAvatar.swift",
+      "literal": "Free",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/SeptenaPage.swift",
+      "literal": "Today",
+      "reason": "Septena Life tab label.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/TextSizeScale.swift",
+      "literal": "Large",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/TextSizeScale.swift",
+      "literal": "Largest",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/TextSizeScale.swift",
+      "literal": "Medium",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/TextSizeScale.swift",
+      "literal": "Small",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/TextSizeScale.swift",
+      "literal": "Smallest",
+      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    }
+  ]
+}

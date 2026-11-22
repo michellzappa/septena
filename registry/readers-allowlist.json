@@ -1,0 +1,87 @@
+{
+  "description": "Generated registry members with no reader yet (scripts/registry-readers.mjs, run by gen-registries --check). Each entry names why and the issue that removes it. An entry that gains a reader fails the check, so this list only shrinks.",
+  "swift": {
+    "RegistryEntityEnums.taskStatus": {
+      "reason": "Swift model enums (TaskStatus, ...) are hand-written; nothing compares them with the registry yet.",
+      "issue": "#259"
+    },
+    "RegistryEntityEnums.taskSource": {
+      "reason": "Swift model enums (TaskStatus, ...) are hand-written; nothing compares them with the registry yet.",
+      "issue": "#259"
+    },
+    "RegistryEntityEnums.projectStatus": {
+      "reason": "Swift model enums (TaskStatus, ...) are hand-written; nothing compares them with the registry yet.",
+      "issue": "#259"
+    },
+    "RegistryEntityEnums.taskKind": {
+      "reason": "Swift model enums (TaskStatus, ...) are hand-written; nothing compares them with the registry yet.",
+      "issue": "#259"
+    },
+    "RegistryEntityEnums.convoAssignee": {
+      "reason": "Swift model enums (TaskStatus, ...) are hand-written; nothing compares them with the registry yet.",
+      "issue": "#259"
+    },
+    "RegistryEntityEnums.convoEndState": {
+      "reason": "Swift model enums (TaskStatus, ...) are hand-written; nothing compares them with the registry yet.",
+      "issue": "#259"
+    },
+    "RegistryEntityEnums.convoHandoffActionType": {
+      "reason": "Swift model enums (TaskStatus, ...) are hand-written; nothing compares them with the registry yet.",
+      "issue": "#259"
+    },
+    "RegistryEntityEnums.convoTurnRole": {
+      "reason": "Swift model enums (TaskStatus, ...) are hand-written; nothing compares them with the registry yet.",
+      "issue": "#259"
+    },
+    "RegistryEntityEnums.convoTurnStep": {
+      "reason": "Swift model enums (TaskStatus, ...) are hand-written; nothing compares them with the registry yet.",
+      "issue": "#259"
+    },
+    "RegistryEntityEnums.entityNames": {
+      "reason": "Swift model enums (TaskStatus, ...) are hand-written; nothing compares them with the registry yet.",
+      "issue": "#259"
+    },
+    "RegistryEntityEnums.deletableEntities": {
+      "reason": "Swift model enums (TaskStatus, ...) are hand-written; nothing compares them with the registry yet.",
+      "issue": "#259"
+    },
+    "RegistryPlans.trialDays": {
+      "reason": "The reverse trial is not built; the Plus pane shows trial copy only.",
+      "issue": "#46"
+    },
+    "RegistryPlans.cards": {
+      "reason": "Plan cards render in the paywall, which is not built.",
+      "issue": "#46"
+    },
+    "RegistryPlans.upsell": {
+      "reason": "Upsell moments show in the paywall flows, which are not built.",
+      "issue": "#46"
+    }
+  },
+  "ts": {
+    "PLAN_TRIAL_DAYS": {
+      "reason": "The server has no trial plan yet (entitlement.ts).",
+      "issue": "#46"
+    },
+    "PLAN_PRODUCTS": {
+      "reason": "The server accepts any product under the sync prefix; the StoreKit work narrows it to these IDs.",
+      "issue": "#46"
+    },
+    "GENERIC_EMPTY_STATE": {
+      "reason": "For the web client's list views.",
+      "issue": "#21"
+    },
+    "FIRST_RUN": {
+      "reason": "For the web client's first run.",
+      "issue": "#21"
+    },
+    "REGISTRY_LANGUAGES": {
+      "reason": "For the web client's localized copy.",
+      "issue": "#21"
+    },
+    "registryText": {
+      "reason": "For the web client's localized copy.",
+      "issue": "#21"
+    }
+  }
+}

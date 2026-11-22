@@ -108,7 +108,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   ]
   /// The pills in registry rail order.
   private var orderedPills: [KitPillButton] {
-    RegistrySurfaces.taskAttributePills.compactMap { pillsByID[$0.id] }
+    RegistrySurfaces.taskAttributePills(on: RegistryPlatform.current).compactMap { pillsByID[$0.id] }
   }
 
   private var leadingConstraint: NSLayoutConstraint!
@@ -270,7 +270,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     pastePill.isHidden = true
     pastePill.onPress = { [weak self] _ in self?.pasteFromClipboard() }
     pillRow.addArrangedSubview(pastePill)
-    for attribute in RegistrySurfaces.taskAttributePills {
+    for attribute in RegistrySurfaces.taskAttributePills(on: RegistryPlatform.current) {
       guard let pill = pillsByID[attribute.id] else { continue }
       pill.attribute = attribute
       pillRow.addArrangedSubview(pill)

@@ -203,7 +203,7 @@ final class SeptenaServices {
     let day = SeptenaDate.format(Date()) ?? ""
     guard lastExpiredPurgeDay != day else { return }
     lastExpiredPurgeDay = day
-    let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+    let cutoff = Calendar.current.date(byAdding: .day, value: -RegistryRules.recentlyDeletedDays, to: Date()) ?? Date()
     taskMutator.purgeExpired(before: cutoff)
   }
 

@@ -15,7 +15,7 @@ import {
 } from "./columns.js";
 import type { Op, OpResult, PullResult, PushResult, Turn } from "./ops.js";
 import type { EntitlementRow } from "../entitlement/entitlement.js";
-import { DOMAIN_RULES, ENTITY_LIMITS } from "../generated/registries.js";
+import { DOMAIN_RULES, ENTITY_LIMITS, TURN_FIELDS } from "../generated/registries.js";
 
 /// Per changed field: [before, after]. `null` means absent / cleared.
 export type ChangeDiff = Record<string, [unknown, unknown]>;
@@ -150,10 +150,8 @@ const CHANGE_LOG_TTL_MS = DOMAIN_RULES.changeLogTtlDays * DAY_MS;
 const MAX_PULL = ENTITY_LIMITS.maxPull;
 const PAIR_FAIL_WINDOW_MS = 10 * 60 * 1000;
 
-const TURN_COLUMNS = [
-  "role", "step", "provider", "confidence", "question", "options",
-  "chosen", "otherText", "inReplyTo", "note", "ts",
-] as const;
+/// The turns table's columns, in the registry's order (`registry/entities.json` `turnFields`).
+const TURN_COLUMNS = TURN_FIELDS;
 
 /// A decoded row as it crosses the RPC boundary: JSON values only.
 export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };

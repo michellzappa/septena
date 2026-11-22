@@ -188,9 +188,9 @@ struct SeptaskSettingsView: View {
   #if os(macOS)
   @ViewBuilder
   private var macSidebarContent: some View {
-    let identityTabs = RegistrySettings.desktopTabs.filter { $0.group == "identity" }
-    let mainTabs = RegistrySettings.desktopTabs.filter { $0.group == "main" }
-    let aboutTabs = RegistrySettings.desktopTabs.filter { $0.group == "about" }
+    let identityTabs = RegistrySettings.desktopTabs.filter { $0.group == "identity" && $0.applies(to: "macos") }
+    let mainTabs = RegistrySettings.desktopTabs.filter { $0.group == "main" && $0.applies(to: "macos") }
+    let aboutTabs = RegistrySettings.desktopTabs.filter { $0.group == "about" && $0.applies(to: "macos") }
 
     if !identityTabs.isEmpty {
       Section {
@@ -269,7 +269,7 @@ struct SeptaskSettingsView: View {
         }
       }
       .formStyle(.grouped)
-      .navigationTitle(RegistrySettings.tabById[tabID]?.title ?? "AI & Agents")
+      .navigationTitle(RegistrySettings.tabById[tabID]?.title ?? tabID)
     default:
       Form {
         let groups = RegistrySettings.rootGroups.filter { $0.desktopTab == tabID }

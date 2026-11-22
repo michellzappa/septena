@@ -13,6 +13,7 @@ import {
   rpcResult,
   unauthorized,
 } from "../rpc.js";
+import { TURN_FIELDS } from "../generated/registries.js";
 import { zId } from "../store/columns.js";
 import type { Row } from "../store/TaskStore.js";
 import { isValidTz, todayYMD } from "../tz.js";
@@ -611,8 +612,7 @@ function agentState(row: Row | null) {
 
 function turnOut(r: Row): ConvoTurn {
   const t: Record<string, unknown> = {};
-  for (const k of ["seq", "role", "step", "provider", "confidence", "question", "options",
-    "chosen", "otherText", "inReplyTo", "note", "ts"]) {
+  for (const k of ["seq", ...TURN_FIELDS]) {
     if (r[k] !== undefined && r[k] !== null) t[k] = r[k];
   }
   return t as unknown as ConvoTurn;

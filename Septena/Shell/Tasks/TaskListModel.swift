@@ -175,7 +175,7 @@ final class TaskListModel {
     }
     calendarEvents = filter == .today
       ? CalendarBridge.shared.remainingTodayEvents()
-      : CalendarBridge.shared.upcomingEvents(days: 30)
+      : CalendarBridge.shared.upcomingEvents(days: RegistryRules.upcomingCalendarDays)
   }
 
   // MARK: - Filing suggestions

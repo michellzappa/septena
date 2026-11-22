@@ -52,7 +52,7 @@ public enum TaskDropReason {
 /// stops glowing even if never explicitly acknowledged.
 public enum AgentCue {
   /// How long after `createdAt` an unacknowledged agent row keeps glowing.
-  public static let decayWindow: TimeInterval = 7 * 24 * 60 * 60   // 7 days
+  public static let decayWindow: TimeInterval = TimeInterval(RegistryRules.cueDecayDays) * 24 * 60 * 60
 }
 
 struct SeptenaTask: Identifiable, Codable, Hashable {

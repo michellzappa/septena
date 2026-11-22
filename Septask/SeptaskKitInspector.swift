@@ -433,11 +433,11 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// same-task or not, since nothing here is a live text edit in progress.
   private func refreshReadOnlyFields(_ next: SeptenaTask) {
     let whenBase: String = if next.today {
-      String(localized: "Today", comment: "Smart list title")
+      TaskFilter.today.title
     } else if let scheduled = next.scheduled {
       KitDayFormat.display(scheduled)
     } else {
-      String(localized: "Anytime", comment: "Smart list title")
+      TaskFilter.unscheduled.title
     }
     let when = next.timeSlotLabel.map { "\(whenBase) · \($0)" } ?? whenBase
     whenButton.title = Self.field("when", when)
@@ -694,8 +694,8 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     mutator.setStarred(id: current.id, starred: nextStarred)
     TaskUndo.recordScheduleChange(
       name: nextStarred
-        ? String(localized: "Star", comment: "SeptaskKit: undo action")
-        : String(localized: "Remove Star", comment: "SeptaskKit: undo action"),
+        ? RegistryActions.title("task.toggleStar", .add)
+        : RegistryActions.title("task.toggleStar", .remove),
       before: before, context: context, mutator: mutator)
     NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     refresh()

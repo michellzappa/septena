@@ -395,18 +395,18 @@ private struct MagicPlusOrb: View {
         onNewTask()
       }
       if isViewingProject {
-        menuRow(title: "New Section", icon: "rectangle.split.1x2") {
+        menuRow(title: RegistryActions.title("section.new"), icon: "rectangle.split.1x2") {
           showingMenu = false
           onNewSection()
         }
       }
       Divider()
         .padding(.vertical, 4)
-      menuRow(title: "New Project", icon: "number") {
+      menuRow(title: RegistryActions.title("sidebar.newProject"), icon: "number") {
         showingMenu = false
         onNewProject()
       }
-      menuRow(title: "New Area", icon: "square.stack.3d.up") {
+      menuRow(title: RegistryActions.title("sidebar.newArea"), icon: "square.stack.3d.up") {
         showingMenu = false
         onNewArea()
       }

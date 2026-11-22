@@ -34,10 +34,8 @@ enum RegistryL10n {
 enum RegistryEntityLimits {
   static let textMax: Int = 2000
   static let notesMax: Int = 100000
-  static let attachmentPointerMax: Int = 4000
   static let stampMax: Int = 40
   static let maxAttachmentBytes: Int64 = 26214400
-  static let maxUserAttachmentBytes: Int64 = 2147483648
   static let maxOpsPerPush: Int = 500
   static let maxPull: Int = 1000
   static let maxChecklistItemsPerTask: Int = 200
@@ -59,7 +57,6 @@ enum RegistryEntityPatterns {
   static let id = "^[A-Za-z0-9._:-]{1,128}$"
   static let clientOpId = "^[A-Za-z0-9_-]{8,64}$"
   static let day = "^\\d{4}-\\d{2}-\\d{2}$"
-  static let time24 = "^([01]\\d|2[0-3]):[0-5]\\d$"
   static let stamp = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}"
 }
 
@@ -102,12 +99,6 @@ enum RegistryRules {
   static let recentlyDeletedDays: Int = 30
   static let upcomingCalendarDays: Int = 30
   static let toastDurationSeconds: Int = 7
-  static let agentRunBudget: Int = 5
-  static let claimTtlDefaultSeconds: Int = 1800
-  static let claimTtlMaxSeconds: Int = 14400
-  static let tombstoneTtlDays: Int = 90
-  static let clientOpTtlDays: Int = 30
-  static let changeLogTtlDays: Int = 365
   static let deleteGraceSeconds: Int = 120
 }
 
@@ -308,6 +299,8 @@ struct RegistrySettingsTab: Sendable, Hashable, Identifiable {
   let group: String
   let paletteSlot: Int?
   let featureId: String
+  /// The tab shows on `platform` when its capability ships (ADR 0015).
+  func applies(to platform: String) -> Bool { RegistryCapabilities.isAvailable(featureId, on: platform) }
 }
 
 /// Choice option descriptor for enum/bounded settings (`registry/settings.json`).
@@ -331,8 +324,10 @@ struct RegistrySettingsItem: Sendable, Hashable, Identifiable {
   let desktopInline: Bool
   let visibility: String
   let platforms: [String]?
+  let featureId: String?
   var id: String { "\(kind):\(key ?? page ?? surface ?? label ?? "item")" }
-  func applies(to platform: String) -> Bool { platforms?.contains(platform) ?? true }
+  /// The item shows on `platform`: listed there and its capability ships (ADR 0015).
+  func applies(to platform: String) -> Bool { (platforms?.contains(platform) ?? true) && featureId.map { RegistryCapabilities.isAvailable($0, on: platform) } != false }
 }
 
 /// One root-level group in mobile Settings (`registry/settings.json`).
@@ -364,7 +359,8 @@ struct RegistrySettingsPage: Sendable, Hashable, Identifiable {
   let platforms: [String]?
   let featureId: String
   let sections: [RegistrySettingsSection]
-  func applies(to platform: String) -> Bool { platforms?.contains(platform) ?? true }
+  /// The page shows on `platform`: listed there and its capability ships (ADR 0015).
+  func applies(to platform: String) -> Bool { (platforms?.contains(platform) ?? true) && RegistryCapabilities.isAvailable(featureId, on: platform) }
 }
 
 /// Unified task-app settings keys, defaults, synced-key list, and taxonomy (`registry/settings.json`).
@@ -477,142 +473,142 @@ enum RegistrySettings {
 
   static let rootGroups: [RegistrySettingsGroup] = [
     RegistrySettingsGroup(id: "account_root", header: nil, mobilePresentation: "card", desktopTab: "account", items: [
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "account", surface: "account_profile_card", label: RegistryL10n.t("Account"), detail: nil, iconId: "settings.account", sfSymbol: "person.crop.circle", statusKey: "syncStatus", desktopInline: false, visibility: "always", platforms: nil),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "account", surface: "account_profile_card", label: RegistryL10n.t("Account"), detail: nil, iconId: "settings.account", sfSymbol: "person.crop.circle", statusKey: "syncStatus", desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
     ]),
     RegistrySettingsGroup(id: "ai_agents_root", header: RegistryL10n.t("AI & Agents"), mobilePresentation: "inline", desktopTab: "ai_agents", items: [
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "claude_pairing", surface: nil, label: RegistryL10n.t("Connect Claude"), detail: nil, iconId: "settings.claude", sfSymbol: "bubble.left.and.text.bubble.right", statusKey: "claudeStatus", desktopInline: true, visibility: "always", platforms: nil),
-      RegistrySettingsItem(kind: "setting", key: "agentsPaused", page: nil, surface: nil, label: RegistryL10n.t("Pause all agents"), detail: RegistryL10n.t("No agent can claim or work on a task while paused."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "signedIn", platforms: nil),
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "ai_preferences", surface: nil, label: RegistryL10n.t("AI Preferences"), detail: nil, iconId: "settings.ai_agents", sfSymbol: "sparkles", statusKey: "aiMode", desktopInline: true, visibility: "always", platforms: nil),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "claude_pairing", surface: nil, label: RegistryL10n.t("Connect Claude"), detail: nil, iconId: "settings.claude", sfSymbol: "bubble.left.and.text.bubble.right", statusKey: "claudeStatus", desktopInline: true, visibility: "always", platforms: nil, featureId: "agents.connector"),
+      RegistrySettingsItem(kind: "setting", key: "agentsPaused", page: nil, surface: nil, label: RegistryL10n.t("Pause all agents"), detail: RegistryL10n.t("No agent can claim or work on a task while paused."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "signedIn", platforms: nil, featureId: "agents.stop-pause"),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "ai_preferences", surface: nil, label: RegistryL10n.t("AI Preferences"), detail: nil, iconId: "settings.ai_agents", sfSymbol: "sparkles", statusKey: "aiMode", desktopInline: true, visibility: "always", platforms: nil, featureId: "ai.reach-dial"),
     ]),
     RegistrySettingsGroup(id: "connections_data_root", header: RegistryL10n.t("Connections & Data"), mobilePresentation: "inline", desktopTab: "connections_data", items: [
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "calendar", surface: nil, label: RegistryL10n.t("Calendar"), detail: nil, iconId: "settings.calendar", sfSymbol: "calendar", statusKey: "calendarStatus", desktopInline: false, visibility: "always", platforms: nil),
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "reminders", surface: nil, label: RegistryL10n.t("Reminders"), detail: nil, iconId: "settings.reminders", sfSymbol: "checklist", statusKey: "remindersStatus", desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"]),
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "import_export", surface: nil, label: RegistryL10n.t("Import & Export"), detail: nil, iconId: "settings.data", sfSymbol: "square.and.arrow.up", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "calendar", surface: nil, label: RegistryL10n.t("Calendar"), detail: nil, iconId: "settings.calendar", sfSymbol: "calendar", statusKey: "calendarStatus", desktopInline: false, visibility: "always", platforms: nil, featureId: "calendar.events"),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "reminders", surface: nil, label: RegistryL10n.t("Reminders"), detail: nil, iconId: "settings.reminders", sfSymbol: "checklist", statusKey: "remindersStatus", desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "import.reminders"),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "import_export", surface: nil, label: RegistryL10n.t("Import & Export"), detail: nil, iconId: "settings.data", sfSymbol: "square.and.arrow.up", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
     ]),
     RegistrySettingsGroup(id: "lists_root", header: RegistryL10n.t("Lists"), mobilePresentation: "inline", desktopTab: "general", items: [
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "smart_lists", surface: nil, label: RegistryL10n.t("Smart Lists"), detail: nil, iconId: "list.today", sfSymbol: "sun.max.fill", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-      RegistrySettingsItem(kind: "setting", key: "todayGroupByList", page: nil, surface: nil, label: RegistryL10n.t("Group Today by list"), detail: RegistryL10n.t("When off, tasks appear in one list with their project or area underneath."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-      RegistrySettingsItem(kind: "setting", key: "todayShowCompleted", page: nil, surface: nil, label: RegistryL10n.t("Show completed tasks"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-      RegistrySettingsItem(kind: "setting", key: "tasksShowAging", page: nil, surface: nil, label: RegistryL10n.t("Fade inactive tasks"), detail: RegistryL10n.t("Tasks without activity for 14 days fade out and move to Faded."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-      RegistrySettingsItem(kind: "setting", key: "tasksShowFaded", page: nil, surface: nil, label: RegistryL10n.t("Show faded tasks"), detail: RegistryL10n.t("Show faded tasks in projects and areas."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-      RegistrySettingsItem(kind: "setting", key: "tasksFilingSuggestions", page: nil, surface: nil, label: RegistryL10n.t("Suggest where to file"), detail: RegistryL10n.t("Learn where you usually file similar tasks."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-      RegistrySettingsItem(kind: "setting", key: "badgeShowOverdue", page: nil, surface: nil, label: RegistryL10n.t("Overdue app icon badge"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "smart_lists", surface: nil, label: RegistryL10n.t("Smart Lists"), detail: nil, iconId: "list.today", sfSymbol: "sun.max.fill", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+      RegistrySettingsItem(kind: "setting", key: "todayGroupByList", page: nil, surface: nil, label: RegistryL10n.t("Group Today by list"), detail: RegistryL10n.t("When off, tasks appear in one list with their project or area underneath."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "lists.today"),
+      RegistrySettingsItem(kind: "setting", key: "todayShowCompleted", page: nil, surface: nil, label: RegistryL10n.t("Show completed tasks"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "lists.today"),
+      RegistrySettingsItem(kind: "setting", key: "tasksShowAging", page: nil, surface: nil, label: RegistryL10n.t("Fade inactive tasks"), detail: RegistryL10n.t("Tasks without activity for 14 days fade out and move to Faded."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "task.aging"),
+      RegistrySettingsItem(kind: "setting", key: "tasksShowFaded", page: nil, surface: nil, label: RegistryL10n.t("Show faded tasks"), detail: RegistryL10n.t("Show faded tasks in projects and areas."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "task.aging"),
+      RegistrySettingsItem(kind: "setting", key: "tasksFilingSuggestions", page: nil, surface: nil, label: RegistryL10n.t("Suggest where to file"), detail: RegistryL10n.t("Learn where you usually file similar tasks."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "edit.filing-suggestion"),
+      RegistrySettingsItem(kind: "setting", key: "badgeShowOverdue", page: nil, surface: nil, label: RegistryL10n.t("Overdue app icon badge"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
     ]),
     RegistrySettingsGroup(id: "appearance_root", header: RegistryL10n.t("Appearance"), mobilePresentation: "inline", desktopTab: "general", items: [
-      RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "accent_color", label: RegistryL10n.t("Accent"), detail: nil, iconId: "settings.appearance", sfSymbol: "paintpalette", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-      RegistrySettingsItem(kind: "setting", key: "textSizeStep", page: nil, surface: nil, label: RegistryL10n.t("Text Size"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-      RegistrySettingsItem(kind: "setting", key: "tasksTitleLines", page: nil, surface: nil, label: RegistryL10n.t("Title lines"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "android"]),
-      RegistrySettingsItem(kind: "setting", key: "tasksSwipeLeadingAction", page: nil, surface: nil, label: RegistryL10n.t("Swipe right"), detail: RegistryL10n.t("Swipe left on a task to select multiple tasks. Swipe right runs this quick action."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados"]),
-      RegistrySettingsItem(kind: "setting", key: "loggingAnimationsEnabled", page: nil, surface: nil, label: RegistryL10n.t("Completion animations"), detail: nil, iconId: "settings.animations", sfSymbol: "party.popper", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+      RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "accent_color", label: RegistryL10n.t("Accent"), detail: nil, iconId: "settings.appearance", sfSymbol: "paintpalette", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+      RegistrySettingsItem(kind: "setting", key: "textSizeStep", page: nil, surface: nil, label: RegistryL10n.t("Text Size"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+      RegistrySettingsItem(kind: "setting", key: "tasksTitleLines", page: nil, surface: nil, label: RegistryL10n.t("Title lines"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "android"], featureId: "settings.display"),
+      RegistrySettingsItem(kind: "setting", key: "tasksSwipeLeadingAction", page: nil, surface: nil, label: RegistryL10n.t("Swipe right"), detail: RegistryL10n.t("Swipe left on a task to select multiple tasks. Swipe right runs this quick action."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados"], featureId: "settings.display"),
+      RegistrySettingsItem(kind: "setting", key: "loggingAnimationsEnabled", page: nil, surface: nil, label: RegistryL10n.t("Completion animations"), detail: nil, iconId: "settings.animations", sfSymbol: "party.popper", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
     ]),
     RegistrySettingsGroup(id: "meta_root", header: nil, mobilePresentation: "inline", desktopTab: nil, items: [
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "privacy", surface: nil, label: RegistryL10n.t("Privacy"), detail: nil, iconId: "settings.privacy", sfSymbol: "hand.raised", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "about", surface: nil, label: RegistryL10n.t("About"), detail: nil, iconId: "settings.about", sfSymbol: "info.circle", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "privacy", surface: nil, label: RegistryL10n.t("Privacy"), detail: nil, iconId: "settings.privacy", sfSymbol: "hand.raised", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "about", surface: nil, label: RegistryL10n.t("About"), detail: nil, iconId: "settings.about", sfSymbol: "info.circle", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
     ]),
   ]
 
   static let pages: [RegistrySettingsPage] = [
     RegistrySettingsPage(id: "account", title: RegistryL10n.t("Account"), iconId: "settings.account", sfSymbol: "person.crop.circle", depth: 1, platforms: nil, featureId: "sync.backend", sections: [
       RegistrySettingsSection(id: "profile", header: nil, footer: RegistryL10n.t("Your name stays on this device, and syncs when you sign in."), platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "account_profile_editor", label: RegistryL10n.t("Your name"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "account_profile_editor", label: RegistryL10n.t("Your name"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
       RegistrySettingsSection(id: "plan", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "pageLink", key: nil, page: "plus", surface: nil, label: RegistryL10n.t("Septena Plus"), detail: nil, iconId: "settings.plus", sfSymbol: "plus.circle.fill", statusKey: "planStatus", desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "pageLink", key: nil, page: "plus", surface: nil, label: RegistryL10n.t("Septena Plus"), detail: nil, iconId: "settings.plus", sfSymbol: "plus.circle.fill", statusKey: "planStatus", desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
       RegistrySettingsSection(id: "sync", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sync_account_status", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sync_account_status", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
       RegistrySettingsSection(id: "sign_in_approval", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sign_in_approval", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "signedIn", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sign_in_approval", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "signedIn", platforms: nil, featureId: "sync.backend"),
       ]),
       RegistrySettingsSection(id: "delete_account", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "delete_account", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "signedIn", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "delete_account", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "signedIn", platforms: nil, featureId: "account.delete"),
       ]),
     ]),
     RegistrySettingsPage(id: "plus", title: RegistryL10n.t("Septena Plus"), iconId: "settings.plus", sfSymbol: "plus.circle.fill", depth: 2, platforms: nil, featureId: "sync.backend", sections: [
       RegistrySettingsSection(id: "offer", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "plus_offer", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "plus_offer", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
     ]),
     RegistrySettingsPage(id: "claude_pairing", title: RegistryL10n.t("Connect Claude"), iconId: "settings.claude", sfSymbol: "bubble.left.and.text.bubble.right", depth: 1, platforms: nil, featureId: "agents.connector", sections: [
       RegistrySettingsSection(id: "connector", header: RegistryL10n.t("Connect Claude"), footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "claude_connector", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "claude_connector", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "agents.connector"),
       ]),
     ]),
     RegistrySettingsPage(id: "ai_preferences", title: RegistryL10n.t("AI Preferences"), iconId: "settings.ai_agents", sfSymbol: "sparkles", depth: 1, platforms: nil, featureId: "ai.reach-dial", sections: [
       RegistrySettingsSection(id: "on_device", header: RegistryL10n.t("On-device intelligence"), footer: nil, platforms: ["ios", "ipados", "macos"], items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "apple_intelligence_status", label: RegistryL10n.t("Apple Intelligence"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"]),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "apple_intelligence_status", label: RegistryL10n.t("Apple Intelligence"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "ai.reach-dial"),
       ]),
       RegistrySettingsSection(id: "reach", header: RegistryL10n.t("Where AI runs"), footer: RegistryL10n.t("Septena never runs AI on your data and never reads it. The intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets where requests may run."), platforms: nil, items: [
-        RegistrySettingsItem(kind: "setting", key: "aiMode", page: nil, surface: nil, label: RegistryL10n.t("AI Mode"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "setting", key: "aiMode", page: nil, surface: nil, label: RegistryL10n.t("AI Mode"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "ai.reach-dial"),
       ]),
       RegistrySettingsSection(id: "explainer", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "ai_explainer", label: RegistryL10n.t("How AI helps with your tasks"), detail: nil, iconId: "settings.about", sfSymbol: "info.circle", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "ai_explainer", label: RegistryL10n.t("How AI helps with your tasks"), detail: nil, iconId: "settings.about", sfSymbol: "info.circle", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "ai.reach-dial"),
       ]),
     ]),
     RegistrySettingsPage(id: "calendar", title: RegistryL10n.t("Calendar"), iconId: "settings.calendar", sfSymbol: "calendar", depth: 1, platforms: nil, featureId: "calendar.events", sections: [
       RegistrySettingsSection(id: "calendars", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "calendar_detail", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "calendar_detail", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "calendar.events"),
       ]),
     ]),
     RegistrySettingsPage(id: "reminders", title: RegistryL10n.t("Reminders"), iconId: "settings.reminders", sfSymbol: "checklist", depth: 1, platforms: ["ios", "ipados", "macos"], featureId: "import.reminders", sections: [
       RegistrySettingsSection(id: "reminders", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reminders_inbox", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"]),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reminders_inbox", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "import.reminders"),
       ]),
     ]),
     RegistrySettingsPage(id: "import_export", title: RegistryL10n.t("Import & Export"), iconId: "settings.data", sfSymbol: "square.and.arrow.up", depth: 1, platforms: nil, featureId: "sync.backend", sections: [
       RegistrySettingsSection(id: "move_in", header: RegistryL10n.t("Move from another app"), footer: RegistryL10n.t("Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import."), platforms: ["ios", "ipados", "macos"], items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "things_import", label: RegistryL10n.t("Import from Things"), detail: nil, iconId: "settings.import", sfSymbol: "square.and.arrow.down", statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"]),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "things_import", label: RegistryL10n.t("Import from Things"), detail: nil, iconId: "settings.import", sfSymbol: "square.and.arrow.down", statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "import.things"),
       ]),
       RegistrySettingsSection(id: "transfer", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "import_export", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "import_export", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
     ]),
     RegistrySettingsPage(id: "privacy", title: RegistryL10n.t("Privacy"), iconId: "settings.privacy", sfSymbol: "hand.raised", depth: 1, platforms: nil, featureId: "settings.display", sections: [
       RegistrySettingsSection(id: "data_locality", header: RegistryL10n.t("Your data"), footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "privacy_explainer", label: nil, detail: RegistryL10n.t("Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena's private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). Apple's on-device intelligence runs locally; you can connect Claude under AI & Agents."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "privacy_explainer", label: nil, detail: RegistryL10n.t("Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena's private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). Apple's on-device intelligence runs locally; you can connect Claude under AI & Agents."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
       RegistrySettingsSection(id: "telemetry", header: RegistryL10n.t("Anonymous usage data"), footer: RegistryL10n.t("Your task text and titles are never sent through analytics. This setting syncs across your devices."), platforms: nil, items: [
-        RegistrySettingsItem(kind: "setting", key: "telemetryLevel", page: nil, surface: nil, label: RegistryL10n.t("Usage data"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "setting", key: "telemetryLevel", page: nil, surface: nil, label: RegistryL10n.t("Usage data"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
     ]),
     RegistrySettingsPage(id: "about", title: RegistryL10n.t("About"), iconId: "settings.about", sfSymbol: "info.circle", depth: 1, platforms: nil, featureId: "settings.display", sections: [
       RegistrySettingsSection(id: "version", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "about_header", label: RegistryL10n.t("Tasks that think with you"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "about_header", label: RegistryL10n.t("Tasks that think with you"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
       RegistrySettingsSection(id: "actions", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "check_updates", label: RegistryL10n.t("Check for Updates…"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["macos", "windows"]),
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_get_started", label: RegistryL10n.t("Show Get Started Again"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_first_run", label: RegistryL10n.t("Show Welcome Again"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "send_feedback", label: RegistryL10n.t("Send feedback"), detail: nil, iconId: "settings.feedback", sfSymbol: "paperplane", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "check_updates", label: RegistryL10n.t("Check for Updates…"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["macos", "windows"], featureId: "mac.updates"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_get_started", label: RegistryL10n.t("Show Get Started Again"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_first_run", label: RegistryL10n.t("Show Welcome Again"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "onboarding.first-run"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "send_feedback", label: RegistryL10n.t("Send feedback"), detail: nil, iconId: "settings.feedback", sfSymbol: "paperplane", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
       RegistrySettingsSection(id: "companion", header: RegistryL10n.t("Septena Life"), footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "septena_life_link", label: RegistryL10n.t("Open Septena Life"), detail: RegistryL10n.t("Septena Life is the companion app for habits, training, food, sleep, mood, and health."), iconId: "settings.companion_app", sfSymbol: "arrow.up.forward.app", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "septena_life_link", label: RegistryL10n.t("Open Septena Life"), detail: RegistryL10n.t("Septena Life is the companion app for habits, training, food, sleep, mood, and health."), iconId: "settings.companion_app", sfSymbol: "arrow.up.forward.app", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
       RegistrySettingsSection(id: "advanced_link", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "pageLink", key: nil, page: "advanced", surface: nil, label: RegistryL10n.t("Advanced"), detail: nil, iconId: "settings.advanced", sfSymbol: "wrench.and.screwdriver", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "pageLink", key: nil, page: "advanced", surface: nil, label: RegistryL10n.t("Advanced"), detail: nil, iconId: "settings.advanced", sfSymbol: "wrench.and.screwdriver", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
     ]),
     RegistrySettingsPage(id: "advanced", title: RegistryL10n.t("Advanced"), iconId: "settings.advanced", sfSymbol: "wrench.and.screwdriver", depth: 2, platforms: nil, featureId: "settings.display", sections: [
       RegistrySettingsSection(id: "agent_tools", header: RegistryL10n.t("Agent tools"), footer: RegistryL10n.t("The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples)."), platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "mcp_skills", label: RegistryL10n.t("MCP Skills"), detail: nil, iconId: "settings.skills", sfSymbol: "book.closed", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "mcp_skills", label: RegistryL10n.t("MCP Skills"), detail: nil, iconId: "settings.skills", sfSymbol: "book.closed", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "agents.connector"),
       ]),
       RegistrySettingsSection(id: "diagnostics", header: RegistryL10n.t("Diagnostics"), footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sync_diagnostics", label: RegistryL10n.t("Sync & storage diagnostics"), detail: RegistryL10n.t("Changes the server refused appear here, newest first. The server kept its own version of each."), iconId: "settings.diagnostics", sfSymbol: "stethoscope", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "diagnostics_weekly", label: RegistryL10n.t("Optional product diagnostics"), detail: RegistryL10n.t("An opt-in weekly summary that helps improve Septena. You don't need it for updates, sync, or support."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sync_diagnostics", label: RegistryL10n.t("Sync & storage diagnostics"), detail: RegistryL10n.t("Changes the server refused appear here, newest first. The server kept its own version of each."), iconId: "settings.diagnostics", sfSymbol: "stethoscope", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "diagnostics_weekly", label: RegistryL10n.t("Optional product diagnostics"), detail: RegistryL10n.t("An opt-in weekly summary that helps improve Septena. You don't need it for updates, sync, or support."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
       RegistrySettingsSection(id: "data_tools", header: RegistryL10n.t("Data tools"), footer: RegistryL10n.t("Paste raw Septena JSON directly from the clipboard to restore or merge records."), platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "paste_json_import", label: RegistryL10n.t("Paste JSON Backup…"), detail: nil, iconId: "settings.paste", sfSymbol: "doc.on.clipboard", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "paste_json_import", label: RegistryL10n.t("Paste JSON Backup…"), detail: nil, iconId: "settings.paste", sfSymbol: "doc.on.clipboard", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
       RegistrySettingsSection(id: "beta_ai", header: RegistryL10n.t("AI diagnostics"), footer: nil, platforms: ["ios", "ipados", "macos"], items: [
-        RegistrySettingsItem(kind: "setting", key: "showModelLabels", page: nil, surface: nil, label: RegistryL10n.t("Show model labels"), detail: RegistryL10n.t("Show which model answered next to each AI reply."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-        RegistrySettingsItem(kind: "setting", key: "pccRoutingEnabled", page: nil, surface: nil, label: RegistryL10n.t("Use Private Cloud Compute"), detail: RegistryL10n.t("Requires the PCC entitlement. Without it, requests fail and fall back on-device."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "minAppleOS27", platforms: nil),
-        RegistrySettingsItem(kind: "setting", key: "pccReasoning", page: nil, surface: nil, label: RegistryL10n.t("Private Cloud Compute reasoning"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "minAppleOS27", platforms: nil),
+        RegistrySettingsItem(kind: "setting", key: "showModelLabels", page: nil, surface: nil, label: RegistryL10n.t("Show model labels"), detail: RegistryL10n.t("Show which model answered next to each AI reply."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "ai.reach-dial"),
+        RegistrySettingsItem(kind: "setting", key: "pccRoutingEnabled", page: nil, surface: nil, label: RegistryL10n.t("Use Private Cloud Compute"), detail: RegistryL10n.t("Requires the PCC entitlement. Without it, requests fail and fall back on-device."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "minAppleOS27", platforms: nil, featureId: "ai.reach-dial"),
+        RegistrySettingsItem(kind: "setting", key: "pccReasoning", page: nil, surface: nil, label: RegistryL10n.t("Private Cloud Compute reasoning"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "minAppleOS27", platforms: nil, featureId: "ai.reach-dial"),
       ]),
     ]),
     RegistrySettingsPage(id: "smart_lists", title: RegistryL10n.t("Smart Lists"), iconId: "list.today", sfSymbol: "sun.max.fill", depth: 1, platforms: nil, featureId: "settings.display", sections: [
       RegistrySettingsSection(id: "smart_lists", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "smart_lists_editor", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "smart_lists_editor", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
     ]),
   ]
@@ -646,6 +642,9 @@ struct RegistryDestination: Sendable, Hashable, Identifiable {
   let shortcutKeycaps: [String]?
   let emptyTitle: String
   let emptyDetail: String
+  let featureId: String
+  /// The list shows on `platform` when its capability ships (ADR 0015).
+  func applies(to platform: String) -> Bool { RegistryCapabilities.isAvailable(featureId, on: platform) }
 }
 
 /// One ordered section of a grouped smart list (`groups` in destinations.json).
@@ -664,17 +663,17 @@ enum RegistryDestinations {
   ]
 
   static let all: [RegistryDestination] = [
-    RegistryDestination(id: "inbox", navigationKey: "triage", serverView: "triage", title: RegistryL10n.t("Inbox"), iconId: "list.inbox", sfSymbol: "tray.full", visibility: "todayBand", canHide: false, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("Inbox is empty"), emptyDetail: RegistryL10n.t("New tasks wait here until you schedule or file them.")),
-    RegistryDestination(id: "today", navigationKey: "today", serverView: "today", title: RegistryL10n.t("Today"), iconId: "list.today", sfSymbol: "sun.max.fill", visibility: "always", canHide: false, shortcutKeycaps: ["⌘", "1"], emptyTitle: RegistryL10n.t("Nothing on Today"), emptyDetail: RegistryL10n.t("Add a task or move one here when you want to work on it today.")),
-    RegistryDestination(id: "review", navigationKey: "review", serverView: "all", title: RegistryL10n.t("Review"), iconId: "list.review", sfSymbol: "eye", visibility: "whenNonEmpty", canHide: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("Nothing to review"), emptyDetail: RegistryL10n.t("Work an agent finished appears here so you can check and accept it.")),
-    RegistryDestination(id: "agent", navigationKey: "agent", serverView: "all", title: RegistryL10n.t("Agent"), iconId: "list.agent", sfSymbol: "sparkles", visibility: "whenNonEmpty", canHide: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No agent work"), emptyDetail: RegistryL10n.t("Tasks you assign to Claude appear here, grouped by where the work stands.")),
-    RegistryDestination(id: "upcoming", navigationKey: "upcoming", serverView: "upcoming", title: RegistryL10n.t("Upcoming"), iconId: "list.upcoming", sfSymbol: "calendar", visibility: "always", canHide: true, shortcutKeycaps: ["⌘", "2"], emptyTitle: RegistryL10n.t("Nothing upcoming"), emptyDetail: RegistryL10n.t("Tasks with a future When or Deadline date appear here.")),
-    RegistryDestination(id: "repeating", navigationKey: "repeating", serverView: "all", title: RegistryL10n.t("Repeating"), iconId: "list.repeating", sfSymbol: "arrow.clockwise", visibility: "always", canHide: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No repeating tasks"), emptyDetail: RegistryL10n.t("Give any task a Repeat rule and it will show up here.")),
-    RegistryDestination(id: "anytime", navigationKey: "unscheduled", serverView: "unscheduled", title: RegistryL10n.t("Anytime"), iconId: "list.anytime", sfSymbol: "rectangle.stack.fill", visibility: "always", canHide: true, shortcutKeycaps: ["⌘", "3"], emptyTitle: RegistryL10n.t("Nothing in Anytime"), emptyDetail: RegistryL10n.t("Open tasks without a date live here.")),
-    RegistryDestination(id: "logbook", navigationKey: "logbook", serverView: "logbook", title: RegistryL10n.t("Logbook"), iconId: "list.logbook", sfSymbol: "checkmark", visibility: "always", canHide: true, shortcutKeycaps: ["⌘", "4"], emptyTitle: RegistryL10n.t("Logbook is empty"), emptyDetail: RegistryL10n.t("Completed and let-go tasks are archived here.")),
-    RegistryDestination(id: "starred", navigationKey: "starred", serverView: "all", title: RegistryL10n.t("Starred"), iconId: "list.starred", sfSymbol: "star.fill", visibility: "whenNonEmpty", canHide: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Starred Tasks"), emptyDetail: RegistryL10n.t("Star important tasks to keep them one tap away.")),
-    RegistryDestination(id: "faded", navigationKey: "faded", serverView: "all", title: RegistryL10n.t("Faded"), iconId: "list.faded", sfSymbol: "circle.dashed", visibility: "whenNonEmpty", canHide: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Faded Tasks"), emptyDetail: RegistryL10n.t("Undated tasks without activity for 14 days appear here until you keep them or let them go.")),
-    RegistryDestination(id: "recentlyDeleted", navigationKey: "recentlyDeleted", serverView: "all", title: RegistryL10n.t("Recently Deleted"), iconId: "list.recently_deleted", sfSymbol: "trash", visibility: "whenNonEmpty", canHide: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Recently Deleted Tasks"), emptyDetail: RegistryL10n.t("Deleted tasks appear here for 30 days before being permanently removed.")),
+    RegistryDestination(id: "inbox", navigationKey: "triage", serverView: "triage", title: RegistryL10n.t("Inbox"), iconId: "list.inbox", sfSymbol: "tray.full", visibility: "todayBand", canHide: false, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("Inbox is empty"), emptyDetail: RegistryL10n.t("New tasks wait here until you schedule or file them."), featureId: "lists.inbox"),
+    RegistryDestination(id: "today", navigationKey: "today", serverView: "today", title: RegistryL10n.t("Today"), iconId: "list.today", sfSymbol: "sun.max.fill", visibility: "always", canHide: false, shortcutKeycaps: ["⌘", "1"], emptyTitle: RegistryL10n.t("Nothing on Today"), emptyDetail: RegistryL10n.t("Add a task or move one here when you want to work on it today."), featureId: "lists.today"),
+    RegistryDestination(id: "review", navigationKey: "review", serverView: "all", title: RegistryL10n.t("Review"), iconId: "list.review", sfSymbol: "eye", visibility: "whenNonEmpty", canHide: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("Nothing to review"), emptyDetail: RegistryL10n.t("Work an agent finished appears here so you can check and accept it."), featureId: "lists.review"),
+    RegistryDestination(id: "agent", navigationKey: "agent", serverView: "all", title: RegistryL10n.t("Agent"), iconId: "list.agent", sfSymbol: "sparkles", visibility: "whenNonEmpty", canHide: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No agent work"), emptyDetail: RegistryL10n.t("Tasks you assign to Claude appear here, grouped by where the work stands."), featureId: "lists.agent"),
+    RegistryDestination(id: "upcoming", navigationKey: "upcoming", serverView: "upcoming", title: RegistryL10n.t("Upcoming"), iconId: "list.upcoming", sfSymbol: "calendar", visibility: "always", canHide: true, shortcutKeycaps: ["⌘", "2"], emptyTitle: RegistryL10n.t("Nothing upcoming"), emptyDetail: RegistryL10n.t("Tasks with a future When or Deadline date appear here."), featureId: "lists.upcoming"),
+    RegistryDestination(id: "repeating", navigationKey: "repeating", serverView: "all", title: RegistryL10n.t("Repeating"), iconId: "list.repeating", sfSymbol: "arrow.clockwise", visibility: "always", canHide: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No repeating tasks"), emptyDetail: RegistryL10n.t("Give any task a Repeat rule and it will show up here."), featureId: "lists.repeating"),
+    RegistryDestination(id: "anytime", navigationKey: "unscheduled", serverView: "unscheduled", title: RegistryL10n.t("Anytime"), iconId: "list.anytime", sfSymbol: "rectangle.stack.fill", visibility: "always", canHide: true, shortcutKeycaps: ["⌘", "3"], emptyTitle: RegistryL10n.t("Nothing in Anytime"), emptyDetail: RegistryL10n.t("Open tasks without a date live here."), featureId: "lists.anytime"),
+    RegistryDestination(id: "logbook", navigationKey: "logbook", serverView: "logbook", title: RegistryL10n.t("Logbook"), iconId: "list.logbook", sfSymbol: "checkmark", visibility: "always", canHide: true, shortcutKeycaps: ["⌘", "4"], emptyTitle: RegistryL10n.t("Logbook is empty"), emptyDetail: RegistryL10n.t("Completed and let-go tasks are archived here."), featureId: "lists.logbook"),
+    RegistryDestination(id: "starred", navigationKey: "starred", serverView: "all", title: RegistryL10n.t("Starred"), iconId: "list.starred", sfSymbol: "star.fill", visibility: "whenNonEmpty", canHide: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Starred Tasks"), emptyDetail: RegistryL10n.t("Star important tasks to keep them one tap away."), featureId: "lists.starred"),
+    RegistryDestination(id: "faded", navigationKey: "faded", serverView: "all", title: RegistryL10n.t("Faded"), iconId: "list.faded", sfSymbol: "circle.dashed", visibility: "whenNonEmpty", canHide: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Faded Tasks"), emptyDetail: RegistryL10n.t("Undated tasks without activity for 14 days appear here until you keep them or let them go."), featureId: "lists.faded"),
+    RegistryDestination(id: "recentlyDeleted", navigationKey: "recentlyDeleted", serverView: "all", title: RegistryL10n.t("Recently Deleted"), iconId: "list.recently_deleted", sfSymbol: "trash", visibility: "whenNonEmpty", canHide: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Recently Deleted Tasks"), emptyDetail: RegistryL10n.t("Deleted tasks appear here for 30 days before being permanently removed."), featureId: "lists.recently-deleted"),
   ]
 
   static let byId: [String: RegistryDestination] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
@@ -727,6 +726,8 @@ struct RegistryActionAvailability: Sendable, Hashable {
   let excludeDestinations: [String]
   let onlyDestinations: [String]
   let requiresRecurrence: Bool
+  /// The action's capability (`featureId`); a menu hides it where it does not ship.
+  let featureId: String
 }
 
 /// One item in a context menu or menu-bar menu (`registry/actions.json`).
@@ -932,64 +933,64 @@ enum RegistryActions {
   ]
 
   static let availability: [String: RegistryActionAvailability] = [
-    "task.editDetails": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
-    "task.toggleInfo": RegistryActionAvailability(selection: "any", platforms: ["macos", "web", "windows"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "task.copy": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "task.duplicate": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
-    "task.toggleComplete": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
-    "task.cancel": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
-    "task.toggleToday": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
-    "task.toggleStar": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
-    "task.tags": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
-    "task.addChecklistItem": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
-    "task.when": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
-    "task.deadline": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
-    "task.reminder": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
-    "task.move": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
-    "task.moveSuggested": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: ["logbook", "recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
-    "task.clearSchedule": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
-    "task.repeat": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
-    "task.pauseResumeRepeat": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: true),
-    "task.createNextCopy": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: true),
-    "task.delete": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false),
-    "task.restore": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: ["recentlyDeleted"], requiresRecurrence: false),
-    "task.deletePermanently": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: ["recentlyDeleted"], requiresRecurrence: false),
-    "task.keepFaded": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: ["faded"], requiresRecurrence: false),
-    "task.letGoFaded": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: ["faded"], requiresRecurrence: false),
-    "area.newProject": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "area.rename": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "area.moveUp": RegistryActionAvailability(selection: "single", platforms: ["ios", "ipados", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "area.moveDown": RegistryActionAvailability(selection: "single", platforms: ["ios", "ipados", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "area.delete": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "project.rename": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "project.moveUp": RegistryActionAvailability(selection: "single", platforms: ["ios", "ipados", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "project.moveDown": RegistryActionAvailability(selection: "single", platforms: ["ios", "ipados", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "project.markDone": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "project.cancel": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "project.delete": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "logged.clear": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "sidebar.newArea": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "sidebar.newProject": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "section.new": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "section.newTask": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "section.rename": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "section.delete": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "notice.openStep": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "notice.toggleStep": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "notice.hideGetStarted": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "app.newTask": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "app.quickAdd": RegistryActionAvailability(selection: "none", platforms: ["ios", "ipados", "web", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "app.quickEntry": RegistryActionAvailability(selection: "none", platforms: ["macos", "windows"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "app.quickFind": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "app.toggleSidebar": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "app.settings": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "app.keyboardShortcuts": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "app.toggleSidebarCounts": RegistryActionAvailability(selection: "none", platforms: ["macos", "ipados", "web", "windows"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "app.textSizeIncrease": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "app.textSizeDecrease": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "app.textSizeReset": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "app.septenaWindow": RegistryActionAvailability(selection: "none", platforms: ["macos"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
-    "app.classicWindow": RegistryActionAvailability(selection: "none", platforms: ["macos"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false),
+    "task.editDetails": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "lists.today"),
+    "task.toggleInfo": RegistryActionAvailability(selection: "any", platforms: ["macos", "web", "windows"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "mac.keyboard"),
+    "task.copy": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "lists.today"),
+    "task.duplicate": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "lists.today"),
+    "task.toggleComplete": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "lists.today"),
+    "task.cancel": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "lists.today"),
+    "task.toggleToday": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "lists.today"),
+    "task.toggleStar": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "lists.starred"),
+    "task.tags": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "task.tags"),
+    "task.addChecklistItem": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "task.checklists"),
+    "task.when": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "task.when-deadline"),
+    "task.deadline": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "task.when-deadline"),
+    "task.reminder": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "task.alerts"),
+    "task.move": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
+    "task.moveSuggested": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: ["logbook", "recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "edit.filing-suggestion"),
+    "task.clearSchedule": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "task.when-deadline"),
+    "task.repeat": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "task.repeat"),
+    "task.pauseResumeRepeat": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: true, featureId: "task.repeat"),
+    "task.createNextCopy": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: true, featureId: "task.repeat"),
+    "task.delete": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "lists.recently-deleted"),
+    "task.restore": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: ["recentlyDeleted"], requiresRecurrence: false, featureId: "lists.recently-deleted"),
+    "task.deletePermanently": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: ["recentlyDeleted"], requiresRecurrence: false, featureId: "lists.recently-deleted"),
+    "task.keepFaded": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: ["faded"], requiresRecurrence: false, featureId: "fade.sweep"),
+    "task.letGoFaded": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: ["faded"], requiresRecurrence: false, featureId: "fade.sweep"),
+    "area.newProject": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
+    "area.rename": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.areas"),
+    "area.moveUp": RegistryActionAvailability(selection: "single", platforms: ["ios", "ipados", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.areas"),
+    "area.moveDown": RegistryActionAvailability(selection: "single", platforms: ["ios", "ipados", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.areas"),
+    "area.delete": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.areas"),
+    "project.rename": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
+    "project.moveUp": RegistryActionAvailability(selection: "single", platforms: ["ios", "ipados", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
+    "project.moveDown": RegistryActionAvailability(selection: "single", platforms: ["ios", "ipados", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
+    "project.markDone": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
+    "project.cancel": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
+    "project.delete": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
+    "logged.clear": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "lists.logbook"),
+    "sidebar.newArea": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.areas"),
+    "sidebar.newProject": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
+    "section.new": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.sections"),
+    "section.newTask": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.sections"),
+    "section.rename": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.sections"),
+    "section.delete": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.sections"),
+    "notice.openStep": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "lists.today"),
+    "notice.toggleStep": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "lists.today"),
+    "notice.hideGetStarted": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "lists.today"),
+    "app.newTask": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "lists.today"),
+    "app.quickAdd": RegistryActionAvailability(selection: "none", platforms: ["ios", "ipados", "web", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "capture.quick-add"),
+    "app.quickEntry": RegistryActionAvailability(selection: "none", platforms: ["macos", "windows"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "capture.quick-entry"),
+    "app.quickFind": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "find.quick-find"),
+    "app.toggleSidebar": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "mac.keyboard"),
+    "app.settings": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "settings.display"),
+    "app.keyboardShortcuts": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "mac.keyboard"),
+    "app.toggleSidebarCounts": RegistryActionAvailability(selection: "none", platforms: ["macos", "ipados", "web", "windows"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "settings.display"),
+    "app.textSizeIncrease": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "settings.display"),
+    "app.textSizeDecrease": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "settings.display"),
+    "app.textSizeReset": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "settings.display"),
+    "app.septenaWindow": RegistryActionAvailability(selection: "none", platforms: ["macos"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "mac.keyboard"),
+    "app.classicWindow": RegistryActionAvailability(selection: "none", platforms: ["macos"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "mac.keyboard"),
   ]
 
   /// Swipe slots in screen order, left to right (`swipeActions`).
@@ -1268,7 +1269,8 @@ enum RegistryPrompts {
 
 /// Snackbar copy (`registry/surfaces.json` `toasts`).
 enum RegistryToasts {
-  static let durationSeconds: Double = 7
+  /// How long a snackbar stays (`registry/rules.json` `toastDurationSeconds`).
+  static let durationSeconds: Double = Double(RegistryRules.toastDurationSeconds)
   static func deferred(date: String) -> String { RegistryL10n.format("Deferred to %@", english: "Deferred to %@", args: [date]) }
   static func moved(destination: String) -> String { RegistryL10n.format("Moved to %@", english: "Moved to %@", args: [destination]) }
   static func deletedSingle(title: String) -> String { title.isEmpty ? RegistryL10n.t("Task deleted") : RegistryL10n.format("\"%@\" deleted", english: "\"%@\" deleted", args: [title]) }
@@ -1292,10 +1294,11 @@ struct RegistryTaskAttribute: Sendable, Hashable, Identifiable {
   /// Pill text while the attribute's work runs (Discuss).
   let workingLabel: String?
   var isPill: Bool { surfaceTier == "inline" || surfaceTier == "popover" }
+  /// The attribute shows on `platform` when its capability ships (ADR 0015).
+  func applies(to platform: String) -> Bool { RegistryCapabilities.isAvailable(featureId, on: platform) }
 }
 
 enum RegistrySurfaces {
-  static let taskAttributeOrder: [String] = ["notes", "when", "deadline", "reminder", "repeat", "star", "list", "tags", "checklist", "attachments", "discuss", "paste"]
   static let taskAttributes: [RegistryTaskAttribute] = [
     RegistryTaskAttribute(id: "notes", label: RegistryL10n.t("Notes"), iconId: "action.notes", sfSymbol: "text.alignleft", commitContract: "closeCommits", surfaceTier: "field", featureId: "task.notes", editOnly: false, workingLabel: nil),
     RegistryTaskAttribute(id: "when", label: RegistryL10n.t("When"), iconId: "action.when", sfSymbol: "calendar", commitContract: "pickCommits", surfaceTier: "popover", featureId: "task.when-deadline", editOnly: false, workingLabel: nil),
@@ -1310,9 +1313,11 @@ enum RegistrySurfaces {
     RegistryTaskAttribute(id: "discuss", label: RegistryL10n.t("Discuss"), iconId: "action.discuss", sfSymbol: "bubble.left.and.bubble.right", commitContract: "closeCommits", surfaceTier: "inline", featureId: "ai.discuss", editOnly: true, workingLabel: RegistryL10n.t("Thinking…")),
     RegistryTaskAttribute(id: "paste", label: RegistryL10n.t("Paste"), iconId: "action.paste", sfSymbol: "doc.on.clipboard", commitContract: "pickCommits", surfaceTier: "chip", featureId: "capture.quick-entry", editOnly: false, workingLabel: nil),
   ]
-  /// The pills, in rail order (every attribute except fields and chips).
-  static let taskAttributePills: [RegistryTaskAttribute] = taskAttributes.filter(\.isPill)
-  static let taskAttributeLabels: [String: String] = Dictionary(uniqueKeysWithValues: taskAttributes.map { ($0.id, $0.label) })
+  /// The pills that show on `platform`, in rail order (every attribute except
+  /// fields and chips, whose capability ships there).
+  static func taskAttributePills(on platform: String) -> [RegistryTaskAttribute] {
+    taskAttributes.filter { $0.isPill && $0.applies(to: platform) }
+  }
   /// The attribute with `id`. Traps on an unknown id: the ids are a closed set.
   static func taskAttribute(_ id: String) -> RegistryTaskAttribute {
     guard let a = taskAttributes.first(where: { $0.id == id }) else { preconditionFailure("unknown task attribute \(id)") }
@@ -1521,16 +1526,26 @@ enum RegistryPlans {
 /// Canonical capability parity ledger (`registry/capabilities.json`, ADR 0013 / ADR 0015).
 enum RegistryCapabilities {
   static let byPlatform: [String: [String: String]] = [
-    "ios": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.history": "ships", "task.aging": "ships", "task.checklists": "planned", "task.tags": "planned", "task.alerts": "planned", "fade.sweep": "ships", "capture.quick-add": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.swipe-actions": "planned", "find.quick-find": "ships", "mac.keyboard": "not_applicable", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "settings.display": "ships"],
-    "ipados": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.history": "ships", "task.aging": "ships", "task.checklists": "planned", "task.tags": "planned", "task.alerts": "planned", "fade.sweep": "ships", "capture.quick-add": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.swipe-actions": "planned", "find.quick-find": "ships", "mac.keyboard": "ships", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "settings.display": "ships"],
-    "macos": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "partial", "task.history": "ships", "task.aging": "ships", "task.checklists": "planned", "task.tags": "planned", "task.alerts": "planned", "fade.sweep": "ships", "capture.quick-add": "not_applicable", "capture.quick-entry": "ships", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.swipe-actions": "not_applicable", "find.quick-find": "ships", "mac.keyboard": "ships", "mac.updates": "ships", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "settings.display": "ships"],
+    "ios": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.history": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.swipe-actions": "ships", "find.quick-find": "ships", "mac.keyboard": "not_applicable", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "settings.display": "ships"],
+    "ipados": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.history": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.swipe-actions": "ships", "find.quick-find": "ships", "mac.keyboard": "ships", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "settings.display": "ships"],
+    "macos": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "partial", "task.history": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "not_applicable", "capture.quick-entry": "ships", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.swipe-actions": "not_applicable", "find.quick-find": "ships", "mac.keyboard": "ships", "mac.updates": "ships", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "settings.display": "ships"],
     "web": ["lists.inbox": "planned", "lists.today": "planned", "lists.review": "planned", "lists.agent": "planned", "lists.upcoming": "planned", "lists.anytime": "planned", "lists.repeating": "planned", "lists.logbook": "planned", "lists.faded": "planned", "lists.starred": "planned", "lists.recently-deleted": "planned", "places.areas": "planned", "places.projects": "planned", "places.sections": "planned", "task.when-deadline": "planned", "task.repeat": "planned", "task.notes": "planned", "task.attachments": "planned", "task.history": "planned", "task.aging": "planned", "task.checklists": "planned", "task.tags": "planned", "task.alerts": "planned", "fade.sweep": "planned", "capture.quick-add": "planned", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "not_applicable", "edit.undo": "planned", "edit.swipe-actions": "not_applicable", "find.quick-find": "planned", "mac.keyboard": "planned", "mac.updates": "not_applicable", "calendar.events": "planned", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "planned", "ai.reach-dial": "planned", "agents.connector": "planned", "onboarding.first-run": "planned", "agents.stop-pause": "planned", "sync.backend": "planned", "account.delete": "planned", "settings.display": "planned"],
     "android": ["lists.inbox": "planned", "lists.today": "planned", "lists.review": "planned", "lists.agent": "planned", "lists.upcoming": "planned", "lists.anytime": "planned", "lists.repeating": "planned", "lists.logbook": "planned", "lists.faded": "planned", "lists.starred": "planned", "lists.recently-deleted": "planned", "places.areas": "planned", "places.projects": "planned", "places.sections": "planned", "task.when-deadline": "planned", "task.repeat": "planned", "task.notes": "planned", "task.attachments": "planned", "task.history": "planned", "task.aging": "planned", "task.checklists": "planned", "task.tags": "planned", "task.alerts": "planned", "fade.sweep": "planned", "capture.quick-add": "planned", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "planned", "edit.undo": "planned", "edit.swipe-actions": "planned", "find.quick-find": "planned", "mac.keyboard": "planned", "mac.updates": "not_applicable", "calendar.events": "planned", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "planned", "ai.reach-dial": "planned", "agents.connector": "planned", "onboarding.first-run": "planned", "agents.stop-pause": "planned", "sync.backend": "planned", "account.delete": "planned", "settings.display": "planned"],
     "windows": ["lists.inbox": "planned", "lists.today": "planned", "lists.review": "planned", "lists.agent": "planned", "lists.upcoming": "planned", "lists.anytime": "planned", "lists.repeating": "planned", "lists.logbook": "planned", "lists.faded": "planned", "lists.starred": "planned", "lists.recently-deleted": "planned", "places.areas": "planned", "places.projects": "planned", "places.sections": "planned", "task.when-deadline": "planned", "task.repeat": "planned", "task.notes": "planned", "task.attachments": "planned", "task.history": "planned", "task.aging": "planned", "task.checklists": "planned", "task.tags": "planned", "task.alerts": "planned", "fade.sweep": "planned", "capture.quick-add": "not_applicable", "capture.quick-entry": "planned", "edit.filing-suggestion": "planned", "edit.undo": "planned", "edit.swipe-actions": "not_applicable", "find.quick-find": "planned", "mac.keyboard": "planned", "mac.updates": "planned", "calendar.events": "planned", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "planned", "ai.reach-dial": "planned", "agents.connector": "planned", "onboarding.first-run": "planned", "agents.stop-pause": "planned", "sync.backend": "planned", "account.delete": "planned", "settings.display": "planned"],
     "watchos": ["lists.inbox": "partial", "lists.today": "partial", "lists.review": "not_applicable", "lists.agent": "not_applicable", "lists.upcoming": "not_applicable", "lists.anytime": "not_applicable", "lists.repeating": "not_applicable", "lists.logbook": "not_applicable", "lists.faded": "not_applicable", "lists.starred": "not_applicable", "lists.recently-deleted": "not_applicable", "places.areas": "not_applicable", "places.projects": "not_applicable", "places.sections": "not_applicable", "task.when-deadline": "not_applicable", "task.repeat": "not_applicable", "task.notes": "not_applicable", "task.attachments": "not_applicable", "task.history": "not_applicable", "task.aging": "not_applicable", "task.checklists": "not_applicable", "task.tags": "not_applicable", "task.alerts": "not_applicable", "fade.sweep": "not_applicable", "capture.quick-add": "not_applicable", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "not_applicable", "edit.undo": "not_applicable", "edit.swipe-actions": "not_applicable", "find.quick-find": "not_applicable", "mac.keyboard": "not_applicable", "mac.updates": "not_applicable", "calendar.events": "not_applicable", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "not_applicable", "ai.reach-dial": "not_applicable", "agents.connector": "not_applicable", "onboarding.first-run": "not_applicable", "agents.stop-pause": "not_applicable", "sync.backend": "planned", "account.delete": "not_applicable", "settings.display": "not_applicable"],
   ]
 
-  static func isShipped(_ featureId: String, on platform: String) -> Bool {
-    byPlatform[platform]?[featureId] == "ships"
+  /// `ships`, `partial`, `planned` or `not_applicable`; nil for an unknown platform or ID.
+  static func status(_ featureId: String, on platform: String) -> String? {
+    byPlatform[platform]?[featureId]
+  }
+
+  /// A surface for `featureId` renders on `platform` only when it ships there
+  /// (fully or partly). Planned and not-applicable features show no dead UI (ADR 0015).
+  static func isAvailable(_ featureId: String, on platform: String) -> Bool {
+    switch status(featureId, on: platform) {
+    case "ships", "partial": return true
+    default: return false
+    }
   }
 }

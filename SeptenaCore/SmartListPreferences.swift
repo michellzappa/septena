@@ -73,7 +73,7 @@ final class SmartListPreferences {
   /// (Inbox) draws inside Today and has no row, so it never takes part in
   /// ordering or show/hide.
   static let sidebarDestinations: [RegistryDestination] =
-    RegistryDestinations.all.filter { $0.visibility != "todayBand" }
+    RegistryDestinations.all.filter { $0.visibility != "todayBand" && $0.applies(to: RegistryPlatform.current) }
   static let sidebarById: [String: RegistryDestination] =
     Dictionary(uniqueKeysWithValues: sidebarDestinations.map { ($0.id, $0) })
 

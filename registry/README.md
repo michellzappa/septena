@@ -46,6 +46,30 @@ Generated outputs (checked in, never hand-edited):
 - the registry entries in `Septena/Localizable.xcstrings` (their comment
   starts "Generated from registry")
 
+## Enforcement (ADR 0020 P3)
+
+- **Capability gating (ADR 0015).** A surface shows on a platform only when
+  its `featureId` is `ships` or `partial` there in `capabilities.json`
+  (`RegistryCapabilities.isAvailable`). The generated `applies(to:)` on
+  settings tabs, pages and items, destinations and task attributes includes
+  that check; menus check it in `RegistryActions.isAvailableOnPlatform`;
+  notices filter in `TaskNotices.today`. Flip a feature to `planned`, run the
+  generator, and its settings, menu items, smart list, pill and notice go away
+  on that platform. A settings item without its own `featureId` takes its
+  setting key's, then the page it opens, then the page it sits on.
+- **Readers.** `--check` fails when a generated Swift member or TS export has
+  no reader (`scripts/registry-readers.mjs`). Read it, stop generating it (the
+  server-only rules in `SERVER_ONLY` are left out of Swift), or list it in
+  `registry/readers-allowlist.json` with a reason and an issue. An allowlist
+  entry that gains a reader fails too.
+- **Literals.** `scripts/lint-design.sh` runs `scripts/lint-registry-literals.py`
+  (`registry-owned-literal`): a Swift string literal in `Septena/Shell/` or
+  `Septask/` that equals a registry string fails the build. Read the
+  generated value instead (`RegistryActions.title(id, .add)`,
+  `TaskFilter.today.title`, `RegistryPrompts.textPrompt(id).title`, ...). Known
+  leftovers are in `scripts/registry-literal-allowlist.json`, each with the
+  issue that removes it.
+
 ## Localized copy (ADR 0020)
 
 - English stays inline in the registry files. The key of a string is its

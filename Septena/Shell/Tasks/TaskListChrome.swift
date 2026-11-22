@@ -750,7 +750,7 @@ struct MagicPlusFloatingOverlay: View {
         morphPill(icon: "number.circle.fill", title: label, accent: accent, ink: ink)
 
       case .newArea:
-        morphPill(icon: "square.stack.3d.up.fill", title: "New Area", accent: accent, ink: ink)
+        morphPill(icon: "square.stack.3d.up.fill", title: RegistryActions.title("sidebar.newArea"), accent: accent, ink: ink)
 
       case nil:
         // Free-floating lifted Magic Plus orb pinned to the user's selected accent.
@@ -1316,12 +1316,12 @@ struct QuickDropProjectTray: View {
         ScrollView {
           VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 8) {
-              quickTargetChip(title: "Inbox", symbol: "tray", tint: Color.accentColor) { ids in
+              quickTargetChip(title: TaskFilter.triage.title, symbol: "tray", tint: Color.accentColor) { ids in
                 let ok = onDropInbox(ids)
                 onDismiss()
                 return ok
               }
-              quickTargetChip(title: "Today", symbol: "sun.max.fill", tint: Theme.todayAccent) { ids in
+              quickTargetChip(title: TaskFilter.today.title, symbol: "sun.max.fill", tint: Theme.todayAccent) { ids in
                 let ok = onDropToday(ids)
                 onDismiss()
                 return ok

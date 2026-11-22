@@ -57,13 +57,13 @@ struct AddTaskPage: View {
 
   private var bucketLabel: String {
     switch bucket {
-    case .inbox: return "Inbox"
-    case .today: return "Today"
-    case .upcoming: return "Upcoming"
+    case .inbox: return TaskFilter.triage.title
+    case .today: return TaskFilter.today.title
+    case .upcoming: return TaskFilter.upcoming.title
     case .area(let id):
-      return LocalCache.areas(in: modelContext).first(where: { $0.id == id })?.title ?? "Area"
+      return LocalCache.areas(in: modelContext).first(where: { $0.id == id })?.title ?? TaskFilter.area(id).title
     case .project(let id):
-      return LocalCache.projects(in: modelContext).first(where: { $0.id == id })?.title ?? "Project"
+      return LocalCache.projects(in: modelContext).first(where: { $0.id == id })?.title ?? TaskFilter.project(id).title
     }
   }
 
@@ -140,7 +140,7 @@ struct AddTaskPage: View {
               Button { pullToToday(task) } label: {
                 AddInfoRow(
                   title: task.title,
-                  subtitle: "Move to Today",
+                  subtitle: RegistryActions.title("task.toggleToday", .add),
                   systemImage: "circle",
                   tint: tint
                 )
@@ -199,7 +199,7 @@ struct AddTaskPage: View {
     let before = TaskUndo.ScheduleSnapshot(task)
     mutator.moveToToday(id: task.id)
     TaskUndo.recordScheduleChange(
-      name: String(localized: "Move to Today", comment: "Undo action name"),
+      name: RegistryActions.title("task.toggleToday", .add),
       before: [before], context: modelContext, mutator: mutator)
     AddInfoSection.tasks.notifyTilesChanged()
     Haptics.tick()

@@ -28,7 +28,7 @@ enum KeyboardShortcutsCatalogue {
   private static var navigation: KeyboardShortcutGroup {
     #if SEPTASK
     let items: [KeyboardShortcut2] = RegistryDestinations.all.compactMap { dest in
-      guard let caps = dest.shortcutKeycaps else { return nil }
+      guard let caps = dest.shortcutKeycaps, dest.applies(to: RegistryPlatform.current) else { return nil }
       return KeyboardShortcut2(keys: caps, label: dest.title)
     }
     return KeyboardShortcutGroup(title: "Navigation", shortcuts: items)
@@ -38,10 +38,10 @@ enum KeyboardShortcutsCatalogue {
       KeyboardShortcut2(keys: ["⌘", "2"], label: "Next tab"),
       KeyboardShortcut2(keys: ["⌘", "3"], label: "Tasks tab"),
       KeyboardShortcut2(keys: ["⌘", "4"], label: "Goals tab"),
-      KeyboardShortcut2(keys: ["⌥", "⌘", "1"], label: "Inbox"),
-      KeyboardShortcut2(keys: ["⌥", "⌘", "2"], label: "Today"),
+      KeyboardShortcut2(keys: ["⌥", "⌘", "1"], label: TaskFilter.triage.title),
+      KeyboardShortcut2(keys: ["⌥", "⌘", "2"], label: TaskFilter.today.title),
       KeyboardShortcut2(keys: ["⌥", "⌘", "3"], label: "Next list"),
-      KeyboardShortcut2(keys: ["⌥", "⌘", "4"], label: "Upcoming"),
+      KeyboardShortcut2(keys: ["⌥", "⌘", "4"], label: TaskFilter.upcoming.title),
       KeyboardShortcut2(keys: ["⌥", "⌘", "5"], label: "Unscheduled"),
     ])
     #endif
@@ -136,7 +136,7 @@ struct KeyboardShortcutsView: View {
           }
         }
       }
-      .navigationTitle("Keyboard Shortcuts")
+      .navigationTitle(RegistryActions.title("app.keyboardShortcuts"))
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
