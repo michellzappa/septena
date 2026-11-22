@@ -1,0 +1,47 @@
+import SwiftUI
+
+// Capture, dictation first. The + opens the system text input at once
+// (dictation, Scribble or keyboard, the user's last choice); after it, one
+// tap says where the task goes. Inbox is first and the default.
+
+struct CaptureButton: View {
+  let onTitle: (String) -> Void
+
+  var body: some View {
+    TextFieldLink(prompt: Text("New To-Do")) {
+      Image(systemName: "plus")
+    } onSubmit: { text in
+      let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+      if !trimmed.isEmpty { onTitle(trimmed) }
+    }
+    .accessibilityLabel("New To-Do")
+  }
+}
+
+struct WhenPicker: View {
+  let title: String
+  let onPick: (WatchOp.When) -> Void
+
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 8) {
+        Text(title)
+          .font(.headline)
+          .lineLimit(4)
+          .padding(.bottom, 2)
+        choice(.inbox, "Inbox", "tray")
+          .handGestureShortcut(.primaryAction)
+        choice(.today, "Today", "star")
+        choice(.tomorrow, "Tomorrow", "sunrise")
+      }
+    }
+    .navigationTitle("Add to")
+  }
+
+  private func choice(_ when: WatchOp.When, _ label: LocalizedStringKey, _ symbol: String) -> some View {
+    Button { onPick(when) } label: {
+      Label(label, systemImage: symbol).frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .tint(when == .inbox ? .accentColor : nil)
+  }
+}

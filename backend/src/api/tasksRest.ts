@@ -57,7 +57,6 @@ export interface ClientTask {
   area?: string;
   project?: string;
   inbox?: true;
-  overdue?: true;
   repeats?: true;
   starred?: true;
   daysOnToday?: number;
@@ -65,7 +64,9 @@ export interface ClientTask {
   checklistDoneCount?: number;
 }
 
-export function clientTask(t: TaskOut, today: string, names: Map<string, string>): ClientTask {
+/// No derived "overdue": the client compares `deadline` with the `today` the
+/// response carries, so "Due today" and "Overdue" stay distinguishable.
+export function clientTask(t: TaskOut, names: Map<string, string>): ClientTask {
   const out: ClientTask = { id: t.id, title: t.title };
   if (t.notes) out.notes = t.notes;
   if (t.scheduled) out.scheduled = t.scheduled;
@@ -76,7 +77,6 @@ export function clientTask(t: TaskOut, today: string, names: Map<string, string>
   if (area) out.area = area;
   if (project) out.project = project;
   if (t.inbox) out.inbox = true;
-  if (t.deadline && t.deadline < today) out.overdue = true;
   if (t.recurrence) out.repeats = true;
   if (t.starred) out.starred = true;
   if (t.daysOnToday) out.daysOnToday = t.daysOnToday;
@@ -95,7 +95,7 @@ function containerNames(areas: Row[], projects: Row[]): Map<string, string> {
   return m;
 }
 
-const zView = z.enum(["today", "inbox", "upcoming"]);
+const zView = z.enum(["today", "inbox", "upcoming", "anytime"]);
 
 tasksRest.get("/", async (c) => {
   const q = z.object({
@@ -117,7 +117,7 @@ tasksRest.get("/", async (c) => {
     today,
     total: list.total,
     truncated: list.truncated,
-    tasks: (list.tasks as TaskOut[]).map((t) => clientTask(t, today, names)),
+    tasks: (list.tasks as TaskOut[]).map((t) => clientTask(t, names)),
   });
 });
 

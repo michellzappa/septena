@@ -64,11 +64,11 @@ describe("tasks REST surface (watch)", () => {
     const { clientTask } = await import("../src/api/tasksRest.ts");
     const list = await listTasks(rpc as never, "UTC", "today", 100);
     const names = new Map([["area-home", "Home"]]);
-    const out = (list.tasks as never[]).map((t) => clientTask(t, "2026-11-22", names));
+    const out = (list.tasks as never[]).map((t) => clientTask(t, names));
     assert.equal(out.length, 1);
     assert.equal(out[0].title, "Pay rent");
     assert.equal(out[0].area, "Home");
-    assert.equal(out[0].overdue, true);
+    assert.equal(out[0].deadline, "2000-01-01");
     assert.equal(out[0].repeats, true);
   });
 });

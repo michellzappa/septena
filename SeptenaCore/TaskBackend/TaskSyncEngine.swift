@@ -1097,6 +1097,9 @@ final class TaskSyncEngine {
     lastError = nil
     // The launch snapshot shows this account's Today (#82).
     TodaySnapshotStore.invalidate()
+    #if os(iOS) && SEPTASK
+    WatchBridge.shared.accountChanged()
+    #endif
   }
 
   /// Backend user id of the last sign-in on this device.
@@ -1156,6 +1159,9 @@ final class TaskSyncEngine {
     _ = StoreHealth.save(context, op: "taskSync.wipe")
     // Account switch / delete: the launch snapshot holds the old rows (#82).
     TodaySnapshotStore.invalidate()
+    #if os(iOS) && SEPTASK
+    WatchBridge.shared.accountChanged()
+    #endif
     store()?.deleteEverything()
     since = 0
     settingsReady = false

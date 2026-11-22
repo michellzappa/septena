@@ -35,6 +35,8 @@ enum SeptaskLaunch {
       // The next cold launch draws Today from this file (#82). macOS draws
       // its AppKit list without `TaskListView`, so it has no reader.
       TodaySnapshotWriter.shared.start()
+      // The Apple Watch: session handoff + Today context (docs/WATCH.md).
+      WatchBridge.shared.start()
       #endif
     }
     Task(priority: .utility) {

@@ -10,7 +10,7 @@ struct TasksTodayProvider: TimelineProvider {
   func placeholder(in context: Context) -> TasksTodayEntry {
     TasksTodayEntry(
       date: Date(),
-      data: TasksTodayComplicationData(remaining: 3, firstTitle: "Book dentist", updatedAt: Date()))
+      data: .placeholder)
   }
 
   func getSnapshot(in context: Context, completion: @escaping (TasksTodayEntry) -> Void) {
@@ -19,20 +19,27 @@ struct TasksTodayProvider: TimelineProvider {
 
   func getTimeline(in context: Context, completion: @escaping (Timeline<TasksTodayEntry>) -> Void) {
     let entry = TasksTodayEntry(date: Date(), data: TasksTodayComplicationData.load())
-    let timeline = Timeline(entries: [entry], policy: .never)
+    // The app reloads after every change; the midnight entry stops showing
+    // yesterday's count until the app refreshes.
+    let midnight = Calendar.current.startOfDay(for: Date().addingTimeInterval(86_400))
+    var tomorrow = entry.data
+    tomorrow.firstTitle = nil
+    tomorrow.secondTitle = nil
+    tomorrow.day = nil
+    let timeline = Timeline(entries: [entry, TasksTodayEntry(date: midnight, data: tomorrow)], policy: .never)
     completion(timeline)
   }
 }
 
 struct TasksTodayComplication: Widget {
-  let kind = "SeptaskToday"
+  let kind = TasksTodayComplicationData.widgetKind
 
   var body: some WidgetConfiguration {
     StaticConfiguration(kind: kind, provider: TasksTodayProvider()) { entry in
       TasksTodayComplicationView(entry: entry)
     }
     .configurationDisplayName("Today")
-    .description("Open tasks remaining for today.")
+    .description("What’s left for today, and what’s next.")
     .supportedFamilies([
       .accessoryCircular,
       .accessoryRectangular,
@@ -74,8 +81,11 @@ private struct CornerView: View {
   let data: TasksTodayComplicationData
 
   var body: some View {
-    Image(systemName: "checklist")
+    Image(systemName: data.remaining == 0 ? "checkmark.circle" : "checklist")
       .font(.title3.weight(.semibold))
+      .widgetLabel {
+        Text(data.remaining == 0 ? String(localized: "All clear") : String(localized: "\(data.remaining) left"))
+      }
   }
 }
 
@@ -113,9 +123,19 @@ private struct RectangularView: View {
       if let title = data.firstTitle {
         Text(title)
           .font(.caption.weight(.medium))
-          .lineLimit(2)
+          .lineLimit(data.secondTitle == nil ? 2 : 1)
+        if let second = data.secondTitle {
+          Text(second)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        }
+      } else if !data.connected {
+        Text("Open Septena")
+          .font(.caption)
+          .foregroundStyle(.secondary)
       } else {
-        Text("All done")
+        Text("All clear")
           .font(.caption)
           .foregroundStyle(.secondary)
       }
@@ -129,7 +149,9 @@ private struct InlineView: View {
 
   var body: some View {
     if data.remaining == 0 {
-      Label("All done", systemImage: "checkmark.circle.fill")
+      Label("All clear", systemImage: "checkmark.circle.fill")
+    } else if let first = data.firstTitle {
+      Text("\(data.remaining) · \(first)")
     } else {
       Text("\(data.remaining) · Today")
     }
