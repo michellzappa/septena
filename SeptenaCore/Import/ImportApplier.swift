@@ -20,6 +20,8 @@ enum ImportApplier {
 
   /// The snapshot `ImportPlanner.plan` needs.
   static func existing(context: ModelContext) -> ImportExisting {
+    // Earlier Things imports must be in the lineage before any plan reads it.
+    ImportLegacyThingsLineage.migrateIfNeeded(context: context)
     let areas = (try? context.fetch(FetchDescriptor<AreaEntity>())) ?? []
     let projects = ((try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? []).filter { $0.deletedAt == nil }
     let tasks = (try? context.fetch(FetchDescriptor<TaskEntity>(
@@ -120,6 +122,9 @@ enum ImportApplier {
         if task.trashed { taskMutator.delete(id: created.id) }
         try record(ImportLedgerItem(entity: .task, sourceId: task.sourceId, septenaID: created.id,
                                     action: .create, fingerprint: fingerprint(taskID: created.id, context: context)))
+        // Task creation is synchronous; yield now and then so the progress
+        // bar can draw during a large import.
+        if batch.items.count % 25 == 0 { await Task.yield() }
       }
     } catch {
       batch.state = .partial
@@ -147,6 +152,7 @@ enum ImportApplier {
   ) async throws -> ImportUndoResult {
     var batch: ImportLedgerBatch
     do { batch = try ImportLedger.load(batchID) } catch { throw ImportError.batchNotFound }
+    guard !batch.isLegacy else { throw ImportError.legacyBatchNotUndoable }
     guard batch.state != .undone else { return ImportUndoResult() }
 
     var result = ImportUndoResult()

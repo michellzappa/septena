@@ -181,6 +181,7 @@ enum ImportError: LocalizedError, Equatable {
   case duplicateSourceIDs(entity: String)
   case emptySource
   case batchNotFound
+  case legacyBatchNotUndoable
 
   var errorDescription: String? {
     switch self {
@@ -194,6 +195,8 @@ enum ImportError: LocalizedError, Equatable {
       return String(localized: "There is nothing to import.")
     case .batchNotFound:
       return String(localized: "That import could not be found on this device.")
+    case .legacyBatchNotUndoable:
+      return String(localized: "This import ran before Septena kept a record of imports, so it cannot be undone.")
     }
   }
 }

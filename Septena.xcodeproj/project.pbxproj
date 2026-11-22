@@ -72,9 +72,9 @@
 		2271DBB9D6444FA0F4E674E1 /* SelectableScrollList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31A3ECD555B2CFF44BE8E37A /* SelectableScrollList.swift */; };
 		24B78DD653EEBECD27F770A4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5B607B2041EC629B65EAF216 /* Assets.xcassets */; };
 		252256EA56353A6AE5783EED /* TaskInlineRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D0C61D7F9B6E0488BAFBD5B /* TaskInlineRows.swift */; };
+		2541B7BC5480CBDE18A3FD85 /* ImportLegacyThingsLineage.swift in Sources */ = {isa = PBXBuildFile; fileRef = D24AEA8BED7F4888DF4EEB9D /* ImportLegacyThingsLineage.swift */; };
 		28E6C6D574345F838074BDEB /* ImportLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89DE35F20091FCD1A25A4FC9 /* ImportLedger.swift */; };
 		29FFCA28F73906960B8D822A /* SeptaskKitRegistryMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 302C01F4346CEA58E00FF8A7 /* SeptaskKitRegistryMenu.swift */; };
-		2A3ADF828185A9C827079D4A /* ThingsImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0BB8C54E2E81F47170B26C /* ThingsImportView.swift */; };
 		2A70C7E73453E59C5BBCDBD2 /* TaskRowActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D28214CE13FEA04AD86CC40 /* TaskRowActions.swift */; };
 		2AE90E48B3A618367052F73E /* OpenNewTaskRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = E85658815D797A7AD141AF84 /* OpenNewTaskRouting.swift */; };
 		2AFB36A63BE9FAA6218AD0A3 /* SharedAppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89AFE66AACDB29E77B118877 /* SharedAppEnvironment.swift */; };
@@ -92,7 +92,6 @@
 		2FAD30E7916688823B23AAA7 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 82B033F3BFB3BA4D616AA595 /* Localizable.xcstrings */; };
 		2FBAAEE806ADEBBA87D748FE /* SeptaskKitMovePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E6C23B6FDCFCB3DC13CC497 /* SeptaskKitMovePicker.swift */; };
 		2FC8944A5494B52F555ABECE /* AppearancePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A2D10A736D3C3B317984AA /* AppearancePickerView.swift */; };
-		303AA6552B1FB390F0B263AC /* ThingsToSeptenaMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81972DBB932252387C43520 /* ThingsToSeptenaMapper.swift */; };
 		30EE74FF7664EB3721F89525 /* SettingsKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90F63193A78E860D04B223C3 /* SettingsKeys.swift */; };
 		31808C03E06FFBE3A6CA91EE /* DayBucketHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D8CDEE95613B81AB250FFC7 /* DayBucketHeader.swift */; };
 		31BBA78DA6CC7EB1B9D83319 /* ShortcutAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA44C493E8D32FA562025394 /* ShortcutAction.swift */; };
@@ -135,7 +134,6 @@
 		453704563EF39AB3A52D9C66 /* TimeTravelSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5226F75824E0CEF3CFD16EDB /* TimeTravelSheet.swift */; };
 		46AD501517F0473D34CC97B4 /* ThingsImportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C12D8EF3D8DC512726EC06D /* ThingsImportModels.swift */; };
 		470054145088DCC7BDAD1A8B /* ConnectedAppsDetails.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA70B1360BCCF32D58280A57 /* ConnectedAppsDetails.swift */; };
-		47149C9344F7EF0E7FB36167 /* ThingsImportSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54EB9C68EEEA42836E910D7 /* ThingsImportSupport.swift */; };
 		49B444FEFAAC7E0E5EB151FC /* ThingsImportParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807BF5EB0443AFEB40FD0D94 /* ThingsImportParser.swift */; };
 		4A8BA60CD98AE903948DC6C0 /* TasksWatchStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49D65622A4E2C5FDF6D0B129 /* TasksWatchStore.swift */; };
 		4AD46D10C3F517C3364FC13D /* AppDisplayName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 522653F0A698B3733B4B544A /* AppDisplayName.swift */; };
@@ -144,7 +142,9 @@
 		4BB016C98DCD2DD2A1C66596 /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD059496E1ABBDD436B3B98F /* AreasProjectsView.swift */; };
 		4BECA7D7E01EFCFDE1B45397 /* AIPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63575F69CDDCCE079FDAEE04 /* AIPolicy.swift */; };
 		4D1E1078F56E2A41100AC932 /* PlatformShims.swift in Sources */ = {isa = PBXBuildFile; fileRef = 305B119660BB1213464F800A /* PlatformShims.swift */; };
+		4D282E8091960C034A451196 /* ImportLegacyThingsLineage.swift in Sources */ = {isa = PBXBuildFile; fileRef = D24AEA8BED7F4888DF4EEB9D /* ImportLegacyThingsLineage.swift */; };
 		4D385248117B5B1C3B53F777 /* TaskRowActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D28214CE13FEA04AD86CC40 /* TaskRowActions.swift */; };
+		4D999F1B51E751111CA82DF2 /* ImportFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BE28EFA3AD5DC57961F6C14 /* ImportFlowView.swift */; };
 		4DBDA28E34CAAE8201FEFA07 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC74986EF0ED7384B3D6BAB /* ContentView.swift */; };
 		4DD938661AAE9472F51D7D3C /* TaskFadeSweepSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47F4F8A44DED55D383D5392D /* TaskFadeSweepSheet.swift */; };
 		4DF2B111C0A971471A3E83BF /* ImportBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7F6598FE504F738CBB74F07 /* ImportBundle.swift */; };
@@ -185,17 +185,14 @@
 		60643B990FF69DBCCCFAF4C5 /* SeptaskKitContainerNotes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D50EE8598280D8894D1D7B /* SeptaskKitContainerNotes.swift */; };
 		60C10B739BD2315CAD354238 /* TaskCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 025B71A56FEDEAF6DFA90B08 /* TaskCommands.swift */; };
 		61060A5270B0C7683C36E952 /* SeptaskKitTaskList.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9FAB53CD698E384BCEB2D0E /* SeptaskKitTaskList.swift */; };
-		613645E626A7E70093A8D248 /* ThingsImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0BB8C54E2E81F47170B26C /* ThingsImportView.swift */; };
 		6233DDEAB1D9D91E807AB729 /* OnDeviceReasoningProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 334559D8448B61ECE6CD6053 /* OnDeviceReasoningProvider.swift */; };
 		62939267740477E7D7FEEB1A /* ThingsImportScratchpad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BA01876C9B4C2ACFFAA3B3E /* ThingsImportScratchpad.swift */; };
 		62DB230A6974FF818D09B2C0 /* SeptenaTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF832BE2BCBE6BE2DD116878 /* SeptenaTab.swift */; };
 		650C39E0A2713310E79B7921 /* ThingsImportSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B9035941A1B1278C84894FB /* ThingsImportSource.swift */; };
-		6565580E334C0FC5E21899C3 /* ThingsImportApply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DE62CAD2CB81CF0A055BE30 /* ThingsImportApply.swift */; };
 		6597AC8412261AFE65DF2442 /* ThingsImportParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807BF5EB0443AFEB40FD0D94 /* ThingsImportParser.swift */; };
 		6721B1039C3F153A19AA09AF /* SeptenaServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D227602C1039FA2206A539A /* SeptenaServices.swift */; };
 		675CA4D708E1B8DC0CF64E48 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = BC28ED53CB3851082AE51E3B /* AppIcon.icns */; };
 		6804DE97DB747232B44C2E63 /* ShortcutAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA44C493E8D32FA562025394 /* ShortcutAction.swift */; };
-		68A43C6FAD298BA30C7D905C /* ThingsImportApply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DE62CAD2CB81CF0A055BE30 /* ThingsImportApply.swift */; };
 		69030C4693661207707D8859 /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
 		6A0058D47576D9E383B89CF6 /* SeptaskQuickActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 793BFFE1738735D4130811DA /* SeptaskQuickActions.swift */; };
 		6A0F1BA1E0616A651CBDD573 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 90CE387562D24188A0AF4ABB /* PrivacyInfo.xcprivacy */; };
@@ -250,6 +247,7 @@
 		7E35424A45A21CCEC2ED1700 /* DemoSeedMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF00EC44C1E78BE7E1417CDF /* DemoSeedMode.swift */; };
 		7E4562B68B27A3A47C0DC8DF /* TasksSkill.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12ECFD48C475A93B6DAC4C1 /* TasksSkill.swift */; };
 		7EE5FF3618C8A137B1BF9D45 /* SectionGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E3474BECAB8AFAE8A5E4FD /* SectionGlyph.swift */; };
+		7F1C6F73EDF64C2B092DD090 /* ImportFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BE28EFA3AD5DC57961F6C14 /* ImportFlowView.swift */; };
 		8074DCE21704505C6742EA23 /* TasksQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C01A0072EA027F544FB8E2E /* TasksQuickAddMenu.swift */; };
 		8115B4D49CB48DDADA10A7FD /* TaskSettingsSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA908450EB9620F790471F03 /* TaskSettingsSections.swift */; };
 		814F4BB8112B907F29396EAC /* SectionManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27161C741F9EC6CFC1F83CE0 /* SectionManifest.swift */; };
@@ -329,7 +327,6 @@
 		A374138B438BF982E5140E0D /* SeptaskKitComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8396DF9C6AB70CD82CCCFEF2 /* SeptaskKitComposer.swift */; };
 		A4556DE025021FFBFEB526DB /* LogCommit.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB729F5223964A4593866439 /* LogCommit.swift */; };
 		A502FC2BC963E7237495AEED /* GitHubProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7BAA3E1C2D19A55758017FC /* GitHubProvider.swift */; };
-		A66E3A4EEA2689BA3959EF19 /* ThingsToSeptenaMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81972DBB932252387C43520 /* ThingsToSeptenaMapper.swift */; };
 		A6AB86AE360811FEBE8359D0 /* SeptaskKitToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5262C87F63C45F97739ABD9E /* SeptaskKitToast.swift */; };
 		A74BB3E7BE101E9C7D13BA62 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5B607B2041EC629B65EAF216 /* Assets.xcassets */; };
 		A7731D354D27DB75CCFD2995 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
@@ -383,7 +380,6 @@
 		C198BDE12989B374F22532AA /* TaskSyncApply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6066BCBF19FFC0F308332140 /* TaskSyncApply.swift */; };
 		C23DB117D9740A048D5DA42B /* TaskReads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBF0DAD74F9392D507229CE /* TaskReads.swift */; };
 		C249F4333211620355AC9D66 /* SelectionLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C376673AF35159635AFCE207 /* SelectionLanguage.swift */; };
-		C31FC1B9C7E21C4895656D9F /* ThingsToSeptenaMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81972DBB932252387C43520 /* ThingsToSeptenaMapper.swift */; };
 		C3DF48E64A442CAD73FA1D2E /* SeptaskKitTaskList.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9FAB53CD698E384BCEB2D0E /* SeptaskKitTaskList.swift */; };
 		C43CC6B35AFB8BCDE9E8455F /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD038CA592ABBBE534D29BB /* SidebarView.swift */; };
 		C46A3A91CBE0E8A2B24D2432 /* ThingsImportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C12D8EF3D8DC512726EC06D /* ThingsImportModels.swift */; };
@@ -397,7 +393,6 @@
 		C7773AD4B14D11E1CB362AB2 /* SeptenaAppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82BF482D659A5EF073C91300 /* SeptenaAppGroup.swift */; };
 		C7A27278DC8ED0B98BE3D1D1 /* Info-Mac.plist in Resources */ = {isa = PBXBuildFile; fileRef = 552273A19DD4EF320AF9CE31 /* Info-Mac.plist */; };
 		C7A7B2D6BE486468CE875C18 /* TaskNavigationContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97FC76883369F74AE2BB5287 /* TaskNavigationContractTests.swift */; };
-		C7FACDABCB4027450AD44689 /* ThingsImportSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54EB9C68EEEA42836E910D7 /* ThingsImportSupport.swift */; };
 		C9F24311AFDF963561AF4FE1 /* SolarClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14C225D655D3B2B11F2054B6 /* SolarClock.swift */; };
 		CA31B720FF2AC7AF77D837B2 /* SeptaskKitSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = F23CC36450E728999075C2D6 /* SeptaskKitSurface.swift */; };
 		CA6D0E476058740F19921A70 /* TodaySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3FCDF9ED65D2DCC712F0A79 /* TodaySnapshot.swift */; };
@@ -431,7 +426,6 @@
 		DB9B8400DDFAD61590C6E1DF /* TaskUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 909E479DF4C6E8141D0C8044 /* TaskUndo.swift */; };
 		DBEDDFE37D2900EC1654F8C0 /* GroupedListSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13EF6D2C844190E2B875C554 /* GroupedListSection.swift */; };
 		DCFC5A8BAF4ADFC917A1F7D5 /* ConversationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15F376CF1F8AAFD193002AF6 /* ConversationEngine.swift */; };
-		DD623697036959F9E186C788 /* ThingsImportMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FF2DD3D0605F9F834DE3350 /* ThingsImportMapping.swift */; };
 		DD8D3125F2016A19FF560B04 /* TaskStructureOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4FD8156022B5BC0FAA1DDC2 /* TaskStructureOrder.swift */; };
 		DE222C131C0ABECB081CC330 /* AddInfoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F9726633BA57A3660E3B81 /* AddInfoRow.swift */; };
 		DE62085674692A8355730D74 /* OnDeviceAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ED4A5F0472A0D1F223A1077 /* OnDeviceAI.swift */; };
@@ -444,7 +438,6 @@
 		E0D08F455216DACBE44D697C /* ConversationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15F376CF1F8AAFD193002AF6 /* ConversationEngine.swift */; };
 		E0D09A93FEB7031444093374 /* TaskAttributeBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAE285F6839B70A6C740264A /* TaskAttributeBar.swift */; };
 		E1E5666E8DD9C3FD252E2EFE /* SeptaskKitSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C172F628CB1EBADF1BAC84EB /* SeptaskKitSidebar.swift */; };
-		E251B35880F459C20EF79874 /* ThingsImportMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FF2DD3D0605F9F834DE3350 /* ThingsImportMapping.swift */; };
 		E2A8C2FD8337CA7D7CDBA30E /* SelectionLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C376673AF35159635AFCE207 /* SelectionLanguage.swift */; };
 		E2D452333F772F9FC7D3FC2F /* TaskConvo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B9559BEC76161CBDBE76A10 /* TaskConvo.swift */; };
 		E2DC6F12AD7CE3772F3C9968 /* TaskCheckbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0EF20A42D5CF76D88B8EADA /* TaskCheckbox.swift */; };
@@ -467,7 +460,6 @@
 		ED09246C51387102FC1944F3 /* TaskHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18E48AC7FB126378FB07EF7F /* TaskHistory.swift */; };
 		ED507929D4F485623446704C /* LaunchMigrators.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9833C23214C009852FAF97DE /* LaunchMigrators.swift */; };
 		ED855BD576200D41492A3532 /* SettingsColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26C27D6A377796108D4A027 /* SettingsColor.swift */; };
-		EDE737BDE5BB778AFA19AF58 /* ThingsImportMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FF2DD3D0605F9F834DE3350 /* ThingsImportMapping.swift */; };
 		EE681EBEEDCF251F1BCD6663 /* TaskListContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74F4EE63016DB289C085D209 /* TaskListContextMenu.swift */; };
 		EE76A2853A1397D487D4C484 /* SeptaskKitPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3189A3B4E867D370B59957C5 /* SeptaskKitPrompt.swift */; };
 		EF23BD559A591B28E7827CDA /* TaskSettingsSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA908450EB9620F790471F03 /* TaskSettingsSections.swift */; };
@@ -576,8 +568,6 @@
 		064AD7254B378893C472B2D9 /* SeptenaPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaPage.swift; sourceTree = "<group>"; };
 		0AE874D502585AA472CA027E /* CommunityClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityClient.swift; sourceTree = "<group>"; };
 		0C06A1D1AB36E3778302425C /* TasksTodayComplicationData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksTodayComplicationData.swift; sourceTree = "<group>"; };
-		0D0BB8C54E2E81F47170B26C /* ThingsImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThingsImportView.swift; sourceTree = "<group>"; };
-		0DE62CAD2CB81CF0A055BE30 /* ThingsImportApply.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThingsImportApply.swift; sourceTree = "<group>"; };
 		0F367B45111BCD92DD817039 /* TaskHistorySection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskHistorySection.swift; sourceTree = "<group>"; };
 		10F9726633BA57A3660E3B81 /* AddInfoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoRow.swift; sourceTree = "<group>"; };
 		11B77F95468462520A3168ED /* RuntimeProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProfile.swift; sourceTree = "<group>"; };
@@ -642,7 +632,6 @@
 		4C0E4D88567E5D9C02EBD801 /* ConnectionHealth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionHealth.swift; sourceTree = "<group>"; };
 		4D28214CE13FEA04AD86CC40 /* TaskRowActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskRowActions.swift; sourceTree = "<group>"; };
 		4D86ABACD9C48916AECBEA66 /* RegistryMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegistryMenu.swift; sourceTree = "<group>"; };
-		4FF2DD3D0605F9F834DE3350 /* ThingsImportMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThingsImportMapping.swift; sourceTree = "<group>"; };
 		50416E7F1C401C7BE3A931AA /* SyncIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncIndicator.swift; sourceTree = "<group>"; };
 		50C93BF01E5F69A01E9E9302 /* SettingsRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRecord.swift; sourceTree = "<group>"; };
 		514B2164CFF2A2C8D2F777F6 /* ConversationCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationCard.swift; sourceTree = "<group>"; };
@@ -735,6 +724,7 @@
 		9833C23214C009852FAF97DE /* LaunchMigrators.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchMigrators.swift; sourceTree = "<group>"; };
 		985D162CC0D1FCEB25589451 /* TasksWatchRefresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksWatchRefresh.swift; sourceTree = "<group>"; };
 		987FCB4361693C9B7FB5731D /* ListSelectionScope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListSelectionScope.swift; sourceTree = "<group>"; };
+		9BE28EFA3AD5DC57961F6C14 /* ImportFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFlowView.swift; sourceTree = "<group>"; };
 		9CB6C346330FB9DFB6F000C9 /* TasksTodayComplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksTodayComplication.swift; sourceTree = "<group>"; };
 		9E48AFEC976A22FEF321AE70 /* FoundationModels.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = FoundationModels.framework; path = System/Library/Frameworks/FoundationModels.framework; sourceTree = SDKROOT; };
 		A08FC40736AFD2B5755C8D81 /* SeptaskKitSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskKitSettings.swift; sourceTree = "<group>"; };
@@ -767,7 +757,6 @@
 		C3D50EE8598280D8894D1D7B /* SeptaskKitContainerNotes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskKitContainerNotes.swift; sourceTree = "<group>"; };
 		C43D0178302244C35C205DC9 /* CommitMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommitMotion.swift; sourceTree = "<group>"; };
 		C477D7CDD9DF6AC28ED82D1A /* ConsistencyHeatmap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsistencyHeatmap.swift; sourceTree = "<group>"; };
-		C54EB9C68EEEA42836E910D7 /* ThingsImportSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThingsImportSupport.swift; sourceTree = "<group>"; };
 		C641220AFE9A17115F46A97C /* ReasoningProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReasoningProvider.swift; sourceTree = "<group>"; };
 		C71A4E1AB6E0523DC1EFBCDA /* TasksSkillPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksSkillPane.swift; sourceTree = "<group>"; };
 		C76671701936DCFC77B97142 /* SeptaskUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SeptaskUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -781,6 +770,7 @@
 		CF16D9CDF344D10FEF6ECA07 /* SeptaskRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskRootView.swift; sourceTree = "<group>"; };
 		D0915B27ABB464AF9B858A74 /* TaskFadeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskFadeTests.swift; sourceTree = "<group>"; };
 		D12ECFD48C475A93B6DAC4C1 /* TasksSkill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksSkill.swift; sourceTree = "<group>"; };
+		D24AEA8BED7F4888DF4EEB9D /* ImportLegacyThingsLineage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportLegacyThingsLineage.swift; sourceTree = "<group>"; };
 		D26C27D6A377796108D4A027 /* SettingsColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsColor.swift; sourceTree = "<group>"; };
 		D2E41573FA5B00CD2EE03D0C /* TaskFilingSuggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskFilingSuggestions.swift; sourceTree = "<group>"; };
 		D3A43D786998D198C9BCA480 /* CKEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CKEngine.swift; sourceTree = "<group>"; };
@@ -789,7 +779,6 @@
 		D4A1CF28130DC18463097263 /* NotificationKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationKit.swift; sourceTree = "<group>"; };
 		D55B87FDA0CBC236D8C868E1 /* SeptenaPlus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaPlus.swift; sourceTree = "<group>"; };
 		D72A1514292FB8D98B35257C /* SeptaskWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskWatchApp.swift; sourceTree = "<group>"; };
-		D81972DBB932252387C43520 /* ThingsToSeptenaMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThingsToSeptenaMapper.swift; sourceTree = "<group>"; };
 		D96B5AFE2BBE7454629E6A5C /* ProfileAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileAvatar.swift; sourceTree = "<group>"; };
 		DCCD5FC9C17ECAC668D04988 /* SeptaskKitFirstRun.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskKitFirstRun.swift; sourceTree = "<group>"; };
 		DD059496E1ABBDD436B3B98F /* AreasProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreasProjectsView.swift; sourceTree = "<group>"; };
@@ -1074,6 +1063,7 @@
 				C242027E9C714DCFEC355188 /* ImportApplier.swift */,
 				B7F6598FE504F738CBB74F07 /* ImportBundle.swift */,
 				89DE35F20091FCD1A25A4FC9 /* ImportLedger.swift */,
+				D24AEA8BED7F4888DF4EEB9D /* ImportLegacyThingsLineage.swift */,
 				A9A9FD1D0664B4A5EB008526 /* ImportPlanner.swift */,
 				BE2DDC3697E8BB67FA753362 /* ImportSource.swift */,
 				52AA78FA43CEB2F76BDDC359 /* Adapters */,
@@ -1131,6 +1121,7 @@
 				E76BB68C1E939296A1D7857C /* CalendarEventRow.swift */,
 				514B2164CFF2A2C8D2F777F6 /* ConversationCard.swift */,
 				15F376CF1F8AAFD193002AF6 /* ConversationEngine.swift */,
+				9BE28EFA3AD5DC57961F6C14 /* ImportFlowView.swift */,
 				888ABAFEFC82F50DCAC891D5 /* RemindersInboxSection.swift */,
 				F08CE2B7876357BC0F5C0A0C /* RemoteTaskSync.swift */,
 				D478A49F1ABB69D66FF622B8 /* ReviewTaskRow.swift */,
@@ -1162,8 +1153,6 @@
 				5C01A0072EA027F544FB8E2E /* TasksQuickAddMenu.swift */,
 				D12ECFD48C475A93B6DAC4C1 /* TasksSkill.swift */,
 				A2C45CF9B91456BCA71AA666 /* TaskViewOptions.swift */,
-				C54EB9C68EEEA42836E910D7 /* ThingsImportSupport.swift */,
-				0D0BB8C54E2E81F47170B26C /* ThingsImportView.swift */,
 			);
 			name = Tasks;
 			path = Septena/Shell/Tasks;
@@ -1211,13 +1200,10 @@
 			isa = PBXGroup;
 			children = (
 				6FDD0F2C1A80067D2D24A9ED /* ThingsDateDecoder.swift */,
-				0DE62CAD2CB81CF0A055BE30 /* ThingsImportApply.swift */,
-				4FF2DD3D0605F9F834DE3350 /* ThingsImportMapping.swift */,
 				6C12D8EF3D8DC512726EC06D /* ThingsImportModels.swift */,
 				807BF5EB0443AFEB40FD0D94 /* ThingsImportParser.swift */,
 				1BA01876C9B4C2ACFFAA3B3E /* ThingsImportScratchpad.swift */,
 				F75BBE36F4FDB38D97CC5132 /* ThingsSQLiteReader.swift */,
-				D81972DBB932252387C43520 /* ThingsToSeptenaMapper.swift */,
 			);
 			path = ThingsImport;
 			sourceTree = "<group>";
@@ -1727,7 +1713,9 @@
 				FC9C93DA24BFFD0B501ADF7A /* HomeChrome.swift in Sources */,
 				1BFCE6DAA43439C3F60AFAEA /* ImportApplier.swift in Sources */,
 				7D6DE4568F5E9A77FB51C3AB /* ImportBundle.swift in Sources */,
+				4D999F1B51E751111CA82DF2 /* ImportFlowView.swift in Sources */,
 				18706A894250E6914D670EAA /* ImportLedger.swift in Sources */,
+				4D282E8091960C034A451196 /* ImportLegacyThingsLineage.swift in Sources */,
 				853DAA6667D6B31B960F90D1 /* ImportPlanner.swift in Sources */,
 				9789D2FB98DDEE500D638DD7 /* ImportSource.swift in Sources */,
 				0A5DA9C8B27B81C26D86C1D6 /* KeyboardShortcutsView.swift in Sources */,
@@ -1882,16 +1870,11 @@
 				1A9BAB830C007CC0735DC411 /* TextSizeScale.swift in Sources */,
 				12700B9642E0695E4FBC00CE /* Theme.swift in Sources */,
 				89703F76F497967F8679E1B5 /* ThingsDateDecoder.swift in Sources */,
-				68A43C6FAD298BA30C7D905C /* ThingsImportApply.swift in Sources */,
-				E251B35880F459C20EF79874 /* ThingsImportMapping.swift in Sources */,
 				C46A3A91CBE0E8A2B24D2432 /* ThingsImportModels.swift in Sources */,
 				6597AC8412261AFE65DF2442 /* ThingsImportParser.swift in Sources */,
 				85AF4714AB6512B88465B073 /* ThingsImportScratchpad.swift in Sources */,
 				650C39E0A2713310E79B7921 /* ThingsImportSource.swift in Sources */,
-				C7FACDABCB4027450AD44689 /* ThingsImportSupport.swift in Sources */,
-				613645E626A7E70093A8D248 /* ThingsImportView.swift in Sources */,
 				1668FCFFBD70B6B468AF59CC /* ThingsSQLiteReader.swift in Sources */,
-				C31FC1B9C7E21C4895656D9F /* ThingsToSeptenaMapper.swift in Sources */,
 				453704563EF39AB3A52D9C66 /* TimeTravelSheet.swift in Sources */,
 				CA6D0E476058740F19921A70 /* TodaySnapshot.swift in Sources */,
 				87674DD53D8D1713619DEB7A /* VolumeUnit.swift in Sources */,
@@ -1915,14 +1898,12 @@
 				E9F84B23FF648640512D17C1 /* TaskFade.swift in Sources */,
 				F16973B670C0D239C7833D09 /* TaskFadeTests.swift in Sources */,
 				FA6ACC1A0B5AA5A3C72116E9 /* ThingsDateDecoder.swift in Sources */,
-				DD623697036959F9E186C788 /* ThingsImportMapping.swift in Sources */,
 				46AD501517F0473D34CC97B4 /* ThingsImportModels.swift in Sources */,
 				BC47EBBB90251EE9253A0F3A /* ThingsImportParser.swift in Sources */,
 				62939267740477E7D7FEEB1A /* ThingsImportScratchpad.swift in Sources */,
 				37D36A4792F578FB21B2EE40 /* ThingsImportTestFixtures.swift in Sources */,
 				A14981D64B7174A3A5C90F70 /* ThingsImportTests.swift in Sources */,
 				347685B09999072F2262EAF0 /* ThingsSQLiteReader.swift in Sources */,
-				303AA6552B1FB390F0B263AC /* ThingsToSeptenaMapper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1992,7 +1973,9 @@
 				44C24A7EB13C4359D8ADF4EC /* HomeChrome.swift in Sources */,
 				E74C21951AB5158E71B97559 /* ImportApplier.swift in Sources */,
 				4DF2B111C0A971471A3E83BF /* ImportBundle.swift in Sources */,
+				7F1C6F73EDF64C2B092DD090 /* ImportFlowView.swift in Sources */,
 				28E6C6D574345F838074BDEB /* ImportLedger.swift in Sources */,
+				2541B7BC5480CBDE18A3FD85 /* ImportLegacyThingsLineage.swift in Sources */,
 				F22049DC1F6D61554E8B98CD /* ImportPlanner.swift in Sources */,
 				B18FA926F83310946B5AC320 /* ImportSource.swift in Sources */,
 				C13DD2378BFE3A4F22E8906F /* KeyboardShortcutsView.swift in Sources */,
@@ -2147,16 +2130,11 @@
 				72B96392DE3026F6AE69E1A8 /* TextSizeScale.swift in Sources */,
 				2C6B13D9A7E1B6C82473E789 /* Theme.swift in Sources */,
 				6E8DA635CCBC03DD78E5FD09 /* ThingsDateDecoder.swift in Sources */,
-				6565580E334C0FC5E21899C3 /* ThingsImportApply.swift in Sources */,
-				EDE737BDE5BB778AFA19AF58 /* ThingsImportMapping.swift in Sources */,
 				B716560276C736E30E061040 /* ThingsImportModels.swift in Sources */,
 				49B444FEFAAC7E0E5EB151FC /* ThingsImportParser.swift in Sources */,
 				6E40E49236931DECE865D4EC /* ThingsImportScratchpad.swift in Sources */,
 				2BCD15FC870819107FE9B539 /* ThingsImportSource.swift in Sources */,
-				47149C9344F7EF0E7FB36167 /* ThingsImportSupport.swift in Sources */,
-				2A3ADF828185A9C827079D4A /* ThingsImportView.swift in Sources */,
 				431DA8EE28D08D8544A2F260 /* ThingsSQLiteReader.swift in Sources */,
-				A66E3A4EEA2689BA3959EF19 /* ThingsToSeptenaMapper.swift in Sources */,
 				9E7DBF2820517C53E994F6BD /* TimeTravelSheet.swift in Sources */,
 				2CA16CD559A6DD32D1F55FEA /* TodaySnapshot.swift in Sources */,
 				F5452FCCD62ABC74729519A8 /* VolumeUnit.swift in Sources */,

@@ -11,7 +11,7 @@ import Foundation
 ///
 /// The suite string was previously written out in seven places. New readers use
 /// this; the existing literals in `SharedTaskCapture`, `ClaudeGatewayProvider`,
-/// the widget snapshot stores, `DayBucket`, and `ThingsImportMapping` should
+/// the widget snapshot stores and `DayBucket` should
 /// fold in here rather than an eighth copy appearing.
 public enum SeptenaAppGroup {
   public static let suite = "group.com.septena.cloud"
