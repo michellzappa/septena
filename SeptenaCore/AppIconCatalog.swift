@@ -6,7 +6,7 @@ import AppKit
 import CoreGraphics
 #endif
 
-/// Canonical 31-icon prebaked App Icon system (1 Default + 30 Alternates)
+/// Canonical 23-icon prebaked App Icon system (1 Default + 22 Alternates)
 /// for Septena (`Septask/Assets.xcassets/AppIcon*.appiconset` on iOS, live
 /// CoreGraphics Dock + bundle icon on macOS).
 ///
@@ -22,8 +22,6 @@ enum AppIconFinish: String, CaseIterable, Sendable, Identifiable {
   case ceramic
   /// Things-style colored fruit shell with dark recessed moat, 90% black (or dark-mode white) checkmark.
   case framed
-  /// Always-dark PVD obsidian shell + smoked matte-black dial even in Light OS.
-  case stealth
 
   var id: String { rawValue }
 
@@ -32,7 +30,6 @@ enum AppIconFinish: String, CaseIterable, Sendable, Identifiable {
     case .obsidian: return "Default"
     case .ceramic:  return "Light"
     case .framed:   return "Framed"
-    case .stealth:  return "Stealth"
     }
   }
 
@@ -41,7 +38,6 @@ enum AppIconFinish: String, CaseIterable, Sendable, Identifiable {
     case .obsidian: return "Obsidian"
     case .ceramic:  return "Ceramic"
     case .framed:   return "Framed"
-    case .stealth:  return "Stealth"
     }
   }
 }
@@ -134,7 +130,7 @@ enum AppIconCatalog {
 
   /// Maps the user's Accent + Finish + optional color override to a concrete `AppIconColor`.
   /// In `Colorful` (default blue-leaning accent):
-  ///   • `Default`, `Light`, `Stealth` → Persimmon orange north (signature Septena)
+  ///   • `Default`, `Light` → Persimmon orange north (signature Septena)
   ///   • `Framed` → Haskap cobalt blue (Things-like blue frame)
   static func resolvedColor(
     finish: AppIconFinish,
@@ -165,7 +161,7 @@ enum AppIconCatalog {
   }
 
   /// Effective finish (`Framed` + `Mono` resolves cleanly to `Obsidian` + `Mono`,
-  /// avoiding a duplicate asset in the 31-icon bundle).
+  /// avoiding a duplicate asset in the 23-icon bundle).
   static func effectiveFinish(finish: AppIconFinish, color: AppIconColor) -> AppIconFinish {
     (finish == .framed && color == .mono) ? .obsidian : finish
   }
@@ -234,11 +230,10 @@ enum AppIconCatalog {
     let sc = body / 1024.0
     let cs = CGColorSpace(name: CGColorSpace.sRGB)!
 
-    let isStealth = finish == .stealth
     let isWhiteShell = finish == .ceramic
-    let isBlackShell = finish == .obsidian || isStealth
+    let isBlackShell = finish == .obsidian
     let isColoredShell = finish == .framed
-    let isDarkFace = isStealth ? true : isDarkOS
+    let isDarkFace = isDarkOS
     let isMono = color.isMono
     let accentCheck = !isColoredShell
 
@@ -289,10 +284,6 @@ enum AppIconCatalog {
       wellMid = cg(isDarkFace ? "#C2BFB7" : "#CBC7BE")
       wellBot = cg(isDarkFace ? "#D4D1C9" : "#DBD8D0")
       shadowCol = cg("#6E6A61")
-    } else if isStealth {
-      shellTop = cg("#26272E"); shellMid = cg("#17181D"); shellBot = cg("#0C0D10"); shellRim = cg("#4C4F5C")
-      wellTop = cg("#040406"); wellMid = cg("#08090C"); wellBot = cg("#0F1015")
-      shadowCol = cg("#020204")
     } else if isBlackShell {
       shellTop = cg("#3B3C46"); shellMid = cg("#27272E"); shellBot = cg("#15151A"); shellRim = cg("#686A78")
       wellTop = cg("#07070A"); wellMid = cg("#0F1015"); wellBot = cg("#181920")
@@ -308,15 +299,15 @@ enum AppIconCatalog {
       shadowCol = adjustL(color.baseHex, delta: -0.36, minL: 0.03, maxL: 0.14)
     }
 
-    let faceTop = isStealth ? cg("#212229") : (isDarkFace ? cg("#2E2F38") : cg("#FFFFFF"))
-    let faceMid = isStealth ? cg("#16171C") : (isDarkFace ? cg("#22232B") : cg(color.paperHex))
-    let faceBot = isStealth ? cg("#0E0F13") : (isDarkFace ? cg("#17181E") : adjustL(color.paperHex, delta: -0.05, minL: 0.86, maxL: 0.96))
+    let faceTop = isDarkFace ? cg("#2E2F38") : cg("#FFFFFF")
+    let faceMid = isDarkFace ? cg("#22232B") : cg(color.paperHex)
+    let faceBot = isDarkFace ? cg("#17181E") : adjustL(color.paperHex, delta: -0.05, minL: 0.86, maxL: 0.96)
 
     let accLight, accMid, accDeep: CGColor
     if isMono {
-      accLight = cg(isDarkFace ? (isStealth ? "#C9CDD6" : "#EFEFF4") : "#525660")
-      accMid   = cg(isDarkFace ? (isStealth ? "#9DA2AE" : "#D5D7E0") : "#434750")
-      accDeep  = cg(isDarkFace ? (isStealth ? "#777C88" : "#B4B7C2") : "#32353C")
+      accLight = cg(isDarkFace ? "#EFEFF4" : "#525660")
+      accMid   = cg(isDarkFace ? "#D5D7E0" : "#434750")
+      accDeep  = cg(isDarkFace ? "#B4B7C2" : "#32353C")
     } else {
       accLight = cg(color.darkHex)
       accMid   = cg(color.baseHex)
@@ -326,8 +317,8 @@ enum AppIconCatalog {
     let checkInkTop = cg(isDarkFace ? "#F6F6F8" : "#4C5058")
     let checkInkBot = cg(isDarkFace ? "#DFDFE5" : "#363940")
     let mutedGlyph = cg(
-      isStealth ? "#9A9EA9" : (isDarkFace ? "#C7C9D4" : "#6A6770"),
-      alpha: isStealth ? 0.28 : (isDarkFace ? 0.34 : 0.28)
+      isDarkFace ? "#C7C9D4" : "#6A6770",
+      alpha: isDarkFace ? 0.34 : 0.28
     )
 
     guard let ctx = CGContext(
@@ -388,14 +379,14 @@ enum AppIconCatalog {
     if let g = CGGradient(colorsSpace: cs, colors: [shellTop, shellMid, shellBot] as CFArray, locations: [0, 0.48, 1]) {
       ctx.drawLinearGradient(g, start: CGPoint(x: 164, y: 20), end: CGPoint(x: 860, y: 1024), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
     }
-    let sheenAlpha: CGFloat = isWhiteShell ? 0.45 : (isStealth ? 0.11 : (isBlackShell ? 0.16 : 0.24))
+    let sheenAlpha: CGFloat = isWhiteShell ? 0.45 : (isBlackShell ? 0.16 : 0.24)
     if let sg = CGGradient(colorsSpace: cs, colors: [cg("#FFFFFF", alpha: sheenAlpha), cg("#FFFFFF", alpha: 0.02), cg("#000000", alpha: isWhiteShell ? 0.06 : 0.14)] as CFArray, locations: [0, 0.55, 1]) {
       ctx.drawRadialGradient(sg, startCenter: CGPoint(x: 286, y: 123), startRadius: 0, endCenter: CGPoint(x: 286, y: 123), endRadius: 737, options: [.drawsAfterEndLocation])
     }
 
     // Outer specular rim
     ctx.addPath(squircle(in: CGRect(x: 8, y: 8, width: 1008, height: 1008), radiusRatio: 0.282))
-    ctx.setStrokeColor(isWhiteShell ? cg("#000000", alpha: 0.08) : shellRim.copy(alpha: isStealth ? 0.24 : 0.32) ?? shellRim)
+    ctx.setStrokeColor(isWhiteShell ? cg("#000000", alpha: 0.08) : shellRim.copy(alpha: 0.32) ?? shellRim)
     ctx.setLineWidth(6)
     ctx.strokePath()
 
@@ -412,7 +403,7 @@ enum AppIconCatalog {
     ctx.setLineWidth(8)
     ctx.strokeEllipse(in: CGRect(x: 512 - 412, y: 512 - 412, width: 824, height: 824))
 
-    ctx.setStrokeColor(cg("#FFFFFF", alpha: isWhiteShell ? 0.85 : (isStealth ? 0.14 : 0.20)))
+    ctx.setStrokeColor(cg("#FFFFFF", alpha: isWhiteShell ? 0.85 : 0.20))
     ctx.setLineWidth(4)
     ctx.strokeEllipse(in: CGRect(x: 512 - 415, y: 515 - 415, width: 830, height: 830))
 
@@ -431,7 +422,7 @@ enum AppIconCatalog {
     }
     ctx.restoreGState()
 
-    ctx.setStrokeColor(cg("#FFFFFF", alpha: isStealth ? 0.14 : (isDarkFace ? 0.18 : 0.94)))
+    ctx.setStrokeColor(cg("#FFFFFF", alpha: isDarkFace ? 0.18 : 0.94))
     ctx.setLineWidth(5)
     ctx.strokeEllipse(in: CGRect(x: 512 - 351, y: 512 - 351, width: 702, height: 702))
 

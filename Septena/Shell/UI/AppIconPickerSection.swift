@@ -3,8 +3,8 @@ import SwiftUI
 /// In-app App Icon picker for Settings ▸ Appearance (iOS, iPadOS, and macOS).
 ///
 /// Presents:
-///   • 4 Icon Styles (`Default`, `Light`, `Framed`, `Stealth`) with live vector
-///     previews matching the 31 prebaked `.appiconset` assets.
+///   • 3 Icon Styles (`Default`, `Light`, `Framed`) with live vector
+///     previews matching the 23 prebaked `.appiconset` assets.
 ///   • Compact Icon Color selector (`Default` = follows Accent above, or choose
 ///     any of the 7 exotic fruits + `Mono` independently).
 struct AppIconPickerSection: View {
@@ -31,9 +31,9 @@ struct AppIconPickerSection: View {
           .foregroundStyle(.secondary)
       }
 
-      // 1. Icon Style selector (4 finishes)
+      // 1. Icon Style selector (3 finishes)
       LazyVGrid(
-        columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4),
+        columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
         spacing: 8
       ) {
         ForEach(AppIconFinish.allCases) { finish in
@@ -198,11 +198,10 @@ struct SeptenaCompassIconView: View {
     AppIconCatalog.effectiveFinish(finish: finish, color: color)
   }
 
-  private var isStealth: Bool { effFinish == .stealth }
   private var isWhiteShell: Bool { effFinish == .ceramic }
-  private var isBlackShell: Bool { effFinish == .obsidian || isStealth }
+  private var isBlackShell: Bool { effFinish == .obsidian }
   private var isColoredShell: Bool { effFinish == .framed }
-  private var isDarkFace: Bool { isStealth ? true : isDarkOS }
+  private var isDarkFace: Bool { isDarkOS }
   private var isMono: Bool { color.isMono }
   private var accentCheck: Bool { !isColoredShell }
 
@@ -233,23 +232,20 @@ struct SeptenaCompassIconView: View {
 
   private var sheenTopOpacity: Double {
     if isWhiteShell { return 0.45 }
-    if isStealth { return 0.11 }
     return isBlackShell ? 0.16 : 0.24
   }
   private var sheenBottomOpacity: Double { isWhiteShell ? 0.06 : 0.14 }
   private var moatStrokeOpacity: Double { isWhiteShell ? 0.28 : 0.55 }
   private var dialRimOpacity: Double {
-    if isStealth { return 0.14 }
     return isDarkFace ? 0.18 : 0.94
   }
   private var dialShadowOpacity: Double { isWhiteShell ? 0.26 : 0.42 }
   private var tickOpacity: Double {
-    if isStealth { return 0.28 }
     return isDarkFace ? 0.34 : 0.28
   }
 
   private func shellRimColor(_ palette: ResolvedPalette) -> Color {
-    isWhiteShell ? Color.black.opacity(0.08) : palette.shellRim.opacity(isStealth ? 0.24 : 0.30)
+    isWhiteShell ? Color.black.opacity(0.08) : palette.shellRim.opacity(0.30)
   }
 
   // 1. Outer shell with a subtle top-left sheen.
@@ -414,15 +410,6 @@ struct SeptenaCompassIconView: View {
       wellMid = hex(isDarkFace ? "#C2BFB7" : "#CBC7BE")
       wellBot = hex(isDarkFace ? "#D4D1C9" : "#DBD8D0")
       shadow = hex("#6E6A61")
-    } else if isStealth {
-      shellTop = hex("#26272E")
-      shellMid = hex("#17181D")
-      shellBot = hex("#0C0D10")
-      shellRim = hex("#4C4F5C")
-      wellTop = hex("#040406")
-      wellMid = hex("#08090C")
-      wellBot = hex("#0F1015")
-      shadow = hex("#020204")
     } else if isBlackShell {
       shellTop = hex("#3B3C46")
       shellMid = hex("#27272E")
@@ -443,17 +430,17 @@ struct SeptenaCompassIconView: View {
       shadow = adjustLightness(baseRGB, delta: -0.36, minL: 0.03, maxL: 0.14)
     }
 
-    let faceTop = isStealth ? hex("#212229") : (isDarkFace ? hex("#2E2F38") : .white)
-    let faceMid = isStealth ? hex("#16171C") : (isDarkFace ? hex("#22232B") : paperRGB.swiftUIColor)
-    let faceBot = isStealth ? hex("#0E0F13") : (isDarkFace ? hex("#17181E") : adjustLightness(paperRGB, delta: -0.05, minL: 0.86, maxL: 0.96))
+    let faceTop = isDarkFace ? hex("#2E2F38") : .white
+    let faceMid = isDarkFace ? hex("#22232B") : paperRGB.swiftUIColor
+    let faceBot = isDarkFace ? hex("#17181E") : adjustLightness(paperRGB, delta: -0.05, minL: 0.86, maxL: 0.96)
 
     let accLight: Color
     let accMid: Color
     let accDeep: Color
     if isMono {
-      accLight = hex(isDarkFace ? (isStealth ? "#C9CDD6" : "#EFEFF4") : "#525660")
-      accMid   = hex(isDarkFace ? (isStealth ? "#9DA2AE" : "#D5D7E0") : "#434750")
-      accDeep  = hex(isDarkFace ? (isStealth ? "#777C88" : "#B4B7C2") : "#32353C")
+      accLight = hex(isDarkFace ? "#EFEFF4" : "#525660")
+      accMid   = hex(isDarkFace ? "#D5D7E0" : "#434750")
+      accDeep  = hex(isDarkFace ? "#B4B7C2" : "#32353C")
     } else {
       accLight = darkRGB.swiftUIColor
       accMid   = baseRGB.swiftUIColor
@@ -467,7 +454,7 @@ struct SeptenaCompassIconView: View {
       accLight: accLight, accMid: accMid, accDeep: accDeep,
       checkInkTop: hex(isDarkFace ? "#F6F6F8" : "#4C5058"),
       checkInkBot: hex(isDarkFace ? "#DFDFE5" : "#363940"),
-      mutedGlyph: hex(isStealth ? "#9A9EA9" : (isDarkFace ? "#C7C9D4" : "#6A6770"))
+      mutedGlyph: hex(isDarkFace ? "#C7C9D4" : "#6A6770")
     )
   }
 

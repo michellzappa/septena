@@ -7,7 +7,7 @@ import SwiftUI
 
 /// The Settings-row and About-pane icon: renders the user's active Septena
 /// Upright Compass app icon (`AppearancePreferences.shared`) at any size,
-/// adapting to Light/Dark appearance (while Stealth stays dark).
+/// adapting to Light/Dark appearance.
 struct SeptenaDiscTile: View {
   var size: CGFloat = 29
   private let appearance = AppearancePreferences.shared

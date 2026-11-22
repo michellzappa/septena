@@ -76,7 +76,7 @@ enum RegistryEntityEnums {
   static let telemetryLevel: [String] = ["none", "minimal", "balanced", "full"]
   static let appearanceMode: [String] = ["system", "light", "dark"]
   static let accentColor: [String] = ["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "acai", "pitaya", "jabuticaba"]
-  static let appIconFinish: [String] = ["obsidian", "ceramic", "framed", "stealth"]
+  static let appIconFinish: [String] = ["obsidian", "ceramic", "framed"]
   static let appIconColor: [String] = ["auto", "persimmon", "haskap", "tamarillo", "yuzu", "carambola", "acai", "pitaya", "mono"]
   static let canvasTexture: [String] = ["none", "topography", "fieldMatrix", "stippleDrift", "causticGlass", "ridges", "washiPaper"]
   static let textureMotion: [String] = ["still", "slowDrift"]

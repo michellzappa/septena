@@ -48,7 +48,7 @@ export const ENTITY_ENUMS = {
   telemetryLevel: ["none","minimal","balanced","full"] as const,
   appearanceMode: ["system","light","dark"] as const,
   accentColor: ["colorful","tamarillo","persimmon","yuzu","carambola","acai","pitaya","jabuticaba"] as const,
-  appIconFinish: ["obsidian","ceramic","framed","stealth"] as const,
+  appIconFinish: ["obsidian","ceramic","framed"] as const,
   appIconColor: ["auto","persimmon","haskap","tamarillo","yuzu","carambola","acai","pitaya","mono"] as const,
   canvasTexture: ["none","topography","fieldMatrix","stippleDrift","causticGlass","ridges","washiPaper"] as const,
   textureMotion: ["still","slowDrift"] as const,

@@ -147,8 +147,7 @@ pub mod enums {
         pub const OBSIDIAN: &str = "obsidian";
         pub const CERAMIC: &str = "ceramic";
         pub const FRAMED: &str = "framed";
-        pub const STEALTH: &str = "stealth";
-        pub const ALL: &[&str] = &["obsidian", "ceramic", "framed", "stealth"];
+        pub const ALL: &[&str] = &["obsidian", "ceramic", "framed"];
     }
     pub mod app_icon_color {
         pub const AUTO: &str = "auto";

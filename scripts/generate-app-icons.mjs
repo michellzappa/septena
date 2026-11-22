@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Generates all 31 prebaked Septena Upright Compass iOS App Icon asset sets
-// (1 Default `AppIcon` + 30 Alternates) inside `Septask/Assets.xcassets/`.
+// Generates all 23 prebaked Septena Upright Compass iOS App Icon asset sets
+// (1 Default `AppIcon` + 22 Alternates) inside `Septask/Assets.xcassets/`.
 //
 // Source of truth: `tools/logo-builder/dial-svg.mjs`.
 // Each `.appiconset` ships explicit 1024x1024 opaque RGB PNGs for both Light OS
 // and Dark OS (`luminosity: dark`), so iOS handles Light/Dark Home Screen icons
-// natively without auto-darkening Stealth icons.
+// natively.
 //
 // Usage: node scripts/generate-app-icons.mjs
 
@@ -35,12 +35,11 @@ const FINISH_SPECS = [
   { id: 'obsidian', prefix: 'Obsidian', shellMode: 'black' },
   { id: 'ceramic',  prefix: 'Ceramic',  shellMode: 'white' },
   { id: 'framed',   prefix: 'Framed',   shellMode: 'color' },
-  { id: 'stealth',  prefix: 'Stealth',  shellMode: 'stealth' },
 ];
 
 const paletteById = Object.fromEntries(FRUIT_PALETTES.map(p => [p.id, p]));
 
-// Build the exact 31-asset list (4 finishes x 8 colors, minus duplicate Framed+Mono)
+// Build the exact 23-asset list (3 finishes x 8 colors, minus duplicate Framed+Mono)
 const iconSets = [];
 for (const fin of FINISH_SPECS) {
   for (const col of COLOR_SPECS) {
@@ -60,7 +59,7 @@ console.log(`Generating ${iconSets.length} AppIcon asset sets in ${path.relative
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'septena-icons-'));
 try {
-  // 1. Write all unique SVG inputs (31 light + 23 dark = 54 SVGs; Stealth reuses its dark render for both slots)
+  // 1. Write all SVG inputs (23 light + 23 dark = 46 SVGs)
   const svgFiles = [];
   const renderJobs = [];
 
@@ -69,7 +68,7 @@ try {
     const lightSvgPath = path.join(tmpDir, `${lightBase}.svg`);
     const lightSvg = renderDialSVG('septena-compass', item.palette, {
       shellMode: item.finish.shellMode,
-      faceMode: item.finish.id === 'stealth' ? 'black' : 'white',
+      faceMode: 'white',
       mono: item.color.mono,
       fullBleed: true,
       size: 1024,
@@ -78,22 +77,18 @@ try {
     fs.writeFileSync(lightSvgPath, lightSvg, 'utf8');
     svgFiles.push(lightSvgPath);
 
-    let darkSvgPath = lightSvgPath;
-    let darkBase = lightBase;
-    if (item.finish.id !== 'stealth') {
-      darkBase = `${item.setName}-1024-dark`;
-      darkSvgPath = path.join(tmpDir, `${darkBase}.svg`);
-      const darkSvg = renderDialSVG('septena-compass', item.palette, {
-        shellMode: item.finish.shellMode,
-        faceMode: 'black',
-        mono: item.color.mono,
-        fullBleed: true,
-        size: 1024,
-        uid: `d_${item.setName}`,
-      });
-      fs.writeFileSync(darkSvgPath, darkSvg, 'utf8');
-      svgFiles.push(darkSvgPath);
-    }
+    const darkBase = `${item.setName}-1024-dark`;
+    const darkSvgPath = path.join(tmpDir, `${darkBase}.svg`);
+    const darkSvg = renderDialSVG('septena-compass', item.palette, {
+      shellMode: item.finish.shellMode,
+      faceMode: 'black',
+      mono: item.color.mono,
+      fullBleed: true,
+      size: 1024,
+      uid: `d_${item.setName}`,
+    });
+    fs.writeFileSync(darkSvgPath, darkSvg, 'utf8');
+    svgFiles.push(darkSvgPath);
 
     renderJobs.push({ item, lightBase, darkBase });
   }
@@ -102,7 +97,7 @@ try {
   execFileSync('qlmanage', ['-t', '-s', '1024', '-o', tmpDir, ...svgFiles], { stdio: 'ignore' });
 
   // 3. Flatten every PNG to an exact 1024x1024 opaque RGB PNG (no alpha channel for App Store Connect).
-  //    Primary `AppIcon` stays full 8-bit pristine quality. The 30 alternates
+  //    Primary `AppIcon` stays full 8-bit pristine quality. The 22 alternates
   //    are quantized to fewer levels per channel so Xcode's LZFSE asset
   //    catalog compresses them much better. A plain cut to few levels bands
   //    the dial's gradients, so the cut uses an 8x8 ordered (Bayer) dither:
