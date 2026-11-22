@@ -76,6 +76,14 @@ when you need to check exactly what is committed:
 remote-build "xcodegen generate && SEPTENA_NO_SIGNING=1 ./scripts/build.sh SeptaskMac 'platform=macOS'"
 ```
 
+**Android build and device artifact:** Android compiles through
+`.github/workflows/android.yml` on `ubuntu-latest`, using Temurin JDK 17 and
+the checked-in `android/gradlew` wrapper. The workflow uploads a short-lived
+debug APK artifact for the user to install on a connected device with `adb`.
+It does not run tests or launch the app. The mini currently has no Java runtime,
+so do not use `remote-build` for Android or install toolchains unless the user
+explicitly asks for that download.
+
 **Do NOT test — the user tests.** The compile above is the ONLY verification an
 agent runs. Never launch the app, boot a simulator, run UI tests, screenshot, or
 otherwise "verify it works" — when the change is built, report it and **ask the

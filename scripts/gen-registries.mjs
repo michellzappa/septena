@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Validates all `registry/*.json` files (including cross-file referential
-// integrity) and generates typed Swift + TypeScript bindings.
+// integrity) and generates typed Swift, TypeScript, and Kotlin bindings.
 //
 // Usage:
 //   node scripts/gen-registries.mjs          # validate and write generated files
@@ -102,6 +102,7 @@ function validateRules(rules) {
     "tombstoneTtlDays",
     "clientOpTtlDays",
     "changeLogTtlDays",
+    "deleteGraceSeconds",
   ];
   for (const k of required) {
     assert(typeof rules[k] === "number" && Number.isFinite(rules[k]) && rules[k] > 0, `rules.json: ${k} must be positive number`);
@@ -1327,6 +1328,231 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   return lines.join("\n");
 }
 
+const kotlinStr = (s) => JSON.stringify(s).replace(/\$/g, "\\$");
+const kotlinName = (s) => camelId(s).replace(/[^A-Za-z0-9_]/g, "_");
+const kotlinConstName = (s) => kotlinName(s)
+  .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+  .replace(/([A-Z])([A-Z][a-z])/g, "$1_$2")
+  .toUpperCase();
+const kotlinTypeName = (s) => {
+  const name = kotlinName(s);
+  return name.charAt(0).toUpperCase() + name.slice(1);
+};
+const kotlinLong = (value) => value === undefined ? "null" : `${value}L`;
+const kotlinDouble = (value) => value === undefined ? "null" : `${Number(value)}${Number.isInteger(Number(value)) ? ".0" : ""}`;
+const kotlinNullableString = (value) => value === undefined ? "null" : kotlinStr(value);
+const kotlinNullableBoolean = (value) => value === undefined ? "null" : String(value);
+
+function generateKotlinCore(bundle) {
+  const { entities, rules, caps, settings, dests, actions, icons } = bundle;
+  const lines = [
+    "// GENERATED FILE — DO NOT EDIT BY HAND.",
+    "// Sources: registry/*.json, registry/conformance/*.json",
+    "// Regenerate: node scripts/gen-registries.mjs",
+    "package app.septena.core.generated",
+    "",
+    "/** Registry-backed wire constraints shared by every client. */",
+    "object RegistryEntityPatterns {",
+  ];
+  for (const [key, value] of Object.entries(entities.patterns)) {
+    lines.push(`    const val ${kotlinName(key)}: String = ${kotlinStr(value)}`);
+  }
+  lines.push("    val all: Map<String, String> = linkedMapOf(");
+  for (const key of Object.keys(entities.patterns)) {
+    lines.push(`        ${kotlinStr(key)} to ${kotlinName(key)},`);
+  }
+  lines.push("    )");
+  lines.push("}");
+  lines.push("");
+
+  lines.push("/** Limits and enum values come directly from `registry/entities.json`. */");
+  lines.push("object RegistryEntityLimits {");
+  lines.push("    val all: Map<String, Long> = linkedMapOf(");
+  for (const [key, value] of Object.entries(entities.limits)) {
+    lines.push(`        ${kotlinStr(key)} to ${value}L,`);
+  }
+  lines.push("    )");
+  lines.push("}");
+  lines.push("");
+
+  lines.push("object RegistryEntityEnums {");
+  lines.push("    val all: Map<String, List<String>> = linkedMapOf(");
+  for (const [key, values] of Object.entries(entities.enums)) {
+    lines.push(`        ${kotlinStr(key)} to listOf(${values.map(kotlinStr).join(", ")}),`);
+  }
+  lines.push("    )");
+  for (const [key, values] of Object.entries(entities.enums)) {
+    lines.push(`    object ${kotlinTypeName(key)} {`);
+    for (const value of values) {
+      lines.push(`        const val ${kotlinConstName(value)}: String = ${kotlinStr(value)}`);
+    }
+    lines.push("    }");
+  }
+  lines.push("}");
+  lines.push("");
+
+  const entityNames = Object.keys(entities.entities);
+  const deletableNames = entityNames.filter((name) => entities.entities[name].deletable);
+  lines.push("data class RegistryColumnSpec(");
+  lines.push("    val kind: String,");
+  lines.push("    val format: String?,");
+  lines.push("    val enumName: String?,");
+  lines.push("    val nullable: Boolean?,");
+  lines.push("    val min: Double?,");
+  lines.push("    val max: Long?,");
+  lines.push("    val maxJsonLength: Long?,");
+  lines.push("    val defaultJson: String?,");
+  lines.push("    val serverOwned: Boolean,");
+  lines.push(")");
+  lines.push("");
+  lines.push("data class RegistryEntitySpec(");
+  lines.push("    val table: String,");
+  lines.push("    val deletable: Boolean,");
+  lines.push("    val requiredOnInsert: Set<String>,");
+  lines.push("    val updatable: Set<String>?,");
+  lines.push("    val columns: Map<String, RegistryColumnSpec>,");
+  lines.push(")");
+  lines.push("");
+
+  lines.push("/** Full entity and field contract generated from the canonical registry. */");
+  lines.push("object RegistryEntities {");
+  lines.push("    val all: Map<String, RegistryEntitySpec> = linkedMapOf(");
+  for (const [entityName, entity] of Object.entries(entities.entities)) {
+    lines.push(`        ${kotlinStr(entityName)} to RegistryEntitySpec(`);
+    lines.push(`            table = ${kotlinStr(entity.table)},`);
+    lines.push(`            deletable = ${entity.deletable},`);
+    lines.push(`            requiredOnInsert = setOf(${entity.requiredOnInsert.map(kotlinStr).join(", ")}),`);
+    lines.push(`            updatable = ${entity.updatable === undefined ? "null" : `setOf(${entity.updatable.map(kotlinStr).join(", ")})`},`);
+    lines.push("            columns = linkedMapOf(");
+    for (const [columnName, column] of Object.entries(entity.columns)) {
+      lines.push(`                ${kotlinStr(columnName)} to RegistryColumnSpec(`);
+      lines.push(`                    kind = ${kotlinStr(column.kind)},`);
+      lines.push(`                    format = ${kotlinNullableString(column.format)},`);
+      lines.push(`                    enumName = ${kotlinNullableString(column.enum)},`);
+      lines.push(`                    nullable = ${kotlinNullableBoolean(column.nullable)},`);
+      lines.push(`                    min = ${kotlinDouble(column.min)},`);
+      lines.push(`                    max = ${kotlinLong(column.max)},`);
+      lines.push(`                    maxJsonLength = ${kotlinLong(column.maxJsonLength)},`);
+      lines.push(`                    defaultJson = ${column.default === undefined ? "null" : kotlinStr(JSON.stringify(column.default))},`);
+      lines.push(`                    serverOwned = ${column.serverOwned === true},`);
+      lines.push("                ),");
+    }
+    lines.push("            ),");
+    lines.push("        ),");
+  }
+  lines.push("    )");
+  lines.push(`    val names: List<String> = listOf(${entityNames.map(kotlinStr).join(", ")})`);
+  lines.push(`    val deletableNames: Set<String> = setOf(${deletableNames.map(kotlinStr).join(", ")})`);
+  lines.push("}");
+  lines.push("");
+
+  lines.push("/** Generated field keys prevent each client from maintaining its own wire spelling. */");
+  lines.push("object RegistryEntityFields {");
+  for (const [entityName, entity] of Object.entries(entities.entities)) {
+    lines.push(`    object ${kotlinTypeName(entityName)} {`);
+    for (const columnName of Object.keys(entity.columns)) {
+      lines.push(`        const val ${kotlinConstName(columnName)}: String = ${kotlinStr(columnName)}`);
+    }
+    lines.push("    }");
+  }
+  lines.push("}");
+  lines.push("");
+
+  lines.push("object RegistryEntityNames {");
+  for (const entityName of entityNames) {
+    lines.push(`    const val ${kotlinConstName(entityName)}: String = ${kotlinStr(entityName)}`);
+  }
+  lines.push(`    val all: List<String> = listOf(${entityNames.map(kotlinStr).join(", ")})`);
+  lines.push(`    val deletable: Set<String> = setOf(${deletableNames.map(kotlinStr).join(", ")})`);
+  lines.push("}");
+  lines.push("");
+
+  lines.push("/** Numeric domain constants shared with the backend and Apple clients. */");
+  lines.push("object RegistryRules {");
+  for (const [key, value] of Object.entries(rules)) {
+    if (key === "version") continue;
+    const type = Number.isInteger(value) ? "Long" : "Double";
+    const literal = Number.isInteger(value) ? `${value}L` : `${value}`;
+    lines.push(`    const val ${kotlinConstName(key)}: ${type} = ${literal}`);
+  }
+  lines.push("}");
+  lines.push("");
+
+  const emitIdObject = (objectName, ids) => {
+    lines.push(`/** Stable IDs generated from the canonical registry: ${objectName}. */`);
+    lines.push(`object ${objectName} {`);
+    const seen = new Set();
+    for (const id of ids) {
+      const constant = kotlinConstName(id);
+      assert(!seen.has(constant), `${objectName}: IDs collide after Kotlin constant conversion at ${id}`);
+      seen.add(constant);
+      lines.push(`    const val ${constant}: String = ${kotlinStr(id)}`);
+    }
+    lines.push("}");
+    lines.push("");
+  };
+
+  emitIdObject("RegistrySettingKeys", Object.keys(settings.keys));
+  emitIdObject("RegistryDestinationIds", dests.destinations.map((destination) => destination.id));
+  emitIdObject("RegistryActionIds", Object.keys(actions.actions));
+  emitIdObject("RegistryCapabilityIds", Object.keys(caps.capabilities));
+  emitIdObject("RegistryIconIds", Object.keys(icons.icons));
+  emitIdObject("RegistryPlatformIds", caps.platforms);
+
+  lines.push("/** Capability status by canonical feature ID and platform. */");
+  lines.push("object RegistryCapabilities {");
+  lines.push("    val statusByFeatureAndPlatform: Map<String, Map<String, String>> = linkedMapOf(");
+  for (const [featureId, capability] of Object.entries(caps.capabilities)) {
+    lines.push(`        ${kotlinStr(featureId)} to linkedMapOf(`);
+    for (const [platform, status] of Object.entries(capability)) {
+      if (platform === "title") continue;
+      lines.push(`            ${kotlinStr(platform)} to ${kotlinStr(status)},`);
+    }
+    lines.push("        ),");
+  }
+  lines.push("    )");
+  lines.push("    val androidStatusByFeatureId: Map<String, String> = linkedMapOf(");
+  for (const [featureId, capability] of Object.entries(caps.capabilities)) {
+    lines.push(`        ${kotlinStr(featureId)} to ${kotlinStr(capability.android)},`);
+  }
+  lines.push("    )");
+  lines.push("}");
+  lines.push("");
+
+  // The presentation registries are consumed at runtime by every client.
+  // Keep their complete canonical JSON available to Kotlin as generated
+  // resources too; Android must not grow hand-maintained copies of actions,
+  // settings, surfaces, destinations, icons, tokens, or capability metadata.
+  lines.push("/** Complete canonical registry documents for Kotlin/JVM clients. */");
+  lines.push("object RegistryDocuments {");
+  for (const [name, document] of Object.entries({
+    entities: bundle.entities,
+    rules: bundle.rules,
+    icons: bundle.icons,
+    tokens: bundle.tokens,
+    capabilities: bundle.caps,
+    settings: bundle.settings,
+    destinations: bundle.dests,
+    actions: bundle.actions,
+    surfaces: bundle.surfaces,
+    conformance: bundle.conformance,
+    localizations: bundle.translations,
+  })) {
+    const value = JSON.stringify(document);
+    // A JVM string constant cannot exceed the class-file UTF-8 limit. Split
+    // into small pieces so future registry growth cannot make generation
+    // silently produce an invalid class.
+    const chunks = value.match(/[\s\S]{1,12000}/g) ?? [""];
+    lines.push(`    val ${kotlinName(name)}Json: String = listOf(`);
+    for (const chunk of chunks) lines.push(`        ${kotlinStr(chunk)},`);
+    lines.push("    ).joinToString(\"\")");
+  }
+  lines.push("}");
+  lines.push("");
+
+  return lines.join("\n");
+}
+
 function writeOrCheck(rel, content) {
   const full = path.join(REPO, rel);
   const existing = fs.existsSync(full) ? fs.readFileSync(full, "utf8") : null;
@@ -1381,10 +1607,19 @@ if (SEED_LANG) {
 const TRANSLATIONS = L10N.readTranslations(REPO);
 const l10nReport = L10N.checkTranslations(BY_KEY, TRANSLATIONS, assert);
 
-const bundle = { entities, rules, icons, tokens, caps, settings, dests, actions, surfaces };
+const conformanceDir = path.join(REPO, "registry/conformance");
+const conformance = Object.fromEntries(
+  fs.readdirSync(conformanceDir).filter((name) => name.endsWith(".json")).sort()
+    .map((name) => [name.replace(/\.json$/, ""), readJSON(`registry/conformance/${name}`)]),
+);
+const bundle = {
+  entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, conformance,
+  translations: { en: JSON.parse(L10N.englishFile(BY_KEY)), ...TRANSLATIONS },
+};
 const outputs = [
   ["SeptenaCore/Generated/RegistryConstants.swift", generateSwift(bundle)],
   ["backend/src/generated/registries.ts", generateTS(bundle)],
+  ["android/core/src/main/kotlin/app/septena/core/generated/RegistryConstants.kt", generateKotlinCore(bundle)],
   ["registry/l10n/en.json", L10N.englishFile(BY_KEY)],
 ];
 // The catalog is shared with Xcode, which rewrites extraction state and

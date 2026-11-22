@@ -102,6 +102,7 @@ enum RegistryRules {
   static let tombstoneTtlDays: Int = 90
   static let clientOpTtlDays: Int = 30
   static let changeLogTtlDays: Int = 365
+  static let deleteGraceSeconds: Int = 120
 }
 
 /// Semantic icon ID → SF Symbol lookup (`registry/icons.json`).

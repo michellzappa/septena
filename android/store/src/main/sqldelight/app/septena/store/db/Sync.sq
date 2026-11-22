@@ -1,0 +1,215 @@
+CREATE TABLE sync_record (
+  entity TEXT NOT NULL,
+  id TEXT NOT NULL,
+  fields_json TEXT NOT NULL,
+  revision INTEGER,
+  updated_at TEXT,
+  deleted_at TEXT,
+  remote_known INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (entity, id)
+);
+
+CREATE TABLE sync_shadow (
+  entity TEXT NOT NULL,
+  id TEXT NOT NULL,
+  fields_json TEXT NOT NULL,
+  revision INTEGER,
+  gone INTEGER NOT NULL DEFAULT 0,
+  remote_known INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (entity, id)
+);
+
+CREATE TABLE sync_turn (
+  task_id TEXT NOT NULL,
+  sequence INTEGER NOT NULL,
+  fields_json TEXT NOT NULL,
+  PRIMARY KEY (task_id, sequence)
+);
+
+CREATE TABLE sync_local_turn (
+  local_seq INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  task_id TEXT NOT NULL,
+  client_op_id TEXT NOT NULL UNIQUE,
+  fields_json TEXT NOT NULL
+);
+
+CREATE INDEX sync_local_turn_task_order ON sync_local_turn(task_id, local_seq);
+
+CREATE TABLE sync_outbox (
+  seq INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  client_op_id TEXT NOT NULL UNIQUE,
+  op_json TEXT NOT NULL,
+  entity TEXT NOT NULL,
+  row_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  not_before_ms INTEGER NOT NULL,
+  sent INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX sync_outbox_row_order ON sync_outbox(entity, row_id, seq);
+CREATE INDEX sync_outbox_due_order ON sync_outbox(not_before_ms, seq);
+
+CREATE TABLE sync_rejected (
+  client_op_id TEXT NOT NULL PRIMARY KEY,
+  op_json TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  rejected_at_ms INTEGER NOT NULL,
+  retryable INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE sync_metadata (
+  key TEXT NOT NULL PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+selectRecord:
+SELECT entity, id, fields_json AS fieldsJson, revision, updated_at AS updatedAt,
+       deleted_at AS deletedAt, remote_known AS remoteKnown
+FROM sync_record WHERE entity = ? AND id = ?;
+
+selectRecords:
+SELECT entity, id, fields_json AS fieldsJson, revision, updated_at AS updatedAt,
+       deleted_at AS deletedAt, remote_known AS remoteKnown
+FROM sync_record WHERE entity = ? ORDER BY id;
+
+selectTurns:
+SELECT task_id AS taskId, sequence, fields_json AS fieldsJson
+FROM sync_turn WHERE task_id = ? ORDER BY sequence;
+
+selectLocalTurns:
+SELECT local_seq AS localSeq, task_id AS taskId, client_op_id AS clientOpId, fields_json AS fieldsJson
+FROM sync_local_turn WHERE task_id = ? ORDER BY local_seq;
+
+insertLocalTurn:
+INSERT INTO sync_local_turn(task_id, client_op_id, fields_json) VALUES (?, ?, ?);
+
+deleteLocalTurnByOp:
+DELETE FROM sync_local_turn WHERE client_op_id = ?;
+
+updateLocalTurnClientOpId:
+UPDATE sync_local_turn SET client_op_id = ? WHERE client_op_id = ?;
+
+deleteLocalTurns:
+DELETE FROM sync_local_turn WHERE task_id = ?;
+
+upsertTurn:
+INSERT INTO sync_turn(task_id, sequence, fields_json) VALUES (?, ?, ?)
+ON CONFLICT(task_id, sequence) DO UPDATE SET fields_json = excluded.fields_json;
+
+deleteAllTurns:
+DELETE FROM sync_turn;
+
+upsertRecord:
+INSERT INTO sync_record(entity, id, fields_json, revision, updated_at, deleted_at, remote_known)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(entity, id) DO UPDATE SET
+  fields_json = excluded.fields_json,
+  revision = excluded.revision,
+  updated_at = excluded.updated_at,
+  deleted_at = excluded.deleted_at,
+  remote_known = excluded.remote_known;
+
+deleteRecord:
+DELETE FROM sync_record WHERE entity = ? AND id = ?;
+
+selectShadow:
+SELECT entity, id, fields_json AS fieldsJson, revision, gone, remote_known AS remoteKnown
+FROM sync_shadow WHERE entity = ? AND id = ?;
+
+selectAllShadows:
+SELECT entity, id, fields_json AS fieldsJson, revision, gone, remote_known AS remoteKnown
+FROM sync_shadow;
+
+upsertShadow:
+INSERT INTO sync_shadow(entity, id, fields_json, revision, gone, remote_known)
+VALUES (?, ?, ?, ?, ?, ?)
+ON CONFLICT(entity, id) DO UPDATE SET
+  fields_json = excluded.fields_json,
+  revision = excluded.revision,
+  gone = excluded.gone,
+  remote_known = excluded.remote_known;
+
+deleteAllShadows:
+DELETE FROM sync_shadow;
+
+insertOutbox:
+INSERT INTO sync_outbox(client_op_id, op_json, entity, row_id, kind, payload_json, not_before_ms, sent)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+selectLastRowOperation:
+SELECT seq, client_op_id AS clientOpId, op_json AS operationJson, entity, row_id AS rowId,
+       kind, payload_json AS payloadJson, not_before_ms AS notBeforeMs, sent
+FROM sync_outbox WHERE entity = ? AND row_id = ? AND kind IN ('upsert', 'delete')
+ORDER BY seq DESC LIMIT 1;
+
+selectOutboxForRow:
+SELECT seq, client_op_id AS clientOpId, op_json AS operationJson, entity, row_id AS rowId,
+       kind, payload_json AS payloadJson, not_before_ms AS notBeforeMs, sent
+FROM sync_outbox WHERE entity = ? AND row_id = ? ORDER BY seq;
+
+selectAllOutbox:
+SELECT seq, client_op_id AS clientOpId, op_json AS operationJson, entity, row_id AS rowId,
+       kind, payload_json AS payloadJson, not_before_ms AS notBeforeMs, sent
+FROM sync_outbox ORDER BY seq;
+
+selectDueOutbox:
+SELECT seq, client_op_id AS clientOpId, op_json AS operationJson, entity, row_id AS rowId,
+       kind, payload_json AS payloadJson, not_before_ms AS notBeforeMs, sent
+FROM sync_outbox WHERE not_before_ms <= ? ORDER BY seq LIMIT ?;
+
+markOutboxSent:
+UPDATE sync_outbox SET sent = 1 WHERE client_op_id = ?;
+
+updateUnsentOutbox:
+UPDATE sync_outbox SET op_json = ?, payload_json = ?, not_before_ms = ?
+WHERE client_op_id = ? AND sent = 0;
+
+deleteOutbox:
+DELETE FROM sync_outbox WHERE client_op_id = ?;
+
+deleteUnsentRowOutbox:
+DELETE FROM sync_outbox WHERE entity = ? AND row_id = ? AND sent = 0;
+
+deleteAllRowOutbox:
+DELETE FROM sync_outbox WHERE entity = ? AND row_id = ?;
+
+selectRejected:
+SELECT client_op_id AS clientOpId, op_json AS operationJson, reason, rejected_at_ms AS rejectedAtMs, retryable
+FROM sync_rejected ORDER BY rejected_at_ms;
+
+selectRejectedByID:
+SELECT client_op_id AS clientOpId, op_json AS operationJson, reason, rejected_at_ms AS rejectedAtMs, retryable
+FROM sync_rejected WHERE client_op_id = ?;
+
+upsertRejected:
+INSERT INTO sync_rejected(client_op_id, op_json, reason, rejected_at_ms, retryable)
+VALUES (?, ?, ?, ?, ?)
+ON CONFLICT(client_op_id) DO UPDATE SET
+  reason = excluded.reason,
+  rejected_at_ms = excluded.rejected_at_ms,
+  retryable = excluded.retryable;
+
+deleteRejected:
+DELETE FROM sync_rejected WHERE client_op_id = ?;
+
+selectSyncCursor:
+SELECT value FROM sync_metadata WHERE key = 'since';
+
+setSyncCursor:
+INSERT INTO sync_metadata(key, value) VALUES ('since', ?)
+ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+
+resetRemoteRecords:
+DELETE FROM sync_record
+WHERE remote_known = 1
+  AND NOT EXISTS (
+    SELECT 1 FROM sync_outbox
+    WHERE sync_outbox.entity = sync_record.entity AND sync_outbox.row_id = sync_record.id
+  );
+
+clearRemoteRecordMetadata:
+UPDATE sync_record SET revision = NULL, updated_at = NULL, remote_known = 0;
+
+deleteAllMetadata:
+DELETE FROM sync_metadata;
