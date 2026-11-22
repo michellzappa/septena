@@ -132,6 +132,16 @@ struct SeptaskFirstRunView: View {
         .buttonStyle(.borderless)
       }
       Spacer()
+      // Closing counts as finished, so the first run never traps the user
+      // (2026-11-22). About ▸ Show Welcome Again brings it back.
+      if step?.kind != "finish" {
+        Button(action: finish) {
+          Label("Close", systemImage: "xmark")
+            .labelStyle(.iconOnly)
+        }
+        .buttonStyle(.borderless)
+        .keyboardShortcut(.cancelAction)
+      }
     }
     .padding(.horizontal, 16)
     .padding(.top, 12)

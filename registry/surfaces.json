@@ -258,40 +258,6 @@
         "secondary": { "title": "Not now", "action": "next" }
       },
       {
-        "id": "moveIn",
-        "kind": "choices",
-        "icon": "onboarding.move_in",
-        "title": "Bring your tasks",
-        "body": "Start from the list you already have, or start empty.",
-        "completesGetStartedStep": "importTasks",
-        "choices": [
-          {
-            "id": "things",
-            "icon": "onboarding.things",
-            "title": "From Things",
-            "detail": "Copies your areas, projects and tasks. Nothing in Things changes.",
-            "action": "importThings",
-            "platforms": ["ios", "ipados", "macos"]
-          },
-          {
-            "id": "reminders",
-            "icon": "settings.reminders",
-            "title": "From Reminders",
-            "detail": "Pick a Reminders list. Each reminder you bring in moves to your Inbox, and Septena deletes it from Reminders.",
-            "action": "importReminders",
-            "platforms": ["ios", "ipados", "macos"]
-          },
-          {
-            "id": "fresh",
-            "icon": "onboarding.fresh",
-            "title": "Start empty",
-            "detail": "Add tasks as they come up.",
-            "action": "next",
-            "platforms": ["ios", "ipados", "macos", "web", "android", "windows"]
-          }
-        ]
-      },
-      {
         "id": "connectClaude",
         "kind": "connectAgent",
         "icon": "settings.claude",

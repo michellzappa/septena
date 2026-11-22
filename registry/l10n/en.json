@@ -145,12 +145,6 @@
       "destinations.destinations.today.emptyState.detail"
     ]
   },
-  "Add tasks as they come up.": {
-    "text": "Add tasks as they come up.",
-    "paths": [
-      "surfaces.firstRun.steps.moveIn.choices.fresh.detail"
-    ]
-  },
   "Add your first task": {
     "text": "Add your first task",
     "paths": [
@@ -297,12 +291,6 @@
     "text": "Bring in your tasks",
     "paths": [
       "surfaces.notices.items.getStarted.steps.importTasks.title"
-    ]
-  },
-  "Bring your tasks": {
-    "text": "Bring your tasks",
-    "paths": [
-      "surfaces.firstRun.steps.moveIn.title"
     ]
   },
   "Calendar": {
@@ -492,12 +480,6 @@
     "paths": [
       "surfaces.firstRun.steps.welcome.primary.title",
       "surfaces.firstRun.steps.connectClaude.afterDone.title"
-    ]
-  },
-  "Copies your areas, projects and tasks. Nothing in Things changes.": {
-    "text": "Copies your areas, projects and tasks. Nothing in Things changes.",
-    "paths": [
-      "surfaces.firstRun.steps.moveIn.choices.things.detail"
     ]
   },
   "Copy": {
@@ -859,18 +841,6 @@
     "text": "Free on one device. Plus on all of them.",
     "paths": [
       "plans.headline"
-    ]
-  },
-  "From Reminders": {
-    "text": "From Reminders",
-    "paths": [
-      "surfaces.firstRun.steps.moveIn.choices.reminders.title"
-    ]
-  },
-  "From Things": {
-    "text": "From Things",
-    "paths": [
-      "surfaces.firstRun.steps.moveIn.choices.things.title"
     ]
   },
   "General": {
@@ -1624,12 +1594,6 @@
       "tokens.fruitAccents.persimmon.name"
     ]
   },
-  "Pick a Reminders list. Each reminder you bring in moves to your Inbox, and Septena deletes it from Reminders.": {
-    "text": "Pick a Reminders list. Each reminder you bring in moves to your Inbox, and Septena deletes it from Reminders.",
-    "paths": [
-      "surfaces.firstRun.steps.moveIn.choices.reminders.detail"
-    ]
-  },
   "Pitaya": {
     "text": "Pitaya",
     "paths": [
@@ -2191,18 +2155,6 @@
     "text": "Starred",
     "paths": [
       "destinations.destinations.starred.title"
-    ]
-  },
-  "Start empty": {
-    "text": "Start empty",
-    "paths": [
-      "surfaces.firstRun.steps.moveIn.choices.fresh.title"
-    ]
-  },
-  "Start from the list you already have, or start empty.": {
-    "text": "Start from the list you already have, or start empty.",
-    "paths": [
-      "surfaces.firstRun.steps.moveIn.body"
     ]
   },
   "Stipple Drift": {

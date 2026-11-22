@@ -242,12 +242,6 @@
       "issue": "#260"
     },
     {
-      "file": "Septena/Shell/Tasks/RemindersInboxSection.swift",
-      "literal": "From Reminders",
-      "reason": "Placeholder, section title or label with no registry field yet.",
-      "issue": "#260"
-    },
-    {
       "file": "Septena/Shell/Tasks/TaskA11y.swift",
       "literal": "Task",
       "reason": "Placeholder, section title or label with no registry field yet.",
