@@ -44,9 +44,15 @@ struct WhenPicker: View {
   }
 
   private func choice(_ when: WatchOp.When, _ label: LocalizedStringKey, _ symbol: String) -> some View {
-    Button { onPick(when) } label: {
-      Label(label, systemImage: symbol).frame(maxWidth: .infinity, alignment: .leading)
+    let store = WatchStore.shared
+    let isDefault = when == .inbox
+    return Button { onPick(when) } label: {
+      Label(label, systemImage: symbol)
+        .foregroundStyle(isDefault ? store.accentInkColor : .primary)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .tint(when == .inbox ? .accentColor : nil)
+    .buttonStyle(.borderedProminent)
+    .buttonBorderShape(.roundedRectangle(radius: 10))
+    .tint(isDefault ? store.accentColor : Color.gray.opacity(0.3))
   }
 }

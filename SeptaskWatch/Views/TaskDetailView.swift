@@ -33,10 +33,12 @@ struct TaskDetailView: View {
           act { store.complete(task) }
         } label: {
           Label("Complete", systemImage: "checkmark")
+            .foregroundStyle(store.accentInkColor)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
-        .tint(.green)
+        .buttonBorderShape(.roundedRectangle(radius: 10))
+        .tint(store.accentColor)
         .handGestureShortcut(.primaryAction)
         .padding(.top, 4)
 
@@ -52,6 +54,9 @@ struct TaskDetailView: View {
           Label("Cancel Task", systemImage: "xmark.circle")
             .frame(maxWidth: .infinity)
         }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.roundedRectangle(radius: 10))
+        .tint(.red)
         .padding(.top, 6)
       }
       .padding(.horizontal, 2)
@@ -94,8 +99,13 @@ struct TaskDetailView: View {
 
   private func action(_ title: LocalizedStringKey, _ symbol: String, _ run: @escaping () -> Void) -> some View {
     Button { act(run) } label: {
-      Label(title, systemImage: symbol).frame(maxWidth: .infinity, alignment: .leading)
+      Label(title, systemImage: symbol)
+        .foregroundStyle(.primary)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .buttonStyle(.bordered)
+    .buttonBorderShape(.roundedRectangle(radius: 10))
+    .tint(.gray)
   }
 
   /// Back to the list first, so the change (and its Undo) plays there.
