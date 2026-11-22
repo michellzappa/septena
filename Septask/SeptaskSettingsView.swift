@@ -275,15 +275,24 @@ struct SeptaskSettingsView: View {
         let groups = RegistrySettings.rootGroups.filter { $0.desktopTab == tabID }
         ForEach(groups) { group in
           let visibleItems = group.items.filter(isItemVisible)
-          if !visibleItems.isEmpty {
+          let inlinePages = visibleItems.filter { $0.kind == "pageLink" && $0.desktopInline }
+          let rows = visibleItems.filter { !($0.kind == "pageLink" && $0.desktopInline) }
+          if !rows.isEmpty {
             Section {
-              ForEach(visibleItems) { item in
+              ForEach(rows) { item in
                 registryItemRow(item, expandDesktopInline: true)
               }
             } header: {
               if let header = group.header {
                 Text(header)
               }
+            }
+          }
+          // A desktop-inline page link (Appearance) expands its page's
+          // sections into the tab instead of pushing a page.
+          ForEach(inlinePages) { item in
+            if let target = item.page {
+              inlineDesktopPageSections(target)
             }
           }
         }
@@ -301,7 +310,7 @@ struct SeptaskSettingsView: View {
     case RegistrySettings.PageID.aiPreferences:
       SeptaskAIPreferencesSections()
     default:
-      EmptyView()
+      registryPageSections(pageID, titleAsHeader: true)
     }
   }
 
@@ -596,6 +605,35 @@ struct SeptaskSettingsView: View {
     }
   }
 
+  // MARK: - Registry-Rendered Page Sections
+
+  /// Renders a page's sections straight from `RegistrySettings.pages`, for
+  /// pages whose rows are all plain settings and inline surfaces (Appearance).
+  /// On a desktop tab the page title stands in for a missing section header.
+  @ViewBuilder
+  private func registryPageSections(_ pageID: String, titleAsHeader: Bool) -> some View {
+    if let page = RegistrySettings.pageById[pageID] {
+      ForEach(page.sections.filter { $0.applies(to: currentPlatform) }) { section in
+        let visibleItems = section.items.filter(isItemVisible)
+        if !visibleItems.isEmpty {
+          Section {
+            ForEach(visibleItems) { item in
+              registryItemRow(item, expandDesktopInline: titleAsHeader)
+            }
+          } header: {
+            if let header = section.header ?? (titleAsHeader ? page.title : nil) {
+              Text(header)
+            }
+          } footer: {
+            if let footer = section.footer {
+              Text(footer)
+            }
+          }
+        }
+      }
+    }
+  }
+
   // MARK: - Depth-1 & Depth-2 Pages
 
   @ViewBuilder
@@ -631,6 +669,15 @@ struct SeptaskSettingsView: View {
       SeptaskSmartListsPane()
     case RegistrySettings.PageID.plus:
       SeptaskPlusPane()
+    case RegistrySettings.PageID.appearance:
+      Form {
+        registryPageSections(pageID, titleAsHeader: false)
+      }
+      .formStyle(.grouped)
+      .navigationTitle(RegistrySettings.pageById[pageID]?.title ?? "")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
     default:
       EmptyView()
     }

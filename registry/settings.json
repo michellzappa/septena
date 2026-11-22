@@ -533,40 +533,16 @@
     },
     {
       "id": "appearance_root",
-      "header": "Appearance",
       "mobilePresentation": "inline",
       "desktopTab": "general",
       "items": [
         {
-          "kind": "customSurface",
-          "surface": "accent_color",
-          "label": "Accent",
+          "kind": "pageLink",
+          "page": "appearance",
+          "label": "Appearance",
           "icon": "settings.appearance",
+          "desktopInline": true,
           "featureId": "settings.display"
-        },
-        {
-          "kind": "setting",
-          "key": "textSizeStep",
-          "label": "Text Size"
-        },
-        {
-          "kind": "setting",
-          "key": "tasksTitleLines",
-          "label": "Title lines",
-          "platforms": ["ios", "ipados", "android"]
-        },
-        {
-          "kind": "setting",
-          "key": "tasksSwipeLeadingAction",
-          "label": "Swipe right",
-          "detail": "Swipe left on a task to select multiple tasks. Swipe right runs this quick action.",
-          "platforms": ["ios", "ipados"]
-        },
-        {
-          "kind": "setting",
-          "key": "loggingAnimationsEnabled",
-          "label": "Completion animations",
-          "icon": "settings.animations"
         }
       ]
     },
@@ -593,6 +569,51 @@
     }
   ],
   "pages": [
+    {
+      "id": "appearance",
+      "title": "Appearance",
+      "icon": "settings.appearance",
+      "depth": 1,
+      "featureId": "settings.display",
+      "sections": [
+        {
+          "id": "appearance",
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "accent_color",
+              "label": "Accent",
+              "icon": "settings.appearance",
+              "featureId": "settings.display"
+            },
+            {
+              "kind": "setting",
+              "key": "textSizeStep",
+              "label": "Text Size"
+            },
+            {
+              "kind": "setting",
+              "key": "tasksTitleLines",
+              "label": "Title lines",
+              "platforms": ["ios", "ipados", "android"]
+            },
+            {
+              "kind": "setting",
+              "key": "tasksSwipeLeadingAction",
+              "label": "Swipe right",
+              "detail": "Swipe left on a task to select multiple tasks. Swipe right runs this quick action.",
+              "platforms": ["ios", "ipados"]
+            },
+            {
+              "kind": "setting",
+              "key": "loggingAnimationsEnabled",
+              "label": "Completion animations",
+              "icon": "settings.animations"
+            }
+          ]
+        }
+      ]
+    },
     {
       "id": "account",
       "title": "Account",

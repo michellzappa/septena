@@ -105,7 +105,7 @@
   "Accent": {
     "text": "Accent",
     "paths": [
-      "settings.rootGroups.appearance_root.items.0.label"
+      "settings.pages.appearance.sections.appearance.items.0.label"
     ]
   },
   "Account": {
@@ -223,7 +223,8 @@
   "Appearance": {
     "text": "Appearance",
     "paths": [
-      "settings.rootGroups.appearance_root.header"
+      "settings.rootGroups.appearance_root.items.0.label",
+      "settings.pages.appearance.title"
     ]
   },
   "Apple Intelligence": {
@@ -456,7 +457,7 @@
   "Completion animations": {
     "text": "Completion animations",
     "paths": [
-      "settings.rootGroups.appearance_root.items.4.label"
+      "settings.pages.appearance.sections.appearance.items.4.label"
     ]
   },
   "Connect Claude": {
@@ -2248,13 +2249,13 @@
   "Swipe left on a task to select multiple tasks. Swipe right runs this quick action.": {
     "text": "Swipe left on a task to select multiple tasks. Swipe right runs this quick action.",
     "paths": [
-      "settings.rootGroups.appearance_root.items.3.detail"
+      "settings.pages.appearance.sections.appearance.items.3.detail"
     ]
   },
   "Swipe right": {
     "text": "Swipe right",
     "paths": [
-      "settings.rootGroups.appearance_root.items.3.label"
+      "settings.pages.appearance.sections.appearance.items.3.label"
     ]
   },
   "Sync & storage diagnostics": {
@@ -2386,7 +2387,7 @@
   "Text Size": {
     "text": "Text Size",
     "paths": [
-      "settings.rootGroups.appearance_root.items.1.label",
+      "settings.pages.appearance.sections.appearance.items.1.label",
       "actions.menuBar.view.items.textSize.title"
     ]
   },
@@ -2473,7 +2474,7 @@
   "Title lines": {
     "text": "Title lines",
     "paths": [
-      "settings.rootGroups.appearance_root.items.2.label"
+      "settings.pages.appearance.sections.appearance.items.2.label"
     ]
   },
   "Today": {

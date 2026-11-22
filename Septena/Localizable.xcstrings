@@ -2288,7 +2288,7 @@
 
     },
     "Appearance" : {
-      "comment" : "Generated from registry settings.rootGroups.appearance_root.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.rootGroups.appearance_root.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -3465,7 +3465,7 @@
       }
     },
     "Completion animations" : {
-      "comment" : "Generated from registry settings.rootGroups.appearance_root.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.appearance.sections.appearance.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -11486,7 +11486,7 @@
       "extractionState" : "manual"
     },
     "Swipe left on a task to select multiple tasks. Swipe right runs this quick action." : {
-      "comment" : "Generated from registry settings.rootGroups.appearance_root.items.3.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.appearance.sections.appearance.items.3.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -11498,7 +11498,7 @@
       }
     },
     "Swipe right" : {
-      "comment" : "Generated from registry settings.rootGroups.appearance_root.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.appearance.sections.appearance.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -12313,7 +12313,7 @@
 
     },
     "Title lines" : {
-      "comment" : "Generated from registry settings.rootGroups.appearance_root.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.appearance.sections.appearance.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {

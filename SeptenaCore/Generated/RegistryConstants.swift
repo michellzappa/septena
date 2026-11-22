@@ -442,6 +442,7 @@ enum RegistrySettings {
   }
 
   enum PageID {
+    static let appearance = "appearance"
     static let account = "account"
     static let plus = "plus"
     static let claudePairing = "claude_pairing"
@@ -494,12 +495,8 @@ enum RegistrySettings {
       RegistrySettingsItem(kind: "setting", key: "tasksFilingSuggestions", page: nil, surface: nil, label: RegistryL10n.t("Suggest where to file"), detail: RegistryL10n.t("Learn where you usually file similar tasks."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "edit.filing-suggestion"),
       RegistrySettingsItem(kind: "setting", key: "badgeShowOverdue", page: nil, surface: nil, label: RegistryL10n.t("Overdue app icon badge"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
     ]),
-    RegistrySettingsGroup(id: "appearance_root", header: RegistryL10n.t("Appearance"), mobilePresentation: "inline", desktopTab: "general", items: [
-      RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "accent_color", label: RegistryL10n.t("Accent"), detail: nil, iconId: "settings.appearance", sfSymbol: "paintpalette", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
-      RegistrySettingsItem(kind: "setting", key: "textSizeStep", page: nil, surface: nil, label: RegistryL10n.t("Text Size"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
-      RegistrySettingsItem(kind: "setting", key: "tasksTitleLines", page: nil, surface: nil, label: RegistryL10n.t("Title lines"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "android"], featureId: "settings.display"),
-      RegistrySettingsItem(kind: "setting", key: "tasksSwipeLeadingAction", page: nil, surface: nil, label: RegistryL10n.t("Swipe right"), detail: RegistryL10n.t("Swipe left on a task to select multiple tasks. Swipe right runs this quick action."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados"], featureId: "settings.display"),
-      RegistrySettingsItem(kind: "setting", key: "loggingAnimationsEnabled", page: nil, surface: nil, label: RegistryL10n.t("Completion animations"), detail: nil, iconId: "settings.animations", sfSymbol: "party.popper", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+    RegistrySettingsGroup(id: "appearance_root", header: nil, mobilePresentation: "inline", desktopTab: "general", items: [
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "appearance", surface: nil, label: RegistryL10n.t("Appearance"), detail: nil, iconId: "settings.appearance", sfSymbol: "paintpalette", statusKey: nil, desktopInline: true, visibility: "always", platforms: nil, featureId: "settings.display"),
     ]),
     RegistrySettingsGroup(id: "meta_root", header: nil, mobilePresentation: "inline", desktopTab: nil, items: [
       RegistrySettingsItem(kind: "pageLink", key: nil, page: "privacy", surface: nil, label: RegistryL10n.t("Privacy"), detail: nil, iconId: "settings.privacy", sfSymbol: "hand.raised", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
@@ -508,6 +505,15 @@ enum RegistrySettings {
   ]
 
   static let pages: [RegistrySettingsPage] = [
+    RegistrySettingsPage(id: "appearance", title: RegistryL10n.t("Appearance"), iconId: "settings.appearance", sfSymbol: "paintpalette", depth: 1, platforms: nil, featureId: "settings.display", sections: [
+      RegistrySettingsSection(id: "appearance", header: nil, footer: nil, platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "accent_color", label: RegistryL10n.t("Accent"), detail: nil, iconId: "settings.appearance", sfSymbol: "paintpalette", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+        RegistrySettingsItem(kind: "setting", key: "textSizeStep", page: nil, surface: nil, label: RegistryL10n.t("Text Size"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+        RegistrySettingsItem(kind: "setting", key: "tasksTitleLines", page: nil, surface: nil, label: RegistryL10n.t("Title lines"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "android"], featureId: "settings.display"),
+        RegistrySettingsItem(kind: "setting", key: "tasksSwipeLeadingAction", page: nil, surface: nil, label: RegistryL10n.t("Swipe right"), detail: RegistryL10n.t("Swipe left on a task to select multiple tasks. Swipe right runs this quick action."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados"], featureId: "settings.display"),
+        RegistrySettingsItem(kind: "setting", key: "loggingAnimationsEnabled", page: nil, surface: nil, label: RegistryL10n.t("Completion animations"), detail: nil, iconId: "settings.animations", sfSymbol: "party.popper", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+      ]),
+    ]),
     RegistrySettingsPage(id: "account", title: RegistryL10n.t("Account"), iconId: "settings.account", sfSymbol: "person.crop.circle", depth: 1, platforms: nil, featureId: "sync.backend", sections: [
       RegistrySettingsSection(id: "profile", header: nil, footer: RegistryL10n.t("Your name stays on this device, and syncs when you sign in."), platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "account_profile_editor", label: RegistryL10n.t("Your name"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),

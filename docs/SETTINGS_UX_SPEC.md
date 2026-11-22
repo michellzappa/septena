@@ -22,7 +22,7 @@ Today's task-app Settings (`Septask/SeptaskSettingsView.swift`, `TaskSettingsSec
 ### Design rules (progressive disclosure, new-user-first)
 
 1. **Depth follows frequency and user stage:**
-   - **Depth 0 (top level):** Identity/sync state, Day-1 setup (**Connect Claude**, **Calendar**, **Reminders**, **Import & Export**), and everyday list/appearance preferences. On compact/mobile layouts (iOS, Android), everyday controls render **inline** on the root screen rather than behind subpages.
+   - **Depth 0 (top level):** Identity/sync state, Day-1 setup (**Connect Claude**, **Calendar**, **Reminders**, **Import & Export**), and everyday list preferences. On compact/mobile layouts (iOS, Android), everyday list controls render **inline** on the root screen rather than behind subpages. Appearance is the exception (decided 2026-11-22): the root shows one **Appearance** row that pushes the `appearance` page. On desktop the same page link is `desktopInline`, so the General tab still shows the Appearance section inline.
    - **Depth 1 (one tap):** Focused multi-step flows, pickers, and dedicated forms (**Account**, **Connect Claude**, **AI Preferences**, **Calendar**, **Reminders**, **Import & Export**, **Privacy**, **About**).
    - **Depth 2 (`About ▸ Advanced`):** Diagnostics, developer/beta aids, raw MCP reference, refused sync changes, store health, paste JSON, and opt-in weekly diagnostics. Invisible until sought.
 2. **One canonical home per function (enforced by CI):** No `settingKey` or `customSurface` may appear more than once in the Settings UI tree.
@@ -52,10 +52,10 @@ Every setting and custom surface currently in `Septask/` and shared `Septena/She
 | `tasksShowAging` | `setting` (`bool`) | `device` | Inline toggle in **Lists** | `general` | all | `always` | Update registry label/detail to match P2 (`c1ad4b76`): *"Fade untouched tasks"* |
 | `tasksFilingSuggestions` | `setting` (`bool`) | `device` | Inline toggle in **Lists** | `general` | `ios`, `ipados`, `macos`, `android`, `windows` | `always` | On-device classifier toggle |
 | `badgeShowOverdue` | `setting` (`bool`) | `device` (`sharedAppGroup`) | Inline toggle in **Lists** | `general` | `ios`, `ipados`, `macos`, `android`, `windows` | `always` | Device-local overdue badge |
-| `accent_color` | `customSurface` | device/local *(future synced)* | Inline swatch row in **Appearance** | `general` (Appearance section) | all | `always` | Remove *"shared with Septena Life"* footer copy for task-app users |
-| `textSizeStep` | `setting` (`int`, `-2…+2`) | `device` | Inline slider in **Appearance** | `general` (Appearance section) | all | `always` | Mirrors macOS `View ▸ Text Size` |
+| `accent_color` | `customSurface` | device/local *(future synced)* | Inline swatch row in **Appearance** | `general` (Appearance section, from the `appearance` page) | all | `always` | Remove *"shared with Septena Life"* footer copy for task-app users |
+| `textSizeStep` | `setting` (`int`, `-2…+2`) | `device` | Inline slider in **Appearance** | `general` (Appearance section, from the `appearance` page) | all | `always` | Mirrors macOS `View ▸ Text Size` |
 | `tasksTitleLines` | `setting` (`int`, `1…3`) | `device` | Inline picker in **Appearance** | `general` (hidden on desktop) | `ios`, `ipados`, `android` | `always` | Mobile-only row wrap limit |
-| `loggingAnimationsEnabled` | `setting` (`bool`) | `device` | Inline toggle in **Appearance** | `general` (Appearance section) | all | `always` | Completion flourish toggle |
+| `loggingAnimationsEnabled` | `setting` (`bool`) | `device` | Inline toggle in **Appearance** | `general` (Appearance section, from the `appearance` page) | all | `always` | Completion flourish toggle |
 
 ### Depth 1 — Dedicated 1-tap subpages (Account, Privacy, About)
 
