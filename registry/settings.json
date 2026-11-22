@@ -617,8 +617,7 @@
             {
               "kind": "setting",
               "key": "loggingAnimationsEnabled",
-              "label": "Completion animations",
-              "icon": "settings.animations"
+              "label": "Completion animations"
             }
           ]
         }

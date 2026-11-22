@@ -7,7 +7,7 @@ import SwiftUI
 ///   • Mode (`System` / `Light` / `Dark`, device-local) + `Sync across devices`
 ///   • Accent Color (`Colorful` default + 7 exotic fruits, restrained reach)
 ///   • Header Texture (`Pure Canvas` default + 6 procedural Header Wash styles)
-///   • Texture Intensity (`Subtle` / `Balanced` / `Bold`) + `Slow drift` motion
+///   • `Slow drift` texture motion (intensity stays at its stored value; no UI)
 struct AppearancePickerView: View {
   private let appearance = AppearancePreferences.shared
   @Environment(DayClock.self) private var dayClock
@@ -34,12 +34,6 @@ struct AppearancePickerView: View {
     let count = 4
     #endif
     return Array(repeating: GridItem(.flexible(), spacing: 8), count: count)
-  }
-
-  private var intensityBucket: Int {
-    if appearance.textureIntensity < 45 { return 35 }
-    if appearance.textureIntensity < 68 { return 55 }
-    return 80
   }
 
   var body: some View {
@@ -129,26 +123,9 @@ struct AppearancePickerView: View {
         }
       }
 
-      // 4. Texture Intensity & Motion (only when a texture is active)
+      // 5. Texture motion (only when a texture is active)
       if appearance.hasActiveTexture {
         VStack(alignment: .leading, spacing: 10) {
-          HStack {
-            Text("Intensity")
-              .font(.subheadline)
-            Spacer()
-            Picker("Intensity", selection: Binding(
-              get: { intensityBucket },
-              set: { appearance.textureIntensity = $0 }
-            )) {
-              Text("Subtle").tag(35)
-              Text("Balanced").tag(55)
-              Text("Bold").tag(80)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(maxWidth: 220)
-          }
-
           Toggle(isOn: Binding(
             get: { appearance.textureMotion == .slowDrift },
             set: { appearance.textureMotion = $0 ? .slowDrift : .still }

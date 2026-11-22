@@ -326,12 +326,6 @@
       "issue": "#260"
     },
     {
-      "file": "Septena/Shell/UI/AppearancePickerView.swift",
-      "literal": "Balanced",
-      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
-      "issue": "#260"
-    },
-    {
       "file": "Septena/Shell/UI/KeyboardShortcutsView.swift",
       "literal": "General",
       "reason": "Placeholder, section title or label with no registry field yet.",
