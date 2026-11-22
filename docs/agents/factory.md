@@ -26,9 +26,9 @@ Set up 2026-11-19 so planned work keeps moving without mz.
   simulator or run UI tests. Strategy, pricing and positioning never go in
   this public repo.
 - **Builds:** mz scheduled this run, so a build gate inside the run counts as
-  requested. Use only the Mac schemes (`scripts/build.sh SeptenaMac
-  'platform=macOS'`, `SeptaskMac`), never the iOS schemes (watchOS runtime
-  gap, `CLAUDE.md`). One build per logical unit. Say in the report which
+  requested. Use only the Mac scheme (`scripts/build.sh SeptaskMac
+  'platform=macOS'`), never the iOS schemes (watchOS runtime gap,
+  `AGENTS.md`). `SeptenaMac` left with Septena Life (ADR 0017). One build per logical unit. Say in the report which
   builds ran.
 - **Checkout state first.** `git fetch`, then compare `HEAD` with
   `origin/main` and read `git status`. If the checkout is behind and files
@@ -134,11 +134,11 @@ first inside each. Docs-only issues before Swift issues.
    (since 2026-09-14): the factory commits its own work. Push only as
    §0 "Push" allows.
 4. **Code change:** `scripts/wt-new factory-<date>-<N>`, work and commit there.
-   Gate in the worktree on both Mac schemes
-   (`scripts/build.sh SeptenaMac 'platform=macOS'`, then `SeptaskMac`); a
+   Gate in the worktree on the Mac scheme
+   (`scripts/build.sh SeptaskMac 'platform=macOS'`); a
    worktree builds without `Config/Secrets.xcconfig` (checked 2026-11-21).
    Integrate with `scripts/wt-done --prebuilt --no-push factory-<date>-<N>`:
-   it merges into `main`, rebuilds both Mac schemes on the merged tree only
+   it merges into `main`, rebuilds the Mac scheme on the merged tree only
    when `main` moved since the branch (else the worktree gate stands), and
    removes the worktree and branch. Push once at the end (§0 "Push"). If
    integration is not possible (main dirty, a merge conflict, a red merged
