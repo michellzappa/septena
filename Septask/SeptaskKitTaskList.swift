@@ -412,6 +412,10 @@ final class SeptaskKitTaskListController: NSViewController {
   /// One toast per window (`SeptaskKitToast.swift`). A new one replaces the
   /// current one; it never stacks.
   private let toastStore = SeptenaToastStore()
+  /// The completed ids the project/area logged footer counts, captured on
+  /// each reload. "Clear Logged…" (issue #208) clears exactly this set, so
+  /// the prompt's count matches the footer and no other page is touched.
+  private var loggedClearIDs: [String] = []
   private lazy var toastHost = KitToastHost(store: toastStore)
 
   override func loadView() {
@@ -505,6 +509,13 @@ final class SeptaskKitTaskListController: NSViewController {
           tableView.selectRowIndexes([row], byExtendingSelection: false)
         }
         self.buildNoticeStepMenu().popUp(positioning: nil, at: point, in: tableView)
+        return
+      }
+      // The project/area logged footer has its own one-item menu (registry
+      // `scope.loggedFooter`). Today's footer has none: it is not a scope.
+      if self.rows.indices.contains(row), case .loggedFooter = self.rows[row],
+         self.scopeId != nil, !self.loggedClearIDs.isEmpty {
+        self.buildLoggedFooterMenu().popUp(positioning: nil, at: point, in: tableView)
         return
       }
       // Only a TASK row has a task menu. A header, an event, the "New task"
@@ -1046,6 +1057,7 @@ final class SeptaskKitTaskListController: NSViewController {
       : [.tagFilterBar(tags: listTags, active: Array(activeTagFilterIDs).sorted())]
     let titleRows: [Row] = (screenTitleRow().map { [$0] } ?? []) + tagBarRows
     var newRows: [Row]
+    loggedClearIDs = []
     switch filter {
     case .today where todayGroupsByList:
       newRows = titleRows + noticeRows(pool) + agenda() + triageBand(rawTriage)
@@ -1103,6 +1115,7 @@ final class SeptaskKitTaskListController: NSViewController {
         completed = completed.filter { $0.project == nil }
       }
       completed.sort { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
+      loggedClearIDs = completed.map(\.id)
 
       let open = pool.filter { $0.status == .open }
       let faded = showsFadedInLists ? LocalCache.fadedTasks(in: context, scope: filter) : []
@@ -4387,6 +4400,57 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.selectRowIndexes([row], byExtendingSelection: false)
     tableView.scrollRowToVisible(row)
     beginEditingRow(row)
+  }
+
+  // MARK: - Clear logged (issue #208)
+
+  /// Right-click on a project's or area's logged footer: "Clear Logged…",
+  /// the same registry menu the SwiftUI footer shows on long press.
+  private func buildLoggedFooterMenu() -> NSMenu {
+    KitRegistryMenu.build(RegistryActions.menu("scope.loggedFooter")) { [weak self] id in
+      guard let self, id == "logged.clear" else { return nil }
+      return .init { self.menuClearLogged() }
+    }
+  }
+
+  /// The project's or area's own name for the clear prompt.
+  private var scopeDisplayName: String {
+    let snapshot = StructureCache.snapshot(in: context)
+    let name: String?
+    switch filter {
+    case .project(let id): name = snapshot.projects.first { $0.id == id }?.title
+    case .area(let id): name = snapshot.areas.first { $0.id == id }?.title
+    default: name = nil
+    }
+    guard let name, !name.isEmpty else { return filter.title }
+    return name
+  }
+
+  /// Ask with the registry `clearLogged` copy (page name and exact count),
+  /// then soft-delete to Recently Deleted. Undo is recorded at the gesture;
+  /// the toast undoes this batch only, same ticket pattern as
+  /// `deleteSelection`.
+  private func menuClearLogged() {
+    commitOpenEdits()
+    let ids = loggedClearIDs
+    guard !ids.isEmpty else { return }
+    let copy = RegistryPrompts.clearLogged(count: ids.count, name: scopeDisplayName)
+    KitPrompt.confirmDestructive(
+      title: copy.title,
+      message: copy.message,
+      confirmTitle: copy.confirmTitle,
+      in: view.window
+    ) { [weak self] in
+      guard let self else { return }
+      TaskUndo.recordDelete(ids: ids, mutator: self.mutator)
+      let ticket = TaskUndoTicket()
+      for id in ids { self.mutator.delete(id: id) }
+      self.toastStore.show(SeptenaToastCopy.deleted(count: ids.count)) { [weak self, mutator] in
+        ticket.undo { for id in ids { mutator.restore(id: id) } }
+        self?.reload()
+      }
+      self.reload()
+    }
   }
 
   private func menuDeleteHeading() {

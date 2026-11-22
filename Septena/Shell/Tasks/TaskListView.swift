@@ -320,6 +320,10 @@ struct TaskListView: View {
   /// Confirmation target for swipe "Delete Permanently" in Recently Deleted
   /// (`docs/IOS_SWIPE_ACTIONS_SPEC.md` §2 — permanent delete has no undo).
   @State private var permanentDeleteConfirmTask: SeptenaTask?
+  /// Pending "Clear Logged…" on a project or area page (issue #208): the
+  /// completed ids the logged footer counted when the menu opened, plus the
+  /// registry prompt copy that names the page and that exact count.
+  @State private var clearLoggedRequest: ClearLoggedRequest?
 
   private var isSwipeEditModeActive: Bool {
     #if os(iOS)
@@ -827,6 +831,24 @@ struct TaskListView: View {
         headingDeleteTarget = nil
       }
       Button("Cancel", role: .cancel) { headingDeleteTarget = nil }
+    }
+    // Registry `clearLogged`, the same copy the AppKit shell's sheet shows.
+    .confirmationDialog(
+      clearLoggedRequest?.copy.title ?? "",
+      isPresented: Binding(
+        get: { clearLoggedRequest != nil },
+        set: { if !$0 { clearLoggedRequest = nil } }
+      ),
+      titleVisibility: .visible,
+      presenting: clearLoggedRequest
+    ) { request in
+      Button(request.copy.confirmTitle ?? "", role: .destructive) {
+        commitClearLogged(ids: request.ids)
+        clearLoggedRequest = nil
+      }
+      Button(RegistryPrompts.cancelTitle, role: .cancel) { clearLoggedRequest = nil }
+    } message: { request in
+      Text(request.copy.message)
     }
     .alert(
       "Delete Permanently?",
@@ -2901,12 +2923,67 @@ struct TaskListView: View {
         .contentShape(Rectangle())
     }
     .buttonStyle(PlainHoverRowButtonStyle())
+    // Long press / right-click: registry `scope.loggedFooter` ("Clear
+    // Logged…"), the same menu the AppKit footer row shows.
+    .contextMenu { scopeLoggedContextMenu }
     // Blank band above the footer as tall as a group title, so it reads as
     // its own section, not glued to the last task (mz, 2026-11-20). Outside
     // the button, so the gap isn't a tap target.
     .padding(.top, loggedFooterGap)
     .asListRow()
     .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
+  }
+
+  @ViewBuilder
+  private var scopeLoggedContextMenu: some View {
+    RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
+      RegistryActions.menu("scope.loggedFooter")) { id in
+        guard id == "logged.clear" else { return nil }
+        return .init { requestClearLogged() }
+      })
+  }
+
+  /// The project's or area's own name for the clear prompt. Falls back to the
+  /// generic "Project" / "Area" label when the row is not in the snapshot.
+  private var scopeDisplayName: String {
+    let name: String?
+    switch filter {
+    case .project(let id): name = projects.first { $0.id == id }?.title
+    case .area(let id): name = areas.first { $0.id == id }?.title
+    default: name = nil
+    }
+    guard let name, !name.isEmpty else { return filter.title }
+    return name
+  }
+
+  /// Ask before clearing. The ids are the footer's own set (done only, not
+  /// settling, area pages area-direct only), so other projects and areas
+  /// keep their logged items.
+  private func requestClearLogged() {
+    if closeActiveEditIfNeeded() { return }
+    let ids = loggedScopeItems.map(\.id)
+    guard !ids.isEmpty else { return }
+    clearLoggedRequest = ClearLoggedRequest(
+      ids: ids,
+      copy: RegistryPrompts.clearLogged(count: ids.count, name: scopeDisplayName))
+  }
+
+  /// Soft-delete the logged items to Recently Deleted (30-day recovery). Undo
+  /// is recorded here, at the gesture, never in the mutator. The toast undoes
+  /// this batch only, same ticket pattern as `applyDelete`.
+  private func commitClearLogged(ids: [String]) {
+    guard !ids.isEmpty else { return }
+    Haptics.warning()
+    for id in ids {
+      removeLocally(id: id)
+      mutator.delete(id: id)
+    }
+    TaskUndo.recordDelete(ids: ids, mutator: mutator)
+    let ticket = TaskUndoTicket()
+    showToast(SeptenaToastCopy.deleted(count: ids.count)) {
+      ticket.undo { for id in ids { mutator.restore(id: id) } }
+      Task { await load() }
+    }
   }
 
   /// Active project ids belonging to `areaId` — filing scope on area pages.
@@ -5310,4 +5387,11 @@ struct TaskListView: View {
     .secondary
   }
 
+}
+
+/// One pending "Clear Logged…" confirmation: the task ids it will clear and
+/// the prompt copy built for them (registry `clearLogged`).
+private struct ClearLoggedRequest {
+  let ids: [String]
+  let copy: RegistryPromptCopy
 }

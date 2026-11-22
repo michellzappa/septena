@@ -3049,8 +3049,74 @@
         }
       }
     },
+    "Clear" : {
+      "comment" : "Generated from registry surfaces.prompts.items.clearLogged.confirmTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpar"
+          }
+        }
+      }
+    },
     "Clear (Anytime)" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
+    },
+    "Clear %lld logged items from “%@”?" : {
+      "comment" : "Generated from registry surfaces.prompts.items.clearLogged.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Clear 1 logged item from “%2$@”?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Clear %lld logged items from “%@”?"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Limpar 1 item registrado de “%2$@”?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Limpar %lld itens registrados de “%@”?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Clear Logged…" : {
+      "comment" : "Generated from registry actions.actions.logged.clear.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpar registrados…"
+          }
+        }
+      }
     },
     "Clear Schedule" : {
       "comment" : "SeptaskKit localization pass 2026-08-09",
@@ -3059,6 +3125,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Limpar agendamento"
+          }
+        }
+      }
+    },
+    "Cleared items move to Recently Deleted. You can undo this." : {
+      "comment" : "Generated from registry surfaces.prompts.items.clearLogged.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os itens limpos vão para Apagadas recentemente. Você pode desfazer isso."
           }
         }
       }
