@@ -57,8 +57,6 @@ export const theme = {
   radius: { card: 40, device: 120, badge: 999 },
   shadow: {
     device: "0 60px 120px -30px rgb(0 0 0 / 0.35)",
-    // septena-site components/scenes/scenes.css .scene-frame--phone, scaled.
-    phone: (k) => `0 ${20 * k}px ${50 * k}px ${-20 * k}px rgb(0 0 0 / 0.3), inset 0 0 0 ${k}px rgb(255 255 255 / 0.3)`,
     card: "0 24px 60px -12px rgb(0 0 0 / 0.18)",
   },
 

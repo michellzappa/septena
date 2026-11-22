@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Canonical device shapes for marketing visuals: the website scenes (septena-site) and the App Store panels (appstore/). One iPhone, one Android phone, one MacBook, one Windows laptop. Units are points (dp on Android) at 1x. A phone case is the screen plus the bezel on every side; corners are circular and concentric (screen radius = outerRadius - bezel). A laptop is a lid (screen plus a black glass bezel) on a base that overhangs the lid on both sides. Renderers scale these numbers; they never redefine them.",
+  "description": "Canonical device shapes for marketing visuals: the website scenes (septena-site) and the App Store panels (appstore/). Units are points (dp on Android) at 1x. A phone case is the screen plus the bezel on every side; screen radius = outerRadius - bezel. A laptop is a lid (a thin rim, a black glass bezel, the screen) on a base that overhangs the lid; outerRadius rounds the lid top, hingeRadius the lid bottom. corner: continuous (Apple) or circular. registry/device-shape.mjs draws these; renderers never redefine them.",
   "devices": {
     "iphone": {
       "label": "iPhone",
@@ -9,7 +9,8 @@
         "height": 874
       },
       "bezel": 6,
-      "outerRadius": 48,
+      "outerRadius": 64,
+      "corner": "continuous",
       "cutout": {
         "kind": "island",
         "width": 126,
@@ -17,7 +18,25 @@
         "top": 11
       },
       "finish": {
-        "gradient": "linear-gradient(145deg,#747479,#202023 28%,#303034 80%,#737379)",
+        "angle": 145,
+        "stops": [
+          [
+            0,
+            "#747479"
+          ],
+          [
+            0.28,
+            "#202023"
+          ],
+          [
+            0.8,
+            "#303034"
+          ],
+          [
+            1,
+            "#737379"
+          ]
+        ],
         "highlight": "rgb(255 255 255 / .3)"
       }
     },
@@ -29,13 +48,32 @@
       },
       "bezel": 7,
       "outerRadius": 44,
+      "corner": "circular",
       "cutout": {
         "kind": "punchHole",
         "diameter": 12,
         "top": 12
       },
       "finish": {
-        "gradient": "linear-gradient(145deg,#5c5d60,#1b1c1e 30%,#2a2b2e 80%,#5a5b5e)",
+        "angle": 145,
+        "stops": [
+          [
+            0,
+            "#5c5d60"
+          ],
+          [
+            0.3,
+            "#1b1c1e"
+          ],
+          [
+            0.8,
+            "#2a2b2e"
+          ],
+          [
+            1,
+            "#5a5b5e"
+          ]
+        ],
         "highlight": "rgb(255 255 255 / .22)"
       }
     },
@@ -46,16 +84,28 @@
         "height": 740
       },
       "bezel": 16,
-      "outerRadius": 20,
+      "outerRadius": 30,
+      "hingeRadius": 6,
+      "corner": "continuous",
       "cutout": {
-        "kind": "notch",
-        "width": 150,
-        "height": 20
+        "kind": "camera",
+        "diameter": 6,
+        "top": 5
       },
       "finish": {
-        "glass": "#0b0b0c",
-        "gradient": "linear-gradient(180deg,#c9cacd,#9c9da1)",
-        "highlight": "rgb(255 255 255 / .35)"
+        "angle": 180,
+        "stops": [
+          [
+            0,
+            "#c9cacd"
+          ],
+          [
+            1,
+            "#9c9da1"
+          ]
+        ],
+        "highlight": "rgb(255 255 255 / .35)",
+        "glass": "#0b0b0c"
       },
       "base": {
         "height": 20,
@@ -71,15 +121,27 @@
       },
       "bezel": 14,
       "outerRadius": 12,
+      "hingeRadius": 4,
+      "corner": "circular",
       "cutout": {
         "kind": "camera",
         "diameter": 6,
         "top": 4
       },
       "finish": {
-        "glass": "#0b0b0c",
-        "gradient": "linear-gradient(180deg,#3d3e42,#232427)",
-        "highlight": "rgb(255 255 255 / .18)"
+        "angle": 180,
+        "stops": [
+          [
+            0,
+            "#3d3e42"
+          ],
+          [
+            1,
+            "#232427"
+          ]
+        ],
+        "highlight": "rgb(255 255 255 / .18)",
+        "glass": "#0b0b0c"
       },
       "base": {
         "height": 18,

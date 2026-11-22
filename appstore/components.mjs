@@ -18,10 +18,13 @@
 
 import { readFileSync } from "node:fs";
 import { theme } from "./theme.mjs";
+import { phoneShape } from "../registry/device-shape.mjs";
 
 // The one iPhone shape (registry/device-frames.json), shared with the website scenes.
 const IPHONE = JSON.parse(readFileSync(new URL("../registry/device-frames.json", import.meta.url), "utf8")).devices.iphone;
 const IPHONE_CASE_WIDTH = IPHONE.screen.width + 2 * IPHONE.bezel;
+// Case drawing and screen mask from registry/device-shape.mjs (continuous corners).
+const PHONE = phoneShape(IPHONE);
 
 const esc = (s = "") =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -76,9 +79,12 @@ function shot(s, device, tint) {
     ? { pad: Math.round(IPHONE.bezel * k), radius: Math.round(IPHONE.outerRadius * k), island: true, bezel: true }
     : FRAME[device.frame] ?? FRAME.none;
   const screenR = Math.max(0, f.radius - f.pad);
+  const clip = f.bezel
+    ? `-webkit-mask:${PHONE.screen} center/100% 100% no-repeat; mask:${PHONE.screen} center/100% 100% no-repeat;`
+    : `border-radius:${screenR}px;`;
   const screen = s.img
-    ? `<img class="screen" src="${s.img}" alt="" style="border-radius:${screenR}px;">`
-    : placeholderScreen(s.src, tint, device.screenAspect ?? 0.46, screenR);
+    ? `<img class="screen" src="${s.img}" alt="" style="${clip}">`
+    : placeholderScreen(s.src, tint, device.screenAspect ?? 0.46, clip);
   // Real captures already include the device's Dynamic Island/status bar — only
   // draw a synthetic island on the (content-free) placeholder.
   const c = IPHONE.cutout;
@@ -86,7 +92,7 @@ function shot(s, device, tint) {
   return `
   <div class="shot-zone" style="transform: translateY(${Math.round((s.offsetY ?? 0) * 100)}%);">
     <div class="shot-wrap" style="width:${w}px; transform: rotate(${s.rotate ?? 0}deg);">
-      <div class="frame" style="width:${w}px; padding:${f.pad}px; border-radius:${f.radius}px;${f.bezel ? ` background:${IPHONE.finish.gradient}; box-shadow:${theme.shadow.phone(k)};` : ""}">
+      <div class="frame" style="width:${w}px; padding:${f.pad}px;${f.bezel ? ` background:${PHONE.case} center/100% 100% no-repeat; box-shadow:none; overflow:visible; filter:drop-shadow(0 ${Math.round(20 * k)}px ${Math.round(24 * k)}px rgb(0 0 0 / .28));` : ` border-radius:${f.radius}px;`}">
         ${screen}${island}
       </div>
       ${s.img ? callout(s.callout, { w, pad: f.pad, margin: (dw - w) / 2, tint }) : ""}
@@ -144,8 +150,8 @@ const LAYOUT_CALLOUTS = `window.__layoutCallouts = () => {
 };`;
 
 // Quiet, honest placeholder — neutral screen with the expected capture name.
-function placeholderScreen(src, tint, aspect, radius = 0) {
-  return `<div class="screen ph" style="background:${theme.paper}; aspect-ratio:${aspect}; border-radius:${radius}px;">
+function placeholderScreen(src, tint, aspect, clip = "") {
+  return `<div class="screen ph" style="background:${theme.paper}; aspect-ratio:${aspect}; ${clip}">
     <div class="ph-center">
       <svg viewBox="0 0 24 24" width="120" height="120" style="color:${tint};opacity:.5">
         <rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="1.4"/>
