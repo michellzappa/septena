@@ -193,6 +193,11 @@ targets:
           - CFBundleURLName: com.septena.tasks
             CFBundleURLSchemes:
               - septask
+    postBuildScripts:
+      # Build number = git commit count, on every build (scripts/stamp-built-plist.sh).
+      - name: Stamp build number
+        script: "\"${SRCROOT}/scripts/stamp-built-plist.sh\""
+        basedOnDependencyAnalysis: false
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
@@ -236,6 +241,11 @@ targets:
             NSExtensionActivationRule:
               NSExtensionActivationSupportsText: true
               NSExtensionActivationSupportsWebURLWithMaxCount: 1
+    postBuildScripts:
+      # Build number = git commit count, on every build (scripts/stamp-built-plist.sh).
+      - name: Stamp build number
+        script: "\"${SRCROOT}/scripts/stamp-built-plist.sh\""
+        basedOnDependencyAnalysis: false
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
@@ -271,6 +281,11 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    postBuildScripts:
+      # Build number = git commit count, on every build (scripts/stamp-built-plist.sh).
+      - name: Stamp build number
+        script: "\"${SRCROOT}/scripts/stamp-built-plist.sh\""
+        basedOnDependencyAnalysis: false
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
@@ -309,6 +324,11 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    postBuildScripts:
+      # Build number = git commit count, on every build (scripts/stamp-built-plist.sh).
+      - name: Stamp build number
+        script: "\"${SRCROOT}/scripts/stamp-built-plist.sh\""
+        basedOnDependencyAnalysis: false
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
@@ -404,6 +424,11 @@ targets:
           - CFBundleURLName: com.septena.tasks
             CFBundleURLSchemes:
               - septask
+    postBuildScripts:
+      # Build number = git commit count, on every build (scripts/stamp-built-plist.sh).
+      - name: Stamp build number
+        script: "\"${SRCROOT}/scripts/stamp-built-plist.sh\""
+        basedOnDependencyAnalysis: false
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
@@ -449,6 +474,11 @@ targets:
         CFBundleName: Septena
         WKApplication: true
         WKCompanionAppBundleIdentifier: com.septena.tasks
+    postBuildScripts:
+      # Build number = git commit count, on every build (scripts/stamp-built-plist.sh).
+      - name: Stamp build number
+        script: "\"${SRCROOT}/scripts/stamp-built-plist.sh\""
+        basedOnDependencyAnalysis: false
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
@@ -483,6 +513,11 @@ targets:
         CFBundleName: Septena
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    postBuildScripts:
+      # Build number = git commit count, on every build (scripts/stamp-built-plist.sh).
+      - name: Stamp build number
+        script: "\"${SRCROOT}/scripts/stamp-built-plist.sh\""
+        basedOnDependencyAnalysis: false
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig

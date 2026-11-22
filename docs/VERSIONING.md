@@ -36,7 +36,16 @@ wiring across all six plists; `scripts/stamp-version.sh` runs it before stamping
 so a mis-wired archive can't ship. **Add a new bundle target's plist to that
 script's `PLISTS` list.**
 
-**The build number is now stamped live, not just at archive.** The committer-cron
+**Every build stamps the built bundle (2026-11-22).** Each bundle target runs
+`scripts/stamp-built-plist.sh` as its last build phase (project.yml
+`postBuildScripts`). It writes `git rev-list --count HEAD` into the BUILT
+`Info.plist`'s `CFBundleVersion`, before code signing. It never edits a tracked
+file. So device and simulator builds show the real commit count, and the app
+and its extensions always match. The xcconfig value below is only the fallback
+for a build without git, and the number on an archive. **A new bundle target
+must get the same `postBuildScripts` entry.**
+
+**Historical (the cron is gone since 2026-09-14):** The committer-cron
 runs `scripts/changelog-stamp.sh` after it lands real work, which stamps
 `CURRENT_PROJECT_VERSION` to the commit count (see *The in-development entry*
 below). `scripts/stamp-version.sh` remains the belt-and-suspenders re-stamp run

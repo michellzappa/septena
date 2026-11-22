@@ -1554,6 +1554,7 @@
 				0917FB7CFF796805A21A299B /* Resources */,
 				9E0D6383F421529FD85679F4 /* Frameworks */,
 				CB2A3B5EE2855FDAFD483CAB /* Embed Foundation Extensions */,
+				91818991303765478171F436 /* Stamp build number */,
 			);
 			buildRules = (
 			);
@@ -1578,6 +1579,7 @@
 				7DF56E7FAAFEE22D37B525DD /* Frameworks */,
 				0A1DFE6859253031D3CA3025 /* Embed Foundation Extensions */,
 				65B541B6DF8813E4BDA91B8B /* Embed Watch Content */,
+				02B1CF1C49367C495FE4D765 /* Stamp build number */,
 			);
 			buildRules = (
 			);
@@ -1600,6 +1602,7 @@
 			buildPhases = (
 				A0BE84B06EC350203B6AD9FA /* Sources */,
 				610D08715736C1398D5516D5 /* Resources */,
+				D0D01F641014D12B4F65FCE1 /* Stamp build number */,
 			);
 			buildRules = (
 			);
@@ -1619,6 +1622,7 @@
 				B5E2CEE3CBFB38CEC66D4ACB /* Sources */,
 				2C4DAEA8391185C994B9ED81 /* Resources */,
 				D24E40B8369A6D675822A6A3 /* Embed Foundation Extensions */,
+				2F69242889081B6168A98310 /* Stamp build number */,
 			);
 			buildRules = (
 			);
@@ -1657,6 +1661,7 @@
 			buildPhases = (
 				80AF65300BC8CA465955D0DD /* Sources */,
 				3B37026470792D3813EB0066 /* Resources */,
+				8DD7749DD289B55CD1D8BDB2 /* Stamp build number */,
 			);
 			buildRules = (
 			);
@@ -1675,6 +1680,7 @@
 			buildPhases = (
 				ACD0B85FAF6A8A7F0DC175DF /* Sources */,
 				F092C6820A91342449BA4BE3 /* Resources */,
+				A4AE3C90DA55C751D5981510 /* Stamp build number */,
 			);
 			buildRules = (
 			);
@@ -1729,6 +1735,7 @@
 			buildPhases = (
 				54A3C91FC56E63126BD64DEE /* Sources */,
 				8BE08794AE5C7CE0EFF641EE /* Resources */,
+				1ACE9BD2AE84E3EFE0EA64C5 /* Stamp build number */,
 			);
 			buildRules = (
 			);
@@ -1893,6 +1900,142 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		02B1CF1C49367C495FE4D765 /* Stamp build number */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Stamp build number";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/stamp-built-plist.sh\"";
+		};
+		1ACE9BD2AE84E3EFE0EA64C5 /* Stamp build number */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Stamp build number";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/stamp-built-plist.sh\"";
+		};
+		2F69242889081B6168A98310 /* Stamp build number */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Stamp build number";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/stamp-built-plist.sh\"";
+		};
+		8DD7749DD289B55CD1D8BDB2 /* Stamp build number */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Stamp build number";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/stamp-built-plist.sh\"";
+		};
+		91818991303765478171F436 /* Stamp build number */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Stamp build number";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/stamp-built-plist.sh\"";
+		};
+		A4AE3C90DA55C751D5981510 /* Stamp build number */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Stamp build number";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/stamp-built-plist.sh\"";
+		};
+		D0D01F641014D12B4F65FCE1 /* Stamp build number */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Stamp build number";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/stamp-built-plist.sh\"";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		14EF934324C86E62670607F9 /* Sources */ = {

@@ -124,8 +124,10 @@ Full guide: `docs/VERSIONING.md`. The rules that bite:
   in `project.yml` and is **bumped by hand only when cutting a release**. The
   build number `CURRENT_PROJECT_VERSION` lives in `Config/Base.xcconfig` (NOT
   project.yml — a project-level value would override the xcconfig) and is
-  **the git commit count**, stamped live by the committer-cron
-  (`scripts/changelog-stamp.sh`) every time work lands, and re-stamped by
+  **the git commit count**. Every build writes it into the built bundle's
+  `Info.plist` (`scripts/stamp-built-plist.sh`, a `postBuildScripts` phase on
+  every bundle target in project.yml), so device builds go up with each
+  commit. The xcconfig value is only the no-git fallback, re-stamped by
   `scripts/stamp-version.sh` at archive time. Never hand-bump it; never move it
   into project.yml. Every embedded target (apps, watch, widgets, complication,
   live activity) reads `$(CURRENT_PROJECT_VERSION)`/`$(MARKETING_VERSION)` so the
