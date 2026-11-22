@@ -674,6 +674,7 @@ private struct SeptaskAccountPane: View {
       }
 
       SeptaskSyncAccountSection()
+      SeptaskSignInApprovalSection()
       SeptaskDeleteAccountSection()
     }
     .formStyle(.grouped)

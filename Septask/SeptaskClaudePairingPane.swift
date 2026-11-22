@@ -79,63 +79,42 @@ enum SeptaskClipboard {
   }
 }
 
-/// The pairing code Claude's browser page shows, approved through the task
-/// backend. Used by Settings ▸ Connect Claude and by the first run, so the
-/// approval and its error copy exist once. `onApproved` runs after success.
+/// The code field for a sign-in code, on Settings ▸ Connect Claude and in the
+/// first run. Continue opens `SeptaskApproveSignInFlow`, which looks the code
+/// up and shows who asks before the user approves; so a device code typed
+/// here reads "Sign in on <device>?", never "Connect Claude". `onApproved`
+/// runs after an approval of either kind.
 struct SeptaskPairingCodeField: View {
   var onApproved: (() -> Void)?
   private var sync: TaskSyncEngine { .shared }
   @State private var pairCode = ""
-  @State private var pairing = false
-  @State private var pairResult: (text: String, failed: Bool)?
+  @State private var reviewing: ReviewedCode?
+
+  private struct ReviewedCode: Identifiable {
+    let code: String
+    var id: String { code }
+  }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack {
-        TextField("Code from the browser page", text: $pairCode)
-          .font(.body.monospaced())
-          .onSubmit(approvePairing)
-          .disabled(!sync.signedIn)
-        Button("Approve", action: approvePairing)
-          .disabled(!sync.signedIn || pairing
-                    || pairCode.trimmingCharacters(in: .whitespaces).isEmpty)
-      }
-      if pairing {
-        HStack {
-          ProgressView().controlSize(.small)
-          Text("Approving…").foregroundStyle(.secondary)
-        }
-      } else if let pairResult {
-        Text(pairResult.text)
-          .font(.caption)
-          .foregroundStyle(pairResult.failed ? .red : .secondary)
+    HStack {
+      TextField("Code from the browser page", text: $pairCode)
+        .font(.body.monospaced())
+        .onSubmit(review)
+        .disabled(!sync.signedIn)
+      Button("Continue", action: review)
+        .disabled(!sync.signedIn || SeptaskApproveSignInFlow.normalized(pairCode) == nil)
+    }
+    .sheet(item: $reviewing) { reviewed in
+      SeptaskApproveSignInFlow(initialCode: reviewed.code) { _ in
+        pairCode = ""
+        onApproved?()
       }
     }
   }
 
-  private func approvePairing() {
-    let code = pairCode.trimmingCharacters(in: .whitespaces)
-    guard sync.signedIn, !pairing, !code.isEmpty else { return }
-    pairing = true
-    pairResult = nil
-    Task { @MainActor in
-      defer { pairing = false }
-      do {
-        _ = try await TaskBackendClient.shared.approvePairing(code: code)
-        pairCode = ""
-        pairResult = ("Approved. Finish in your browser.", false)
-        TaskNotices.completeStep(.connectAI)
-        onApproved?()
-      } catch TaskBackendError.http(_, let code) where code == "invalid_code" {
-        pairResult = ("That code is wrong or has expired.", true)
-      } catch TaskBackendError.http(_, let code) where code == "code_used" {
-        pairResult = ("That code was already used.", true)
-      } catch TaskBackendError.http(_, let code) where code == "too_many_attempts" {
-        pairResult = ("Too many wrong codes. Try again in 10 minutes.", true)
-      } catch {
-        pairResult = ((error as? LocalizedError)?.errorDescription ?? error.localizedDescription, true)
-      }
-    }
+  private func review() {
+    guard sync.signedIn, let code = SeptaskApproveSignInFlow.normalized(pairCode) else { return }
+    reviewing = ReviewedCode(code: code)
   }
 }
 

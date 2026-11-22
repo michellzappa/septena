@@ -171,6 +171,8 @@ enum RegistryIcons {
     "action.reminder": "bell",
     "action.star": "star",
     "settings.account": "person.crop.circle",
+    "settings.sign_in_approval": "person.badge.key",
+    "auth.device": "laptopcomputer.and.iphone",
     "settings.general": "slider.horizontal.3",
     "settings.tasks": "checklist",
     "settings.ai_agents": "sparkles",
@@ -506,6 +508,9 @@ enum RegistrySettings {
       ]),
       RegistrySettingsSection(id: "sync", header: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sync_account_status", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+      ]),
+      RegistrySettingsSection(id: "sign_in_approval", header: nil, platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sign_in_approval", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "signedIn", platforms: nil),
       ]),
       RegistrySettingsSection(id: "delete_account", header: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "delete_account", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "signedIn", platforms: nil),

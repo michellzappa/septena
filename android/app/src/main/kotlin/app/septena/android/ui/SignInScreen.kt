@@ -32,7 +32,8 @@ private sealed interface SignInStep {
 
 /**
  * Sign-in by device approval (ADR 0016): this device shows a code and the user enters it in Septena on a
- * signed-in iPhone, iPad or Mac, in the same field that connects Claude. Debug-spike copy, not humanized yet.
+ * signed-in iPhone, iPad or Mac (Settings ▸ Account ▸ Approve a sign-in), which shows this device's name before
+ * the user approves.
  */
 @Composable
 fun SignInScreen(graph: AndroidAppGraph) {
@@ -57,7 +58,7 @@ fun SignInScreen(graph: AndroidAppGraph) {
                         }
                     }
                 }
-                step = SignInStep.Failed("The code expired. Get a new one.")
+                step = SignInStep.Failed("The code expired.")
             }
             else -> Unit
         }
@@ -67,23 +68,21 @@ fun SignInScreen(graph: AndroidAppGraph) {
         modifier = Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Septena", style = MaterialTheme.typography.headlineMedium)
+        Text("Sign in to Septena", style = MaterialTheme.typography.headlineMedium)
         when (val current = step) {
             SignInStep.Start -> {
-                Text("Sign in with a device where Septena is already signed in.")
+                Text("Use a device where Septena is already signed in.")
                 Button(onClick = { step = SignInStep.Requesting }) { Text("Get a sign-in code") }
             }
             SignInStep.Requesting -> CircularProgressIndicator()
             is SignInStep.ShowCode -> {
-                Text("On your iPhone or iPad: Septena ▸ Settings ▸ Connect Claude.")
-                Text("On your Mac: Septena ▸ Settings ▸ AI & Agents.")
-                Text("Enter this code:")
+                Text("On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Enter this code:")
                 Text(
                     current.device.displayCode,
                     style = MaterialTheme.typography.displaySmall,
                     fontFamily = FontFamily.Monospace,
                 )
-                Text("The code works for 10 minutes. This screen continues on its own after you approve it.")
+                Text("The code works for 10 minutes. After you approve it, this screen continues by itself.")
                 CircularProgressIndicator()
             }
             is SignInStep.Failed -> {

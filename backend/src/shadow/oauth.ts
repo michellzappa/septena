@@ -292,14 +292,60 @@ export async function pollDevicePairing(env: Env, body: z.infer<typeof zDevicePo
 
 // ---- POST /v1/pair/approve (called by the app, bearer-authenticated) ----
 
+export const zPairKind = z.enum(["connector", "device"]);
+
 export const zPairApproveBody = z.object({
   code: z.string().min(1).max(32),
   timeZone: z.string().max(64).optional(),
+  /// The kind the user confirmed after /v1/pair/inspect. Optional: app builds
+  /// from before 2026-11-22 approve without the confirm step.
+  kind: zPairKind.optional(),
 }).strict();
 
+export const zPairInspectBody = z.object({
+  code: z.string().min(1).max(32),
+}).strict();
+
+type PairFailure = { ok: false; status: 404 | 409 | 429; error: "invalid_code" | "code_used" | "too_many_attempts" };
+
 export type PairApproveResult =
-  | { ok: true; client: string }
-  | { ok: false; status: 404 | 409 | 429; error: "invalid_code" | "code_used" | "too_many_attempts" };
+  | { ok: true; client: string; kind: "connector" | "device" }
+  | PairFailure;
+
+export type PairInspectResult =
+  | { ok: true; kind: "connector" | "device"; client: string; expiresIn: number }
+  | PairFailure;
+
+/// Shows what a code asks for before the user approves it. A wrong code counts
+/// toward the same failure limit as approve, so inspect cannot be used to
+/// guess codes faster.
+export async function inspectPairing(
+  env: Env,
+  userId: string,
+  body: z.infer<typeof zPairInspectBody>,
+): Promise<PairInspectResult> {
+  const store = storeFor(env, userId);
+  if ((await store.pairFailures()) >= PAIR_MAX_FAILURES) {
+    logEvent("pair_inspect", { ok: false, reason: "rate_limited" });
+    return { ok: false, status: 429, error: "too_many_attempts" };
+  }
+  const code = normalizePairCode(body.code);
+  const res = code ? await pairingFor(env, code).peek() : { outcome: "not_found" as const };
+  if (res.outcome === "ok") {
+    logEvent("pair_inspect", { ok: true, kind: res.purpose });
+    return {
+      ok: true,
+      kind: res.purpose,
+      client: res.clientName ?? (res.purpose === "device" ? "A new device" : "Claude"),
+      expiresIn: Math.max(0, Math.round((res.expiresAt - Date.now()) / 1000)),
+    };
+  }
+  await store.notePairFailure();
+  logEvent("pair_inspect", { ok: false, reason: res.outcome });
+  return res.outcome === "already_used"
+    ? { ok: false, status: 409, error: "code_used" }
+    : { ok: false, status: 404, error: "invalid_code" };
+}
 
 export async function approvePairing(
   env: Env,
@@ -314,11 +360,12 @@ export async function approvePairing(
   const code = normalizePairCode(body.code);
   const timeZone = body.timeZone && isValidTz(body.timeZone) ? body.timeZone : undefined;
   const res = code
-    ? await pairingFor(env, code).approve({ userId, timeZone })
-    : { outcome: "not_found" as const, clientName: undefined };
+    ? await pairingFor(env, code).approve({ userId, timeZone }, body.kind)
+    : { outcome: "not_found" as const, clientName: undefined, purpose: undefined };
   if (res.outcome === "ok") {
-    logEvent("preview_pair_approve", { ok: true });
-    return { ok: true, client: res.clientName ?? "Claude" };
+    const kind = res.purpose ?? "connector";
+    logEvent("preview_pair_approve", { ok: true, kind });
+    return { ok: true, client: res.clientName ?? (kind === "device" ? "A new device" : "Claude"), kind };
   }
   await store.notePairFailure();
   logEvent("preview_pair_approve", { ok: false, reason: res.outcome });

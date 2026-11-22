@@ -594,6 +594,12 @@
           ]
         },
         {
+          "id": "sign_in_approval",
+          "items": [
+            { "kind": "customSurface", "surface": "sign_in_approval", "visibility": "signedIn", "featureId": "sync.backend" }
+          ]
+        },
+        {
           "id": "delete_account",
           "items": [
             { "kind": "customSurface", "surface": "delete_account", "visibility": "signedIn", "featureId": "account.delete" }

@@ -8,11 +8,13 @@ import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from 
 import { issueSession, refreshSession, revokeSession, storeFor, verifyAccessToken } from "./session.js";
 import {
   approvePairing,
+  inspectPairing,
   pollDevicePairing,
   startDevicePairing,
   zDevicePollBody,
   zDeviceStartBody,
   zPairApproveBody,
+  zPairInspectBody,
 } from "../shadow/oauth.js";
 import {
   appAccountTokenFor,
@@ -248,13 +250,22 @@ api.get("/attachments/:id", async (c) => {
   });
 });
 
-// ---- pairing a Claude connector to this user (MCP preview, src/shadow/) ----
+// ---- approving a sign-in code: a new device or a Claude connector (src/shadow/oauth.ts) ----
+
+api.post("/pair/inspect", async (c) => {
+  const body = await parse(c, zPairInspectBody);
+  if (body instanceof Response) return body;
+  const res = await inspectPairing(c.env, c.get("userId"), body);
+  return res.ok
+    ? c.json({ kind: res.kind, client: res.client, expiresIn: res.expiresIn }, 200, { "Cache-Control": "no-store" })
+    : c.json({ error: res.error }, res.status);
+});
 
 api.post("/pair/approve", async (c) => {
   const body = await parse(c, zPairApproveBody);
   if (body instanceof Response) return body;
   const res = await approvePairing(c.env, c.get("userId"), body);
-  return res.ok ? c.json({ ok: true, client: res.client }) : c.json({ error: res.error }, res.status);
+  return res.ok ? c.json({ ok: true, client: res.client, kind: res.kind }) : c.json({ error: res.error }, res.status);
 });
 
 // ---- sync entitlement (docs/SYNC_SUBSCRIPTION_SPEC.md §5–§6) ----
