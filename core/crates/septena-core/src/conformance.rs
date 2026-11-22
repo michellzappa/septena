@@ -68,6 +68,11 @@ pub fn run_conformance(fixture: String, json: String) -> Result<ConformanceRepor
                 let input = json!({ "conversation": case["convo"], "now": CONVO_NOW });
                 run.check("cases", case, "deriveConversation", input, true);
             }
+            for case in cases(&doc, "conversationState") {
+                let now = case.get("now").cloned().unwrap_or_else(|| json!(CONVO_NOW));
+                let input = json!({ "conversation": case["convo"], "now": now });
+                run.check("conversationState", case, "conversationState", input, false);
+            }
         }
         "sync-engine" => {
             for (section, function) in [

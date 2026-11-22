@@ -47,6 +47,89 @@ pub struct ConversationProjection {
     pub pending_reasoning: bool,
 }
 
+/// The facts about a conversation that task lists and the Agent list read.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationState {
+    pub is_terminal: bool,
+    /// An agent handed the task back for the human to verify (`needs_verify`).
+    pub needs_human_review: bool,
+    /// The last turn is a provider turn with options and no answer yet.
+    pub has_open_provider_question: bool,
+    pub awaits_human: bool,
+    pub has_started: bool,
+    /// A live claim: `claim_until` is after `now`. The host passes
+    /// `claim_until` only when the claim has a claimant.
+    pub is_claimed: bool,
+    /// The Agent smart list stage (`queued`, `working`, `yourTurn`, `review`,
+    /// `done`), or none when the task is not agent work.
+    pub agent_stage: Option<String>,
+}
+
+/// The predicates and the Agent-list stage of a conversation
+/// (`docs/TASK_FACTORY_SPEC.md` §3). Review and Done win over a stale
+/// assignee; a stop counts as Your turn, because only the human can resume it
+/// (ADR 0008).
+#[cfg_attr(feature = "ffi", uniffi::export)]
+pub fn conversation_state(conversation: TaskConversation, now: String) -> Result<ConversationState, CoreError> {
+    let now = instant(&now, "now")?;
+    let facts = Facts::of(&conversation, now);
+    let agent_stage = if conversation.assignee.as_deref() != Some(convo_assignee::CLAUDE)
+        && !facts.is_claimed
+        && !facts.needs_review
+    {
+        None
+    } else if facts.needs_review {
+        Some("review")
+    } else if facts.is_terminal {
+        Some("done")
+    } else if facts.open_question || conversation.stopped_at.is_some() {
+        Some("yourTurn")
+    } else if facts.is_claimed {
+        Some("working")
+    } else {
+        Some("queued")
+    };
+    Ok(ConversationState {
+        is_terminal: facts.is_terminal,
+        needs_human_review: facts.needs_review,
+        has_open_provider_question: facts.open_question,
+        awaits_human: facts.needs_review || facts.open_question,
+        has_started: facts.has_started,
+        is_claimed: facts.is_claimed,
+        agent_stage: agent_stage.map(str::to_string),
+    })
+}
+
+struct Facts {
+    is_terminal: bool,
+    needs_review: bool,
+    open_question: bool,
+    has_started: bool,
+    is_claimed: bool,
+}
+
+impl Facts {
+    fn of(conversation: &TaskConversation, now: i64) -> Facts {
+        let last = conversation.thread.iter().max_by_key(|turn| turn.sequence);
+        let is_terminal = conversation.end_state.as_deref().is_some_and(|s| s != convo_end_state::OPEN);
+        Facts {
+            is_terminal,
+            needs_review: conversation.end_state.as_deref() == Some(convo_end_state::NEEDS_VERIFY),
+            open_question: last.is_some_and(|t| {
+                t.role == convo_turn_role::PROVIDER && t.options.as_ref().is_some_and(|o| !o.is_empty())
+            }),
+            has_started: !conversation.thread.is_empty()
+                || conversation.confirmed_intent.is_some()
+                || is_terminal
+                || conversation.artifact_exists
+                || conversation.handoff_exists,
+            is_claimed: conversation.claim_until.as_deref().and_then(parse_instant_ms).is_some_and(|until| until > now),
+        }
+    }
+}
+
 /// Projects a conversation onto its row stage and badge. `now` decides
 /// whether a claim is still live.
 #[cfg_attr(feature = "ffi", uniffi::export)]

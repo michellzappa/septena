@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Golden conformance vectors for deriveConvo and awaitsReasoning across Swift, TypeScript, and Kotlin.",
+  "description": "Golden conformance vectors for deriveConvo and awaitsReasoning across Swift, TypeScript, and Kotlin, and for the conversation predicates and Agent-list stage (conversationState) of the shared core (ADR 0025).",
   "cases": [
     {
       "name": "empty conversation with no assignee",
@@ -93,5 +93,18 @@
       },
       "expected": { "stage": "terminal", "badge": "wontDo", "pendingReasoning": false }
     }
+  ],
+  "conversationState": [
+    {"name": "not agent work: no assignee, no claim, no review", "convo": {"thread": []}, "expected": {"isTerminal": false, "needsHumanReview": false, "hasOpenProviderQuestion": false, "awaitsHuman": false, "hasStarted": false, "isClaimed": false, "agentStage": null}},
+    {"name": "assigned to claude with no turns is queued", "convo": {"assignee": "claude", "thread": []}, "expected": {"isTerminal": false, "needsHumanReview": false, "hasOpenProviderQuestion": false, "awaitsHuman": false, "hasStarted": false, "isClaimed": false, "agentStage": "queued"}},
+    {"name": "open provider question is your turn", "convo": {"assignee": "claude", "thread": [{"seq": 1, "role": "provider", "step": "decide", "question": "Which?", "options": ["A", "B"], "ts": "2026-11-20T10:00:00Z"}]}, "expected": {"isTerminal": false, "needsHumanReview": false, "hasOpenProviderQuestion": true, "awaitsHuman": true, "hasStarted": true, "isClaimed": false, "agentStage": "yourTurn"}},
+    {"name": "live claim is working", "convo": {"assignee": "claude", "claimUntil": "2026-11-20T12:30:00Z", "thread": [{"seq": 1, "role": "provider", "step": "decide", "question": "Which?", "options": ["A", "B"], "ts": "2026-11-20T10:00:00Z"}, {"seq": 2, "role": "user", "step": "work", "note": "Go", "ts": "2026-11-20T10:05:00Z"}]}, "expected": {"isTerminal": false, "needsHumanReview": false, "hasOpenProviderQuestion": false, "awaitsHuman": false, "hasStarted": true, "isClaimed": true, "agentStage": "working"}},
+    {"name": "expired claim is queued", "convo": {"assignee": "claude", "claimUntil": "2026-11-20T11:00:00Z", "thread": [{"seq": 1, "role": "provider", "step": "decide", "question": "Which?", "options": ["A", "B"], "ts": "2026-11-20T10:00:00Z"}, {"seq": 2, "role": "user", "step": "work", "note": "Go", "ts": "2026-11-20T10:05:00Z"}]}, "expected": {"isTerminal": false, "needsHumanReview": false, "hasOpenProviderQuestion": false, "awaitsHuman": false, "hasStarted": true, "isClaimed": false, "agentStage": "queued"}},
+    {"name": "live claim counts as agent work without the claude assignee", "convo": {"assignee": "me", "claimUntil": "2026-11-20T13:00:00Z", "thread": [{"seq": 2, "role": "user", "step": "work", "note": "Go", "ts": "2026-11-20T10:05:00Z"}]}, "expected": {"isTerminal": false, "needsHumanReview": false, "hasOpenProviderQuestion": false, "awaitsHuman": false, "hasStarted": true, "isClaimed": true, "agentStage": "working"}},
+    {"name": "needs_verify is review even when assigned to me", "convo": {"assignee": "me", "endState": "needs_verify", "thread": []}, "expected": {"isTerminal": true, "needsHumanReview": true, "hasOpenProviderQuestion": false, "awaitsHuman": true, "hasStarted": true, "isClaimed": false, "agentStage": "review"}},
+    {"name": "agent_done is done", "convo": {"assignee": "claude", "endState": "agent_done", "thread": []}, "expected": {"isTerminal": true, "needsHumanReview": false, "hasOpenProviderQuestion": false, "awaitsHuman": false, "hasStarted": true, "isClaimed": false, "agentStage": "done"}},
+    {"name": "stopped agent work is your turn", "convo": {"assignee": "claude", "stoppedAt": "2026-11-20T11:00:00Z", "thread": [{"seq": 2, "role": "user", "step": "work", "note": "Go", "ts": "2026-11-20T10:05:00Z"}]}, "expected": {"isTerminal": false, "needsHumanReview": false, "hasOpenProviderQuestion": false, "awaitsHuman": false, "hasStarted": true, "isClaimed": false, "agentStage": "yourTurn"}},
+    {"name": "open question on a local task is not agent work", "convo": {"assignee": "local", "thread": [{"seq": 1, "role": "provider", "step": "decide", "question": "Which?", "options": ["A", "B"], "ts": "2026-11-20T10:00:00Z"}]}, "expected": {"isTerminal": false, "needsHumanReview": false, "hasOpenProviderQuestion": true, "awaitsHuman": true, "hasStarted": true, "isClaimed": false, "agentStage": null}},
+    {"name": "an artifact alone means the conversation has started", "convo": {"artifactExists": true, "thread": []}, "expected": {"isTerminal": false, "needsHumanReview": false, "hasOpenProviderQuestion": false, "awaitsHuman": false, "hasStarted": true, "isClaimed": false, "agentStage": null}}
   ]
 }
