@@ -375,6 +375,87 @@ plan table row), `usage` (`connectorWritesToday`, `agentRunsThisMonth`),
   poll-only sync on free, the 402 bodies. The app reads all of it from
   `GET /v1/entitlement` and the 402 body.
 
+### 6.4 Limit logic review (2026-11-22)
+
+A review of §6.3 before `ENTITLEMENT_ENFORCE` turns on. Each finding has
+a default; mz can overrule it. Nothing here is built yet unless it says so.
+
+**1. A reinstall looks like a second device.** A device is a session. A
+reinstall, a restored phone or a new phone signs in as a new session while
+the old session still holds the slot until it expires. The user then sees
+the `second_device` upsell on the phone they always used, which breaks
+"replacing a phone never needs Plus" (ADR 0023).
+*Default:* a slot holder that has not synced for 14 days loses the slot to
+the next device that syncs, with no prompt. The move button stays for the
+case inside 14 days.
+
+**2. The free move can stand in for Plus.** `POST /v1/entitlement/device`
+is free and instant, so a free user with a phone and a Mac can move the
+slot back and forth and get two-device sync by hand.
+*Default:* one move per 24 hours. A second move inside that window returns
+402 with the `second_device` words. Finding 1's automatic take does not
+count as a move.
+
+**3. "Delete lapsed data after 12 months" contradicts the free account.**
+§7 says the server keeps a lapsed user's data 12 months, then deletes it.
+But a lapsed account is a free account, and a free account keeps one
+device syncing to the server. Deleting its data would delete a free
+account's backup.
+*Default:* lapsing never deletes tasks. After 12 months lapsed, the server
+deletes only what the free plan does not hold: attachment bytes in R2 and
+change-log rows past the free window, after a warning mail. An account with
+no sign-in for 24 months is deleted after a warning mail, on every plan.
+
+**4. The trial can repeat.** The user id comes from the Apple `sub`, so
+deleting the account and signing in again gives the same user id with an
+empty Durable Object, and `startTrialOnce` starts a new trial.
+*Default:* keep a KV marker `trial-used:<userId>` that account deletion does
+not remove. It holds no personal data beyond the id the server already
+derives.
+
+**5. Old app builds meet 402.** Builds from before P1 do not know the 402
+bodies. Once enforcement is on, a free account on such a build sees a sync
+error instead of the upsell.
+*Default:* enforcement turns on only after a build that handles every 402
+body is the only build on TestFlight and the App Store, and after a week of
+`entitlement_would_block` logs shows what would block.
+
+**6. A plan check failure blocks paying users too.** In enforce mode a
+failed plan read returns 503 on sync for everyone. That is fail closed, as
+§6 says, but a Durable Object hiccup then stops sync for Plus accounts.
+*Default:* keep fail closed for writes that cost money (attachments,
+agent claims), and let sync through on a failed plan read, logged as
+`plan_check_failed`. Sync of one device is free anyway; the device check
+needs the plan only to block a second device.
+
+**7. A purchase on the wrong account is silent.** An Apple ID that bought
+Plus while signed in to Septena account A, then used with account B, gets
+403 `account_mismatch`; the app finishes the transaction and shows
+"failed".
+*Default:* the Plus sheet says "This Apple ID's Plus belongs to another
+Septena account" when `Transaction.currentEntitlements` holds a Plus
+transaction whose `appAccountToken` is not this account's.
+
+**8. Live sync on one device.** With one syncing device, `liveSync: false`
+mostly delays agent and connector edits reaching the app, which is the
+moment the free account should feel agents work.
+*Default:* keep poll-only on free, with the poll at most 2 minutes while
+the app is in front.
+
+**9. What already holds.** The trial and a lapse leave the device used
+last syncing (newest `slotAt`). Grace and billing retry stay active. A
+refund revokes at once. History past the free window hides and comes back
+on upgrade. Downloads of stored files keep working on free. Counters use
+UTC days and months, and a renewal of a claim is not a new agent run.
+
+**Issues:** #262 (findings 1, 2, 4, 6), #263 (finding 3), #264 (402
+bodies, findings 5 and 8), #265 (finding 7), #267 (turn enforcement on).
+
+**Order to turn enforcement on:** findings 1, 2, 4 and 6 in the backend;
+the app handles every 402 body (the upsell moments, issue list in §10);
+grants for testers; a week of `entitlement_would_block` logs; then
+`ENTITLEMENT_ENFORCE=true`.
+
 ## 7. App behavior
 
 - **Active:** sync runs, the connector works, agents run.
@@ -384,8 +465,9 @@ plan table row), `usage` (`connectorWritesToday`, `agentRunsThisMonth`),
   shows the upsell for that moment (§3.2) and nothing else.
 - **Lapsed:** the account falls back to the free limits. The most recently
   used device keeps syncing; the others keep their local data and stop
-  syncing (ADR 0023). Local data stays on every device and stays fully editable. The server keeps the data *(default: 12 months)*, then mails a
-  warning before it deletes. Re-subscribing resumes sync with the server
+  syncing (ADR 0023). Local data stays on every device and stays fully editable. Lapsing never deletes tasks: after 12 months the server
+  deletes only attachment bytes and change-log rows past the free window,
+  after a warning mail (§6.4, finding 3). Re-subscribing resumes sync with the server
   copy as the base and pushes local edits on top (the normal op queue).
 - The app never deletes local data because a subscription ended.
 - Agents and links stop at expiry. Open agent claims return to the user.
@@ -547,7 +629,7 @@ before any public release that uses the backend.
 | Is the hosted Claude connector paid? | Yes, it runs on our server |
 | Lifetime product | None |
 | Family Sharing | Off at launch |
-| How long the server keeps a lapsed user's data | 12 months, with a warning mail first |
+| How long the server keeps a lapsed user's data | Tasks: always (it is a free account). Attachment bytes and old history: 12 months, with a warning mail first (§6.4) |
 | Tip jar in the task app | Removed |
 | Early TestFlight access as a subscriber perk | Yes |
 | Does the code stay open source? | Yes; the paid product is the hosted service |
