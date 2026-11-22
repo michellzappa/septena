@@ -201,19 +201,21 @@ reads this table; `appstore/validate.mjs` checks it.
   Callout text is never written by hand.
 - `title` is at most 28 characters, without the `*` marks. It is the only
   text on the panel (decided 2026-11-22: one level of title, no subtitle).
-  Leave `sub` empty. Each panel shows one shipped feature.
+  Leave `sub` empty. Each panel shows one shipped feature, and the title
+  names that feature plainly. Say "your agent", never a vendor: Septena works
+  with any agent that speaks MCP.
 - No em or en dashes. Every title and sub passes the humanizer skill.
 
 ### iPhone
 
 | slug | scene | callout | title | sub |
 | --- | --- | --- | --- | --- |
-| thinks | thinking/1 | - | Tasks that think with you | |
-| agent | agents/3 | agent-status | Claude does the legwork | |
-| inbox | capture/1 | - | Today stays yours | |
-| plan | plan/1 | task-reply | Pick the few that matter | |
-| dates | dates/2 | - | Start Monday, due Friday | |
-| details | notes/2 | - | Keep the details on the task | |
+| thinks | thinking/1 | - | AI that asks first | |
+| agent | agents/3 | - | Your agent works your list | |
+| inbox | capture/1 | - | New tasks wait in the Inbox | |
+| plan | plan/1 | task-reply | Plan today from Anytime | |
+| dates | dates/2 | - | Start dates and deadlines | |
+| details | notes/2 | - | Notes and files on the task | |
 
 ---
 
