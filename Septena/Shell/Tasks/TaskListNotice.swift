@@ -108,7 +108,7 @@ struct TaskListNotice<Actions: View>: View {
     }
     .buttonStyle(.plain)
     .inlineHover(capsule: true)
-    .accessibilityLabel(Text("Dismiss"))
+    .accessibilityLabel(Text(RegistryNotices.dismissTitle))
   }
 
   @ViewBuilder

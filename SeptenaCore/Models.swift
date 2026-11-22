@@ -1035,25 +1035,38 @@ enum TaskFilter: Equatable, Hashable {
     }
   }
 
-  // User-facing label. "Anytime" is the single home for open, dateless tasks
-  // (it absorbed the former "Someday" bucket). The serverView key stays
-  // `unscheduled` so the API contract is unchanged.
+  /// The smart list's registry row (`registry/destinations.json`), joined by
+  /// `navigationKey`. Nil for a project or an area.
+  var registryDestination: RegistryDestination? {
+    RegistryDestinations.byNavigationKey[navigationKey]
+  }
+
+  // User-facing label, from the registry. "Anytime" is the single home for
+  // open, dateless tasks (it absorbed the former "Someday" bucket). The
+  // serverView key stays `unscheduled` so the API contract is unchanged.
   var title: String {
     switch self {
-    case .today: return String(localized: "Today", comment: "Task filter")
-    case .triage: return String(localized: "Inbox", comment: "Task filter")
-    case .review: return String(localized: "Review", comment: "Task filter")
-    case .agent: return RegistryDestinations.byNavigationKey["agent"]?.title ?? "Agent"
-    case .upcoming: return String(localized: "Upcoming", comment: "Task filter")
-    case .repeating: return String(localized: "Repeating", comment: "Task filter")
-    case .unscheduled: return String(localized: "Anytime", comment: "Task filter")
-    case .starred: return String(localized: "Starred", comment: "Task filter")
-    case .logbook: return String(localized: "Logbook", comment: "Task filter")
-    case .faded: return String(localized: "Faded", comment: "Task filter")
-    case .recentlyDeleted: return String(localized: "Recently Deleted", comment: "Task filter")
-    case .project: return String(localized: "Project", comment: "Task filter")
-    case .area: return String(localized: "Area", comment: "Task filter")
+    case .project: return RegistryL10n.t("Project")
+    case .area: return RegistryL10n.t("Area")
+    default: return registryDestination?.title ?? navigationKey
     }
+  }
+
+  /// Empty-state copy for this list: the destination's own, or the generic
+  /// one (`genericEmptyState`) for a project or an area.
+  var emptyTitle: String {
+    registryDestination?.emptyTitle ?? RegistryDestinations.GenericEmpty.title
+  }
+
+  /// For a project or an area: how to add a task here. "Double-click" only
+  /// exists with a pointer; on a touch screen the + is the way in.
+  var emptyDetail: String {
+    if let registryDestination { return registryDestination.emptyDetail }
+    #if os(macOS)
+    return RegistryDestinations.GenericEmpty.pointerDetail
+    #else
+    return RegistryDestinations.GenericEmpty.touchDetail
+    #endif
   }
 }
 
