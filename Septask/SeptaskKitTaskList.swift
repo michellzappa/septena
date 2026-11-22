@@ -2700,9 +2700,12 @@ final class SeptaskKitTaskListController: NSViewController {
       restoreTasks(actionableSelection.map(\.id))
       return
     }
+    // Read the task selection BEFORE dismissing notices: a dismiss moves the
+    // selection to the next row, and reading it after would complete a task
+    // the user never selected.
+    let selection = actionableSelection
     toggleSelectedNoticeSteps()
     dismissSelectedNotices()
-    let selection = actionableSelection
     guard !selection.isEmpty else { return }
     apply(completing: selection.filter { $0.status == .open },
          reopening: selection.filter { $0.status != .open })
