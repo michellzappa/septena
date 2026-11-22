@@ -109,9 +109,9 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
 
     override suspend fun applyPushResults(results: List<SyncOperationResult>, at: Instant) {
         database.transaction {
-            val outbox = queries.selectAllOutbox().executeAsList().associateBy { it.clientOpId }
+            val outbox = queries.selectAllOutbox().executeAsList().associateBy { it.clientOpId }.toMutableMap()
             for (result in results) {
-                val row = outbox[result.clientOpId] ?: continue
+                val row = outbox.remove(result.clientOpId) ?: continue
                 val operation = SyncWireCodec.decodeOperation(row.operationJson)
                 when (result.status) {
                     SyncResultStatus.APPLIED, SyncResultStatus.NOOP -> {
@@ -136,6 +136,11 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
                             reason = result.reason?.takeIf(String::isNotBlank) ?: "The server rejected this change",
                             rejected_at_ms = at.toEpochMilli(),
                             retryable = 1L,
+                        )
+                        restoreRejectedOperation(
+                            operation = operation,
+                            pendingOperations = outbox.values.sortedBy { it.seq }
+                                .map { SyncWireCodec.decodeOperation(it.operationJson) },
                         )
                         queries.deleteOutbox(result.clientOpId)
                     }
@@ -337,6 +342,45 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
             not_before_ms = notBefore.toEpochMilli(),
             sent = 0L,
         )
+    }
+
+    private fun restoreRejectedOperation(
+        operation: SyncOperation,
+        pendingOperations: List<SyncOperation>,
+    ) {
+        when (operation) {
+            is SyncOperation.Upsert -> {
+                val row = queries.selectRecord(operation.entity, operation.id).executeAsOneOrNull() ?: return
+                val shadow = queries.selectShadow(operation.entity, operation.id).executeAsOneOrNull() ?: return
+                if (shadow.remoteKnown != 1L) return
+
+                val shadowFields = parseObject(shadow.fieldsJson)
+                val restoredFields = parseObject(row.fieldsJson).toMutableMap()
+                val remainingUpserts = pendingOperations.filterIsInstance<SyncOperation.Upsert>()
+                    .filter { it.entity == operation.entity && it.id == operation.id }
+                for (field in operation.fields.keys) {
+                    val pendingValue = remainingUpserts.asReversed()
+                        .firstOrNull { field in it.fields }
+                        ?.fields
+                        ?.get(field)
+                    when {
+                        pendingValue != null -> restoredFields[field] = pendingValue
+                        field in shadowFields -> restoredFields[field] = shadowFields.getValue(field)
+                        else -> restoredFields.remove(field)
+                    }
+                }
+                queries.upsertRecord(
+                    entity = row.entity,
+                    id = row.id,
+                    fields_json = encodeObject(restoredFields),
+                    revision = row.revision,
+                    updated_at = row.updatedAt,
+                    deleted_at = row.deletedAt,
+                    remote_known = row.remoteKnown,
+                )
+            }
+            is SyncOperation.Delete, is SyncOperation.AppendTurn -> Unit
+        }
     }
 
     private fun applySuccessfulOperation(operation: SyncOperation, revision: Long?, sequence: Long?) {
