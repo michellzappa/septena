@@ -267,7 +267,7 @@ enum RegistryTokens {
   }
   static let accentPalette: [String] = ["#ef4444", "#f97316", "#f59e0b", "#eab308", "#84cc16", "#22c55e", "#10b981", "#14b8a6", "#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#ec4899", "#f43f5e"]
   static let fruitAccents: [RegistryFruitAccent] = [
-    RegistryFruitAccent(id: "colorful", name: RegistryL10n.t("Colorful"), origin: "System · Blue + semantic", lightHex: "#007AFF", darkHex: "#0A84FF", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: true),
+    RegistryFruitAccent(id: "colorful", name: RegistryL10n.t("Colorful"), origin: "Default · Blue + semantic", lightHex: "#007AFF", darkHex: "#0A84FF", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: true),
     RegistryFruitAccent(id: "tamarillo", name: RegistryL10n.t("Tamarillo"), origin: "Andes · Crimson", lightHex: "#D6333F", darkHex: "#FF5C67", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: false),
     RegistryFruitAccent(id: "persimmon", name: RegistryL10n.t("Persimmon"), origin: "East Asia · Vermilion", lightHex: "#E05212", darkHex: "#FF7738", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: false),
     RegistryFruitAccent(id: "yuzu", name: RegistryL10n.t("Yuzu"), origin: "Japan · Citrus gold", lightHex: "#C28500", darkHex: "#F2BF2C", checkLightHex: "#FFFFFF", checkDarkHex: "#141518", multicolor: false),
@@ -412,7 +412,7 @@ enum RegistrySettings {
     static let telemetryLevel: String = "balanced"
     static let agentsPaused: Bool = false
     static let getStartedDismissed: Bool = false
-    static let accentColor: String = "persimmon"
+    static let accentColor: String = "colorful"
     static let canvasTexture: String = "none"
     static let textureIntensity: Int = 55
     static let textureMotion: String = "still"

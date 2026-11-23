@@ -126,8 +126,8 @@ enum AppIconColor: String, CaseIterable, Sendable, Identifiable {
 enum AppIconCatalog {
   static let finishStorageKey = RegistrySettings.StorageKey.appIconFinish
   /// Theme = icon: the icon color follows the app accent one to one.
-  /// `Persimmon` is the default accent and the primary icon, so a fresh
-  /// install never switches icons. `Colorful` (system blue) also keeps it. `Jabuticaba` maps to `Mono`.
+  /// `Colorful` (the default accent) keeps the primary Persimmon icon, so a
+  /// fresh install never switches icons. `Jabuticaba` maps to `Mono`.
   static func resolvedColor(accentColorID: String) -> AppIconColor {
     switch accentColorID {
     case "jabuticaba": return .mono

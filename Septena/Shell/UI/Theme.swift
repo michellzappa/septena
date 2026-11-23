@@ -141,7 +141,7 @@ enum Theme {
   }()
 
   /// Done-checkbox fill — user's selected Septena accent in Septask
-  /// (`Persimmon` default; `Colorful` = system blue; or one of the 7 fruit accents),
+  /// (`Colorful` default = system blue, or one of the 7 fruit accents),
   /// matching native system checkboxes in both light and dark appearances.
   @MainActor static var checkboxFill: Color { selectionAccent }
 
@@ -211,8 +211,8 @@ enum Theme {
   }
   #endif
 
-  /// Selection color: in Septask, the user's chosen accent (`Persimmon` by default,
-  /// `Colorful` = system blue, or another fruit accent); in Septena, the platform accent.
+  /// Selection color: in Septask, the user's chosen accent (`Colorful` default
+  /// = blue, or one of the 7 fruit accents); in Septena, the platform accent.
   /// Restrained reach (ADR 0019): selection wash, done checkboxes, active
   /// chips/pills, active iOS tab, primary modal CTA, unread dot, header wash.
   @MainActor static var selectionAccent: Color {

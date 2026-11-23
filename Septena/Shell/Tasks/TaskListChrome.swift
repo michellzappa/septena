@@ -559,7 +559,7 @@ struct MagicPlusRowDropModifier: ViewModifier {
 
   /// Subtle dashed-outline landing slot revealed in the parted row gap.
   private var ghostSlotPlaceholder: some View {
-    let accent = AppearancePreferences.shared.accentSwiftUIColor
+    let accent = AppearancePreferences.shared.magicPlusSwiftUIColor
     return RoundedRectangle(cornerRadius: 10, style: .continuous)
       .strokeBorder(accent.opacity(0.45),
                     style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
@@ -683,7 +683,7 @@ struct MagicPlusFloatingOverlay: View {
   }
 
   private var card: some View {
-    let accent = AppearancePreferences.shared.accentSwiftUIColor
+    let accent = AppearancePreferences.shared.magicPlusSwiftUIColor
     return TaskDragStackPreview(
       title: RegistryActions.title("app.newTask"),
       count: 1,

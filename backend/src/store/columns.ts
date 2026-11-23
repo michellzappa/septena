@@ -85,7 +85,7 @@ export const SETTING_VALUES = {
   /// When the first run (registry/surfaces.json `firstRun`) finished on any
   /// device. Set once; a second device that signs in skips the first run.
   onboardedAt: z.string().regex(new RegExp(ENTITY_PATTERNS.stamp), "expected ISO time").max(ENTITY_LIMITS.stampMax),
-  /// App accent color ID (ADR 0019 fruits; persimmon default, colorful = system blue).
+  /// App accent color ID (ADR 0019: colorful default + 7 exotic fruits).
   accentColor: z.enum(ENTITY_ENUMS.accentColor),
   /// Procedural header-wash canvas texture ID (ADR 0019).
   canvasTexture: z.enum(ENTITY_ENUMS.canvasTexture),

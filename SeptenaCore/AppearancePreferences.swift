@@ -239,7 +239,7 @@ final class AppearancePreferences {
     RegistryTokens.fruitAccents.first { $0.id == accentColorID }
       ?? RegistryTokens.fruitAccents.first
       ?? RegistryFruitAccent(
-        id: "colorful", name: "Colorful", origin: "System · Blue + semantic",
+        id: "colorful", name: "Colorful", origin: "Default · Blue + semantic",
         lightHex: "#007AFF", darkHex: "#0A84FF",
         checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: true
       )
@@ -319,6 +319,28 @@ final class AppearancePreferences {
     guard isColorful, let hex = RegistryTokens.multicolorGlyphHex[iconID] else { return accentSwiftUIColor }
     let c = RGBTriple.fromHex(hex)
     return Color(.sRGB, red: c.r, green: c.g, blue: c.b, opacity: 1)
+  }
+
+  /// The brand fruit. Colorful (the default) is several colors, not just
+  /// system blue: the Magic Plus orb wears Persimmon there, so the app's most
+  /// visible control reads as Septena and not as a stock blue button.
+  private var brandFruit: RegistryFruitAccent {
+    guard isColorful,
+          let persimmon = RegistryTokens.fruitAccents.first(where: { $0.id == "persimmon" })
+    else { return currentFruit }
+    return persimmon
+  }
+
+  /// Fill for the Magic Plus orb: Persimmon under Colorful, else the accent.
+  var magicPlusSwiftUIColor: Color {
+    let f = brandFruit
+    return Self.dynamicColor(light: RGBTriple.fromHex(f.lightHex), dark: RGBTriple.fromHex(f.darkHex))
+  }
+
+  /// Glyph ink on the Magic Plus orb, paired with `magicPlusSwiftUIColor`.
+  var magicPlusInkSwiftUIColor: Color {
+    let f = brandFruit
+    return Self.dynamicColor(light: RGBTriple.fromHex(f.checkLightHex), dark: RGBTriple.fromHex(f.checkDarkHex))
   }
 
   var checkInkSwiftUIColor: Color {

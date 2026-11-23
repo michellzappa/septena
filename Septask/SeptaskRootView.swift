@@ -312,16 +312,16 @@ private struct MagicPlusOrb: View {
 
   var body: some View {
     let appearance = AppearancePreferences.shared
-    let accent = appearance.accentSwiftUIColor
-    let ink = appearance.checkInkSwiftUIColor
+    let accent = appearance.magicPlusSwiftUIColor
+    let ink = appearance.magicPlusInkSwiftUIColor
 
     // Keep both the resting "+" orb and the cancel socket inside one stable
     // ZStack (toggling opacity/scale, never swapping container identity) so
     // SwiftUI's active DragGesture never drops mid-drag.
     ZStack {
-      // Resting "+" orb — hidden completely while dragging. Always renders in
-      // the user's selected accent color (`AppearancePreferences.shared`) so
-      // it never drifts across tabs, areas, or projects.
+      // Resting "+" orb — hidden completely while dragging. Renders in the
+      // brand Persimmon under Colorful, else the user's fruit accent
+      // (`AppearancePreferences.magicPlusSwiftUIColor`), never per-section.
       ZStack {
         Circle()
           .fill(accent.gradient)
