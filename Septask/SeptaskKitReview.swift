@@ -58,7 +58,7 @@ final class KitReviewTaskCell: NSTableCellView {
     textStack.translatesAutoresizingMaskIntoConstraints = false
     textStack.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-    acceptButton.title = String(localized: "Accept", comment: "SeptaskKit: accept review task")
+    acceptButton.title = RegistryActions.title("task.acceptReview")
     acceptButton.bezelStyle = .rounded
     acceptButton.controlSize = .small
     acceptButton.target = self

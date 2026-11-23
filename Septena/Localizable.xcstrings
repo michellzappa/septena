@@ -1465,6 +1465,18 @@
         }
       }
     },
+    "Accept" : {
+      "comment" : "Generated from registry actions.actions.task.acceptReview.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aceitar"
+          }
+        }
+      }
+    },
     "Account" : {
       "comment" : "Generated from registry settings.desktopTabs.account.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -10526,6 +10538,18 @@
     "Send" : {
 
     },
+    "Send Back…" : {
+      "comment" : "Generated from registry actions.actions.task.sendBackReview.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Devolver…"
+          }
+        }
+      }
+    },
     "Send feedback" : {
       "comment" : "Generated from registry settings.pages.about.sections.actions.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -10919,6 +10943,18 @@
     },
     "Severity" : {
 
+    },
+    "Share…" : {
+      "comment" : "Generated from registry actions.actions.task.share.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartilhar…"
+          }
+        }
+      }
     },
     "Shared projects" : {
       "comment" : "Generated from registry plans.outcomes.agents.rows.share.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

@@ -327,7 +327,7 @@ final class KitConversationView: NSView {
     }
 
     if isTaskOpen {
-      let accept = NSButton(title: String(localized: "Accept", comment: "SeptaskKit: accept review task"),
+      let accept = NSButton(title: RegistryActions.title("task.acceptReview"),
                             target: self, action: #selector(acceptReview))
       accept.bezelStyle = .rounded
       accept.controlSize = .small

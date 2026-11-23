@@ -223,6 +223,9 @@ describe("Registry cross-cutting contracts (R1–R4)", () => {
     assert.equal(SURFACES_CATALOG.prompts.safetyContract.cancelIsDefaultButton, true);
     assert.equal(CAPABILITIES["lists.today"].macos, "ships");
     assert.ok(ACTIONS_CATALOG.contextMenus["sidebar.project"].some((i: { kind: string; id?: string }) => i.kind === "action" && i.id === "project.markDone"));
-    assert.ok(ACTIONS_CATALOG.contextMenus["task.row"].some((i: { kind: string; id?: string }) => i.kind === "submenu" && i.id === "schedule"));
+    // docs/TASK_ROW_MENU_SPEC.md: one flat menu, Move is the only submenu.
+    const taskRow = ACTIONS_CATALOG.contextMenus["task.row"] as { kind: string; id?: string }[];
+    assert.deepEqual(taskRow.filter((i) => i.kind === "submenu").map((i) => i.id), ["move"]);
+    assert.ok(taskRow.some((i) => i.kind === "action" && i.id === "task.open"));
   });
 });

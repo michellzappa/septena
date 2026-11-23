@@ -137,6 +137,12 @@
       "settings.pages.appearance.sections.appearance.items.0.label"
     ]
   },
+  "Accept": {
+    "text": "Accept",
+    "paths": [
+      "actions.actions.task.acceptReview.title"
+    ]
+  },
   "Account": {
     "text": "Account",
     "paths": [
@@ -455,13 +461,6 @@
     "text": "Colorful",
     "paths": [
       "tokens.fruitAccents.colorful.name"
-    ]
-  },
-  "Complete": {
-    "text": "Complete",
-    "paths": [
-      "actions.contextMenus.task.row.complete.title",
-      "actions.menuBar.task.items.complete.title"
     ]
   },
   "Completed": {
@@ -1326,12 +1325,6 @@
       "actions.contextMenus.sidebar.project.moveToArea.title"
     ]
   },
-  "Move to Section": {
-    "text": "Move to Section",
-    "paths": [
-      "actions.contextMenus.task.row.moveToSection.title"
-    ]
-  },
   "Move to Suggested List": {
     "text": "Move to Suggested List",
     "paths": [
@@ -2083,8 +2076,7 @@
   "Schedule": {
     "text": "Schedule",
     "paths": [
-      "actions.actions.task.when.shortTitle",
-      "actions.contextMenus.task.row.schedule.title"
+      "actions.actions.task.when.shortTitle"
     ]
   },
   "Search Tasks": {
@@ -2144,6 +2136,12 @@
       "actions.actions.task.conversation.send.title",
       "surfaces.prompts.text.conversationOther.confirmTitle",
       "surfaces.prompts.text.conversationReply.confirmTitle"
+    ]
+  },
+  "Send Back…": {
+    "text": "Send Back…",
+    "paths": [
+      "actions.actions.task.sendBackReview.title"
     ]
   },
   "Send feedback": {
@@ -2237,6 +2235,12 @@
     "text": "Shared projects",
     "paths": [
       "plans.outcomes.agents.rows.share.label"
+    ]
+  },
+  "Share…": {
+    "text": "Share…",
+    "paths": [
+      "actions.actions.task.share.title"
     ]
   },
   "Sharing a project needs Plus": {

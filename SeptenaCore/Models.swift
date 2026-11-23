@@ -1581,3 +1581,19 @@ extension SeptenaTask {
   /// Single entry point so L0 (`extKey`/`extUrl`) can plug in ahead of `conversation`.
   var linkedIssue: ConvoIssueLink? { conversation.linkedIssue }
 }
+
+/// The text the row menu's Share… hands to the system share sheet
+/// (`task.share`, docs/TASK_ROW_MENU_SPEC.md). One builder for both shells,
+/// so iOS and the Mac share the same words.
+///
+/// One task: its title, then its notes after a blank line. Several tasks:
+/// one title per line, the same shape ⌘C copies.
+enum TaskShareText {
+  static func text(for tasks: [SeptenaTask]) -> String {
+    if tasks.count == 1, let task = tasks.first {
+      let notes = task.notes?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+      return notes.isEmpty ? task.title : "\(task.title)\n\n\(notes)"
+    }
+    return tasks.map(\.title).joined(separator: "\n")
+  }
+}

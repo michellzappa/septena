@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // The per-row context menu and the modal presenter that hosts the sheets it
 // opens. Split out of TaskListView.swift.
@@ -12,6 +15,15 @@ struct TaskListModalPresenter: ViewModifier {
   @Binding var repeatTargetId: String?
   var reminderTargetId: Binding<String?> = .constant(nil)
   var tagsTargetIds: Binding<[String]> = .constant([])
+  /// The Review row whose Send Back… alert is open (row menu
+  /// `task.sendBackReview`).
+  var sendBackTargetId: Binding<String?> = .constant(nil)
+  var applySendBack: ((String, String) -> Void)? = nil
+
+  /// Set by the When sheet's Repeat row: the Repeat sheet opens for this task
+  /// once the When sheet has finished dismissing (two sheets can't overlap).
+  @State private var pendingRepeatId: String?
+  @State private var sendBackNote = ""
 
   let areas: [Area]
   let projects: [Project]
@@ -27,7 +39,7 @@ struct TaskListModalPresenter: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .sheet(item: $whenSheet) { sheet in
+      .sheet(item: $whenSheet, onDismiss: openPendingRepeat) { sheet in
         let firstId = sheet.taskIds.first
         let bulk = sheet.taskIds.count > 1
         switch sheet.kind {
@@ -35,11 +47,15 @@ struct TaskListModalPresenter: ViewModifier {
           DatePickerSheet(
             title: bulk ? "When (\(sheet.taskIds.count) tasks)" : "When",
             initialDate: currentScheduled(firstId),
-            clearLabel: "No Date"
+            clearLabel: "No Date",
+            // Repeat lives in the When picker (docs/TASK_ROW_MENU_SPEC.md).
+            // The Repeat sheet edits one task, so the row is single-only.
+            repeatLabel: bulk ? nil : TaskRepeatLabel.title(currentRecurrence(firstId)),
+            onRepeat: bulk ? nil : { pendingRepeatId = firstId }
           ) { date in
             applyWhen(sheet.taskIds, .scheduled, date)
           }
-          .presentationDetents([.height(DatePickerSheet.sheetHeight), .large])
+          .presentationDetents([.height(DatePickerSheet.fittedHeight(showsRepeat: !bulk)), .large])
           .presentationBackground(.thinMaterial)
           .presentationCornerRadius(Theme.cornerRadius)
         case .deadline:
@@ -123,6 +139,64 @@ struct TaskListModalPresenter: ViewModifier {
         .presentationCornerRadius(Theme.cornerRadius)
         #endif
       }
+      .alert(String(localized: "Send Back"), isPresented: Binding(
+        get: { sendBackTargetId.wrappedValue != nil },
+        set: { if !$0 { sendBackTargetId.wrappedValue = nil; sendBackNote = "" } }
+      )) {
+        TextField(String(localized: "What needs another pass?"), text: $sendBackNote)
+        Button(String(localized: "Cancel"), role: .cancel) {}
+        Button(String(localized: "Send Back")) {
+          let note = sendBackNote.trimmingCharacters(in: .whitespacesAndNewlines)
+          if let id = sendBackTargetId.wrappedValue, !note.isEmpty {
+            applySendBack?(id, note)
+          }
+        }
+      }
+  }
+
+  private func openPendingRepeat() {
+    guard let id = pendingRepeatId else { return }
+    pendingRepeatId = nil
+    repeatTargetId = id
+    showingRepeatSheet = true
+  }
+}
+
+/// The When picker's Repeat row title: "Repeat…", or "Repeat: <rule>" when
+/// the task already repeats. Both shells read it.
+enum TaskRepeatLabel {
+  static func title(_ recurrence: Recurrence?) -> String {
+    guard let recurrence else { return RegistryActions.title("task.repeat") }
+    return String(localized: "Repeat: \(recurrence.shortLabel)")
+  }
+}
+
+/// Share… (`task.share`): the system share sheet with `TaskShareText`.
+enum TaskSharePresenter {
+  @MainActor
+  static func present(_ tasks: [SeptenaTask]) {
+    let text = TaskShareText.text(for: tasks)
+    guard !text.isEmpty else { return }
+    #if os(iOS)
+    guard let scene = UIApplication.shared.connectedScenes
+      .compactMap({ $0 as? UIWindowScene })
+      .first(where: { $0.activationState == .foregroundActive }),
+      var top = scene.keyWindow?.rootViewController else { return }
+    while let presented = top.presentedViewController { top = presented }
+    let sheet = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+    // iPad presents the share sheet as a popover; it needs an anchor.
+    if let popover = sheet.popoverPresentationController {
+      popover.sourceView = top.view
+      popover.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
+      popover.permittedArrowDirections = []
+    }
+    top.present(sheet, animated: true)
+    #elseif os(macOS)
+    guard let window = NSApp.keyWindow, let view = window.contentView else { return }
+    let point = view.convert(window.mouseLocationOutsideOfEventStream, from: nil)
+    NSSharingServicePicker(items: [text])
+      .show(relativeTo: NSRect(origin: point, size: .zero), of: view, preferredEdge: .minY)
+    #endif
   }
 }
 
@@ -134,6 +208,9 @@ struct TaskListRowContextMenu: View {
   let target: TaskListView.ActionTarget
   let filter: TaskFilter
   let rankedSuggestions: [SuggestionEngine.Suggestion]?
+  /// The row chip's filing pick (Inbox rows). When set, the menu leads with
+  /// "File in <list>" and the Move submenu drops its Suggested entry.
+  var filingChip: SuggestionEngine.Suggestion? = nil
   let onDuplicate: (TaskListView.ActionTarget) -> Void
   /// Starts touch multi-select with this row selected (Select). nil hides
   /// it: the Mac, or a list that is already selecting.
@@ -167,6 +244,10 @@ struct TaskListRowContextMenu: View {
   let onCreateNextCopy: (SeptenaTask) -> Void
   let onCancel: ([String]) -> Void
   let onDelete: (TaskListView.ActionTarget) -> Void
+  var onShare: ((TaskListView.ActionTarget) -> Void)? = nil
+  /// Review rows (`needs_verify`) only.
+  var onAcceptReview: ((SeptenaTask) -> Void)? = nil
+  var onSendBackReview: ((SeptenaTask) -> Void)? = nil
 
   private var count: Int { target.count }
   private var single: SeptenaTask? {
@@ -183,16 +264,29 @@ struct TaskListRowContextMenu: View {
     let tasks = target.tasks
     let plural: RegistryTitleVariant = count > 1 ? .plural : .base
     switch id {
-    case "task.editDetails":
+    case "task.open", "task.editDetails":
       guard let task = single else { return nil }
       return .init { onOpenDetail(task) }
+    case "task.share":
+      guard let onShare else { return nil }
+      return .init { onShare(target) }
+    case "task.acceptReview":
+      guard let task = single, task.conversation.needsHumanReview,
+            let onAcceptReview else { return nil }
+      return .init { onAcceptReview(task) }
+    case "task.sendBackReview":
+      guard let task = single, task.conversation.needsHumanReview,
+            let onSendBackReview else { return nil }
+      return .init { onSendBackReview(task) }
     case "task.duplicate":
       return .init(variant: plural) { onDuplicate(target) }
     case "task.select":
       guard let task = single, let onSelect else { return nil }
       return .init { onSelect(task) }
     case "task.toggleComplete":
-      guard let onToggleComplete else { return nil }
+      // Several tasks only: one task completes from its checkbox
+      // (docs/TASK_ROW_MENU_SPEC.md). ⌘K and the menu bar still do one.
+      guard count > 1, let onToggleComplete else { return nil }
       return .init { onToggleComplete(target.ids) }
     case "task.cancel":
       return .init(variant: plural) { onCancel(target.ids) }
@@ -245,8 +339,21 @@ struct TaskListRowContextMenu: View {
     switch id {
     case "moveDestinations": return moveDestinations
     case "sectionDestinations": return sectionDestinations
+    case "filingSuggestion": return filingSuggestionNodes
     default: return []
     }
+  }
+
+  /// "File in <list>" — the row chip's pick, first in the menu for an Inbox
+  /// row. The same pick the chip shows, so the two never disagree.
+  private var filingSuggestionNodes: [RegistryMenuNode] {
+    guard let chip = filingChip, let task = single else { return [] }
+    return [RegistryMenuEntry.slot(
+      id: "fileSuggested",
+      title: String(localized: "File in \(chip.title)"),
+      sfSymbol: chip.kind == .project ? "number" : "folder") {
+        onApplySuggestion(task, chip)
+      }]
   }
 
   /// The Move submenu's destinations: the filing suggestion first (the same
@@ -254,7 +361,7 @@ struct TaskListRowContextMenu: View {
   /// title), then Inbox, every area and every top-level project.
   private var moveDestinations: [RegistryMenuNode] {
     var nodes: [RegistryMenuNode] = []
-    if let suggestion = rankedSuggestions?.first, let task = single {
+    if filingChip == nil, let suggestion = rankedSuggestions?.first, let task = single {
       nodes.append(RegistryMenuEntry.slot(
         id: "suggested",
         title: String(localized: "Suggested: \(suggestion.title)"),

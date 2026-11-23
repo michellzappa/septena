@@ -437,20 +437,6 @@ final class MagicPlusDragState {
     restFrames.removeAll()
   }
 
-  /// Where a target's slot opens in the rest layout: above a row for
-  /// `before`, under it otherwise (a section slot always opens under it).
-  private static func slotY(_ target: ActiveTarget) -> CGFloat {
-    if case .taskRow = target.kind, target.before { return target.frame.minY }
-    return target.frame.maxY
-  }
-
-  /// Shortest distance from a point to a rect (0 inside it).
-  private static func distance(from point: CGPoint, to rect: CGRect) -> CGFloat {
-    let dx = max(rect.minX - point.x, 0, point.x - rect.maxX)
-    let dy = max(rect.minY - point.y, 0, point.y - rect.maxY)
-    return hypot(dx, dy)
-  }
-
   private func resolveTarget(for location: CGPoint) {
     // Dragging back onto the resting orb socket cancels cleanly.
     let dx = location.x - homeCenter.x
@@ -475,84 +461,93 @@ final class MagicPlusDragState {
     }
 
     // Aim slightly above the fingertip where the floating ghost card sits.
-    let probe = CGPoint(x: location.x, y: location.y - 24)
-    // Resolve against the rest layout (see `restFrames`).
-    let layout: [Zone] = zones.values.map { zone in
-      var z = zone
-      if let rest = restFrames[zone.id] { z.frame = rest }
-      return z
-    }
-    let candidates = layout.filter { zone in
-      let padY: CGFloat = zone.priority >= 2 ? 4 : 0
-      return zone.frame.insetBy(dx: -8, dy: -padY).contains(probe)
-    }
+    let probeY = location.y - 24
 
-    // No holes: when the probe sits in a gap (row spacing, between sections,
-    // empty space below the last row, the nav bar), fall back to the nearest
-    // registered zone so every drop position has a destination. A row picked
-    // this way resolves before/after by the midline, so space under the last
-    // row lands after it and space above the first lands before it.
-    let best = candidates.max { a, b in
-      if a.priority != b.priority { return a.priority < b.priority }
-      return abs(a.frame.midY - probe.y) > abs(b.frame.midY - probe.y)
-    } ?? layout.min { a, b in
-      let da = Self.distance(from: probe, to: a.frame)
-      let db = Self.distance(from: probe, to: b.frame)
-      if da != db { return da < db }
-      return a.priority > b.priority
-    }
-
-    // Stickiness in the dead space between two lists (the end of one area and
-    // the header of the next): when the probe sits in no zone, keep the current
-    // target until another zone is clearly nearer. Picking the strictly
-    // nearest zone flipped between the two lists at every pixel around the
-    // midpoint.
-    if candidates.isEmpty, let current = activeTarget,
-       let currentZone = layout.first(where: { $0.id == current.id }),
-       let best, best.id != current.id,
-       Self.distance(from: probe, to: currentZone.frame)
-         < Self.distance(from: probe, to: best.frame) + 20 {
-      return
-    }
-
-    guard let best else {
+    // The model is the one iOS uses for reordering: a list of INSERTION
+    // POINTS (gaps), resolved in DISPLAY space, where the open slot takes
+    // room. Built from the rest layout (`restFrames`), then the open slot's
+    // height is added under it, which is exactly what the user sees. So
+    // "past the middle of the row you see" is what moves the slot, and the
+    // slot's own height is the hysteresis: once it moves, the finger sits
+    // half a slot inside the new region, never on a boundary.
+    let gaps = insertionPoints()
+    guard !gaps.isEmpty else {
       if activeTarget != nil {
         a11yAnimate(.snappy(duration: 0.18)) { activeTarget = nil }
       }
       return
     }
+    let slot = MagicPlusRowDropModifier.gapHeight
+    let open = activeTarget.flatMap { t in
+      gaps.firstIndex { $0.id == t.id && $0.before == t.before }
+    }
+    // Representative display y of each gap: the open one is its slot's
+    // middle; gaps under it moved down by one slot.
+    func displayY(_ k: Int) -> CGFloat {
+      guard let open else { return gaps[k].y }
+      if k == open { return gaps[k].y + slot / 2 }
+      return k > open ? gaps[k].y + slot : gaps[k].y
+    }
+    var bestIndex = 0
+    var bestDistance = CGFloat.infinity
+    for k in gaps.indices {
+      let d = abs(displayY(k) - probeY)
+      if d < bestDistance { bestDistance = d; bestIndex = k }
+    }
+    let g = gaps[bestIndex]
+    if bestIndex == open { return }
+    let next = ActiveTarget(id: g.id, kind: g.kind, before: g.before, frame: g.frame)
+    Haptics.selection()
+    a11yAnimate(.snappy(duration: 0.18)) {
+      activeTarget = next
+    }
+  }
 
+  /// One insertion point: where a slot opens, and which zone owns the drop.
+  private struct Gap {
+    let y: CGFloat
+    let id: String
+    let kind: MagicPlusDropKind
     let before: Bool
-    if case .taskRow = best.kind {
-      // Hysteresis around midline so parting the row gap never oscillates.
-      if let current = activeTarget, current.id == best.id {
-        before = current.before
-          ? probe.y < best.frame.maxY - 8
-          : probe.y < best.frame.minY + 8
-      } else {
-        before = probe.y < best.frame.midY
-      }
-    } else {
-      before = true
-    }
+    let frame: CGRect
+    /// Owner preference when two points share a place: a row's top is the
+    /// most exact drop, then a header, then a row's bottom.
+    let rank: Int
+  }
 
-    let next = ActiveTarget(id: best.id, kind: best.kind, before: before, frame: best.frame)
-    // Two targets whose slots open at (nearly) the same place are ONE slot:
-    // "after row A" / "before row B" on touching rows, and "under a list's
-    // header" / "before its first row" at the top of a list (header-to-row
-    // spacing apart). Keep the current target then: switching would move the
-    // slot's padding to the other view (a visible hop) and fire a second
-    // tick. 16pt sits under any real slot-to-slot distance (a row is 44pt+).
-    if let current = activeTarget, current.id != next.id,
-       abs(Self.slotY(current) - Self.slotY(next)) < 16 {
-      return
-    }
-    if activeTarget?.id != next.id || activeTarget?.before != next.before {
-      Haptics.selection()
-      a11yAnimate(.snappy(duration: 0.18)) {
-        activeTarget = next
+  /// Every insertion point in the rest layout, top to bottom, one per place.
+  /// A row offers its top and its bottom; a header offers the place under
+  /// it. Points closer than 16pt are ONE place ("after A" / "before B" on
+  /// touching rows; "under the header" / "before the first row"), so the
+  /// slot can never hop between two names for the same spot. A real
+  /// distinct place is at least a row (44pt) away.
+  private func insertionPoints() -> [Gap] {
+    var points: [Gap] = []
+    for zone in zones.values {
+      let frame = restFrames[zone.id] ?? zone.frame
+      switch zone.kind {
+      case .taskRow:
+        points.append(Gap(y: frame.minY, id: zone.id, kind: zone.kind,
+                          before: true, frame: frame, rank: 0))
+        points.append(Gap(y: frame.maxY, id: zone.id, kind: zone.kind,
+                          before: false, frame: frame, rank: 2))
+      case .taskSection:
+        points.append(Gap(y: frame.maxY, id: zone.id, kind: zone.kind,
+                          before: true, frame: frame, rank: 1))
       }
     }
+    points.sort { $0.y < $1.y }
+    var merged: [Gap] = []
+    var clusterStart: CGFloat = -.infinity
+    for p in points {
+      if let last = merged.last, p.y - clusterStart < 16 {
+        if p.rank < last.rank { merged[merged.count - 1] = p }
+      } else {
+        merged.append(p)
+        clusterStart = p.y
+      }
+    }
+    return merged
   }
 }
 

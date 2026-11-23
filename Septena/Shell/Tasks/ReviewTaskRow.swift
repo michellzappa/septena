@@ -67,7 +67,7 @@ struct ReviewTaskRow: View {
           .buttonStyle(.bordered)
           .controlSize(.small)
 
-          Button("Accept") {
+          Button(RegistryActions.title("task.acceptReview")) {
             onAccept()
           }
           .buttonStyle(.borderedProminent)

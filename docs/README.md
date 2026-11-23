@@ -85,6 +85,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [MOVING_IN_SPEC.md](MOVING_IN_SPEC.md) | building (#99, ADR 0021): one import engine, source adapters |
 | [CHECKLISTS_SPEC.md](CHECKLISTS_SPEC.md) | proposal (#76) |
 | [DATA_EXPORT_SPEC.md](DATA_EXPORT_SPEC.md) | proposal (#130) |
+| [TASK_ROW_MENU_SPEC.md](TASK_ROW_MENU_SPEC.md) | building (#300): one flat row menu, Repeat in the When picker |
 | [IOS_SWIPE_ACTIONS_SPEC.md](IOS_SWIPE_ACTIONS_SPEC.md) | superseded 2026-11-23 (swipes dropped) |
 | [MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md](MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md) | partly superseded 2026-11-23 (Select menu item replaces swipe-to-select) |
 | [TAGS_SPEC.md](TAGS_SPEC.md) | proposal (#96) |

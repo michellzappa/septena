@@ -1088,6 +1088,11 @@ struct TaskDateBoard: View {
   var todayActive: Bool = false
   /// e.g. "No Date" / "Remove Deadline". The row hides when nil.
   var clearLabel: String?
+  /// When only: the Repeat row's title ("Repeat…" / "Repeat: Every week").
+  /// The row hides when nil. Repeat is set where the date is set
+  /// (docs/TASK_ROW_MENU_SPEC.md).
+  var repeatLabel: String? = nil
+  var onRepeat: (() -> Void)? = nil
   let onToday: () -> Void
   let onPick: (Date) -> Void
   let onClear: () -> Void
@@ -1124,6 +1129,16 @@ struct TaskDateBoard: View {
             title: clearLabel, active: false) {
           Haptics.commit()
           onClear()
+        }
+        .padding(.top, 4)
+      }
+
+      if let repeatLabel, let onRepeat {
+        Hairline(leadingInset: 0)
+        row(symbol: RegistryIcons.sfSymbol(for: "action.repeat"), tint: Theme.inkSecondary,
+            title: repeatLabel, active: false) {
+          Haptics.press()
+          onRepeat()
         }
         .padding(.top, 4)
       }

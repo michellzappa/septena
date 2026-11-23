@@ -2968,7 +2968,13 @@ final class SeptaskKitTaskListController: NSViewController {
           name: String(localized: "Change Time", comment: "SeptaskKit: undo action"),
           before: before)
         self.onStoreChanged?()
-      } : nil
+      } : nil,
+      // Repeat lives in the When picker (docs/TASK_ROW_MENU_SPEC.md). The
+      // title names the rule only when every selected row agrees on it.
+      repeatTitle: kind == .when
+        ? TaskRepeatLabel.title(Set(selection.map(\.recurrence)).count == 1 ? selection.first?.recurrence : nil)
+        : nil,
+      onRepeat: kind == .when ? { [weak self] in self?.presentRecurrencePanel() } : nil
     ) { [weak self] date, today in
       guard let self else { return }
       let before = selection.map(self.scheduleSnapshot)
@@ -4069,11 +4075,28 @@ final class SeptaskKitTaskListController: NSViewController {
       guard let self else { return nil }
       switch id {
       case "task.editDetails": return .init { self.beginEditSelectedRow() }
+      // Open = the full composer, the same as double-click and Return.
+      case "task.open":
+        guard single != nil else { return nil }
+        return .init { self.beginComposingSelectedRow() }
+      case "task.share":
+        guard !selection.isEmpty else { return nil }
+        return .init { self.shareSelection() }
+      case "task.acceptReview":
+        guard let single, single.conversation.needsHumanReview else { return nil }
+        return .init { self.acceptReviewTask(id: single.id) }
+      case "task.sendBackReview":
+        guard let single, single.conversation.needsHumanReview else { return nil }
+        return .init { self.presentSendBackForSelectedRow(taskID: single.id) }
       case "task.toggleInfo":
         let visible = UserDefaults.standard.bool(forKey: SettingsKey.septaskInspectorVisible)
         return .init(variant: visible ? .active : .base) { self.onToggleInspector?() }
       case "task.duplicate": return .init(variant: plural) { self.duplicateSelection() }
-      case "task.toggleComplete": return .init { self.toggleCompleteSelection() }
+      case "task.toggleComplete":
+        // Several tasks only: one task completes from its checkbox
+        // (docs/TASK_ROW_MENU_SPEC.md). ⌘K and the menu bar still do one.
+        guard selection.count > 1 else { return nil }
+        return .init { self.toggleCompleteSelection() }
       case "task.cancel": return .init(variant: plural) { self.cancelSelection() }
       case "task.delete": return .init(variant: plural) { self.deleteSelection() }
       case "task.toggleToday":
@@ -4116,9 +4139,41 @@ final class SeptaskKitTaskListController: NSViewController {
       switch id {
       case "moveDestinations": return self.moveDestinationNodes(selection: selection)
       case "sectionDestinations": return self.sectionDestinationNodes(selection: selection)
+      case "filingSuggestion": return self.filingSuggestionNodes(selection: selection)
       default: return []
       }
     })
+  }
+
+  /// "File in <list>" — the row capsule's pick, first in the menu for an
+  /// Inbox row. The Move submenu then leaves its Suggested entry out.
+  private func filingSuggestionNodes(selection: [SeptenaTask]) -> [RegistryMenuNode] {
+    guard selection.count == 1, let task = selection.first,
+          let suggestion = filingSuggestions[task.id] else { return [] }
+    return [RegistryMenuEntry.slot(
+      id: "fileSuggested",
+      title: String(localized: "File in \(suggestion.title)",
+                    comment: "SeptaskKit: row menu, file an Inbox task in its suggested list"),
+      sfSymbol: suggestion.kind == .project ? "number" : "folder") { [weak self] in
+        self?.applyFilingSuggestion(taskID: task.id, suggestion: suggestion)
+      }]
+  }
+
+  /// Share… (`task.share`): the system share picker, anchored to the row.
+  private func shareSelection() {
+    let text = TaskShareText.text(for: actionableSelection)
+    guard !text.isEmpty, tableView.selectedRow >= 0 else { return }
+    NSSharingServicePicker(items: [text])
+      .show(relativeTo: tableView.rect(ofRow: tableView.selectedRow),
+            of: tableView, preferredEdge: .maxY)
+  }
+
+  /// Send Back… from the row menu: the same popover as the row's button,
+  /// anchored to the row.
+  private func presentSendBackForSelectedRow(taskID: String) {
+    let row = tableView.selectedRow
+    guard row >= 0, let anchor = tableView.rowView(atRow: row, makeIfNecessary: false) else { return }
+    presentSendBackPopover(taskID: taskID, anchor: anchor)
   }
 
   /// The trash's own vocabulary (registry `task.recentlyDeleted`) — nothing
@@ -4190,11 +4245,13 @@ final class SeptaskKitTaskListController: NSViewController {
   /// selection only: a pick is ranked for one title.
   private func suggestedMoveNode(selection: [SeptenaTask], projects: [Project]) -> RegistryMenuNode? {
     guard selection.count == 1, let task = selection.first else { return nil }
-    // The capsule's snapshot first (Inbox); else the same GATE live
-    // (`TaskFilingSuggestions.top`) so Area pages still offer a suggested
-    // child project inside the Move submenu even without a row capsule.
-    guard let suggestion = filingSuggestions[task.id]
-      ?? TaskFilingSuggestions.top(
+    // An Inbox row's pick leads the whole menu ("File in …"), so the Move
+    // submenu doesn't repeat it.
+    guard filingSuggestions[task.id] == nil else { return nil }
+    // The same GATE live (`TaskFilingSuggestions.top`), so Area pages still
+    // offer a suggested child project inside the Move submenu without a row
+    // capsule.
+    guard let suggestion = TaskFilingSuggestions.top(
         for: task, filter: filter, engine: SuggestionEngine.shared,
         childProjectIds: Self.childProjectIds(in: projects))
     else { return nil }
