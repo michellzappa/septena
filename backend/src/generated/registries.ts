@@ -49,7 +49,7 @@ export const ENTITY_ENUMS = {
   appearanceMode: ["system","light","dark"] as const,
   accentColor: ["colorful","tamarillo","persimmon","yuzu","carambola","haskap","acai","pitaya","jabuticaba"] as const,
   appIconFinish: ["obsidian","ceramic","framed"] as const,
-  canvasTexture: ["none","topography","fieldMatrix","stippleDrift","causticGlass","ridges","washiPaper"] as const,
+  canvasTexture: ["none","topography","fieldMatrix","stippleDrift","ridges","washiPaper"] as const,
   textureMotion: ["still","slowDrift"] as const,
 } as const;
 

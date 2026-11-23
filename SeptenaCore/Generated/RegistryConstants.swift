@@ -77,7 +77,7 @@ enum RegistryEntityEnums {
   static let appearanceMode: [String] = ["system", "light", "dark"]
   static let accentColor: [String] = ["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "haskap", "acai", "pitaya", "jabuticaba"]
   static let appIconFinish: [String] = ["obsidian", "ceramic", "framed"]
-  static let canvasTexture: [String] = ["none", "topography", "fieldMatrix", "stippleDrift", "causticGlass", "ridges", "washiPaper"]
+  static let canvasTexture: [String] = ["none", "topography", "fieldMatrix", "stippleDrift", "ridges", "washiPaper"]
   static let textureMotion: [String] = ["still", "slowDrift"]
   static let entityNames: [String] = ["task", "area", "project", "attachment", "checklistItem", "tag", "convo", "setting"]
   static let deletableEntities: [String] = ["task", "area", "project", "attachment", "checklistItem", "tag"]

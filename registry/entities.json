@@ -68,7 +68,7 @@
     "appearanceMode": ["system", "light", "dark"],
     "accentColor": ["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "haskap", "acai", "pitaya", "jabuticaba"],
     "appIconFinish": ["obsidian", "ceramic", "framed"],
-    "canvasTexture": ["none", "topography", "fieldMatrix", "stippleDrift", "causticGlass", "ridges", "washiPaper"],
+    "canvasTexture": ["none", "topography", "fieldMatrix", "stippleDrift", "ridges", "washiPaper"],
     "textureMotion": ["still", "slowDrift"]
   },
   "entities": {

@@ -3014,18 +3014,6 @@
     "Carry over missed items" : {
 
     },
-    "Caustic Glass" : {
-      "comment" : "Generated from registry tokens.textures.causticGlass.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vidro cáustico"
-          }
-        }
-      }
-    },
     "Change history" : {
       "comment" : "Generated from registry plans.outcomes.nothing_lost.rows.history.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -8925,18 +8913,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Abre o app Atalhos com cada ação do Septena Life pronta para entrar em um atalho, bloco da Tela de Início ou automação."
-          }
-        }
-      }
-    },
-    "Optical" : {
-      "comment" : "Generated from registry tokens.textures.causticGlass.tag. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Óptico"
           }
         }
       }

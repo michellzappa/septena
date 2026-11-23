@@ -79,7 +79,7 @@ Textures render **exclusively as a faded top header wash** extending **all the w
 
 | Parameter | Type / Range | Default | Notes |
 |---|---|---|---|
-| `canvasTexture` | enum (`none`, `topography`, `fieldMatrix`, `stippleDrift`, `causticGlass`, `ridges`, `washiPaper`) | `"none"` *(default; could preview `"topography"` in onboarding)* | |
+| `canvasTexture` | enum (`none`, `topography`, `fieldMatrix`, `stippleDrift`, `ridges`, `washiPaper`) | `"none"` *(default; could preview `"topography"` in onboarding)* | |
 | `textureIntensity` | int `15…100` (no UI since 2026-11-22; the stored value still applies) | `55` | Clamped so high values never hurt contrast |
 | `textureMotion` | enum (`still`, `slowDrift`) | `"still"` | Optional glacial **3D slice morphing** (`z = t * speed` so shapes evolve in place rather than treadmill-scrolling; ~20fps GPU cadence, auto-pauses under Reduce Motion, Low Power Mode, and inactive/background windows) |
 
