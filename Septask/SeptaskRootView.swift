@@ -33,6 +33,9 @@ struct SeptaskRootView: View {
   @Environment(LogCommitCenter.self) private var logCommit
   @Environment(\.modelContext) private var modelContext
   @State private var magicPlusDrag = MagicPlusDragState()
+  /// True while the software keyboard is up. The orb hides then: while the
+  /// user types, it covers the field and the rows around it.
+  @State private var keyboardVisible = false
   @State private var showingNewProjectSheet = false
   @State private var newProjectInitialAreaId: String? = nil
   @State private var showingNewAreaAlert = false
@@ -199,9 +202,11 @@ struct SeptaskRootView: View {
       ContentView()
 
       let hideMagicPlus = nav.isTaskMultiSelectActive || SeptenaToastActivity.shared.hasActiveToast
+        || keyboardVisible
       MagicPlusOrb(
         drag: magicPlusDrag,
         isViewingProject: isViewingProject,
+        isViewingToday: isViewingToday,
         onNewTask: { triggerInlineNewTask() },
         onNewSection: { nav.shouldCreateHeading = true },
         onNewProject: {
@@ -233,6 +238,19 @@ struct SeptaskRootView: View {
         magicPlusDrag.reset()
       }
     }
+    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+      keyboardVisible = true
+    }
+    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+      keyboardVisible = false
+    }
+  }
+
+  /// Today never creates areas or projects, so the orb's tap there makes a
+  /// task directly instead of opening the create menu.
+  private var isViewingToday: Bool {
+    if case .filter(.today) = nav.path.last { return true }
+    return false
   }
 
   private var isViewingProject: Bool {
@@ -280,6 +298,7 @@ private struct MagicPlusOrb: View {
   @State private var showingMenu = false
 
   let isViewingProject: Bool
+  let isViewingToday: Bool
   let onNewTask: () -> Void
   let onNewSection: () -> Void
   let onNewProject: () -> Void
@@ -347,7 +366,7 @@ private struct MagicPlusOrb: View {
     .onTapGesture {
       guard !drag.isDragging else { return }
       Haptics.tap()
-      showingMenu = true
+      if isViewingToday { onNewTask() } else { showingMenu = true }
     }
     .simultaneousGesture(
       DragGesture(minimumDistance: 8, coordinateSpace: .global)
@@ -365,7 +384,9 @@ private struct MagicPlusOrb: View {
     )
     .accessibilityAddTraits(.isButton)
     .accessibilityLabel("New")
-    .accessibilityHint("Tap for create options, or drag onto a list position.")
+    .accessibilityHint(isViewingToday
+      ? Text("Tap for a new task, or drag onto a list position.")
+      : Text("Tap for create options, or drag onto a list position."))
     .popover(isPresented: $showingMenu, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
       quickMenu
         .presentationCompactAdaptation(.popover)
