@@ -1,12 +1,10 @@
 import SwiftUI
 
 // The composer's elective-pill rail — a single row of icon + label capsules
-// under the title & notes, in the registry's `taskAttributes` order — and the
-// inline panels a button expands into. Split out of
+// under the title & notes, in the registry's `taskAttributes` order. A picker
+// pill opens the same sheet the row menu opens (TaskPickerSheets.swift, ADR
+// 0029); the checklist and attachments render in the composer. Split out of
 // TaskComposer.swift.
-//
-// `TaskAttributeBar` is the entry point; the pill and the three inline panels
-// are private to this file.
 
 // MARK: - Attribute pill bar
 
@@ -62,9 +60,10 @@ struct TaskAttributeBar: View {
     var label: String { registry.label }
     /// Needs a saved task (tags, checklist, attachments, discuss).
     var editOnly: Bool { registry.editOnly }
-    /// List opens a sheet — a rich, searchable area/project picker reused across
-    /// the Tasks surfaces. Every other pill expands an inline panel under the rail.
-    var presentsSheet: Bool { self == .list }
+    /// A `popover` attribute opens its picker: the same sheet the row menu,
+    /// the menu bar and the shortcut open (ADR 0029: one picker per attribute).
+    /// The rest act in place (Star) or expand a panel under the rail.
+    var presentsSheet: Bool { registry.surfaceTier == "popover" }
   }
 
   /// Edit-only pill values, read once per render from the live task.
@@ -85,9 +84,15 @@ struct TaskAttributeBar: View {
     }
   }
 
-  /// The currently expanded inline pill (never `.list`, which presents a sheet).
+  /// The currently expanded inline pill (never a picker pill, which presents a sheet).
   @State private var expanded: Attribute?
-  @State private var showingList = false
+  /// The picker sheet that shows, if any.
+  @State private var picker: Attribute?
+  /// A picker to open once the current sheet has gone (When's Repeat row).
+  @State private var pendingPicker: Attribute?
+  /// Bumped when the task changes outside the draft (tags from the picker,
+  /// steps, attachments), so the edit-only pill values read the store again.
+  @State private var editRevision = 0
   @State private var discussStarted: Bool
   @State private var discussWorking = false
   /// The Checklist pill was tapped on a task with no steps yet. A task WITH
@@ -116,6 +121,7 @@ struct TaskAttributeBar: View {
   }
 
   var body: some View {
+    let _ = editRevision
     let edit = discussTask.map(EditOnlyState.init(task:))
     return VStack(alignment: .leading, spacing: 10) {
       // Steps sit open under the notes whenever the task has any, so opening a
@@ -157,15 +163,16 @@ struct TaskAttributeBar: View {
     .onAppear(perform: reloadDiscussState)
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
       reloadDiscussState()
+      editRevision += 1
     }
-    .sheet(isPresented: $showingList) {
-      MovePickerSheet(areas: areas, projects: projects,
-                      currentAreaId: draft.areaId, currentProjectId: draft.projectId) { a, p in
-        draft.areaId = a; draft.projectId = p
+    .sheet(item: $picker, onDismiss: {
+      editRevision += 1
+      if let next = pendingPicker {
+        pendingPicker = nil
+        picker = next
       }
-      #if os(iOS)
-      .presentationDetents([.large, .medium])
-      #endif
+    }) { attr in
+      pickerSheet(attr)
     }
     // Keyboard Space / Return on a focused pill arrives here.
     .onChange(of: activate) { _, attr in
@@ -246,43 +253,84 @@ struct TaskAttributeBar: View {
     }
   }
 
-  /// Inline cards already sit on `Theme.cardSurface` (`secondaryGroupedBackground`),
-  /// so expanded picker panels inside them step down to `Theme.mutedSurface` to
-  /// keep a distinct surface; the drawer sits on `groupedBackground`.
-  private var panelFill: Color {
-    neutral ? Theme.mutedSurface : Theme.secondaryGroupedBackground
-  }
-
   @ViewBuilder
   private var inlineEditor: some View {
-    // One transition for every inline panel — they all slide down from the rail.
-    Group {
-      switch expanded {
-      case .when:       InlineWhenPanel(draft: $draft, accent: accent, fill: panelFill)
-      case .deadline:   InlineDatePanel(date: $draft.deadline, fill: panelFill)
-      case .reminder:   InlineReminderPanel(reminder: $draft.reminder,
-                                            accent: accent,
-                                            fill: panelFill) {
-        a11yAnimate(.snappy(duration: 0.22)) { expanded = nil }
-      }
-      case .repeatRule: InlineRepeatPanel(recurrence: $draft.recurrence,
-                                          hasScheduledDate: draft.scheduled != nil,
-                                          scheduledDate: SeptenaDate.format(draft.scheduled),
-                                          accent: accent,
-                                          fill: panelFill) {
-        a11yAnimate(.snappy(duration: 0.22)) { expanded = nil }
-      }
-      case .tags:
-        if let task = discussTask {
-          TaskTagsPanel(taskID: task.id, accent: accent, fill: panelFill)
-        }
-      case .attachments:
-        if let task = discussTask { TaskAttachmentsPanel(taskID: task.id) }
-      // The checklist is not a pill panel: it renders above the rail.
-      case .discuss, .star, .list, .checklist, .none: EmptyView()
-      }
+    // Attachments is the one pill that expands a panel under the rail. The
+    // checklist renders above the rail; the pickers open as sheets.
+    if expanded == .attachments, let task = discussTask {
+      TaskAttachmentsPanel(taskID: task.id)
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
-    .transition(.opacity.combined(with: .move(edge: .top)))
+  }
+
+  /// The picker for a `popover` attribute. These are the same sheets, with the
+  /// same detents, that `TaskListModalPresenter` opens from the row menu, so a
+  /// pill and a menu row can never show different editors (ADR 0029). The pill
+  /// writes the draft; the composer commits it.
+  @ViewBuilder
+  private func pickerSheet(_ attr: Attribute) -> some View {
+    switch attr {
+    case .when:
+      DatePickerSheet(
+        title: attr.label,
+        initialDate: draft.scheduled,
+        initialToday: draft.onToday && draft.scheduled == nil,
+        clearLabel: "No Date",
+        initialStartTime: draft.startTime,
+        initialDurationMinutes: draft.durationMinutes,
+        onTimeSlotChange: { start, minutes in
+          draft.startTime = start
+          draft.durationMinutes = minutes
+          // A time with no day means today, as the AppKit composer does.
+          if start != nil && !draft.onToday && draft.scheduled == nil { draft.setToday() }
+        },
+        // The same Repeat row the row menu's When picker shows (#300).
+        repeatLabel: TaskRepeatLabel.title(draft.recurrence),
+        onRepeat: { pendingPicker = .repeatRule }
+      ) { date in
+        if let date { draft.setScheduled(date) } else { draft.clearWhen() }
+      }
+      .taskPickerChrome(DatePickerSheet.detents(showsRepeat: true, showsTime: true))
+    case .deadline:
+      DatePickerSheet(title: attr.label, initialDate: draft.deadline,
+                      clearLabel: "Remove Deadline") { date in
+        draft.deadline = date
+      }
+      .taskPickerChrome(DatePickerSheet.detents(showsRepeat: false, showsTime: false))
+    case .reminder:
+      ReminderPickerSheet(initial: draft.reminder) { reminder in
+        draft.reminder = reminder
+      }
+      .taskPickerChrome(TaskPickerDetents.standard)
+    case .repeatRule:
+      RecurrencePickerSheet(
+        initial: draft.recurrence,
+        hasScheduledDate: draft.scheduled != nil,
+        scheduledDate: SeptenaDate.format(draft.scheduled),
+        initialPaused: discussTask?.recurrencePaused ?? false,
+        onPick: { rule in draft.recurrence = rule },
+        // Pause is a field of the saved task, not of the draft.
+        onPauseChanged: discussTask.map { task -> (Bool) -> Void in
+          { paused in
+            Haptics.commit()
+            SeptenaServices.shared.taskMutator.setRecurrencePaused(id: task.id, paused: paused)
+          }
+        })
+      .taskPickerChrome(TaskPickerDetents.standard)
+    case .list:
+      MovePickerSheet(areas: areas, projects: projects,
+                      currentAreaId: draft.areaId, currentProjectId: draft.projectId) { a, p in
+        draft.areaId = a; draft.projectId = p
+      }
+      .taskPickerChrome(TaskPickerDetents.move)
+    case .tags:
+      if let task = discussTask {
+        TagPickerSheet(taskIDs: [task.id])
+          .taskPickerChrome(TaskPickerDetents.standard)
+      }
+    case .star, .checklist, .attachments, .discuss:
+      EmptyView()
+    }
   }
 
   /// The single dispatch for every pill: sheet-backed pills open their sheet,
@@ -316,7 +364,7 @@ struct TaskAttributeBar: View {
     a11yAnimate(.snappy(duration: 0.22)) {
       if attr.presentsSheet {
         expanded = nil
-        showingList = true
+        picker = attr
       } else {
         expanded = (expanded == attr) ? nil : attr
       }
@@ -460,599 +508,6 @@ private struct AttributePillGlassBackground: ViewModifier {
     }
   }
 }
-// MARK: - Inline "When" editor
-
-/// The scheduling control — the single home for Today and a planning date, so
-/// neither needs its own pill. Body is `TaskDateBoard`, the app's one task
-/// date board, so the pill expands the SAME Today row / week strip / calendar
-/// / Clear the When sheet and the AppKit ⌘S popover show. It used to be three
-/// bespoke chips (Today / Tomorrow / Weekend) over a full month calendar — a
-/// third date vocabulary in a surface that already had two.
-///
-/// Picking today normalizes back to the pinned-Today state. Leaving it unset
-/// keeps the task in Anytime.
-private struct InlineWhenPanel: View {
-  @Binding var draft: TaskDraft
-  let accent: Color
-  let fill: Color
-  @State private var showTimeControls = false
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      TaskDateBoard(
-        selected: draft.scheduled,
-        todayActive: draft.onToday && draft.scheduled == nil,
-        clearLabel: (draft.scheduled != nil || draft.onToday || draft.startTime != nil) ? "No Date" : nil,
-        onToday: { a11yAnimate(.snappy(duration: 0.2)) { draft.setToday() } },
-        onPick: { d in a11yAnimate(.snappy(duration: 0.2)) { draft.setScheduled(d) } },
-        onClear: { a11yAnimate(.snappy(duration: 0.2)) { draft.clearWhen(); showTimeControls = false } })
-
-      Divider()
-
-      if showTimeControls || draft.startTime != nil {
-        VStack(alignment: .leading, spacing: 8) {
-          HStack {
-            Label("Time", systemImage: "clock")
-              .font(.septenaLabel)
-              .foregroundStyle(Theme.inkPrimary)
-            Spacer()
-            DatePicker(
-              "Start time",
-              selection: Binding(
-                get: { TaskTimeSlot.pickerDate(from: draft.startTime) },
-                set: { newDate in
-                  draft.startTime = TaskTimeSlot.hhmm(from: newDate)
-                  if !draft.onToday && draft.scheduled == nil { draft.setToday() }
-                }
-              ),
-              displayedComponents: .hourAndMinute
-            )
-            .labelsHidden()
-            Button("Clear") {
-              a11yAnimate(.snappy(duration: 0.18)) {
-                draft.startTime = nil
-                draft.durationMinutes = nil
-                showTimeControls = false
-              }
-            }
-            .buttonStyle(.plain)
-            .font(.septenaCaption)
-            .foregroundStyle(Theme.inkSecondary)
-            .contentShape(Rectangle())
-          }
-
-          HStack(spacing: 6) {
-            ForEach(TaskTimeSlot.quickDurations, id: \.minutes) { preset in
-              SelectableChip(preset.label,
-                             isSelected: draft.durationMinutes == preset.minutes,
-                             tint: accent) {
-                Haptics.selection()
-                a11yAnimate(.snappy(duration: 0.18)) {
-                  if draft.startTime == nil { draft.startTime = "09:00" }
-                  if !draft.onToday && draft.scheduled == nil { draft.setToday() }
-                  draft.durationMinutes = draft.durationMinutes == preset.minutes ? nil : preset.minutes
-                }
-              }
-            }
-            Spacer(minLength: 0)
-          }
-        }
-      } else {
-        Button {
-          a11yAnimate(.snappy(duration: 0.2)) {
-            showTimeControls = true
-            if draft.startTime == nil { draft.startTime = "09:00" }
-            if !draft.onToday && draft.scheduled == nil { draft.setToday() }
-          }
-        } label: {
-          HStack(spacing: 6) {
-            Image(systemName: "clock")
-              .scaledFont(size: 12)
-            Text("Add time")
-              .font(.septenaLabel)
-            Spacer(minLength: 0)
-          }
-          .foregroundStyle(Theme.inkSecondary)
-          .padding(.vertical, 2)
-          .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-      }
-    }
-    .padding(12)
-    .background(fill,
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    .onAppear {
-      showTimeControls = draft.startTime != nil
-    }
-  }
-}
-
-// MARK: - Inline date editor
-
-/// The Deadline pill's body — the same `TaskDateBoard` the When pill expands,
-/// writing a plain `Date?`. Its Today row is an ordinary date (a deadline has
-/// no today flag), which is the only way Deadline differs from When here.
-/// It used to be a bare month calendar with no relative choices at all.
-private struct InlineDatePanel: View {
-  @Binding var date: Date?
-  let fill: Color
-  @Environment(DayClock.self) private var clock
-
-  private var cal: Calendar { Calendar.current }
-  private var today: Date {
-    cal.startOfDay(for: SeptenaDate.parse(clock.today) ?? clock.now)
-  }
-
-  var body: some View {
-    TaskDateBoard(
-      selected: date,
-      todayActive: date.map { cal.isDate($0, inSameDayAs: today) } ?? false,
-      clearLabel: date != nil ? "Remove Deadline" : nil,
-      onToday: { a11yAnimate(.snappy(duration: 0.2)) { date = today } },
-      onPick: { d in a11yAnimate(.snappy(duration: 0.2)) { date = cal.startOfDay(for: d) } },
-      onClear: { a11yAnimate(.snappy(duration: 0.2)) { date = nil } })
-    .padding(12)
-    .background(fill,
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-  }
-}
-
-// MARK: - Inline reminder editor (TR2)
-
-private struct InlineReminderPanel: View {
-  @Binding var reminder: TaskReminder?
-  let accent: Color
-  let fill: Color
-  var onStop: () -> Void = {}
-
-  @State private var pickedDate: Date = DayClock.appNow.addingTimeInterval(3600)
-  @State private var mode: TaskReminderMode = .floating
-  @State private var showOptions = false
-  @State private var notificationsDenied = false
-
-  private func apply(date: Date, mode: TaskReminderMode) {
-    pickedDate = date
-    self.mode = mode
-    reminder = TaskReminder.make(date: date, mode: mode)
-    Task {
-      let granted = await TaskReminderScheduler.shared.requestAuthorizationIfNeeded()
-      notificationsDenied = !granted
-    }
-  }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      if notificationsDenied {
-        Button {
-          TaskReminderScheduler.openNotificationSettings()
-        } label: {
-          HStack(spacing: 6) {
-            Image(systemName: "bell.slash")
-              .font(.caption.weight(.semibold))
-            Text("Notifications are off. Open Settings")
-              .font(.caption.weight(.medium))
-            Spacer(minLength: 0)
-          }
-          .foregroundStyle(Theme.overdueRed)
-          .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-      }
-
-      ScrollView(.horizontal, showsIndicators: false) {
-        HStack(spacing: 6) {
-          ForEach(TaskReminder.quickPresets(), id: \.title) { preset in
-            SelectableChip(preset.title, isSelected: false, tint: accent) {
-              apply(date: preset.date, mode: mode)
-            }
-          }
-        }
-      }
-
-      DatePicker(
-        "Remind at",
-        selection: Binding(
-          get: { pickedDate },
-          set: { apply(date: $0, mode: mode) }
-        ),
-        displayedComponents: [.date, .hourAndMinute]
-      )
-      .datePickerStyle(.compact)
-      .font(.septenaSidebarRow)
-
-      Button {
-        a11yAnimate(.snappy(duration: 0.2)) { showOptions.toggle() }
-      } label: {
-        HStack(spacing: 6) {
-          Image(systemName: showOptions ? "chevron.down" : "chevron.right")
-            .font(.caption.weight(.semibold))
-          Text(showOptions ? "Hide time zone options" : "Time zone options…")
-            .font(.caption.weight(.medium))
-          Spacer(minLength: 0)
-        }
-        .foregroundStyle(Theme.inkSecondary)
-        .contentShape(Rectangle())
-      }
-      .buttonStyle(.plain)
-
-      if showOptions {
-        Toggle(
-          "Fixed time zone",
-          isOn: Binding(
-            get: { mode == .fixed },
-            set: { isFixed in
-              let next: TaskReminderMode = isFixed ? .fixed : .floating
-              mode = next
-              if reminder != nil {
-                apply(date: pickedDate, mode: next)
-              }
-            }
-          )
-        )
-        .font(.septenaSidebarRow)
-        .tint(accent)
-      }
-
-      if reminder != nil {
-        Button(role: .destructive) {
-          reminder = nil
-          onStop()
-        } label: {
-          Label("Clear Reminder", systemImage: "xmark.circle")
-            .font(.septenaLabel)
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(Theme.overdueRed)
-      }
-    }
-    .padding(12)
-    .background(fill,
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    .onAppear {
-      if let existing = reminder {
-        pickedDate = existing.effectiveFireDate() ?? DayClock.appNow.addingTimeInterval(3600)
-        mode = existing.mode
-        showOptions = existing.mode == .fixed
-      } else {
-        pickedDate = TaskReminder.quickPresets().first?.date ?? DayClock.appNow.addingTimeInterval(3600)
-        mode = .floating
-        showOptions = false
-      }
-    }
-    .task {
-      notificationsDenied = await TaskReminderScheduler.shared.authorizationStatus() == .denied
-    }
-  }
-}
-
-// MARK: - Inline repeat editor
-
-/// Unit + interval + after-completion controls writing a `Recurrence?`, the
-/// inline twin of `RecurrencePickerSheet`. Expanded under the Repeat pill.
-private struct InlineRepeatPanel: View {
-  @Binding var recurrence: Recurrence?
-  /// A fixed-schedule rule anchors on the task's scheduled date. Without one it
-  /// silently degrades into an after-completion rule (the anchor falls back to
-  /// the completion day), so the toggle is held ON and explained rather than
-  /// offering a choice that doesn't do what it says.
-  let hasScheduledDate: Bool
-  var scheduledDate: String? = nil
-  let accent: Color
-  let fill: Color
-  /// Collapse the rail's expanded panel. "Don't Repeat" calls it (clear + close);
-  /// owned by `TaskAttributeBar.expanded`.
-  var onStop: () -> Void = {}
-
-  private enum MonthlyMode: Int { case anchor = 0, dayOfMonth = 1, ordinal = 2 }
-
-  private static let weekdayPills: [(day: Int, short: String, full: String)] = [
-    (2, "M", "Monday"), (3, "T", "Tuesday"), (4, "W", "Wednesday"),
-    (5, "T", "Thursday"), (6, "F", "Friday"), (7, "S", "Saturday"),
-    (1, "S", "Sunday"),
-  ]
-
-  private static let ordinalChoices: [(value: Int, label: String)] = [
-    (1, "1st"), (2, "2nd"), (3, "3rd"), (4, "4th"), (-1, "Last"),
-  ]
-
-  private static let fullWeekdays: [(value: Int, label: String)] = [
-    (1, "Sunday"), (2, "Monday"), (3, "Tuesday"), (4, "Wednesday"),
-    (5, "Thursday"), (6, "Friday"), (7, "Saturday"),
-  ]
-
-  private static let nextPreviewFormatter: DateFormatter = {
-    let f = DateFormatter()
-    f.setLocalizedDateFormatFromTemplate("EEEMMMd")
-    return f
-  }()
-
-  /// True once the user actually picks a value here (or the task already
-  /// repeated when the panel opened). A panel opened but left untouched reverts
-  /// on close — so merely *peeking* at Repeat never commits a recurrence, and
-  /// re-tapping the pill (or clicking away) cleanly undoes the open.
-  @State private var confirmed = false
-  @State private var showCustom = false
-
-  /// Every control write goes through here so any real interaction marks the
-  /// recurrence as confirmed (and thus kept on close).
-  private func write(_ r: Recurrence) { recurrence = r; confirmed = true }
-
-  private var unit: Binding<Recurrence.Unit> {
-    Binding(get: { recurrence?.unit ?? .week },
-            set: { write(Recurrence(unit: $0, interval: recurrence?.interval ?? 1,
-                                    afterCompletion: recurrence?.afterCompletion ?? true,
-                                    weekdays: recurrence?.weekdays,
-                                    monthDay: recurrence?.monthDay,
-                                    ordinalWeekday: recurrence?.ordinalWeekday)) })
-  }
-  private var interval: Binding<Int> {
-    Binding(get: { recurrence?.interval ?? 1 },
-            set: { write(Recurrence(unit: recurrence?.unit ?? .week, interval: $0,
-                                    afterCompletion: recurrence?.afterCompletion ?? true,
-                                    weekdays: recurrence?.weekdays,
-                                    monthDay: recurrence?.monthDay,
-                                    ordinalWeekday: recurrence?.ordinalWeekday)) })
-  }
-  private var afterCompletion: Binding<Bool> {
-    // Reads ON with no date because that IS the behavior — showing a stored
-    // OFF the engine can't honor would misreport what the rule will do.
-    Binding(get: { !hasScheduledDate || (recurrence?.afterCompletion ?? true) },
-            set: { write(Recurrence(unit: recurrence?.unit ?? .week,
-                                    interval: recurrence?.interval ?? 1,
-                                    afterCompletion: $0,
-                                    weekdays: recurrence?.weekdays,
-                                    monthDay: recurrence?.monthDay,
-                                    ordinalWeekday: recurrence?.ordinalWeekday)) })
-  }
-
-  private var currentMonthlyMode: MonthlyMode {
-    if recurrence?.ordinalWeekday != nil { return .ordinal }
-    if recurrence?.monthDay != nil { return .dayOfMonth }
-    return .anchor
-  }
-
-  private var supportsCustomOptions: Bool {
-    guard hasScheduledDate, let r = recurrence, !r.afterCompletion else { return false }
-    return r.unit == .week || r.unit == .month || r.unit == .year
-  }
-
-  private var nextPreview: String? {
-    guard let r = recurrence,
-          let wire = r.nextDate(completedOn: DayClock.appToday, scheduled: scheduledDate),
-          let date = SeptenaDate.parse(wire) else { return nil }
-    return Self.nextPreviewFormatter.string(from: date)
-  }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      Picker("Unit", selection: unit) {
-        Text("Day").tag(Recurrence.Unit.day)
-        Text("Week").tag(Recurrence.Unit.week)
-        Text("Month").tag(Recurrence.Unit.month)
-        Text("Year").tag(Recurrence.Unit.year)
-      }
-      .pickerStyle(.segmented)
-
-      if hasScheduledDate {
-        let isWeekdays = recurrence?.afterCompletion == false
-          && recurrence?.unit == .week
-          && recurrence?.interval == 1
-          && Set(recurrence?.weekdays ?? []) == Set([2, 3, 4, 5, 6])
-        SelectableChip("Weekdays (Mon to Fri)", isSelected: isWeekdays, tint: accent) {
-          write(Recurrence(unit: .week, interval: 1, afterCompletion: false,
-                           weekdays: [2, 3, 4, 5, 6]))
-        }
-      }
-
-      Stepper(value: interval, in: 1...99) {
-        Text("Every \(intervalLabel())")
-          .font(.septenaSidebarRow)
-          .foregroundStyle(Theme.inkPrimary)
-      }
-
-      Toggle("After completion", isOn: afterCompletion)
-        .font(.septenaSidebarRow)
-        .tint(accent)
-        .disabled(!hasScheduledDate)
-
-      if supportsCustomOptions {
-        Button {
-          a11yAnimate(.snappy(duration: 0.2)) { showCustom.toggle() }
-        } label: {
-          HStack(spacing: 6) {
-            Image(systemName: showCustom ? "chevron.down" : "chevron.right")
-              .font(.caption.weight(.semibold))
-            Text(showCustom ? "Hide custom options" : "Custom options…")
-              .font(.caption.weight(.medium))
-            Spacer(minLength: 0)
-          }
-          .foregroundStyle(Theme.inkSecondary)
-          .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-
-        if showCustom {
-          if recurrence?.unit == .week {
-            let selectedDays = Set(recurrence?.weekdays ?? [])
-            HStack(spacing: 4) {
-              ForEach(Self.weekdayPills, id: \.day) { item in
-                SelectableChip(item.short,
-                               isSelected: selectedDays.contains(item.day),
-                               tint: accent,
-                               shape: .roundedRect,
-                               fillsWidth: true) {
-                  var next = selectedDays
-                  if next.contains(item.day) { next.remove(item.day) } else { next.insert(item.day) }
-                  write(Recurrence(unit: .week,
-                                   interval: recurrence?.interval ?? 1,
-                                   afterCompletion: false,
-                                   weekdays: next.isEmpty ? nil : next.sorted()))
-                }
-                .accessibilityLabel(item.full)
-              }
-            }
-          } else if recurrence?.unit == .month || recurrence?.unit == .year {
-            let anchor = scheduledDate.flatMap(SeptenaDate.parse) ?? DayClock.appNow
-            let cal = Calendar.current
-            let defaultDay = cal.component(.day, from: anchor)
-            let defaultOrd = min(4, max(1, (defaultDay - 1) / 7 + 1))
-            let defaultWeekday = cal.component(.weekday, from: anchor)
-
-            Picker("Monthly rule", selection: Binding(
-              get: { currentMonthlyMode },
-              set: { mode in
-                switch mode {
-                case .anchor:
-                  write(Recurrence(unit: recurrence?.unit ?? .month,
-                                   interval: recurrence?.interval ?? 1,
-                                   afterCompletion: false))
-                case .dayOfMonth:
-                  write(Recurrence(unit: recurrence?.unit ?? .month,
-                                   interval: recurrence?.interval ?? 1,
-                                   afterCompletion: false,
-                                   monthDay: recurrence?.monthDay ?? defaultDay))
-                case .ordinal:
-                  write(Recurrence(unit: recurrence?.unit ?? .month,
-                                   interval: recurrence?.interval ?? 1,
-                                   afterCompletion: false,
-                                   ordinalWeekday: recurrence?.ordinalWeekday
-                                     ?? RecurrenceOrdinalWeekday(ordinal: defaultOrd,
-                                                                 weekday: defaultWeekday)))
-                }
-              }
-            )) {
-              Text("Same day").tag(MonthlyMode.anchor)
-              Text("On day").tag(MonthlyMode.dayOfMonth)
-              Text("Ordinal").tag(MonthlyMode.ordinal)
-            }
-            .pickerStyle(.segmented)
-
-            if currentMonthlyMode == .dayOfMonth {
-              HStack(spacing: 8) {
-                Text("Day")
-                  .font(.caption)
-                  .foregroundStyle(Theme.inkSecondary)
-                Picker("Day of month", selection: Binding(
-                  get: { recurrence?.monthDay ?? defaultDay },
-                  set: { day in
-                    write(Recurrence(unit: recurrence?.unit ?? .month,
-                                     interval: recurrence?.interval ?? 1,
-                                     afterCompletion: false,
-                                     monthDay: day))
-                  }
-                )) {
-                  ForEach(1...31, id: \.self) { d in Text("\(d)").tag(d) }
-                  Text("Last day").tag(-1)
-                }
-                .pickerStyle(.menu)
-                .tint(Theme.inkPrimary)
-              }
-            } else if currentMonthlyMode == .ordinal {
-              let currentOW = recurrence?.ordinalWeekday
-                ?? RecurrenceOrdinalWeekday(ordinal: defaultOrd, weekday: defaultWeekday)
-              HStack(spacing: 6) {
-                Text("On the")
-                  .font(.caption)
-                  .foregroundStyle(Theme.inkSecondary)
-                Picker("Ordinal", selection: Binding(
-                  get: { currentOW.ordinal },
-                  set: { ord in
-                    write(Recurrence(unit: recurrence?.unit ?? .month,
-                                     interval: recurrence?.interval ?? 1,
-                                     afterCompletion: false,
-                                     ordinalWeekday: RecurrenceOrdinalWeekday(ordinal: ord,
-                                                                              weekday: currentOW.weekday)))
-                  }
-                )) {
-                  ForEach(Self.ordinalChoices, id: \.value) { item in
-                    Text(item.label).tag(item.value)
-                  }
-                }
-                .pickerStyle(.menu)
-                .tint(Theme.inkPrimary)
-
-                Picker("Weekday", selection: Binding(
-                  get: { currentOW.weekday },
-                  set: { wd in
-                    write(Recurrence(unit: recurrence?.unit ?? .month,
-                                     interval: recurrence?.interval ?? 1,
-                                     afterCompletion: false,
-                                     ordinalWeekday: RecurrenceOrdinalWeekday(ordinal: currentOW.ordinal,
-                                                                              weekday: wd)))
-                  }
-                )) {
-                  ForEach(Self.fullWeekdays, id: \.value) { item in
-                    Text(item.label).tag(item.value)
-                  }
-                }
-                .pickerStyle(.menu)
-                .tint(Theme.inkPrimary)
-              }
-            }
-          }
-        }
-      }
-
-      if let next = nextPreview, let r = recurrence {
-        Text("\(r.shortLabel) · Next: \(next)")
-          .font(.caption)
-          .foregroundStyle(Theme.inkSecondary)
-          .fixedSize(horizontal: false, vertical: true)
-      }
-
-      if !hasScheduledDate {
-        Text("Give the task a date to repeat on a fixed schedule.")
-          .font(.caption)
-          .foregroundStyle(Theme.inkSecondary)
-          .fixedSize(horizontal: false, vertical: true)
-      }
-
-      Button(role: .destructive) {
-        recurrence = nil
-        confirmed = true   // explicit clear; don't let onDisappear second-guess it
-        onStop()
-      } label: {
-        Label("Don't Repeat", systemImage: "xmark.circle")
-          .font(.septenaLabel)
-      }
-      .buttonStyle(.plain)
-      .foregroundStyle(Theme.overdueRed)
-    }
-    .padding(12)
-    .background(fill,
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    // Opening shows a weekly preview so the controls have something to bind, but
-    // it's only a peek: `confirmed` stays false until a real edit, and an
-    // untouched panel reverts to "no repeat" on close (`onDisappear`). A task
-    // that already repeated counts as confirmed, so editing never loses it.
-    .onAppear {
-      if recurrence == nil {
-        recurrence = Recurrence(unit: .week)
-        confirmed = false
-        showCustom = false
-      } else {
-        confirmed = true
-        showCustom = recurrence?.weekdays != nil
-          || recurrence?.monthDay != nil
-          || recurrence?.ordinalWeekday != nil
-      }
-    }
-    .onDisappear { if !confirmed { recurrence = nil } }
-  }
-
-  /// Pluralized "N days/weeks/months/years" via the String Catalog (one/other).
-  private func intervalLabel() -> String {
-    let n = interval.wrappedValue
-    switch recurrence?.unit ?? .week {
-    case .day:   return String(localized: "\(n) days")
-    case .week:  return String(localized: "\(n) weeks")
-    case .month: return String(localized: "\(n) months")
-    case .year:  return String(localized: "\(n) years")
-    }
-  }
-}
-
 // MARK: - Inline Checklist panel
 
 /// The step ⌘K ticks instead of the task: set while a checklist step holds the
@@ -1343,116 +798,5 @@ private struct TaskChecklistPanel: View {
     }
     reload()
     focus = .step(lastID)
-  }
-}
-
-// MARK: - Inline Tags panel
-
-/// Progressive-disclosure inline tags editor inside the SwiftUI task editor
-/// (iOS/iPadOS & SwiftUI sheets). Shows tap-to-toggle chips, an inline
-/// "New tag…" field, and a quiet "Manage…" sheet trigger.
-private struct TaskTagsPanel: View {
-  let taskID: String
-  let accent: Color
-  let fill: Color
-
-  @State private var allTags: [TaskTag] = []
-  @State private var assignedIDs: [String] = []
-  @State private var newTagName: String = ""
-  @State private var showingManageTags = false
-
-  private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      if !allTags.isEmpty {
-        ScrollView(.horizontal, showsIndicators: false) {
-          HStack(spacing: 6) {
-            ForEach(allTags) { tag in
-              let assigned = assignedIDs.contains(tag.id)
-              SelectableChip(isSelected: assigned,
-                             tint: tag.color != nil ? TagColorPalette.color(for: tag.color) : accent) {
-                toggle(tag)
-              } label: {
-                HStack(spacing: 4) {
-                  if tag.color != nil {
-                    Circle()
-                      .fill(TagColorPalette.color(for: tag.color))
-                      .frame(width: 6, height: 6)
-                  }
-                  Text(tag.name)
-                }
-              }
-            }
-          }
-        }
-      }
-
-      HStack(spacing: 8) {
-        Image(systemName: "plus")
-          .font(.system(size: 11, weight: .semibold))
-          .foregroundStyle(Theme.inkSecondary)
-        TextField("New tag…", text: $newTagName)
-          .textFieldStyle(.plain)
-          .font(.septenaLabel)
-          .onSubmit { createAndAssign() }
-        if !newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-          Button("Add") { createAndAssign() }
-            .buttonStyle(.plain)
-            .font(.septenaLabel)
-            .foregroundStyle(Theme.inkPrimary)
-            .contentShape(Rectangle())
-        } else if !allTags.isEmpty {
-          Button("Manage…") { showingManageTags = true }
-            .buttonStyle(.plain)
-            .font(.septenaCaption)
-            .foregroundStyle(Theme.inkSecondary)
-            .contentShape(Rectangle())
-        }
-      }
-      .padding(.top, allTags.isEmpty ? 0 : 2)
-    }
-    .padding(12)
-    .background(fill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    .sheet(isPresented: $showingManageTags, onDismiss: reload) {
-      ManageTagsSheet()
-    }
-    .onAppear { reload() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in reload() }
-  }
-
-  private func reload() {
-    let ctx = LocalStore.shared.container.mainContext
-    allTags = LocalCache.allTags(in: ctx)
-    assignedIDs = LocalCache.liveTasks(ids: [taskID], in: ctx).first?.tags ?? []
-  }
-
-  private func toggle(_ tag: TaskTag) {
-    let before = assignedIDs
-    let after = before.contains(tag.id)
-      ? before.filter { $0 != tag.id }
-      : before + [tag.id]
-    Haptics.commit()
-    mutator.setTaskTags(id: taskID, tagIDs: after)
-    TaskUndo.recordTaskTags(before: [taskID: before], after: [taskID: after], mutator: mutator)
-    a11yAnimate(.snappy(duration: 0.18)) { reload() }
-  }
-
-  private func createAndAssign() {
-    let trimmed = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return }
-    if let existing = allTags.first(where: { $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame }) {
-      if !assignedIDs.contains(existing.id) { toggle(existing) }
-      newTagName = ""
-      return
-    }
-    guard let created = mutator.createTag(name: trimmed) else { return }
-    TaskUndo.recordTagCreate(created, mutator: mutator)
-    let before = assignedIDs
-    let after = before + [created.id]
-    mutator.setTaskTags(id: taskID, tagIDs: after)
-    TaskUndo.recordTaskTags(before: [taskID: before], after: [taskID: after], mutator: mutator)
-    newTagName = ""
-    reload()
   }
 }

@@ -20,16 +20,44 @@ import SwiftUI
 /// strip's first cell.
 struct DatePickerSheet: View {
   @Environment(DayClock.self) private var clock
+  @Environment(SectionTheme.self) private var theme
   let title: String
   let initialDate: Date?
+  /// The Today flag is set and no date is. The board marks today's cell.
+  let initialToday: Bool
   let clearLabel: String      // e.g. "No Date" / "Remove Deadline"
   /// When only: the Repeat row's title. nil hides the row.
-  var repeatLabel: String? = nil
+  let repeatLabel: String?
   /// The Repeat row: the caller opens the Repeat editor once this sheet has
   /// dismissed.
-  var onRepeat: (() -> Void)? = nil
+  let onRepeat: (() -> Void)?
+  /// When only: the time slot editor under the board. A time change applies
+  /// at once and does not close the sheet. Nil hides the time controls (Deadline).
+  let onTimeSlotChange: ((String?, Int?) -> Void)?
   let onPick: (Date?) -> Void
   @Environment(\.dismiss) private var dismiss
+
+  @State private var startTime: String?
+  @State private var durationMinutes: Int?
+  @State private var showTimeControls: Bool
+
+  init(title: String, initialDate: Date?, initialToday: Bool = false, clearLabel: String,
+       initialStartTime: String? = nil, initialDurationMinutes: Int? = nil,
+       onTimeSlotChange: ((String?, Int?) -> Void)? = nil,
+       repeatLabel: String? = nil, onRepeat: (() -> Void)? = nil,
+       onPick: @escaping (Date?) -> Void) {
+    self.title = title
+    self.initialDate = initialDate
+    self.initialToday = initialToday
+    self.clearLabel = clearLabel
+    self.onTimeSlotChange = onTimeSlotChange
+    self.repeatLabel = repeatLabel
+    self.onRepeat = onRepeat
+    self.onPick = onPick
+    _startTime = State(initialValue: initialStartTime)
+    _durationMinutes = State(initialValue: initialDurationMinutes)
+    _showTimeControls = State(initialValue: initialStartTime != nil)
+  }
 
   private var cal: Calendar { Calendar.current }
   private var anchorDay: Date {
@@ -41,10 +69,17 @@ struct DatePickerSheet: View {
   static let sheetHeight: CGFloat = 276
   /// Extra height when the board carries the Repeat row.
   static let repeatRowHeight: CGFloat = 52
+  /// Extra height for the When sheet's time row (and its duration chips once open).
+  static let timeRowHeight: CGFloat = 96
 
-  /// The fitted height for this sheet, Repeat row included.
-  static func fittedHeight(showsRepeat: Bool) -> CGFloat {
-    sheetHeight + (showsRepeat ? repeatRowHeight : 0)
+  /// The fitted height for this sheet, Repeat row and time row included.
+  static func fittedHeight(showsRepeat: Bool, showsTime: Bool = false) -> CGFloat {
+    sheetHeight + (showsRepeat ? repeatRowHeight : 0) + (showsTime ? timeRowHeight : 0)
+  }
+
+  /// The detents every host uses for this sheet (ADR 0029: one picker, one presentation).
+  static func detents(showsRepeat: Bool, showsTime: Bool) -> Set<PresentationDetent> {
+    [.height(fittedHeight(showsRepeat: showsRepeat, showsTime: showsTime)), .large]
   }
 
   var body: some View {
@@ -52,7 +87,8 @@ struct DatePickerSheet: View {
       VStack(spacing: 0) {
         TaskDateBoard(
           selected: initialDate.map { cal.startOfDay(for: $0) },
-          todayActive: initialDate.map { cal.isDate($0, inSameDayAs: anchorDay) } ?? false,
+          todayActive: initialToday
+            || (initialDate.map { cal.isDate($0, inSameDayAs: anchorDay) } ?? false),
           clearLabel: clearLabel,
           repeatLabel: onRepeat == nil ? nil : repeatLabel,
           onRepeat: onRepeat.map { open in { open(); dismiss() } },
@@ -61,6 +97,14 @@ struct DatePickerSheet: View {
           onClear: { commit(nil) })
         .padding(.horizontal, Theme.hPadding)
         .padding(.top, 6)
+
+        if onTimeSlotChange != nil {
+          Divider()
+            .padding(.horizontal, Theme.hPadding)
+            .padding(.vertical, 8)
+          timeControls
+            .padding(.horizontal, Theme.hPadding)
+        }
 
         Spacer(minLength: 0)
       }
@@ -73,13 +117,106 @@ struct DatePickerSheet: View {
         }
       }
     }
-    .macSheetFrame(width: 420, height: Self.fittedHeight(showsRepeat: onRepeat != nil) + 60)
+    .macSheetFrame(width: 420, height: Self.fittedHeight(showsRepeat: onRepeat != nil,
+                                                         showsTime: onTimeSlotChange != nil) + 60)
+  }
+
+  /// Start time and duration, the same controls as the AppKit date popover.
+  @ViewBuilder
+  private var timeControls: some View {
+    if showTimeControls || startTime != nil {
+      VStack(alignment: .leading, spacing: 8) {
+        HStack {
+          Label("Time", systemImage: "clock")
+            .font(.septenaLabel)
+            .foregroundStyle(Theme.inkPrimary)
+          Spacer()
+          DatePicker(
+            "Start time",
+            selection: Binding(
+              get: { TaskTimeSlot.pickerDate(from: startTime) },
+              set: { setSlot(TaskTimeSlot.hhmm(from: $0), durationMinutes) }
+            ),
+            displayedComponents: .hourAndMinute
+          )
+          .labelsHidden()
+          Button("Clear") {
+            a11yAnimate(.snappy(duration: 0.18)) {
+              setSlot(nil, nil)
+              showTimeControls = false
+            }
+          }
+          .buttonStyle(.plain)
+          .font(.septenaCaption)
+          .foregroundStyle(Theme.inkSecondary)
+          .contentShape(Rectangle())
+        }
+
+        HStack(spacing: 6) {
+          ForEach(TaskTimeSlot.quickDurations, id: \.minutes) { preset in
+            SelectableChip(preset.label,
+                           isSelected: durationMinutes == preset.minutes,
+                           tint: theme.accent) {
+              Haptics.selection()
+              a11yAnimate(.snappy(duration: 0.18)) {
+                setSlot(startTime ?? "09:00",
+                        durationMinutes == preset.minutes ? nil : preset.minutes)
+              }
+            }
+          }
+          Spacer(minLength: 0)
+        }
+      }
+    } else {
+      Button {
+        a11yAnimate(.snappy(duration: 0.2)) {
+          showTimeControls = true
+          setSlot(startTime ?? "09:00", durationMinutes)
+        }
+      } label: {
+        HStack(spacing: 6) {
+          Image(systemName: "clock")
+            .scaledFont(size: 12)
+          Text("Add time")
+            .font(.septenaLabel)
+          Spacer(minLength: 0)
+        }
+        .foregroundStyle(Theme.inkSecondary)
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+    }
+  }
+
+  private func setSlot(_ start: String?, _ duration: Int?) {
+    startTime = start
+    durationMinutes = start == nil ? nil : duration
+    onTimeSlotChange?(startTime, durationMinutes)
   }
 
   private func commit(_ day: Date?) {
     onPick(day.map { cal.startOfDay(for: $0) })
     dismiss()
   }
+}
+
+// MARK: - Shared picker presentation
+
+extension View {
+  /// The one presentation every task picker uses, whether a composer pill, the
+  /// task page or a row menu opens it (ADR 0029: one picker per attribute).
+  func taskPickerChrome(_ detents: Set<PresentationDetent>) -> some View {
+    presentationDetents(detents)
+      .presentationBackground(.thinMaterial)
+      .presentationCornerRadius(Theme.cornerRadius)
+  }
+}
+
+/// Detents per picker, so the pill and the row menu size the same sheet the same way.
+enum TaskPickerDetents {
+  static let move: Set<PresentationDetent> = [.large, .medium]
+  static let standard: Set<PresentationDetent> = [.medium, .large]
 }
 
 // MARK: - Reminder picker sheet (TR2)

@@ -36,6 +36,8 @@ struct TaskListModalPresenter: ViewModifier {
   let applyRecurrence: (String, Recurrence?) -> Void
   let applyRecurrencePaused: (String, Bool) -> Void
   var applyReminder: ((String, TaskReminder?) -> Void)? = nil
+  /// When only: start time and duration, applied live from the When sheet.
+  var applyTimeSlot: (([String], String?, Int?) -> Void)? = nil
 
   func body(content: Content) -> some View {
     content
@@ -44,10 +46,18 @@ struct TaskListModalPresenter: ViewModifier {
         let bulk = sheet.taskIds.count > 1
         switch sheet.kind {
         case .scheduled:
+          // The same When picker the composer pill opens (ADR 0029). The time
+          // slot shows for one task; a bulk When sets the date only.
+          let first = currentTask(firstId)
+          let slot = (!bulk && applyTimeSlot != nil) ? applyTimeSlot : nil
           DatePickerSheet(
             title: bulk ? "When (\(sheet.taskIds.count) tasks)" : "When",
             initialDate: currentScheduled(firstId),
+            initialToday: !bulk && first?.today == true,
             clearLabel: "No Date",
+            initialStartTime: bulk ? nil : first?.startTime,
+            initialDurationMinutes: bulk ? nil : first?.durationMinutes,
+            onTimeSlotChange: slot.map { apply in { start, minutes in apply(sheet.taskIds, start, minutes) } },
             // Repeat lives in the When picker (docs/TASK_ROW_MENU_SPEC.md).
             // The Repeat sheet edits one task, so the row is single-only.
             repeatLabel: bulk ? nil : TaskRepeatLabel.title(currentRecurrence(firstId)),
@@ -55,9 +65,7 @@ struct TaskListModalPresenter: ViewModifier {
           ) { date in
             applyWhen(sheet.taskIds, .scheduled, date)
           }
-          .presentationDetents([.height(DatePickerSheet.fittedHeight(showsRepeat: !bulk)), .large])
-          .presentationBackground(.thinMaterial)
-          .presentationCornerRadius(Theme.cornerRadius)
+          .taskPickerChrome(DatePickerSheet.detents(showsRepeat: !bulk, showsTime: slot != nil))
         case .deadline:
           DatePickerSheet(
             title: bulk ? "Deadline (\(sheet.taskIds.count) tasks)" : "Deadline",
@@ -66,9 +74,7 @@ struct TaskListModalPresenter: ViewModifier {
           ) { date in
             applyWhen(sheet.taskIds, .deadline, date)
           }
-          .presentationDetents([.height(DatePickerSheet.sheetHeight), .large])
-          .presentationBackground(.thinMaterial)
-          .presentationCornerRadius(Theme.cornerRadius)
+          .taskPickerChrome(DatePickerSheet.detents(showsRepeat: false, showsTime: false))
         }
       }
       .sheet(isPresented: $showingMoveSheet) {
@@ -90,9 +96,7 @@ struct TaskListModalPresenter: ViewModifier {
           }
           moveTargetIds = []
         }
-        .presentationDetents([.large, .medium])
-        .presentationBackground(.thinMaterial)
-        .presentationCornerRadius(Theme.cornerRadius)
+        .taskPickerChrome(TaskPickerDetents.move)
       }
       .sheet(isPresented: $showingRepeatSheet) {
         let scheduledDate = currentScheduled(repeatTargetId)
@@ -108,9 +112,7 @@ struct TaskListModalPresenter: ViewModifier {
         }, onPauseChanged: { paused in
           if let id = repeatTargetId { applyRecurrencePaused(id, paused) }
         })
-        .presentationDetents([.medium, .large])
-        .presentationBackground(.thinMaterial)
-        .presentationCornerRadius(Theme.cornerRadius)
+        .taskPickerChrome(TaskPickerDetents.standard)
       }
       .sheet(isPresented: Binding(
         get: { reminderTargetId.wrappedValue != nil },
@@ -121,9 +123,7 @@ struct TaskListModalPresenter: ViewModifier {
             applyReminder?(id, reminder)
             reminderTargetId.wrappedValue = nil
           }
-          .presentationDetents([.medium, .large])
-          .presentationBackground(.thinMaterial)
-          .presentationCornerRadius(Theme.cornerRadius)
+          .taskPickerChrome(TaskPickerDetents.standard)
         }
       }
       .sheet(isPresented: Binding(
@@ -133,11 +133,7 @@ struct TaskListModalPresenter: ViewModifier {
         TagPickerSheet(taskIDs: tagsTargetIds.wrappedValue) {
           tagsTargetIds.wrappedValue = []
         }
-        #if os(iOS)
-        .presentationDetents([.medium, .large])
-        .presentationBackground(.thinMaterial)
-        .presentationCornerRadius(Theme.cornerRadius)
-        #endif
+        .taskPickerChrome(TaskPickerDetents.standard)
       }
       .alert(String(localized: "Send Back"), isPresented: Binding(
         get: { sendBackTargetId.wrappedValue != nil },

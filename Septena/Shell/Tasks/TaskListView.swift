@@ -615,7 +615,8 @@ struct TaskListView: View {
           mutator.setRecurrencePaused(id: id, paused: paused)
           Task { await load() }
         },
-        applyReminder: applyReminder
+        applyReminder: applyReminder,
+        applyTimeSlot: applyTimeSlot
       ))
       .sheet(isPresented: Binding(
         get: { sweepSheetTasks != nil },
@@ -4872,6 +4873,18 @@ struct TaskListView: View {
   /// derived by re-reading the store afterwards — `schedule` / `setDeadline` /
   /// `removeFromToday` each carry their own Today side effects, and predicting
   /// them here would be a second copy of that logic (see `TaskUndo.restore`).
+  /// Start time and duration from the When sheet. The AppKit date popover
+  /// applies the same action (`SeptaskKitTaskList.presentDatePopover`).
+  private func applyTimeSlot(_ ids: [String], startTime: String?, durationMinutes: Int?) {
+    recordingSchedule(String(localized: "Change Time", comment: "Undo action name"), ids) {
+      for id in ids {
+        mutator.apply(.setTimeSlot(startTime: startTime, durationMinutes: durationMinutes,
+                                   timeZone: nil), to: id)
+      }
+    }
+    Task { await load() }
+  }
+
   private func recordingSchedule(_ name: String, _ ids: [String], _ body: () -> Void) {
     let before = scheduleSnapshots(ids)
     body()
