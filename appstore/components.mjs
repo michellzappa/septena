@@ -360,15 +360,15 @@ function portrait(panel, device, tint) {
   ${background(panel.background)}
   <div class="top" style="position:relative; z-index:3; padding:130px 110px 0; text-align:${panel.align ?? "left"};">
     ${badge(panel.badge, tint)}
-    <h1${panel.headline.includes(". ") ? ' class="lead"' : ""}>${lead(panel.headline)}</h1>
+    <h1${panel.headline.includes(". ") ? ' class="lead"' : ""}>${panel.splitTitle ? `<strong>${rich(panel.headline.slice(0, panel.headline.indexOf(". ") + 1))}</strong>` : lead(panel.headline)}</h1>
     ${panel.sub ? `<p class="sub" style="${panel.align === "center" ? "margin-left:auto;margin-right:auto;" : ""}">${rich(panel.sub)}</p>` : ""}
   </div>
   <style>
     .shot-zone { position:absolute; left:0; right:0; display:flex; justify-content:center; }
     .founder { position:absolute; left:50%; top:46%; transform:translateX(-50%); width:1020px; }
   </style>
-  ${panel.photo ? `<div class="photo" style="position:absolute; left:0; right:0; bottom:0; top:${panel.photo.top ?? 160}px; background:url(${panel.photo.img}) ${panel.photo.focus ?? "50% 40%"}/auto ${Math.round((panel.photo.zoom ?? 1.15) * 100)}% no-repeat;"></div>
-  <div style="position:absolute; inset:0; background:linear-gradient(to bottom, #0B0B0C 0, #0B0B0C ${panel.photo.top ?? 160}px, rgb(11 11 12 / ${panel.photo.shade ?? 0.7}) ${(panel.photo.top ?? 160) + 160}px, rgb(11 11 12 / 0) ${panel.photo.fade ?? 900}px);"></div>` : ""}
+  ${panel.photo ? `<div class="photo" style="position:absolute; inset:0; background:url(${panel.photo.img}) ${panel.photo.focus ?? "50% 40%"}/auto ${Math.round((panel.photo.zoom ?? 1.15) * 100)}% no-repeat;"></div>
+  <div style="position:absolute; inset:0; background:linear-gradient(to bottom, rgb(11 11 12 / ${panel.photo.shade ?? 0.9}) 0, rgb(11 11 12 / 0) ${panel.photo.fade ?? 1100}px, rgb(11 11 12 / 0) calc(100% - ${panel.photo.fade ?? 1100}px), rgb(11 11 12 / ${panel.photo.shade ?? 0.9}) 100%);"></div>` : ""}
   ${(panel.shots ?? []).map((s) => shot(s, device, tint)).join("")}
   ${shot(panel.shot, device, tint)}
   ${watch(panel.watch)}
@@ -376,6 +376,7 @@ function portrait(panel, device, tint) {
   ${founder(panel.founder)}
   ${overlays(panel.overlays)}
   ${panel.footnote ? `<p class="footnote">${rich(panel.footnote)}</p>` : ""}
+  ${panel.splitTitle ? `<h1 class="lead" style="position:absolute; z-index:3; left:110px; right:110px; bottom:150px; margin:0;"><span class="light" style="opacity:1;">${rich(panel.headline.slice(panel.headline.indexOf(". ") + 2))}</span></h1>` : ""}
 </div>`;
 }
 

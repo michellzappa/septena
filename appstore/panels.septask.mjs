@@ -32,7 +32,7 @@ import { parseScreenshots } from "./metadata.mjs";
 const VISUAL = {
   // A photo panel (experiment 2026-11-23): the title over a dark top band,
   // the photo filling the rest. art/: committed images, no screen capture.
-  photo:          { photo: { src: "art/photo-today.png" }, background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" }, leadSize: 124 },
+  photo:          { photo: { src: "art/photo-today.png" }, background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" }, leadSize: 124, splitTitle: true },
   hook:           { fruit: "haskap", texture: "topography" },
   // Native on each device: the Mac window behind, the iPhone in front. The
   // iPad joins when the scene builder has an iPad layout (septena-site#17).
@@ -90,6 +90,8 @@ const iphone = rows.map((row, i) => {
     background: v.background ?? { style: "texture", fill, tint, ...(fill ? {} : { accent: theme.inkSoft }), texture: textureId(v.texture ?? theme.app.textures[i % theme.app.textures.length]), seed: 42 + i, intensity: 70, fade: 1 },
     photo: v.photo,
     leadSize: v.leadSize,
+    // splitTitle: the claim at the top, the rest of the title at the bottom.
+    splitTitle: v.splitTitle,
     headline: row.title,
     // The first panel's title stands alone and larger; the others carry a
     // one-sentence sub (docs/APPSTORE-SEPTASK.md, ## Screenshots).
