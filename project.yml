@@ -207,6 +207,10 @@ targets:
       # Build number = git commit count, on every build (scripts/stamp-built-plist.sh).
       - name: Stamp build number
         script: "\"${SRCROOT}/scripts/stamp-built-plist.sh\""
+        # The input orders this phase after Info.plist processing. Without it
+        # the app target can rewrite Info.plist after the stamp (seen 2026-11-23).
+        inputFiles:
+          - "$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)"
         basedOnDependencyAnalysis: false
     configFiles:
       Debug: Config/Base.xcconfig
@@ -255,6 +259,10 @@ targets:
       # Build number = git commit count, on every build (scripts/stamp-built-plist.sh).
       - name: Stamp build number
         script: "\"${SRCROOT}/scripts/stamp-built-plist.sh\""
+        # The input orders this phase after Info.plist processing. Without it
+        # the app target can rewrite Info.plist after the stamp (seen 2026-11-23).
+        inputFiles:
+          - "$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)"
         basedOnDependencyAnalysis: false
     configFiles:
       Debug: Config/Base.xcconfig
@@ -295,6 +303,10 @@ targets:
       # Build number = git commit count, on every build (scripts/stamp-built-plist.sh).
       - name: Stamp build number
         script: "\"${SRCROOT}/scripts/stamp-built-plist.sh\""
+        # The input orders this phase after Info.plist processing. Without it
+        # the app target can rewrite Info.plist after the stamp (seen 2026-11-23).
+        inputFiles:
+          - "$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)"
         basedOnDependencyAnalysis: false
     configFiles:
       Debug: Config/Base.xcconfig
@@ -338,6 +350,10 @@ targets:
       # Build number = git commit count, on every build (scripts/stamp-built-plist.sh).
       - name: Stamp build number
         script: "\"${SRCROOT}/scripts/stamp-built-plist.sh\""
+        # The input orders this phase after Info.plist processing. Without it
+        # the app target can rewrite Info.plist after the stamp (seen 2026-11-23).
+        inputFiles:
+          - "$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)"
         basedOnDependencyAnalysis: false
     configFiles:
       Debug: Config/Base.xcconfig
@@ -438,6 +454,10 @@ targets:
       # Build number = git commit count, on every build (scripts/stamp-built-plist.sh).
       - name: Stamp build number
         script: "\"${SRCROOT}/scripts/stamp-built-plist.sh\""
+        # The input orders this phase after Info.plist processing. Without it
+        # the app target can rewrite Info.plist after the stamp (seen 2026-11-23).
+        inputFiles:
+          - "$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)"
         basedOnDependencyAnalysis: false
     configFiles:
       Debug: Config/Base.xcconfig
@@ -488,6 +508,10 @@ targets:
       # Build number = git commit count, on every build (scripts/stamp-built-plist.sh).
       - name: Stamp build number
         script: "\"${SRCROOT}/scripts/stamp-built-plist.sh\""
+        # The input orders this phase after Info.plist processing. Without it
+        # the app target can rewrite Info.plist after the stamp (seen 2026-11-23).
+        inputFiles:
+          - "$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)"
         basedOnDependencyAnalysis: false
     configFiles:
       Debug: Config/Base.xcconfig
@@ -527,6 +551,10 @@ targets:
       # Build number = git commit count, on every build (scripts/stamp-built-plist.sh).
       - name: Stamp build number
         script: "\"${SRCROOT}/scripts/stamp-built-plist.sh\""
+        # The input orders this phase after Info.plist processing. Without it
+        # the app target can rewrite Info.plist after the stamp (seen 2026-11-23).
+        inputFiles:
+          - "$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)"
         basedOnDependencyAnalysis: false
     configFiles:
       Debug: Config/Base.xcconfig
