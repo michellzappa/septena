@@ -4075,10 +4075,16 @@ final class SeptaskKitTaskListController: NSViewController {
       guard let self else { return nil }
       switch id {
       case "task.editDetails": return .init { self.beginEditSelectedRow() }
-      // Open = the full composer, the same as double-click and Return.
+      // Open = the task page (ADR 0029): on the Mac that is the inspector
+      // pane. A row double-click and Return stay the inline composer. The
+      // inspector follows the selection, so an open pane needs no toggle.
       case "task.open":
         guard single != nil else { return nil }
-        return .init { self.beginComposingSelectedRow() }
+        return .init {
+          if !UserDefaults.standard.bool(forKey: SettingsKey.septaskInspectorVisible) {
+            self.onToggleInspector?()
+          }
+        }
       case "task.share":
         guard !selection.isEmpty else { return nil }
         return .init { self.shareSelection() }

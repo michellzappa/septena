@@ -48,9 +48,10 @@ only), the filing suggestion (only when the top group does not already show
 it), Inbox, areas and top-level projects, then Move… for the full picker.
 It replaces the two old submenus, Move and Move to Section.
 
-Open opens the task's full surface. Today that is expand-in-place on
-iPhone, iPad and Mac (the same as tap, Return and double-click) and a
-pushed screen on Android.
+Open opens the task page (ADR 0029, `docs/TASK_PAGE_SPEC.md`), never the
+inline editor: a row tap is inline, Open is the page. On the Mac it shows
+the inspector pane. Until the SwiftUI page lands (#303), Open on iPhone and
+iPad still expands the row inline.
 
 Share… sends the task title, then its notes after a blank line, through the
 system share sheet. Several tasks share one title per line, the shape ⌘C
@@ -60,7 +61,7 @@ copies. The text comes from `TaskShareText` in `SeptenaCore/Models.swift`.
 
 | Removed row | Now |
 |---|---|
-| Edit Details / Rename | Open. ⌘R still renames the title inline. |
+| Edit Details / Rename | Open (the task page). ⌘R still renames the title inline. |
 | Show Info (Mac) | View menu and ⌥⌘I. It toggles a pane; it is not a task action. |
 | Move to Today / Remove from Today | When picker (Today is its first cell) and ⌘T |
 | Clear When | When picker (Clear row) and ⌘⇧. |
@@ -101,7 +102,6 @@ bar item is how a Mac user finds a shortcut.
 
 | Question | Default |
 |---|---|
-| Is there one canonical task page (content defined once, each platform only picks the host)? | *(default)* No change. Open uses each platform's current surface. |
 | Typed repeat ("walk the dog every friday") in quick add and the When field. `SeptenaDateParser.parseRepeatRule` exists with tests, but no screen calls it. | *(default)* Not built. mz chose the When picker only. |
 | Create Next Copy has no place on iPhone and iPad after it left the row menu. | *(default)* Menu bar only (iPad keyboard, Mac). Add it to the Repeat sheet if it is missed. |
 | Cancel has no place on the task page, and on iPhone it is two steps away (Select → More). | *(default)* Leave it there. Add Cancel to the task page if it is missed. |
