@@ -17,7 +17,26 @@ import Security
 /// deletes use `kSecAttrSynchronizableAny` so they match whichever variant
 /// happens to exist (important during the migration from the old local-only
 /// items — see `makeSynchronizable`).
+///
+/// Every query names the data protection keychain. On macOS the default is
+/// the legacy login keychain, whose items trust only the app *path* that made
+/// them: after the rename from Septask.app the task backend's refresh token
+/// asked for a password on every read, could not be replaced, and every new
+/// sign-in was lost at the next refresh. The data protection keychain scopes
+/// items by team and bundle id, so a rebuild or rename keeps them, and
+/// Septena and Septena Life no longer share one item. iOS ignores the key.
 public enum KeychainStore {
+
+  /// Unsigned local builds have no application-identifier entitlement and
+  /// cannot reach the data protection keychain; they fall back to the legacy
+  /// one so they still run.
+  nonisolated(unsafe) private static var useDataProtection = true
+
+  private static func scoped(_ query: [String: Any]) -> CFDictionary {
+    var q = query
+    if useDataProtection { q[kSecUseDataProtectionKeychain as String] = true }
+    return q as CFDictionary
+  }
 
   /// Store (or replace) `value` under `account`. When `synchronizable` is true
   /// the item propagates via iCloud Keychain.
@@ -30,7 +49,10 @@ public enum KeychainStore {
       kSecAttrAccessible as String:     kSecAttrAccessibleAfterFirstUnlock,
       kSecAttrSynchronizable as String: synchronizable,
     ]
-    SecItemAdd(query as CFDictionary, nil)
+    if SecItemAdd(scoped(query), nil) == errSecMissingEntitlement {
+      useDataProtection = false
+      SecItemAdd(scoped(query), nil)
+    }
   }
 
   /// Load the value for `account`, matching either a synced or a local item.
@@ -43,7 +65,11 @@ public enum KeychainStore {
       kSecMatchLimit as String:         kSecMatchLimitOne,
     ]
     var item: CFTypeRef?
-    let status = SecItemCopyMatching(query as CFDictionary, &item)
+    var status = SecItemCopyMatching(scoped(query), &item)
+    if status == errSecMissingEntitlement {
+      useDataProtection = false
+      status = SecItemCopyMatching(scoped(query), &item)
+    }
     guard status == errSecSuccess, let data = item as? Data else { return nil }
     return String(data: data, encoding: .utf8)
   }
@@ -55,7 +81,10 @@ public enum KeychainStore {
       kSecAttrAccount as String:        account,
       kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
     ]
-    SecItemDelete(query as CFDictionary)
+    if SecItemDelete(scoped(query)) == errSecMissingEntitlement {
+      useDataProtection = false
+      SecItemDelete(scoped(query))
+    }
   }
 
   /// One-time, idempotent migration: if a *local-only* (non-synchronizable)
@@ -72,7 +101,7 @@ public enum KeychainStore {
       kSecMatchLimit as String:         kSecMatchLimitOne,
     ]
     var item: CFTypeRef?
-    guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+    guard SecItemCopyMatching(scoped(query), &item) == errSecSuccess,
           let data = item as? Data,
           let value = String(data: data, encoding: .utf8) else { return }
     store(value, account: account, synchronizable: true)
