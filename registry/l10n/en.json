@@ -1004,7 +1004,7 @@
   "History": {
     "text": "History",
     "paths": [
-      "surfaces.taskPage.blocks.taskPage.history.label"
+      "surfaces.taskAttributes.history.label"
     ]
   },
   "How AI helps with your tasks": {

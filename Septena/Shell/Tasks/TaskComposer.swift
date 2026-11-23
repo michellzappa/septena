@@ -392,7 +392,7 @@ struct TaskComposerCard: View {
         pastedImagesStrip
       })
     case .attributes:
-      // The rail hosts the checklist and attachments panels; their blocks
+      // The rail hosts the checklist, attachments and history panels; their blocks
       // gate them (`kinds`), so the registry decides where they show.
       return AnyView(TaskAttributeBar(
         draft: $draft,
@@ -406,16 +406,14 @@ struct TaskComposerCard: View {
         discussVisible: $discussKickoffVisible,
         moveFocus: { moveFocus(forward: $0) },
         showsChecklist: kinds.contains(.checklist),
-        showsAttachments: kinds.contains(.attachments)
+        showsAttachments: kinds.contains(.attachments),
+        showsHistory: kinds.contains(.history)
       ))
-    case .checklist, .attachments:
+    case .checklist, .attachments, .history:
       return AnyView(EmptyView()) // rendered by the attribute rail, see `.attributes`
     case .conversation:
       guard let task = editingTask else { return AnyView(EmptyView()) }
       return AnyView(ConversationSection(task: task, accent: accent))
-    case .history:
-      guard let task = editingTask else { return AnyView(EmptyView()) }
-      return AnyView(TaskHistorySection(taskID: task.id))
     }
   }
 
@@ -469,9 +467,9 @@ struct TaskComposerCard: View {
       if kinds.contains(.header) { titleNotesCard }
 
       VStack(alignment: .leading, spacing: inline ? 10 : 14) {
-        // Header draws above this column; checklist and attachments draw
-        // inside the attribute rail.
-        ForEach(blocks.filter { ![.header, .checklist, .attachments].contains($0.kind) }) { block in
+        // Header draws above this column; checklist, attachments and history
+        // draw inside the attribute rail.
+        ForEach(blocks.filter { ![.header, .checklist, .attachments, .history].contains($0.kind) }) { block in
           blockView(block, kinds: kinds)
         }
       }
@@ -1139,6 +1137,12 @@ struct TaskComposerCard: View {
     for attr in TaskAttributeBar.Attribute.rail {
       if attr == .discuss {
         if discussKickoffVisible { order.append(.pill(.discuss)) }
+      } else if attr == .history {
+        // Page depth only, and only where the backend keeps a log.
+        if isEditing, TaskHistory.isAvailable,
+           pageBlocks.contains(where: { $0.kind == .history }) {
+          order.append(.pill(.history))
+        }
       } else if !attr.editOnly || isEditing {
         order.append(.pill(attr))
       }

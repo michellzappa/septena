@@ -39,6 +39,8 @@ struct TaskAttributeBar: View {
   /// its panel.
   var showsChecklist: Bool = true
   var showsAttachments: Bool = true
+  /// The task page's `history` block is on at this depth (page only).
+  var showsHistory: Bool = false
 
   /// The electives. Order, label and icon come from the registry
   /// (`registry/surfaces.json` `taskAttributes`, ADR 0020) so the AppKit
@@ -50,6 +52,8 @@ struct TaskAttributeBar: View {
     case when, deadline, reminder, repeatRule = "repeat", star, list, tags, checklist, attachments
     /// Edit-mode AI kickoff — shown only before a conversation exists.
     case discuss
+    /// The change log: opens `TaskHistoryPanel` under the rail. Read-only.
+    case history
     var id: Self { self }
 
     private var registry: RegistryTaskAttribute { RegistrySurfaces.taskAttribute(rawValue) }
@@ -111,7 +115,8 @@ struct TaskAttributeBar: View {
        activate: Binding<Attribute?>, discussTask: SeptenaTask? = nil,
        discussVisible: Binding<Bool> = .constant(false),
        moveFocus: ((Bool) -> Void)? = nil,
-       showsChecklist: Bool = true, showsAttachments: Bool = true) {
+       showsChecklist: Bool = true, showsAttachments: Bool = true,
+       showsHistory: Bool = false) {
     _draft = draft
     self.areas = areas
     self.projects = projects
@@ -124,6 +129,7 @@ struct TaskAttributeBar: View {
     self.moveFocus = moveFocus
     self.showsChecklist = showsChecklist
     self.showsAttachments = showsAttachments
+    self.showsHistory = showsHistory
     _discussStarted = State(initialValue: discussTask?.conversation.hasStarted ?? true)
   }
 
@@ -199,6 +205,7 @@ struct TaskAttributeBar: View {
     if attr == .discuss { return showsDiscuss }
     if attr == .checklist && !showsChecklist { return false }
     if attr == .attachments && !showsAttachments { return false }
+    if attr == .history && !(showsHistory && TaskHistory.isAvailable) { return false }
     return !attr.editOnly || discussTask != nil
   }
 
@@ -243,6 +250,9 @@ struct TaskAttributeBar: View {
     // or project once filed (but tinted only when explicitly filed, see isSet).
     case .list:
       return draft.listLabel(areas: areas, projects: projects)
+    // Read-only: the pill just names the log.
+    case .history:
+      return nil
     }
   }
 
@@ -250,6 +260,7 @@ struct TaskAttributeBar: View {
   private func isSet(_ attr: Attribute, edit: EditOnlyState?) -> Bool {
     switch attr {
     case .discuss:     discussWorking
+    case .history:     false
     case .tags:        !(edit?.tagNames.isEmpty ?? true)
     case .checklist:   (edit?.stepsTotal ?? 0) > 0
     case .attachments: (edit?.attachments ?? 0) > 0
@@ -264,10 +275,14 @@ struct TaskAttributeBar: View {
 
   @ViewBuilder
   private var inlineEditor: some View {
-    // Attachments is the one pill that expands a panel under the rail. The
-    // checklist renders above the rail; the pickers open as sheets.
+    // Attachments and History expand a panel under the rail. The checklist
+    // renders above the rail; the pickers open as sheets.
     if expanded == .attachments, let task = discussTask {
       TaskAttachmentsPanel(taskID: task.id)
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+    if expanded == .history, let task = discussTask {
+      TaskHistoryPanel(taskID: task.id)
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
   }
@@ -337,7 +352,7 @@ struct TaskAttributeBar: View {
         TagPickerSheet(taskIDs: [task.id])
           .taskPickerChrome(TaskPickerDetents.standard)
       }
-    case .star, .checklist, .attachments, .discuss:
+    case .star, .checklist, .attachments, .discuss, .history:
       EmptyView()
     }
   }

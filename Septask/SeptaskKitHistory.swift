@@ -1,17 +1,18 @@
 #if os(macOS)
 import AppKit
 
-// The inspector's History section: who changed the task and what, newest
+// The inspector's History panel: who changed the task and what, newest
 // first, from the task backend's change log (`TaskHistory`, SeptenaCore).
-// Collapsed by default. The log loads only when the section is open, and
-// again for each task shown while it stays open, so selecting rows never
-// waits on the network.
+// The inspector's History button opens it (registry `taskAttributes`
+// `history`, the same attribute as the SwiftUI History pill). Closed by
+// default. The log loads only while the panel is open, and again for each
+// task shown while it stays open, so selecting rows never waits on the
+// network.
 @MainActor
 final class KitHistoryView: NSStackView {
   /// Names an area or project id for "Moved to …"; nil when unknown.
   var listTitle: (String) -> String? = { _ in nil }
 
-  private let toggle = NSButton()
   private let rows = NSStackView()
   private let status = NSTextField(wrappingLabelWithString: "")
   private var taskID: String?
@@ -25,41 +26,32 @@ final class KitHistoryView: NSStackView {
     alignment = .leading
     spacing = 8
 
-    toggle.isBordered = false
-    toggle.bezelStyle = .inline
-    toggle.imagePosition = .imageLeading
-    toggle.font = SeptaskKitTheme.chip
-    toggle.contentTintColor = SeptaskKitTheme.iconMuted
-    toggle.target = self
-    toggle.action = #selector(toggleExpanded)
-    // Keyboard focus stays on the fields, like the close button.
-    toggle.refusesFirstResponder = true
-
     rows.orientation = .vertical
     rows.alignment = .leading
     rows.spacing = 10
     status.font = SeptaskKitTheme.meta
     status.textColor = SeptaskKitTheme.inkSecondary
 
-    addArrangedSubview(toggle)
     addArrangedSubview(status)
     addArrangedSubview(rows)
     // Full width, so the wrapping labels wrap at the pane edge.
     rows.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
     status.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
-    updateToggle()
+    isHidden = true
     render(nil)
   }
 
   @available(*, unavailable)
   required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
-  /// Shows the section for a task. Returns false, and hides it, where the
-  /// backend does not own tasks: there is no log to read.
+  /// Points the panel at a task. Returns false where the backend does not
+  /// own tasks: there is no log to read, and the History button hides.
   @discardableResult
   func configure(taskID: String) -> Bool {
-    isHidden = !TaskHistory.isAvailable
-    guard !isHidden else { return false }
+    guard TaskHistory.isAvailable else {
+      isHidden = true
+      return false
+    }
     if taskID != self.taskID {
       self.taskID = taskID
       loaded = nil
@@ -70,22 +62,15 @@ final class KitHistoryView: NSStackView {
     return true
   }
 
-  @objc private func toggleExpanded() {
-    expanded.toggle()
-    // Each open reads the log again: it may have grown since.
+  /// Opens or closes the panel. Each open reads the log again: it may have
+  /// grown since.
+  func setExpanded(_ open: Bool) {
+    expanded = open
+    isHidden = !open
     loaded = nil
     loadTask?.cancel()
-    updateToggle()
     render(nil)
-    if expanded { loadIfNeeded() }
-  }
-
-  private func updateToggle() {
-    toggle.title = RegistrySurfaces.taskPageBlock(.history).label ?? ""
-    toggle.image = NSImage(systemSymbolName: expanded ? "chevron.down" : "chevron.right",
-                           accessibilityDescription: nil)?
-      .withSymbolConfiguration(.init(pointSize: 9, weight: .semibold))
-    toggle.setAccessibilityExpanded(expanded)
+    if open { loadIfNeeded() }
   }
 
   private func loadIfNeeded() {

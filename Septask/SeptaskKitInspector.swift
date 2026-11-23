@@ -34,6 +34,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let checklistLabel = NSTextField(labelWithString: "")
   private let checklistView = KitChecklistView()
   private let attachFileButton = NSButton()
+  /// Opens the History panel: the registry `history` attribute, the same
+  /// one the SwiftUI rail shows as a pill.
+  private let historyButton = NSButton()
   private let attachmentsLabel = NSTextField(labelWithString: "")
   private let attachmentsView = KitAttachmentsView()
   private let placeholder = NSTextField(labelWithString: String(localized: "No Selection",
@@ -129,7 +132,8 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       button.identifier = NSUserInterfaceItemIdentifier(id)
     }
     for (button, action) in [(addChecklistButton, #selector(addChecklistStep)),
-                             (attachFileButton, #selector(attachFile))] {
+                             (attachFileButton, #selector(attachFile)),
+                             (historyButton, #selector(toggleHistory))] {
       button.bezelStyle = .rounded
       button.target = self
       button.action = action
@@ -137,6 +141,11 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     }
     addChecklistButton.title = String(localized: "Add Checklist…", comment: "SeptaskKit: inspector add checklist")
     attachFileButton.title = String(localized: "Attach File…", comment: "SeptaskKit: inspector attach file")
+    let historyAttr = RegistrySurfaces.taskAttribute("history")
+    historyButton.title = historyAttr.label
+    historyButton.image = NSImage(systemSymbolName: historyAttr.sfSymbol, accessibilityDescription: nil)
+    historyButton.imagePosition = .imageLeading
+    historyButton.setButtonType(.pushOnPushOff)
 
     form.orientation = .vertical
     form.alignment = .leading
@@ -336,8 +345,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     return conversationView
   }
 
-  /// History draws its own heading (the block label) on its disclosure
-  /// button, and loads only while open (`KitHistoryView`).
+  /// History: the registry `history` attribute as a button (the SwiftUI rail
+  /// shows it as a pill), and the panel it opens. The log loads only while
+  /// the panel is open (`KitHistoryView`).
   private func addHistoryBlock() -> NSView {
     historyView.translatesAutoresizingMaskIntoConstraints = false
     historyView.listTitle = { [weak self] id in
@@ -345,9 +355,14 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       let snapshot = StructureCache.snapshot(in: self.context)
       return snapshot.projects.first { $0.id == id }?.title ?? snapshot.areas.first { $0.id == id }?.title
     }
+    form.addArrangedSubview(historyButton)
     form.addArrangedSubview(historyView)
     fillWidth(historyView)
     return historyView
+  }
+
+  @objc private func toggleHistory() {
+    historyView.setExpanded(historyButton.state == .on)
   }
 
   private var formScroll: NSScrollView?
@@ -412,7 +427,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
         reloadTextIfIdle(next)
         refreshReadOnlyFields(next)
         refreshConversation(next)
-        historyView.configure(taskID: next.id)
+        historyButton.isHidden = !historyView.configure(taskID: next.id)
       }
       return
     }
@@ -445,7 +460,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     updateAttachmentsVisibility()
     refreshReadOnlyFields(next)
     refreshConversation(next)
-    historyView.configure(taskID: next.id)
+    historyButton.isHidden = !historyView.configure(taskID: next.id)
     formScroll?.contentView.scroll(to: .zero)
   }
 

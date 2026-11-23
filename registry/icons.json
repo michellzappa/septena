@@ -64,6 +64,7 @@
     "action.notes": { "sfSymbol": "text.alignleft", "material": "notes", "lucide": "align-left" },
     "action.discuss": { "sfSymbol": "bubble.left.and.bubble.right", "material": "forum", "lucide": "message-square" },
     "action.attachment": { "sfSymbol": "paperclip", "material": "attach_file", "lucide": "paperclip" },
+    "action.history": { "sfSymbol": "clock.arrow.circlepath", "material": "history", "lucide": "history" },
     "action.checklist": { "sfSymbol": "checklist", "material": "checklist", "lucide": "list-checks" },
     "action.tag": { "sfSymbol": "tag", "material": "label", "lucide": "tag" },
     "action.reminder": { "sfSymbol": "bell", "material": "notifications", "lucide": "bell" },

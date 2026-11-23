@@ -1,16 +1,17 @@
 import SwiftData
 import SwiftUI
 
-// The History section of the task composer (edit mode): who changed this
-// task and what, newest first, from the task backend's change log
-// (`TaskHistory`, SeptenaCore). Collapsed by default; the log loads only when
-// the section opens, so opening a task never waits on the network.
-// Shown only where the backend owns tasks (`TaskHistory.isAvailable`).
-struct TaskHistorySection: View {
+// The History panel of the task page (edit mode): who changed this task and
+// what, newest first, from the task backend's change log (`TaskHistory`,
+// SeptenaCore). The History pill on the attribute rail opens it, like the
+// Attachments panel (registry `taskAttributes` `history`). It mounts only
+// when the pill opens, so opening a task never waits on the network, and
+// each open reads the log again. The pill shows only where the backend owns
+// tasks (`TaskHistory.isAvailable`).
+struct TaskHistoryPanel: View {
   let taskID: String
 
   @Environment(\.modelContext) private var modelContext
-  @State private var expanded = false
   @State private var rows: [TaskHistoryRow] = []
   @State private var loadedFor: String?
   @State private var failed = false
@@ -24,32 +25,13 @@ struct TaskHistorySection: View {
     // A VStack, not a Group: `.task` needs a child that always exists
     // (CLAUDE.md Group-modifier trap).
     VStack(alignment: .leading, spacing: 8) {
-      if TaskHistory.isAvailable {
-        Button {
-          expanded.toggle()
-          // Each open reads the log again: it may have grown since.
-          if !expanded { loadedFor = nil }
-        } label: { header }
-          .buttonStyle(.plain)
-        if expanded { content }
-      }
+      content
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .task(id: expanded ? taskID : nil) { await load() }
+    .task(id: taskID) { await load() }
     #if SEPTASK
     .sheet(isPresented: $showingPlus) { SeptaskPlusSheet(upsellID: edge?.id) }
     #endif
-  }
-
-  private var header: some View {
-    HStack(spacing: 6) {
-      Image(systemName: expanded ? "chevron.down" : "chevron.right")
-        .font(.caption2.weight(.semibold))
-      Text(RegistrySurfaces.taskPageBlock(.history).label ?? "").font(.subheadline.weight(.semibold))
-      Spacer(minLength: 0)
-    }
-    .foregroundStyle(.secondary)
-    .contentShape(Rectangle())
   }
 
   @ViewBuilder private var content: some View {
@@ -87,7 +69,7 @@ struct TaskHistorySection: View {
   }
 
   private func load() async {
-    guard expanded, loadedFor != taskID else { return }
+    guard loadedFor != taskID else { return }
     let id = taskID
     do {
       let page = try await TaskBackendClient.shared.history(taskID: id)

@@ -166,6 +166,7 @@ enum RegistryIcons {
     "action.notes": "text.alignleft",
     "action.discuss": "bubble.left.and.bubble.right",
     "action.attachment": "paperclip",
+    "action.history": "clock.arrow.circlepath",
     "action.checklist": "checklist",
     "action.tag": "tag",
     "action.reminder": "bell",
@@ -1414,6 +1415,7 @@ enum RegistrySurfaces {
     RegistryTaskAttribute(id: "checklist", label: RegistryL10n.t("Checklist"), iconId: "action.checklist", sfSymbol: "checklist", commitContract: "pickCommits", surfaceTier: "inline", featureId: "task.checklists", editOnly: true, workingLabel: nil),
     RegistryTaskAttribute(id: "attachments", label: RegistryL10n.t("Attachments"), iconId: "action.attachment", sfSymbol: "paperclip", commitContract: "pickCommits", surfaceTier: "inline", featureId: "task.attachments", editOnly: true, workingLabel: nil),
     RegistryTaskAttribute(id: "discuss", label: RegistryL10n.t("Discuss"), iconId: "action.discuss", sfSymbol: "bubble.left.and.bubble.right", commitContract: "closeCommits", surfaceTier: "inline", featureId: "ai.discuss", editOnly: true, workingLabel: RegistryL10n.t("Thinking…")),
+    RegistryTaskAttribute(id: "history", label: RegistryL10n.t("History"), iconId: "action.history", sfSymbol: "clock.arrow.circlepath", commitContract: "pickCommits", surfaceTier: "inline", featureId: "task.history", editOnly: true, workingLabel: nil),
     RegistryTaskAttribute(id: "paste", label: RegistryL10n.t("Paste"), iconId: "action.paste", sfSymbol: "doc.on.clipboard", commitContract: "pickCommits", surfaceTier: "chip", featureId: "capture.quick-entry", editOnly: false, workingLabel: nil),
   ]
   /// The pills that show on `platform`, in rail order (every attribute except
@@ -1442,7 +1444,7 @@ enum RegistrySurfaces {
     RegistryTaskPageBlock(id: "taskPage.checklist", kind: .checklist, depths: [.inline, .page], label: RegistryL10n.t("Checklist"), attributeId: "checklist", featureId: "task.checklists", editOnly: true),
     RegistryTaskPageBlock(id: "taskPage.attachments", kind: .attachments, depths: [.inline, .page], label: RegistryL10n.t("Attachments"), attributeId: "attachments", featureId: "task.attachments", editOnly: true),
     RegistryTaskPageBlock(id: "taskPage.conversation", kind: .conversation, depths: [.page], label: RegistryL10n.t("Conversation"), attributeId: nil, featureId: "ai.discuss", editOnly: true),
-    RegistryTaskPageBlock(id: "taskPage.history", kind: .history, depths: [.page], label: RegistryL10n.t("History"), attributeId: nil, featureId: "task.history", editOnly: true),
+    RegistryTaskPageBlock(id: "taskPage.history", kind: .history, depths: [.page], label: RegistryL10n.t("History"), attributeId: "history", featureId: "task.history", editOnly: true),
   ]
   /// The blocks a host renders at `depth` on `platform`, in order. A create
   /// (no saved task yet) passes `isEditing: false` to drop `editOnly` blocks.

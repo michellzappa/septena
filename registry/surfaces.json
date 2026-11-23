@@ -322,6 +322,7 @@
     { "id": "checklist", "label": "Checklist", "icon": "action.checklist", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "task.checklists", "editOnly": true },
     { "id": "attachments", "label": "Attachments", "countLabel": { "one": "{count} file", "other": "{count} files" }, "icon": "action.attachment", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "task.attachments", "editOnly": true },
     { "id": "discuss", "label": "Discuss", "workingLabel": "Thinking…", "icon": "action.discuss", "commitContract": "closeCommits", "surfaceTier": "inline", "featureId": "ai.discuss", "editOnly": true },
+    { "id": "history", "label": "History", "icon": "action.history", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "task.history", "editOnly": true },
     { "id": "paste", "label": "Paste", "icon": "action.paste", "commitContract": "pickCommits", "surfaceTier": "chip", "featureId": "capture.quick-entry" }
   ],
   "taskPage": {
@@ -334,7 +335,7 @@
       { "id": "taskPage.checklist", "kind": "checklist", "attribute": "checklist", "depths": ["inline", "page"], "featureId": "task.checklists", "editOnly": true },
       { "id": "taskPage.attachments", "kind": "attachments", "attribute": "attachments", "depths": ["inline", "page"], "featureId": "task.attachments", "editOnly": true },
       { "id": "taskPage.conversation", "kind": "conversation", "label": "Conversation", "depths": ["page"], "featureId": "ai.discuss", "editOnly": true },
-      { "id": "taskPage.history", "kind": "history", "label": "History", "depths": ["page"], "featureId": "task.history", "editOnly": true }
+      { "id": "taskPage.history", "kind": "history", "attribute": "history", "depths": ["page"], "featureId": "task.history", "editOnly": true }
     ]
   },
   "taskDetail": {

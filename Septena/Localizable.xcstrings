@@ -5989,7 +5989,7 @@
       }
     },
     "History" : {
-      "comment" : "Generated from registry surfaces.taskPage.blocks.taskPage.history.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry surfaces.taskAttributes.history.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Hit your daily water goal" : {
