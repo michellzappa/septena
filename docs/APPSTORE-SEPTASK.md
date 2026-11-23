@@ -216,6 +216,9 @@ reads this table; `appstore/validate.mjs` checks it.
   2026-11-22 rule of one level of title). Say "your agent", never a vendor: Septena works
   with any agent that speaks MCP.
 - No em or en dashes. Every title and sub passes the humanizer skill.
+- Panels next to each other must not look alike. `appstore/panels.septask.mjs`
+  varies the fill, light or dark screen, tilt, phone size, callout and number
+  of phones per slug (decided 2026-11-23).
 
 ### iPhone
 
@@ -223,10 +226,11 @@ reads this table; `appstore/validate.mjs` checks it.
 | --- | --- | --- | --- | --- |
 | hook | today/0 | - | Tasks that think with you | |
 | thinking | thinking/1 | - | AI that asks before it acts | Tap Discuss, and Septena asks one short question first. |
-| agent-work | agents/2 | - | Your agents do the work | Hand a task to your agent, and it asks you when it needs a decision. |
-| agent-result | agents/3 | - | You decide when it’s done | Finished work waits in Review until you Accept it. |
-| inbox | capture/1 | - | New tasks wait in the Inbox | Nothing lands on Today until you put it there. |
+| agent-work | agents/2 | agent-status | Your agents do the work | Hand a task to your agent, and it asks you when it needs a decision. |
+| agent-result | agents/3 | agent-status | You decide when it’s done | Finished work waits in Review until you Accept it. |
+| inbox | capture/1 | task-capture | New tasks wait in the Inbox | Nothing lands on Today until you put it there. |
 | dates | dates/2 | - | Pick When, keep the Deadline | When is the day you start, and the Deadline is the day it’s due. |
+| looks | looks/0 | - | Make it yours | Pick an accent colour and a texture for your lists. |
 
 ---
 

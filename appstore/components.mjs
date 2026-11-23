@@ -96,7 +96,7 @@ function shot(s, device, tint) {
   const c = IPHONE.cutout;
   const island = f.island && !s.img ? `<div class="island" style="top:${Math.round((IPHONE.bezel + c.top) * k)}px; width:${Math.round(c.width * k)}px; height:${Math.round(c.height * k)}px;"></div>` : "";
   return `
-  <div class="shot-zone" style="transform: translateY(${Math.round((s.offsetY ?? 0) * 100)}%);">
+  <div class="shot-zone" style="transform: translate(${Math.round((s.offsetX ?? 0) * 100)}%, ${Math.round((s.offsetY ?? 0) * 100)}%);">
     <div class="shot-wrap" style="width:${w}px; transform: rotate(${s.rotate ?? 0}deg);">
       <div class="frame" style="width:${w}px; padding:${f.pad}px;${f.bezel ? ` background:${PHONE.case} center/100% 100% no-repeat; box-shadow:none; overflow:visible; filter:drop-shadow(0 ${Math.round(20 * k)}px ${Math.round(24 * k)}px rgb(0 0 0 / .28));` : ` border-radius:${f.radius}px;`}">
         ${screen}${island}
@@ -295,6 +295,7 @@ function portrait(panel, device, tint) {
     .shot-zone { position:absolute; left:0; right:0; bottom:-90px; display:flex; justify-content:center; }
     .founder { position:absolute; left:50%; top:46%; transform:translateX(-50%); width:1020px; }
   </style>
+  ${(panel.shots ?? []).map((s) => shot(s, device, tint)).join("")}
   ${shot(panel.shot, device, tint)}
   ${chips(panel.chips)}
   ${founder(panel.founder)}
