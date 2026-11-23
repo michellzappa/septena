@@ -81,6 +81,8 @@ There is exactly **one** visual treatment for "this is selected / active / curre
 | Row in a floating palette or source list | The same fill drawn **inset** — `InsetSelectionBackground` (macOS Tasks sidebar, ⌘K quick find) |
 | Chip / segment / filter | `SelectableChip` — a `tint.opacity(0.22)` wash under `tint` ink, semibold |
 
+**A press on a navigation target is the selection, shown at once.** The macOS source list selects on mouse-down, so a click shows the wash before the button comes up. A SwiftUI `Button` acts on release, so every sidebar row, home tile and drill-in card uses `NavigationPressStyle`: while pressed, the target wears the same `Theme.listSelectionFill` it wears when selected. Chrome painted outside the button reads the press through `NavigationPressReader`. No tint flash, no scale, no second color.
+
 Two failure modes to recognize:
 
 - **An inset highlight on an ordinary list row** reads as a chip floating *on top of* the row rather than the row itself being selected. Inset is only for palettes and source lists.

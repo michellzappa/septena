@@ -533,7 +533,7 @@ struct SidebarRootView: View {
                         count: spec.count,
                         isSelected: isSelected(spec.route))
         }
-        .buttonStyle(InertButtonStyle())
+        .buttonStyle(NavigationPressStyle())
         .contextMenu { smartListContextMenu(for: spec) }
         // Drag-a-task-onto-Today re-home, matching the area / project cards
         // below. Only the Today tile takes a drop; self-gates to iPad
@@ -748,8 +748,9 @@ struct SidebarRootView: View {
   ///     tagged by its route, whose selection drives the detail directly through
   ///     `sidebarSelection` — a single click (or arrow key) *is* open, the
   ///     standard system source-list model.
-  ///   • iPhone / slide-over (compact): a Button that sets `nav.path` directly;
-  ///     InertButtonStyle suppresses the click-tint flash.
+  ///   • iPhone / slide-over (compact): a Button that sets `nav.path` directly.
+  ///     `NavigationPressStyle` shows the selection wash from touch-down, the
+  ///     way the source list selects on mouse-down (`SelectionLanguage.swift`).
   @ViewBuilder
   private func navRow<Content: View>(_ route: Route,
                                      @ViewBuilder content: () -> Content) -> some View {
@@ -760,7 +761,7 @@ struct SidebarRootView: View {
       content().tag(route.id)
     } else {
       Button { selectRoute(route) } label: { content() }
-        .buttonStyle(PlainHoverRowButtonStyle(cornerRadius: 10))
+        .buttonStyle(NavigationPressStyle(hoverCornerRadius: 10))
     }
     #endif
   }
@@ -895,21 +896,26 @@ struct SidebarRootView: View {
   private func compactRow<V: View>(route: Route? = nil,
                                    @ViewBuilder _ row: () -> V) -> some View {
     let selected = route.map { isSelected($0) } ?? false
-    row()
-      #if os(iOS)
+    #if os(iOS)
+    // Custom neutral fill only — suppress UIKit's accent capsule / selection
+    // ring so rows don't grow or glow on tap (same pattern as the task-list
+    // detail). The row wears that fill from touch-down, not from the push:
+    // `NavigationPressReader` + `navRow`'s `NavigationPressStyle`.
+    let rowView = row()
+    NavigationPressReader { pressed in
+      rowView.listRowBackground(SelectableListRowBackground(isSelected: selected || pressed))
+    }
       .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-      // Custom neutral fill only — suppress UIKit's accent capsule / selection
-      // ring so rows don't grow or glow on tap (same pattern as the task-list
-      // detail).
-      .listRowBackground(SelectableListRowBackground(isSelected: selected))
-      #else
+      .septenaSuppressListCellSelection()
+    #else
+    row()
       // macOS: unselected rows stay transparent so the native `.sidebar` Liquid
       // Glass material shows through; the selected row gets the app's
       // `listSelectionFill` as an inset capsule. Suppress AppKit's accent ring
       // so that fill is the only highlight.
       .listRowBackground(SidebarMacRowBackground(isSelected: selected))
-      #endif
       .septenaSuppressListCellSelection()
+    #endif
   }
 
   /// The area's own row — tappable to its detail, with rename / reorder / delete
@@ -1443,9 +1449,9 @@ struct SmartListTile: View {
   /// Total rows on the list — big bold number top-right.
   var count: Int? = nil
   /// When true, the tile gets the same neutral selection fill as list rows —
-  /// no outline ring. iPhone never sees a selected tile (tapping pushes onto the
-  /// stack).
+  /// no outline ring. A press shows the same fill (`NavigationPressStyle`).
   var isSelected: Bool = false
+  @Environment(\.isNavigationPressed) private var isPressed
 
   var body: some View {
     // Mimestream-style minimal tile: white card with a small filled
@@ -1474,7 +1480,7 @@ struct SmartListTile: View {
     .frame(maxWidth: .infinity, minHeight: 78, alignment: .topLeading)
     .background(
       RoundedRectangle(cornerRadius: TaskCardMetrics.radius, style: .continuous)
-        .fill(isSelected ? Theme.listSelectionFill : Theme.cardSurface)
+        .fill(isSelected || isPressed ? Theme.listSelectionFill : Theme.cardSurface)
     )
   }
 

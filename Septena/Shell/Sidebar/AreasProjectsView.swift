@@ -357,14 +357,19 @@ struct AreaDetailView: View {
           projectsSectionHeader
           let areaProjects = projectsInArea
           ForEach(Array(areaProjects.enumerated()), id: \.element.id) { idx, project in
-            Button { openProject(project) } label: {
-              projectRow(project)
+            // The card wears the selection fill from touch-down, like a
+            // sidebar row (`NavigationPressStyle`, SelectionLanguage.swift).
+            NavigationPressReader { pressed in
+              Button { openProject(project) } label: {
+                projectRow(project)
+              }
+              .buttonStyle(NavigationPressStyle(hoverCornerRadius: Theme.cornerRadiusSmall))
+              .modifier(TaskMoveDrop(perform: { ids in
+                handleProjectDrop(ids: ids, project: project)
+              }))
+              .taskCardChrome(TaskCardPosition(index: idx, count: areaProjects.count),
+                              isSelected: pressed)
             }
-            .buttonStyle(PlainHoverRowButtonStyle())
-            .modifier(TaskMoveDrop(perform: { ids in
-              handleProjectDrop(ids: ids, project: project)
-            }))
-            .taskCardChrome(TaskCardPosition(index: idx, count: areaProjects.count))
           }
         }
       }

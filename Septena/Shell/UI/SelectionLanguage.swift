@@ -62,6 +62,69 @@ struct InsetSelectionBackground: View {
   }
 }
 
+// MARK: - Pressed navigation target
+
+/// A press on a navigation target IS the selection, shown at once.
+///
+/// The macOS source list selects a row on mouse-down, so the click shows the
+/// selection wash before the button comes up. A SwiftUI `Button` acts on
+/// touch-UP, and the old plain / inert row styles painted nothing while the
+/// finger was down, so an iPhone tap showed nothing until the push began and
+/// read as "not immediate". This style closes that gap: while pressed, the
+/// target wears the same `Theme.listSelectionFill` it wears when selected.
+/// No second highlight, no tint flash, no scale.
+///
+/// Two ways the press reaches the fill, by who paints it:
+///  - the label paints its own fill (a home tile): read
+///    `@Environment(\.isNavigationPressed)` and treat it like `isSelected`.
+///  - chrome outside the button paints it (a sidebar row's list background,
+///    a project card on an area page): wrap the row in
+///    `NavigationPressReader` and pass its `isPressed` to that chrome.
+///
+/// iOS holds a touch in a scroll view for a moment before it counts as a
+/// press (it could still become a scroll). That is the platform's own
+/// highlight timing, the same as a `UITableView` cell; do not work around it.
+struct NavigationPressStyle: ButtonStyle {
+  /// Pointer hover on iPad and Mac, as `PlainHoverRowButtonStyle` gives.
+  /// nil for a target that has no hover (a tile).
+  var hoverCornerRadius: CGFloat? = nil
+  @Environment(\.navigationPressBinding) private var pressBinding
+
+  @ViewBuilder
+  func makeBody(configuration: Configuration) -> some View {
+    let label = configuration.label
+      .environment(\.isNavigationPressed, configuration.isPressed)
+      .onChange(of: configuration.isPressed) { _, pressed in
+        pressBinding?.wrappedValue = pressed
+      }
+    if let hoverCornerRadius {
+      label.rowHover(cornerRadius: hoverCornerRadius)
+    } else {
+      label
+    }
+  }
+}
+
+/// Hands a `NavigationPressStyle` button's press to chrome painted OUTSIDE
+/// the button (a list row background, a task card), so that chrome can treat
+/// it like `isSelected`.
+struct NavigationPressReader<Content: View>: View {
+  @ViewBuilder let content: (_ isPressed: Bool) -> Content
+  @State private var isPressed = false
+
+  var body: some View {
+    content(isPressed)
+      .environment(\.navigationPressBinding, $isPressed)
+  }
+}
+
+extension EnvironmentValues {
+  /// True inside the label of a pressed `NavigationPressStyle` button.
+  @Entry var isNavigationPressed: Bool = false
+  /// Set by `NavigationPressReader`; the button style reports its press here.
+  @Entry var navigationPressBinding: Binding<Bool>? = nil
+}
+
 // MARK: - Selectable chip
 
 /// Shape of a `SelectableChip`. Capsule is the default; `.roundedRect` exists

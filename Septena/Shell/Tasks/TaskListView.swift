@@ -74,6 +74,12 @@ struct TaskListView: View {
   @State private var triageStorage: [SeptenaTask] = []
   @State private var fadedScopeStorage: [SeptenaTask] = []
   @State private var storageFilter: TaskFilter? = nil
+  /// Store reads for the current filter before `hydrateFilterStorageIfNeeded`
+  /// copies them into the storage above. The first `body` pass of a new list
+  /// reads `items` many times; this memo makes that pass cost one fetch, not
+  /// one fetch per read, so a tap starts the push without a stall. A class in
+  /// `@State`: filling it during `body` does not invalidate the view.
+  @State private var preHydration = PreHydrationReads()
   /// The archive is deliberately incremental: 1,000 completed tasks should
   /// not be decoded, sorted, and rendered just to open the Logbook.
   private static let logbookPageSize = 100
@@ -134,12 +140,42 @@ struct TaskListView: View {
     get {
       storageFilter == filter
         ? itemsStorage
-        : launchSnapshot?.today ?? localTasks()
+        : launchSnapshot?.today ?? preHydrationItems()
     }
     nonmutating set {
       itemsStorage = newValue
       storageFilter = filter
     }
+  }
+
+  /// See `preHydration`. Today fills its Inbox band from the same fetch.
+  private func preHydrationItems() -> [SeptenaTask] {
+    preHydration.reset(for: filter)
+    if let cached = preHydration.items { return cached }
+    if filter == .today {
+      let lists = LocalCache.todayAndTriage(in: modelContext)
+      preHydration.items = lists.today
+      preHydration.triage = lists.triage
+      return lists.today
+    }
+    let fresh = localTasks()
+    preHydration.items = fresh
+    return fresh
+  }
+
+  private func preHydrationTriage() -> [SeptenaTask] {
+    guard filter == .today else { return [] }
+    preHydration.reset(for: filter)
+    if preHydration.triage == nil { _ = preHydrationItems() }
+    return preHydration.triage ?? []
+  }
+
+  private func preHydrationFaded() -> [SeptenaTask] {
+    preHydration.reset(for: filter)
+    if let cached = preHydration.faded { return cached }
+    let fresh = LocalCache.fadedTasks(in: modelContext, scope: filter)
+    preHydration.faded = fresh
+    return fresh
   }
 
   /// The visible archive window. All other filters stay unbounded because
@@ -206,8 +242,7 @@ struct TaskListView: View {
     guard filter == .today else { return [] }
     let base = storageFilter == filter
       ? triageStorage
-      : launchSnapshot?.inbox
-        ?? LocalCache.tasks(in: LocalStore.shared.container.mainContext, filter: .triage)
+      : launchSnapshot?.inbox ?? preHydrationTriage()
     return base.filter { $0.status == .open || model.settle.isSettling($0.id) }
   }
 
@@ -417,7 +452,7 @@ struct TaskListView: View {
   private var fadedScopeItems: [SeptenaTask] {
     guard showFadedInLists, scopeLoggedFilterId != nil else { return [] }
     if storageFilter == filter { return fadedScopeStorage }
-    return LocalCache.fadedTasks(in: modelContext, scope: filter)
+    return preHydrationFaded()
   }
   private func toggleScopeFadedExpanded() {
     guard let id = scopeLoggedFilterId else { return }
@@ -1190,6 +1225,7 @@ struct TaskListView: View {
   private func didAppearOnScreen() {
     isOnScreen = true
     hydrateFilterStorageIfNeeded()
+    hydrateRowDecorationsIfNeeded()
     refreshTodayNotices()
     flushDeferredReloadIfNeeded()
     syncMultiSelectChrome()
@@ -1197,19 +1233,35 @@ struct TaskListView: View {
     consumePendingTaskReveal()
   }
 
-  /// Hydrates `itemsStorage` once on filter arrival so the `items` getter never
-  /// re-runs `LocalCache.tasks(...)` multiple times per frame while waiting for
-  /// the coalesced async `load()`. Preserves the cold-launch Today snapshot (#82).
+  /// Hydrates every filter-scoped storage once on filter arrival, from the
+  /// reads the first `body` pass already made (`preHydration`), so the list,
+  /// Today's Inbox band and the faded section are all whole in the first frame
+  /// and nothing pops in when the coalesced `load()` lands. Preserves the
+  /// cold-launch Today snapshot (#82).
   private func hydrateFilterStorageIfNeeded() {
     guard storageFilter != filter else { return }
+    defer { preHydration.clear() }
     if filter == .today, !embedded, !LaunchPhase.shared.firstFrameDrawn,
        let snap = TodaySnapshotStore.launchRows(day: clock.today) {
       itemsStorage = snap.today
+      triageStorage = snap.inbox
       storageFilter = filter
       return
     }
-    itemsStorage = localTasks()
+    itemsStorage = preHydrationItems()
+    triageStorage = preHydrationTriage()
+    fadedScopeStorage = (showFadedInLists && scopeLoggedFilterId != nil) ? preHydrationFaded() : []
     storageFilter = filter
+  }
+
+  /// Tag chips and checklist counts are drawn from these maps. A new list
+  /// instance starts with them empty, so without this read the chips and
+  /// counts appeared a beat after the rows. Not on the launch frame
+  /// (docs/LAUNCH_PERF.md): there `performLoad` fills them.
+  private func hydrateRowDecorationsIfNeeded() {
+    guard LaunchPhase.shared.firstFrameDrawn, tagsByID.isEmpty, checklistCounts.isEmpty else { return }
+    tagsByID = LocalCache.tagsByID(in: modelContext)
+    checklistCounts = LocalCache.checklistSummaryByTask(in: modelContext)
   }
 
   private func refreshTodayNotices() {
@@ -5432,4 +5484,30 @@ struct TaskListView: View {
 private struct ClearLoggedRequest {
   let ids: [String]
   let copy: RegistryPromptCopy
+}
+
+/// `TaskListView.preHydration`: one store read per filter for the frames
+/// before the filter-scoped `@State` is hydrated.
+@MainActor
+private final class PreHydrationReads {
+  private var filter: TaskFilter?
+  var items: [SeptenaTask]?
+  var triage: [SeptenaTask]?
+  var faded: [SeptenaTask]?
+
+  /// Forget reads made for another filter.
+  func reset(for filter: TaskFilter) {
+    guard self.filter != filter else { return }
+    clear()
+    self.filter = filter
+  }
+
+  /// Drop every read: hydrated storage owns the rows from here, and a later
+  /// pre-hydration pass must read the store fresh.
+  func clear() {
+    filter = nil
+    items = nil
+    triage = nil
+    faded = nil
+  }
 }
