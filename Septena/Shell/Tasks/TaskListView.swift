@@ -5007,16 +5007,18 @@ struct TaskListView: View {
     return keys
   }
 
-  /// Today's calendar agenda — quiet text on the gray canvas, tucked directly
-  /// under the screen title. White cards are reserved for tasks.
+  /// Today's calendar agenda — an "Agenda" group header over one solo card,
+  /// the same anatomy as every other Today group, each Upcoming day's events,
+  /// and the Mac Today list (`SeptaskKitTaskList.agenda()`). It used to sit as
+  /// bare text on the gray canvas, which read as floating between the cards.
   @ViewBuilder
   private var todayCalendarRow: some View {
     if filter == .today, showCalendarEvents, !model.calendarEvents.isEmpty {
+      groupHeader(icon: "calendar",
+                  title: String(localized: "Agenda", comment: "SeptaskKit: Today calendar group"))
+        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
       calendarEventsBlock(model.calendarEvents)
-        .environment(\.rowHInset, TaskCardMetrics.contentInset)
-        .padding(.horizontal, TaskCardMetrics.margin)
-        .padding(.bottom, 8)
-        .plainListChrome()
+        .taskCardChrome(.solo)
         .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
   }
