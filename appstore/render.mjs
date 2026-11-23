@@ -125,11 +125,16 @@ const settingLabel = (key) => {
   for (const g of SETTINGS.rootGroups) for (const item of g.items ?? []) if (item.key === key) return item.label;
   throw new Error(`setting ${key} is not in registry/settings.json`);
 };
-// The agent's face: always the same shape (the crew's first face), always in
-// the panel's accent, so every slide shows the same agent (mz, 2026-11-23).
+// The agent's face: always the round "Your agent" face the site's /agents
+// page shows, in the panel's accent, so every slide shows the same agent. The
+// triangle read as a warning sign (mz, 2026-11-23).
+const SAMPLE_FACE = (() => {
+  const file = join(SITE, "content", "agent-avatars.json");
+  return existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).sample ?? null : null;
+})();
 const agentFace = (color) => {
-  if (!CREW[0]) throw new Error(`no agent face in ${SITE}/content/agent-avatars.json (run scripts/sync-agent-avatars.mjs there)`);
-  return { ...CREW[0], color };
+  if (!SAMPLE_FACE) throw new Error(`no sample agent face in ${SITE}/content/agent-avatars.json (run scripts/sync-agent-avatars.mjs there)`);
+  return { ...SAMPLE_FACE, color };
 };
 // Builds a panel's card from what its screen shows (see card() in components.mjs).
 function resolveCard(device, panel) {
