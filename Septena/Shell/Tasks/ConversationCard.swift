@@ -219,7 +219,7 @@ struct ConversationCard: View {
       }
       if isTaskOpen {
         HStack(spacing: 8) {
-          Button("Accept") { acceptReview() }
+          Button(RegistryActions.title("task.acceptReview")) { acceptReview() }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
           Button("Send back") { a11yAnimate { showSendBack.toggle() } }

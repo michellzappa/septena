@@ -449,6 +449,8 @@ struct TaskListView: View {
   @State private var repeatTargetId: String?
   @State private var reminderTargetId: String?
   @State private var tagsTargetIds: [String] = []
+  /// Review row whose Send Back… alert is open (row menu).
+  @State private var sendBackTargetId: String?
   @State private var starredOnlyFilter = false
   @State private var selectedTagIDs: Set<String> = []
   @State private var tagsByID: [String: TaskTag] = [:]
@@ -594,6 +596,11 @@ struct TaskListView: View {
         repeatTargetId: $repeatTargetId,
         reminderTargetId: $reminderTargetId,
         tagsTargetIds: $tagsTargetIds,
+        sendBackTargetId: $sendBackTargetId,
+        applySendBack: { id, note in
+          guard let task = currentTask(id: id) else { return }
+          sendBackReview(task, note: note)
+        },
         areas: areas,
         projects: projects,
         currentTask: currentTask,
@@ -2444,22 +2451,8 @@ struct TaskListView: View {
             #endif
             beginEdit(task)
           },
-          onAccept: {
-            Haptics.success()
-            let previousNote = task.conversation.endStateNote
-            mutator.complete(id: task.id)
-            mutator.acknowledge(id: task.id)
-            TaskUndo.recordAcceptReview(id: task.id, previousNote: previousNote, mutator: mutator)
-            Task { await load() }
-          },
-          onSendBack: { note in
-            Haptics.commit()
-            let before = task.conversation
-            mutator.sendBackConvo(id: task.id, note: note)
-            let after = mutator.conversation(id: task.id) ?? before
-            TaskUndo.recordSendBack(id: task.id, before: before, after: after, mutator: mutator)
-            Task { await load() }
-          }
+          onAccept: { acceptReview(task) },
+          onSendBack: { note in sendBackReview(task, note: note) }
         )
         .asListRow()
         .taskCardChrome(position, isSelected: selection.contains(task.id))
@@ -2467,6 +2460,27 @@ struct TaskListView: View {
         .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
       }
     }
+  }
+
+  /// Accept a Review row: completes it and clears the review (with undo).
+  /// The row's button and the row menu's Accept both call this.
+  private func acceptReview(_ task: SeptenaTask) {
+    Haptics.success()
+    let previousNote = task.conversation.endStateNote
+    mutator.complete(id: task.id)
+    mutator.acknowledge(id: task.id)
+    TaskUndo.recordAcceptReview(id: task.id, previousNote: previousNote, mutator: mutator)
+    Task { await load() }
+  }
+
+  /// Send a Review row back to the agent with a note (with undo).
+  private func sendBackReview(_ task: SeptenaTask, note: String) {
+    Haptics.commit()
+    let before = task.conversation
+    mutator.sendBackConvo(id: task.id, note: note)
+    let after = mutator.conversation(id: task.id) ?? before
+    TaskUndo.recordSendBack(id: task.id, before: before, after: after, mutator: mutator)
+    Task { await load() }
   }
 
   /// Agent smart list (docs/TASK_FACTORY_SPEC.md §3): one section per
@@ -4020,6 +4034,10 @@ struct TaskListView: View {
         target: target,
         filter: filter,
         rankedSuggestions: rankedSuggestions(for: target),
+        filingChip: {
+          guard case let .single(task) = target else { return nil }
+          return filingChipSuggestion(for: task)
+        }(),
         onDuplicate: { target in duplicate(target.ids) },
         onSelect: allowsTouchMultiSelect && !touchSelectionActive
           ? { task in beginTouchSelection(task.id) } : nil,
@@ -4095,7 +4113,10 @@ struct TaskListView: View {
         onDelete: { target in
           Haptics.warning()
           for id in target.ids { applyDelete(id) }
-        }
+        },
+        onShare: { target in TaskSharePresenter.present(target.tasks) },
+        onAcceptReview: { task in acceptReview(task) },
+        onSendBackReview: { task in sendBackTargetId = task.id }
       )
     }
   }

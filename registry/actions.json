@@ -11,6 +11,34 @@
       "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "lists.today"
     },
+    "task.open": {
+      "title": "Open",
+      "icon": "action.open",
+      "role": "default",
+      "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted"] },
+      "featureId": "lists.today"
+    },
+    "task.share": {
+      "title": "Share…",
+      "icon": "action.share",
+      "role": "default",
+      "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
+      "featureId": "task.share"
+    },
+    "task.acceptReview": {
+      "title": "Accept",
+      "icon": "action.accept",
+      "role": "default",
+      "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted"] },
+      "featureId": "lists.review"
+    },
+    "task.sendBackReview": {
+      "title": "Send Back…",
+      "icon": "action.send_back",
+      "role": "default",
+      "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted"] },
+      "featureId": "lists.review"
+    },
     "task.toggleInfo": {
       "title": "Show Info",
       "activeTitle": "Hide Info",
@@ -469,56 +497,36 @@
   },
   "contextMenus": {
     "task.row": [
-      { "kind": "action", "id": "task.editDetails" },
-      { "kind": "action", "id": "task.toggleInfo" },
-      { "kind": "action", "id": "task.duplicate" },
-      { "kind": "action", "id": "task.select" },
+      { "kind": "action", "id": "task.acceptReview" },
+      { "kind": "action", "id": "task.sendBackReview" },
+      { "kind": "slot", "slot": "filingSuggestion" },
       { "kind": "divider" },
-      {
-        "kind": "submenu",
-        "id": "complete",
-        "title": "Complete",
-        "icon": "action.complete",
-        "items": [
-          { "kind": "action", "id": "task.toggleComplete" },
-          { "kind": "action", "id": "task.cancel" },
-          { "kind": "divider" },
-          { "kind": "action", "id": "task.delete" }
-        ]
-      },
-      { "kind": "action", "id": "task.toggleToday" },
-      { "kind": "action", "id": "task.toggleStar" },
-      { "kind": "action", "id": "task.tags" },
-      {
-        "kind": "submenu",
-        "id": "schedule",
-        "title": "Schedule",
-        "icon": "action.schedule",
-        "items": [
-          { "kind": "action", "id": "task.when" },
-          { "kind": "action", "id": "task.deadline" },
-          { "kind": "action", "id": "task.reminder" },
-          { "kind": "divider" },
-          { "kind": "action", "id": "task.clearSchedule" }
-        ]
-      },
+      { "kind": "action", "id": "task.when" },
       {
         "kind": "submenu",
         "id": "move",
         "title": "Move",
         "icon": "action.move",
-        "items": [{ "kind": "slot", "slot": "moveDestinations" }, { "kind": "divider" }, { "kind": "action", "id": "task.move" }]
+        "items": [
+          { "kind": "slot", "slot": "sectionDestinations" },
+          { "kind": "divider" },
+          { "kind": "slot", "slot": "moveDestinations" },
+          { "kind": "divider" },
+          { "kind": "action", "id": "task.move" }
+        ]
       },
-      {
-        "kind": "submenu",
-        "id": "moveToSection",
-        "title": "Move to Section",
-        "icon": "action.move_section",
-        "items": [{ "kind": "slot", "slot": "sectionDestinations" }]
-      },
-      { "kind": "action", "id": "task.repeat" },
-      { "kind": "action", "id": "task.pauseResumeRepeat" },
-      { "kind": "action", "id": "task.createNextCopy" }
+      { "kind": "action", "id": "task.tags" },
+      { "kind": "action", "id": "task.deadline" },
+      { "kind": "action", "id": "task.toggleStar" },
+      { "kind": "divider" },
+      { "kind": "action", "id": "task.open" },
+      { "kind": "action", "id": "task.duplicate" },
+      { "kind": "action", "id": "task.share" },
+      { "kind": "action", "id": "task.select" },
+      { "kind": "divider" },
+      { "kind": "action", "id": "task.toggleComplete" },
+      { "kind": "divider" },
+      { "kind": "action", "id": "task.delete" }
     ],
     "task.recentlyDeleted": [{ "kind": "action", "id": "task.restore" }, { "kind": "divider" }, { "kind": "action", "id": "task.deletePermanently" }],
     "task.faded": [
@@ -629,32 +637,26 @@
         { "kind": "action", "id": "sidebar.newProject" },
         { "kind": "action", "id": "sidebar.newArea" },
         { "kind": "divider" },
-        { "kind": "action", "id": "task.editDetails", "titleField": "desktopTitle" },
-        { "kind": "action", "id": "task.duplicate" },
-        { "kind": "divider" },
-        {
-          "kind": "submenu",
-          "id": "complete",
-          "title": "Complete",
-          "icon": "action.complete",
-          "items": [
-            { "kind": "action", "id": "task.toggleComplete" },
-            { "kind": "action", "id": "task.cancel" },
-            { "kind": "divider" },
-            { "kind": "action", "id": "task.delete" }
-          ]
-        },
         { "kind": "action", "id": "task.toggleToday" },
-        { "kind": "action", "id": "task.toggleStar" },
-        { "kind": "action", "id": "task.tags" },
-        { "kind": "action", "id": "task.addChecklistItem" },
         { "kind": "action", "id": "task.when" },
-        { "kind": "action", "id": "task.deadline" },
-        { "kind": "action", "id": "task.reminder" },
-        { "kind": "action", "id": "task.move" },
         { "kind": "action", "id": "task.clearSchedule" },
         { "kind": "action", "id": "task.repeat" },
-        { "kind": "action", "id": "task.createNextCopy" }
+        { "kind": "action", "id": "task.createNextCopy" },
+        { "kind": "divider" },
+        { "kind": "action", "id": "task.move" },
+        { "kind": "action", "id": "task.tags" },
+        { "kind": "action", "id": "task.deadline" },
+        { "kind": "action", "id": "task.reminder" },
+        { "kind": "action", "id": "task.toggleStar" },
+        { "kind": "divider" },
+        { "kind": "action", "id": "task.editDetails", "titleField": "desktopTitle" },
+        { "kind": "action", "id": "task.duplicate" },
+        { "kind": "action", "id": "task.addChecklistItem" },
+        { "kind": "divider" },
+        { "kind": "action", "id": "task.toggleComplete" },
+        { "kind": "action", "id": "task.cancel" },
+        { "kind": "divider" },
+        { "kind": "action", "id": "task.delete" }
       ]
     },
     { "id": "help", "title": "Help", "system": "help", "items": [{ "kind": "action", "id": "app.keyboardShortcuts" }] }

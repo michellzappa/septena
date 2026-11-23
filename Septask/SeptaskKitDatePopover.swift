@@ -63,12 +63,24 @@ enum SeptaskKitDatePopover {
                       relativeTo rect: NSRect,
                       of view: NSView,
                       onTimeSlotChange: ((String?, Int?) -> Void)? = nil,
+                      repeatTitle: String? = nil,
+                      onRepeat: (() -> Void)? = nil,
                       handler: @escaping Handler) {
     let handle = KitPopoverHandle()
+    // The Repeat row closes this popover first, then opens the Repeat editor
+    // on the next turn: a transient popover can't host a second one.
+    let openRepeat: (() -> Void)? = onRepeat.map { open in
+      {
+        handle.close()
+        DispatchQueue.main.async { open() }
+      }
+    }
     let board = KitDateBoard(kind: kind, initial: initial,
                              initialStartTime: initialStartTime,
                              initialDurationMinutes: initialDurationMinutes,
-                             onTimeSlotChange: onTimeSlotChange) { date, today in
+                             onTimeSlotChange: onTimeSlotChange,
+                             repeatTitle: kind == .when ? repeatTitle : nil,
+                             onRepeat: kind == .when ? openRepeat : nil) { date, today in
       handler(date, today)
       handle.close()
     } onCancel: {
@@ -1384,6 +1396,9 @@ private final class KitDateBoard: NSView {
   private let onPick: (Date?, Bool) -> Void
   private let onCancel: () -> Void
   private let onTimeSlotChange: ((String?, Int?) -> Void)?
+  /// When only: the Repeat row (docs/TASK_ROW_MENU_SPEC.md). Both nil hides it.
+  private let repeatTitle: String?
+  private let onRepeat: (() -> Void)?
   private var startTime: String?
   private var durationMinutes: Int?
   private let timeDisclosureButton = NSButton()
@@ -1437,8 +1452,12 @@ private final class KitDateBoard: NSView {
        initialStartTime: String? = nil,
        initialDurationMinutes: Int? = nil,
        onTimeSlotChange: ((String?, Int?) -> Void)? = nil,
+       repeatTitle: String? = nil,
+       onRepeat: (() -> Void)? = nil,
        onPick: @escaping (Date?, Bool) -> Void, onCancel: @escaping () -> Void) {
     self.kind = kind
+    self.repeatTitle = repeatTitle
+    self.onRepeat = onRepeat
     self.startTime = initialStartTime
     self.durationMinutes = initialDurationMinutes
     self.onTimeSlotChange = onTimeSlotChange
@@ -1550,6 +1569,24 @@ private final class KitDateBoard: NSView {
     stack.setCustomSpacing(8, after: calendarCell)
     stack.setCustomSpacing(4, after: bottomSeparator)
 
+    // Repeat is set where the date is set: one row under Clear that opens
+    // the Repeat editor. Last cell on the time axis, so ↓ reaches it.
+    var repeatCell: KitDateCell?
+    if let repeatTitle, let onRepeat {
+      let repeatSeparator = NSBox()
+      repeatSeparator.boxType = .separator
+      let cell = KitDateCell(radius: 8, height: Self.rowHeight) { onRepeat() }
+      cell.fillRow(symbol: RegistryIcons.sfSymbol(for: "action.repeat"),
+                   tint: SeptaskKitTheme.inkSecondary, title: repeatTitle)
+      stack.setCustomSpacing(8, after: clearCell)
+      stack.addArrangedSubview(repeatSeparator)
+      stack.addArrangedSubview(cell)
+      stack.setCustomSpacing(4, after: repeatSeparator)
+      repeatSeparator.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
+      cell.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
+      repeatCell = cell
+    }
+
     // Progressive-disclosure optional start/end time section (`.when` only,
     // docs/TASK_TIMES_AND_ICAL_SPEC.md §2).
     if kind == .when, onTimeSlotChange != nil {
@@ -1634,7 +1671,7 @@ private final class KitDateBoard: NSView {
       view.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
     }
 
-    cells = dayCells + [calendarCell, clearCell]
+    cells = dayCells + [calendarCell, clearCell] + (repeatCell.map { [$0] } ?? [])
     for cell in cells {
       cell.onHover = { [weak self] hovered in self?.focus(cell: hovered) }
     }

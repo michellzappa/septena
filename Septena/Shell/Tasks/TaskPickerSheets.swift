@@ -23,6 +23,11 @@ struct DatePickerSheet: View {
   let title: String
   let initialDate: Date?
   let clearLabel: String      // e.g. "No Date" / "Remove Deadline"
+  /// When only: the Repeat row's title. nil hides the row.
+  var repeatLabel: String? = nil
+  /// The Repeat row: the caller opens the Repeat editor once this sheet has
+  /// dismissed.
+  var onRepeat: (() -> Void)? = nil
   let onPick: (Date?) -> Void
   @Environment(\.dismiss) private var dismiss
 
@@ -34,6 +39,13 @@ struct DatePickerSheet: View {
   /// Fitted sheet height: 7-day strip (today first) + calendar button + Clear.
   /// `.large` stays available as a drag-up fallback for big Dynamic Type.
   static let sheetHeight: CGFloat = 276
+  /// Extra height when the board carries the Repeat row.
+  static let repeatRowHeight: CGFloat = 52
+
+  /// The fitted height for this sheet, Repeat row included.
+  static func fittedHeight(showsRepeat: Bool) -> CGFloat {
+    sheetHeight + (showsRepeat ? repeatRowHeight : 0)
+  }
 
   var body: some View {
     NavigationStack {
@@ -42,6 +54,8 @@ struct DatePickerSheet: View {
           selected: initialDate.map { cal.startOfDay(for: $0) },
           todayActive: initialDate.map { cal.isDate($0, inSameDayAs: anchorDay) } ?? false,
           clearLabel: clearLabel,
+          repeatLabel: onRepeat == nil ? nil : repeatLabel,
+          onRepeat: onRepeat.map { open in { open(); dismiss() } },
           onToday: { commit(anchorDay) },
           onPick: { commit($0) },
           onClear: { commit(nil) })
@@ -59,7 +73,7 @@ struct DatePickerSheet: View {
         }
       }
     }
-    .macSheetFrame(width: 420, height: Self.sheetHeight + 60)
+    .macSheetFrame(width: 420, height: Self.fittedHeight(showsRepeat: onRepeat != nil) + 60)
   }
 
   private func commit(_ day: Date?) {
