@@ -122,6 +122,9 @@ struct TaskListStandaloneChrome: ViewModifier {
   #endif
   let embedded: Bool
   let recentlyDeleted: Bool
+  /// The Starred filter as a toolbar toggle beside Search. nil when the list
+  /// has no starred open task (the button appears only when it can filter).
+  var starFilter: Binding<Bool>? = nil
   /// The owning list's own create action (see `TaskListToolbarChrome.onNew`).
   var onNew: (() -> Void)? = nil
 
@@ -143,6 +146,11 @@ struct TaskListStandaloneChrome: ViewModifier {
         content
       } else {
         content.toolbar {
+          if let starFilter {
+            ToolbarItem(placement: .topBarTrailing) {
+              StarFilterToolbarButton(isOn: starFilter)
+            }
+          }
           if !recentlyDeleted {
             ToolbarItem(placement: .topBarTrailing) {
               PageAddButton { newTask() }
@@ -163,6 +171,7 @@ struct TaskListStandaloneChrome: ViewModifier {
       content.pageChrome(
         id: "tasks",
         title: "Tasks",
+        accessory: { starFilter.map { AnyView(StarFilterToolbarButton(isOn: $0)) } },
         add: recentlyDeleted ? nil : .action { newTask() }
       )
     }
@@ -178,6 +187,24 @@ struct TaskListStandaloneChrome: ViewModifier {
       )
     }
     #endif
+  }
+}
+
+/// The Starred filter as a toolbar toggle: an outlined star at rest, a filled
+/// Today-accent star while only starred tasks show.
+struct StarFilterToolbarButton: View {
+  @Binding var isOn: Bool
+
+  var body: some View {
+    Button {
+      Haptics.tick()
+      a11yAnimate(.snappy(duration: 0.18)) { isOn.toggle() }
+    } label: {
+      Image(systemName: isOn ? "star.fill" : "star")
+    }
+    .tint(isOn ? Theme.todayAccent : .primary)
+    .accessibilityLabel(Text(TaskFilter.starred.title))
+    .accessibilityAddTraits(isOn ? .isSelected : [])
   }
 }
 

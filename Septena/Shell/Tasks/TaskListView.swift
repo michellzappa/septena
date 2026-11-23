@@ -786,6 +786,8 @@ struct TaskListView: View {
     // a pushed list shows gear + "+" in its own nav bar.
     .modifier(TaskListStandaloneChrome(embedded: embedded,
                                        recentlyDeleted: filter == .recentlyDeleted || filter == .faded,
+                                       starFilter: starFilterInToolbar && showsStarFilterPill
+                                         ? $starredOnlyFilter : nil,
                                        onNew: { handleExternalCreateTrigger() }))
     // (Keyboard navigation — ↑↓ traversal, Return/Esc, focus reclaim —
     // is owned by `SelectableScrollList`; the `+` toolbar button and ⌘N still
@@ -1994,14 +1996,26 @@ struct TaskListView: View {
       }
   }
 
+  /// On Septask iPhone/iPad the Starred filter is a toolbar toggle beside
+  /// Search (`StarFilterToolbarButton`), not a chip. Embedded lists have no
+  /// toolbar of their own and macOS has no slot there, so they keep the chip.
+  private var starFilterInToolbar: Bool {
+    #if os(iOS) && SEPTASK
+    return !embedded
+    #else
+    return false
+    #endif
+  }
+
   @ViewBuilder
   private var starFilterBar: some View {
     let listTags = availableTagsInList
-    let hasActiveFilter = (starredOnlyFilter && showsStarFilterPill) || !selectedTagIDs.isEmpty
-    if showsStarFilterPill || !listTags.isEmpty {
+    let starChip = showsStarFilterPill && !starFilterInToolbar
+    let hasActiveFilter = (starredOnlyFilter && starChip) || !selectedTagIDs.isEmpty
+    if starChip || !listTags.isEmpty {
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 6) {
-          if showsStarFilterPill {
+          if starChip {
             SelectableChip(isSelected: starredOnlyFilter, tint: Theme.todayAccent, onCanvas: true) {
               Haptics.tick()
               a11yAnimate(.snappy(duration: 0.18)) { starredOnlyFilter.toggle() }
@@ -2038,7 +2052,7 @@ struct TaskListView: View {
             Button {
               Haptics.tick()
               a11yAnimate(.snappy(duration: 0.18)) {
-                starredOnlyFilter = false
+                if starChip { starredOnlyFilter = false }
                 selectedTagIDs.removeAll()
               }
             } label: {

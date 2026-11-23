@@ -274,13 +274,15 @@ extension View {
     id: String,
     title: String,
     localActions: @escaping () -> AnyView? = { nil },
+    accessory: @escaping () -> AnyView? = { nil },
     add: PageAdd? = nil,
     showsGlobal: Bool = true,
     scrollTopInset: CGFloat? = nil,
     wideContentGutter: CGFloat = 0
   ) -> some View {
     modifier(PageChromeModifier(id: id, title: title,
-                                localActions: localActions, add: add,
+                                localActions: localActions, accessory: accessory,
+                                add: add,
                                 showsGlobal: showsGlobal,
                                 scrollTopInset: scrollTopInset,
                                 wideContentGutter: wideContentGutter))
@@ -379,6 +381,9 @@ private struct PageChromeModifier: ViewModifier {
   let id: String
   let title: String
   let localActions: () -> AnyView?
+  /// One page-local toolbar button beside Search on iPhone Septask (the
+  /// Tasks Starred filter). nil → nothing.
+  let accessory: () -> AnyView?
   let add: PageAdd?
   let showsGlobal: Bool
   let scrollTopInset: CGFloat?
@@ -471,6 +476,9 @@ private struct PageChromeModifier: ViewModifier {
         ToolbarItem(placement: .topBarTrailing) {
           OverflowMenu { actions }
         }
+      }
+      if let accessory = accessory() {
+        ToolbarItem(placement: .topBarTrailing) { accessory }
       }
       ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }
     } else {
