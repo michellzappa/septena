@@ -213,6 +213,14 @@ for (const device of activeDevices()) {
       if (!el) throw new Error(`${device.key}/${panel.id}: ring element "${panel.shot.ring.element}" is not on screen ${panel.shot.src}`);
       panel.shot.ring = { ...panel.shot.ring, frame: el.frame, screenWidth: m.width };
     }
+    if (panel.shot?.incoming) {
+      const m = shotElements(device, panel.shot.src, panel.shot.appearance, panel.shot.accent);
+      panel.shot.incoming = { screenWidth: m.width, rows: panel.shot.incoming.map((id) => {
+        const el = m?.elements.find((e) => e.id === id);
+        if (!el) throw new Error(`${device.key}/${panel.id}: incoming element "${id}" is not on screen ${panel.shot.src}`);
+        return { frame: el.frame, label: el.label.split("\n")[0] };
+      }) };
+    }
     if (panel.shot?.callout) {
       const el = meta?.elements.find((e) => e.id === panel.shot.callout.element);
       if (!el) throw new Error(`${device.key}/${panel.id}: callout element "${panel.shot.callout.element}" is not on screen ${panel.shot.src}`);

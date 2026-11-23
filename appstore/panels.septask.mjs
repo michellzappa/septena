@@ -47,7 +47,8 @@ const VISUAL = {
   // the left. All upright. The iPad joins when septena-site#17 adds its layout.
   devices:        {
     // Black, like the photo panel: the devices carry the light.
-    fruit: null, texture: "topography", background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" },
+    // Charcoal with the topography texture, softer than black (mz, 2026-11-23).
+    fruit: null, texture: "topography", background: { style: "texture", fill: "#2A2B30", texture: "topography", seed: 51, intensity: 55, fade: 0.5 },
     shot: { width: 0.42, offsetX: 0.22, top: 1440, accent: "tamarillo" },
     shots: [{ src: "today/0", layout: "mac", frame: "laptop", accent: "tamarillo", width: 1.34, offsetX: -0.1, top: 760 }],
     watch: { src: "today/0", from: "tamarillo", accentFruit: "tamarillo", left: 120, top: 1960, width: 300 },
@@ -72,7 +73,7 @@ const VISUAL = {
   "agent-result": {
     fruit: "carambola", texture: "stippleDrift",
     shot: { ring: { element: "task-review-brief" } },
-    card: { kind: "review", element: "task-review-brief", top: 1720 },
+    card: { kind: "review", element: "task-review-brief", top: 2110 },
   },
   // Slide 6: the list that lets go (T4). The Faded list, and the weekly
   // notice from the registry, counted from the screen.
@@ -85,6 +86,9 @@ const VISUAL = {
   // No other app is named on the panel (mz, 2026-11-23).
   "move-in":      {
     fruit: "tamarillo", texture: "topography",
+    // Tasks arriving from your other app: copies of three rows slide in from
+    // the left edge onto their own rows. Titles come from the screen.
+    shot: { width: 0.56, offsetX: 0.2, incoming: ["task-reply", "task-dentist", "task-receipts"] },
     card: { kind: "section", page: "import_export", section: "move_in", top: 2160 },
   },
   // Slide 8: yours, built in the open. No screen: one symbol per claim
@@ -92,13 +96,15 @@ const VISUAL = {
   // IN THE OPEN) and the Privacy & Data page; icons are Lucide names.
   open:           {
     fruit: "haskap", texture: "ridges",
+    // Each promise traces to the store description (YOURS, BUILT IN THE OPEN)
+    // or the Privacy & Data page (registry/settings.json). Sync needs an
+    // account, so "no account" is said as "start without one".
     claims: [
-      { icon: "code", label: "Open source" },
-      { icon: "scale", label: "MIT License" },
-      { icon: "user-x", label: "No account needed" },
-      { icon: "smartphone", label: "Stays on your device" },
-      { icon: "file-braces", label: "JSON backup anytime" },
-      { icon: "cpu", label: "On-device AI" },
+      { icon: "code", title: "Open source, MIT License", body: "Every line of the apps and the sync server is public.", wide: true, dark: true },
+      { icon: "smartphone", title: "Start without an account", body: "Your tasks stay on this device." },
+      { icon: "refresh-cw", title: "Sign in to sync", body: "Through Septena’s own server, encrypted at rest." },
+      { icon: "file-braces", title: "Back up as JSON", body: "Take all your tasks with you, anytime." },
+      { icon: "eye-off", title: "Not in analytics", body: "Your task titles and text are never sent." },
     ],
   },
   dates:          { fruit: "persimmon", texture: "ridges", shot: { appearance: "dark" } },

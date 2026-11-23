@@ -140,8 +140,33 @@ function shot(s, device, tint) {
       </div>
       ${s.img ? callout(s.callout, { w, pad: f.pad, margin: (dw - w) / 2, tint }) : ""}
       ${s.img && s.ring?.frame ? ring(s.ring, { w, pad: f.pad }) : ""}
+      ${s.img && s.incoming ? incoming(s.incoming, { w, pad: f.pad, tint }) : ""}
     </div>
   </div>`;
+}
+
+// --------------------------------------------------------------- incoming
+// Tasks arriving from another app: a copy of each row slides in from the
+// left, its right end over the phone's edge at the row it lands on, with an
+// accent trail behind it. Rows further down sit further out, still on their
+// way. Titles and positions come from the screen's .elements.json.
+function incoming(inc, { w, pad, tint }) {
+  const k = (w - 2 * pad) / (inc.screenWidth ?? 402);
+  const ui = String(theme.fonts.ui).replace(/"/g, "'");
+  return inc.rows.map((r, i) => {
+
+    // Spaced wider than the rows, so the copies never overlap: they line up
+    // with the first row and stream down from there.
+    const top = pad + (inc.rows[0].frame[1] + inc.rows[0].frame[3] / 2) * k + i * 150;
+    const enter = 40 - i * 90; // how far into the phone the pill's right end reaches
+    // Anchored by its right end, so each pill is as wide as its title.
+    return `<div style="position:absolute; z-index:4; right:calc(100% - ${enter}px); top:${top}px; transform:translateY(-50%); display:flex; align-items:center; opacity:${1 - i * 0.12};">
+      <span style="width:300px; height:10px; border-radius:6px; background:linear-gradient(90deg, transparent, color-mix(in oklab, ${tint} 70%, white));"></span>
+      <span style="display:flex; align-items:center; gap:26px; padding:24px 32px; background:#fff; border-radius:28px; box-shadow:0 0 0 4px ${tint}, 0 24px 50px rgb(0 0 0 / .28); font:500 36px/1.2 ${ui}; color:#141518; white-space:nowrap;">
+        <span style="flex:none; width:44px; height:44px; border:4px solid #C7C7CC; border-radius:12px;"></span>${esc(r.label)}
+      </span>
+    </div>`;
+  }).join("");
 }
 
 // ------------------------------------------------------------------- ring
@@ -171,13 +196,22 @@ function claims(list, tint) {
   if (!list?.length) return "";
   const ui = String(theme.fonts.ui).replace(/"/g, "'");
   const color = list.tint ?? tint;
-  const svg = (node) => `<svg width="132" height="132" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${node.map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).filter(([k]) => k !== "key").map(([k, v]) => `${k}="${esc(String(v))}"`).join(" ")}/>`).join("")}</svg>`;
+  const svg = (node, stroke = color, size = 132) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${node.map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).filter(([k]) => k !== "key").map(([k, v]) => `${k}="${esc(String(v))}"`).join(" ")}/>`).join("")}</svg>`;
+  // A bento: a wide dark tile first, then white tiles. Each tile has a
+  // symbol, a short promise and one plain sentence that explains it.
+  const tile = (c) => {
+    const ink = c.dark ? "#fff" : "#141518", sub = c.dark ? "rgb(255 255 255 / .72)" : "#6E6E73";
+    return `<div style="grid-column:${c.wide ? "1 / -1" : "auto"}; background:${c.dark ? "#141518" : "#fff"}; border-radius:56px; padding:${c.wide ? "64px 64px" : "56px 52px"}; min-height:${c.wide ? 460 : 660}px; display:flex; flex-direction:${c.wide ? "row" : "column"}; ${c.wide ? "align-items:center; gap:56px;" : "justify-content:space-between;"} box-shadow:0 40px 80px rgb(0 0 0 / .18);">
+      <span style="flex:none; display:inline-flex; align-items:center; justify-content:center; width:${c.wide ? 200 : 150}px; height:${c.wide ? 200 : 150}px; border-radius:${c.wide ? 52 : 42}px; background:${c.dark ? color : `color-mix(in oklab, ${color} 13%, white)`};">${svg(c.node, c.dark ? "#fff" : color, c.wide ? 116 : 88)}</span>
+      <div>
+        <div style="font:700 ${c.wide ? 72 : 60}px/1.1 ${ui}; color:${ink}; letter-spacing:-0.015em;">${esc(c.title)}</div>
+        <div style="font:400 ${c.wide ? 44 : 42}px/1.3 ${ui}; color:${sub}; margin-top:18px;">${esc(c.body)}</div>
+      </div>
+    </div>`;
+  };
   return `
-  <div style="position:absolute; z-index:3; left:110px; right:110px; top:${list.top ?? 880}px; display:grid; grid-template-columns:1fr 1fr; gap:44px;">
-    ${list.map((c) => `<div style="background:#fff; border-radius:56px; padding:64px 56px; min-height:440px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 40px 80px rgb(0 0 0 / .18);">
-      ${svg(c.node)}
-      <div style="font:700 64px/1.12 ${ui}; color:#141518; letter-spacing:-0.01em;">${esc(c.label)}</div>
-    </div>`).join("")}
+  <div style="position:absolute; z-index:3; left:100px; right:100px; top:${list.top ?? 860}px; display:grid; grid-template-columns:1fr 1fr; gap:40px;">
+    ${list.map(tile).join("")}
   </div>`;
 }
 
