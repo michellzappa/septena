@@ -224,7 +224,7 @@ reads this table; `appstore/validate.mjs` checks it.
 
 | slug | scene | callout | title | sub |
 | --- | --- | --- | --- | --- |
-| photo | - | - | Tasks that think with you. Septena is the task app for you and your agents. | |
+| photo | - | - | Tasks that think with you. Meet Septena, the task app for you and your agents. | |
 | from-agent | today/0 | - | Septena is your agent’s memory. Plan out loud, and every task waits in your Inbox. | |
 | thinking | thinking/1 | - | Septena asks before it acts. Discuss any task, and answer with a tap. | |
 | agent-work | agents/1 | - | Hand off the work. Your agent works in Septena from the task’s notes. Stop it anytime. | |
