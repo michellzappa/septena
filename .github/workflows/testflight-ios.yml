@@ -10,6 +10,9 @@ name: Septena iOS TestFlight
 # (or App Manager with access to Certificates, Identifiers & Profiles).
 # The archive step signs with an Apple Development identity and the export
 # re-signs with Apple Distribution, so IOS_SIGNING_P12 holds BOTH identities.
+# The export names the local Apple Distribution identity (signingCertificate):
+# without it Xcode tries cloud signing, which the API key is refused
+# ("Cloud signing permission error", 2026-11-23).
 #
 # Build number = git commit count (scripts/stamp-version.sh), so every push to
 # main gets a new, higher build number. MARKETING_VERSION stays the
@@ -162,6 +165,7 @@ jobs:
             <key>destination</key><string>upload</string>
             <key>teamID</key><string>${TEAM_ID}</string>
             <key>signingStyle</key><string>automatic</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
             <key>uploadSymbols</key><true/>
             <key>manageAppVersionAndBuildNumber</key><false/>
           </dict>
