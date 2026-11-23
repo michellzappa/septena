@@ -1400,19 +1400,20 @@ struct TaskListView: View {
   /// capture happens via Magic Plus / New task / ⌘N, matching AppKit).
   private var showsGroupedHeaderQuickAdd: Bool { false }
 
-  /// Compact iPhone Septena uses the floating Magic Plus orb instead of an idle
-  /// "New task" trigger row in Inbox — the capture slot mounts only while an
-  /// inline draft is actively open.
+  /// Septena has no idle "New task" trigger row in Inbox on any platform:
+  /// capture starts from Magic Plus (iPhone), the toolbar "+" (iPad) or ⌘N
+  /// (Mac), and the capture slot mounts only while an inline draft is open.
+  /// The AppKit list makes the same choice (no "New task" line on Today).
   private var usesMagicPlusInsteadOfInboxTrigger: Bool {
-    #if os(iOS) && SEPTASK
-    !usesPushNavigation
+    #if SEPTASK
+    true
     #else
     false
     #endif
   }
 
-  /// Inbox foot quick-add: always visible on Today (Mac/iPad); on iPhone
-  /// Septena, only mounts while an Inbox inline draft is actively open.
+  /// Inbox foot quick-add: in Septena it mounts only while an Inbox inline
+  /// draft is actively open; Septena Life keeps the idle trigger row.
   private var showsQuickAddInInbox: Bool {
     guard filter == .today && allowsInlineCreate else { return false }
     if usesMagicPlusInsteadOfInboxTrigger {

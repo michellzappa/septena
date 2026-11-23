@@ -1067,15 +1067,14 @@ final class SeptaskKitTaskListController: NSViewController {
     switch filter {
     case .today where todayGroupsByList:
       newRows = titleRows + noticeRows(pool) + agenda() + triageBand(rawTriage)
-        + groupedByList(withoutTriage(pool), inboxFooter: newTaskLine)
+        + groupedByList(withoutTriage(pool))
         + todayLoggedRows()
     case .today:
       // Flat Today: due-first ordering, per the setting's documented contract
       // — but only for CLASSIFIED work. The Inbox run still leads the page:
-      // the triage band, then the loose rows, then the "New task" line that
-      // closes it, exactly as `groupedByList(_:inboxFooter:)` orders them one
-      // case up. Sorting the loose rows in with the rest scattered Inbox
-      // through the list and pushed the capture line to the very bottom.
+      // the triage band, then the loose rows, exactly as `groupedByList`
+      // orders them one case up. Sorting the loose rows in with the rest
+      // scattered Inbox through the list.
       // SwiftUI's `ungroupedOpenItems` makes the same split — it renders only
       // tasks carrying a project or area, because Inbox is drawn above it.
       let rest = withoutTriage(pool)
@@ -1099,7 +1098,7 @@ final class SeptaskKitTaskListController: NSViewController {
                 icon: .symbol("list.bullet"), count: classified.count)
       ]
       newRows = titleRows + noticeRows(pool) + agenda() + triageBand(rawTriage)
-        + loose.map(chipped) + newTaskLine
+        + loose.map(chipped)
         + listsHeader
         + classified.map(chipped)
         + todayLoggedRows()
@@ -1739,30 +1738,6 @@ final class SeptaskKitTaskListController: NSViewController {
       + band.map(chipped)
   }
 
-  /// The "New task" line, or nothing while an INBOX create is in flight —
-  /// then the row being typed into sits exactly where the line was and reads
-  /// as the slot itself rather than sitting under a duplicate prompt.
-  /// `pendingNewTaskId` clears on commit (and on an abandoned empty row, which
-  /// is purged), and the reload that follows puts a fresh line back.
-  ///
-  /// Only a pending row that lands in the Inbox run (no area, no project)
-  /// takes the line's place. A ⌘N or header "+" inside an area / project
-  /// group on Today opens its row in THAT group, far from the Inbox card, so
-  /// hiding the line there made it vanish and reappear for nothing. Read the
-  /// store, not `rows`: this runs while `rows` is being rebuilt.
-  ///
-  /// Emitted by the CALLER, not by `triageBand`, because Today's Inbox run is
-  /// the triage band PLUS the loose rows that `groupedByList` emits before its
-  /// first group header — the same `allInbox` split SwiftUI's `triageSection`
-  /// makes. Appending it to the band alone parked it above those loose rows.
-  private var newTaskLine: [Row] {
-    guard let pendingNewTaskId,
-          let pending = LocalCache.task(id: pendingNewTaskId, in: context),
-          pending.isUnfiled
-    else { return [Row.newTask] }
-    return []
-  }
-
   /// An MCP-authored row can satisfy both the triage band and Today (the band
   /// keys off the agent cue, not the date fields), so Today's own rows drop
   /// anything already shown in the band above.
@@ -2145,7 +2120,7 @@ final class SeptaskKitTaskListController: NSViewController {
     reload(animated: false)
   }
 
-  private func groupedByList(_ pool: [SeptenaTask], inboxFooter: [Row] = []) -> [Row] {
+  private func groupedByList(_ pool: [SeptenaTask]) -> [Row] {
     let snapshot = StructureCache.snapshot(in: context)
     let byProject = Dictionary(grouping: pool.filter { $0.project != nil },
                                by: { $0.project! })
@@ -2156,9 +2131,7 @@ final class SeptaskKitTaskListController: NSViewController {
 
     // Loose rows keep their chips: an agent proposal can name a project while
     // still sitting in the ungrouped band.
-    // `inboxFooter` closes the Inbox run — Today's "New task" line sits after
-    // the loose rows and before the first group header.
-    var result: [Row] = loose.map(chipped) + inboxFooter
+    var result: [Row] = loose.map(chipped)
     func appendProject(_ project: Project) {
       guard let tasks = byProject[project.id], !tasks.isEmpty else { return }
       result.append(.header(id: "p-\(project.id)", title: project.title,

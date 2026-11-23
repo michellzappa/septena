@@ -548,6 +548,12 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   fights the framework (and that we then chase across sessions). When the
   idiomatic API genuinely can't do it, say so plainly and pick the closest
   standard behavior — don't invent.
+- **Same behavior on every platform.** iPhone, iPad, Mac and Android do
+  the same thing for the same feature. A platform-specific behavior needs a
+  strong reason (a platform rule, a missing API, a different input device),
+  written in a comment where the branch lives. "It was built that way first"
+  is not a reason. When you find one platform drifting, fix it on all of them
+  in the same change, or file an issue for the platform you cannot reach.
 - **One selection/target language per surface — NEVER two.** There is exactly
   ONE visual treatment for "this row/item is selected, focused, hovered, pressed,
   or a drop target" on any given surface, and it is the app's canonical token
