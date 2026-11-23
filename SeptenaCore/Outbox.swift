@@ -205,16 +205,19 @@ final class TaskMutator {
     cloudBackend.removeFromToday(id: id)
   }
 
-  /// "Clear When" (`task.clearSchedule`): drop the When date, the deadline
-  /// and the Today pin, and send the row to Anytime. Every shell calls this
-  /// one write so the platforms cannot disagree about what the action
+  /// "Clear When" (`task.clearSchedule`, action A6 in
+  /// `docs/TASK_DATES_SPEC.md`): drop the When date, the deadline, the Today
+  /// pin and the time slot, and send the row to Anytime. Every shell calls
+  /// this one write so the platforms cannot disagree about what the action
   /// clears. The deadline goes before the pin: `setDeadline` can pin a row
   /// that only its deadline held on Today, and the unpin after it undoes
-  /// that. Undo is recorded by the caller at the gesture, not here.
+  /// that. A time slot with no day has no meaning (spec I6), so it goes too.
+  /// Undo is recorded by the caller at the gesture, not here.
   func clearSchedule(id: String) {
     schedule(id: id, date: nil)
     setDeadline(id: id, date: nil)
     moveToToday(id: id, today: false)
+    setTimeSlot(id: id, startTime: nil, durationMinutes: nil)
     acknowledge(id: id)
   }
 

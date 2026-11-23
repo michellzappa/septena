@@ -1,6 +1,6 @@
 # 0027. Task date rules are actions in the shared core
 
-- Status: proposed (2026-11-23)
+- Status: accepted (2026-11-23)
 - Date: 2026-11-23
 - Deciders: mz
 - Builds on: [ADR 0025](0025-shared-rust-core.md) (one shared Rust core)
@@ -71,8 +71,8 @@ A lint rule stops a shell from calling the low-level setters.
   the core (C4, C3) before their copies can go. Until then, a platform can port
   a rule only if it passes the same fixtures.
 - Some current behaviours change on one platform or another, because the
-  platforms disagree today and only one answer can survive. Spec §8 lists each
-  case for mz to decide.
+  platforms disagree today and only one answer can survive. Spec §8 records
+  mz's decision for each case.
 
 ## Links
 

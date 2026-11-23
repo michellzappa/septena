@@ -1,13 +1,13 @@
 # Task dates spec
 
-**Status:** proposal (2026-11-23) · **ADR:** [0027](adr/0027-task-date-rules-are-core-actions.md),
+**Status:** accepted (2026-11-23) · **ADR:** [0027](adr/0027-task-date-rules-are-core-actions.md),
 built on [0025](adr/0025-shared-rust-core.md) · **Issues:** one per phase (§9)
 
 This spec defines what a task's date fields mean, what every user action does
 to them, and how each surface reads them. It is the single reference for
 When, deadline, Today, overdue, Upcoming and Anytime. Code that disagrees with
-it is a bug. Rules marked **(Q)** wait for a decision from mz (§8). Until mz
-decides, the default written here applies.
+it is a bug. Rules marked **(Q)** rest on a decision mz made on 2026-11-23
+(§8).
 
 ## 1. Goal
 
@@ -198,11 +198,11 @@ can move.
 reminders. No fixture covers an action. `task-views.json` has no deadline-only,
 `scheduled == T`, deleted, faded, invalid-day or pin-plus-future-When case.
 
-## 8. Open questions
+## 8. Decisions
 
-Each has a default. The default applies until mz answers.
+mz answered each question on 2026-11-23. Every answer was the proposed default.
 
-| # | Question | Default | Why |
+| # | Question | Decision | Why |
 |---|---|---|---|
 | Q1 | A future When on a task with an overdue deadline: keep the deadline (task stays on Today, red) or delete it? | Keep | A deadline is a commitment. Moving the plan does not move the commitment. This is iOS and Things behaviour. |
 | Q2 | Remove from Today on a task with an overdue deadline: delete the deadline, or refuse? | Delete it (current Apple + REST) | Otherwise "Remove from Today" cannot remove the task. The undo entry restores it. |
@@ -216,7 +216,7 @@ Each has a default. The default applies until mz answers.
 
 | Phase | Scope | Done when | Depends on |
 |---|---|---|---|
-| D0 | This spec and ADR 0027. mz answers §8. | ADR accepted. | — |
+| D0 | This spec and ADR 0027. mz answers §8. | Done 2026-11-23. | — |
 | D1 Core | `septena-core` gets `task_dates`: the actions of §4 as `(snapshot, action, T) → patch`, the invariants of §3 as a normaliser, R3/R4/R5/R8 added to `taskViewMembership`. New fixtures `registry/conformance/task-dates.json` (every action × every starting state that matters) and the missing `task-views.json` cases. Release a core tag. | Fixtures pass in Rust, Swift, JVM and WASM harnesses. | D0 |
 | D2 Apple fixes now | Fix W4 (⌘T), W5, W10 and R-b..R-g in Swift without waiting for the core link, each pinned by a Swift test against the D1 fixtures. | The listed drifts are gone on iOS and Mac. | D0 |
 | D3 Apple on the core | `TaskMutator` gets one method per action and calls the core for the patch. Every shell call site (W1–W3) calls the action. `isOnToday`, `isOverdue`, Upcoming and rolled-in copies are deleted in favour of the core's membership. A lint rule fails a shell file that calls `schedule`, `reschedule`, `setDeadline`, `moveToToday` or `removeFromToday` directly. Watch and widgets read the same values. | No date rule left in Swift outside the core bridge. | D1, ADR 0025 C4 |
