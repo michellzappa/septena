@@ -652,10 +652,14 @@ struct MagicPlusOptionalSectionDrop: ViewModifier {
 
 #if os(iOS)
 /// Full-screen non-hit-testing overlay that renders the finger-following Magic
-/// Plus orb and morphs it live into a ghost task card or contextual action pill
-/// as it glides over drop targets.
+/// Plus drag. It draws the same `TaskDragStackPreview` card that a task row
+/// lifts into, so every task drag is one object. The card's destination chip
+/// names the target under the finger, or Cancel over the cancel socket.
 struct MagicPlusFloatingOverlay: View {
   let drag: MagicPlusDragState
+
+  /// Upper bound of the card width, for the clamp against the screen edges.
+  private static let cardWidth: CGFloat = 260
 
   var body: some View {
     GeometryReader { geo in
@@ -663,11 +667,11 @@ struct MagicPlusFloatingOverlay: View {
         let localOrigin = geo.frame(in: .global).origin
         let rawX = drag.fingerLocation.x - localOrigin.x
         let rawY = drag.fingerLocation.y - localOrigin.y - 36
-        let halfW = estimatedWidth / 2
+        let halfW = Self.cardWidth / 2
         let clampedX = min(max(rawX, halfW + 16), max(halfW + 16, geo.size.width - halfW - 16))
         let clampedY = max(rawY, 64)
 
-        morphedContent
+        card
           .position(x: clampedX, y: clampedY)
           .a11yAnimation(.snappy(duration: 0.2), value: drag.activeTarget?.kind)
           .a11yAnimation(.snappy(duration: 0.2), value: drag.isOverCancelSocket)
@@ -678,117 +682,26 @@ struct MagicPlusFloatingOverlay: View {
     .allowsHitTesting(false)
   }
 
-  private var estimatedWidth: CGFloat {
-    if drag.isOverCancelSocket { return 116 }
-    switch drag.activeTarget?.kind {
-    case .taskRow:     return 280
-    case .taskSection: return 220
-    case .newProject:  return 220
-    case .newArea:     return 150
-    case nil:          return 62
-    }
-  }
-
-  @ViewBuilder
-  private var morphedContent: some View {
-    if drag.isOverCancelSocket {
-      HStack(spacing: 6) {
-        Image(systemName: "xmark")
-          .scaledFont(size: 13, weight: .bold)
-          .foregroundStyle(Color.white)
-        Text("Cancel")
-          .font(.septenaButton)
-          .foregroundStyle(Color.white)
-      }
-      .padding(.horizontal, 14)
-      .frame(height: 40)
-      .background(Color.red.opacity(0.9), in: Capsule())
-      .overlay(
-        Capsule()
-          .strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
-      )
-      .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
-    } else {
-      let appearance = AppearancePreferences.shared
-      let accent = appearance.accentSwiftUIColor
-      let ink = appearance.checkInkSwiftUIColor
-
-      switch drag.activeTarget?.kind {
-      case .taskRow(let context):
-        // Morph into a crisp live ghost task row ready to land in the parted gap.
-        HStack(spacing: 12) {
-          RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .strokeBorder(accent, lineWidth: 2)
-            .frame(width: 20, height: 20)
-          Text(RegistryActions.title("app.newTask"))
-            .font(.septenaTaskTitle)
-            .foregroundStyle(.primary)
-          Spacer(minLength: 8)
-          if let context, !context.isEmpty {
-            Text(context)
-              .font(.septenaCaption)
-              .foregroundStyle(accent)
-              .lineLimit(1)
-              .padding(.horizontal, 8)
-              .padding(.vertical, 3)
-              .background(accent.opacity(0.14), in: Capsule())
-          }
-        }
-        .padding(.horizontal, 14)
-        .frame(width: 280, height: 46)
-        .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-          RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(accent.opacity(0.7), lineWidth: 1.5)
-        )
-        .shadow(color: .black.opacity(0.28), radius: 14, y: 6)
-
-      case .taskSection(let label):
-        morphPill(icon: "checkmark.circle.fill", title: label, accent: accent, ink: ink)
-
-      case .newProject(let label):
-        morphPill(icon: "number.circle.fill", title: label, accent: accent, ink: ink)
-
-      case .newArea:
-        morphPill(icon: "square.stack.3d.up.fill", title: RegistryActions.title("sidebar.newArea"), accent: accent, ink: ink)
-
-      case nil:
-        // Free-floating lifted Magic Plus orb pinned to the user's selected accent.
-        ZStack {
-          Circle()
-            .fill(accent.gradient)
-            .overlay(
-              Circle()
-                .strokeBorder(ink.opacity(0.28), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.32), radius: 14, y: 6)
-          Image(systemName: "plus")
-            .scaledFont(size: 24, weight: .bold)
-            .foregroundStyle(ink)
-        }
-        .frame(width: 62, height: 62)
-      }
-    }
-  }
-
-  private func morphPill(icon: String, title: String, accent: Color, ink: Color) -> some View {
-    HStack(spacing: 8) {
-      Image(systemName: icon)
-        .scaledFont(size: 16, weight: .semibold)
-        .foregroundStyle(ink)
-      Text(title)
-        .font(.septenaButton)
-        .foregroundStyle(ink)
-        .lineLimit(1)
-    }
-    .padding(.horizontal, 16)
-    .frame(height: 44)
-    .background(accent.gradient, in: Capsule())
-    .overlay(
-      Capsule()
-        .strokeBorder(ink.opacity(0.25), lineWidth: 1)
+  private var card: some View {
+    let accent = AppearancePreferences.shared.accentSwiftUIColor
+    return TaskDragStackPreview(
+      title: RegistryActions.title("app.newTask"),
+      count: 1,
+      accent: accent,
+      destination: destination,
+      destinationTint: drag.isOverCancelSocket ? .red : accent
     )
-    .shadow(color: .black.opacity(0.3), radius: 14, y: 6)
+  }
+
+  private var destination: String? {
+    if drag.isOverCancelSocket { return "Cancel" }
+    switch drag.activeTarget?.kind {
+    case .taskRow(let context):   return (context?.isEmpty ?? true) ? nil : context
+    case .taskSection(let label): return label
+    case .newProject(let label):  return label
+    case .newArea:                return RegistryActions.title("sidebar.newArea")
+    case nil:                     return nil
+    }
   }
 }
 #endif
@@ -798,10 +711,14 @@ struct MagicPlusFloatingOverlay: View {
 /// Tactile drag preview for `.draggable(TaskDragIDs)`: a compact rounded task
 /// card when lifting one row, or a subtle physical stack with an accent count
 /// badge when lifting a multi-selection (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §6.1).
+/// The Magic Plus drag (`MagicPlusFloatingOverlay`) draws this same card, with
+/// `destination` naming the drop target under the finger.
 struct TaskDragStackPreview: View {
   let title: String
   let count: Int
   var accent: Color = .accentColor
+  var destination: String? = nil
+  var destinationTint: Color? = nil
 
   var body: some View {
     ZStack(alignment: .topTrailing) {
@@ -835,6 +752,17 @@ struct TaskDragStackPreview: View {
             .foregroundStyle(Theme.inkPrimary)
             .lineLimit(1)
             .truncationMode(.tail)
+          if let destination {
+            let tint = destinationTint ?? accent
+            Text(destination)
+              .scaledFont(size: 11, weight: .semibold)
+              .foregroundStyle(tint)
+              .lineLimit(1)
+              .padding(.horizontal, 7)
+              .padding(.vertical, 2)
+              .background(tint.opacity(0.14), in: Capsule())
+              .layoutPriority(-1)
+          }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
