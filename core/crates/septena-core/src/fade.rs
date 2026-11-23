@@ -90,7 +90,12 @@ fn is_eligible(input: &FadeInput, today: Day) -> bool {
     }
     // A When date today or later holds the task. An invalid day reads as no
     // date (invariant I3).
-    if input.scheduled.as_deref().and_then(Day::parse).is_some_and(|d| d >= today) {
+    if input
+        .scheduled
+        .as_deref()
+        .and_then(Day::parse)
+        .is_some_and(|d| d >= today)
+    {
         return false;
     }
     !input.has_recurrence && !input.is_agent_turn && !input.is_assigned_to_claude && !input.is_awaiting_human

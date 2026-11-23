@@ -74,7 +74,12 @@ pub(crate) fn invoke_value(function: &str, input: Value) -> Result<Value, CoreEr
         }
         "applyDateAction" => {
             let args: DateActionArgs = decode(input).map_err(|e| parse(&e))?;
-            Ok(patch_json(&apply_date_action(args.task, args.action, args.today, args.now)?))
+            Ok(patch_json(&apply_date_action(
+                args.task,
+                args.action,
+                args.today,
+                args.now,
+            )?))
         }
         "normalizeTaskDates" => {
             let args: NormalizeArgs = decode(input).map_err(|e| parse(&e))?;

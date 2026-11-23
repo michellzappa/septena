@@ -339,11 +339,8 @@ impl Ctx<'_> {
     /// A reminder on the old When day moves to the new one. A moved reminder
     /// is armed again: its snooze and dismissal go.
     fn shift_reminder(&mut self, old: Day, new: Day) {
-        let shifted = shift_reminder_on_reschedule(
-            self.f.reminder_at.clone(),
-            Some(old.to_string()),
-            Some(new.to_string()),
-        );
+        let shifted =
+            shift_reminder_on_reschedule(self.f.reminder_at.clone(), Some(old.to_string()), Some(new.to_string()));
         if shifted != self.f.reminder_at {
             self.f.reminder_at = shifted;
             self.f.reminder_snoozed_until = None;
