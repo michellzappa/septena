@@ -172,6 +172,18 @@ targets:
               - UISceneConfigurationName: Default
                 UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SeptaskSceneDelegate
         UIApplicationSupportsIndirectInputEvents: true
+        # App Store validation rejects an iPad bundle without all four
+        # orientations (iPad multitasking). This target writes its own
+        # Info.plist, so the project-level INFOPLIST_KEY_ values never reach it.
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         # Always-present icon long-press actions. Types match
         # ShortcutAction's raw values.
         UIApplicationShortcutItems:
