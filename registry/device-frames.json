@@ -1,9 +1,15 @@
 {
   "version": 1,
-  "description": "Canonical device shapes for marketing visuals: the website scenes (septena-site) and the App Store panels (appstore/). The iPad is drawn in landscape. Units are points (dp on Android) at 1x. A phone case is the screen plus the bezel on every side; screen radius = outerRadius - bezel. A laptop is a lid (a thin rim, a black glass bezel, the screen) on a base that overhangs the lid; outerRadius rounds the lid top, hingeRadius the lid bottom. corner: continuous (Apple) or circular. registry/device-shape.mjs draws these; renderers never redefine them.",
+  "description": "Canonical device shapes for marketing visuals: the website scenes (septena-site) and the App Store panels (appstore/). The iPad is drawn in landscape. Units are points (dp on Android) at 1x. A phone case is the screen plus the bezel on every side; screen radius = outerRadius - bezel. A laptop is a lid (a thin rim, a black glass bezel, the screen) on a base that overhangs the lid; outerRadius rounds the lid top, hingeRadius the lid bottom. corner: continuous (Apple) or circular. registry/device-shape.mjs draws these; renderers never redefine them. system names the OS a frame's screen must look like (docs/PLATFORM_CHROME.md): os and version are the target release, icons the column of registry/icons.json the app's own glyphs come from (sf = sfSymbol, material = material; the Windows client is planned on Compose Desktop, so Material), chrome the renderer's system chrome id, chrome the renderer's system chrome id.",
   "devices": {
     "iphone": {
       "label": "iPhone",
+      "system": {
+        "os": "iOS",
+        "version": "27",
+        "icons": "sf",
+        "chrome": "ios"
+      },
       "screen": {
         "width": 402,
         "height": 874
@@ -42,6 +48,12 @@
     },
     "android": {
       "label": "Android phone",
+      "system": {
+        "os": "Android",
+        "version": "17",
+        "icons": "material",
+        "chrome": "android"
+      },
       "screen": {
         "width": 412,
         "height": 915
@@ -79,6 +91,12 @@
     },
     "ipad": {
       "label": "iPad",
+      "system": {
+        "os": "iPadOS",
+        "version": "27",
+        "icons": "sf",
+        "chrome": "ipados"
+      },
       "screen": {
         "width": 1180,
         "height": 820
@@ -116,6 +134,12 @@
     },
     "macbook": {
       "label": "MacBook",
+      "system": {
+        "os": "macOS",
+        "version": "27",
+        "icons": "sf",
+        "chrome": "macos"
+      },
       "screen": {
         "width": 1120,
         "height": 740
@@ -152,6 +176,12 @@
     },
     "windowsLaptop": {
       "label": "Windows laptop",
+      "system": {
+        "os": "Windows",
+        "version": "11",
+        "icons": "material",
+        "chrome": "windows"
+      },
       "screen": {
         "width": 1120,
         "height": 740

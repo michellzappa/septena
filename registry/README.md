@@ -19,7 +19,7 @@ iOS, iPadOS, macOS, Backend/MCP, Web, Android, and Windows. See
 | `registry/tokens.json` | Semantic design tokens, selection washes, 16-color palette, 5-step text scale | R4 (`#145`) |
 | `registry/plans.json` | Plans and pricing: prices, plan limits (the server plan table), pricing-page cards and comparison rows, promises, upsell copy (ADR 0010, ADR 0023). The site's /pricing page and the app's Septena Plus page render it | — |
 | `registry/capabilities.json` | Capability parity ledger keyed by Feature ID (ADR 0013) | R4 (`#145`) |
-| `registry/device-frames.json` | Canonical iPhone and Android shapes for marketing visuals (website scenes, App Store panels) | — |
+| `registry/device-frames.json` | Canonical device shapes for marketing visuals (website scenes, App Store panels), and the OS each screen must look like (docs/PLATFORM_CHROME.md) | — |
 | `registry/l10n/en.json` | Generated: every user-facing registry string, its placeholders and source paths | L1 (`#214`) |
 | `registry/l10n/<lang>.json` | Translations of registry copy, keyed by the English text | L1 (`#214`) |
 
