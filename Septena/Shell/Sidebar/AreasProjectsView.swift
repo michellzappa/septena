@@ -3,83 +3,246 @@ import SwiftData
 
 // MARK: - Notes field shared by Area / Project detail
 
-/// Multi-line notes editor with inline markdown preview when blurred.
+/// Multi-line notes editor with a markdown preview when blurred.
 ///
-/// The TextField is ALWAYS in the view tree (controlled via `.opacity`),
-/// not conditionally rendered — that's what fixes the previous "edit only
-/// once" bug, where swapping Text↔TextField on focus change tore down the
-/// freshly-mounted field before `@FocusState` could land on it.
+/// The TextField is ALWAYS in the view tree (hidden via `.opacity` and a
+/// zero height), not conditionally rendered — that's what fixes the previous
+/// "edit only once" bug, where swapping Text↔TextField on focus change tore
+/// down the freshly-mounted field before `@FocusState` could land on it.
 ///
 /// Layout:
-///   • TextField (axis .vertical, lineLimit 1...12) is the source of truth
-///     for height — grows with content, scrolls internally past 12 lines.
-///   • Text(AttributedString(markdown:)) overlays on top when the field
-///     isn't focused and has content; tap forwards focus.
-///   • Hit testing is gated on focus so taps go to the right layer.
+///   • Focused (or empty): the TextField (axis .vertical, lineLimit 1...12)
+///     edits the raw markdown.
+///   • Blurred with content: the rendered preview shows the first
+///     `previewLines` lines. Longer notes get a "Show more" toggle; expanding
+///     pushes the tasks below down. A tap on a clamped preview expands it; a
+///     tap on a full preview starts editing.
 /// `selection` lets the project view drop the cursor under the first heading
 /// of a freshly inserted notes template (`ContainerNotes.template`).
-@ViewBuilder
 func notesField(_ text: Binding<String>,
                 placeholder: String,
                 selection: Binding<TextSelection?> = .constant(nil),
                 focused: FocusState<Bool>.Binding) -> some View {
-  let showRender = !focused.wrappedValue && !text.wrappedValue.isEmpty
-  ZStack(alignment: .topLeading) {
-    TextField(placeholder, text: text, selection: selection, axis: .vertical)
-      .textFieldStyle(.plain)
-      .focusEffectDisabled()
-      .font(.septenaNotes)
-      .foregroundStyle(Theme.inkSecondary)
-      .focused(focused)
-      .lineLimit(1...12)
-      .opacity(showRender ? 0 : 1)
-      .allowsHitTesting(!showRender)
+  ContainerNotesField(text: text, placeholder: placeholder,
+                      selection: selection, focused: focused)
+}
 
-    if showRender {
-      Text(markdownAttributed(text.wrappedValue))
-        .font(.septenaNotes)
-        .foregroundStyle(Theme.inkSecondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .textSelection(.enabled)
-        .contentShape(Rectangle())
-        .septenaEditableTitleCursor()
-        .onTapGesture { focused.wrappedValue = true }
+struct ContainerNotesField: View {
+  @Binding var text: String
+  let placeholder: String
+  @Binding var selection: TextSelection?
+  var focused: FocusState<Bool>.Binding
+
+  /// Lines the blurred preview shows before the "Show more" toggle.
+  static let previewLines = 3
+
+  @State private var expanded = false
+  @State private var clampedHeight: CGFloat = 0
+  @State private var fullHeight: CGFloat = 0
+
+  private var showRender: Bool { !focused.wrappedValue && !text.isEmpty }
+  /// The preview is cut off at `previewLines`. Measured, not guessed from the
+  /// line count, because a single long paragraph wraps past 3 lines too.
+  private var isClamped: Bool { !expanded && fullHeight > clampedHeight + 1 }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      ZStack(alignment: .topLeading) {
+        TextField(placeholder, text: $text, selection: $selection, axis: .vertical)
+          .textFieldStyle(.plain)
+          .focusEffectDisabled()
+          .font(.septenaNotes)
+          .foregroundStyle(Theme.inkSecondary)
+          .focused(focused)
+          .lineLimit(1...12)
+          // Hidden field must not hold the header open at its own height
+          // while the (shorter) clamped preview shows.
+          .frame(height: showRender ? 0 : nil, alignment: .top)
+          .clipped()
+          .opacity(showRender ? 0 : 1)
+          .allowsHitTesting(!showRender)
+
+        if showRender {
+          let rendered = markdownAttributed(text)
+          Text(rendered)
+            .font(.septenaNotes)
+            .foregroundStyle(Theme.inkSecondary)
+            .lineLimit(expanded ? nil : Self.previewLines)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+              clampedHeight = $0
+            }
+            // The same text at full height, invisible: its height tells
+            // whether the clamp cut anything off.
+            .background(alignment: .topLeading) {
+              Text(rendered)
+                .font(.septenaNotes)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .hidden()
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                  fullHeight = $0
+                }
+            }
+            .textSelection(.enabled)
+            .contentShape(Rectangle())
+            .septenaEditableTitleCursor()
+            .onTapGesture {
+              if isClamped {
+                a11yAnimate { expanded = true }
+              } else {
+                focused.wrappedValue = true
+              }
+            }
+        }
+      }
+
+      if showRender && (isClamped || expanded) {
+        Button {
+          a11yAnimate { expanded.toggle() }
+        } label: {
+          HStack(spacing: 4) {
+            Text(expanded ? "Show less" : "Show more")
+            Image(systemName: expanded ? "chevron.up" : "chevron.down")
+              .imageScale(.small)
+          }
+          .font(.septenaLabel)
+          .foregroundStyle(Theme.inkSecondary)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+      }
     }
   }
 }
 
-/// Render the raw notes string as an `AttributedString` with inline
-/// markdown applied (**bold**, *italic*, `code`, [links], # headings via
-/// `# Heading` rendering as bold + larger text). Falls back to plain text
-/// if the parse fails.
+/// Render the raw notes string for the blurred preview.
+///
+/// Line-based on purpose: the user's line breaks survive exactly as typed
+/// (CommonMark would fold a single newline into a space and drop the gap
+/// between blocks, which ran "Goal" straight into its paragraph).
+///   • `#`/`##` lines → semibold headings; `###` (agent log bylines,
+///     `ContainerNotes`) → a quiet label.
+///   • `-`/`*`/`+` items → "•", task items → "☐"/"☑", `1.` kept as typed,
+///     `>` quotes → italic.
+///   • Everything else → inline markdown (**bold**, *italic*, `code`, links).
+///   • Runs of blank lines collapse to one; the blank line directly under a
+///     heading is dropped; a heading with nothing under it (an unfilled
+///     template section) is left out of the preview.
 func markdownAttributed(_ raw: String) -> AttributedString {
-  // `.full` lets us honor `#`/`##` as headers; whitespace is preserved
-  // so the user's line breaks survive the render.
-  var opts = AttributedString.MarkdownParsingOptions()
-  opts.interpretedSyntax = .full
-  opts.allowsExtendedAttributes = true
-  if var attr = try? AttributedString(markdown: raw, options: opts) {
-    // Promote `# Heading` lines so they read as headings even though
-    // AttributedString doesn't auto-style by header level on its own.
-    for run in attr.runs where run.presentationIntent != nil {
-      for component in run.presentationIntent?.components ?? [] {
-        if case .header(let level) = component.kind {
-          if level >= 3 {
-            // `### <day> · <agent>` is how an agent log entry starts
-            // (ContainerNotes): a quiet byline, not a section title.
-            attr[run.range].font = .septenaLabel
-            attr[run.range].foregroundColor = Theme.inkSecondary
-          } else {
-            let size: CGFloat = level == 1 ? 18 : 16
-            attr[run.range].font = .system(size: size, weight: .semibold)
-            attr[run.range].foregroundColor = Theme.inkPrimary
-          }
+  let lines = notesPreviewLines(raw)
+  var out = AttributedString()
+  for (index, line) in lines.enumerated() {
+    if index > 0 { out += AttributedString("\n") }
+    out += renderNotesLine(line)
+  }
+  return out
+}
+
+private enum NotesLine {
+  case heading(level: Int, text: String)
+  case blank
+  case body(String)
+}
+
+private func classifyNotesLine(_ line: String) -> NotesLine {
+  let trimmed = line.trimmingCharacters(in: .whitespaces)
+  if trimmed.isEmpty { return .blank }
+  if trimmed.hasPrefix("#") {
+    let hashes = trimmed.prefix(while: { $0 == "#" }).count
+    let rest = trimmed.dropFirst(hashes)
+    if hashes <= 6, let first = rest.first, first == " " || first == "\t" {
+      return .heading(level: hashes, text: rest.trimmingCharacters(in: .whitespaces))
+    }
+  }
+  return .body(line)
+}
+
+/// Normalize the line list: drop empty sections, collapse blank runs, trim
+/// blank lines at both ends and directly under a heading.
+private func notesPreviewLines(_ raw: String) -> [NotesLine] {
+  let source = raw.replacingOccurrences(of: "\r\n", with: "\n")
+    .components(separatedBy: "\n")
+    .map { classifyNotesLine($0.replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression)) }
+
+  // A heading is empty when the next non-blank line is a heading of the same
+  // or a higher level, or the end of the notes.
+  var kept: [NotesLine] = []
+  for (index, line) in source.enumerated() {
+    if case .heading(let level, _) = line {
+      var hasContent = false
+      for next in source[(index + 1)...] {
+        switch next {
+        case .blank: continue
+        case .heading(let nextLevel, _): hasContent = nextLevel > level
+        case .body: hasContent = true
         }
+        break
       }
+      if !hasContent { continue }
+    }
+    kept.append(line)
+  }
+
+  var result: [NotesLine] = []
+  for line in kept {
+    if case .blank = line {
+      guard let last = result.last else { continue }
+      if case .blank = last { continue }
+      if case .heading = last { continue }
+    }
+    result.append(line)
+  }
+  while let last = result.last, case .blank = last { result.removeLast() }
+  return result
+}
+
+private func renderNotesLine(_ line: NotesLine) -> AttributedString {
+  switch line {
+  case .blank:
+    return AttributedString("")
+  case .heading(let level, let text):
+    var attr = inlineMarkdown(text)
+    if level >= 3 {
+      // `### <day> · <agent>` is how an agent log entry starts
+      // (ContainerNotes): a quiet byline, not a section title.
+      attr.font = .septenaLabel
+      attr.foregroundColor = Theme.inkSecondary
+    } else {
+      attr.font = .system(size: level == 1 ? 18 : 16, weight: .semibold)
+      attr.foregroundColor = Theme.inkPrimary
     }
     return attr
+  case .body(let text):
+    let indentWidth = text.prefix(while: { $0 == " " || $0 == "\t" }).count
+    let indent = String(repeating: "  ", count: min(indentWidth / 2, 4))
+    let content = text.trimmingCharacters(in: .whitespaces)
+
+    if let match = content.firstMatch(of: #/^[-*+]\s+\[([ xX])\]\s+(.*)$/#) {
+      let done = match.1 != " "
+      return AttributedString(indent + (done ? "☑ " : "☐ ")) + inlineMarkdown(String(match.2))
+    }
+    if let match = content.firstMatch(of: #/^[-*+]\s+(.*)$/#) {
+      return AttributedString(indent + "• ") + inlineMarkdown(String(match.1))
+    }
+    if let match = content.firstMatch(of: #/^(\d+[.)])\s+(.*)$/#) {
+      return AttributedString(indent + String(match.1) + " ") + inlineMarkdown(String(match.2))
+    }
+    if let match = content.firstMatch(of: #/^>\s?(.*)$/#) {
+      var attr = inlineMarkdown(String(match.1))
+      attr.font = Font.septenaNotes.italic()
+      return attr
+    }
+    return inlineMarkdown(content)
   }
-  return AttributedString(raw)
+}
+
+/// Inline markdown only (**bold**, *italic*, `code`, [links]); plain text
+/// when the parse fails.
+private func inlineMarkdown(_ text: String) -> AttributedString {
+  let options = AttributedString.MarkdownParsingOptions(
+    interpretedSyntax: .inlineOnlyPreservingWhitespace)
+  return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
 }
 
 // MARK: - Area detail (rename + project list + tasks scoped to area)
