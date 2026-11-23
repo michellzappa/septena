@@ -228,10 +228,10 @@ function watch(w) {
   const ui = String(theme.fonts.ui).replace(/"/g, "'"); // inside style="…" attributes
   const rows = w.rows.map((t) => `<div style="display:flex; align-items:center; gap:${Math.round(width * 0.05)}px; padding:${Math.round(width * 0.035)}px ${Math.round(width * 0.05)}px; background:#1c1c1e; border-radius:${Math.round(width * 0.07)}px; margin-top:${Math.round(width * 0.03)}px;"><span style="flex:none; width:${Math.round(width * 0.08)}px; height:${Math.round(width * 0.08)}px; border:${Math.max(2, Math.round(width * 0.012))}px solid #8e8e93; border-radius:50%;"></span><span style="font:600 ${Math.round(width * 0.08)}px/1.15 ${ui}; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(t)}</span></div>`).join("");
   // Short straps that start behind the case's curve (the case paints over
-  // them), darker toward their sides and their far end, so they read as
-  // curving down and away from the face.
+  // them), darkening toward their far end, so they read as curving down and
+  // away from the face.
   const tuck = Math.round(r * 0.7);
-  const band = (top) => `<div style="position:absolute; left:${Math.round(width * 0.17)}px; right:${Math.round(width * 0.17)}px; ${top ? `bottom:calc(100% - ${tuck}px)` : `top:calc(100% - ${tuck}px)`}; height:${Math.round(h * 0.26) + tuck}px; background:linear-gradient(${top ? "to top" : "to bottom"}, rgb(0 0 0 / 0) 45%, rgb(0 0 0 / .5) 100%), linear-gradient(90deg, #111113 0%, #2e2e31 24%, #333336 50%, #2e2e31 76%, #111113 100%); border-radius:${top ? "22px 22px 0 0" : "0 0 22px 22px"};"></div>`;
+  const band = (top) => `<div style="position:absolute; left:${Math.round(width * 0.17)}px; right:${Math.round(width * 0.17)}px; ${top ? `bottom:calc(100% - ${tuck}px)` : `top:calc(100% - ${tuck}px)`}; height:${Math.round(h * 0.26) + tuck}px; background:linear-gradient(${top ? "to top" : "to bottom"}, #38383b 0%, #2a2a2d 45%, #0c0c0e 100%); border-radius:${top ? "22px 22px 0 0" : "0 0 22px 22px"};"></div>`;
   return `
   <div style="position:absolute; z-index:4; left:${w.left}px; top:${w.top}px; width:${width}px; height:${h}px;">
     ${band(true)}${band(false)}
