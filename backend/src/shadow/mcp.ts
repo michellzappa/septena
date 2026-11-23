@@ -64,6 +64,7 @@ import { PROMPTS, getPrompt } from "./prompts.js";
 // reconnect.
 
 const INSTRUCTIONS =
+  "New here? Call tasks_orientation first: it returns this guide, every tool by family, and which areas have a brief.\n\n" +
   "Septena tasks. These tools read the signed-in user's tasks, areas, projects and " +
   "task conversations in the Septena task backend, and create, change and complete " +
   "tasks and their conversations. It is the same data the user's Septena app shows, " +
@@ -141,6 +142,7 @@ const zArgs = {
     limit: zLimit(500).optional(),
   }),
   tasks_list_tags: z.object({}),
+  tasks_orientation: z.object({}),
   tasks_search: z.object({
     query: z.string().min(1),
     area: z.string().min(1).optional(),
@@ -306,6 +308,9 @@ async function callTool(
   switch (name as ReadToolName) {
     case "tasks_list":
       result = await listTasks(store, timeZone, a.view, a.limit as number | undefined, a.tag as string | string[] | undefined);
+      break;
+    case "tasks_orientation":
+      result = orientation(await store.readAreas(500));
       break;
     case "tasks_search":
       result = await searchTasks(store, timeZone, a as unknown as SearchArgs);
@@ -538,6 +543,31 @@ export async function listTasks(
     tasks: tasks.slice(0, limit).map((t) => stripDays(annotate(t, today, nowMs))),
     total: matched.length,
     truncated: matched.length > limit,
+  };
+}
+
+/// `tasks_orientation`: the server instructions (one copy, INSTRUCTIONS), the
+/// tools grouped by family from the served definitions, and which areas have
+/// a brief (text above `## Log` in the area notes).
+function orientation(areas: Row[]) {
+  const agentNames = new Set(AGENT_TOOLS.map((t) => t.name));
+  const notesNames = new Set(NOTES_TOOLS.map((t) => t.name));
+  const family = (t: Tool) =>
+    agentNames.has(t.name) ? "agent loop: claim, release, events, history"
+    : notesNames.has(t.name) ? "area and project notes: the brief and the log"
+    : /^tasks_(thread_|set_)/.test(t.name) ? "task conversation: turns, acceptance, artifact, handoff, end state"
+    : t.annotations?.readOnlyHint ? "read"
+    : "write tasks and checklists";
+  const families: Record<string, { name: string; title: string }[]> = {};
+  for (const t of TOOLS) (families[family(t)] ??= []).push({ name: t.name, title: t.title ?? t.name });
+  return {
+    guide: INSTRUCTIONS,
+    tools: families,
+    areas: areas.map((r) => {
+      const notes = str(r.context) ?? "";
+      const brief = notes.split(/^## Log\b/m)[0].trim();
+      return { id: r.id as string, title: str(r.title) ?? "", hasBrief: brief.length > 0 };
+    }),
   };
 }
 
