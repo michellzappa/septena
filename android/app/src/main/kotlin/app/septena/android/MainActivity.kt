@@ -5,13 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.septena.android.ui.SignInScreen
 import app.septena.android.ui.TaskHomeScreen
+import app.septena.android.ui.SeptenaAndroidTheme
 
 class MainActivity : ComponentActivity() {
     private val graph by lazy { (application as SeptenaAndroidApp).graph }
@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MaterialTheme {
+            SeptenaAndroidTheme {
                 Surface(modifier = Modifier.safeDrawingPadding()) {
                     val signedIn by graph.credentials.signedIn.collectAsStateWithLifecycle()
                     if (signedIn) TaskHomeScreen(graph) else SignInScreen(graph)
