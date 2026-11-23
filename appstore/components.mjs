@@ -111,13 +111,33 @@ function shot(s, device, tint) {
   const c = IPHONE.cutout;
   const island = f.island && !s.img ? `<div class="island" style="top:${Math.round((IPHONE.bezel + c.top) * k)}px; width:${Math.round(c.width * k)}px; height:${Math.round(c.height * k)}px;"></div>` : "";
   return `
-  <div class="shot-zone"${s.alignTop ? " data-align-top" : ""}${s.alignMiddle != null ? ` data-align-middle="${s.alignMiddle}"` : ""} style="bottom:${s.bottom ?? 110}px; transform: translate(${Math.round((s.offsetX ?? 0) * 100)}%, ${Math.round((s.offsetY ?? 0) * 100)}%);">
+  <div class="shot-zone"${s.alignTop ? " data-align-top" : ""}${s.alignMiddle != null ? ` data-align-middle="${s.alignMiddle}"` : ""} style="${s.top != null ? `top:${s.top}px` : `bottom:${s.bottom ?? 110}px`}; transform: translate(${Math.round((s.offsetX ?? 0) * 100)}%, ${Math.round((s.offsetY ?? 0) * 100)}%);">
     <div class="shot-wrap" style="width:${w}px; transform: rotate(${s.rotate ?? 0}deg);">
       ${faces(s.faces, w)}
       <div class="frame" style="position:relative; z-index:1; width:${w}px; padding:${f.pad}px;${f.bezel ? ` background:${PHONE.case} center/100% 100% no-repeat; box-shadow:none; overflow:visible; filter:drop-shadow(0 ${Math.round(20 * k)}px ${Math.round(24 * k)}px rgb(0 0 0 / .28));` : ` border-radius:${f.radius}px;`}">
         ${screen}${island}
       </div>
       ${s.img ? callout(s.callout, { w, pad: f.pad, margin: (dw - w) / 2, tint }) : ""}
+    </div>
+  </div>`;
+}
+
+// ------------------------------------------------------------------ watch
+// A small Apple Watch with Today's first tasks (rows come from a scene's
+// elements, see render.mjs). Drawn, not captured: the scene builder has no
+// watch layout yet. left/top/width in design px; accent: the title colour.
+function watch(w) {
+  if (!w) return "";
+  const width = w.width ?? 300, h = Math.round(width * 1.22), r = Math.round(width * 0.27);
+  const ui = String(theme.fonts.ui).replace(/"/g, "'"); // inside style="…" attributes
+  const rows = w.rows.map((t) => `<div style="display:flex; align-items:center; gap:${Math.round(width * 0.05)}px; padding:${Math.round(width * 0.035)}px ${Math.round(width * 0.05)}px; background:#1c1c1e; border-radius:${Math.round(width * 0.07)}px; margin-top:${Math.round(width * 0.03)}px;"><span style="flex:none; width:${Math.round(width * 0.08)}px; height:${Math.round(width * 0.08)}px; border:${Math.max(2, Math.round(width * 0.012))}px solid #8e8e93; border-radius:50%;"></span><span style="font:600 ${Math.round(width * 0.08)}px/1.15 ${ui}; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(t)}</span></div>`).join("");
+  const band = (top) => `<div style="position:absolute; left:${Math.round(width * 0.18)}px; right:${Math.round(width * 0.18)}px; ${top ? "bottom:100%" : "top:100%"}; height:${Math.round(h * 0.42)}px; background:linear-gradient(${top ? "0deg" : "180deg"}, #2c2c2e, #1c1c1e); border-radius:${top ? "30px 30px 0 0" : "0 0 30px 30px"};"></div>`;
+  return `
+  <div style="position:absolute; z-index:4; left:${w.left}px; top:${w.top}px; width:${width}px; height:${h}px;">
+    ${band(true)}${band(false)}
+    <div style="position:absolute; inset:0; background:#0b0b0c; border-radius:${r}px; border:${Math.round(width * 0.035)}px solid #3a3a3c; box-shadow:0 30px 60px rgb(0 0 0 / .35); overflow:hidden; padding:${Math.round(width * 0.09)}px ${Math.round(width * 0.07)}px;">
+      <div style="font:700 ${Math.round(width * 0.11)}px/1 ${ui}; color:${w.accent ?? "#fff"}; margin-bottom:${Math.round(width * 0.04)}px;">Today</div>
+      ${rows}
     </div>
   </div>`;
 }
@@ -351,6 +371,7 @@ function portrait(panel, device, tint) {
   <div style="position:absolute; inset:0; background:linear-gradient(to bottom, #0B0B0C 0, #0B0B0C ${panel.photo.top ?? 160}px, rgb(11 11 12 / ${panel.photo.shade ?? 0.7}) ${(panel.photo.top ?? 160) + 160}px, rgb(11 11 12 / 0) ${panel.photo.fade ?? 900}px);"></div>` : ""}
   ${(panel.shots ?? []).map((s) => shot(s, device, tint)).join("")}
   ${shot(panel.shot, device, tint)}
+  ${watch(panel.watch)}
   ${chips(panel.chips)}
   ${founder(panel.founder)}
   ${overlays(panel.overlays)}

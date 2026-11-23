@@ -38,8 +38,11 @@ const VISUAL = {
   // iPad joins when the scene builder has an iPad layout (septena-site#17).
   devices:        {
     fruit: "tamarillo", texture: "topography",
-    shot: { width: 0.46, offsetX: 0.24 },
-    shots: [{ src: "today/0", layout: "mac", accent: "tamarillo", width: 0.88, offsetX: -0.03, top: 680 }],
+    // The phone sits on the Mac window (in front, overlapping it), and a small
+    // watch stands next to the phone.
+    shot: { width: 0.46, offsetX: 0.2, top: 1080 },
+    shots: [{ src: "today/0", layout: "mac", accent: "tamarillo", width: 0.88, offsetX: -0.04, top: 640 }],
+    watch: { src: "today/0", from: "tamarillo", accent: "#FF7A85", left: 170, top: 1800, width: 330 },
   },
   thinking:       { fruit: "yuzu", texture: "fieldMatrix" },
   // Agent faces (the site's avatar crew, in our fruit colours) sit on the
@@ -104,6 +107,7 @@ const iphone = rows.map((row, i) => {
       width: v.shot?.width ?? 0.68, offsetY: 0, rotate: 0, // one size everywhere; the devices panel shares the frame with a Mac
     },
     shots: v.shots,
+    watch: v.watch,
   };
 });
 

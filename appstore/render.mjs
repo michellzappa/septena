@@ -153,6 +153,14 @@ for (const device of activeDevices()) {
             return `data:image/png;base64,${readFileSync(file).toString("base64")}`;
           })(),
         },
+        // A small watch: its rows are the first task titles on the named scene's
+        // screen (that screen's .elements.json), never typed by hand.
+        watch: panel.watch && (() => {
+          const meta = shotElements(device, panel.watch.src, "light", panel.watch.from ?? null);
+          const rows = (meta?.elements ?? []).filter((e) => e.id.startsWith("task-")).slice(0, panel.watch.rows ?? 3).map((e) => e.label.split("\n")[0]);
+          if (!rows.length) throw new Error(`${device.key}/${panel.id}: no task rows on ${panel.watch.src} for the watch`);
+          return { ...panel.watch, rows };
+        })(),
         shot: panel.shot && { ...withFaces(panel.shot), img: shotDataURL(device, panel.shot.src, panel.shot.appearance, panel.shot.accent) },
         // Extra phones behind the main one (a fan). Fails closed: every one needs a real capture.
         shots: (panel.shots ?? []).map((s) => {
