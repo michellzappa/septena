@@ -74,11 +74,10 @@ draft sweep apply on both platforms.
 ## Launch screen
 
 The iOS launch screen (`UILaunchScreen` in `project.yml`, Septask target)
-shows the seven-disc glyph, 60 pt, centered, in systemGray2 on the system
-background. Assets: `Septask/Assets.xcassets/LaunchGlyph` (two vector PDFs,
-light and dark) and `LaunchBackground` (white / black). The PDFs are
-generated from the icon's own `discs.svg`:
-`swift scripts/render-launch-glyph.swift`. Never hand-draw the mark.
+is blank: only the system background, `LaunchBackground` in
+`Septask/Assets.xcassets` (white / black). It shows no glyph, so the first
+frame replaces an empty screen, not a logo. Decided 2026-11-23; the glyph
+launch screen and its render script were removed.
 
 ## Today snapshot
 

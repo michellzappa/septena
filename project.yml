@@ -154,12 +154,10 @@ targets:
           - es
           - pt-BR
         ITSAppUsesNonExemptEncryption: false
-        # The app glyph, small and subtle, centered on the system background
-        # (white / black). Both are Septask/Assets.xcassets assets with light
-        # and dark variants; the monochrome compass glyph PDFs are generated
-        # by scripts/render-launch-glyph.swift (#82).
+        # A blank launch screen: only the system background (white / black,
+        # Septask/Assets.xcassets/LaunchBackground). No glyph, so the first
+        # frame replaces an empty screen instead of a logo (docs/LAUNCH_PERF.md).
         UILaunchScreen:
-          UIImageName: LaunchGlyph
           UIColorName: LaunchBackground
         # Scene lifecycle so Home Screen Quick Actions land: the cold-launch
         # item rides UIScene.ConnectionOptions, delivered to SeptaskSceneDelegate

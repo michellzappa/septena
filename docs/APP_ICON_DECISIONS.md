@@ -34,7 +34,7 @@ Replaces the legacy 7-dotted disc emblem across all app surfaces.
 
 ## 3. Legacy 7-Dot Replacement Across All Surfaces
 
-- **iOS Launch Screen (`LaunchGlyph.imageset`):** Minimal monochrome vector PDF (`60×60pt`, `systemGray2` light/dark) rendered by `scripts/render-launch-glyph.swift` (bezel ring + 6 ticks + upright North + checkmark).
+- **iOS Launch Screen:** Blank, system background only (`LaunchBackground`). The glyph launch screen was removed on 2026-11-23.
 - **Settings & About (`SeptenaDiscTile`):** Live `SeptenaCompassIconView` mirroring the user's active icon finish & color.
 - **macOS & watchOS:** Replaced `Septask/AppIcon.icns`, removed obsolete `Septask/AppIcon.icon` (`discs.svg`), and updated `SeptaskWatch/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`.
 - **Celebration burst (`SeptenaOpenView`):** Radiates upright North pointer + 6 oriented machined ticks along the 7 bearings.
