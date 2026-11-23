@@ -1955,7 +1955,9 @@ struct TaskListView: View {
                        magicContext: "Inbox")
           }
         } header: {
-          inboxHeader(count: allInbox.count)
+          // Type-erased: a deep header type overflowed the launch stack
+          // (see cardedRows).
+          AnyView(inboxHeader(count: allInbox.count))
         }
       }
     }
@@ -2788,7 +2790,7 @@ struct TaskListView: View {
                reorderable: true,
                grouped: true)
     ForEach(headings) { heading in
-      headingRow(heading)
+      AnyView(headingRow(heading))
       let members = visibleItems.filter { $0.heading == heading.id }
       cardedRows(members, reorderable: true, grouped: true, magicContext: heading.title)
     }
@@ -4616,7 +4618,12 @@ struct TaskListView: View {
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
       let position = TaskCardPosition(index: idx, count: cardCount)
       let isExpanded = expandedEditId == task.id
-      taskRow(task, quickMenu: quickMenu?(task) ?? false)
+      // Type-erased per row: the modifier chain below is a deep generic type,
+      // and every list that nests cardedRows (Inbox, project headings) put it
+      // one level deeper until swift_getTypeByMangledName overflowed the iOS
+      // main-thread stack (launch and opening a project with sections both
+      // crashed, 2026-11-23). The row stays a direct child of the ForEach.
+      AnyView(taskRow(task, quickMenu: quickMenu?(task) ?? false)
         .modifier(rowMoveDrop)
         .taskCardChrome(position,
                         // An open inline editor keeps the clean card surface
@@ -4652,12 +4659,12 @@ struct TaskListView: View {
           onDropIDs: canMagicRowDrop ? nil : onDropIDs
         ))
         .zIndex(isExpanded ? 1 : 0)
-        .inlineEditDimmed(isInlineEditing && !isExpanded, onDismiss: collapseEdit)
+        .inlineEditDimmed(isInlineEditing && !isExpanded, onDismiss: collapseEdit))
     }
     if appendQuickAdd {
       let isEditingQuickAdd = quickAddShowsEditor
         && quickAddCaptureTask.map { expandedEditId == $0.id } == true
-      quickAddLine(showsEditor: quickAddShowsEditor)
+      AnyView(quickAddLine(showsEditor: quickAddShowsEditor)
         .asListRow()
         // The quick-add trigger is a selectable row (it carries the sentinel id
         // and sits in `keyboardOrderedTaskIds`), so it has to paint the same
@@ -4669,7 +4676,7 @@ struct TaskListView: View {
                         isSelected: isEditingQuickAdd ? false : selection.contains(Self.quickAddScrollID),
                         isEditing: isEditingQuickAdd)
         .zIndex(isEditingQuickAdd ? 1 : 0)
-        .inlineEditDimmed(isInlineEditing && !isEditingQuickAdd, onDismiss: collapseEdit)
+        .inlineEditDimmed(isInlineEditing && !isEditingQuickAdd, onDismiss: collapseEdit))
     }
   }
 

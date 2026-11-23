@@ -309,14 +309,30 @@ extension View {
 // MARK: - Magic Plus interactive drag coordinator (iPhone compact)
 
 /// What kind of drop target the dragged Magic Plus orb is currently hovering.
-/// Drives the live visual morph (orb → ghost task row / contextual pill).
+/// Every kind shows the same insertion line (`MagicPlusInsertionMark`).
 enum MagicPlusDropKind: Equatable {
-  /// Between two rows in a reorderable list (parts a full ghost-row gap).
+  /// Between two rows in a reorderable list.
   case taskRow(context: String?)
-  /// Onto a section/heading/group/day header, a non-reorderable card, or a
-  /// list row on the Tasks index. Every target makes a new task: the orb never
-  /// makes an Area or a Project.
+  /// Onto a section/heading/group/day header or a non-reorderable card. It
+  /// makes a new task.
   case taskSection(label: String)
+  /// A place on the Tasks index (list root), where the orb makes only
+  /// Projects and Areas. `edge` says which insertion points the zone offers.
+  case listInsert(edge: MagicPlusInsertEdge)
+}
+
+/// The insertion points a Tasks index zone offers (`MagicPlusDropKind.listInsert`).
+enum MagicPlusInsertEdge: Equatable {
+  /// Above and below the row (a Project between Projects).
+  case both
+  /// Above the row only (a new Area before this area's card).
+  case top
+  /// Below the row only (a new Project first in this area).
+  case bottom
+  /// The given distance below the row: the gap under the last card (a new
+  /// Area at the end). It sits a card gap away from "below the row", so the
+  /// two stay distinct places.
+  case belowGap(CGFloat)
 }
 
 /// Live coordinator for the iPhone Magic Plus finger-tracking & morphing drag.
@@ -443,8 +459,8 @@ final class MagicPlusDragState {
       }
     }
 
-    // Aim slightly above the fingertip where the floating ghost card sits.
-    let probeY = location.y - 24
+    // The drag draws no card (decided 2026-11-23): aim at the fingertip.
+    let probeY = location.y
 
     // One list of insertion points (`insertionPoints`), and the list does
     // not move during the drag, so the target is the nearest point to what
@@ -499,6 +515,7 @@ final class MagicPlusDragState {
   /// distinct place is at least a row (44pt) away.
   private func insertionPoints() -> [Gap] {
     var points: [Gap] = []
+    var listPoints: [Gap] = []
     for zone in zones.values {
       let frame = zone.frame
       switch zone.kind {
@@ -510,6 +527,26 @@ final class MagicPlusDragState {
       case .taskSection:
         points.append(Gap(y: frame.maxY, id: zone.id, kind: zone.kind,
                           before: true, frame: frame, rank: 1))
+      case .listInsert(let edge):
+        // Tasks index points never merge: the card gap between "end of this
+        // area" and "new Area" is 14pt, under the 16pt merge distance, and
+        // both are real places. The line's inset tells them apart.
+        switch edge {
+        case .both:
+          listPoints.append(Gap(y: frame.minY, id: zone.id, kind: zone.kind,
+                                before: true, frame: frame, rank: 0))
+          listPoints.append(Gap(y: frame.maxY, id: zone.id, kind: zone.kind,
+                                before: false, frame: frame, rank: 2))
+        case .top:
+          listPoints.append(Gap(y: frame.minY, id: zone.id, kind: zone.kind,
+                                before: true, frame: frame, rank: 0))
+        case .bottom:
+          listPoints.append(Gap(y: frame.maxY, id: zone.id, kind: zone.kind,
+                                before: false, frame: frame, rank: 2))
+        case .belowGap(let gap):
+          listPoints.append(Gap(y: frame.maxY + gap, id: zone.id, kind: zone.kind,
+                                before: false, frame: frame, rank: 2))
+        }
       }
     }
     points.sort { $0.y < $1.y }
@@ -523,7 +560,7 @@ final class MagicPlusDragState {
         clusterStart = p.y
       }
     }
-    return merged
+    return (merged + listPoints).sorted { $0.y < $1.y }
   }
 }
 
@@ -538,8 +575,8 @@ extension EnvironmentValues {
   }
 }
 
-/// Registers a reorderable task row as a live Magic Plus gap-parting target.
-/// Opens a 48pt ghost-row slot above or below the row as the finger hovers.
+/// Registers a reorderable task row as a live Magic Plus target. The
+/// insertion line shows above or below the row as the finger hovers.
 struct MagicPlusRowDropModifier: ViewModifier {
 
   @Environment(\.magicPlusDrag) private var drag
@@ -654,6 +691,94 @@ extension View {
   }
 }
 
+// MARK: - Magic Plus on the Tasks index
+
+/// Registers a Tasks index row (an Area or a Project) as a Magic Plus target.
+/// The drop turns the insertion line into an inline draft row. `active` gates
+/// the zone: the index stays mounted under every pushed list, and its zones
+/// must never catch a drop made on another page.
+struct MagicPlusListInsertModifier: ViewModifier {
+  /// Holds the last row frame without SwiftUI observation, so scrolling never
+  /// invalidates the row.
+  private final class FrameBox { var rect: CGRect = .zero }
+
+  @Environment(\.magicPlusDrag) private var drag
+  @State private var box = FrameBox()
+  let id: String
+  let edge: MagicPlusInsertEdge
+  /// Leading inset of the line: a Project line starts past the icon column,
+  /// an Area line spans the card.
+  let lineInset: CGFloat
+  let active: Bool
+  let onDrop: (_ before: Bool) -> Void
+
+  private var hoverBefore: Bool? {
+    guard let drag, drag.isDragging, let target = drag.activeTarget, target.id == id else {
+      return nil
+    }
+    return target.before
+  }
+
+  private func register() {
+    guard let drag, active, box.rect != .zero else { return }
+    drag.register(id: id, kind: .listInsert(edge: edge), priority: 2,
+                  frame: box.rect, onDrop: onDrop)
+  }
+
+  /// A line between two cards draws in the middle of the card gap; a line
+  /// inside a card draws on the row edge.
+  private var lineOffset: CGFloat {
+    switch edge {
+    case .top:                return -MagicPlusListMetrics.cardGap / 2
+    case .belowGap(let gap):  return gap / 2
+    case .both, .bottom:      return 0
+    }
+  }
+
+  func body(content: Content) -> some View {
+    if let drag {
+      content
+        .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { rect in
+          box.rect = rect
+          register()
+        }
+        .onChange(of: active) { _, on in
+          if on { register() } else { drag.unregister(id: id) }
+        }
+        .onDisappear { drag.unregister(id: id) }
+        .overlay(alignment: hoverBefore == true ? .top : .bottom) {
+          if hoverBefore != nil {
+            MagicPlusInsertionMark()
+              .padding(.leading, lineInset)
+              .offset(y: lineOffset)
+          }
+        }
+        .a11yAnimation(.snappy(duration: 0.15), value: hoverBefore)
+    } else {
+      content
+    }
+  }
+}
+
+/// The Tasks index card gap the Area lines sit in. Matches the sidebar's
+/// `listSectionSpacing`.
+enum MagicPlusListMetrics {
+  static let cardGap: CGFloat = 14
+}
+
+extension View {
+  func magicPlusListInsert(
+    id: String,
+    edge: MagicPlusInsertEdge,
+    lineInset: CGFloat = 0,
+    active: Bool,
+    onDrop: @escaping (_ before: Bool) -> Void
+  ) -> some View {
+    modifier(MagicPlusListInsertModifier(id: id, edge: edge, lineInset: lineInset,
+                                         active: active, onDrop: onDrop))
+  }
+}
+
 /// Pass-through wrapper that registers a `magicPlusSectionDrop` only when a
 /// non-nil `onDropIDs` closure is supplied.
 struct MagicPlusOptionalSectionDrop: ViewModifier {
@@ -672,67 +797,11 @@ struct MagicPlusOptionalSectionDrop: ViewModifier {
   }
 }
 
-#if os(iOS)
-/// Full-screen non-hit-testing overlay that renders the finger-following Magic
-/// Plus drag. It draws the same `TaskDragStackPreview` card that a task row
-/// lifts into, so every task drag is one object. The card's destination chip
-/// names the target under the finger, or Cancel over the cancel socket.
-struct MagicPlusFloatingOverlay: View {
-  let drag: MagicPlusDragState
-
-  /// Upper bound of the card width, for the clamp against the screen edges.
-  private static let cardWidth: CGFloat = 260
-
-  var body: some View {
-    GeometryReader { geo in
-      if drag.isDragging {
-        let localOrigin = geo.frame(in: .global).origin
-        let rawX = drag.fingerLocation.x - localOrigin.x
-        let rawY = drag.fingerLocation.y - localOrigin.y - 36
-        let halfW = Self.cardWidth / 2
-        let clampedX = min(max(rawX, halfW + 16), max(halfW + 16, geo.size.width - halfW - 16))
-        let clampedY = max(rawY, 64)
-
-        card
-          .position(x: clampedX, y: clampedY)
-          .a11yAnimation(.snappy(duration: 0.2), value: drag.activeTarget?.kind)
-          .a11yAnimation(.snappy(duration: 0.2), value: drag.isOverCancelSocket)
-          .transition(.scale(scale: 0.8).combined(with: .opacity))
-      }
-    }
-    .ignoresSafeArea()
-    .allowsHitTesting(false)
-  }
-
-  private var card: some View {
-    let accent = AppearancePreferences.shared.magicPlusSwiftUIColor
-    return TaskDragStackPreview(
-      title: RegistryActions.title("app.newTask"),
-      count: 1,
-      accent: accent,
-      destination: destination,
-      destinationTint: drag.isOverCancelSocket ? .red : accent
-    )
-  }
-
-  private var destination: String? {
-    if drag.isOverCancelSocket { return "Cancel" }
-    switch drag.activeTarget?.kind {
-    case .taskRow(let context):   return (context?.isEmpty ?? true) ? nil : context
-    case .taskSection(let label): return label
-    case nil:                     return nil
-    }
-  }
-}
-#endif
-
 // MARK: - Multi-task stacked drag preview
 
 /// Tactile drag preview for `.draggable(TaskDragIDs)`: a compact rounded task
 /// card when lifting one row, or a subtle physical stack with an accent count
 /// badge when lifting a multi-selection (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §6.1).
-/// The Magic Plus drag (`MagicPlusFloatingOverlay`) draws this same card, with
-/// `destination` naming the drop target under the finger.
 struct TaskDragStackPreview: View {
   let title: String
   let count: Int

@@ -125,6 +125,12 @@ struct SidebarRootView: View {
   /// existing NewProjectSheet shows it as the target.
   @State private var newProjectInArea: String?
 
+  /// The inline row a Magic Plus drop opens on the iPhone Tasks index: the
+  /// insert line turns into this row, and its title creates the Project or
+  /// Area at that position.
+  @State private var magicDraft: SidebarMagicDraft?
+  @State private var magicDraftTitle = ""
+
   var body: some View {
     #if os(macOS)
     sidebarMac.modifier(rightClickAlerts).sheet(item: $emojiAreaTarget, content: areaEmojiSheet)
@@ -899,32 +905,41 @@ struct SidebarRootView: View {
   private func areaProjectSections() -> some View {
     // Each row knows its slice of the section's card, so a long-press lifts
     // exactly that slice (`cardRow`).
-    let topLevel = topLevelProjects
-    if !topLevel.isEmpty {
+    // A Magic Plus draft row is spliced in as a slot (`projectSlots` /
+    // `areaSlots`) and takes its own slice of the card.
+    let looseRows = projectSlots(topLevelProjects, area: nil)
+    if !looseRows.isEmpty {
       Section {
-        ForEach(Array(topLevel.enumerated()), id: \.element.id) { idx, project in
-          compactRow(route: .project(id: project.id)) {
-            projectRow(project, parent: nil,
-                       position: TaskCardPosition(index: idx, count: topLevel.count))
-          }
+        ForEach(Array(looseRows.enumerated()), id: \.element.id) { idx, slot in
+          projectSlotRow(slot, parent: nil,
+                         position: TaskCardPosition(index: idx, count: looseRows.count),
+                         isLastInLastCard: areas.isEmpty && magicDraft == nil
+                           && idx == looseRows.count - 1)
         }
       }
     }
-    ForEach(areas, id: \.id) { area in
-      let areaProjects = projects.filter { $0.area == area.id && $0.status == .active }
-      let collapsed = collapsedAreas.contains(area.id)
-      let rowCount = 1 + (collapsed ? 0 : areaProjects.count)
-      Section {
-        compactRow(route: .area(id: area.id)) {
-          areaRow(area, hasProjects: !areaProjects.isEmpty, collapsed: collapsed,
-                  position: TaskCardPosition(index: 0, count: rowCount))
+    ForEach(areaSlots) { slot in
+      switch slot {
+      case .draft:
+        Section {
+          compactRow { magicDraftRow(isArea: true) }
         }
-        if !collapsed {
-          ForEach(Array(areaProjects.enumerated()), id: \.element.id) { idx, project in
-            compactRow(route: .project(id: project.id)) {
-              projectRow(project, parent: area.id,
-                         position: TaskCardPosition(index: idx + 1, count: rowCount))
-            }
+      case .area(let area, let index):
+        let areaProjects = projects.filter { $0.area == area.id && $0.status == .active }
+        let collapsed = collapsedAreas.contains(area.id)
+        let rows = collapsed ? [] : projectSlots(areaProjects, area: area.id)
+        let rowCount = 1 + rows.count
+        let isLastArea = index == areas.count - 1 && !magicDraftIsAreaAtEnd
+        Section {
+          compactRow(route: .area(id: area.id)) {
+            areaRow(area, hasProjects: !areaProjects.isEmpty, collapsed: collapsed,
+                    position: TaskCardPosition(index: 0, count: rowCount),
+                    isLastInLastCard: isLastArea && rows.isEmpty)
+          }
+          ForEach(Array(rows.enumerated()), id: \.element.id) { idx, row in
+            projectSlotRow(row, parent: area.id,
+                           position: TaskCardPosition(index: idx + 1, count: rowCount),
+                           isLastInLastCard: isLastArea && idx == rows.count - 1)
           }
         }
       }
@@ -996,21 +1011,25 @@ struct SidebarRootView: View {
   /// its section's grouped card, projects underneath.
   @ViewBuilder
   private func areaRow(_ area: Area, hasProjects: Bool, collapsed: Bool,
-                       position: TaskCardPosition) -> some View {
+                       position: TaskCardPosition, isLastInLastCard: Bool) -> some View {
     areaRowBase(area, hasProjects: hasProjects, collapsed: collapsed, position: position)
     // Drag-a-task-here re-home on co-visible sidebar+list (iPad/Mac).
     .modifier(SidebarTaskDrop(kind: .area(area.id), mutator: taskMutator) {
       newProjectInArea = area.id
       showingNewProject = true
     })
-    // Magic Plus over an Area makes a new task in that Area. The orb only
-    // ever makes tasks (decided 2026-11-23).
-    .magicPlusSectionDrop(id: "mp-sidebar-area-\(area.id)",
-                          kind: .taskSection(label: "New Task in \(area.title)")) {
-      Haptics.commit()
-      nav.go(to: .area(id: area.id))
-      nav.requestNewTask()
+    // Magic Plus on the Tasks index makes Projects and Areas, never tasks
+    // (decided 2026-11-23). One insertion point per row, under it (decided
+    // 2026-11-23): under the area row a new Project goes first in the area.
+    // The only Area point is under the last card (a new Area at the end).
+    .magicPlusListInsert(id: "mp-sidebar-area-\(area.id)", edge: .bottom,
+                         lineInset: Self.projectLineInset, active: magicZonesActive) { _ in
+      if collapsedAreas.contains(area.id) { toggleAreaCollapsed(area.id) }
+      openMagicDraft(.project(area: area.id, index: 0))
     }
+    .modifier(MagicPlusTrailingAreaGap(enabled: isLastInLastCard, active: magicZonesActive) {
+      openMagicDraft(.area(index: areas.count))
+    })
   }
 
   /// The tappable row and its context menu; `projectRow` adds the drop targets.
@@ -1035,20 +1054,126 @@ struct SidebarRootView: View {
   }
 
   @ViewBuilder
-  private func projectRow(_ project: Project, parent: String?,
-                          position: TaskCardPosition) -> some View {
+  private func projectRow(_ project: Project, parent: String?, index: Int,
+                          position: TaskCardPosition, isLastInLastCard: Bool) -> some View {
     projectRowBase(project, position: position)
     // Drag-a-task-here re-home on co-visible sidebar+list (iPad/Mac).
     .modifier(SidebarTaskDrop(kind: .project(project.id), mutator: taskMutator) {
       newProjectInArea = parent
       showingNewProject = true
     })
-    // Magic Plus over a Project makes a new task in that Project.
-    .magicPlusSectionDrop(id: "mp-sidebar-proj-\(project.id)",
-                          kind: .taskSection(label: "New Task in \(project.title)")) {
-      Haptics.commit()
-      nav.go(to: .project(id: project.id))
-      nav.requestNewTask()
+    // Magic Plus under a Project puts a new Project after it, in the same
+    // area.
+    .magicPlusListInsert(id: "mp-sidebar-proj-\(project.id)", edge: .bottom,
+                         lineInset: Self.projectLineInset, active: magicZonesActive) { _ in
+      openMagicDraft(.project(area: parent, index: index + 1))
+    }
+    .modifier(MagicPlusTrailingAreaGap(enabled: isLastInLastCard, active: magicZonesActive) {
+      openMagicDraft(.area(index: areas.count))
+    })
+  }
+
+  // MARK: - Magic Plus drafts (iPhone Tasks index)
+
+  /// Leading inset of a Project insert line: it starts past the icon column,
+  /// so it reads as "inside this card". An Area line spans the whole gap.
+  private static let projectLineInset: CGFloat = Theme.sidebarIconSize + 4
+
+  /// Insert zones live only while the index is the visible root of the
+  /// iPhone stack. The index stays mounted under every pushed list, and its
+  /// zones must never catch a drop made there.
+  private var magicZonesActive: Bool {
+    !usesPushNavigation && nav.path.isEmpty
+  }
+
+  private var magicDraftIsAreaAtEnd: Bool {
+    if case .area(let i) = magicDraft, i >= areas.count { return true }
+    return false
+  }
+
+  /// Areas in order, with the Area draft spliced in at its index.
+  private var areaSlots: [SidebarAreaSlot] {
+    var slots = areas.enumerated().map { SidebarAreaSlot.area($0.element, index: $0.offset) }
+    if case .area(let i) = magicDraft {
+      slots.insert(.draft, at: min(max(i, 0), slots.count))
+    }
+    return slots
+  }
+
+  /// One area's projects (or the loose ones), with the Project draft spliced
+  /// in at its index.
+  private func projectSlots(_ list: [Project], area: String?) -> [SidebarProjectSlot] {
+    var slots = list.enumerated().map { SidebarProjectSlot.project($0.element, index: $0.offset) }
+    if case .project(let a, let i) = magicDraft, a == area {
+      slots.insert(.draft, at: min(max(i, 0), slots.count))
+    }
+    return slots
+  }
+
+  @ViewBuilder
+  private func projectSlotRow(_ slot: SidebarProjectSlot, parent: String?,
+                              position: TaskCardPosition,
+                              isLastInLastCard: Bool) -> some View {
+    switch slot {
+    case .draft:
+      compactRow { magicDraftRow(isArea: false) }
+    case .project(let project, let index):
+      compactRow(route: .project(id: project.id)) {
+        projectRow(project, parent: parent, index: index, position: position,
+                   isLastInLastCard: isLastInLastCard)
+      }
+    }
+  }
+
+  private func magicDraftRow(isArea: Bool) -> some View {
+    SidebarMagicDraftRow(isArea: isArea, title: $magicDraftTitle, onEnd: commitMagicDraft)
+      #if os(iOS)
+      // iOS rows carry their 16pt side inset inside the row (`cardRow`).
+      .padding(.horizontal, 16)
+      #endif
+  }
+
+  private func openMagicDraft(_ draft: SidebarMagicDraft) {
+    Haptics.commit()
+    magicDraftTitle = ""
+    a11yAnimate(.snappy(duration: 0.22)) { magicDraft = draft }
+  }
+
+  /// Ends the draft row: a typed title creates the Project or Area at the
+  /// draft's position; an empty title just closes the row.
+  private func commitMagicDraft() {
+    guard let draft = magicDraft else { return }
+    let title = magicDraftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+    a11yAnimate(.snappy(duration: 0.22)) { magicDraft = nil }
+    magicDraftTitle = ""
+    guard !title.isEmpty else { return }
+    switch draft {
+    case .project(let area, let index):
+      let siblingIDs = projects.filter { $0.area == area && $0.status == .active }.map(\.id)
+      Task {
+        do {
+          let created = try await projectsMutator.create(title: title, area: area)
+          var ids = siblingIDs.filter { $0 != created.id }
+          ids.insert(created.id, at: min(index, ids.count))
+          try await projectsMutator.reorder(orderedIDs: ids)
+          await load()
+        } catch {
+          errorMessage = error.localizedDescription
+        }
+      }
+    case .area(let index):
+      let areaIDs = areas.map(\.id)
+      Task {
+        do {
+          let created = try await areasMutator.create(title: title)
+          var ids = areaIDs.filter { $0 != created.id }
+          ids.insert(created.id, at: min(index, ids.count))
+          try await areasMutator.reorder(orderedIDs: ids)
+          await load()
+        } catch {
+          errorMessage = error.localizedDescription
+        }
+      }
     }
   }
 
@@ -1414,8 +1539,9 @@ struct SmartListRow: View {
 #if os(iOS)
 /// Shared rhythm for the iOS Tasks sidebar: tile gutters, inter-row gaps in
 /// the 2×2 grid, and the gap between the grid and the grouped cards below.
+/// The card gap is the Magic Plus line's gap too (`MagicPlusListMetrics`).
 private enum IOSSidebarListMetrics {
-  static let sectionSpacing: CGFloat = 14
+  static let sectionSpacing: CGFloat = MagicPlusListMetrics.cardGap
 }
 
 /// iPhone + iPad share the insetGrouped "bubble card" Tasks home — the same
@@ -2119,20 +2245,101 @@ private struct SidebarNewAreaDropDelegate: DropDelegate {
 private struct SmartListTaskDrop: ViewModifier {
   let route: Route
   let mutator: TaskMutator
-  @Environment(NavigationState.self) private var nav
 
   func body(content: Content) -> some View {
     if let kind = SidebarTaskDrop.Kind(route: route) {
       content
         .modifier(SidebarTaskDrop(kind: kind, mutator: mutator))
-        .magicPlusSectionDrop(id: "mp-sidebar-smart-\(route.id)",
-                              kind: .taskSection(label: "New Task in \(route.title)")) {
-          Haptics.commit()
-          nav.go(to: route)
-          nav.requestNewTask()
-        }
     } else {
       content
+    }
+  }
+}
+
+// MARK: - Magic Plus drafts on the Tasks index
+
+/// Where a Magic Plus drop on the Tasks index opens its inline draft row.
+enum SidebarMagicDraft: Equatable {
+  /// A new Project at `index` among the active projects of `area` (nil: loose).
+  case project(area: String?, index: Int)
+  /// A new Area at `index` in the area order.
+  case area(index: Int)
+}
+
+private enum SidebarAreaSlot: Identifiable {
+  case area(Area, index: Int)
+  case draft
+
+  var id: String {
+    switch self {
+    case .area(let area, _): return area.id
+    case .draft:             return "magic-draft-area"
+    }
+  }
+}
+
+private enum SidebarProjectSlot: Identifiable {
+  case project(Project, index: Int)
+  case draft
+
+  var id: String {
+    switch self {
+    case .project(let project, _): return project.id
+    case .draft:                   return "magic-draft-project"
+    }
+  }
+}
+
+/// The gap under the last card on the Tasks index: a drop there makes a new
+/// Area at the end. Registered only by the last row of the last card.
+private struct MagicPlusTrailingAreaGap: ViewModifier {
+  let enabled: Bool
+  let active: Bool
+  let onDrop: () -> Void
+
+  func body(content: Content) -> some View {
+    if enabled {
+      content.magicPlusListInsert(id: "mp-sidebar-area-gap-end",
+                                  edge: .belowGap(MagicPlusListMetrics.cardGap),
+                                  active: active) { _ in onDrop() }
+    } else {
+      content
+    }
+  }
+}
+
+/// The inline row the insert line turns into: the Project or Area glyph and a
+/// focused title field. Return or leaving the field ends it; the host creates
+/// the item when the title is not empty.
+private struct SidebarMagicDraftRow: View {
+  let isArea: Bool
+  @Binding var title: String
+  let onEnd: () -> Void
+  @FocusState private var focused: Bool
+
+  var body: some View {
+    let prompt = RegistryPrompts.textPrompt(isArea ? "newArea" : "newProject")
+    HStack(spacing: Theme.sidebarRowSpacing) {
+      Group {
+        if isArea {
+          AreaIcon()
+        } else {
+          ProjectProgressIcon(progress: 0, tint: Theme.inkSecondary)
+        }
+      }
+      .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
+      TextField(prompt.placeholder, text: $title)
+        .scaledFont(size: isArea ? Theme.sidebarAreaTitleSize : Theme.sidebarTitleSize,
+                    weight: isArea ? .semibold : Theme.sidebarTitleWeight)
+        .foregroundStyle(SidebarRowTitleStyle.color)
+        .focused($focused)
+        .submitLabel(.done)
+        .onSubmit(onEnd)
+    }
+    .frame(height: isArea ? Theme.sidebarRowHeight : Theme.sidebarProjectRowHeight)
+    .onAppear { DispatchQueue.main.async { focused = true } }
+    .onChange(of: focused) { _, isFocused in
+      if !isFocused { onEnd() }
     }
   }
 }

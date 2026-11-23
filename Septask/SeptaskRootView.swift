@@ -186,8 +186,11 @@ struct SeptaskRootView: View {
       MagicPlusOrb(
         drag: magicPlusDrag,
         isViewingProject: isViewingProject,
+        isViewingHome: isViewingHome,
         onNewTask: { triggerInlineNewTask() },
-        onNewSection: { nav.shouldCreateHeading = true }
+        onNewSection: { nav.shouldCreateHeading = true },
+        onNewProject: { nav.shouldCreateProject = true },
+        onNewArea: { nav.shouldCreateArea = true }
       )
       .padding(.trailing, 16)
       .padding(.bottom, 8)
@@ -195,11 +198,13 @@ struct SeptaskRootView: View {
       .allowsHitTesting(!hideMagicPlus)
       .a11yAnimation(.snappy(duration: 0.2), value: hideMagicPlus)
 
-      MagicPlusFloatingOverlay(drag: magicPlusDrag)
     }
     .environment(\.magicPlusDrag, magicPlusDrag)
     .onAppear {
-      magicPlusDrag.fallbackDrop = { triggerInlineNewTask() }
+      // An empty list root has no insert point: a drop there makes an Area.
+      magicPlusDrag.fallbackDrop = {
+        if nav.path.isEmpty { nav.shouldCreateArea = true } else { triggerInlineNewTask() }
+      }
       // Open on Today, with the list root one Back away. The split layout
       // already falls back to Today when the path is empty (ContentView).
       if nav.path.isEmpty { nav.path = [.filter(.today)] }
@@ -217,8 +222,14 @@ struct SeptaskRootView: View {
     }
   }
 
-  /// The orb only makes tasks. On a project it also makes a section, so its
-  /// tap there opens a two-row menu; everywhere else the tap makes a task.
+  /// The list root (Tasks index). There the orb makes only Projects and
+  /// Areas (decided 2026-11-23): the tap opens a two-row menu, and the drag
+  /// drops a new Project or Area at the line.
+  private var isViewingHome: Bool { nav.path.isEmpty }
+
+  /// The orb only makes tasks on a list. On a project it also makes a
+  /// section, so its tap there opens a two-row menu; everywhere else the tap
+  /// makes a task.
   private var isViewingProject: Bool {
     if case .project = nav.path.last { return true }
     return false
@@ -232,11 +243,12 @@ struct SeptaskRootView: View {
 /// - Solid accent circle + subtle 6-dot grip beneath `+` communicates a
 ///   grabbable object rather than a flat tap-only tab icon.
 /// - Tap makes a task. On a project it opens a popover with `New Task` and
-///   `New Section`. Areas and projects are made from the lists page.
-/// - Instant drag (no hold delay) detaches the orb to follow the finger 1:1
-///   and morphs live into a ghost task card or contextual action pill over
-///   every row gap, heading, Today/Anytime group, Upcoming day, or Tasks
-///   index Area/Project drop zone.
+///   `New Section`. On the list root it opens `New Project` and `New Area`
+///   only.
+/// - Instant drag (no hold delay) hides the orb and shows the insertion line
+///   at the row gap, heading, Today/Anytime group or Upcoming day under the
+///   finger, or between Projects and Areas on the list root. No floating
+///   card (decided 2026-11-23).
 private struct MagicPlusOrb: View {
   let drag: MagicPlusDragState
   @State private var showingMenu = false
@@ -248,8 +260,11 @@ private struct MagicPlusOrb: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   let isViewingProject: Bool
+  let isViewingHome: Bool
   let onNewTask: () -> Void
   let onNewSection: () -> Void
+  let onNewProject: () -> Void
+  let onNewArea: () -> Void
 
   var body: some View {
     let appearance = AppearancePreferences.shared
@@ -317,7 +332,7 @@ private struct MagicPlusOrb: View {
       guard !drag.isDragging else { return }
       Haptics.press()
       if !reduceMotion { popTick += 1 }
-      if isViewingProject { showingMenu = true } else { onNewTask() }
+      if isViewingProject || isViewingHome { showingMenu = true } else { onNewTask() }
     }
     .simultaneousGesture(
       DragGesture(minimumDistance: 0)
@@ -339,9 +354,11 @@ private struct MagicPlusOrb: View {
     )
     .accessibilityAddTraits(.isButton)
     .accessibilityLabel("New")
-    .accessibilityHint(isViewingProject
-      ? Text("Tap for a new task or section, or drag onto a list position.")
-      : Text("Tap for a new task, or drag onto a list position."))
+    .accessibilityHint(isViewingHome
+      ? Text("Tap for a new project or area, or drag onto a list position.")
+      : isViewingProject
+        ? Text("Tap for a new task or section, or drag onto a list position.")
+        : Text("Tap for a new task, or drag onto a list position."))
     .popover(isPresented: $showingMenu, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
       quickMenu
         .presentationCompactAdaptation(.popover)
@@ -366,9 +383,20 @@ private struct MagicPlusOrb: View {
 
   private var quickMenu: some View {
     VStack(alignment: .leading, spacing: 2) {
-      menuRow(title: RegistryActions.title("app.newTask"), icon: "checkmark.circle") {
-        showingMenu = false
-        onNewTask()
+      if isViewingHome {
+        menuRow(title: RegistryActions.title("sidebar.newProject"), icon: "number") {
+          showingMenu = false
+          onNewProject()
+        }
+        menuRow(title: RegistryActions.title("sidebar.newArea"), icon: "square.stack.3d.up") {
+          showingMenu = false
+          onNewArea()
+        }
+      } else {
+        menuRow(title: RegistryActions.title("app.newTask"), icon: "checkmark.circle") {
+          showingMenu = false
+          onNewTask()
+        }
       }
       if isViewingProject {
         menuRow(title: RegistryActions.title("section.new"), icon: "rectangle.split.1x2") {
