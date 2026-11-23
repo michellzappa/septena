@@ -4,6 +4,8 @@
     <application
         android:name=".SeptenaAndroidApp"
         android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:label="Septena"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
