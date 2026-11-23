@@ -366,6 +366,14 @@
       "availability": { "selection": "none" },
       "featureId": "settings.display"
     },
+    "app.undo": {
+      "title": "Undo",
+      "message": "Task change saved",
+      "icon": "action.restore",
+      "role": "default",
+      "availability": { "selection": "none", "platforms": ["android"] },
+      "featureId": "edit.undo"
+    },
     "app.keyboardShortcuts": {
       "title": "Keyboard Shortcuts",
       "icon": "settings.about",

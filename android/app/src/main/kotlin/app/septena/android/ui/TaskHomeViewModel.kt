@@ -128,7 +128,11 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     fun complete(id: String) {
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { graph.taskMutator.complete(id) } }
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.captureTaskEdit(id) { graph.taskMutator.complete(id) }
+                }
+            }
                 .onSuccess {
                     errorMessage.value = null
                     noteLocalChangeAndSync()

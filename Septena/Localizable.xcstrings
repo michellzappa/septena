@@ -13010,6 +13010,10 @@
         }
       }
     },
+    "Undo" : {
+      "comment" : "Generated from registry actions.actions.app.undo.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Universal conventions every section relies on. Each section skill below extends this." : {
       "localizations" : {
         "pt-BR" : {

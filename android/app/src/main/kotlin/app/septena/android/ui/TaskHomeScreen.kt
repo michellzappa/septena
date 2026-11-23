@@ -1,5 +1,6 @@
 package app.septena.android.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -14,6 +15,10 @@ import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.PermanentDrawerSheet
 import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -21,6 +26,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +34,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -40,7 +47,9 @@ import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryCapabilityIds
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.ui.TaskHomeContent
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,8 +59,41 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
     val factory = remember(graph) { TaskHomeViewModelFactory(graph) }
     val homeViewModel: TaskHomeViewModel = viewModel(factory = factory)
     val state by homeViewModel.state.collectAsStateWithLifecycle()
+    val undoSnackbarHostState = remember { SnackbarHostState() }
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val wideLayout = LocalConfiguration.current.screenWidthDp >= 600
+    val undoTitle = RegistryCatalog.actionTitle(
+        RegistryActionIds.APP_UNDO,
+        languageTag = languageTag,
+    ).orEmpty()
+    val undoMessage = RegistryCatalog.actionTitle(
+        RegistryActionIds.APP_UNDO,
+        field = "message",
+        languageTag = languageTag,
+    ).orEmpty()
+
+    LaunchedEffect(graph, undoSnackbarHostState, undoTitle, undoMessage) {
+        var lastEditId = graph.taskUndoHistory.state.value.latestEditId
+        graph.taskUndoHistory.state.collect { undoState ->
+            if (undoState.latestEditId == lastEditId) return@collect
+            lastEditId = undoState.latestEditId
+            val result = undoSnackbarHostState.showSnackbar(
+                message = undoMessage,
+                actionLabel = undoTitle,
+                withDismissAction = true,
+                duration = SnackbarDuration.Long,
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                val undone = runCatching {
+                    withContext(Dispatchers.IO) { graph.taskUndoHistory.undo(graph.taskMutator) }
+                }.getOrDefault(false)
+                if (undone) {
+                    graph.sync.noteLocalChange()
+                    graph.sync.requestSync()
+                }
+            }
+        }
+    }
     val pageTitle = when (val location = state.location) {
         is TaskHomeLocation.SmartList -> RegistryCatalog.destinationTitle(location.destinationId, languageTag)
             .orEmpty()
@@ -111,91 +153,100 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
         }
     }
 
-    if (wideLayout) {
-        PermanentNavigationDrawer(
-            drawerContent = {
-                PermanentDrawerSheet {
-                    TaskHomeNavigation(
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (wideLayout) {
+            PermanentNavigationDrawer(
+                drawerContent = {
+                    PermanentDrawerSheet {
+                        TaskHomeNavigation(
+                            state = state,
+                            languageTag = languageTag,
+                            areasTitle = areasTitle,
+                            projectsTitle = projectsTitle,
+                            onSelect = homeViewModel::select,
+                        )
+                    }
+                }
+            ) {
+                if (quickFindOpen) {
+                    QuickFindScreen(graph, onBack = { quickFindOpen = false }, onSelect = openQuickFindTarget)
+                } else if (openedTaskId != null) {
+                    TaskDetailScreen(graph, openedTaskId!!, onBack = { openedTaskId = null })
+                } else {
+                    TaskHomeScaffold(
+                        graph = graph,
                         state = state,
-                        languageTag = languageTag,
-                        areasTitle = areasTitle,
-                        projectsTitle = projectsTitle,
-                        onSelect = homeViewModel::select,
+                        title = pageTitle,
+                        sidebarActionTitle = sidebarActionTitle,
+                        quickAddTitle = quickAddTitle,
+                        quickFindTitle = quickFindTitle,
+                        completeTitle = completeTitle,
+                        emptyTitle = emptyTitle,
+                        inboxTitle = inboxTitle,
+                        showNavigationAction = false,
+                        onDraftTitleChange = homeViewModel::updateDraft,
+                        onQuickAdd = homeViewModel::quickAdd,
+                        onComplete = homeViewModel::complete,
+                        onOpenTask = { openedTaskId = it },
+                        onQuickFind = { quickFindOpen = true },
+                        onSelectHomeLocation = homeViewModel::select,
                     )
                 }
-            },
-        ) {
-            if (quickFindOpen) {
-                QuickFindScreen(graph, onBack = { quickFindOpen = false }, onSelect = openQuickFindTarget)
-            } else if (openedTaskId != null) {
-                TaskDetailScreen(graph, openedTaskId!!, onBack = { openedTaskId = null })
-            } else {
-                TaskHomeScaffold(
-                    graph = graph,
-                    state = state,
-                    title = pageTitle,
-                    sidebarActionTitle = sidebarActionTitle,
-                    quickAddTitle = quickAddTitle,
-                    quickFindTitle = quickFindTitle,
-                    completeTitle = completeTitle,
-                    emptyTitle = emptyTitle,
-                    inboxTitle = inboxTitle,
-                    showNavigationAction = false,
-                    onDraftTitleChange = homeViewModel::updateDraft,
-                    onQuickAdd = homeViewModel::quickAdd,
-                    onComplete = homeViewModel::complete,
-                    onOpenTask = { openedTaskId = it },
-                    onQuickFind = { quickFindOpen = true },
-                    onSelectHomeLocation = homeViewModel::select,
-                )
             }
-        }
-    } else {
-        val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-        val scope = rememberCoroutineScope()
-        ModalNavigationDrawer(
-            drawerState = drawerState,
-            drawerContent = {
-                ModalDrawerSheet {
-                    TaskHomeNavigation(
+        } else {
+            val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+            val scope = rememberCoroutineScope()
+            ModalNavigationDrawer(
+                drawerState = drawerState,
+                drawerContent = {
+                    ModalDrawerSheet {
+                        TaskHomeNavigation(
+                            state = state,
+                            languageTag = languageTag,
+                            areasTitle = areasTitle,
+                            projectsTitle = projectsTitle,
+                            onSelect = { location ->
+                                homeViewModel.select(location)
+                                scope.launch { drawerState.close() }
+                            },
+                        )
+                    }
+                }
+            ) {
+                if (quickFindOpen) {
+                    QuickFindScreen(graph, onBack = { quickFindOpen = false }, onSelect = openQuickFindTarget)
+                } else if (openedTaskId != null) {
+                    TaskDetailScreen(graph, openedTaskId!!, onBack = { openedTaskId = null })
+                } else {
+                    TaskHomeScaffold(
+                        graph = graph,
                         state = state,
-                        languageTag = languageTag,
-                        areasTitle = areasTitle,
-                        projectsTitle = projectsTitle,
-                        onSelect = { location ->
-                            homeViewModel.select(location)
-                            scope.launch { drawerState.close() }
-                        },
+                        title = pageTitle,
+                        sidebarActionTitle = sidebarActionTitle,
+                        quickAddTitle = quickAddTitle,
+                        quickFindTitle = quickFindTitle,
+                        completeTitle = completeTitle,
+                        emptyTitle = emptyTitle,
+                        inboxTitle = inboxTitle,
+                        showNavigationAction = true,
+                        onOpenNavigation = { scope.launch { drawerState.open() } },
+                        onDraftTitleChange = homeViewModel::updateDraft,
+                        onQuickAdd = homeViewModel::quickAdd,
+                        onComplete = homeViewModel::complete,
+                        onOpenTask = { openedTaskId = it },
+                        onQuickFind = { quickFindOpen = true },
+                        onSelectHomeLocation = homeViewModel::select,
                     )
                 }
-            },
-        ) {
-            if (quickFindOpen) {
-                QuickFindScreen(graph, onBack = { quickFindOpen = false }, onSelect = openQuickFindTarget)
-            } else if (openedTaskId != null) {
-                TaskDetailScreen(graph, openedTaskId!!, onBack = { openedTaskId = null })
-            } else {
-                TaskHomeScaffold(
-                    graph = graph,
-                    state = state,
-                    title = pageTitle,
-                    sidebarActionTitle = sidebarActionTitle,
-                    quickAddTitle = quickAddTitle,
-                    quickFindTitle = quickFindTitle,
-                    completeTitle = completeTitle,
-                    emptyTitle = emptyTitle,
-                    inboxTitle = inboxTitle,
-                    showNavigationAction = true,
-                    onOpenNavigation = { scope.launch { drawerState.open() } },
-                    onDraftTitleChange = homeViewModel::updateDraft,
-                    onQuickAdd = homeViewModel::quickAdd,
-                    onComplete = homeViewModel::complete,
-                    onOpenTask = { openedTaskId = it },
-                    onQuickFind = { quickFindOpen = true },
-                    onSelectHomeLocation = homeViewModel::select,
-                )
             }
         }
+
+        SnackbarHost(
+            hostState = undoSnackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+        )
     }
 }
 

@@ -173,7 +173,9 @@ fun TaskDetailScreen(
             if (notesChanged) put(RegistryEntityFields.Task.NOTES, JsonValue.stringOrNull(notes.ifEmpty { null }))
         }
         withContext(Dispatchers.IO) {
-            check(graph.taskMutator.updateFields(taskId, changes) != null)
+            graph.captureTaskEdit(taskId) {
+                check(graph.taskMutator.updateFields(taskId, changes) != null)
+            }
         }
         textIsDirty = false
         saveFailed = false
@@ -254,7 +256,9 @@ fun TaskDetailScreen(
             saving = true
             saveFailed = false
             runCatching {
-                withContext(Dispatchers.IO) { block() }
+                withContext(Dispatchers.IO) {
+                    graph.captureTaskEdit(taskId, block)
+                }
             }.onSuccess {
                 graph.sync.noteLocalChange()
                 graph.sync.requestSync()

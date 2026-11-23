@@ -2716,6 +2716,12 @@
       "destinations.destinations.faded.emptyState.detail"
     ]
   },
+  "Undo": {
+    "text": "Undo",
+    "paths": [
+      "actions.actions.app.undo.title"
+    ]
+  },
   "Upcoming": {
     "text": "Upcoming",
     "paths": [

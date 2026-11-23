@@ -15,6 +15,7 @@ import app.septena.core.SystemDayClock
 import app.septena.core.TaskMutator
 import app.septena.core.TaskSyncEngine
 import app.septena.core.UuidTaskIdGenerator
+import app.septena.core.generated.RegistryEntityNames
 import app.septena.store.SqlDelightTaskStore
 import app.septena.store.db.SeptenaDatabase
 import app.septena.transport.SeptenaAuthClient
@@ -44,6 +45,7 @@ class AndroidAppGraph(application: Application) {
     val clock = SystemDayClock()
     val ids = UuidTaskIdGenerator()
     val taskMutator = TaskMutator(taskStore, clock, ids)
+    val taskUndoHistory = TaskUndoHistory()
     val registryEntityMutator = RegistryEntityMutator(taskStore, clock, ids)
     val conversationMutator = ConversationMutator(taskStore, ids)
     val recurrenceRules = RecurrenceRules
@@ -55,4 +57,15 @@ class AndroidAppGraph(application: Application) {
     val credentials = AppCredentials(SessionStore(application), auth)
     private val transport = UrlConnectionSyncTransport(credentials, clientVersion)
     val sync = SyncController(TaskSyncEngine(taskStore, transport, clock), appScope)
+
+    /**
+     * Wraps a user gesture's task write so undo captures only that local edit.
+     * Sync and background code call mutators directly and never enter this path.
+     */
+    suspend fun captureTaskEdit(taskId: String, mutation: suspend () -> Unit) {
+        val before = taskStore.record(RegistryEntityNames.TASK, taskId)
+        mutation()
+        val after = taskStore.record(RegistryEntityNames.TASK, taskId)
+        taskUndoHistory.recordEdit(before, after)
+    }
 }
