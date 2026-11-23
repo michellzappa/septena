@@ -357,6 +357,14 @@ final class MagicPlusDragState {
 
   /// Non-observed registry so scrolling rows never trigger SwiftUI view invalidations.
   @ObservationIgnored private var zones: [String: Zone] = [:]
+  /// Zone frames frozen at drag start. Targets resolve against this REST
+  /// layout, never the live one: the open slot pushes every zone under it down
+  /// by a slot height, and resolving against those moved frames fed the slot
+  /// back into the hit test (the probe fell into the slot it had just opened,
+  /// the nearest-zone fallback picked a neighbour, the slot moved, repeat).
+  /// The list cannot scroll during the drag (the finger is on the orb), so the
+  /// rest layout stays true for the whole gesture.
+  @ObservationIgnored private var restFrames: [String: CGRect] = [:]
 
   func register(
     id: String,
@@ -367,10 +375,16 @@ final class MagicPlusDragState {
   ) {
     guard frame.width > 0, frame.height > 0 else { return }
     zones[id] = Zone(id: id, kind: kind, priority: priority, frame: frame, onDrop: onDrop)
+    // A zone that first appears mid-drag joins the rest layout only while no
+    // slot is open; with a slot open its frame is already shifted.
+    if isDragging, restFrames[id] == nil, activeTarget == nil {
+      restFrames[id] = frame
+    }
   }
 
   func unregister(id: String) {
     zones.removeValue(forKey: id)
+    restFrames.removeValue(forKey: id)
     if activeTarget?.id == id {
       activeTarget = nil
     }
@@ -381,6 +395,7 @@ final class MagicPlusDragState {
     isOverCancelSocket = false
     fingerLocation = location
     activeTarget = nil
+    restFrames = zones.mapValues(\.frame)
     Haptics.press()
     resolveTarget(for: location)
   }
@@ -400,6 +415,7 @@ final class MagicPlusDragState {
       isOverCancelSocket = false
       activeTarget = nil
     }
+    restFrames.removeAll()
     if let hit, let action {
       action(hit.before)
     } else if !isOverHome(location) {
@@ -418,6 +434,14 @@ final class MagicPlusDragState {
     isOverCancelSocket = false
     activeTarget = nil
     zones.removeAll()
+    restFrames.removeAll()
+  }
+
+  /// Where a target's slot opens in the rest layout: above a row for
+  /// `before`, under it otherwise (a section slot always opens under it).
+  private static func slotY(_ target: ActiveTarget) -> CGFloat {
+    if case .taskRow = target.kind, target.before { return target.frame.minY }
+    return target.frame.maxY
   }
 
   /// Shortest distance from a point to a rect (0 inside it).
@@ -452,7 +476,13 @@ final class MagicPlusDragState {
 
     // Aim slightly above the fingertip where the floating ghost card sits.
     let probe = CGPoint(x: location.x, y: location.y - 24)
-    let candidates = zones.values.filter { zone in
+    // Resolve against the rest layout (see `restFrames`).
+    let layout: [Zone] = zones.values.map { zone in
+      var z = zone
+      if let rest = restFrames[zone.id] { z.frame = rest }
+      return z
+    }
+    let candidates = layout.filter { zone in
       let padY: CGFloat = zone.priority >= 2 ? 4 : 0
       return zone.frame.insetBy(dx: -8, dy: -padY).contains(probe)
     }
@@ -465,7 +495,7 @@ final class MagicPlusDragState {
     let best = candidates.max { a, b in
       if a.priority != b.priority { return a.priority < b.priority }
       return abs(a.frame.midY - probe.y) > abs(b.frame.midY - probe.y)
-    } ?? zones.values.min { a, b in
+    } ?? layout.min { a, b in
       let da = Self.distance(from: probe, to: a.frame)
       let db = Self.distance(from: probe, to: b.frame)
       if da != db { return da < db }
@@ -494,6 +524,13 @@ final class MagicPlusDragState {
     }
 
     let next = ActiveTarget(id: best.id, kind: best.kind, before: before, frame: best.frame)
+    // "After row A" and "before row B" are the same slot when A and B touch.
+    // Keep the current target then: switching would move the slot's padding
+    // from one row to the other (a visible hop) and fire a second tick.
+    if let current = activeTarget, current.id != next.id,
+       abs(Self.slotY(current) - Self.slotY(next)) < 2 {
+      return
+    }
     if activeTarget?.id != next.id || activeTarget?.before != next.before {
       Haptics.selection()
       a11yAnimate(.snappy(duration: 0.18)) {
