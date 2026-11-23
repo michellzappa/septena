@@ -131,13 +131,12 @@ without threading `currentDate` does nothing — the date strip is a
 ### 8. MCP / agent skill — **optional**
 
 `static var mcpSkill: SectionSkill?` on the plugin declares the human-facing
-brief only; it does **not** make tools callable. For app-local MCP, add matching
-tool schemas in `SeptenaCore/MCP/MCPToolCatalog.swift`, dispatch/read-write
-handlers in `SeptenaCore/MCP/MCPDispatch.swift`, and include list tools in
-`readOnlyTools` when they only read the local mirror. If the hosted gateway is
-expected to expose the same section, mirror the schema and handlers there too.
+brief only; it does **not** make tools callable. Tools live on the one MCP
+server, the task backend (`backend/src/shadow/mcp.ts`); the in-app server
+(`SeptenaCore/MCP/`) was removed on 2026-11-21. Add the schema and handlers
+there.
 
-The gateway's `backend/skill.md` is generated from
+The backend's `backend/skill.md` is generated from
 `SectionRegistry.fullSkillMarkdown()`, so keep the plugin brief in sync with the
 actual MCP tools. A section with only `mcpSkill` text is documented for agents
 but not executable.

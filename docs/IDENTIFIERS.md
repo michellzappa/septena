@@ -114,8 +114,8 @@ app, both MCP servers and the task backend:
 | `effort` | `"light"` / `"heavy"` or absent | Absent = unknown. |
 
 All are read-only over MCP: only the app writes them. Today they live on the
-local model and in the in-app MCP server; the task backend and its connector
-get them with the backend columns (docs/SEPTASK_BACKEND.md §5.2).
+local model only. The task backend and its connector (the one MCP server) get
+them with the backend columns (#117, docs/SEPTASK_BACKEND.md §5.2).
 
 ## Foreign keys
 

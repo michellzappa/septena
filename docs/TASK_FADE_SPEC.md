@@ -344,8 +344,8 @@ P1 must land on the backend schema first if the cutover (M1) has happened,
 else on the local model with the backend fields specified for the cutover.
 
 Each phase touches shared task code: build all four schemes (`CLAUDE.md`,
-"Septask"). Any new MCP field lands in the in-app server and
-`backend/` together.
+"Septask"). Any new MCP field lands in `backend/`, the one MCP
+server (the in-app server was removed on 2026-11-21).
 
 ## 11. Open questions for mz
 

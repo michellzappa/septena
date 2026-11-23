@@ -642,32 +642,27 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   the banned list (no "late nights" etc.) is binding.
 - Don't add FastAPI/server client code — the repo is CloudKit-first; remaining
   FastAPI references are migration history slated for cleanup.
-- **Two MCP servers, edited in lockstep.** There are TWO: the **in-app** server
-  (`SeptenaCore/MCP/` — `LocalMCPServer` + `MCPDispatch` + `MCPToolCatalog`,
-  macOS, for Claude Code) and the **hosted gateway** (`backend/` in this repo,
-  Cloudflare Worker / TS, for consumer chat; imported with history from the
-  old `../septena-mcp-gateway` repo, which is now frozen: edit and deploy only
-  from `backend/`). **Any MCP
-  tool change must land in BOTH, plus the docs/skills, in the same change** —
-  never one without the others, or the two surfaces silently diverge. The
-  gateway's `skill.md` is generated from `SectionRegistry.fullSkillMarkdown()`, so
-  keep in-app section skill briefs in sync with the gateway's tools.
-  **One sanctioned exception: the agent loop** (`tasks_claim`,
-  `tasks_release`, `tasks_agent_events`, `tasks_activity`) lives ONLY on the
-  task backend connector (`api.septena.app/mcp`, `src/shadow/agent.ts`). A claim
-  needs the Durable Object's single writer, and its rules (leases, the
+- **One MCP server: the task backend connector.** It is
+  `api.septena.app/mcp`, served from `backend/src/shadow/mcp.ts` (Cloudflare
+  Worker / TS). The in-app macOS server (`SeptenaCore/MCP/`) was removed on
+  2026-11-21 (commit `7b101882`), and the old CloudKit gateway
+  (`mcp.septena.app`) was decommissioned on 2026-11-20. Docs that still
+  describe "two servers, edited in lockstep" are history. An MCP tool change
+  lands in `backend/` plus the docs and skill briefs in the same change. The
+  brief at `backend/skill.md` is generated from
+  `SectionRegistry.fullSkillMarkdown()`, so keep the plugin briefs in sync
+  with the backend's tools. The agent loop (`tasks_claim`, `tasks_release`,
+  `tasks_agent_events`, `tasks_activity`) lives in `src/shadow/agent.ts`: a
+  claim needs the Durable Object's single writer, and its rules (leases, the
   human-only stop, pause, run budget) are enforced in `TaskStore`, not in tool
-  code. Do not port these tools to the CloudKit gateway or the in-app server.
-  See ADR 0008.
-- **Both MCP servers are DUAL-ERA and must stay that way.** MCP revision
+  code. See ADR 0008.
+- **The MCP server is DUAL-ERA and must stay that way.** MCP revision
   `2026-07-28` made the protocol stateless (no `initialize`, no
   `Mcp-Session-Id`, no GET stream; version + client identity ride in
-  `params._meta` and mirrored HTTP headers). Both servers implement it —
+  `params._meta` and mirrored HTTP headers). The server implements it —
   `server/discover`, `resultType`, `ttlMs`/`cacheScope`, header validation
   (`-32020`), honest version negotiation (`-32022`) — **while still answering
   the legacy `initialize` handshake**, because Claude's connector and every
   existing `claude mcp add` registration still speak the old shape. Deleting
-  the legacy path takes the live connector offline. The era rules and constants
-  are mirrored in `SeptenaCore/MCP/MCPRevision.swift` ⇄
-  `backend/src/protocol.ts` — edit in lockstep like everything
-  else MCP.
+  the legacy path takes the live connector offline. The era rules and
+  constants live in `backend/src/protocol.ts`.
