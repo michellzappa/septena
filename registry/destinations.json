@@ -226,7 +226,7 @@
       "id": "recentlyDeleted",
       "navigationKey": "recentlyDeleted",
       "serverView": "all",
-      "title": "Recently Deleted",
+      "title": "Deleted",
       "icon": "list.recently_deleted",
       "sidebarOrder": 9,
       "sidebarSection": "bottom",
@@ -241,7 +241,7 @@
       "supportsInlineCreate": false,
       "dropBehavior": "delete",
       "featureId": "lists.recently-deleted",
-      "emptyState": { "title": "No Recently Deleted Tasks", "detail": "Septena keeps deleted tasks here for 30 days, then deletes them for good." }
+      "emptyState": { "title": "No Deleted Tasks", "detail": "Septena keeps deleted tasks here for 30 days, then deletes them for good." }
     }
   ],
   "genericEmptyState": {

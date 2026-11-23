@@ -703,6 +703,12 @@
       "surfaces.prompts.items.deleteProject.variants.empty.title"
     ]
   },
+  "Deleted": {
+    "text": "Deleted",
+    "paths": [
+      "destinations.destinations.recentlyDeleted.title"
+    ]
+  },
   "Devices": {
     "text": "Devices",
     "paths": [
@@ -1410,16 +1416,16 @@
       "destinations.destinations.inbox.emptyState.detail"
     ]
   },
+  "No Deleted Tasks": {
+    "text": "No Deleted Tasks",
+    "paths": [
+      "destinations.destinations.recentlyDeleted.emptyState.title"
+    ]
+  },
   "No Faded Tasks": {
     "text": "No Faded Tasks",
     "paths": [
       "destinations.destinations.faded.emptyState.title"
-    ]
-  },
-  "No Recently Deleted Tasks": {
-    "text": "No Recently Deleted Tasks",
-    "paths": [
-      "destinations.destinations.recentlyDeleted.emptyState.title"
     ]
   },
   "No Starred Tasks": {
@@ -1873,7 +1879,6 @@
   "Recently Deleted": {
     "text": "Recently Deleted",
     "paths": [
-      "destinations.destinations.recentlyDeleted.title",
       "plans.outcomes.nothing_lost.rows.deleted.label"
     ]
   },

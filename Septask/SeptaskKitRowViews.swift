@@ -576,7 +576,7 @@ enum KitGlyph {
     let key = "s:\(name):\(cacheTag):\(size)"
     if let hit = cache[key] { return hit }
     guard NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil else { return nil }
-    let baseConfig = NSImage.SymbolConfiguration(pointSize: size * 0.78, weight: .semibold)
+    let baseConfig = NSImage.SymbolConfiguration(pointSize: size * 0.68, weight: .semibold)
     let image = draw(size: NSSize(width: size, height: size)) { rect in
       let config = baseConfig.applying(NSImage.SymbolConfiguration(paletteColors: [color]))
       guard let glyph = NSImage(systemSymbolName: name, accessibilityDescription: nil)?

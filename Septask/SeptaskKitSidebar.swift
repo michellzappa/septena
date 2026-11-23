@@ -156,6 +156,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// `heightOfRowByItem`, so each area still reads as its own section without
   /// the "Areas & Projects" text header that used to separate them.
   private var topLevelAreaOrProjectKeys: Set<String> = []
+  /// Smart lists in the bottom section (Logbook, Faded, Deleted). Their
+  /// titles draw in secondary ink so the fixed lists recede below the work.
+  private var bottomSmartListKeys: Set<String> = []
   /// Where `organize` (loose projects, then areas) begins and ends within
   /// `roots` — `roots = topViews + organize + bottomViews`. Structure
   /// drag-reorder uses `[organizeStartIndex, bottomStartIndex)` so areas and
@@ -595,6 +598,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     var gapKeys = Set(organize.map(\.key))
     if let firstBottom = bottomViews.first { gapKeys.insert(firstBottom.key) }
     topLevelAreaOrProjectKeys = gapKeys
+    bottomSmartListKeys = Set(bottomViews.map(\.key))
     outlineView.reloadData()
     restoreExpansion()
 
@@ -1092,6 +1096,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     case .filter(let filter, let title, let symbol):
       cell.textField?.font = SeptaskKitTheme.sidebarTitle
       cell.textField?.stringValue = title
+      cell.textField?.textColor = bottomSmartListKeys.contains(node.key)
+        ? SeptaskKitTheme.inkSecondary
+        : SeptaskKitTheme.inkPrimary
       let isToday = filter == .today
       let tint: NSColor = isToday
         ? AppearancePreferences.shared.accentNSColor
@@ -1104,6 +1111,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       // affordance rather than a heavy bold face.
       cell.textField?.font = SeptaskKitTheme.sidebarTitle
       cell.textField?.stringValue = area.title
+      cell.textField?.textColor = SeptaskKitTheme.inkPrimary
       if let emoji = area.emoji {
         cell.emoji.isHidden = false
         cell.emoji.stringValue = emoji
@@ -1116,6 +1124,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       // label and top navigation carry the semibold hierarchy.
       cell.textField?.font = SeptaskKitTheme.taskTitle
       cell.textField?.stringValue = project.title
+      cell.textField?.textColor = SeptaskKitTheme.inkPrimary
       cell.imageView?.image = KitGlyph.progress(progress)
     }
     cell.badge.stringValue = showsCounts ? (node.count.map(String.init) ?? "") : ""

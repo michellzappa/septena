@@ -4380,6 +4380,18 @@
         }
       }
     },
+    "Deleted" : {
+      "comment" : "Generated from registry destinations.destinations.recentlyDeleted.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagadas"
+          }
+        }
+      }
+    },
     "Deleted tasks appear here for 30 days before being permanently removed." : {
       "localizations" : {
         "pt-BR" : {
@@ -8027,6 +8039,18 @@
     },
     "No Deadline" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
+    },
+    "No Deleted Tasks" : {
+      "comment" : "Generated from registry destinations.destinations.recentlyDeleted.emptyState.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma tarefa apagada"
+          }
+        }
+      }
     },
     "No entries logged on this day" : {
       "extractionState" : "stale",
