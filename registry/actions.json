@@ -191,6 +191,13 @@
     },
     "task.keepFaded": { "title": "Keep", "icon": "action.restore", "role": "default", "availability": { "selection": "any", "onlyDestinations": ["faded"] }, "featureId": "fade.sweep" },
     "task.letGoFaded": { "title": "Let Go", "icon": "action.let_go", "role": "default", "availability": { "selection": "any", "onlyDestinations": ["faded"] }, "featureId": "fade.sweep" },
+    "place.saveNotes": {
+      "title": "Save Notes",
+      "icon": "action.notes",
+      "role": "default",
+      "availability": { "selection": "single" },
+      "featureId": "places.projects"
+    },
     "area.newProject": {
       "title": "New Project in Area",
       "icon": "action.add",

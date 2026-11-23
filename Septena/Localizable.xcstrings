@@ -8093,12 +8093,60 @@
         }
       }
     },
+    "No open tasks in this area yet." : {
+      "comment" : "Generated from registry surfaces.prompts.placesScreen.emptyStates.emptyAreaTasks.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda não há tarefas abertas nesta área."
+          }
+        }
+      }
+    },
+    "No open tasks in this project yet." : {
+      "comment" : "Generated from registry surfaces.prompts.placesScreen.emptyStates.emptyProjectTasks.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda não há tarefas abertas neste projeto."
+          }
+        }
+      }
+    },
+    "No open tasks in this section yet." : {
+      "comment" : "Generated from registry surfaces.prompts.placesScreen.emptyStates.emptySectionTasks.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda não há tarefas abertas nesta seção."
+          }
+        }
+      }
+    },
     "No prior session" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nenhuma sessão anterior"
+          }
+        }
+      }
+    },
+    "No projects in this area yet." : {
+      "comment" : "Generated from registry surfaces.prompts.placesScreen.emptyStates.emptyAreaProjects.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda não há projetos nesta área."
           }
         }
       }
@@ -8158,6 +8206,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nenhuma seção declara notificações ainda."
+          }
+        }
+      }
+    },
+    "No sections in this project yet." : {
+      "comment" : "Generated from registry surfaces.prompts.placesScreen.emptyStates.emptyProjectSections.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda não há seções neste projeto."
           }
         }
       }
@@ -9352,7 +9412,14 @@
       }
     },
     "Projects" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projetos"
+          }
+        }
+      }
     },
     "Projects in this area will be detached but not deleted." : {
       "localizations" : {
@@ -10111,6 +10178,18 @@
     },
     "Save" : {
 
+    },
+    "Save Notes" : {
+      "comment" : "Generated from registry actions.actions.place.saveNotes.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvar notas"
+          }
+        }
+      }
     },
     "Say one of these to log without opening the app. Asking for a section that's turned off turns it back on automatically — your data is never lost. Every other action is Siri-callable too — open the Shortcuts app to give it a phrase." : {
       "localizations" : {
@@ -12170,6 +12249,42 @@
     "The same tasks on your phone, tablet and Mac, updated as you type." : {
       "comment" : "Generated from registry plans.outcomes.everywhere.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
+    },
+    "The section is no longer available." : {
+      "comment" : "Generated from registry surfaces.prompts.placesScreen.errors.placeErrorSectionUnavailable.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A seção não está mais disponível."
+          }
+        }
+      }
+    },
+    "The section is no longer in this project." : {
+      "comment" : "Generated from registry surfaces.prompts.placesScreen.errors.placeErrorSectionWrongProject.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A seção não faz mais parte deste projeto."
+          }
+        }
+      }
+    },
+    "The selected item is not a section." : {
+      "comment" : "Generated from registry surfaces.prompts.placesScreen.errors.placeErrorNotASection.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O item selecionado não é uma seção."
+          }
+        }
+      }
     },
     "The seven discs unfurl in foil — the Septena+ thank-you" : {
 

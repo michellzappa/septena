@@ -211,6 +211,26 @@
       { "id": "newProject", "title": "New Project", "placeholder": "Project name", "confirmTitle": "Create", "featureId": "places.projects" },
       { "id": "renameProject", "title": "Rename Project", "placeholder": "Project name", "confirmTitle": "Rename", "featureId": "places.projects" }
     ],
+    "placesScreen": {
+      "id": "placesScreen",
+      "labels": [
+        { "id": "areaProjectsHeading", "label": "Projects" },
+        { "id": "tasksHeading", "label": "Tasks" },
+        { "id": "sectionsHeading", "label": "Sections" }
+      ],
+      "emptyStates": [
+        { "id": "emptyAreaProjects", "title": "No projects in this area yet." },
+        { "id": "emptyAreaTasks", "title": "No open tasks in this area yet." },
+        { "id": "emptyProjectTasks", "title": "No open tasks in this project yet." },
+        { "id": "emptyProjectSections", "title": "No sections in this project yet." },
+        { "id": "emptySectionTasks", "title": "No open tasks in this section yet." }
+      ],
+      "errors": [
+        { "id": "placeErrorSectionUnavailable", "message": "The section is no longer available." },
+        { "id": "placeErrorSectionWrongProject", "message": "The section is no longer in this project." },
+        { "id": "placeErrorNotASection", "message": "The selected item is not a section." }
+      ]
+    },
     "error": { "title": "Error", "confirmTitle": "OK" }
   },
   "toasts": {

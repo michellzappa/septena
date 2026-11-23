@@ -36,6 +36,9 @@ data class TaskRecord(
             notes: String? = null,
             source: String = RegistryEntityEnums.TaskSource.APP,
             sourceClient: String = "Septena Android",
+            kind: String? = null,
+            heading: String? = null,
+            position: Double? = null,
         ): Map<String, JsonValue> = linkedMapOf(
             RegistryEntityFields.Task.TITLE to JsonValue.StringValue(title),
             RegistryEntityFields.Task.STATUS to JsonValue.StringValue(RegistryEntityEnums.TaskStatus.OPEN),
@@ -50,6 +53,9 @@ data class TaskRecord(
             scheduled?.let { put(RegistryEntityFields.Task.SCHEDULED, JsonValue.StringValue(it)) }
             deadline?.let { put(RegistryEntityFields.Task.DEADLINE, JsonValue.StringValue(it)) }
             if (todaySetOn != null) put(RegistryEntityFields.Task.TODAY_SET_ON, JsonValue.StringValue(todaySetOn))
+            kind?.let { put(RegistryEntityFields.Task.KIND, JsonValue.StringValue(it)) }
+            heading?.let { put(RegistryEntityFields.Task.HEADING, JsonValue.StringValue(it)) }
+            position?.let { put(RegistryEntityFields.Task.POSITION, JsonValue.DecimalValue(it)) }
             notes?.let { put(RegistryEntityFields.Task.NOTES, JsonValue.StringValue(it)) }
         }
     }

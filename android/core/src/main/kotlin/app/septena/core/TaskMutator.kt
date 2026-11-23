@@ -19,7 +19,49 @@ class TaskMutator(
         deadline: String? = null,
         today: Boolean = false,
         notes: String? = null,
-        source: String = "app",
+        source: String = app.septena.core.generated.RegistryEntityEnums.TaskSource.APP,
+        heading: String? = null,
+        position: Double? = null,
+    ): TaskRecord = createTask(
+        title = title,
+        area = area,
+        project = project,
+        scheduled = scheduled,
+        deadline = deadline,
+        today = today,
+        notes = notes,
+        source = source,
+        kind = null,
+        heading = heading,
+        position = position,
+    )
+
+    suspend fun createHeading(title: String, project: String, position: Double? = null): TaskRecord = createTask(
+        title = title,
+        area = null,
+        project = project,
+        scheduled = null,
+        deadline = null,
+        today = false,
+        notes = null,
+        source = app.septena.core.generated.RegistryEntityEnums.TaskSource.APP,
+        kind = app.septena.core.generated.RegistryEntityEnums.TaskKind.HEADING,
+        heading = null,
+        position = position,
+    )
+
+    private suspend fun createTask(
+        title: String,
+        area: String?,
+        project: String?,
+        scheduled: String?,
+        deadline: String?,
+        today: Boolean,
+        notes: String?,
+        source: String,
+        kind: String?,
+        heading: String?,
+        position: Double?,
     ): TaskRecord {
         val id = ids.nextTaskId()
         val normalizedTitle = title.trim { it.isWhitespace() }
@@ -37,6 +79,9 @@ class TaskMutator(
             todaySetOn = if (today) todayString else null,
             notes = notes,
             source = source,
+            kind = kind,
+            heading = heading,
+            position = position,
         )
         validateTitle(normalizedTitle)
         RegistryValidator.requireValidUpsert(RegistryEntityNames.TASK, id, fields, insert = true)

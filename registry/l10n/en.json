@@ -1378,10 +1378,40 @@
       "plans.outcomes.agents.rows.connector.cells.plus"
     ]
   },
+  "No open tasks in this area yet.": {
+    "text": "No open tasks in this area yet.",
+    "paths": [
+      "surfaces.prompts.placesScreen.emptyStates.emptyAreaTasks.title"
+    ]
+  },
+  "No open tasks in this project yet.": {
+    "text": "No open tasks in this project yet.",
+    "paths": [
+      "surfaces.prompts.placesScreen.emptyStates.emptyProjectTasks.title"
+    ]
+  },
+  "No open tasks in this section yet.": {
+    "text": "No open tasks in this section yet.",
+    "paths": [
+      "surfaces.prompts.placesScreen.emptyStates.emptySectionTasks.title"
+    ]
+  },
+  "No projects in this area yet.": {
+    "text": "No projects in this area yet.",
+    "paths": [
+      "surfaces.prompts.placesScreen.emptyStates.emptyAreaProjects.title"
+    ]
+  },
   "No repeating tasks": {
     "text": "No repeating tasks",
     "paths": [
       "destinations.destinations.repeating.emptyState.title"
+    ]
+  },
+  "No sections in this project yet.": {
+    "text": "No sections in this project yet.",
+    "paths": [
+      "surfaces.prompts.placesScreen.emptyStates.emptyProjectSections.title"
     ]
   },
   "Not Now": {
@@ -1694,6 +1724,12 @@
       "surfaces.prompts.text.renameProject.placeholder"
     ]
   },
+  "Projects": {
+    "text": "Projects",
+    "paths": [
+      "surfaces.prompts.placesScreen.labels.areaProjectsHeading.label"
+    ]
+  },
   "Purchase received. Plus turns on when Septena reaches the server.": {
     "text": "Purchase received. Plus turns on when Septena reaches the server.",
     "paths": [
@@ -1872,6 +1908,12 @@
       "tokens.textures.ridges.name"
     ]
   },
+  "Save Notes": {
+    "text": "Save Notes",
+    "paths": [
+      "actions.actions.place.saveNotes.title"
+    ]
+  },
   "Schedule": {
     "text": "Schedule",
     "paths": [
@@ -1885,6 +1927,12 @@
     "paths": [
       "surfaces.prompts.text.newSection.placeholder",
       "surfaces.prompts.text.renameSection.placeholder"
+    ]
+  },
+  "Sections": {
+    "text": "Sections",
+    "paths": [
+      "surfaces.prompts.placesScreen.labels.sectionsHeading.label"
     ]
   },
   "See Plus": {
@@ -2256,6 +2304,12 @@
       "actions.shortcutsSheet.taskList.title"
     ]
   },
+  "Tasks": {
+    "text": "Tasks",
+    "paths": [
+      "surfaces.prompts.placesScreen.labels.tasksHeading.label"
+    ]
+  },
   "Tasks that think with you": {
     "text": "Tasks that think with you",
     "paths": [
@@ -2333,6 +2387,24 @@
     "text": "The same tasks on your phone, tablet and Mac, updated as you type.",
     "paths": [
       "plans.outcomes.everywhere.detail"
+    ]
+  },
+  "The section is no longer available.": {
+    "text": "The section is no longer available.",
+    "paths": [
+      "surfaces.prompts.placesScreen.errors.placeErrorSectionUnavailable.message"
+    ]
+  },
+  "The section is no longer in this project.": {
+    "text": "The section is no longer in this project.",
+    "paths": [
+      "surfaces.prompts.placesScreen.errors.placeErrorSectionWrongProject.message"
+    ]
+  },
+  "The selected item is not a section.": {
+    "text": "The selected item is not a section.",
+    "paths": [
+      "surfaces.prompts.placesScreen.errors.placeErrorNotASection.message"
     ]
   },
   "The task app stays free": {
