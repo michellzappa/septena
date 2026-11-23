@@ -395,5 +395,6 @@
       { "value": -1, "title": "Last" }
     ],
     "featureId": "task.notes"
-  }
+  },
+  "quickFind": {"id":"quickFind","featureId":"find.quick-find","placeholder":"Search tasks, projects, areas…","emptyState":{"title":"Search Tasks","detail":"Find any task, project, or area."},"noResults":{"title":"No matches","detail":"No tasks, projects, or areas match your search."},"completed":{"label":"Completed"},"controls":{"back":"Back"}}
 }

@@ -3480,6 +3480,18 @@
     "Complete Task" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
+    "Completed" : {
+      "comment" : "Generated from registry surfaces.quickFind.completed.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Concluída"
+          }
+        }
+      }
+    },
     "Completed and let-go tasks are archived here." : {
       "comment" : "Generated from registry destinations.destinations.logbook.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -8104,6 +8116,18 @@
     "No list" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
+    "No matches" : {
+      "comment" : "Generated from registry surfaces.quickFind.noResults.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum resultado"
+          }
+        }
+      }
+    },
     "No meals logged yet" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8339,6 +8363,18 @@
     },
     "No Tasks" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
+    },
+    "No tasks, projects, or areas match your search." : {
+      "comment" : "Generated from registry surfaces.quickFind.noResults.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma tarefa, projeto ou área corresponde à sua busca."
+          }
+        }
+      }
     },
     "no trends yet" : {
 
@@ -9584,6 +9620,18 @@
         }
       }
     },
+    "Quick Find" : {
+      "comment" : "Generated from registry surfaces.quickFind.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Busca rápida"
+          }
+        }
+      }
+    },
     "Quick Find…" : {
       "comment" : "Generated from registry actions.actions.app.quickFind.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -10271,8 +10319,28 @@
         }
       }
     },
+    "Search Tasks" : {
+      "comment" : "Generated from registry surfaces.quickFind.emptyState.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar tarefas"
+          }
+        }
+      }
+    },
     "Search tasks, projects, areas…" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar tarefas, projetos, áreas…"
+          }
+        }
+      }
     },
     "Section name" : {
       "comment" : "SeptaskKit localization pass 2026-08-09",

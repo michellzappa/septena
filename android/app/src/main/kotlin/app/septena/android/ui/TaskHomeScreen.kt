@@ -46,6 +46,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 fun TaskHomeScreen(graph: AndroidAppGraph) {
     var openedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    var quickFindOpen by rememberSaveable { mutableStateOf(false) }
     val factory = remember(graph) { TaskHomeViewModelFactory(graph) }
     val homeViewModel: TaskHomeViewModel = viewModel(factory = factory)
     val state by homeViewModel.state.collectAsStateWithLifecycle()
@@ -59,6 +60,10 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
     }
     val quickAddTitle = RegistryCatalog.actionTitle(
         RegistryActionIds.APP_QUICK_ADD,
+        languageTag = languageTag,
+    ).orEmpty()
+    val quickFindTitle = RegistryCatalog.actionTitle(
+        RegistryActionIds.APP_QUICK_FIND,
         languageTag = languageTag,
     ).orEmpty()
     val completeTitle = RegistryCatalog.actionTitle(
@@ -75,6 +80,36 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
     val emptyTitle = (state.location as? TaskHomeLocation.SmartList)
         ?.let { RegistryCatalog.destinationEmptyTitle(it.destinationId, languageTag) }
         .orEmpty()
+    val openQuickFindTarget: (QuickFindTarget) -> Unit = { target ->
+        quickFindOpen = false
+        when (target) {
+            is QuickFindTarget.Task -> {
+                val destination = when {
+                    target.projectId != null -> state.projects.firstOrNull {
+                        (it.location as? TaskHomeLocation.Project)?.id == target.projectId
+                    }?.location ?: TaskHomeLocation.Project(target.projectId, "")
+                    target.areaId != null -> state.areas.firstOrNull {
+                        (it.location as? TaskHomeLocation.Area)?.id == target.areaId
+                    }?.location ?: TaskHomeLocation.Area(target.areaId, "")
+                    else -> TaskHomeLocation.SmartList(target.destinationId ?: RegistryDestinationIds.TODAY)
+                }
+                homeViewModel.select(destination)
+                openedTaskId = target.taskId
+            }
+            is QuickFindTarget.Area -> {
+                val destination = state.areas.firstOrNull {
+                    (it.location as? TaskHomeLocation.Area)?.id == target.areaId
+                }?.location ?: TaskHomeLocation.Area(target.areaId, "")
+                homeViewModel.select(destination)
+            }
+            is QuickFindTarget.Project -> {
+                val destination = state.projects.firstOrNull {
+                    (it.location as? TaskHomeLocation.Project)?.id == target.projectId
+                }?.location ?: TaskHomeLocation.Project(target.projectId, "")
+                homeViewModel.select(destination)
+            }
+        }
+    }
 
     if (wideLayout) {
         PermanentNavigationDrawer(
@@ -90,14 +125,18 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                 }
             },
         ) {
-            if (openedTaskId != null) {
+            if (quickFindOpen) {
+                QuickFindScreen(graph, onBack = { quickFindOpen = false }, onSelect = openQuickFindTarget)
+            } else if (openedTaskId != null) {
                 TaskDetailScreen(graph, openedTaskId!!, onBack = { openedTaskId = null })
             } else {
                 TaskHomeScaffold(
+                    graph = graph,
                     state = state,
                     title = pageTitle,
                     sidebarActionTitle = sidebarActionTitle,
                     quickAddTitle = quickAddTitle,
+                    quickFindTitle = quickFindTitle,
                     completeTitle = completeTitle,
                     emptyTitle = emptyTitle,
                     inboxTitle = inboxTitle,
@@ -106,6 +145,8 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                     onQuickAdd = homeViewModel::quickAdd,
                     onComplete = homeViewModel::complete,
                     onOpenTask = { openedTaskId = it },
+                    onQuickFind = { quickFindOpen = true },
+                    onSelectHomeLocation = homeViewModel::select,
                 )
             }
         }
@@ -129,14 +170,18 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                 }
             },
         ) {
-            if (openedTaskId != null) {
+            if (quickFindOpen) {
+                QuickFindScreen(graph, onBack = { quickFindOpen = false }, onSelect = openQuickFindTarget)
+            } else if (openedTaskId != null) {
                 TaskDetailScreen(graph, openedTaskId!!, onBack = { openedTaskId = null })
             } else {
                 TaskHomeScaffold(
+                    graph = graph,
                     state = state,
                     title = pageTitle,
                     sidebarActionTitle = sidebarActionTitle,
                     quickAddTitle = quickAddTitle,
+                    quickFindTitle = quickFindTitle,
                     completeTitle = completeTitle,
                     emptyTitle = emptyTitle,
                     inboxTitle = inboxTitle,
@@ -146,6 +191,8 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                     onQuickAdd = homeViewModel::quickAdd,
                     onComplete = homeViewModel::complete,
                     onOpenTask = { openedTaskId = it },
+                    onQuickFind = { quickFindOpen = true },
+                    onSelectHomeLocation = homeViewModel::select,
                 )
             }
         }
@@ -217,10 +264,12 @@ private fun DrawerGroupTitle(title: String) {
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 private fun TaskHomeScaffold(
+    graph: AndroidAppGraph,
     state: TaskHomeUiState,
     title: String,
     sidebarActionTitle: String,
     quickAddTitle: String,
+    quickFindTitle: String,
     completeTitle: String,
     emptyTitle: String,
     inboxTitle: String,
@@ -230,6 +279,8 @@ private fun TaskHomeScaffold(
     onQuickAdd: () -> Unit,
     onComplete: (String) -> Unit,
     onOpenTask: (String) -> Unit,
+    onQuickFind: () -> Unit,
+    onSelectHomeLocation: (TaskHomeLocation) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -244,27 +295,52 @@ private fun TaskHomeScaffold(
                 } else {
                     {}
                 },
+                actions = {
+                    TextButton(onClick = onQuickFind) {
+                        Text(quickFindTitle)
+                    }
+                },
             )
         },
     ) { contentPadding ->
-        TaskHomeContent(
-            quickAddTitle = quickAddTitle,
-            completeTitle = completeTitle,
-            emptyTitle = emptyTitle,
-            inboxBandTitle = inboxTitle,
-            isToday = (state.location as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.TODAY,
-            inboxTasks = state.inboxTasks,
-            tasks = state.tasks,
-            canQuickAdd = state.canQuickAdd,
-            canComplete = state.canComplete,
-            draftTitle = state.draftTitle,
-            errorMessage = state.errorMessage,
-            modifier = Modifier.padding(contentPadding),
-            onDraftTitleChange = onDraftTitleChange,
-            onQuickAdd = onQuickAdd,
-            onComplete = onComplete,
-            onOpenTask = onOpenTask,
-        )
+        when (val location = state.location) {
+            is TaskHomeLocation.Area -> AreasProjectsScreen(
+                graph = graph,
+                destination = AreasProjectsDestination.Area(location.id),
+                modifier = Modifier.padding(contentPadding),
+                onOpenProject = { projectId ->
+                    val project = state.projects.firstOrNull {
+                        (it.location as? TaskHomeLocation.Project)?.id == projectId
+                    }?.location ?: TaskHomeLocation.Project(projectId, "")
+                    onSelectHomeLocation(project)
+                },
+                onOpenTask = onOpenTask,
+            )
+            is TaskHomeLocation.Project -> AreasProjectsScreen(
+                graph = graph,
+                destination = AreasProjectsDestination.Project(location.id),
+                modifier = Modifier.padding(contentPadding),
+                onOpenTask = onOpenTask,
+            )
+            is TaskHomeLocation.SmartList -> TaskHomeContent(
+                quickAddTitle = quickAddTitle,
+                completeTitle = completeTitle,
+                emptyTitle = emptyTitle,
+                inboxBandTitle = inboxTitle,
+                isToday = location.destinationId == RegistryDestinationIds.TODAY,
+                inboxTasks = state.inboxTasks,
+                tasks = state.tasks,
+                canQuickAdd = state.canQuickAdd,
+                canComplete = state.canComplete,
+                draftTitle = state.draftTitle,
+                errorMessage = state.errorMessage,
+                modifier = Modifier.padding(contentPadding),
+                onDraftTitleChange = onDraftTitleChange,
+                onQuickAdd = onQuickAdd,
+                onComplete = onComplete,
+                onOpenTask = onOpenTask,
+            )
+        }
     }
 }
 

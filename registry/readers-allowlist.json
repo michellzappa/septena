@@ -170,7 +170,7 @@
       "issue": "#174"
     },
     "RegistryEntityFields.Tag.*": {
-      "reason": "Tags are not on Android yet.",
+      "reason": "Quick Find indexes task tag names; tag editing is not on Android yet.",
       "issue": "#174"
     },
     "RegistryEntityFields.Area.*": {
@@ -187,10 +187,6 @@
     },
     "RegistryEntityNames.ATTACHMENT": {
       "reason": "Attachments are not on Android yet.",
-      "issue": "#174"
-    },
-    "RegistryEntityNames.TAG": {
-      "reason": "Tags are not on Android yet.",
       "issue": "#174"
     },
     "RegistryDestinationIds.REVIEW": {

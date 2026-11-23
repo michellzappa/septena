@@ -459,6 +459,12 @@
       "actions.menuBar.task.items.complete.title"
     ]
   },
+  "Completed": {
+    "text": "Completed",
+    "paths": [
+      "surfaces.quickFind.completed.label"
+    ]
+  },
   "Completion animations": {
     "text": "Completion animations",
     "paths": [
@@ -866,6 +872,12 @@
     "text": "Files and images synced, up to 10 GB",
     "paths": [
       "plans.cards.plus.points.2"
+    ]
+  },
+  "Find any task, project, or area.": {
+    "text": "Find any task, project, or area.",
+    "paths": [
+      "surfaces.quickFind.emptyState.detail"
     ]
   },
   "Free": {
@@ -1440,6 +1452,12 @@
       "plans.outcomes.agents.rows.connector.cells.plus"
     ]
   },
+  "No matches": {
+    "text": "No matches",
+    "paths": [
+      "surfaces.quickFind.noResults.title"
+    ]
+  },
   "No open tasks in this area yet.": {
     "text": "No open tasks in this area yet.",
     "paths": [
@@ -1474,6 +1492,12 @@
     "text": "No sections in this project yet.",
     "paths": [
       "surfaces.prompts.placesScreen.emptyStates.emptyProjectSections.title"
+    ]
+  },
+  "No tasks, projects, or areas match your search.": {
+    "text": "No tasks, projects, or areas match your search.",
+    "paths": [
+      "surfaces.quickFind.noResults.detail"
     ]
   },
   "Not Now": {
@@ -2013,6 +2037,18 @@
       "settings.keys.tasksSwipeLeadingAction.options.1.title",
       "actions.actions.task.when.shortTitle",
       "actions.contextMenus.task.row.schedule.title"
+    ]
+  },
+  "Search Tasks": {
+    "text": "Search Tasks",
+    "paths": [
+      "surfaces.quickFind.emptyState.title"
+    ]
+  },
+  "Search tasks, projects, areas…": {
+    "text": "Search tasks, projects, areas…",
+    "paths": [
+      "surfaces.quickFind.placeholder"
     ]
   },
   "Section name": {
