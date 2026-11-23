@@ -9,11 +9,9 @@ import SwiftUI
 /// it here is discoverability, not a second source of truth — which is why
 /// this is a shared view rather than a copy per surface.
 ///
-/// Mounted in three places: the macOS View menu (Septena's `App.swift` and
-/// Septask's `SeptaskCommandMenus`, which also feeds the iPadOS menu bar), the
-/// Today page's "···" on iPhone (`TaskListStandaloneChrome`), and the Tasks
-/// sidebar's "···" on iPad regular (`SidebarView`), where a split-view detail
-/// must not publish its own chrome.
+/// Mounted only in the macOS / iPadOS View menu (Septena's `App.swift` and
+/// Septask's `SeptaskCommandMenus`). On iPhone and iPad it lives in Settings
+/// only: it is a global setting, not a per-page option (2026-11-23).
 ///
 /// The title says "Today" because the setting is Today-scoped — Anytime,
 /// project pages, and Upcoming group unconditionally — so the item stays

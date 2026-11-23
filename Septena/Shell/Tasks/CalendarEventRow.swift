@@ -40,7 +40,10 @@ struct CalendarEventRow: View {
       // row checkboxes and header icons above, so it sits under that leading
       // grid and the title lands on the shared task-title X. Neutral ink keeps
       // the strip quiet; all-day events leave the column empty but still reserved.
-      Group {
+      // A ZStack, not a Group: a Group with no child (an all-day event) drops
+      // the `.frame` with it, so the column collapsed and all-day titles sat
+      // left of the timed ones.
+      ZStack {
         if let timeLabel {
           Text(timeLabel)
             .font(.system(size: 11))

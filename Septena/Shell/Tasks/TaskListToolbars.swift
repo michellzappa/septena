@@ -122,10 +122,6 @@ struct TaskListStandaloneChrome: ViewModifier {
   #endif
   let embedded: Bool
   let recentlyDeleted: Bool
-  /// Today only — the grouping option is Today-scoped, and a "···" that
-  /// appears on every list to hold one inapplicable row is worse than none.
-  /// iPad regular is served by the sidebar's "···" instead (see below).
-  let showsViewOptions: Bool
   /// The owning list's own create action (see `TaskListToolbarChrome.onNew`).
   var onNew: (() -> Void)? = nil
 
@@ -139,18 +135,14 @@ struct TaskListStandaloneChrome: ViewModifier {
       #if SEPTASK
       // Septask has no floating window-level overlay bar (unlike Septena's
       // `RootTabView.iPadTabless`), so on iPad / unfolded iPhone Duo the
-      // standalone detail column owns its own trailing actions (Today's view
-      // options + New Task). The sidebar owns leading Quick Find / Settings,
+      // standalone detail column owns its own trailing action (New Task).
+      // "Group Today by List" is a global setting: it lives in Settings, not
+      // in a per-page "···" (decided 2026-11-23). The sidebar owns leading Quick Find / Settings,
       // and `NavigationSplitView` supplies the native sidebar toggle.
       if embedded {
         content
       } else {
         content.toolbar {
-          if showsViewOptions {
-            ToolbarItem(placement: .topBarTrailing) {
-              OverflowMenu { TaskViewOptions() }
-            }
-          }
           if !recentlyDeleted {
             ToolbarItem(placement: .topBarTrailing) {
               PageAddButton { newTask() }
@@ -171,7 +163,6 @@ struct TaskListStandaloneChrome: ViewModifier {
       content.pageChrome(
         id: "tasks",
         title: "Tasks",
-        localActions: { showsViewOptions ? AnyView(TaskViewOptions()) : nil },
         add: recentlyDeleted ? nil : .action { newTask() }
       )
     }

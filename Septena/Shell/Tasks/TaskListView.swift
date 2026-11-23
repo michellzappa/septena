@@ -786,7 +786,6 @@ struct TaskListView: View {
     // a pushed list shows gear + "+" in its own nav bar.
     .modifier(TaskListStandaloneChrome(embedded: embedded,
                                        recentlyDeleted: filter == .recentlyDeleted || filter == .faded,
-                                       showsViewOptions: filter == .today,
                                        onNew: { handleExternalCreateTrigger() }))
     // (Keyboard navigation — ↑↓ traversal, Return/Esc, focus reclaim —
     // is owned by `SelectableScrollList`; the `+` toolbar button and ⌘N still
@@ -1961,8 +1960,10 @@ struct TaskListView: View {
     switch filter {
     case .starred, .logbook, .recentlyDeleted, .faded:
       return false
+    case .today:
+      return (items + triageItems).contains { $0.starred && $0.status == .open }
     default:
-      return items.contains(where: \.starred)
+      return items.contains { $0.starred && $0.status == .open }
     }
   }
 
@@ -3117,7 +3118,7 @@ struct TaskListView: View {
   /// classified-list pool so pointer rendering and keyboard traversal cannot
   /// drift when a completed row settles or the Inbox is folded.
   private var todayOpenTaskPool: [SeptenaTask] {
-    items.filter { $0.status == .open || model.settle.isSettling($0.id) }
+    chipFiltered(items).filter { $0.status == .open || model.settle.isSettling($0.id) }
   }
 
   private var todayLooseInboxRows: [SeptenaTask] {
@@ -3125,7 +3126,7 @@ struct TaskListView: View {
   }
 
   private var renderedTodayInboxRows: [SeptenaTask] {
-    excludingQuickAddCapture(triageItems + todayLooseInboxRows)
+    excludingQuickAddCapture(chipFiltered(triageItems) + todayLooseInboxRows)
   }
 
   /// `quickAddLine` replaces the sentinel with the real draft row while the
@@ -4602,7 +4603,7 @@ struct TaskListView: View {
   /// card — Inbox stays above; each row shows its list as a subtitle.
   @ViewBuilder
   private var ungroupedOpenItems: some View {
-    let base = items
+    let base = chipFiltered(items)
     let pool = base.filter { $0.status == .open || model.settle.isSettling($0.id) }
     // Sidebar order, not due-first: flat drops the headers, not the sequence
     // (`TaskListOrder.byList`, shared with `groupedOpenItems`' emission order
@@ -4617,7 +4618,7 @@ struct TaskListView: View {
   /// real SwiftUI sections so group titles are headers, not selectable rows.
   @ViewBuilder
   private var groupedOpenItems: some View {
-    let base = items
+    let base = chipFiltered(items)
     // Drop finished rows (completed or cancelled) except those still settling
     // (just checked / just cancelled), so a finished task lingers for the beat
     // then fades — instead of sitting struck through until the next reload.
@@ -4833,6 +4834,15 @@ struct TaskListView: View {
     if hideHistoricalDone {
       result = result.filter { $0.status == .open || model.settle.isSettling($0.id) }
     }
+    return chipFiltered(result)
+  }
+
+  /// The Starred and tag chips in `starFilterBar`. Every row source a list
+  /// renders goes through this — Today's Inbox and grouped cards read `items`
+  /// and `triageItems` directly, and skipped the chips, so on Today the
+  /// Starred chip did nothing.
+  private func chipFiltered(_ tasks: [SeptenaTask]) -> [SeptenaTask] {
+    var result = tasks
     if starredOnlyFilter && showsStarFilterPill {
       result = result.filter(\.starred)
     }

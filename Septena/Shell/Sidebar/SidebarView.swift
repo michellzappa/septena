@@ -552,18 +552,6 @@ struct SidebarRootView: View {
 
   @ViewBuilder
   private var tasksMenuExtraRows: some View {
-    #if os(iOS) && !SEPTASK
-    // Septena iPad regular: the detail pane must not publish chrome (the
-    // sidebar owns the window's gear/···/+), so Today's view options ride here
-    // instead of in `TaskListStandaloneChrome`. Septask's split detail owns
-    // its own toolbar so Today's view options live on Today directly. macOS
-    // gets these from the View menu, which is where a Mac user looks for them.
-    if usesPushNavigation,
-       effectiveSidebarRoute.sameDestination(as: .filter(.today)) {
-      TaskViewOptions()
-      Divider()
-    }
-    #endif
     Button {
       showingNewArea = true
       newAreaName = ""
