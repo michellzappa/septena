@@ -154,6 +154,7 @@
   "Add": {
     "text": "Add",
     "paths": [
+      "actions.actions.app.shareCapture.add.title",
       "surfaces.prompts.text.newSection.confirmTitle"
     ]
   },

@@ -367,6 +367,13 @@
       "availability": { "selection": "none", "platforms": ["ios", "ipados", "web", "android"] },
       "featureId": "capture.quick-add"
     },
+    "app.shareCapture.add": {
+      "title": "Add",
+      "icon": "action.add",
+      "role": "default",
+      "availability": { "selection": "none", "platforms": ["android"] },
+      "featureId": "capture.share-target"
+    },
     "app.quickEntry": {
       "title": "Quick Entry",
       "icon": "action.add",
