@@ -145,6 +145,14 @@ for (const device of activeDevices()) {
     const html = renderPanelHTML(
       {
         ...panel,
+        photo: panel.photo && {
+          ...panel.photo,
+          img: (() => {
+            const file = join(ROOT, panel.photo.src);
+            if (!existsSync(file)) throw new Error(`${device.key}/${panel.id}: photo ${panel.photo.src} is missing`);
+            return `data:image/png;base64,${readFileSync(file).toString("base64")}`;
+          })(),
+        },
         shot: panel.shot && { ...withFaces(panel.shot), img: shotDataURL(device, panel.shot.src, panel.shot.appearance, panel.shot.accent) },
         // Extra phones behind the main one (a fan). Fails closed: every one needs a real capture.
         shots: (panel.shots ?? []).map((s) => {

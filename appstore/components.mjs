@@ -338,6 +338,7 @@ function portrait(panel, device, tint) {
     .shot-zone { position:absolute; left:0; right:0; display:flex; justify-content:center; }
     .founder { position:absolute; left:50%; top:46%; transform:translateX(-50%); width:1020px; }
   </style>
+  ${panel.photo ? `<div class="photo" style="position:absolute; left:0; right:0; bottom:0; top:${panel.photo.top ?? 560}px; background:url(${panel.photo.img}) center ${panel.photo.focus ?? "40%"}/cover no-repeat; -webkit-mask:linear-gradient(to bottom, transparent 0, #000 ${panel.photo.fade ?? 340}px); mask:linear-gradient(to bottom, transparent 0, #000 ${panel.photo.fade ?? 340}px);"></div>` : ""}
   ${(panel.shots ?? []).map((s) => shot(s, device, tint)).join("")}
   ${shot(panel.shot, device, tint)}
   ${chips(panel.chips)}

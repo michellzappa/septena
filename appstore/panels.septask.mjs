@@ -30,6 +30,9 @@ import { parseScreenshots } from "./metadata.mjs";
 // Neighbouring panels differ in fill, light or dark screen, size or number
 // of phones (docs/APPSTORE-SEPTASK.md).
 const VISUAL = {
+  // A photo panel (experiment 2026-11-23): the title over a dark top band,
+  // the photo filling the rest. art/: committed images, no screen capture.
+  photo:          { photo: { src: "art/photo-today.png" }, background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" }, leadSize: 124 },
   hook:           { fruit: "haskap", texture: "topography" },
   thinking:       { fruit: "yuzu", texture: "fieldMatrix" },
   // Agent faces (the site's avatar crew) peek out from behind the phone where
@@ -74,14 +77,16 @@ const iphone = rows.map((row, i) => {
   return {
     id: row.slug,
     // No fruit: the app's light canvas with the texture in a soft grey.
-    background: { style: "texture", fill, tint, ...(fill ? {} : { accent: theme.inkSoft }), texture: textureId(v.texture ?? theme.app.textures[i % theme.app.textures.length]), seed: 42 + i, intensity: 70, fade: 1 },
+    background: v.background ?? { style: "texture", fill, tint, ...(fill ? {} : { accent: theme.inkSoft }), texture: textureId(v.texture ?? theme.app.textures[i % theme.app.textures.length]), seed: 42 + i, intensity: 70, fade: 1 },
+    photo: v.photo,
+    leadSize: v.leadSize,
     headline: row.title,
     // The first panel's title stands alone and larger; the others carry a
     // one-sentence sub (docs/APPSTORE-SEPTASK.md, ## Screenshots).
     sub: row.sub || undefined,
     align: "center",
     headlineSize: i === 0 ? 190 : 156,
-    shot: {
+    shot: row.scene === "-" ? null : {
       scene: row.scene,
       src: row.scene,
       callout: row.callout && row.callout !== "-" ? { element: row.callout, ...(v.callout ?? {}) } : null,
