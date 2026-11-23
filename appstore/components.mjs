@@ -118,7 +118,35 @@ function shot(s, device, tint) {
         ${screen}${island}
       </div>
       ${s.img ? callout(s.callout, { w, pad: f.pad, margin: (dw - w) / 2, tint }) : ""}
+      ${s.img && s.ring?.frame ? ring(s.ring, { w, pad: f.pad }) : ""}
     </div>
+  </div>`;
+}
+
+// ------------------------------------------------------------------- ring
+// A ring around one on-screen element (its frame from the scene's
+// .elements.json, resolved in render.mjs), in the ring colour. No card, no line.
+function ring(r, { w, pad }) {
+  const k = (w - 2 * pad) / (r.screenWidth ?? 402);
+  const [x, y, fw, fh] = r.frame;
+  const g = 12;
+  return `<div style="position:absolute; z-index:2; left:${pad + x * k - g}px; top:${pad + y * k - g}px; width:${fw * k + 2 * g}px; height:${fh * k + 2 * g}px; border:7px solid ${r.color ?? "#fff"}; border-radius:28px; box-shadow:0 0 0 8px color-mix(in oklab, ${r.color ?? "#fff"} 22%, transparent);"></div>`;
+}
+
+// -------------------------------------------------------------- chat card
+// A message from your agent, as a floating card (not a phone screen, not a
+// vendor's app): your words, then the agent's reply next to its face (the
+// site's avatar crew). Text comes from panels.septask.mjs; left/top/width in
+// design px.
+function chat(c) {
+  if (!c) return "";
+  const ui = String(theme.fonts.ui).replace(/"/g, "'");
+  const bubble = (text, mine) => `<div style="max-width:${mine ? 82 : 78}%; ${mine ? "margin-left:auto;" : ""} padding:30px 38px; border-radius:40px; ${mine ? "border-bottom-right-radius:12px;" : "border-bottom-left-radius:12px;"} background:${mine ? (c.tint ?? "#1D63DC") : "#F2F2F7"}; color:${mine ? "#fff" : "#141518"}; font:500 46px/1.25 ${ui};">${esc(text)}</div>`;
+  const face = c.face ? `<svg width="96" height="96" viewBox="-120 -120 240 240" style="flex:none; overflow:visible;"><path d="${esc(c.face.body)}" fill="${esc(c.face.color)}"/><path d="${esc(c.face.eyes)}" fill="#fff"/></svg>` : "";
+  return `
+  <div style="position:absolute; z-index:5; left:${c.left ?? 110}px; right:${c.right ?? 110}px; top:${c.top}px; padding:40px; background:#fff; border-radius:56px; box-shadow:0 40px 90px rgb(0 0 0 / .28); display:flex; flex-direction:column; gap:26px;">
+    ${bubble(c.you, true)}
+    <div style="display:flex; align-items:flex-end; gap:20px;">${face}${bubble(c.agent, false)}</div>
   </div>`;
 }
 
@@ -372,6 +400,7 @@ function portrait(panel, device, tint) {
   ${(panel.shots ?? []).map((s) => shot(s, device, tint)).join("")}
   ${shot(panel.shot, device, tint)}
   ${watch(panel.watch)}
+  ${chat(panel.chat)}
   ${chips(panel.chips)}
   ${founder(panel.founder)}
   ${overlays(panel.overlays)}

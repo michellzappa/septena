@@ -33,7 +33,15 @@ const VISUAL = {
   // A photo panel (experiment 2026-11-23): the title over a dark top band,
   // the photo filling the rest. art/: committed images, no screen capture.
   photo:          { photo: { src: "art/photo-today.png" }, background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" }, leadSize: 124, splitTitle: true },
-  hook:           { fruit: "haskap", texture: "topography" },
+  // Slide 2: a task arrives from your agent. A message card (your words, the
+  // agent's reply by its face) above the phone; the new task, an agent
+  // proposal in the Inbox, has a ring. Message text stays here: it is panel
+  // art, not store copy, and it matches the proposal on the today scene.
+  "from-agent":   {
+    fruit: "haskap", texture: "topography",
+    shot: { width: 0.62, ring: { element: "task-proposal", color: "#1D63DC" } },
+    chat: { top: 730, face: 0, tint: "#1D63DC", you: "Remind me to check the download links before the launch.", agent: "Done. It’s in your Septena Inbox." },
+  },
   // Native on each device: the Mac window behind, the iPhone in front. The
   // iPad joins when the scene builder has an iPad layout (septena-site#17).
   devices:        {
@@ -110,6 +118,7 @@ const iphone = rows.map((row, i) => {
     },
     shots: v.shots,
     watch: v.watch,
+    chat: v.chat,
   };
 });
 

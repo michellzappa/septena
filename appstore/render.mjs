@@ -137,6 +137,12 @@ for (const device of activeDevices()) {
     // A shot may pick its own appearance (shot.appearance), so one set mixes
     // light and dark screens.
     const meta = panel.shot?.callout ? shotElements(device, panel.shot.src, panel.shot.appearance, panel.shot.accent) : null;
+    if (panel.shot?.ring) {
+      const m = shotElements(device, panel.shot.src, panel.shot.appearance, panel.shot.accent);
+      const el = m?.elements.find((e) => e.id === panel.shot.ring.element);
+      if (!el) throw new Error(`${device.key}/${panel.id}: ring element "${panel.shot.ring.element}" is not on screen ${panel.shot.src}`);
+      panel.shot.ring = { ...panel.shot.ring, frame: el.frame, screenWidth: m.width };
+    }
     if (panel.shot?.callout) {
       const el = meta?.elements.find((e) => e.id === panel.shot.callout.element);
       if (!el) throw new Error(`${device.key}/${panel.id}: callout element "${panel.shot.callout.element}" is not on screen ${panel.shot.src}`);
@@ -155,6 +161,11 @@ for (const device of activeDevices()) {
         },
         // A small watch: its rows are the first task titles on the named scene's
         // screen (that screen's .elements.json), never typed by hand.
+        chat: panel.chat && (() => {
+          const face = panel.chat.face == null ? null : CREW[panel.chat.face];
+          if (panel.chat.face != null && !face) throw new Error(`${device.key}/${panel.id}: chat face ${panel.chat.face} is not in the avatar crew`);
+          return { ...panel.chat, face };
+        })(),
         watch: panel.watch && (() => {
           const meta = shotElements(device, panel.watch.src, "light", panel.watch.from ?? null);
           const rows = (meta?.elements ?? []).filter((e) => e.id.startsWith("task-")).slice(0, panel.watch.rows ?? 3).map((e) => e.label.split("\n")[0]);
