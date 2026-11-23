@@ -34,6 +34,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0026](0026-plus-on-any-store-stripe-for-web.md) | Sell Plus on any store, one account entitlement, Stripe for web | accepted |
 | [0027](0027-task-date-rules-are-core-actions.md) | Task date rules are actions in the shared core | accepted |
 | [0028](0028-registry-owns-vocabulary-platforms-own-interaction.md) | The registry owns vocabulary; each platform owns layout and interaction | accepted |
+| [0029](0029-one-task-page-two-depths.md) | One task page with two depths; one picker per attribute | accepted |
 
 ## Template
 
