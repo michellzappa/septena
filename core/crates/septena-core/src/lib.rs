@@ -23,6 +23,7 @@ mod json;
 mod recurrence;
 mod reminders;
 mod sync;
+mod task_dates;
 mod views;
 
 pub use conformance::*;
@@ -33,6 +34,7 @@ pub use json::*;
 pub use recurrence::*;
 pub use reminders::*;
 pub use sync::*;
+pub use task_dates::*;
 pub use views::*;
 
 pub use generated::registry;

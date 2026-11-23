@@ -53,7 +53,8 @@ pub fn row_opacity(fill: Option<f64>) -> f64 {
 #[cfg_attr(feature = "ffi", uniffi::export)]
 pub fn should_fade(input: FadeInput) -> Result<bool, CoreError> {
     let now = instant(&input.now, "now")?;
-    if !is_eligible(&input) {
+    let today = day(&input.today, "today")?;
+    if !is_eligible(&input, today) {
         return Ok(false);
     }
     let Some(clock) = clock_ms(&input) else {
@@ -67,7 +68,8 @@ pub fn should_fade(input: FadeInput) -> Result<bool, CoreError> {
 #[cfg_attr(feature = "ffi", uniffi::export)]
 pub fn fade_fill(input: FadeInput) -> Result<Option<f64>, CoreError> {
     let now = instant(&input.now, "now")?;
-    if input.shows_agent_cue || !is_eligible(&input) {
+    let today = day(&input.today, "today")?;
+    if input.shows_agent_cue || !is_eligible(&input, today) {
         return Ok(None);
     }
     let Some(clock) = clock_ms(&input) else { return Ok(None) };
@@ -79,18 +81,17 @@ pub fn fade_fill(input: FadeInput) -> Result<Option<f64>, CoreError> {
     Ok(Some((elapsed as f64 / window).min(1.0)))
 }
 
-fn is_eligible(input: &FadeInput) -> bool {
+fn is_eligible(input: &FadeInput, today: Day) -> bool {
     if !input.is_open || input.is_heading || input.is_deleted || input.is_faded {
         return false;
     }
-    if input.deadline.as_deref().is_some_and(|d| !d.is_empty()) {
+    if input.deadline.as_deref().and_then(Day::parse).is_some() {
         return false;
     }
-    if let Some(scheduled) = input.scheduled.as_deref().filter(|s| !s.is_empty()) {
-        let head: String = scheduled.chars().take(10).collect();
-        if head.as_str() >= input.today.as_str() {
-            return false;
-        }
+    // A When date today or later holds the task. An invalid day reads as no
+    // date (invariant I3).
+    if input.scheduled.as_deref().and_then(Day::parse).is_some_and(|d| d >= today) {
+        return false;
     }
     !input.has_recurrence && !input.is_agent_turn && !input.is_assigned_to_claude && !input.is_awaiting_human
 }

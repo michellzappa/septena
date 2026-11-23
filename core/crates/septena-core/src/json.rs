@@ -6,12 +6,14 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::error::CoreError;
+use crate::task_dates::patch_json;
 use crate::{
-    ConversationProjection, FadeInput, OrdinalWeekday, PullPageHeader, PushOutcome, RecurrenceRule, ReminderArmInput,
-    TaskConversation, TaskSnapshot, TaskViewMembership, check_pull_page, conversation_state, derive_conversation,
-    fade_fill, next_scheduled_date, occurrence_id, plan_pull_row, plan_push_response, row_opacity,
-    server_rejection_reason, shift_reminder_for_recurrence, shift_reminder_on_reschedule, should_arm_reminder,
-    should_fade, task_view_membership,
+    ConversationProjection, DateAction, FadeInput, OrdinalWeekday, PullPageHeader, PushOutcome, RecurrenceRule,
+    ReminderArmInput, TaskConversation, TaskSnapshot, TaskViewMembership, apply_date_action, check_pull_page,
+    conversation_state, derive_conversation, fade_fill, next_occurrence_dates, next_scheduled_date,
+    normalize_task_dates, occurrence_id, plan_pull_row, plan_push_response, row_opacity, server_rejection_reason,
+    shift_reminder_for_recurrence, shift_reminder_on_reschedule, should_arm_reminder, should_fade,
+    task_view_membership,
 };
 
 /// The functions `invoke_json` accepts.
@@ -20,6 +22,9 @@ pub const JSON_FUNCTIONS: &[&str] = &[
     "shouldFade",
     "fadeFill",
     "taskViewMembership",
+    "applyDateAction",
+    "normalizeTaskDates",
+    "nextOccurrenceDates",
     "nextScheduledDate",
     "occurrenceId",
     "shiftReminderForRecurrence",
@@ -66,6 +71,19 @@ pub(crate) fn invoke_value(function: &str, input: Value) -> Result<Value, CoreEr
         "taskViewMembership" => {
             let args: ViewArgs = decode(input).map_err(|e| parse(&e))?;
             Ok(membership_json(&task_view_membership(args.task, args.today, args.now)?))
+        }
+        "applyDateAction" => {
+            let args: DateActionArgs = decode(input).map_err(|e| parse(&e))?;
+            Ok(patch_json(&apply_date_action(args.task, args.action, args.today, args.now)?))
+        }
+        "normalizeTaskDates" => {
+            let args: NormalizeArgs = decode(input).map_err(|e| parse(&e))?;
+            Ok(patch_json(&normalize_task_dates(args.task, args.today)?))
+        }
+        "nextOccurrenceDates" => {
+            let args: NextOccurrenceArgs = decode(input).map_err(|e| parse(&e))?;
+            serde_json::to_value(next_occurrence_dates(args.task, args.next_scheduled, args.now)?)
+                .map_err(|e| CoreError::invalid(e.to_string()))
         }
         "nextScheduledDate" => {
             let args: NextScheduledArgs = decode(input).map_err(|e| parse(&e))?;
@@ -155,6 +173,10 @@ pub(crate) fn membership_json(m: &TaskViewMembership) -> Value {
             "upcoming": m.matches_upcoming,
             "anytime": m.matches_anytime,
         },
+        "dueState": m.due_state,
+        "deadlineRed": m.deadline_red,
+        "upcomingDay": m.upcoming_day,
+        "arrivedOnOwn": m.arrived_on_own,
     })
 }
 
@@ -171,6 +193,28 @@ pub(crate) fn projection_json(p: &ConversationProjection) -> Value {
 pub(crate) struct ViewArgs {
     pub task: TaskSnapshot,
     pub today: String,
+    pub now: String,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct DateActionArgs {
+    pub task: TaskSnapshot,
+    pub action: DateAction,
+    pub today: String,
+    pub now: String,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct NormalizeArgs {
+    pub task: TaskSnapshot,
+    pub today: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct NextOccurrenceArgs {
+    pub task: TaskSnapshot,
+    pub next_scheduled: String,
     pub now: String,
 }
 

@@ -155,7 +155,7 @@ platform derives them itself.
 - **Android.** The device time zone, through `DayClock`.
 - **Core.** The core never reads a clock. The host passes T and now.
 - All day comparisons in the core use parsed `Day` values, never string
-  compares (the fade rule in `fade.rs` is the one string compare left).
+  compares.
 
 ## 7. Audit (2026-11-23)
 
@@ -214,6 +214,21 @@ mz answered each question on 2026-11-23. Every answer was the proposed default.
 | Q7 | One "arrived on its own" cue (R8), or keep the rolled-in banner and the arrived dot separate? | One | Two definitions of one idea drift. |
 
 ## 9. Phases
+
+**D1 defaults** (recorded 2026-11-23, #288; mz can overrule):
+
+- A heading or a deleted task has no dates to change: every action returns
+  an empty patch.
+- A11 on a task with a future When date keeps the date. Otherwise A11 is A1.
+- A12 does not clear the agent cue: a new agent row is a proposal. The core
+  has `normalize_task_dates` for A12 and for restore (W11).
+- A1 or A2 on a fixed repeat, "this occurrence": the old When date becomes
+  `recurrenceAnchorDate` when none is set. "The whole series": the new day
+  becomes the slot. The host still rebases the other open copies.
+- R3 gives a due state only to active tasks.
+- R8 reads the `created` day. A task without one has not arrived on its own.
+- A stored invalid day becomes nil on the next write. A day passed into an
+  action that is not valid is an error.
 
 | Phase | Scope | Done when | Depends on |
 |---|---|---|---|
