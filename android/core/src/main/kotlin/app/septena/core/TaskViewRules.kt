@@ -72,6 +72,13 @@ data class TaskViewMembership(
 
 /** Shared list membership rules; today and now are supplied by DayClock. */
 object TaskViewRules {
+    private val recurrenceUnits = setOf(
+        RegistryEntityEnums.RecurrenceUnit.DAY,
+        RegistryEntityEnums.RecurrenceUnit.WEEK,
+        RegistryEntityEnums.RecurrenceUnit.MONTH,
+        RegistryEntityEnums.RecurrenceUnit.YEAR,
+    )
+
     fun membership(task: TaskSnapshot, today: LocalDate, now: Instant): TaskViewMembership {
         val open = task.status == RegistryEntityEnums.TaskStatus.OPEN
         val deleted = task.deletedAt != null
@@ -115,6 +122,40 @@ object TaskViewRules {
             daysOnToday = daysOnToday,
             matchesView = matches,
         )
+    }
+
+    /**
+     * Membership for a registry destination, including the historical lists
+     * whose rows are not represented by the open-task fields in
+     * [TaskViewMembership.matchesView].
+     */
+    fun matchesView(
+        task: TaskSnapshot,
+        destinationId: String,
+        today: LocalDate,
+        now: Instant,
+    ): Boolean {
+        val activeMembership = membership(task, today, now).matchesView[destinationId]
+        if (activeMembership != null) return activeMembership
+
+        val isHeading = task.isHeading
+        val isDeleted = task.deletedAt != null
+        return when (destinationId) {
+            RegistryDestinationIds.REPEATING ->
+                task.status == RegistryEntityEnums.TaskStatus.OPEN &&
+                    !isHeading && !isDeleted && !TaskFadeRules.isFaded(task.fadedAt) &&
+                    task.recurrenceUnit in recurrenceUnits
+
+            RegistryDestinationIds.LOGBOOK ->
+                !isHeading && !isDeleted &&
+                    task.status in setOf(
+                        RegistryEntityEnums.TaskStatus.DONE,
+                        RegistryEntityEnums.TaskStatus.CANCELLED,
+                    )
+
+            RegistryDestinationIds.RECENTLY_DELETED -> isDeleted && !isHeading
+            else -> false
+        }
     }
 
     private fun isFreshAgentProposal(task: TaskSnapshot, now: Instant): Boolean {

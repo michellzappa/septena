@@ -205,11 +205,17 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             val membership = TaskViewRules.membership(snapshot, today, now)
             when (resolvedLocation) {
                 is TaskHomeLocation.SmartList -> {
-                    if (membership.matchesView[resolvedLocation.destinationId] != true) continue
+                    if (!TaskViewRules.matchesView(snapshot, resolvedLocation.destinationId, today, now)) continue
                     val positioned = PositionedTask(
                         TaskListItem(record.id, snapshot.title),
                         record.fields[positionField(resolvedLocation.destinationId)].numberValue()
                             ?: record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
+                        archiveDate = when (resolvedLocation.destinationId) {
+                            RegistryDestinationIds.LOGBOOK ->
+                                record.fields[RegistryEntityFields.Task.COMPLETED_AT].stringValue()
+                            RegistryDestinationIds.RECENTLY_DELETED -> record.deletedAt
+                            else -> null
+                        },
                     )
                     if (resolvedLocation.destinationId == RegistryDestinationIds.TODAY && membership.inTodayInbox) {
                         inbox += positioned
@@ -254,14 +260,15 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 destinationId = destinationId,
                 selectedCount = 1,
             ),
-        )
+        ) && destinationId != RegistryDestinationIds.LOGBOOK &&
+            destinationId != RegistryDestinationIds.RECENTLY_DELETED
         return LoadedTaskHome(
             location = resolvedLocation,
             smartLists = smartListItems,
             areas = areaRecords,
             projects = projectRecords,
             inboxTasks = inbox.sortedTaskItems(),
-            tasks = visible.sortedTaskItems(),
+            tasks = visible.sortedTaskItems(destinationId),
             canQuickAdd = canQuickAdd,
             canComplete = canComplete,
         )
@@ -278,17 +285,33 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             task.status == RegistryEntityEnums.TaskStatus.OPEN &&
             !task.isHeading && task.deletedAt == null && !TaskFadeRules.isFaded(task.fadedAt)
 
-    private fun List<PositionedTask>.sortedTaskItems(): List<TaskListItem> =
-        sortedWith(compareBy<PositionedTask>({ it.position ?: Double.MAX_VALUE }, { it.item.title.lowercase() }))
+    private fun List<PositionedTask>.sortedTaskItems(destinationId: String? = null): List<TaskListItem> =
+        sortedWith(
+            if (destinationId == RegistryDestinationIds.LOGBOOK ||
+                destinationId == RegistryDestinationIds.RECENTLY_DELETED
+            ) {
+                compareByDescending<PositionedTask> { it.archiveDate.orEmpty() }
+                    .thenBy { it.item.title.lowercase() }
+            } else {
+                compareBy<PositionedTask>({ it.position ?: Double.MAX_VALUE }, { it.item.title.lowercase() })
+            },
+        )
             .map(PositionedTask::item)
 
-    private data class PositionedTask(val item: TaskListItem, val position: Double?)
+    private data class PositionedTask(
+        val item: TaskListItem,
+        val position: Double?,
+        val archiveDate: String? = null,
+    )
 
     private companion object {
         val SHELL_DESTINATIONS = setOf(
             RegistryDestinationIds.TODAY,
             RegistryDestinationIds.UPCOMING,
+            RegistryDestinationIds.REPEATING,
             RegistryDestinationIds.ANYTIME,
+            RegistryDestinationIds.LOGBOOK,
+            RegistryDestinationIds.RECENTLY_DELETED,
         )
     }
 }
