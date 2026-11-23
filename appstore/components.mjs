@@ -150,7 +150,7 @@ function shot(s, device, tint) {
 function ring(r, { w, pad }) {
   const k = (w - 2 * pad) / (r.screenWidth ?? 402);
   const [x, y, fw, fh] = r.frame;
-  const g = 12;
+  const g = 24; // breathing room around the element
   return `<div style="position:absolute; z-index:2; left:${pad + x * k - g}px; top:${pad + y * k - g}px; width:${fw * k + 2 * g}px; height:${fh * k + 2 * g}px; border:7px solid ${r.color ?? "#fff"}; border-radius:28px; box-shadow:0 0 0 8px color-mix(in oklab, ${r.color ?? "#fff"} 22%, transparent);"></div>`;
 }
 

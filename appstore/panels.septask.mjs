@@ -46,7 +46,8 @@ const VISUAL = {
   // on a MacBook at the back, the iPhone in front at the right, the watch at
   // the left. All upright. The iPad joins when septena-site#17 adds its layout.
   devices:        {
-    fruit: null, texture: "topography",
+    // Black, like the photo panel: the devices carry the light.
+    fruit: null, texture: "topography", background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" },
     shot: { width: 0.42, offsetX: 0.22, top: 1440, accent: "tamarillo" },
     shots: [{ src: "today/0", layout: "mac", frame: "laptop", accent: "tamarillo", width: 1.34, offsetX: -0.1, top: 760 }],
     watch: { src: "today/0", from: "tamarillo", accentFruit: "tamarillo", left: 120, top: 1960, width: 300 },
@@ -62,19 +63,22 @@ const VISUAL = {
   // and a card with the agent's status, Stop, and the Pause all agents switch.
   "agent-work":   {
     fruit: "acai", texture: "ridges",
-    shot: { appearance: "light" },
-    card: { kind: "agent", element: "agent-status", top: 1700, toggleSetting: "agentsPaused" },
+    // The agent's side: you hand it the task, it says what it is doing. The
+    // phone shows the task working, with the agent's status ringed.
+    shot: { appearance: "light", ring: { element: "agent-status" } },
+    chat: { top: 1680, you: "Can you take the launch brief?", agent: "On it. I’m drafting it from the task’s notes and will ask if I need you." },
   },
   // Slide 5: agent work waits in Review until you accept it.
   "agent-result": {
-    fruit: "jabuticaba", texture: "stippleDrift",
+    fruit: "carambola", texture: "stippleDrift",
+    shot: { ring: { element: "task-review-brief" } },
     card: { kind: "review", element: "task-review-brief", top: 1720 },
   },
   // Slide 6: the list that lets go (T4). The Faded list, and the weekly
   // notice from the registry, counted from the screen.
   "lets-go":      {
     fruit: "pitaya", texture: "washiPaper",
-    card: { kind: "notice", notice: "weeklySweep", top: 1800 },
+    card: { kind: "notice", notice: "weeklySweep", top: 1800, actions: false },
   },
   dates:          { fruit: "persimmon", texture: "ridges", shot: { appearance: "dark" } },
   looks:          {

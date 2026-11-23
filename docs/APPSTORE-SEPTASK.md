@@ -227,11 +227,11 @@ reads this table; `appstore/validate.mjs` checks it.
 | photo | - | - | Tasks that think with you. Septena is the task app for you and your agents. | |
 | from-agent | today/0 | - | Your agent adds tasks, too. Plan out loud with it, and Septena is its memory. | |
 | thinking | thinking/1 | - | Discuss any task. Septena asks what matters, and you answer with a tap. | |
-| agent-work | agents/1 | - | Hand it off, stop it anytime. Your agent works the task while you stay in charge. | |
+| agent-work | agents/1 | - | Hand off the work. Your agent works from the task’s notes, and you can stop it anytime. | |
 | agent-result | review/0 | - | You decide when it’s done. Agent work waits in Review until you accept it. | |
 | lets-go | faded/0 | - | The list that lets go. Old tasks fade, and each week Septena asks if you still want them. | |
-| devices | today/0 | - | One list, every device. iPhone, iPad, Mac and Apple Watch. | |
 | looks | looks/2 | - | Make it yours. Pick an accent colour and a texture for your lists. | |
+| devices | today/0 | - | One list, every device. iPhone, iPad, Mac and Apple Watch. | |
 
 ---
 

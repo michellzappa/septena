@@ -148,12 +148,12 @@ function resolveCard(device, panel) {
   }
   if (c.kind === "agent") {
     const [status, ...buttons] = el(c.element);
-    return { ...base, title: el(c.taskElement ?? "task-detail")[0], subtitle: status, actions: buttons.map((label) => ({ label, kind: label === "Stop" ? "destructive" : "tinted" })), toggle: c.toggleSetting ? settingLabel(c.toggleSetting) : null };
+    return { ...base, title: el(c.taskElement ?? "task-detail")[0], subtitle: status, actions: c.actions === false ? [] : buttons.map((label) => ({ label, kind: label === "Stop" ? "destructive" : "tinted" })), toggle: c.toggleSetting ? settingLabel(c.toggleSetting) : null };
   }
   if (c.kind === "review") {
     const lines = el(c.element);
     const actions = lines.slice(-2);
-    return { ...base, title: lines[0], subtitle: lines[1], artifact: lines.length > 4 ? lines[2] : null, actions: actions.map((label, i) => ({ label, kind: i === actions.length - 1 ? "primary" : "tinted" })) };
+    return { ...base, title: lines[0], subtitle: lines[1], artifact: c.artifact && lines.length > 4 ? lines[2] : null, actions: actions.map((label, i) => ({ label, kind: i === actions.length - 1 ? "primary" : "tinted" })) };
   }
   if (c.kind === "notice") {
     // A registry notice (registry/surfaces.json), its count from the screen.
@@ -161,7 +161,7 @@ function resolveCard(device, panel) {
     if (!n) throw new Error(`${device.key}/${panel.id}: notice ${c.notice} is not in registry/surfaces.json`);
     const count = (m?.elements ?? []).filter((e) => e.id.startsWith("task-")).length;
     const title = typeof n.title === "string" ? n.title : (count === 1 ? n.title.one : n.title.other).replace("{count}", String(count));
-    return { ...base, face: null, title, subtitle: n.detail, actions: n.primaryTitle ? [{ label: n.primaryTitle, kind: "primary" }] : [] };
+    return { ...base, face: null, title, subtitle: n.detail, actions: n.primaryTitle && c.actions !== false ? [{ label: n.primaryTitle, kind: "primary" }] : [] };
   }
   if (c.kind === "list") {
     const rows = c.elements.map((id) => {
