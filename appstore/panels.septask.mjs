@@ -48,7 +48,7 @@ const VISUAL = {
   devices:        {
     fruit: null, texture: "topography",
     shot: { width: 0.42, offsetX: 0.22, top: 1440, accent: "tamarillo" },
-    shots: [{ src: "today/0", layout: "mac", frame: "laptop", accent: "tamarillo", width: 1.02, top: 860 }],
+    shots: [{ src: "today/0", layout: "mac", frame: "laptop", accent: "tamarillo", width: 1.34, offsetX: -0.1, top: 760 }],
     watch: { src: "today/0", from: "tamarillo", accent: "#FF5C67", left: 120, top: 1960, width: 300 },
   },
   thinking:       { fruit: "yuzu", texture: "fieldMatrix" },
