@@ -532,6 +532,8 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   renders + validates, and the website's `/about/brand#app-store` is the review
   page (no viewer in this repo), `fastlane deliver` uploads.
   Mac is a separate ASC app (own deliver run). See `docs/APPSTORE.md`.
+  For generated Photo Studio lifestyle images and device variants, use
+  `docs/photo-studio/SKILL.md`.
 
 ## Conventions
 
