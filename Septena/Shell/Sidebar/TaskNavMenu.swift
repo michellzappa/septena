@@ -35,12 +35,20 @@ struct TaskNavMenu<Trigger: View>: View {
   /// sidebar instead, which is what drives its panes.
   var onNavigate: ((Route) -> Void)? = nil
   @ViewBuilder var label: () -> Trigger
+  /// Smart lists that hide while empty and currently have rows. Read once per
+  /// task change, not per render: iOS builds the `Menu` content on every
+  /// body pass, and the read runs five filtered fetches of the whole store.
+  @State private var nonEmptyIDs: Set<String> = []
 
   var body: some View {
     Menu {
       menuContent
     } label: {
       label()
+    }
+    .onAppear { refreshNonEmptyIDs() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+      refreshNonEmptyIDs()
     }
     // Render the label as plain content (the ScreenTitle / chevron the caller
     // passed), not a bezeled macOS menu button, and hide the system caret
@@ -51,10 +59,15 @@ struct TaskNavMenu<Trigger: View>: View {
     .inlineHover()
   }
 
+  private func refreshNonEmptyIDs() {
+    let ids = TaskDestinations.nonEmptySmartListIDs(in: modelContext)
+    if ids != nonEmptyIDs { nonEmptyIDs = ids }
+  }
+
   // MARK: - Menu content
 
-  // Built lazily when the menu opens, so the per-render title never pays for a
-  // structure read. Groups are separated by explicit `Divider()`s rather than
+  // iOS builds this on every body pass, not when the menu opens, so it reads
+  // only memoized state (`StructureCache`, `nonEmptyIDs`). Groups are separated by explicit `Divider()`s rather than
   // `Section`s: a `Section` whose leading element is a plain-`Text` button (an
   // emoji area) followed by more rows gets that text promoted to a centered,
   // greyed section header on macOS — so every row stays a uniform, left-aligned
@@ -66,7 +79,7 @@ struct TaskNavMenu<Trigger: View>: View {
     let projects = snapshot.projects
     let topLevel = projects.filter { $0.area == nil && $0.status == .active }
 
-    ForEach(TaskDestinations.sidebarRoutes(in: .top, context: modelContext), id: \.id) { destButton($0) }
+    ForEach(TaskDestinations.sidebarRoutes(in: .top, nonEmptyIDs: nonEmptyIDs), id: \.id) { destButton($0) }
 
     if !topLevel.isEmpty {
       Divider()
@@ -80,7 +93,7 @@ struct TaskNavMenu<Trigger: View>: View {
       ForEach(areaProjects) { destButton(.project(id: $0.id), title: $0.title) }
     }
 
-    let bottomRoutes = TaskDestinations.sidebarRoutes(in: .bottom, context: modelContext)
+    let bottomRoutes = TaskDestinations.sidebarRoutes(in: .bottom, nonEmptyIDs: nonEmptyIDs)
     if !bottomRoutes.isEmpty {
       Divider()
       ForEach(bottomRoutes, id: \.id) { destButton($0) }

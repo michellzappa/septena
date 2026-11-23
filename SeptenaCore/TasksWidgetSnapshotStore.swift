@@ -40,6 +40,9 @@ public enum TasksWidgetSnapshotStore {
 
   public static func save(_ snapshot: TasksWidgetSnapshot, reloadTimelines: Bool = true) {
     guard let data = try? encoder.encode(snapshot) else { return }
+    // An unchanged snapshot needs no write and no timeline reload; WidgetKit
+    // budgets reloads.
+    guard defaults.data(forKey: snapshotKey) != data else { return }
     defaults.set(data, forKey: snapshotKey)
     if reloadTimelines {
       reloadWidgetTimelines()

@@ -62,8 +62,15 @@ final class BadgeManager {
 
   private func refresh(context: ModelContext) {
     let enabled = SeptenaAppGroup.defaults.bool(forKey: Self.defaultsKey)
+    #if canImport(UIKit)
+    // iOS never shows the count (see `apply`), and `overdueCount` reads every
+    // task in the store on the main actor, once per task change and once per
+    // defaults write. Skip the read.
+    apply(count: 0, enabled: enabled)
+    #else
     let count = enabled ? LocalCache.overdueCount(in: context) : 0
-    apply(count: enabled ? count : 0, enabled: enabled)
+    apply(count: count, enabled: enabled)
+    #endif
   }
 
   private func apply(count: Int, enabled: Bool) {

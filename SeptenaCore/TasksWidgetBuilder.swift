@@ -238,6 +238,11 @@ final class TasksWidgetSnapshotPublisher {
   private var pendingTask: Task<Void, Never>?
   private var observers: [NSObjectProtocol] = []
   private var darwinRegistered = false
+  /// The only setting the snapshot reads. `UserDefaults.didChangeNotification`
+  /// fires for every defaults write in the process, the snapshot's own save
+  /// included, so a bare observer rebuilt the snapshot every debounce forever
+  /// (a full store read on the main actor, ~3 times a second).
+  private var lastAppLockRedacted = TasksWidgetBuilder.isAppLockRedacted()
 
   private init() {}
 
@@ -250,7 +255,6 @@ final class TasksWidgetSnapshotPublisher {
       .septaskSettingsPulled,
       .septenaAppearanceChanged,
       .NSCalendarDayChanged,
-      UserDefaults.didChangeNotification,
     ]
     for name in names {
       observers.append(NotificationCenter.default.addObserver(
@@ -261,8 +265,22 @@ final class TasksWidgetSnapshotPublisher {
         }
       })
     }
+    observers.append(NotificationCenter.default.addObserver(
+      forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+    ) { _ in
+      MainActor.assumeIsolated {
+        TasksWidgetSnapshotPublisher.shared.appLockSettingMayHaveChanged()
+      }
+    })
     registerDarwinObserver()
     publishNow()
+  }
+
+  private func appLockSettingMayHaveChanged() {
+    let redacted = TasksWidgetBuilder.isAppLockRedacted()
+    guard redacted != lastAppLockRedacted else { return }
+    lastAppLockRedacted = redacted
+    schedulePublish()
   }
 
   func schedulePublish() {
