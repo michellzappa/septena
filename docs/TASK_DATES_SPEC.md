@@ -1,7 +1,7 @@
 # Task dates spec
 
 **Status:** accepted (2026-11-23) · **ADR:** [0027](adr/0027-task-date-rules-are-core-actions.md),
-built on [0025](adr/0025-shared-rust-core.md) · **Issues:** one per phase (§9)
+built on [0025](adr/0025-shared-rust-core.md) · **Issues:** D1 #288, D2 #289, D3 #290, D4 #291, D5 #292
 
 This spec defines what a task's date fields mean, what every user action does
 to them, and how each surface reads them. It is the single reference for
