@@ -59,8 +59,10 @@ Generated outputs (checked in, never hand-edited):
   generator, and its settings, menu items, smart list, pill and notice go away
   on that platform. A settings item without its own `featureId` takes its
   setting key's, then the page it opens, then the page it sits on.
-- **Readers.** `--check` fails when a generated Swift member or TS export has
-  no reader (`scripts/registry-readers.mjs`). Read it, stop generating it (the
+- **Readers.** `--check` fails when a generated Swift member, TS export or
+  Kotlin member has no reader (`scripts/registry-readers.mjs`). Kotlin
+  allowlist entries may be `Object.*`: Android reads ID catalogs member by
+  member as features ship, and the wildcard fails once every member is read. Read it, stop generating it (the
   server-only rules in `SERVER_ONLY` are left out of Swift), or list it in
   `registry/readers-allowlist.json` with a reason and an issue. An allowlist
   entry that gains a reader fails too.

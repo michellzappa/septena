@@ -598,7 +598,7 @@ let BY_KEY = null;
 // Rules, limits and patterns that only the server enforces. The Apple client
 // never reads them, so Swift does not get them (the reader check in
 // `scripts/registry-readers.mjs` fails on generated code nobody reads).
-// TypeScript and Kotlin still get every key.
+// TypeScript gets every key; Kotlin skips the server-only rules too.
 const SERVER_ONLY = new Set([
   "agentRunBudget", "claimTtlDefaultSeconds", "claimTtlMaxSeconds",
   "tombstoneTtlDays", "clientOpTtlDays", "changeLogTtlDays",
@@ -1764,8 +1764,6 @@ function generateKotlinCore(bundle) {
     lines.push("        ),");
   }
   lines.push("    )");
-  lines.push(`    val names: List<String> = listOf(${entityNames.map(kotlinStr).join(", ")})`);
-  lines.push(`    val deletableNames: Set<String> = setOf(${deletableNames.map(kotlinStr).join(", ")})`);
   lines.push("}");
   lines.push("");
 
@@ -1793,7 +1791,7 @@ function generateKotlinCore(bundle) {
   lines.push("/** Numeric domain constants shared with the backend and Apple clients. */");
   lines.push("object RegistryRules {");
   for (const [key, value] of Object.entries(rules)) {
-    if (key === "version") continue;
+    if (key === "version" || SERVER_ONLY.has(key)) continue;
     const type = Number.isInteger(value) ? "Long" : "Double";
     const literal = Number.isInteger(value) ? `${value}L` : `${value}`;
     lines.push(`    const val ${kotlinConstName(key)}: ${type} = ${literal}`);
@@ -1876,11 +1874,6 @@ function generateKotlinCore(bundle) {
       lines.push(`            ${kotlinStr(platform)} to ${kotlinStr(status)},`);
     }
     lines.push("        ),");
-  }
-  lines.push("    )");
-  lines.push("    val androidStatusByFeatureId: Map<String, String> = linkedMapOf(");
-  for (const [featureId, capability] of Object.entries(caps.capabilities)) {
-    lines.push(`        ${kotlinStr(featureId)} to ${kotlinStr(capability.android)},`);
   }
   lines.push("    )");
   lines.push("}");

@@ -1,5 +1,5 @@
 {
-  "description": "Generated registry members with no reader yet (scripts/registry-readers.mjs, run by gen-registries --check). Each entry names why and the issue that removes it. An entry that gains a reader fails the check, so this list only shrinks.",
+  "description": "Generated registry members with no reader yet (scripts/registry-readers.mjs, run by gen-registries --check). Each entry names why and the issue that removes it. An entry that gains a reader fails the check, so this list only shrinks. The kotlin lane also accepts `Object.*` for a catalog that Android reads member by member as features ship.",
   "swift": {
     "RegistryEntityEnums.taskStatus": {
       "reason": "Swift model enums (TaskStatus, ...) are hand-written; nothing compares them with the registry yet.",
@@ -74,6 +74,152 @@
     "registryText": {
       "reason": "For the web client's localized copy.",
       "issue": "#21"
+    }
+  },
+  "kotlin": {
+    "RegistryActionIds.*": {
+      "reason": "Android implements a subset of the registry; members gain readers as features ship (ADR 0028). Actions and menus.",
+      "issue": "#174"
+    },
+    "RegistryCapabilityIds.*": {
+      "reason": "Android implements a subset of the registry; members gain readers as features ship (ADR 0028). A ships claim with no reader is checked by #285.",
+      "issue": "#285"
+    },
+    "RegistryIconIds.*": {
+      "reason": "Android draws Material icons chosen in code; it does not read the registry icon map yet.",
+      "issue": "#180"
+    },
+    "RegistrySettingKeys.*": {
+      "reason": "Android has no Settings surface yet.",
+      "issue": "#244"
+    },
+    "RegistryNoticeIds.*": {
+      "reason": "Android shows no notices yet.",
+      "issue": "#174"
+    },
+    "RegistryPromptIds.*": {
+      "reason": "Android implements a subset of the registry; members gain readers as features ship (ADR 0028). Delete and account prompts.",
+      "issue": "#174"
+    },
+    "RegistryFirstRunStepIds.*": {
+      "reason": "Android has no first-run flow yet; it reads only the done step.",
+      "issue": "#174"
+    },
+    "RegistryTaskAttributeIds.*": {
+      "reason": "Android implements a subset of the registry; members gain readers as features ship (ADR 0028). Reminder, star, list, attachments, discuss and paste attributes.",
+      "issue": "#174"
+    },
+    "RegistryPlatformIds.*": {
+      "reason": "Android reads only its own platform ID; the others exist for the capability table.",
+      "issue": "#180"
+    },
+    "RegistryEntityEnums.AccentColor.*": {
+      "reason": "Appearance settings are not on Android yet.",
+      "issue": "#244"
+    },
+    "RegistryEntityEnums.AppIconFinish.*": {
+      "reason": "Appearance settings are not on Android yet.",
+      "issue": "#244"
+    },
+    "RegistryEntityEnums.AppearanceMode.*": {
+      "reason": "Appearance settings are not on Android yet.",
+      "issue": "#244"
+    },
+    "RegistryEntityEnums.CanvasTexture.*": {
+      "reason": "Appearance settings are not on Android yet.",
+      "issue": "#244"
+    },
+    "RegistryEntityEnums.TextureMotion.*": {
+      "reason": "Appearance settings are not on Android yet.",
+      "issue": "#244"
+    },
+    "RegistryEntityEnums.TelemetryLevel.*": {
+      "reason": "Privacy settings are not on Android yet.",
+      "issue": "#244"
+    },
+    "RegistryEntityEnums.ReminderMode.*": {
+      "reason": "Reminders are not on Android yet.",
+      "issue": "#174"
+    },
+    "RegistryEntityEnums.ConvoAssignee.*": {
+      "reason": "Task conversations are not on Android yet.",
+      "issue": "#242"
+    },
+    "RegistryEntityEnums.ConvoEndState.*": {
+      "reason": "Task conversations are not on Android yet.",
+      "issue": "#242"
+    },
+    "RegistryEntityEnums.ConvoHandoffActionType.*": {
+      "reason": "Task conversations are not on Android yet.",
+      "issue": "#242"
+    },
+    "RegistryEntityEnums.ConvoTurnRole.*": {
+      "reason": "Task conversations are not on Android yet.",
+      "issue": "#242"
+    },
+    "RegistryEntityEnums.ConvoTurnStep.*": {
+      "reason": "Task conversations are not on Android yet.",
+      "issue": "#242"
+    },
+    "RegistryEntityFields.Convo.*": {
+      "reason": "Task conversations are not on Android yet.",
+      "issue": "#242"
+    },
+    "RegistryEntityFields.Attachment.*": {
+      "reason": "Attachments are not on Android yet.",
+      "issue": "#174"
+    },
+    "RegistryEntityFields.Tag.*": {
+      "reason": "Tags are not on Android yet.",
+      "issue": "#174"
+    },
+    "RegistryEntityFields.Area.*": {
+      "reason": "Area notes proposals, emoji and attachments are not on Android yet.",
+      "issue": "#174"
+    },
+    "RegistryEntityFields.Project.*": {
+      "reason": "Project notes proposals, GitHub repo and attachments are not on Android yet.",
+      "issue": "#174"
+    },
+    "RegistryEntityFields.Task.*": {
+      "reason": "Reminder fields: reminders are not on Android yet.",
+      "issue": "#174"
+    },
+    "RegistryEntityNames.ATTACHMENT": {
+      "reason": "Attachments are not on Android yet.",
+      "issue": "#174"
+    },
+    "RegistryEntityNames.TAG": {
+      "reason": "Tags are not on Android yet.",
+      "issue": "#174"
+    },
+    "RegistryDestinationIds.REVIEW": {
+      "reason": "Review is planned on Android.",
+      "issue": "#174"
+    },
+    "RegistryDestinationIds.AGENT": {
+      "reason": "The Agent list is planned on Android.",
+      "issue": "#242"
+    },
+    "RegistryDestinationIds.FADED": {
+      "reason": "Fade is not on Android yet.",
+      "issue": "#247"
+    },
+    "RegistryRules.FADE_SWEEP_WEEKDAY": {
+      "reason": "Fade rules move to the shared core.",
+      "issue": "#247"
+    },
+    "RegistryRules.RECENTLY_DELETED_DAYS": {
+      "reason": "Android ships Recently Deleted but does not read the retention rule; the purge moves to the shared core.",
+      "issue": "#247"
+    },
+    "RegistryRules.UPCOMING_CALENDAR_DAYS": {
+      "reason": "Calendar events in Upcoming are not on Android yet.",
+      "issue": "#252"
+    },
+    "RegistryRules.TOAST_DURATION_SECONDS": {
+      "reason": "Android has no undo toast yet.",
+      "issue": "#241"
     }
   }
 }
