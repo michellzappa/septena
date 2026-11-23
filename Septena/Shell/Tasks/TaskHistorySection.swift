@@ -45,7 +45,7 @@ struct TaskHistorySection: View {
     HStack(spacing: 6) {
       Image(systemName: expanded ? "chevron.down" : "chevron.right")
         .font(.caption2.weight(.semibold))
-      Text("History").font(.subheadline.weight(.semibold))
+      Text(RegistrySurfaces.taskPageBlock(.history).label ?? "").font(.subheadline.weight(.semibold))
       Spacer(minLength: 0)
     }
     .foregroundStyle(.secondary)

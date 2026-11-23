@@ -491,7 +491,48 @@ function validateSurfaces(surfaces, icons, caps, plans) {
     assert(attr.icon in icons.icons, `surfaces.json: attribute ${attr.id} unknown icon "${attr.icon}"`);
     assert(attr.featureId in caps.capabilities, `surfaces.json: attribute ${attr.id} unknown featureId "${attr.featureId}"`);
   }
+  // The task page (ADR 0029, docs/TASK_PAGE_SPEC.md): ordered blocks from a
+  // closed set of kinds. Each platform writes one renderer per kind; the
+  // registry holds order, depth and gating, never geometry (ADR 0028).
+  const page = surfaces.taskPage;
+  assert(page && Array.isArray(page.blocks) && page.blocks.length > 0, "surfaces.json: taskPage.blocks missing");
+  assert(page.featureId in caps.capabilities, `surfaces.json: taskPage unknown featureId "${page.featureId}"`);
+  const blockIds = new Set();
+  for (const b of page.blocks) {
+    assert(!blockIds.has(b.id), `surfaces.json: duplicate taskPage block ${b.id}`);
+    blockIds.add(b.id);
+    assert(TASK_PAGE_BLOCK_KINDS.has(b.kind), `surfaces.json: taskPage block ${b.id} unknown kind "${b.kind}"`);
+    assert(Array.isArray(b.depths) && b.depths.length > 0 && b.depths.every((d) => TASK_PAGE_DEPTHS.has(d)), `surfaces.json: taskPage block ${b.id} needs depths from ${[...TASK_PAGE_DEPTHS].join(", ")}`);
+    assert(b.featureId in caps.capabilities, `surfaces.json: taskPage block ${b.id} unknown featureId "${b.featureId}"`);
+    if (b.attribute !== undefined) assert(attrIds.has(b.attribute), `surfaces.json: taskPage block ${b.id} unknown attribute "${b.attribute}"`);
+    if (["checklist", "attachments", "conversation", "history"].includes(b.kind)) {
+      assert(typeof b.label === "string" || b.attribute !== undefined, `surfaces.json: taskPage block ${b.id} needs a label or an attribute`);
+    }
+  }
+  for (const kind of TASK_PAGE_BLOCK_KINDS) {
+    assert(page.blocks.filter((b) => b.kind === kind).length === 1, `surfaces.json: taskPage needs exactly one "${kind}" block`);
+  }
 }
+
+// One picker per attribute (ADR 0029): every popover attribute is opened by
+// exactly one action, so the pill, the page row, the context menu, the menu
+// bar and the shortcut all reach the same picker.
+function checkOpensAttribute({ actions, surfaces }) {
+  const attrById = new Map(surfaces.taskAttributes.map((a) => [a.id, a]));
+  const openers = new Map();
+  for (const [id, a] of Object.entries(actions.actions)) {
+    if (a.opensAttribute === undefined) continue;
+    assert(attrById.has(a.opensAttribute), `actions.json: ${id} opensAttribute names unknown attribute "${a.opensAttribute}"`);
+    assert(!openers.has(a.opensAttribute), `actions.json: attribute "${a.opensAttribute}" is opened by both ${openers.get(a.opensAttribute)} and ${id}`);
+    openers.set(a.opensAttribute, id);
+  }
+  for (const attr of surfaces.taskAttributes) {
+    if (attr.surfaceTier !== "popover") continue;
+    assert(openers.has(attr.id), `actions.json: popover attribute "${attr.id}" has no action with opensAttribute (ADR 0029: one picker per attribute)`);
+  }
+}
+const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checklist", "attachments", "conversation", "history"]);
+const TASK_PAGE_DEPTHS = new Set(["inline", "page"]);
 
 // ---- plans.json (ADR 0010, ADR 0023) ----
 const PLAN_LEVELS = ["device", "account", "plus"];
@@ -1123,6 +1164,19 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   }
   lines.push("  ]");
   lines.push("");
+  lines.push("  /// The task attribute whose picker an action opens (`opensAttribute`, ADR 0029).");
+  lines.push("  /// Every entry point for an attribute (pill, page row, context menu, menu bar,");
+  lines.push("  /// shortcut) runs this action, so all of them open the same picker.");
+  lines.push("  static let opensAttribute: [String: String] = [");
+  for (const [id, a] of Object.entries(actions.actions)) {
+    if (a.opensAttribute !== undefined) lines.push(`    ${swiftStr(id)}: ${swiftStr(a.opensAttribute)},`);
+  }
+  lines.push("  ]");
+  lines.push("  /// The action that opens the picker for `attributeId`, or nil for an attribute with no picker.");
+  lines.push("  static func action(opening attributeId: String) -> String? {");
+  lines.push("    opensAttribute.first(where: { $0.value == attributeId })?.key");
+  lines.push("  }");
+  lines.push("");
   lines.push("  /// Actions whose `role` is `destructive` (red in menus and swipes).");
   lines.push("  static let destructive: Set<String> = [");
   for (const [id, a] of Object.entries(actions.actions)) {
@@ -1375,6 +1429,49 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("    default: return nil");
   lines.push("    }");
   lines.push("  }");
+  // The task page (ADR 0029): ordered blocks, each shown at the depths it names.
+  const attrLabel = new Map(surfaces.taskAttributes.map((a) => [a.id, L(a.label, a, "label")]));
+  lines.push("  /// The task page (`surfaces.json` `taskPage`, ADR 0029) in block order.");
+  lines.push("  static let taskPageBlocks: [RegistryTaskPageBlock] = [");
+  for (const b of surfaces.taskPage.blocks) {
+    const label = b.label !== undefined ? L(b.label, b, "label") : b.attribute !== undefined ? attrLabel.get(b.attribute) : "nil";
+    lines.push(`    RegistryTaskPageBlock(id: ${swiftStr(b.id)}, kind: .${b.kind}, depths: [${b.depths.map((d) => "." + d).join(", ")}], label: ${label}, attributeId: ${b.attribute === undefined ? "nil" : swiftStr(b.attribute)}, featureId: ${swiftStr(b.featureId)}, editOnly: ${b.editOnly === true}),`);
+  }
+  lines.push("  ]");
+  lines.push("  /// The blocks a host renders at `depth` on `platform`, in order. A create");
+  lines.push("  /// (no saved task yet) passes `isEditing: false` to drop `editOnly` blocks.");
+  lines.push("  static func taskPageBlocks(_ depth: RegistryTaskPageDepth, on platform: String, isEditing: Bool = true) -> [RegistryTaskPageBlock] {");
+  lines.push("    taskPageBlocks.filter { $0.depths.contains(depth) && $0.applies(to: platform) && (isEditing || !$0.editOnly) }");
+  lines.push("  }");
+  lines.push("  /// The block of `kind`. Each kind appears exactly once (the generator checks it).");
+  lines.push("  static func taskPageBlock(_ kind: RegistryTaskPageBlockKind) -> RegistryTaskPageBlock {");
+  lines.push("    guard let b = taskPageBlocks.first(where: { $0.kind == kind }) else { preconditionFailure(\"no task page block \\(kind)\") }");
+  lines.push("    return b");
+  lines.push("  }");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// The closed set of task page block kinds (ADR 0029). Each platform writes one renderer per kind.");
+  lines.push("enum RegistryTaskPageBlockKind: String, Sendable, Hashable, CaseIterable {");
+  for (const k of TASK_PAGE_BLOCK_KINDS) lines.push(`  case ${k}`);
+  lines.push("}");
+  lines.push("");
+  lines.push("/// Where a task page block shows: `inline` (the quick edit in the row) or `page` (the full task page).");
+  lines.push("enum RegistryTaskPageDepth: String, Sendable, Hashable {");
+  for (const d of TASK_PAGE_DEPTHS) lines.push(`  case ${d}`);
+  lines.push("}");
+  lines.push("");
+  lines.push("/// One block of the task page (`surfaces.json` `taskPage.blocks`). `label` is the");
+  lines.push("/// section heading (its own, or its attribute's); nil for header, notes and attributes.");
+  lines.push("struct RegistryTaskPageBlock: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let kind: RegistryTaskPageBlockKind");
+  lines.push("  let depths: [RegistryTaskPageDepth]");
+  lines.push("  let label: String?");
+  lines.push("  let attributeId: String?");
+  lines.push("  let featureId: String");
+  lines.push("  let editOnly: Bool");
+  lines.push("  /// The block shows on `platform` when its capability ships there (ADR 0015).");
+  lines.push("  func applies(to platform: String) -> Bool { RegistryCapabilities.isAvailable(featureId, on: platform) }");
   lines.push("}");
   lines.push("");
 
@@ -1629,7 +1726,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
-  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes })} as const;`);
+  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskPage: surfaces.taskPage })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);
@@ -1833,6 +1930,7 @@ function generateKotlinCore(bundle) {
       .flatMap((k) => (surfaces.prompts.placesScreen[k] ?? []).map((x) => x.id)),
     RegistryFirstRunStepIds: surfaces.firstRun.steps.map((s) => s.id),
     RegistryTaskAttributeIds: surfaces.taskAttributes.map((a) => a.id),
+    RegistryTaskPageBlockIds: surfaces.taskPage.blocks.map((b) => b.id),
   };
   const idCounts = new Map();
   (function countIds(v) {
@@ -2029,6 +2127,7 @@ validateSettings(settings, entities, icons, caps);
 const destIds = validateDestinations(dests, icons, caps);
 validateActions(actions, icons, caps, destIds);
 validateSurfaces(surfaces, icons, caps, plans);
+checkOpensAttribute({ actions, surfaces });
 validateFirstRun(surfaces, icons, caps, settings);
 validatePlans(plans, icons, caps);
 validateConformance();

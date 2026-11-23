@@ -77,6 +77,10 @@
     }
   },
   "kotlin": {
+    "RegistryTaskPageBlockIds.*": {
+      "reason": "Android renders TaskDetailScreen by hand until it renders from taskPage.blocks (ADR 0029).",
+      "issue": "#305"
+    },
     "RegistryActionIds.*": {
       "reason": "Android implements a subset of the registry; members gain readers as features ship (ADR 0028). Actions and menus.",
       "issue": "#174"

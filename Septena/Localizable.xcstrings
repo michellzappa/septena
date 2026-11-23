@@ -3713,6 +3713,10 @@
     "Control Center" : {
 
     },
+    "Conversation" : {
+      "comment" : "Generated from registry surfaces.taskPage.blocks.taskPage.conversation.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Copied" : {
       "localizations" : {
         "pt-BR" : {
@@ -5971,6 +5975,10 @@
           }
         }
       }
+    },
+    "History" : {
+      "comment" : "Generated from registry surfaces.taskPage.blocks.taskPage.history.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Hit your daily water goal" : {
       "extractionState" : "manual",
