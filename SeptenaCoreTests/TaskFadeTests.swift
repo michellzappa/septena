@@ -150,6 +150,12 @@ final class TaskFadeTests: XCTestCase {
       fadedDates: [fadedThu], calendar: utc
     ))
 
+    // Sunday only: an ignored banner is gone on Monday
+    XCTAssertFalse(TaskFade.isSweepDue(
+      now: date(2026, 11, 23, hour: 10), lastSweepAt: nil, dismissedWeek: nil,
+      fadedDates: [fadedThu], calendar: utc
+    ))
+
     // Not due when no tasks faded
     XCTAssertFalse(TaskFade.isSweepDue(
       now: sunday, lastSweepAt: nil, dismissedWeek: nil,

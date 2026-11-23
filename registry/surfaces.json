@@ -83,7 +83,8 @@
         "dismissScope": "accountWeek",
         "dismissible": true,
         "title": { "one": "1 task faded this week", "other": "{count} tasks faded this week" },
-        "primaryTitle": "Sweep",
+        "detail": "Still want any of them?",
+        "primaryTitle": "Review",
         "featureId": "fade.sweep"
       },
       {
@@ -94,8 +95,8 @@
         "dismissScope": "none",
         "dismissible": false,
         "title": "Tasks without activity for 14 days",
-        "detail": "Open a task or choose Keep to bring it back, or sweep the list to let the rest go.",
-        "primaryTitle": "Sweep…",
+        "detail": "Open a task or choose Keep to bring it back, or review the list and let the rest go.",
+        "primaryTitle": "Review…",
         "featureId": "lists.faded"
       },
       {

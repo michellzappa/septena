@@ -1530,8 +1530,8 @@
       "surfaces.firstRun.steps.done.primary.title"
     ]
   },
-  "Open a task or choose Keep to bring it back, or sweep the list to let the rest go.": {
-    "text": "Open a task or choose Keep to bring it back, or sweep the list to let the rest go.",
+  "Open a task or choose Keep to bring it back, or review the list and let the rest go.": {
+    "text": "Open a task or choose Keep to bring it back, or review the list and let the rest go.",
     "paths": [
       "surfaces.notices.items.fadedPile.detail"
     ]
@@ -1856,7 +1856,14 @@
     "text": "Review",
     "paths": [
       "destinations.destinations.review.title",
-      "destinations.destinations.agent.groups.review.title"
+      "destinations.destinations.agent.groups.review.title",
+      "surfaces.notices.items.weeklySweep.primaryTitle"
+    ]
+  },
+  "Review…": {
+    "text": "Review…",
+    "paths": [
+      "surfaces.notices.items.fadedPile.primaryTitle"
     ]
   },
   "Ridge Lines": {
@@ -2123,6 +2130,12 @@
       "destinations.destinations.starred.title"
     ]
   },
+  "Still want any of them?": {
+    "text": "Still want any of them?",
+    "paths": [
+      "surfaces.notices.items.weeklySweep.detail"
+    ]
+  },
   "Stipple Drift": {
     "text": "Stipple Drift",
     "paths": [
@@ -2145,18 +2158,6 @@
     "text": "Suggest where to file",
     "paths": [
       "settings.rootGroups.lists_root.items.5.label"
-    ]
-  },
-  "Sweep": {
-    "text": "Sweep",
-    "paths": [
-      "surfaces.notices.items.weeklySweep.primaryTitle"
-    ]
-  },
-  "Sweep…": {
-    "text": "Sweep…",
-    "paths": [
-      "surfaces.notices.items.fadedPile.primaryTitle"
     ]
   },
   "Swipe left on a task to select multiple tasks. Swipe right runs this quick action.": {

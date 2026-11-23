@@ -8733,6 +8733,10 @@
         }
       }
     },
+    "Open a task or choose Keep to bring it back, or review the list and let the rest go." : {
+      "comment" : "Generated from registry surfaces.notices.items.fadedPile.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Open a task or choose Keep to bring it back, or sweep the list to let the rest go." : {
       "comment" : "Generated from registry surfaces.notices.items.fadedPile.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -10019,6 +10023,18 @@
         }
       }
     },
+    "Review…" : {
+      "comment" : "Generated from registry surfaces.notices.items.fadedPile.primaryTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revisar…"
+          }
+        }
+      }
+    },
     "Ridge Lines" : {
       "comment" : "Generated from registry tokens.textures.ridges.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -11293,6 +11309,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Passos e movimento (HealthKit)"
+          }
+        }
+      }
+    },
+    "Still want any of them?" : {
+      "comment" : "Generated from registry surfaces.notices.items.weeklySweep.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda quer alguma delas?"
           }
         }
       }
