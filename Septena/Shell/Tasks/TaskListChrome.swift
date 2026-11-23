@@ -537,11 +537,14 @@ final class MagicPlusDragState {
     }
 
     let next = ActiveTarget(id: best.id, kind: best.kind, before: before, frame: best.frame)
-    // "After row A" and "before row B" are the same slot when A and B touch.
-    // Keep the current target then: switching would move the slot's padding
-    // from one row to the other (a visible hop) and fire a second tick.
+    // Two targets whose slots open at (nearly) the same place are ONE slot:
+    // "after row A" / "before row B" on touching rows, and "under a list's
+    // header" / "before its first row" at the top of a list (header-to-row
+    // spacing apart). Keep the current target then: switching would move the
+    // slot's padding to the other view (a visible hop) and fire a second
+    // tick. 16pt sits under any real slot-to-slot distance (a row is 44pt+).
     if let current = activeTarget, current.id != next.id,
-       abs(Self.slotY(current) - Self.slotY(next)) < 2 {
+       abs(Self.slotY(current) - Self.slotY(next)) < 16 {
       return
     }
     if activeTarget?.id != next.id || activeTarget?.before != next.before {
