@@ -284,6 +284,12 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
       self.syncChecklistHeight(notify: true)
       self.updateChecklistPill()
     }
+    // The steps read as part of the document: ↑ or Shift-Tab off the first
+    // step climbs into notes, ↓ or Tab off the last goes on to the rail.
+    checklistView.onLeave = { [weak self] delta in
+      guard let self else { return }
+      if delta < 0 { self.focusNotes() } else { self.window?.makeFirstResponder(self.firstFocusablePill ?? self.titleView) }
+    }
 
     attachmentsView.translatesAutoresizingMaskIntoConstraints = false
     attachmentsView.onChanged = { [weak self] in
@@ -609,7 +615,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     titleView.nextKeyView = notesView
   }
 
-  /// Tab order inside the open row: title ⇄ notes, then out to the rail when
+  /// Tab order inside the open row: title ⇄ notes ⇄ steps (when the task has
+  /// any), then out to the rail when
   /// the rail can actually take focus. With Full Keyboard Access off — the
   /// default — the pills can't become first responder at all, so Tab cycles
   /// between the two text fields rather than dead-ending on a button that
@@ -618,8 +625,16 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     let current = window?.firstResponder
     let target: NSView
     if forward {
+      if current === notesView, checklistView.hasItems {
+        checklistView.focusFirstItem()
+        return
+      }
       target = current === titleView ? notesView : (firstFocusablePill ?? titleView)
     } else {
+      if current !== notesView, current !== titleView, checklistView.hasItems {
+        checklistView.focusLastItem()
+        return
+      }
       target = current === notesView ? titleView : notesView
     }
     window?.makeFirstResponder(target)
@@ -775,6 +790,11 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     case #selector(NSResponder.moveUp(_:))
       where textView === notesView && caretOnFirstLine(of: notesView):
       focusTitle()
+      return true
+    // ↓ on the last line of notes walks on into the checklist steps.
+    case #selector(NSResponder.moveDown(_:))
+      where textView === notesView && checklistView.hasItems && caretOnLastLine(of: notesView):
+      checklistView.focusFirstItem()
       return true
     // Autosaves like the SwiftUI inline host — Esc folds the row, it doesn't
     // discard what was typed. One press from either field (notes used to hop
@@ -1120,6 +1140,9 @@ final class KitPillButton: NSButton {
 @MainActor
 final class KitChecklistView: NSView {
   var onChanged: (() -> Void)?
+  /// ↑ on the first step (-1) or ↓ on the last (+1): the host moves the
+  /// keyboard out of the checklist (composer: up to notes, down to the rail).
+  var onLeave: ((Int) -> Void)?
 
   private var taskID: String?
   private var items: [ChecklistItem] = []
@@ -1184,6 +1207,23 @@ final class KitChecklistView: NSView {
     for row in rowViews { row.flushIfDirty() }
   }
 
+  var hasItems: Bool { !items.isEmpty }
+
+  func focusFirstItem() { rowViews.first?.focusTitle() }
+  func focusLastItem() { rowViews.last?.focusTitle() }
+
+  /// ⌘K while a step's field holds the keyboard toggles THAT step, not the
+  /// task. Returns false when no step is focused, so ⌘K completes the task.
+  static func toggleFocusedStep(in window: NSWindow?) -> Bool {
+    guard let editor = window?.firstResponder as? NSTextView,
+          let field = editor.delegate as? NSTextField else { return false }
+    var view: NSView? = field
+    while let current = view, !(current is KitChecklistItemRow) { view = current.superview }
+    guard let row = view as? KitChecklistItemRow else { return false }
+    row.toggleFromKeyboard()
+    return true
+  }
+
   func appendItemAndFocus() {
     guard let taskID else { return }
     flushPendingEdits()
@@ -1219,7 +1259,7 @@ final class KitChecklistView: NSView {
     let total = items.count
     for (idx, item) in items.enumerated() {
       let row = KitChecklistItemRow(item: item, index: idx, total: total)
-      row.onToggle = { [weak self] current in self?.toggle(current) }
+      row.onToggle = { [weak self] current, keepFocus in self?.toggle(current, keepFocus: keepFocus) }
       row.onCommitTitle = { [weak self] current, nextTitle in self?.commitTitle(current, nextTitle: nextTitle) }
       row.onInsertBelow = { [weak self] current in self?.insertBelow(current) }
       row.onDelete = { [weak self] current, focusPrevious in self?.delete(current, focusPrevious: focusPrevious) }
@@ -1240,13 +1280,13 @@ final class KitChecklistView: NSView {
     }
   }
 
-  private func toggle(_ item: ChecklistItem) {
+  private func toggle(_ item: ChecklistItem, keepFocus: Bool) {
     flushPendingEdits()
     var after = item
     after.checked.toggle()
     mutator.updateChecklistItem(id: item.id, checked: after.checked)
     TaskUndo.recordChecklistUpdate(before: item, after: after, mutator: mutator)
-    reload(focusItemID: nil)
+    reload(focusItemID: keepFocus ? item.id : nil)
     onChanged?()
   }
 
@@ -1290,7 +1330,7 @@ final class KitChecklistView: NSView {
   private func moveFocus(from itemID: String, delta: Int) {
     guard let idx = rowViews.firstIndex(where: { $0.itemID == itemID }) else { return }
     let next = idx + delta
-    guard rowViews.indices.contains(next) else { return }
+    guard rowViews.indices.contains(next) else { onLeave?(delta); return }
     rowViews[next].focusTitle()
   }
 
@@ -1334,7 +1374,7 @@ private final class KitChecklistItemRow: NSView, NSTextFieldDelegate {
   private var item: ChecklistItem
   var itemID: String { item.id }
 
-  var onToggle: ((ChecklistItem) -> Void)?
+  var onToggle: ((ChecklistItem, Bool) -> Void)?
   var onCommitTitle: ((ChecklistItem, String) -> Void)?
   var onInsertBelow: ((ChecklistItem) -> Void)?
   var onDelete: ((ChecklistItem, Bool) -> Void)?
@@ -1456,7 +1496,8 @@ private final class KitChecklistItemRow: NSView, NSTextFieldDelegate {
     }
   }
 
-  @objc private func togglePressed() { onToggle?(item) }
+  @objc private func togglePressed() { onToggle?(item, false) }
+  func toggleFromKeyboard() { onToggle?(item, true) }
   @objc private func deletePressed() { onDelete?(item, false) }
   @objc private func moveUpPressed() { onMoveOrder?(item, -1) }
   @objc private func moveDownPressed() { onMoveOrder?(item, 1) }
@@ -1497,6 +1538,16 @@ private final class KitChecklistItemRow: NSView, NSTextFieldDelegate {
     case #selector(NSResponder.moveDown(_:)):
       flushIfDirty()
       onMoveFocus?(item, 1)
+      return true
+    // Tab walks the steps like ↓ (and out to the rail past the last), the
+    // same loop as the SwiftUI editor's `focusOrder`.
+    case #selector(NSResponder.insertTab(_:)):
+      flushIfDirty()
+      onMoveFocus?(item, 1)
+      return true
+    case #selector(NSResponder.insertBacktab(_:)):
+      flushIfDirty()
+      onMoveFocus?(item, -1)
       return true
     default:
       return false

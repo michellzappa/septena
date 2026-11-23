@@ -24,6 +24,8 @@ import AppKit
 enum TaskEditFocus: Hashable {
   case title
   case notes
+  /// A checklist step, by item id (edit mode, between notes and the rail).
+  case step(String)
   case pill(TaskAttributeBar.Attribute)
 }
 
@@ -409,7 +411,8 @@ struct TaskComposerCard: View {
           focus: $focus,
           activate: $pendingPillActivate,
           discussTask: editingTask,
-          discussVisible: $discussKickoffVisible
+          discussVisible: $discussKickoffVisible,
+          moveFocus: { moveFocus(forward: $0) }
         )
 
         // Edit mode only — a not-yet-created task has no id/conversation.
@@ -972,6 +975,10 @@ struct TaskComposerCard: View {
   /// Tab order: title → notes → every pill (including Discuss when edit mode offers it).
   private var focusOrder: [TaskEditFocus] {
     var order: [TaskEditFocus] = [.title, .notes]
+    // Steps follow notes, as on the Mac. Read on a key press, never in `body`.
+    if let task = editingTask {
+      order += LocalCache.checklistItems(forTaskID: task.id, in: modelContext).map { .step($0.id) }
+    }
     // Rail order from the registry; edit-only pills join once a task exists.
     for attr in TaskAttributeBar.Attribute.rail {
       if attr == .discuss {

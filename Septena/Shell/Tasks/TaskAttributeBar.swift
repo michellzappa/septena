@@ -34,6 +34,9 @@ struct TaskAttributeBar: View {
   var discussTask: SeptenaTask? = nil
   /// Written whenever `showsDiscuss` changes so the composer can Tab to the pill.
   @Binding var discussVisible: Bool
+  /// The composer's Tab loop, handed to the checklist so arrows and Tab walk
+  /// out of the steps the same way they walk between them.
+  var moveFocus: ((Bool) -> Void)? = nil
 
   /// The electives. Order, label and icon come from the registry
   /// (`registry/surfaces.json` `taskAttributes`, ADR 0020) so the AppKit
@@ -97,7 +100,8 @@ struct TaskAttributeBar: View {
   init(draft: Binding<TaskDraft>, areas: [Area], projects: [Project], accent: Color,
        neutral: Bool = false, focus: FocusState<TaskEditFocus?>.Binding,
        activate: Binding<Attribute?>, discussTask: SeptenaTask? = nil,
-       discussVisible: Binding<Bool> = .constant(false)) {
+       discussVisible: Binding<Bool> = .constant(false),
+       moveFocus: ((Bool) -> Void)? = nil) {
     _draft = draft
     self.areas = areas
     self.projects = projects
@@ -107,6 +111,7 @@ struct TaskAttributeBar: View {
     _activate = activate
     self.discussTask = discussTask
     _discussVisible = discussVisible
+    self.moveFocus = moveFocus
     _discussStarted = State(initialValue: discussTask?.conversation.hasStarted ?? true)
   }
 
@@ -116,8 +121,8 @@ struct TaskAttributeBar: View {
       // Steps sit open under the notes whenever the task has any, so opening a
       // task shows its checklist without a tap. The pill only starts one.
       if let task = discussTask, checklistOpened || (edit?.stepsTotal ?? 0) > 0 {
-        TaskChecklistPanel(taskID: task.id, accent: accent, fill: panelFill,
-                           addRequest: checklistAddRequest)
+        TaskChecklistPanel(taskID: task.id, addRequest: checklistAddRequest,
+                           focus: $focus, moveFocus: moveFocus)
           .transition(.opacity.combined(with: .move(edge: .top)))
       }
 
@@ -1050,59 +1055,80 @@ private struct InlineRepeatPanel: View {
 
 // MARK: - Inline Checklist panel
 
-/// Progressive-disclosure inline checklist editor inside the SwiftUI task editor
-/// (iOS/iPadOS & SwiftUI Mac sheet). Shows whenever the task has steps, and
-/// opens from the Checklist pill when it has none; supports inline add,
-/// Return-to-insert-below, multi-line paste split, reorder, and delete with
-/// shared `TaskUndo` recording.
+/// The step ⌘K ticks instead of the task: set while a checklist step holds the
+/// keyboard, nil otherwise. The task list's ⌘K handler reads it first (same
+/// rule as the Mac's `KitChecklistView.toggleFocusedStep`).
+@MainActor @Observable
+final class FocusedChecklistStep {
+  static let shared = FocusedChecklistStep()
+  var toggle: (() -> Void)?
+}
+
+/// The task's checklist inside the SwiftUI task editor (iPhone, iPad). Drawn
+/// and driven like the Mac composer's `KitChecklistView`: steps read as part
+/// of the document under the notes (notes-size text, no card), ↑/↓ and Tab
+/// walk title → notes → steps → rail, Return inserts below, Backspace on an
+/// empty step deletes it, ⌘K ticks the focused step. Move and delete sit in
+/// the row's context menu (long-press here, right-click on the Mac), with the
+/// same × delete button on the row. Every edit records on `TaskUndo`.
 private struct TaskChecklistPanel: View {
   let taskID: String
-  let accent: Color
-  let fill: Color
   /// Each change appends a step and focuses it (the Checklist pill).
   var addRequest: Int = 0
+  @FocusState.Binding var focus: TaskEditFocus?
+  /// The composer's focus loop (`TaskComposerCard.moveFocus`), which lists
+  /// every step between notes and the rail.
+  var moveFocus: ((Bool) -> Void)?
 
   @State private var items: [ChecklistItem] = []
   @State private var drafts: [String: String] = [:]
-  @FocusState private var focusedItemID: String?
 
   private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
+    VStack(alignment: .leading, spacing: 4) {
       ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
         checklistRow(item: item, index: idx, total: items.count)
       }
 
-      Button {
-        addStep()
-      } label: {
-        HStack(spacing: 6) {
-          Image(systemName: "plus")
-            .font(.system(size: 11, weight: .semibold))
-          Text("Add step")
-            .font(.septenaLabel)
-          Spacer(minLength: 0)
+      if !items.isEmpty {
+        Button {
+          addStep()
+        } label: {
+          HStack(spacing: 6) {
+            Image(systemName: "plus")
+              .font(.system(size: 11, weight: .medium))
+              .frame(width: 24)
+            Text("Add step")
+              .font(.septenaLabel)
+            Spacer(minLength: 0)
+          }
+          .foregroundStyle(Theme.inkSecondary)
+          .padding(.vertical, 2)
+          .contentShape(Rectangle())
         }
-        .foregroundStyle(Theme.inkSecondary)
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Add checklist step"))
       }
-      .buttonStyle(.plain)
-      .accessibilityLabel(Text("Add checklist step"))
     }
-    .padding(12)
-    .background(fill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     .onAppear {
       reload()
       if items.isEmpty { addStep() }
     }
     .onChange(of: addRequest) { _, _ in addStep() }
+    .onChange(of: focus) { oldValue, newValue in
+      if case .step(let id)? = oldValue, newValue != oldValue,
+         let item = items.first(where: { $0.id == id }) {
+        commitTitle(item)
+      }
+      publishFocusedStep(newValue)
+    }
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
       reload()
     }
     .onDisappear {
       flushAllDrafts()
+      FocusedChecklistStep.shared.toggle = nil
     }
   }
 
@@ -1130,75 +1156,92 @@ private struct TaskChecklistPanel: View {
     let spokenTitle = item.title.isEmpty ? "Untitled step" : item.title
     let spokenState = item.checked ? "checked" : "unchecked"
 
-    return HStack(spacing: 8) {
+    return HStack(spacing: 6) {
       Button {
         toggle(item)
       } label: {
         Image(systemName: item.checked ? "checkmark.circle.fill" : "circle")
           .font(.system(size: 15, weight: .regular))
-          .foregroundStyle(item.checked ? accent : Theme.inkSecondary)
+          .foregroundStyle(item.checked ? Theme.inkSecondary : Theme.iconMuted)
           .frame(width: 24, height: 24)
           .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
       .accessibilityLabel(Text("\(spokenTitle), checklist item \(index + 1) of \(total), \(spokenState)"))
 
-      TextField("Step", text: binding)
+      TextField("Checklist item", text: binding)
         .textFieldStyle(.plain)
-        .font(.septenaLabel)
+        .font(.septenaTaskTitle)
         .foregroundStyle(item.checked ? Theme.inkSecondary : Theme.inkPrimary)
         .strikethrough(item.checked, color: Theme.inkSecondary)
-        .focused($focusedItemID, equals: item.id)
+        .focused($focus, equals: .step(item.id))
         .onSubmit {
           commitTitle(item)
           insertBelow(item)
         }
-        .onChange(of: focusedItemID) { oldID, newID in
-          if oldID == item.id, newID != item.id {
-            commitTitle(item)
-          }
+        .onKeyPress(.upArrow) { moveFocus?(false); return .handled }
+        .onKeyPress(.downArrow) { moveFocus?(true); return .handled }
+        .onKeyPress(keys: [.tab]) { press in
+          moveFocus?(!press.modifiers.contains(.shift)); return .handled
+        }
+        .onKeyPress(.delete) {
+          guard (drafts[item.id] ?? item.title).isEmpty else { return .ignored }
+          delete(item, focusPrevious: true)
+          return .handled
         }
         .accessibilityLabel(Text("\(spokenTitle), checklist item \(index + 1) of \(total), \(spokenState)"))
 
-      Menu {
-        if index > 0 {
-          Button {
-            moveOrder(itemID: item.id, delta: -1)
-          } label: {
-            Label("Move Up", systemImage: "arrow.up")
-          }
-        }
-        if index + 1 < total {
-          Button {
-            moveOrder(itemID: item.id, delta: 1)
-          } label: {
-            Label("Move Down", systemImage: "arrow.down")
-          }
-        }
-        Button(role: .destructive) {
-          delete(item)
-        } label: {
-          Label("Delete Step", systemImage: "trash")
-        }
+      Button {
+        delete(item, focusPrevious: false)
       } label: {
-        Image(systemName: "ellipsis")
-          .font(.system(size: 12, weight: .medium))
-          .foregroundStyle(Theme.inkSecondary)
+        Image(systemName: "xmark")
+          .font(.system(size: 10, weight: .semibold))
+          .foregroundStyle(Theme.iconMuted)
           .frame(width: 24, height: 24)
           .contentShape(Rectangle())
       }
-      #if os(macOS)
-      .menuStyle(.borderlessButton)
-      #endif
-      .fixedSize()
-      .accessibilityLabel(Text("Checklist item actions"))
+      .buttonStyle(.plain)
+      .accessibilityLabel(Text("Delete step"))
+    }
+    .contextMenu {
+      if index > 0 {
+        Button {
+          moveOrder(itemID: item.id, delta: -1)
+        } label: {
+          Label("Move Up", systemImage: "arrow.up")
+        }
+      }
+      if index + 1 < total {
+        Button {
+          moveOrder(itemID: item.id, delta: 1)
+        } label: {
+          Label("Move Down", systemImage: "arrow.down")
+        }
+      }
+      Button(role: .destructive) {
+        delete(item, focusPrevious: false)
+      } label: {
+        Label("Delete Step", systemImage: "trash")
+      }
+    }
+  }
+
+  /// ⌘K targets the focused step while one of THIS task's steps holds focus.
+  private func publishFocusedStep(_ value: TaskEditFocus?) {
+    if case .step(let id)? = value, items.contains(where: { $0.id == id }) {
+      FocusedChecklistStep.shared.toggle = { [id] in
+        guard let item = items.first(where: { $0.id == id }) else { return }
+        toggle(item)
+      }
+    } else {
+      FocusedChecklistStep.shared.toggle = nil
     }
   }
 
   private func reload() {
     let loaded = LocalCache.checklistItems(forTaskID: taskID, in: LocalStore.shared.container.mainContext)
     items = loaded
-    for item in loaded where focusedItemID != item.id {
+    for item in loaded where focus != .step(item.id) {
       drafts[item.id] = item.title
     }
   }
@@ -1224,7 +1267,7 @@ private struct TaskChecklistPanel: View {
     TaskUndo.recordChecklistAdd(created, mutator: mutator)
     drafts[created.id] = ""
     reload()
-    focusedItemID = created.id
+    focus = .step(created.id)
   }
 
   private func insertBelow(_ item: ChecklistItem) {
@@ -1241,7 +1284,7 @@ private struct TaskChecklistPanel: View {
     TaskUndo.recordChecklistAdd(created, mutator: mutator)
     drafts[created.id] = ""
     reload()
-    focusedItemID = created.id
+    focus = .step(created.id)
   }
 
   private func toggle(_ item: ChecklistItem) {
@@ -1267,14 +1310,15 @@ private struct TaskChecklistPanel: View {
     a11yAnimate(.snappy(duration: 0.18)) { reload() }
   }
 
-  private func delete(_ item: ChecklistItem) {
+  private func delete(_ item: ChecklistItem, focusPrevious: Bool) {
     let idx = items.firstIndex(where: { $0.id == item.id })
     let prevID = idx.flatMap { $0 > 0 ? items[$0 - 1].id : nil }
+    let hadFocus = focus == .step(item.id)
     drafts.removeValue(forKey: item.id)
     mutator.deleteChecklistItem(id: item.id)
     TaskUndo.recordChecklistDelete(item, mutator: mutator)
     a11yAnimate(.snappy(duration: 0.18)) { reload() }
-    if focusedItemID == item.id { focusedItemID = prevID }
+    if hadFocus { focus = (focusPrevious ? prevID : nil).map { .step($0) } }
   }
 
   private func splitPaste(_ item: ChecklistItem, lines: [String]) {
@@ -1298,7 +1342,7 @@ private struct TaskChecklistPanel: View {
       }
     }
     reload()
-    focusedItemID = lastID
+    focus = .step(lastID)
   }
 }
 

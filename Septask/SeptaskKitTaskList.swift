@@ -2695,6 +2695,8 @@ final class SeptaskKitTaskListController: NSViewController {
   // MARK: - Mutations
 
   func toggleCompleteSelection() {
+    // ⌘K on a focused checklist step ticks the step (composer or inspector).
+    if KitChecklistView.toggleFocusedStep(in: tableView.window) { return }
     // ⌘K with the row open: save the typed text, close, complete (Things).
     if composingTaskId != nil {
       completeComposingTask()

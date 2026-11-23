@@ -692,7 +692,7 @@ struct TaskListView: View {
       openWhen: !hasTaskSelection ? nil : openWhenForSelected,
       openDeadline: !hasTaskSelection ? nil : openDeadlineForSelected,
       openMove: !hasTaskSelection ? nil : openMoveForSelected,
-      toggleComplete: selection.isEmpty ? nil : toggleSelected,
+      toggleComplete: selection.isEmpty && FocusedChecklistStep.shared.toggle == nil ? nil : toggleSelected,
       cancel: !hasTaskSelection ? nil : cancelSelected,
       delete: !hasTaskSelection ? nil : deleteSelected,
       clearSchedule: !hasTaskSelection ? nil : clearScheduleForSelected,
@@ -744,7 +744,7 @@ struct TaskListView: View {
       openWhen: !hasTaskSelection ? nil : openWhenForSelected,
       openDeadline: !hasTaskSelection ? nil : openDeadlineForSelected,
       openMove: !hasTaskSelection ? nil : openMoveForSelected,
-      toggleComplete: selection.isEmpty ? nil : toggleSelected,
+      toggleComplete: selection.isEmpty && FocusedChecklistStep.shared.toggle == nil ? nil : toggleSelected,
       cancel: !hasTaskSelection ? nil : cancelSelected,
       delete: !hasTaskSelection ? nil : deleteSelected,
       clearSchedule: !hasTaskSelection ? nil : clearScheduleForSelected,
@@ -3295,6 +3295,11 @@ struct TaskListView: View {
   }
 
   private func toggleSelected() {
+    // ⌘K on a focused checklist step ticks the step, not the task.
+    if let toggleStep = FocusedChecklistStep.shared.toggle {
+      toggleStep()
+      return
+    }
     // ⌘K on Get started steps ticks them (or unticks them, when every
     // selected step is already done), like completing tasks.
     let steps = selectedNoticeSteps
