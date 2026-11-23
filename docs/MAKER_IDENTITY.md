@@ -276,6 +276,17 @@ The previous Block B (June 2026: "eleven weeks of evenings and weekends", "not
 a night owl", "everything I track", "local-first") is retired. Its claims are
 stale or now banned (§1).
 
+### Block J — press bio (third person, for the press kit) — 2026-11-23
+
+Used on septena.app/about/brand (`MAKER_BIO` in the site's `lib/messaging.ts`).
+The first sentence traces to §1 (built by one person, built with AI). The rest
+comes from mz's own biography on michellzappa.com/about.
+
+> Michell Zappa makes Septena on his own, with AI as his pair programmer, mostly
+> Claude. He is a technology futurist and founded Envisioning, a technology
+> research institute, in 2010. He writes the weekly Artificial Insights
+> newsletter about AI. He is Swedish-Brazilian and lives in Amsterdam.
+
 ### Block C — Patronage / the AI-bill joke (Support / Septena+)
 
 > Septena is free and stays free. If you want to chip in: I build this with a lot
