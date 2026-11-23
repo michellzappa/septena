@@ -747,13 +747,18 @@ struct TaskComposerCard: View {
     // iOS: the system `PasteButton` reads the clipboard with the user's tap
     // as consent, so no paste-permission alert appears. It draws its own
     // system "Paste" label and clipboard glyph.
+    // It is a secure system control: iOS draws it and limits its styling to
+    // shape, label style, size, tint and button style. Regular size matches
+    // the rail pills' 34pt height; the glass style matches their material;
+    // blue sets the clipboard action apart from the task's own attributes.
     PasteButton(supportedContentTypes: [.image, .plainText]) { providers in
       Task { @MainActor in await applyPaste(providers) }
     }
     .buttonBorderShape(.capsule)
     .labelStyle(.titleAndIcon)
-    .controlSize(.small)
-    .tint(accent)
+    .controlSize(.regular)
+    .buttonStyle(.glass)
+    .tint(.blue)
     #else
     let attr = RegistrySurfaces.taskAttribute("paste")
     Button {
