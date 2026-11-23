@@ -72,32 +72,32 @@ extension CommitMotion {
       // Soft swell, low sharpness — matches the gradient bloom.
       return HapticPatternSpec(beats: [
         HapticBeat(kind: .continuous, time: 0, duration: 0.4, intensity: 0.55 * i, sharpness: 0.2),
-      ], fallback: .tick)
+      ], fallback: .commit)
     case .sink:
       // A soft appear, then a firmer landing thump synced to the ripple.
       return HapticPatternSpec(beats: [
         HapticBeat(kind: .transient, time: 0,   intensity: 0.3, sharpness: 0.3),
         HapticBeat(kind: .transient, time: 0.5, intensity: 0.6, sharpness: 0.45),
-      ], fallback: .tick)
+      ], fallback: .commit)
     case .ripple:
       // A soft transient per ring launch — calm, low sharpness.
       return HapticPatternSpec(beats: [
         HapticBeat(kind: .transient, time: 0,    intensity: 0.45, sharpness: 0.2),
         HapticBeat(kind: .transient, time: 0.16, intensity: 0.3,  sharpness: 0.2),
         HapticBeat(kind: .transient, time: 0.32, intensity: 0.2,  sharpness: 0.2),
-      ], fallback: .tick)
+      ], fallback: .commit)
     case .arc:
       // A light swell following the sweep, then a transient at the landing.
       return HapticPatternSpec(beats: [
         HapticBeat(kind: .continuous, time: 0,    duration: 0.45, intensity: 0.4 * i, sharpness: 0.4),
         HapticBeat(kind: .transient,  time: 0.46, intensity: 0.6, sharpness: 0.7),
-      ], fallback: .tick)
+      ], fallback: .commit)
     case .fill:
       // A rising swell as it fills, capped by a pop at full.
       return HapticPatternSpec(beats: [
         HapticBeat(kind: .continuous, time: 0,    duration: 0.5, intensity: 0.5 * i, sharpness: 0.3),
         HapticBeat(kind: .transient,  time: 0.52, intensity: 0.65, sharpness: 0.6),
-      ], fallback: .tick)
+      ], fallback: .commit)
     }
   }
 }
@@ -781,7 +781,7 @@ enum SectionLog {
   /// flourish. `write` does the update + tile refresh.
   static func edit(write: () -> Void) {
     write()
-    Haptics.tick()
+    Haptics.commit()
   }
 
   /// A NEW log that deliberately stays off the canvas: the everyday repeats
@@ -791,7 +791,7 @@ enum SectionLog {
   /// policy rather than accessibility.
   static func quietLog(announce: String? = nil, write: () -> Void) {
     write()
-    Haptics.tick()
+    Haptics.commit()
     if let announce { A11y.announce(announce) }
   }
 }

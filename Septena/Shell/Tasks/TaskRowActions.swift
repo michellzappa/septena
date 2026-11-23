@@ -87,7 +87,7 @@ struct TaskRowActions: ViewModifier {
           onOpenDetail: { onOpenDetail?($0) },
           onApplySuggestion: { _, _ in },
           onMoveToToday: { ids, today in
-            Haptics.tick()
+            Haptics.commit()
             recordingSchedule(today
                                 ? RegistryActions.title("task.toggleToday", .add)
                                 : RegistryActions.title("task.toggleToday", .remove),
@@ -104,7 +104,7 @@ struct TaskRowActions: ViewModifier {
             onChange?()
           },
           onToggleStar: { ids, starred in
-            Haptics.tick()
+            Haptics.commit()
             recordingSchedule(starred
                               ? RegistryActions.title("task.toggleStar", .add)
                               : RegistryActions.title("task.toggleStar", .remove),
@@ -115,7 +115,7 @@ struct TaskRowActions: ViewModifier {
           },
           onToggleComplete: { ids in
             let wasDone = task.status == .done
-            Haptics.tick()
+            if wasDone { Haptics.commit() } else { Haptics.success() }
             for id in ids {
               if wasDone { mutator.uncomplete(id: id) } else { mutator.complete(id: id) }
               mutator.acknowledge(id: id)
@@ -136,7 +136,7 @@ struct TaskRowActions: ViewModifier {
             tagsTargetIds = target.ids
           },
           onClearSchedule: { ids in
-            Haptics.tick()
+            Haptics.commit()
             recordingSchedule(RegistryActions.title("task.clearSchedule"), ids) {
               for id in ids { mutator.apply(.clearWhen, to: id) }
             }
@@ -153,7 +153,7 @@ struct TaskRowActions: ViewModifier {
           moveTopProjects: projects.filter { $0.area == nil && $0.status == .active },
           onOpenRepeat: { t in repeatTargetId = t.id; showingRepeatSheet = true },
           onSetRepeatPaused: { ids, paused in
-            Haptics.tick()
+            Haptics.commit()
             recordingSchedule(String(localized: "Change Repeat", comment: "Undo action name"),
                               ids) {
               for id in ids { mutator.setRecurrencePaused(id: id, paused: paused) }
@@ -161,7 +161,7 @@ struct TaskRowActions: ViewModifier {
             onChange?()
           },
           onCreateNextCopy: { t in
-            Haptics.tick()
+            Haptics.commit()
             if let copy = mutator.createNextOccurrence(id: t.id) {
               TaskUndo.recordCreate(
                 name: RegistryActions.title("task.createNextCopy"),
@@ -202,7 +202,7 @@ struct TaskRowActions: ViewModifier {
           for id in ids { applyMove(id: id, areaId: areaId, projectId: projectId) }
         },
         applyRecurrence: { id, rule in
-          Haptics.tick()
+          Haptics.commit()
           recordingSchedule(String(localized: "Change Repeat", comment: "Undo action name"),
                             [id]) {
             mutator.setRecurrence(id: id, recurrence: rule)
@@ -210,7 +210,7 @@ struct TaskRowActions: ViewModifier {
           onChange?()
         },
         applyRecurrencePaused: { id, paused in
-          Haptics.tick()
+          Haptics.commit()
           recordingSchedule(String(localized: "Change Repeat", comment: "Undo action name"),
                             [id]) {
             mutator.setRecurrencePaused(id: id, paused: paused)
@@ -218,7 +218,7 @@ struct TaskRowActions: ViewModifier {
           onChange?()
         },
         applyReminder: { id, reminder in
-          Haptics.tick()
+          Haptics.commit()
           recordingSchedule(String(localized: "Change Reminder", comment: "Undo action name"),
                             [id]) {
             mutator.setReminder(id: id, reminder: reminder)
@@ -231,7 +231,7 @@ struct TaskRowActions: ViewModifier {
   // The field rules live in `TaskDateActions` (spec §4: A1, A2, A5, A7);
   // this only picks the undo name and the feedback.
   private func applyWhen(id: String, kind: TaskListView.WhenKind, date: Date?) {
-    Haptics.tick()
+    Haptics.commit()
     let name = kind == .deadline
       ? String(localized: "Set Deadline", comment: "Undo action name")
       : String(localized: "Schedule Task", comment: "Undo action name")
@@ -256,7 +256,7 @@ struct TaskRowActions: ViewModifier {
   }
 
   private func duplicateTask(_ task: SeptenaTask) {
-    Haptics.tick()
+    Haptics.commit()
     let copy = mutator.duplicate(task)
     TaskUndo.recordCreate(name: String(localized: "Duplicate Task", comment: "Undo action name"),
                           ids: [copy.id], mutator: mutator,
@@ -274,7 +274,7 @@ struct TaskRowActions: ViewModifier {
     let alreadyThere = projectId.map { current.project == $0 }
       ?? (current.project == nil && current.area == areaId)
     guard !alreadyThere else { return }
-    Haptics.tick()
+    Haptics.commit()
     // One save, the same call the Tasks list and the AppKit shell make.
     mutator.moveToList(id: id, area: areaId, project: projectId)
     mutator.acknowledge(id: id)
@@ -316,7 +316,7 @@ struct TaskRowActions: ViewModifier {
           return .registry(id, variant: .remove,
                            systemImage: RegistryIcons.sfSymbol(for: "action.today_remove"),
                            tint: .gray) {
-            Haptics.tick()
+            Haptics.commit()
             recordingSchedule(RegistryActions.title(id, .remove), [task.id]) {
               mutator.apply(.removeFromToday, to: task.id)
             }
@@ -335,7 +335,7 @@ struct TaskRowActions: ViewModifier {
   }
 
   private func moveToToday() {
-    Haptics.tick()
+    Haptics.commit()
     recordingSchedule(RegistryActions.title("task.toggleToday", .add), [task.id]) {
       mutator.apply(.putOnToday, to: task.id)
       promoteFlash.flash(task.id)
@@ -733,7 +733,7 @@ private struct TaskRowSwipeContainer<Content: View>: View {
     let armed = isLeadingFullSwipeArmed || isTrailingFullSwipeArmed
     if armed && !crossedFullSwipe {
       crossedFullSwipe = true
-      Haptics.tick()
+      Haptics.threshold()
     } else if !armed && crossedFullSwipe {
       crossedFullSwipe = false
     }

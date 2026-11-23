@@ -178,7 +178,7 @@ struct SeptaskRootView: View {
   /// - On the list root (no list mounted) or read-only history smart lists:
   ///   opens Today (Inbox) and opens the inline composer there.
   private func triggerInlineNewTask() {
-    Haptics.tap()
+    Haptics.press()
     let canCreateInPlace: Bool = {
       guard let last = nav.path.last else { return false }
       switch last {
@@ -381,7 +381,7 @@ private struct MagicPlusOrb: View {
     }
     .onTapGesture {
       guard !drag.isDragging else { return }
-      Haptics.tap()
+      Haptics.press()
       if !reduceMotion { popTick += 1 }
       if isViewingToday { onNewTask() } else { showingMenu = true }
     }

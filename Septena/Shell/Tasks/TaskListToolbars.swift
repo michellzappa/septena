@@ -197,7 +197,6 @@ struct StarFilterToolbarButton: View {
 
   var body: some View {
     Button {
-      Haptics.tick()
       a11yAnimate(.snappy(duration: 0.18)) { isOn.toggle() }
     } label: {
       Image(systemName: isOn ? "star.fill" : "star")
@@ -205,6 +204,8 @@ struct StarFilterToolbarButton: View {
     .tint(isOn ? Theme.todayAccent : .primary)
     .accessibilityLabel(Text(TaskFilter.starred.title))
     .accessibilityAddTraits(isOn ? .isSelected : [])
+    // Local filter state: the haptic follows it (docs/HAPTICS_SPEC.md).
+    .sensoryFeedback(trigger: isOn) { _, on in .selection(on ? .on : .off) }
   }
 }
 

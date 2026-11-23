@@ -13,12 +13,12 @@ final class AddInfoRouter {
   func push(_ section: AddInfoSection) {
     page = section
     query = ""
-    Haptics.pick()
+    Haptics.selection()
   }
 
   func pop() {
     page = nil
     query = ""
-    Haptics.pick()
+    Haptics.selection()
   }
 }

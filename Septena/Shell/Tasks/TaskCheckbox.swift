@@ -51,28 +51,28 @@ enum CheckFeel {
       return HapticPatternSpec(beats: [
         HapticBeat(kind: .transient, time: 0.04, intensity: 0.42 * i, sharpness: 0.78),
         HapticBeat(kind: .transient, time: 0.12, intensity: 0.14 * i, sharpness: 0.45),
-      ], fallback: .tick)
+      ], fallback: .commit)
     case .echo:
       // TWO beats, clearly spaced: today's mark, answered by a quieter,
       // rounder echo (visual ring at +0.18s). The gap is the signature.
       return HapticPatternSpec(beats: [
         HapticBeat(kind: .transient, time: 0,    intensity: 0.45 * i, sharpness: 0.62),
         HapticBeat(kind: .transient, time: 0.18, intensity: 0.24 * i, sharpness: 0.38),
-      ], fallback: .tick)
+      ], fallback: .commit)
     case .drop:
       // FALL → THUD: a faint swell of air while the fill falls, then a
       // soft round landing synced to the impact squash (~0.15s).
       return HapticPatternSpec(beats: [
         HapticBeat(kind: .continuous, time: 0, duration: 0.13, intensity: 0.18 * i, sharpness: 0.15),
         HapticBeat(kind: .transient, time: 0.15, intensity: 0.45 * i, sharpness: 0.3),
-      ], fallback: .tick)
+      ], fallback: .commit)
     case .tuck:
       // THUD → soft CLOSE: a low muted thud, then the drawer easing shut
       // synced to the visual's dip (~0.22s). Slowest rhythm of the four.
       return HapticPatternSpec(beats: [
         HapticBeat(kind: .transient, time: 0,    intensity: 0.4 * i,  sharpness: 0.25),
         HapticBeat(kind: .transient, time: 0.22, intensity: 0.24 * i, sharpness: 0.45),
-      ], fallback: .tick)
+      ], fallback: .commit)
     }
   }
 }
@@ -455,7 +455,7 @@ enum TaskCelebration {
       Haptics.play(HapticPatternSpec(beats: [
         HapticBeat(kind: .transient, time: 0.04, intensity: 0.45, sharpness: 0.7),
         HapticBeat(kind: .transient, time: 0.16, intensity: 0.22, sharpness: 0.3),
-      ], fallback: .tick))
+      ], fallback: .commit))
     } else {
       Haptics.play(CheckFeel.stamp.hapticSpec())
     }

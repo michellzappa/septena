@@ -708,7 +708,7 @@ struct TaskComposerCard: View {
   private func applyPaste(_ text: String) {
     pasteOffered = false
     guard let split = TaskTitleText.pasteSplit(text) else { return }
-    Haptics.tick()
+    Haptics.selection()
     a11yAnimate(.snappy(duration: 0.2)) {
       draft.title = split.title
       if let notes = split.notes { draft.notes = notes }
@@ -719,7 +719,7 @@ struct TaskComposerCard: View {
 
   private func applySuggestedList() {
     guard let s = suggestedList else { return }
-    Haptics.tick()
+    Haptics.selection()
     a11yAnimate(.snappy(duration: 0.2)) {
       switch s.kind {
       case .project:
@@ -749,7 +749,7 @@ struct TaskComposerCard: View {
   }
 
   private func apply(_ token: DetectedToken) {
-    Haptics.tick()
+    Haptics.selection()
     a11yAnimate(.snappy(duration: 0.2)) { applyToken(token) }
     updateSuggestion()
   }
@@ -962,7 +962,7 @@ struct TaskComposerCard: View {
   /// `.onDisappear`, but `persistOnce` is idempotent so it won't write twice.
   private func commit() {
     guard draft.canSave else { return }
-    Haptics.tick()
+    Haptics.commit()
     persistOnce()
     // Return saves and closes, for a new task too. A new task used to chain
     // into a second blank draft below it (the Things capture chain); that

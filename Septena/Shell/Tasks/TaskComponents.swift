@@ -1014,7 +1014,7 @@ struct WeekStrip: View {
         let isToday = Self.cal.isDate(d, inSameDayAs: anchorDay)
         let isWeekend = Self.cal.isDateInWeekend(d)
         Button {
-          Haptics.pick()
+          Haptics.selection()
           onPick(Self.cal.startOfDay(for: d))
         } label: {
           // Selection reuses the canonical chip fill/ink (SelectionLanguage).
@@ -1122,7 +1122,7 @@ struct TaskDateBoard: View {
         Hairline(leadingInset: 0)
         row(symbol: "xmark.circle", tint: Theme.iconMuted,
             title: clearLabel, active: false) {
-          Haptics.warning()
+          Haptics.commit()
           onClear()
         }
         .padding(.top, 4)
@@ -1161,7 +1161,7 @@ struct TaskDateBoard: View {
   /// iPhone — and picking a day there commits it, like every other control.
   private var calendarButton: some View {
     Button {
-      Haptics.pick()
+      Haptics.press()
       calendarDate = selected ?? anchorDay
       showingCalendar = true
     } label: {

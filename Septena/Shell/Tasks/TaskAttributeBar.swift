@@ -295,7 +295,7 @@ struct TaskAttributeBar: View {
     }
     if attr == .star {
       focus = .pill(.star)
-      Haptics.tick()
+      Haptics.selection()
       a11yAnimate(.snappy(duration: 0.18)) { draft.starred.toggle() }
       return
     }
@@ -526,7 +526,7 @@ private struct InlineWhenPanel: View {
               SelectableChip(preset.label,
                              isSelected: draft.durationMinutes == preset.minutes,
                              tint: accent) {
-                Haptics.tick()
+                Haptics.selection()
                 a11yAnimate(.snappy(duration: 0.18)) {
                   if draft.startTime == nil { draft.startTime = "09:00" }
                   if !draft.onToday && draft.scheduled == nil { draft.setToday() }
@@ -1289,7 +1289,7 @@ private struct TaskChecklistPanel: View {
 
   private func toggle(_ item: ChecklistItem) {
     flushAllDrafts()
-    Haptics.tick()
+    Haptics.commit()
     var after = item
     after.checked.toggle()
     mutator.updateChecklistItem(id: item.id, checked: after.checked)
@@ -1432,7 +1432,7 @@ private struct TaskTagsPanel: View {
     let after = before.contains(tag.id)
       ? before.filter { $0 != tag.id }
       : before + [tag.id]
-    Haptics.tick()
+    Haptics.commit()
     mutator.setTaskTags(id: taskID, tagIDs: after)
     TaskUndo.recordTaskTags(before: [taskID: before], after: [taskID: after], mutator: mutator)
     a11yAnimate(.snappy(duration: 0.18)) { reload() }

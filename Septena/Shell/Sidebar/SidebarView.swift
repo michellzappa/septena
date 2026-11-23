@@ -191,7 +191,7 @@ struct SidebarRootView: View {
   private func renameProject(_ project: Project, to raw: String) {
     let trimmed = raw.trimmingCharacters(in: .whitespaces)
     guard !trimmed.isEmpty, trimmed != project.title else { return }
-    Haptics.tick()
+    Haptics.commit()
     Task {
       do {
         try await projectsMutator.rename(id: project.id, to: trimmed)
@@ -205,7 +205,7 @@ struct SidebarRootView: View {
   private func renameArea(_ area: Area, to raw: String) {
     let trimmed = raw.trimmingCharacters(in: .whitespaces)
     guard !trimmed.isEmpty, trimmed != area.title else { return }
-    Haptics.tick()
+    Haptics.commit()
     Task {
       do {
         try await areasMutator.rename(id: area.id, to: trimmed)
@@ -218,7 +218,7 @@ struct SidebarRootView: View {
 
   private func moveProject(_ project: Project, to areaId: String?) {
     guard project.area != areaId else { return }
-    Haptics.tick()
+    Haptics.commit()
     Task {
       do {
         try await projectsMutator.setArea(id: project.id, area: areaId)
@@ -234,7 +234,7 @@ struct SidebarRootView: View {
   /// suppressed on iPad so it can't collide with the global chrome). If the
   /// project being closed is the one open in the detail, bounce to Today.
   private func setProjectStatus(_ project: Project, to status: ProjectStatus) {
-    Haptics.tick()
+    Haptics.projectStatusChanged(to: status)
     if status != .active, case .project(let id) = nav.path.last, id == project.id {
       nav.path = [.filter(.today)]
     }
@@ -378,13 +378,13 @@ struct SidebarRootView: View {
       #if os(iOS) && SEPTASK
       .onDrop(of: [.septenaTaskDragIDs],
               delegate: SidebarNewAreaDropDelegate {
-                Haptics.tick()
+                Haptics.commit()
                 newAreaName = ""
                 showingNewArea = true
               })
       .magicPlusSectionDrop(id: "mp-sidebar-new-area", kind: .newArea,
                             priority: 1, highlights: false) {
-        Haptics.tick()
+        Haptics.commit()
         newAreaName = ""
         showingNewArea = true
       }
@@ -947,7 +947,7 @@ struct SidebarRootView: View {
     })
     .magicPlusSectionDrop(id: "mp-sidebar-area-\(area.id)",
                           kind: .newProject(label: "New Project in \(area.title)")) {
-      Haptics.tick()
+      Haptics.commit()
       newProjectInArea = area.id
       showingNewProject = true
     }
@@ -983,7 +983,7 @@ struct SidebarRootView: View {
     })
     .magicPlusSectionDrop(id: "mp-sidebar-proj-\(project.id)",
                           kind: .newProject(label: magicLabel)) {
-      Haptics.tick()
+      Haptics.commit()
       newProjectInArea = parent
       showingNewProject = true
     }
@@ -1093,7 +1093,7 @@ struct SidebarRootView: View {
   }
 
   private func commitAreaOrder(_ next: [Area]) {
-    Haptics.tick()
+    Haptics.commit()
     areas = next   // optimistic; the reorder re-posts .septenaStructureChanged → load() re-sorts by position
     let ids = next.map(\.id)
     Task { try? await areasMutator.reorder(orderedIDs: ids) }
@@ -1144,7 +1144,7 @@ struct SidebarRootView: View {
       }
     }
 
-    Haptics.tick()
+    Haptics.commit()
     projects = next   // optimistic; reorder re-posts .septenaStructureChanged → load() re-sorts by position
     let groupIDs = nextSiblings.map(\.id)
     Task { try? await projectsMutator.reorder(orderedIDs: groupIDs) }
@@ -1163,7 +1163,7 @@ struct SidebarRootView: View {
   /// Fold / unfold an area's project list, persisting the choice. Animated so
   /// the project rows slide in/out and the chevron rotates together.
   private func toggleAreaCollapsed(_ areaId: String) {
-    Haptics.tick()
+    Haptics.selection()
     var set = collapsedAreas
     if set.contains(areaId) { set.remove(areaId) } else { set.insert(areaId) }
     a11yAnimate(.easeInOut(duration: 0.2)) {
@@ -1943,7 +1943,7 @@ private struct SidebarTaskDrop: ViewModifier {
                 delegate: SidebarTaskDropDelegate(isTargeted: $isTargeted) { ids in
                   guard !ids.isEmpty else { return false }
                   if TaskDragIDs.isNewTaskPayload(ids) {
-                    Haptics.tick()
+                    Haptics.commit()
                     if let onMagicPlusDrop {
                       onMagicPlusDrop()
                       return true
@@ -1975,7 +1975,7 @@ private struct SidebarTaskDrop: ViewModifier {
   }
 
   private func rehome(_ ids: [String]) {
-    Haptics.tick()
+    Haptics.commit()
     switch kind {
     // Batch move preserves the selection's relative order at the top of the
     // destination and clears the agent cue (parity with `SeptaskKitSidebar`).
@@ -2064,7 +2064,7 @@ private struct SmartListTaskDrop: ViewModifier {
         .modifier(SidebarTaskDrop(kind: kind, mutator: mutator))
         .magicPlusSectionDrop(id: "mp-sidebar-smart-\(route.id)",
                               kind: .taskSection(label: "New Task in \(route.title)")) {
-          Haptics.tick()
+          Haptics.commit()
           nav.go(to: route)
           nav.requestNewTask()
         }

@@ -386,7 +386,7 @@ struct ConversationCard: View {
     mutator.complete(id: taskID)
     mutator.acknowledge(id: taskID)
     TaskUndo.recordAcceptReview(id: taskID, previousNote: previousNote, mutator: mutator)
-    Haptics.tick()
+    Haptics.success()
     showSendBack = false
     reload()
   }
@@ -399,7 +399,7 @@ struct ConversationCard: View {
     mutator.sendBackConvo(id: taskID, note: text)
     let after = mutator.conversation(id: taskID) ?? before
     TaskUndo.recordSendBack(id: taskID, before: before, after: after, mutator: mutator)
-    Haptics.tick()
+    Haptics.commit()
     sendBackNote = ""
     showSendBack = false
     reload()
@@ -421,7 +421,7 @@ struct ConversationCard: View {
     let text = replyText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { return }
     append(ConvoTurn(seq: 0, role: .user, step: .work, note: text, ts: Date()))
-    Haptics.tick()
+    Haptics.commit()
     replyText = ""
     showReply = false
   }

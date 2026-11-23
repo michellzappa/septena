@@ -595,6 +595,12 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   scope), or `.a11yAnimation(_:value:)`. `LogCommit.swift` and
   `CommitMotion.swift` are the two documented exceptions — they gate once at the
   overlay.
+- **Haptics: one vocabulary, chosen by meaning.** Call `Haptics.press /
+  selection / commit / threshold / success / warning` (or `play` for a
+  composed pattern) at the user gesture; never build a feedback generator at
+  a call site (lint rule `haptics-direct-generator`). `.sensoryFeedback` is
+  for local view state only, never task data: sync and undo change task data
+  too. Table and rules: `docs/HAPTICS_SPEC.md`.
 - **`scripts/lint-design.sh` enforces the above and runs from `scripts/build.sh`
   before the build lock.** A violation fails the build. Genuinely sanctioned
   exceptions get `// septena-lint:allow <rule-id>` **on the offending line**,

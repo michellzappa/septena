@@ -178,7 +178,7 @@ struct ReminderPickerSheet: View {
       HStack(spacing: 10) {
         if initial != nil {
           Button {
-            Haptics.warning()
+            Haptics.commit()
             save(nil)
           } label: {
             Text("Clear Reminder")
@@ -567,7 +567,7 @@ struct RecurrencePickerSheet: View {
       HStack(spacing: 10) {
         if initial != nil {
           Button {
-            Haptics.warning()
+            Haptics.commit()
             onPick(nil)
             dismiss()
           } label: {
@@ -728,7 +728,7 @@ struct MovePickerSheet: View {
   private func row(_ kind: RowKind, title: String, projectId: String? = nil,
                    emoji: String? = nil, selected: Bool,
                    indent: Bool = false, action: @escaping () -> Void) -> some View {
-    Button(action: { Haptics.pick(); action() }) {
+    Button(action: { Haptics.selection(); action() }) {
       HStack(spacing: 12) {
         icon(for: kind, projectId: projectId, emoji: emoji)
           .frame(width: 24, alignment: .center)
@@ -984,7 +984,7 @@ struct TagPickerSheet: View {
     guard !before.isEmpty else { return }
     let removing = assignmentState(for: tag.id) == .all
     var after: [String: [String]] = [:]
-    Haptics.tick()
+    Haptics.commit()
     for (id, tags) in before {
       let next: [String]
       if removing {

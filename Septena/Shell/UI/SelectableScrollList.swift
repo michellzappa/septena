@@ -224,7 +224,7 @@ private struct TouchOrPointerTap: ViewModifier {
         }
         .onTapGesture {
           if actions.toggleOnTap {
-            Haptics.tap()
+            Haptics.selection()
             actions.click(id, .command)
             return
           }
@@ -238,7 +238,7 @@ private struct TouchOrPointerTap: ViewModifier {
       // Compact iPhone: skip `onContinuousHover` (no per-row UIHoverGestureRecognizer).
       content.onTapGesture {
         if actions.toggleOnTap {
-          Haptics.tap()
+          Haptics.selection()
           actions.click(id, .command)
         } else {
           actions.activate(id)

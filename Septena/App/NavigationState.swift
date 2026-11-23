@@ -139,7 +139,7 @@ final class NavigationState {
   /// the haptic + path mutation isn't re-implemented at every call site
   /// (sidebar rows, the title dropdown, Quick Find, project drill-in).
   func go(to route: Route, push: Bool = false) {
-    Haptics.tap()
+    Haptics.selection()
     if push { path.append(route) } else { path = [route] }
   }
 

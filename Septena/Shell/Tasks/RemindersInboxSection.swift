@@ -163,7 +163,7 @@ struct RemindersInboxSection: View {
       // Bulk import only earns a button when there is more than one item waiting.
       if pairs.count > 1 {
         Button {
-          Haptics.tick()
+          Haptics.commit()
           Task { await importAll() }
         } label: {
           HStack(spacing: 4) {
@@ -197,7 +197,7 @@ struct RemindersInboxSection: View {
     let isImporting = importingID == pair.view.id
     let hasNotes = !(pair.view.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     Button {
-      Haptics.tick()
+      Haptics.commit()
       Task { await importOne(pair) }
     } label: {
       CheckableRow(

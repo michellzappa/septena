@@ -191,7 +191,7 @@ struct AddTaskPage: View {
       ids: [created.id], mutator: mutator,
       rebuild: { [mutator] in [saved.create(via: mutator).id] })
     AddInfoSection.tasks.notifyTilesChanged()
-    Haptics.tick()
+    Haptics.commit()
     dismiss()
   }
 
@@ -202,7 +202,7 @@ struct AddTaskPage: View {
       name: RegistryActions.title("task.toggleToday", .add),
       before: [before], context: modelContext, mutator: mutator)
     AddInfoSection.tasks.notifyTilesChanged()
-    Haptics.tick()
+    Haptics.commit()
     dismiss()
   }
 

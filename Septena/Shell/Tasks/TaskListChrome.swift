@@ -383,7 +383,7 @@ final class MagicPlusDragState {
     isOverCancelSocket = false
     fingerLocation = location
     activeTarget = nil
-    Haptics.tap()
+    Haptics.press()
     resolveTarget(for: location)
   }
 
@@ -436,7 +436,7 @@ final class MagicPlusDragState {
     let inCancelZone = homeCenter != .zero && hypot(dx, dy) < 48
     if inCancelZone {
       if !isOverCancelSocket {
-        Haptics.tap()
+        Haptics.selection()
       }
       if !isOverCancelSocket || activeTarget != nil {
         a11yAnimate(.snappy(duration: 0.18)) {
@@ -497,7 +497,7 @@ final class MagicPlusDragState {
 
     let next = ActiveTarget(id: best.id, kind: best.kind, before: before, frame: best.frame)
     if activeTarget?.id != next.id || activeTarget?.before != next.before {
-      Haptics.tap()
+      Haptics.selection()
       a11yAnimate(.snappy(duration: 0.18)) {
         activeTarget = next
       }
@@ -980,7 +980,7 @@ private struct TaskRowHorizontalSwipeModifier: ViewModifier {
   private func updateArmed(pull: CGFloat, commit: CGFloat, disarm: CGFloat) {
     if !armed, pull >= commit {
       armed = true
-      Haptics.tick()
+      Haptics.threshold()
     } else if armed, pull < disarm {
       armed = false
     }
@@ -1179,7 +1179,7 @@ private struct TaskSpringLoadMoveDropDelegate: DropDelegate {
   func dropEntered(info: DropInfo) {
     isTargeted = true
     timer.arm {
-      Haptics.tick()
+      Haptics.threshold()
       onSpringLoad()
     }
   }

@@ -130,7 +130,7 @@ struct HeaderQuickAddButton: View {
   @ViewBuilder
   private var button: some View {
     let control = Button {
-      if hapticOnTap { Haptics.tick() }
+      if hapticOnTap { Haptics.press() }
       action()
     } label: {
       glyph

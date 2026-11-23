@@ -98,7 +98,7 @@ struct TaskListNotice<Actions: View>: View {
 
   private func dismissButton(_ action: @escaping () -> Void) -> some View {
     Button {
-      Haptics.tick()
+      Haptics.commit()
       action()
     } label: {
       Image(systemName: "xmark")

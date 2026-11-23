@@ -403,7 +403,7 @@ struct TaskListView: View {
   }
   private func toggleScopeLoggedExpanded() {
     guard let id = scopeLoggedFilterId else { return }
-    Haptics.tick()
+    Haptics.selection()
     var set = scopeLoggedExpandedIds
     if set.contains(id) { set.remove(id) } else { set.insert(id) }
     a11yAnimate(.easeInOut(duration: 0.2)) {
@@ -429,7 +429,7 @@ struct TaskListView: View {
   }
   private func toggleScopeFadedExpanded() {
     guard let id = scopeLoggedFilterId else { return }
-    Haptics.tick()
+    Haptics.selection()
     var set = scopeFadedCollapsedIds
     if set.contains(id) { set.remove(id) } else { set.insert(id) }
     a11yAnimate(.easeInOut(duration: 0.2)) {
@@ -618,7 +618,7 @@ struct TaskListView: View {
         applyMove: applyMoveToSelection,
         applyRecurrence: applyRecurrence,
         applyRecurrencePaused: { id, paused in
-          Haptics.tick()
+          Haptics.commit()
           mutator.setRecurrencePaused(id: id, paused: paused)
           Task { await load() }
         },
@@ -1550,7 +1550,7 @@ struct TaskListView: View {
           onDropToday: { ids in
             let moving = ids.filter { !(currentTask(id: $0)?.isOnToday ?? false) }
             guard !moving.isEmpty else { return false }
-            Haptics.tick()
+            Haptics.commit()
             promoteToToday(moving)
             for id in ids { mutator.acknowledge(id: id) }
             if touchSelectionActive { clearSelection() }
@@ -1913,7 +1913,7 @@ struct TaskListView: View {
     #endif
     Button {
       if closeActiveEditIfNeeded() { return }
-      Haptics.tick()
+      Haptics.selection()
       a11yAnimate(.easeInOut(duration: 0.2)) { onToggle() }
     } label: {
       VStack(alignment: .leading, spacing: 0) {
@@ -2024,7 +2024,6 @@ struct TaskListView: View {
         HStack(spacing: 6) {
           if starChip {
             SelectableChip(isSelected: starredOnlyFilter, tint: Theme.todayAccent, onCanvas: true) {
-              Haptics.tick()
               a11yAnimate(.snappy(duration: 0.18)) { starredOnlyFilter.toggle() }
             } label: {
               HStack(spacing: 4) {
@@ -2039,7 +2038,6 @@ struct TaskListView: View {
             SelectableChip(isSelected: isOn,
                            tint: tag.color != nil ? TagColorPalette.color(for: tag.color) : theme.color(for: "tasks"),
                            onCanvas: true) {
-              Haptics.tick()
               a11yAnimate(.snappy(duration: 0.18)) {
                 if isOn { selectedTagIDs.remove(tag.id) }
                 else { selectedTagIDs.insert(tag.id) }
@@ -2057,7 +2055,6 @@ struct TaskListView: View {
           }
           if hasActiveFilter {
             Button {
-              Haptics.tick()
               a11yAnimate(.snappy(duration: 0.18)) {
                 if starChip { starredOnlyFilter = false }
                 selectedTagIDs.removeAll()
@@ -2077,6 +2074,12 @@ struct TaskListView: View {
       }
       .padding(.top, 4)
       .padding(.bottom, 6)
+      // Filters are local view state, so the haptic follows the state
+      // declaratively (docs/HAPTICS_SPEC.md): turning a filter on plays
+      // selection-on, turning one off (or Clear) plays selection-off.
+      .sensoryFeedback(trigger: (starChip && starredOnlyFilter ? 1 : 0) + selectedTagIDs.count) { old, new in
+        .selection(new > old ? .on : .off)
+      }
     }
   }
 
@@ -2335,7 +2338,7 @@ struct TaskListView: View {
 
   /// Ticks or unticks a Get started step by hand, like a task's checkbox.
   private func toggleNoticeStep(_ step: TaskNoticeStep) {
-    Haptics.tick()
+    Haptics.commit()
     TaskNotices.toggleStep(step)
     motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1; refreshTodayNotices() }
   }
@@ -2475,7 +2478,7 @@ struct TaskListView: View {
             beginEdit(task)
           },
           onAccept: {
-            Haptics.tick()
+            Haptics.success()
             let previousNote = task.conversation.endStateNote
             mutator.complete(id: task.id)
             mutator.acknowledge(id: task.id)
@@ -2483,7 +2486,7 @@ struct TaskListView: View {
             Task { await load() }
           },
           onSendBack: { note in
-            Haptics.tick()
+            Haptics.commit()
             let before = task.conversation
             mutator.sendBackConvo(id: task.id, note: note)
             let after = mutator.conversation(id: task.id) ?? before
@@ -2618,7 +2621,7 @@ struct TaskListView: View {
     }
     model.noteCreated(draft.id)
     draftEditIds.insert(draft.id)
-    Haptics.tick()
+    Haptics.press()
     AddInfoSection.tasks.notifyTilesChanged()
     Task {
       await load()
@@ -2665,7 +2668,7 @@ struct TaskListView: View {
     applyManualOrder(ids: ids, into: remaining,
                      at: before ? targetIdx : targetIdx + 1)
     TaskUndo.recordReorder(undoBefore, context: modelContext, mutator: mutator)
-    Haptics.tick()
+    Haptics.commit()
     if touchSelectionActive { clearSelection() }
     Task { await load() }
     return true
@@ -2851,7 +2854,7 @@ struct TaskListView: View {
     }
     applyManualOrder(ids: ids, into: groupRows,
                      at: before ? targetIdx : targetIdx + 1)
-    Haptics.tick()
+    Haptics.commit()
     if touchSelectionActive { clearSelection() }
     Task { await load() }
     return true
@@ -2888,7 +2891,7 @@ struct TaskListView: View {
       applyManualOrder(ids: ids, into: members, at: 0)
       TaskUndo.recordMove(before: undoBefore, context: modelContext, mutator: mutator)
     }
-    Haptics.tick()
+    Haptics.commit()
     if touchSelectionActive { clearSelection() }
     Task { await load() }
     return true
@@ -3279,13 +3282,13 @@ struct TaskListView: View {
   private func copyTasks(_ ids: [String]) {
     guard let text = copyPayload(for: ids) else { return }
     SeptenaPasteboard.copy(text)
-    Haptics.tick()
+    Haptics.commit()
   }
 
   /// Clone task(s) into brand-new ones (new ids) carrying the same fields.
   private func duplicate(_ ids: [String]) {
     guard !ids.isEmpty else { return }
-    Haptics.tick()
+    Haptics.commit()
     var lastCopyId: String?
     for id in ids {
       guard let task = currentTask(id: id) else { continue }
@@ -3311,7 +3314,7 @@ struct TaskListView: View {
     let steps = selectedNoticeSteps
     if !steps.isEmpty {
       let reopen = steps.allSatisfy(\.done)
-      Haptics.tick()
+      Haptics.commit()
       for step in steps {
         if reopen { TaskNotices.reopenStep(step.id) } else { TaskNotices.completeStep(step.id) }
       }
@@ -3350,7 +3353,7 @@ struct TaskListView: View {
     if tasks.allSatisfy(\.isOnToday) {
       applyRemoveFromToday(ids)
     } else {
-      Haptics.tick()
+      Haptics.commit()
       promoteToToday(ids.filter { !(currentTask(id: $0)?.isOnToday ?? false) })
       for id in ids { mutator.acknowledge(id: id) }
       Task { await load() }
@@ -3363,7 +3366,7 @@ struct TaskListView: View {
   /// immediately (same pattern as delete's `removeLocally`) before the async
   /// reload lands.
   private func applyRemoveFromToday(_ ids: [String]) {
-    Haptics.tick()
+    Haptics.commit()
     let undoBefore = scheduleSnapshots(ids)
     for id in ids { mutator.apply(.removeFromToday, to: id) }
     TaskUndo.recordScheduleChange(
@@ -3446,7 +3449,7 @@ struct TaskListView: View {
   /// entry for the whole selection.
   private func clearSchedule(_ ids: [String]) {
     guard !ids.isEmpty else { return }
-    Haptics.tick()
+    Haptics.commit()
     recordingSchedule(RegistryActions.title("task.clearSchedule"), ids) {
       for id in ids { mutator.apply(.clearWhen, to: id) }
     }
@@ -3464,7 +3467,7 @@ struct TaskListView: View {
   }
 
   private func applyRecurrence(id: String, rule: Recurrence?) {
-    Haptics.tick()
+    Haptics.commit()
     recordingSchedule(String(localized: "Change Repeat", comment: "Undo action name"),
                       [id]) {
       mutator.setRecurrence(id: id, recurrence: rule)
@@ -3473,7 +3476,7 @@ struct TaskListView: View {
   }
 
   private func applyReminder(id: String, reminder: TaskReminder?) {
-    Haptics.tick()
+    Haptics.commit()
     recordingSchedule(String(localized: "Change Reminder", comment: "Undo action name"),
                       [id]) {
       mutator.setReminder(id: id, reminder: reminder)
@@ -3583,7 +3586,7 @@ struct TaskListView: View {
       return !isTask(task, alreadyAt: areaId, projectId)
     }
     guard !ids.isEmpty else { return }
-    Haptics.tick()
+    Haptics.commit()
     let before = filingSnapshots(ids)
     // Apply in reverse so `TaskOrder.topPosition` lands `ids[0]` at the very
     // top followed by `ids[1]`, `ids[2]`, ... preserving visible selection order.
@@ -3874,7 +3877,7 @@ struct TaskListView: View {
   private func keepFadedTasks(_ ids: [String]) {
     let snapshots = ids.compactMap { currentTask(id: $0) }.map(TaskUndo.FadedSnapshot.init)
     guard !snapshots.isEmpty else { return }
-    Haptics.tick()
+    Haptics.commit()
     mutator.keepFaded(ids: snapshots.map(\.id))
     TaskUndo.recordKeepFaded(before: snapshots, mutator: mutator)
     for id in snapshots.map(\.id) { removeLocally(id: id) }
@@ -3933,7 +3936,7 @@ struct TaskListView: View {
       heroMatchIsSource: expandedEditId != task.id,
       onToggle: {
         if touchSelectionActive {
-          Haptics.tap()
+          Haptics.selection()
           toggleTouchSelection(task.id)
         } else {
           toggle(task)
@@ -4088,7 +4091,7 @@ struct TaskListView: View {
         onApplySuggestion: applySuggestion,
         onMoveToToday: { ids, today in
           if today {
-            Haptics.tick()
+            Haptics.commit()
             promoteToToday(ids)
             for id in ids { mutator.acknowledge(id: id) }
             Task { await load() }
@@ -4097,7 +4100,7 @@ struct TaskListView: View {
           }
         },
         onToggleStar: { ids, starred in
-          Haptics.tick()
+          Haptics.commit()
           recordingSchedule(starred
                             ? RegistryActions.title("task.toggleStar", .add)
                             : RegistryActions.title("task.toggleStar", .remove),
@@ -4129,7 +4132,7 @@ struct TaskListView: View {
           showingMoveSheet = true
         },
         onMoveTo: { target, areaId, projectId in
-          Haptics.pick()
+          Haptics.commit()
           applyMove(target.ids, areaId: areaId, projectId: projectId)
         },
         moveAreas: areas,
@@ -4141,12 +4144,12 @@ struct TaskListView: View {
           showingRepeatSheet = true
         },
         onSetRepeatPaused: { ids, paused in
-          Haptics.tick()
+          Haptics.commit()
           for id in ids { mutator.setRecurrencePaused(id: id, paused: paused) }
           Task { await load() }
         },
         onCreateNextCopy: { task in
-          Haptics.tick()
+          Haptics.commit()
           _ = mutator.createNextOccurrence(id: task.id)
           Task { await load() }
         },
@@ -4173,7 +4176,7 @@ struct TaskListView: View {
     if filter == .recentlyDeleted {
       return [
         .registry("task.restore", tint: TaskRowSwipeAction.tint(for: "task.restore")) {
-          Haptics.tick()
+          Haptics.commit()
           mutator.restore(id: task.id)
           removeLocally(id: task.id)
           Task { await load() }
@@ -4200,7 +4203,7 @@ struct TaskListView: View {
             systemImage: "checkmark",
             tint: .green
           ) {
-            Haptics.tick()
+            Haptics.commit()
             promoteToToday([task.id])
             mutator.acknowledge(id: task.id)
             Task { await load() }
@@ -4214,7 +4217,7 @@ struct TaskListView: View {
           }
         }
         return .registry(id, tint: TaskRowSwipeAction.tint(for: id)) {
-          Haptics.tick()
+          Haptics.commit()
           promoteToToday([task.id])
           mutator.acknowledge(id: task.id)
           Task { await load() }
@@ -4299,7 +4302,7 @@ struct TaskListView: View {
       mutator.setHeading(id: id, heading: heading)
       mutator.reorder(id: id, toPosition: pos)
     }
-    Haptics.pick()
+    Haptics.commit()
     Task { await load() }
   }
 
@@ -4421,7 +4424,7 @@ struct TaskListView: View {
         symbol: "arrow.uturn.backward.circle.fill",
         tint: Color.accentColor
       ) {
-        Haptics.tick()
+        Haptics.commit()
         mutator.restore(id: task.id)
         removeLocally(id: task.id)
         Task { await load() }
@@ -4446,7 +4449,7 @@ struct TaskListView: View {
         symbol: "checkmark.circle.fill",
         tint: Theme.todayAccent
       ) {
-        Haptics.tick()
+        Haptics.commit()
         let before = scheduleSnapshots([task.id])
         promoteToToday([task.id])
         mutator.acknowledge(id: task.id)
@@ -4485,7 +4488,7 @@ struct TaskListView: View {
         symbol: "sun.max.fill",
         tint: Theme.todayAccent
       ) {
-        Haptics.tick()
+        Haptics.commit()
         let before = scheduleSnapshots([task.id])
         promoteToToday([task.id])
         mutator.acknowledge(id: task.id)
@@ -4503,7 +4506,7 @@ struct TaskListView: View {
         symbol: "calendar",
         tint: Color.accentColor
       ) {
-        Haptics.tap()
+        Haptics.press()
         whenSheet = WhenSheet(taskIds: [task.id], kind: .scheduled)
       }
 
@@ -4513,7 +4516,7 @@ struct TaskListView: View {
         symbol: "arrow.right.circle.fill",
         tint: Color.accentColor
       ) {
-        Haptics.tap()
+        Haptics.press()
         moveTargetIds = [task.id]
         showingMoveSheet = true
       }
@@ -4525,7 +4528,7 @@ struct TaskListView: View {
         symbol: nextStarred ? "star.fill" : "star.slash",
         tint: Theme.todayAccent
       ) {
-        Haptics.tick()
+        Haptics.commit()
         recordingSchedule(
           nextStarred
             ? RegistryActions.title("task.toggleStar", .add)
@@ -4554,7 +4557,7 @@ struct TaskListView: View {
 
   private func applySuggestion(task: SeptenaTask,
                                suggestion: SuggestionEngine.Suggestion) {
-    Haptics.tick()
+    Haptics.commit()
     // Capture the prior filing BEFORE the move so Undo can put it back.
     let undoBefore = filingSnapshots([task.id])
     let wasInTriage = task.isInTriageBand
@@ -5172,7 +5175,7 @@ struct TaskListView: View {
   }
 
   private func applyWhen(id: String, kind: WhenKind, date: Date?) {
-    Haptics.tick()
+    Haptics.commit()
     switch kind {
     case .deadline:
       recordingSchedule(String(localized: "Set Deadline", comment: "Undo action name"),
@@ -5241,7 +5244,7 @@ struct TaskListView: View {
   /// time the screen reloads (which happens when you leave & return).
   private func toggle(_ task: SeptenaTask) {
     let newStatus: TaskStatus = task.status == .done ? .open : .done
-    if newStatus == .open { Haptics.tap() }
+    if newStatus == .open { Haptics.commit() }
 
     // Completion never relocates a row. We open the settle window BEFORE the
     // status flip so the row stays put while it lingers — `model.settle.isSettling(id)`

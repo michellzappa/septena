@@ -262,7 +262,7 @@ struct AreaDetailView: View {
   private func handleProjectDrop(ids: [String], project: Project) -> Bool {
     guard !ids.isEmpty else { return false }
     if TaskDragIDs.isNewTaskPayload(ids) {
-      Haptics.tick()
+      Haptics.commit()
       openProject(project)
       nav.requestNewTask()
       return true
@@ -274,7 +274,7 @@ struct AreaDetailView: View {
       return task
     }
     guard !moving.isEmpty else { return false }
-    Haptics.tick()
+    Haptics.commit()
     let undoBefore = moving.map(TaskUndo.FilingSnapshot.init)
     taskMutator.moveToList(ids: moving.map(\.id), area: nil, project: project.id, acknowledge: true)
     TaskUndo.recordMove(before: undoBefore, context: modelContext, mutator: taskMutator)
@@ -628,7 +628,7 @@ struct ProjectDetailView: View {
   }
 
   private func moveToArea(_ newAreaId: String?) {
-    Haptics.tick()
+    Haptics.commit()
     Task {
       do {
         try await projectsMutator.setArea(id: project.id, area: newAreaId)
@@ -685,11 +685,7 @@ struct ProjectDetailView: View {
   }
 
   private func setStatus(_ newStatus: ProjectStatus) {
-    switch newStatus {
-    case .done: Haptics.success()
-    case .cancelled: Haptics.warning()
-    case .active: Haptics.tick()
-    }
+    Haptics.projectStatusChanged(to: newStatus)
     status = newStatus
     Task {
       do { try await projectsMutator.setStatus(id: project.id, status: newStatus) }

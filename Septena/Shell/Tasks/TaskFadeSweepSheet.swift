@@ -153,7 +153,7 @@ struct TaskFadeSweepSheet: View {
   }
 
   private func keep(_ task: SeptenaTask) {
-    Haptics.tick()
+    Haptics.commit()
     let snapshot = TaskUndo.FadedSnapshot(task)
     mutator.keepFaded(ids: [task.id])
     TaskUndo.recordKeepFaded(before: [snapshot], mutator: mutator)
@@ -164,7 +164,7 @@ struct TaskFadeSweepSheet: View {
   }
 
   private func letTheRestGo() {
-    Haptics.tick()
+    Haptics.warning()
     let snapshots = remaining.map(TaskUndo.FadedSnapshot.init)
     let ids = remaining.map(\.id)
     mutator.dropFaded(ids: ids)

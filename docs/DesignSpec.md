@@ -202,6 +202,8 @@ Any animation a user can trigger repeatedly — and every celebratory flourish (
 
 The two sanctioned exceptions are `LogCommit.swift` and `CommitMotion.swift`, which gate once at the overlay so the primitives inside them can animate freely; both say so in a comment at the call site. Everything else is enforced by `scripts/lint-design.sh` (§14).
 
+**Haptics have one vocabulary.** Call a `Haptics` verb by what the gesture means (`press`, `selection`, `commit`, `threshold`, `success`, `warning`, or `play` for a composed pattern); local view state uses `.sensoryFeedback`. The table and the rules are in [HAPTICS_SPEC.md](HAPTICS_SPEC.md).
+
 ## 10. Data-viz primitives
 
 The bespoke visualizations. Each kind of chart has **one** definition; a section feeds it data, never re-rolls the drawing. Pick the primitive by the *shape of the question*, not the section.

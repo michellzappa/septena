@@ -63,6 +63,15 @@ scan motion-animation-modifier error \
   'Use .a11yAnimation(_:value:) — bare .animation(_:value:) ignores Reduce Motion.' \
   'Shell/UI/Accessibility\.swift|a11yAnimation|TimelineView'
 
+# ── Haptics (docs/HAPTICS_SPEC.md) ──────────────────────────────────────────
+# One vocabulary, one place that maps meaning to feel. A generator built at a
+# call site picks a feel by hand and skips the window anchoring and the
+# CoreHaptics engine setup in Haptics.swift.
+scan haptics-direct-generator error \
+  'UI(Impact|Selection|Notification|Canvas)FeedbackGenerator|CHHapticEngine[[:space:]]*\(' \
+  'Call a Haptics verb (press/selection/commit/threshold/success/warning/play), or .sensoryFeedback for local view state.' \
+  'SeptenaCore/Haptics\.swift'
+
 # ── Selection language (DesignSpec §4, SelectionLanguage.swift) ──────────────
 # The app accent is adaptive ink — WHITE in dark mode. A solid-accent fill with
 # white text is invisible there. Selected chips use a tint wash + tint ink.
