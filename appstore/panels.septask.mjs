@@ -54,13 +54,18 @@ const iphone = rows.map((row, i) => {
     id: row.slug,
     background: { style: "texture", fill, tint, texture: textureId(v.texture ?? theme.app.textures[i % theme.app.textures.length]), seed: 42 + i, intensity: 70, fade: 1 },
     headline: row.title,
+    // The first panel's title stands alone and larger; the others carry a
+    // one-sentence sub (docs/APPSTORE-SEPTASK.md, ## Screenshots).
+    sub: row.sub || undefined,
     align: "center",
-    headlineSize: 150,
+    headlineSize: i === 0 ? 200 : 140,
     shot: {
       scene: row.scene,
       src: row.scene,
       callout: row.callout && row.callout !== "-" ? { element: row.callout, ...(v.callout ?? {}) } : null,
-      width: 0.78, rotate: 0, offsetY: -0.07,
+      // The phone starts below the text: the first panel's large title, or
+      // the title and its sub on the others.
+      width: 0.78, rotate: 0, offsetY: i === 0 ? 0.03 : row.sub ? 0.01 : -0.07,
       ...(v.shot ?? {}),
     },
   };

@@ -208,10 +208,12 @@ reads this table; `appstore/validate.mjs` checks it.
 - `callout` is an element id from that step's `.elements.json`, or `-`. The
   callout repeats the element's own on-screen text, larger, with a line to it.
   Callout text is never written by hand.
-- `title` is at most 28 characters, without the `*` marks. It is the only
-  text on the panel (decided 2026-11-22: one level of title, no subtitle).
-  Leave `sub` empty. Each panel shows one shipped feature, and the title
-  names that feature plainly. Say "your agent", never a vendor: Septena works
+- `title` is at most 28 characters, without the `*` marks. Each panel shows
+  one shipped feature, and the title names that feature plainly.
+- `sub` is one sentence under the title that says how the feature works, at
+  most 90 characters. The first panel has no `sub`: its title stands alone,
+  larger (experiment 2026-11-23, after Heliophilia's listing; it replaces the
+  2026-11-22 rule of one level of title). Say "your agent", never a vendor: Septena works
   with any agent that speaks MCP.
 - No em or en dashes. Every title and sub passes the humanizer skill.
 
@@ -220,11 +222,11 @@ reads this table; `appstore/validate.mjs` checks it.
 | slug | scene | callout | title | sub |
 | --- | --- | --- | --- | --- |
 | hook | today/0 | - | Tasks that think with you | |
-| thinking | thinking/1 | - | AI that asks before it acts | |
-| agent-work | agents/2 | - | Your agents do the work | |
-| agent-result | agents/3 | - | You decide when it’s done | |
-| inbox | capture/1 | - | New tasks wait in the Inbox | |
-| dates | dates/2 | - | Pick When, keep the Deadline | |
+| thinking | thinking/1 | - | AI that asks before it acts | Tap Discuss, and Septena asks one short question first. |
+| agent-work | agents/2 | - | Your agents do the work | Hand a task to your agent, and it asks you when it needs a decision. |
+| agent-result | agents/3 | - | You decide when it’s done | Finished work waits in Review until you Accept it. |
+| inbox | capture/1 | - | New tasks wait in the Inbox | Nothing lands on Today until you put it there. |
+| dates | dates/2 | - | Pick When, keep the Deadline | When is the day you start, and the Deadline is the day it’s due. |
 
 ---
 

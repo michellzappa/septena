@@ -241,6 +241,7 @@ h1 { font-family:${theme.fonts.display}; font-weight:600; font-size:${panel.head
   line-height:1.06; letter-spacing:-0.025em; text-wrap:balance; }
 h1 em { font-style:normal; color:${tint}; }
 ${panel.background?.fill ? `h1, h1 em { color:#fff; } h1 { font-weight:700; text-shadow:0 2px 24px rgb(0 0 0 / 0.12); }
+.panel .sub { color:rgb(255 255 255 / 0.92); font-weight:600; margin-top:36px; text-wrap:balance; }
 .co-line { filter: drop-shadow(0 0 4px rgb(0 0 0 / 0.35)); }` : ""}
 .bg-wash { position:absolute; inset:0; width:100%; height:100%; }
 .sub { font-size:62px; line-height:1.32; color:${theme.inkSecondary};
