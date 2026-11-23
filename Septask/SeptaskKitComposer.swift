@@ -138,6 +138,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// idempotent: a command that saves typed text first, and the collapse that
   /// follows, never write the same edit twice.
   private var committedTitle = ""
+  /// The task this composer was opened for (`configure(with:)`).
+  private var configuredTaskID: String?
   private var committedNotes: String?
   /// A deferred commit-and-collapse is queued. A second Return / Esc before
   /// it runs must not queue another.
@@ -435,6 +437,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   func configure(with task: SeptenaTask, listName: String?) {
     textUndo.removeAllActions()
     isClosing = false
+    configuredTaskID = task.id
     committedTitle = task.title
     committedNotes = Self.normalizedNotes(task.notes)
     titleView.textStorage?.setAttributedString(
@@ -462,7 +465,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     refreshPills(with: task, listName: listName)
     // A blank new task offers Paste when the clipboard holds text (#210).
     // Read once here, at open; never per keystroke.
-    pastePill.isHidden = !(task.title.isEmpty && committedNotes == nil && SeptenaPasteboard.hasText)
+    pastePill.isHidden = !(task.title.isEmpty && committedNotes == nil && SeptenaPasteboard.hasPasteable)
   }
 
   /// Fill the blank title and notes from the clipboard
@@ -470,6 +473,26 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// the end of the title. Does not commit: the row autosaves on collapse.
   private func pasteFromClipboard() {
     pastePill.isHidden = true
+    // An image becomes an attachment, same as the iOS composer. The row
+    // already exists here, so it attaches at once.
+    if SeptenaPasteboard.hasImage, let taskID = configuredTaskID {
+      KitAttachmentPasteHelper.attachFromPasteboard(to: taskID, presentErrorIn: window)
+      attachmentsView.reload()
+      syncAttachmentsHeight(notify: false)
+      updateAttachPill()
+      // An untitled row is purged when it folds. A pasted image alone titles
+      // it "Image", selected, so typing replaces it.
+      if titleView.string.isEmpty {
+        titleView.textStorage?.setAttributedString(NSAttributedString(
+          string: String(localized: "Image", comment: "Title of a new task made from a pasted image"),
+          attributes: Self.titleAttributes))
+        titleView.needsDisplay = true
+        window?.makeFirstResponder(titleView)
+        titleView.selectAll(nil)
+      }
+      recomputeContentHeights(notify: true)
+      return
+    }
     guard let text = NSPasteboard.general.string(forType: .string),
           let split = TaskTitleText.pasteSplit(text) else { return }
     titleView.textStorage?.setAttributedString(
@@ -1710,9 +1733,7 @@ enum KitAttachmentPasteHelper {
 
   private static func attachImageData(_ data: Data, ext: String, uti: String,
                                       to taskID: String, window: NSWindow?) -> Bool {
-    let df = DateFormatter()
-    df.dateFormat = "yyyy-MM-dd-HHmmss"
-    let filename = "Image-\(df.string(from: DayClock.appNow)).\(ext)"
+    let filename = TaskAttachmentFiles.pastedImageFilename(ext: ext)
     do {
       try SeptenaServices.shared.taskAttachmentStore.add(
         taskID: taskID, data: data, filename: filename, contentType: uti)

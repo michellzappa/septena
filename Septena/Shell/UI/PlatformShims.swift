@@ -31,6 +31,22 @@ enum SeptenaPasteboard {
     return false
     #endif
   }
+
+  /// Whether the clipboard holds an image, WITHOUT reading it (no paste
+  /// alert on iOS: `hasImages`, like `hasStrings`).
+  static var hasImage: Bool {
+    #if canImport(UIKit)
+    return UIPasteboard.general.hasImages
+    #elseif canImport(AppKit)
+    return NSPasteboard.general.availableType(from: [.png, .tiff]) != nil
+    #else
+    return false
+    #endif
+  }
+
+  /// What the new-task Paste chip can use: text for the title, or an image
+  /// for an attachment (#210). Gates the chip on every composer.
+  static var hasPasteable: Bool { hasText || hasImage }
 }
 
 // Tiny cross-platform shims so view files can call the same modifiers on

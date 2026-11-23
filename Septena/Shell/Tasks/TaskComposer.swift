@@ -182,6 +182,11 @@ struct TaskComposerCard: View {
   /// never reads the clipboard, so no iOS paste-permission alert appears.
   /// Cleared by a paste or by the first keystroke.
   @State private var pasteOffered = false
+  /// Images the Paste chip took from the clipboard, held until the task
+  /// exists, then written as attachments (`attachPastedImages`).
+  @State private var pastedImages: [PastedImage] = []
+  /// Shown under the pasted images when a paste could not be used.
+  @State private var pasteError: String?
 
   init(mode: Mode, areas: [Area], projects: [Project], accent: Color,
        presentation: Presentation = .drawer, deferredCreate: Bool = false,
@@ -294,7 +299,7 @@ struct TaskComposerCard: View {
       // store reads empty, and handing that to the host destroyed the task.
       .onDisappear {
         let landed = persistOnce()
-        if !draft.canSave || landed { onVanish?() }
+        if !canSave || landed { onVanish?() }
       }
       .onChange(of: draft.title) { oldValue, newValue in
         // A title is one line, so a line break in the field is never text —
@@ -318,7 +323,7 @@ struct TaskComposerCard: View {
         if TaskTitleText.withoutLineBreaks(newValue) == oldValue {
           draft.title = TaskTitleText.withoutLineBreaks(newValue)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-          if draft.canSave { commit(); return }
+          if canSave { commit(); return }
           // Return on an empty NEW task closes it (its draft is then purged).
           if isCreating { close(); return }
         } else {
@@ -366,7 +371,7 @@ struct TaskComposerCard: View {
       cancelTitle: "Cancel",
       showsSave: true,
       accent: accent,
-      canSave: draft.canSave,
+      canSave: canSave,
       isDirty: isDirty,
       discardTitle: isEditing ? "Discard changes?" : "Discard new task?",
       onSave: { persistOnce() },
@@ -401,6 +406,8 @@ struct TaskComposerCard: View {
         notesField
 
         quickEntryChips
+
+        pastedImagesStrip
 
         TaskAttributeBar(
           draft: $draft,
@@ -527,7 +534,7 @@ struct TaskComposerCard: View {
       // macOS: a vertical-axis field fires onSubmit on plain Return (the iOS
       // newline-as-save trick never triggers there) — commit here instead.
       .onSubmit {
-        if draft.canSave { commit() } else if isCreating { close() }
+        if canSave { commit() } else if isCreating { close() }
       }
       // The field would otherwise swallow Tab, so carry the same focus-cycling
       // handler here too.
@@ -666,6 +673,13 @@ struct TaskComposerCard: View {
   /// Blank new task, clipboard had text at open, nothing typed yet.
   private var showsPasteChip: Bool {
     pasteOffered && isCreating && draft.title.isEmpty && draft.notes.isEmpty
+      && pastedImages.isEmpty
+  }
+
+  /// A new task can be saved once it has a title, or when it is a pasted
+  /// image alone (it then takes the title "Image", `titleImageOnlyDraft`).
+  private var canSave: Bool {
+    draft.canSave || (isCreating && !pastedImages.isEmpty)
   }
 
   /// The Paste chip. Label and icon come from the registry
@@ -676,9 +690,8 @@ struct TaskComposerCard: View {
     // iOS: the system `PasteButton` reads the clipboard with the user's tap
     // as consent, so no paste-permission alert appears. It draws its own
     // system "Paste" label and clipboard glyph.
-    PasteButton(payloadType: String.self) { strings in
-      guard let text = strings.first else { return }
-      Task { @MainActor in applyPaste(text) }
+    PasteButton(supportedContentTypes: [.image, .plainText]) { providers in
+      Task { @MainActor in await applyPaste(providers) }
     }
     .buttonBorderShape(.capsule)
     .labelStyle(.titleAndIcon)
@@ -687,7 +700,11 @@ struct TaskComposerCard: View {
     #else
     let attr = RegistrySurfaces.taskAttribute("paste")
     Button {
-      if let text = NSPasteboard.general.string(forType: .string) { applyPaste(text) }
+      if let image = PastedImage.fromGeneralPasteboard() {
+        applyPastedImage(image)
+      } else if let text = NSPasteboard.general.string(forType: .string) {
+        applyPaste(text)
+      }
     } label: {
       HStack(spacing: 5) {
         Image(systemName: attr.sfSymbol).font(.system(size: 11, weight: .semibold))
@@ -701,6 +718,96 @@ struct TaskComposerCard: View {
     .buttonStyle(.plain)
     .background(Capsule().fill(accent.opacity(0.28)))
     #endif
+  }
+
+  /// What the iOS `PasteButton` delivered. An image wins over text: an image
+  /// copied from a web page also carries its URL as text, and that URL is
+  /// not a title.
+  private func applyPaste(_ providers: [NSItemProvider]) async {
+    if let image = await PastedImage.load(from: providers) {
+      applyPastedImage(image)
+    } else if let text = await PastedImage.loadText(from: providers) {
+      applyPaste(text)
+    } else {
+      pasteOffered = false
+      Haptics.warning()
+      pasteError = String(localized: "Nothing on the clipboard could be pasted.",
+                          comment: "New task: the Paste chip found no text or image")
+    }
+  }
+
+  /// Hold a clipboard image for the new task and show it. It is written as
+  /// an attachment when the task saves.
+  private func applyPastedImage(_ image: PastedImage) {
+    pasteOffered = false
+    guard image.fitsAttachmentLimit else {
+      Haptics.warning()
+      pasteError = String(localized: "Attachments must be 25 MB or smaller.")
+      return
+    }
+    pasteError = nil
+    Haptics.selection()
+    a11yAnimate(.snappy(duration: 0.2)) { pastedImages.append(image) }
+    focusTitle()
+  }
+
+  /// A new task made from a pasted image alone gets the title "Image", so it
+  /// saves like any titled task instead of reading as an empty draft.
+  private func titleImageOnlyDraft() {
+    guard draft.trimmedTitle.isEmpty, !pastedImages.isEmpty else { return }
+    draft.title = String(localized: "Image", comment: "Title of a new task made from a pasted image")
+  }
+
+  /// Write the held images onto the task that now exists, then forget them.
+  private func attachPastedImages(to taskID: String) {
+    guard !pastedImages.isEmpty else { return }
+    let store = SeptenaServices.shared.taskAttachmentStore
+    for image in pastedImages {
+      do {
+        try store.add(taskID: taskID, data: image.data,
+                      filename: image.filename, contentType: image.type.identifier)
+      } catch {
+        Log.persistence.error("Pasted image not attached: \(error.localizedDescription, privacy: .public)")
+      }
+    }
+    pastedImages = []
+  }
+
+  /// The pasted images, each with a remove button, under the quick-entry
+  /// chips. Empty (no view) when nothing was pasted.
+  @ViewBuilder
+  private var pastedImagesStrip: some View {
+    if !pastedImages.isEmpty || pasteError != nil {
+      VStack(alignment: .leading, spacing: 6) {
+        if !pastedImages.isEmpty {
+          HStack(spacing: 8) {
+            ForEach(pastedImages) { image in
+              AttachmentThumbnail(source: .data(image.data), key: image.id.uuidString, side: 64)
+                .overlay(alignment: .topTrailing) {
+                  Button {
+                    Haptics.commit()
+                    a11yAnimate(.snappy(duration: 0.2)) {
+                      pastedImages.removeAll { $0.id == image.id }
+                    }
+                  } label: {
+                    Image(systemName: "xmark.circle.fill")
+                      .symbolRenderingMode(.palette)
+                      .foregroundStyle(.white, .black.opacity(0.6))
+                      .padding(3)
+                      .contentShape(Rectangle())
+                  }
+                  .buttonStyle(.plain)
+                  .accessibilityLabel(Text("Remove image"))
+                }
+            }
+          }
+        }
+        if let pasteError {
+          Text(pasteError).font(.caption).foregroundStyle(.red)
+        }
+      }
+      .transition(.opacity)
+    }
   }
 
   /// Fill the blank draft from clipboard text (`TaskTitleText.pasteSplit`)
@@ -835,7 +942,7 @@ struct TaskComposerCard: View {
       #endif
     }
     pasteOffered = isCreating && draft.title.isEmpty && draft.notes.isEmpty
-      && SeptenaPasteboard.hasText
+      && SeptenaPasteboard.hasPasteable
   }
 
   /// Move keyboard focus into the title field and — on macOS — collapse
@@ -870,7 +977,9 @@ struct TaskComposerCard: View {
     switch seededMode ?? mode {
     case .create:
       applyPendingTokens()
+      titleImageOnlyDraft()
       let created = draft.create(via: mutator)
+      attachPastedImages(to: created.id)
       recordCreateUndo(id: created.id)
       AddInfoSection.tasks.notifyTilesChanged()
       return true
@@ -880,7 +989,9 @@ struct TaskComposerCard: View {
         // inserted a push-deferred entity for layout identity. Updating its
         // title releases the first CloudKit push.
         applyPendingTokens()
+        titleImageOnlyDraft()
         let landed = draft.update(task, via: mutator)
+        if landed { attachPastedImages(to: task.id) }
         // Register the create undo only once the title landed: an "un-create"
         // for a rolled-back write would purge a task the user never got.
         if landed, !recordedCreateUndo {
@@ -925,8 +1036,8 @@ struct TaskComposerCard: View {
   @discardableResult
   private func persistOnce() -> Bool {
     guard !discarded else { return false }
-    guard draft.canSave else { return false }
-    guard draft != lastPersistedDraft else { return true }
+    guard canSave else { return false }
+    guard draft != lastPersistedDraft || !pastedImages.isEmpty else { return true }
     // Mark the draft persisted only AFTER the write reports that it landed.
     // Marking it first meant a rolled-back save was remembered as the last
     // persisted state, so every later call short-circuited on
@@ -947,7 +1058,7 @@ struct TaskComposerCard: View {
     // taken right after seeding (create from the list defaults, edit from the
     // task). A pure whole-struct compare — no field-by-field normalization to get
     // subtly wrong — so an untouched peek is never dirty.
-    draft.differs(fromSeed: seededDraft)
+    draft.differs(fromSeed: seededDraft) || !pastedImages.isEmpty
   }
 
   /// Explicit Cancel → Discard. Latches the autosave off for good so the
@@ -961,7 +1072,7 @@ struct TaskComposerCard: View {
   /// Persist + close (Return-to-save / newline-save). Closing then fires
   /// `.onDisappear`, but `persistOnce` is idempotent so it won't write twice.
   private func commit() {
-    guard draft.canSave else { return }
+    guard canSave else { return }
     Haptics.commit()
     persistOnce()
     // Return saves and closes, for a new task too. A new task used to chain

@@ -59,6 +59,17 @@ enum TaskAttachmentFiles {
     entity.localFilename.map { directory.appendingPathComponent($0) }
   }
 
+  /// The display name for an image pasted from the clipboard, which has no
+  /// file name of its own: `Image-2026-11-23-142501.png`. One rule for the
+  /// iOS composer, the SwiftUI composer and the AppKit composer.
+  @MainActor
+  static func pastedImageFilename(ext: String) -> String {
+    let df = DateFormatter()
+    df.locale = Locale(identifier: "en_US_POSIX")
+    df.dateFormat = "yyyy-MM-dd-HHmmss"
+    return "Image-\(df.string(from: DayClock.appNow)).\(ext)"
+  }
+
   static func ownedFilename(id: String, original: String) -> String {
     let ext = URL(fileURLWithPath: original).pathExtension
     return ext.isEmpty ? id : "\(id).\(ext)"
