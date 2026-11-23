@@ -55,7 +55,7 @@ struct TaskListView: View {
   /// Opt-in: weave the day's calendar events into Today and Upcoming (Things-
   /// style). Only ever populated for those two filters, and only when calendar
   /// access is already granted (Settings → Integrations) — see `load()`.
-  @AppStorage(SettingsKey.tasksShowCalendarEvents) private var showCalendarEvents: Bool = true
+  @AppStorage(SettingsKey.tasksShowCalendarEvents) private var showCalendarEvents: Bool = RegistrySettings.Defaults.tasksShowCalendarEvents
   #if os(iOS)
   @AppStorage(SettingsKey.tasksSwipeLeadingAction) private var swipeLeadingActionRaw: String = TaskSwipeLeadingAction.today.rawValue
   #endif

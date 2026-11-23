@@ -1306,7 +1306,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// owns that, same as `agenda()`/`upcomingBuckets()` below.
   private var showsCalendarEvents: Bool {
     let enabled = UserDefaults.standard.object(forKey: SettingsKey.tasksShowCalendarEvents) == nil
-      ? true
+      ? RegistrySettings.Defaults.tasksShowCalendarEvents
       : UserDefaults.standard.bool(forKey: SettingsKey.tasksShowCalendarEvents)
     return enabled && CalendarBridge.shared.access == .granted
   }
