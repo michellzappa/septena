@@ -5,7 +5,7 @@ name Septask; the name never ships). Septena Life's copy lives in
 `docs/APPSTORE.md`. `appstore/metadata.mjs` parses it (run with
 `SEPTENA_APP=septask`) into fastlane `deliver` metadata files
 (`appstore/metadata-septask/<locale>/*.txt`, and `metadata-septask-mac/` for the
-Mac app) and the viz manifest. Edit copy **here**, never in the generated `.txt`
+Mac app) and the review data for the brand page. Edit copy **here**, never in the generated `.txt`
 files.
 
 **Parse rules** (identical to APPSTORE.md; keep intact):
@@ -224,13 +224,13 @@ reads this table; `appstore/validate.mjs` checks it.
 
 | slug | scene | callout | title | sub |
 | --- | --- | --- | --- | --- |
-| hook | today/0 | - | Tasks that think with you | |
-| thinking | thinking/1 | - | AI that asks before it acts | |
-| agent-work | agents/2 | - | Your agents do the work | |
-| agent-result | agents/3 | - | You decide when it’s done | |
-| inbox | capture/1 | - | Today is your call | |
-| dates | dates/2 | - | Plan the days ahead | |
-| looks | looks/2 | - | Make it yours | |
+| hook | today/0 | - | Tasks that think with you. A native task app for iPhone, iPad and Mac. | |
+| thinking | thinking/1 | - | AI that asks before it acts. It works on one task and asks you with buttons. | |
+| agent-work | agents/2 | - | Your agents do the work. Give your agent a task, and it asks you when it needs you. | |
+| agent-result | agents/3 | - | You decide when it’s done. Finished work waits in Review until you accept it. | |
+| inbox | capture/1 | - | You choose your day. New tasks wait in the Inbox until you put them on Today. | |
+| dates | dates/2 | - | See the week ahead. Every task can have a day to start and a deadline. | |
+| looks | looks/2 | - | Make it yours. Pick an accent colour and a texture for your lists. | |
 
 ---
 
@@ -251,14 +251,20 @@ it.
 cd ../septena-site && npx next build                 # 1. build the site (scene pages)
 cd ../septena/appstore && node export-scenes.mjs     # 2. export phone screens at 3x, one set per panel accent
 cd ../septena/appstore && npm run all:septask        # 3. metadata + render + validate
-npm run viz:septask                                  # 4. review at 127.0.0.1:4477/viz/
+cd ../../_/septena-site && node scripts/sync-appstore.mjs && npm run dev
+                                                     # 4. review at localhost:3000/about/brand#app-store
 fastlane deliver --app_identifier com.septena.tasks --platform ios \
   --metadata_path appstore/metadata-septask \
   --screenshots_path appstore/screenshots-septask    # 5. upload (from the repo root)
 ```
 
 - `appstore/scenes/` is gitignored. Its `manifest.json` records the site
-  revision and fixture the screens came from; the viz shows them.
+  revision and fixture the screens came from; the brand page shows them.
+- **Review in one place:** the site's `/about/brand#app-store` shows the panels,
+  the store text with character counts and the check results, per platform
+  (`validate.mjs` writes `review.septask.json`, `sync-appstore.mjs` copies it).
+  The old local viz page and `serve.mjs` are gone (2026-11-23): never add a
+  second viewer here.
 - Re-export when a scene changes in `../septena-site/lib/task-ui/model.ts` or
   when a table row points at a new scene step.
 - A new panel: add a row to the table above, pick its `scene` from the

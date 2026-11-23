@@ -1,4 +1,5 @@
-// Validate the App Store package and emit viz/manifest.json for the viz app.
+// Validate the App Store package and write review.<app>.json, the review data
+// the website's /about/brand page shows (septena-site scripts/sync-appstore.mjs).
 //
 //   node validate.mjs
 //
@@ -8,7 +9,8 @@
 //   copy        no em/en dashes or <placeholders> in any field; keywords with
 //               no space after a comma, no empty or repeated keyword
 //   panels      (## Screenshots tables, Bipe's rules) unique slugs, at most
-//               10 rows, title <= 28 chars without *marks*, sub <= 90 chars and
+//               10 rows, title <= 28 chars without *marks* (a two-part title
+//               "Claim. How.": claim <= 32, whole <= 90), sub <= 90 chars and
 //               one sentence, scene screen exists, callout element is on it
 //   raw         capture inventory per device/appearance (info only)
 
@@ -16,6 +18,7 @@ import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, openSy
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { allDevices, shotPaths } from "./devices.mjs";
+import { currentApp } from "./apps.mjs";
 import { panelsFor } from "./panels.config.mjs";
 import { parseAppstoreMd, parseScreenshots, LIMITS } from "./metadata.mjs";
 
@@ -77,7 +80,11 @@ for (const [device, rows] of Object.entries(tables)) {
     seen.add(r.slug);
     const title = (r.title ?? "").replace(/\*/g, "");
     if (!title) err(`${where}: no title`);
-    if (title.length > 28) err(`${where}: title ${title.length} chars > 28`);
+    // One sentence: at most 28 characters. "Claim. How it works.": the claim at most
+    // 32, the whole title at most 90 (both parts render at one size).
+    const cut = title.indexOf(". ");
+    if (cut < 0 && title.length > 28) err(`${where}: title ${title.length} chars > 28`);
+    if (cut >= 0 && (cut + 1 > 32 || title.length > 90)) err(`${where}: two-part title: claim ${cut + 1} chars (max 32), whole ${title.length} (max 90)`);
     if ((r.sub ?? "").length > 90) err(`${where}: sub ${r.sub.length} chars > 90`);
     if ((r.sub ?? "").split(/[.!?](?:\s|$)/).filter((x) => x.trim()).length > 1) err(`${where}: sub is more than one sentence`);
     for (const f of ["title", "sub"]) if (DASH.test(r[f] ?? "")) err(`${where}: ${f} contains an em or en dash`);
@@ -162,13 +169,13 @@ const deviceReport = Object.entries(allDevices()).map(([key, d]) => {
     if (TABLE_FOR[key] && d.sceneDir && !(tables[TABLE_FOR[key]]?.length)) err(`${key}: no "### ${TABLE_FOR[key]}" rows in ## Screenshots`);
   }
   return {
-    key, label: d.label, active: d.active, width: d.width, height: d.height,
+    key, label: d.label, registryDevice: d.registryDevice ?? null, active: d.active, width: d.width, height: d.height,
     platform: d.platform, captureNote: d.captureNote,
     panelsConfigured: panelsFor(key).length, shots, raw,
   };
 });
 
-// ----- manifest for the viz -----
+// ----- review data for the website (/about/brand, the App Store section) -----
 const manifest = {
   generatedAt: new Date().toISOString(),
   app: { name: platforms[0]?.fields.name?.trim() ?? "Septena", bundleId: platforms[0]?.bundleId },
@@ -177,10 +184,10 @@ const manifest = {
   devices: deviceReport,
   issues,
 };
-mkdirSync(join(ROOT, "viz"), { recursive: true });
-writeFileSync(join(ROOT, "viz", "manifest.json"), JSON.stringify(manifest, null, 2));
+const REVIEW = join(ROOT, `review.${currentApp().key}.json`);
+writeFileSync(REVIEW, JSON.stringify(manifest, null, 2) + "\n");
 
 for (const i of issues) console.log(`${i.level === "error" ? "✗" : "⚠"} ${i.msg}`);
 const errors = issues.filter((i) => i.level === "error").length;
-console.log(`${errors ? "✗" : "✓"} validate: ${errors} error(s), ${issues.length - errors} warning(s) → viz/manifest.json`);
+console.log(`${errors ? "✗" : "✓"} validate: ${errors} error(s), ${issues.length - errors} warning(s) → ${REVIEW.split("/").pop()}`);
 process.exit(errors ? 1 : 0);

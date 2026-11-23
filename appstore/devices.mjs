@@ -31,6 +31,7 @@ const GEOMETRY = {
     screenAspect: 1320 / 2868,
     platform: "ios",
     frame: "phone",
+    registryDevice: "iphone", // registry/device-frames.json: the site's platform toggle
   },
   ipad13: {
     label: 'iPad 13"',
@@ -40,6 +41,7 @@ const GEOMETRY = {
     screenAspect: 2064 / 2752,
     platform: "ios",
     frame: "pad",
+    registryDevice: "ipad",
   },
   mac: {
     label: "Mac",
@@ -50,6 +52,7 @@ const GEOMETRY = {
     landscape: true,
     platform: "osx", // separate ASC app
     frame: "mac",
+    registryDevice: "macbook",
   },
   watch: {
     label: "Apple Watch",

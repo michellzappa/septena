@@ -34,6 +34,12 @@ const esc = (s = "") =>
 // "*one private app*" → accent-colored span.
 const rich = (s = "") =>
   esc(s).replace(/\*([^*]+)\*/g, `<em>$1</em>`);
+// A two-part title, "Claim. How it works.": the first sentence bold, the rest
+// light, at one size (after Things' listing). A one-sentence title renders as is.
+const lead = (s = "") => {
+  const i = s.indexOf(". ");
+  return i < 0 ? rich(s) : `<strong>${rich(s.slice(0, i + 1))}</strong> <span class="light">${rich(s.slice(i + 2))}</span>`;
+};
 
 // ---------------------------------------------------------------- background
 function background(bg = {}) {
@@ -96,7 +102,7 @@ function shot(s, device, tint) {
   const c = IPHONE.cutout;
   const island = f.island && !s.img ? `<div class="island" style="top:${Math.round((IPHONE.bezel + c.top) * k)}px; width:${Math.round(c.width * k)}px; height:${Math.round(c.height * k)}px;"></div>` : "";
   return `
-  <div class="shot-zone"${s.alignTop ? " data-align-top" : ""} style="bottom:${s.bottom ?? 110}px; transform: translate(${Math.round((s.offsetX ?? 0) * 100)}%, ${Math.round((s.offsetY ?? 0) * 100)}%);">
+  <div class="shot-zone"${s.alignTop ? " data-align-top" : ""}${s.alignMiddle != null ? ` data-align-middle="${s.alignMiddle}"` : ""} style="bottom:${s.bottom ?? 110}px; transform: translate(${Math.round((s.offsetX ?? 0) * 100)}%, ${Math.round((s.offsetY ?? 0) * 100)}%);">
     <div class="shot-wrap" style="width:${w}px; transform: rotate(${s.rotate ?? 0}deg);">
       <div class="frame" style="width:${w}px; padding:${f.pad}px;${f.bezel ? ` background:${PHONE.case} center/100% 100% no-repeat; box-shadow:none; overflow:visible; filter:drop-shadow(0 ${Math.round(20 * k)}px ${Math.round(24 * k)}px rgb(0 0 0 / .28));` : ` border-radius:${f.radius}px;`}">
         ${screen}${island}
@@ -136,9 +142,13 @@ const LAYOUT_CALLOUTS = `window.__layoutCallouts = () => {
   // (data-align-top) share its top line. A phone that reaches into the title
   // marks the page, and render.mjs refuses it.
   const zones = [...document.querySelectorAll(".shot-zone")];
-  const main = zones.find((z) => !("alignTop" in z.dataset));
+  const main = zones.find((z) => !("alignTop" in z.dataset) && !("alignMiddle" in z.dataset));
   for (const zone of zones) if (main && "alignTop" in zone.dataset) {
     zone.style.top = main.offsetTop + "px"; zone.style.bottom = "auto";
+  }
+  // data-align-middle: centred on the main phone's midline, then nudged down by its value.
+  for (const zone of zones) if (main && "alignMiddle" in zone.dataset) {
+    zone.style.top = (main.offsetTop + (main.offsetHeight - zone.offsetHeight) / 2 + (+zone.dataset.alignMiddle || 0)) + "px"; zone.style.bottom = "auto";
   }
   const text = document.querySelector(".panel > .top");
   const phone = main?.querySelector(".frame");
@@ -255,6 +265,9 @@ html,body { width:${device.width}px; height:${device.height}px; overflow:hidden;
 h1 { font-family:${theme.fonts.display}; font-weight:600; font-size:${panel.headlineSize ?? 168}px;
   line-height:1.06; letter-spacing:-0.025em; text-wrap:balance; }
 h1 em { font-style:normal; color:${tint}; }
+h1.lead { font-size:${panel.leadSize ?? 104}px; line-height:1.12; letter-spacing:-0.015em; text-align:center; text-wrap:balance; }
+h1.lead strong { font-weight:800; }
+h1.lead .light { font-weight:400; opacity:.86; }
 ${panel.background?.fill ? `h1, h1 em { color:#fff; } h1 { font-weight:700; text-shadow:0 2px 24px rgb(0 0 0 / 0.12); }
 .panel .sub { color:rgb(255 255 255 / 0.94); font-weight:600; font-size:84px; line-height:1.22; margin-top:40px; max-width:1160px; text-wrap:balance; }
 .co-line { filter: drop-shadow(0 0 4px rgb(0 0 0 / 0.35)); }` : ""}
@@ -303,7 +316,7 @@ function portrait(panel, device, tint) {
   ${background(panel.background)}
   <div class="top" style="position:relative; padding:130px 110px 0; text-align:${panel.align ?? "left"};">
     ${badge(panel.badge, tint)}
-    <h1>${rich(panel.headline)}</h1>
+    <h1${panel.headline.includes(". ") ? ' class="lead"' : ""}>${lead(panel.headline)}</h1>
     ${panel.sub ? `<p class="sub" style="${panel.align === "center" ? "margin-left:auto;margin-right:auto;" : ""}">${rich(panel.sub)}</p>` : ""}
   </div>
   <style>

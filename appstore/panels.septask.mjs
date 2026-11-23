@@ -37,12 +37,13 @@ const VISUAL = {
   inbox:          { fruit: "carambola", texture: "washiPaper" },
   dates:          { fruit: "persimmon", texture: "ridges", shot: { appearance: "dark" } },
   looks:          {
-    // Colourful in front; dark and light behind, smaller, on the same top line.
-    fruit: "tamarillo", texture: "fieldMatrix",
+    // Neutral canvas, so the three looks carry the colour: colourful in front,
+    // dark and light behind, smaller, on the front phone's midline and a little lower.
+    fruit: null, texture: "fieldMatrix",
     shot: { src: "looks/2", appearance: "light", accent: null },
     shots: [
-      { src: "looks/1", appearance: "dark", accent: null, width: 0.56, offsetX: -0.27, alignTop: true },
-      { src: "looks/0", appearance: "light", accent: null, width: 0.56, offsetX: 0.27, alignTop: true },
+      { src: "looks/1", appearance: "dark", accent: null, width: 0.56, offsetX: -0.22, alignMiddle: 90 },
+      { src: "looks/0", appearance: "light", accent: null, width: 0.56, offsetX: 0.22, alignMiddle: 90 },
     ],
   },
 };
@@ -70,7 +71,8 @@ const iphone = rows.map((row, i) => {
   const tint = fill ?? theme.app.accent;
   return {
     id: row.slug,
-    background: { style: "texture", fill, tint, texture: textureId(v.texture ?? theme.app.textures[i % theme.app.textures.length]), seed: 42 + i, intensity: 70, fade: 1 },
+    // No fruit: the app's light canvas with the texture in a soft grey.
+    background: { style: "texture", fill, tint, ...(fill ? {} : { accent: theme.inkSoft }), texture: textureId(v.texture ?? theme.app.textures[i % theme.app.textures.length]), seed: 42 + i, intensity: 70, fade: 1 },
     headline: row.title,
     // The first panel's title stands alone and larger; the others carry a
     // one-sentence sub (docs/APPSTORE-SEPTASK.md, ## Screenshots).

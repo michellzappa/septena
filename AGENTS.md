@@ -528,8 +528,9 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
 - `appstore/` — App Store packaging (iPhone/iPad/Mac/Watch): copy in
   `docs/APPSTORE.md`, panel visuals in `appstore/panels.config.mjs`, surfaces in
   `appstore/devices.mjs`. `appstore/capture.sh <device>` shoots raw screens
-  (iPhone/iPad via `SeptenaUITests`, Mac via `SeptenaMacUITests`), `npm run viz`
-  renders + validates + opens the review webapp, `fastlane deliver` uploads.
+  (iPhone/iPad via `SeptenaUITests`, Mac via `SeptenaMacUITests`), `npm run all`
+  renders + validates, and the website's `/about/brand#app-store` is the review
+  page (no viewer in this repo), `fastlane deliver` uploads.
   Mac is a separate ASC app (own deliver run). See `docs/APPSTORE.md`.
 
 ## Conventions

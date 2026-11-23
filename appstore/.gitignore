@@ -10,5 +10,5 @@ metadata/
 metadata-mac/
 metadata-septask/
 metadata-septask-mac/
-viz/manifest.json
+review.*.json
 scenes/
