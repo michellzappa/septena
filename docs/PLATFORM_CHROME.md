@@ -1,8 +1,7 @@
 # Platform chrome for marketing screens
 
 Status: **draft spec**, 2026-11-23. Owner: mz. Tracking: michellzappa/septena#227
-(App Store sets) and the scene builder issues on michellzappa/septena-site
-listed at the end.
+(App Store sets) and michellzappa/septena-site#15 to #20 (one per plan step).
 
 ## Why
 
@@ -118,16 +117,16 @@ The web preview is a browser window with neutral chrome. It claims no OS.
 ## Plan
 
 1. Move the system chrome out of `TaskScreen` into one component keyed by
-   `system.chrome`, reading the device registry (no visual change).
+   `system.chrome`, reading the device registry (no visual change). (site #15)
 2. iOS 27 audit: redraw the status bar glyphs and toolbar from the iOS 27 kit;
-   decide on SF Symbols for app glyphs (licence check, rule 5).
+   decide on SF Symbols for app glyphs (licence check, rule 5). (site #16)
 3. iPad layout: an `ipad` capture layout with iPadOS chrome and the split
-   view, then the App Store iPad set from it (#227).
+   view, then the App Store iPad set from it (#227). (site #17)
 4. Mac: macOS 27 window chrome and the translucent sidebar, then the App
-   Store Mac set from the mac layout (#227, #266).
+   Store Mac set from the mac layout (#227, #266). (site #18)
 5. Android: Android status bar glyphs, gesture bar, and the app UI from the
-   Compose screens with Material Symbols.
+   Compose screens with Material Symbols. (site #19)
 6. Windows: a `windows` capture layout once the Compose Desktop client has a
-   UI to copy (ADR 0013, W1).
+   UI to copy (ADR 0013, W1). (site #20)
 
 Each step updates the status column above in the same change.
