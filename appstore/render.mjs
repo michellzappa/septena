@@ -144,7 +144,7 @@ for (const device of activeDevices()) {
     const htmlFile = join(buildDir, `${i}_${panel.id}.html`);
     writeFileSync(htmlFile, html);
     const file = join(outDir, `${i}_${device.key}_${panel.id}.png`);
-    await chrome.screenshot(htmlFile, file, { width: device.width, height: device.height, ready: "window.__layoutCallouts?.()" });
+    await chrome.screenshot(htmlFile, file, { width: device.width, height: device.height, ready: "(window.__layoutCallouts?.(), document.documentElement.dataset.overlap ? (() => { throw Error('phone covers the title by ' + document.documentElement.dataset.overlap + 'px') })() : true)" });
     flattenAlpha(file);
     exported.push({ order: i, slug: panel.id, file: `${i}_${device.key}_${panel.id}.png`, title: panel.headline.replace(/\*/g, "") });
     const missing = panel.shot && shotDataURL(device, panel.shot.src, panel.shot.appearance, panel.shot.accent) === null;

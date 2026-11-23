@@ -20,27 +20,29 @@ import { parseScreenshots } from "./metadata.mjs";
 // callout.dy: card centre relative to the element centre, in screen points
 // (the scene builder's 402-wide space). Put the card in empty screen space,
 // never over content; positive dy puts it below the element.
-// shot: overrides the phone (width, offsetX, offsetY, appearance "light" |
-// "dark"). shots: extra phones behind the main one, each { src, appearance,
-// accent, width, offsetX, offsetY }. Phones never tilt (mz, 2026-11-23).
+// Every main phone has the same size and sits on the bottom margin, so the
+// whole device shows and the phones line up across the set (mz, 2026-11-23:
+// no per-panel scaling, no tilt). shot: appearance "light" | "dark".
+// shots: smaller phones behind the main one, only on Make it yours, each
+// { src, appearance, accent, width, offsetX, alignTop }.
 // Every screen is captured in its panel's fruit accent (export-scenes.mjs),
 // so the app's accent matches the fill; accent: null keeps the scene's own.
 // Neighbouring panels differ in fill, light or dark screen, size or number
 // of phones (docs/APPSTORE-SEPTASK.md).
 const VISUAL = {
-  hook:           { fruit: "haskap", texture: "topography", shot: { width: 0.84 } },
-  thinking:       { fruit: "yuzu", texture: "fieldMatrix", shot: { width: 0.92 } },
+  hook:           { fruit: "haskap", texture: "topography" },
+  thinking:       { fruit: "yuzu", texture: "fieldMatrix" },
   "agent-work":   { fruit: "acai", texture: "ridges", shot: { appearance: "dark" } },
-  "agent-result": { fruit: "jabuticaba", texture: "stippleDrift", shot: { width: 0.72 } },
-  inbox:          { fruit: "carambola", texture: "washiPaper", shot: { width: 0.92 } },
-  dates:          { fruit: "persimmon", texture: "ridges", shot: { appearance: "dark", width: 0.72 } },
+  "agent-result": { fruit: "jabuticaba", texture: "stippleDrift" },
+  inbox:          { fruit: "carambola", texture: "washiPaper" },
+  dates:          { fruit: "persimmon", texture: "ridges", shot: { appearance: "dark" } },
   looks:          {
-    // Dark, colourful and light: the three looks of the scene, in their own accents.
+    // Colourful in front; dark and light behind, smaller, on the same top line.
     fruit: "tamarillo", texture: "fieldMatrix",
-    shot: { src: "looks/2", appearance: "light", accent: null, width: 0.6, gap: 150 },
+    shot: { src: "looks/2", appearance: "light", accent: null },
     shots: [
-      { src: "looks/1", appearance: "dark", accent: null, width: 0.54, offsetX: -0.31, gap: 60 },
-      { src: "looks/0", appearance: "light", accent: null, width: 0.54, offsetX: 0.31, gap: 60 },
+      { src: "looks/1", appearance: "dark", accent: null, width: 0.56, offsetX: -0.27, alignTop: true },
+      { src: "looks/0", appearance: "light", accent: null, width: 0.56, offsetX: 0.27, alignTop: true },
     ],
   },
 };
@@ -74,17 +76,16 @@ const iphone = rows.map((row, i) => {
     // one-sentence sub (docs/APPSTORE-SEPTASK.md, ## Screenshots).
     sub: row.sub || undefined,
     align: "center",
-    headlineSize: i === 0 ? 200 : 140,
+    headlineSize: i === 0 ? 190 : 156,
     shot: {
       scene: row.scene,
       src: row.scene,
       callout: row.callout && row.callout !== "-" ? { element: row.callout, ...(v.callout ?? {}) } : null,
       // The phone starts below the text: the first panel's large title, or
       // the title and its sub on the others.
-      width: 0.78, offsetY: 0,
       accent: v.fruit ?? null,
       ...(v.shot ?? {}),
-      rotate: 0,
+      width: 0.68, offsetY: 0, rotate: 0,
     },
     shots: v.shots,
   };

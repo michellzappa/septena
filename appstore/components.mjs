@@ -96,7 +96,7 @@ function shot(s, device, tint) {
   const c = IPHONE.cutout;
   const island = f.island && !s.img ? `<div class="island" style="top:${Math.round((IPHONE.bezel + c.top) * k)}px; width:${Math.round(c.width * k)}px; height:${Math.round(c.height * k)}px;"></div>` : "";
   return `
-  <div class="shot-zone"${s.followText === false ? "" : ` data-follow-text="${s.gap ?? 80}"`} style="transform: translate(${Math.round((s.offsetX ?? 0) * 100)}%, ${Math.round((s.offsetY ?? 0) * 100)}%);">
+  <div class="shot-zone"${s.alignTop ? " data-align-top" : ""} style="bottom:${s.bottom ?? 110}px; transform: translate(${Math.round((s.offsetX ?? 0) * 100)}%, ${Math.round((s.offsetY ?? 0) * 100)}%);">
     <div class="shot-wrap" style="width:${w}px; transform: rotate(${s.rotate ?? 0}deg);">
       <div class="frame" style="width:${w}px; padding:${f.pad}px;${f.bezel ? ` background:${PHONE.case} center/100% 100% no-repeat; box-shadow:none; overflow:visible; filter:drop-shadow(0 ${Math.round(20 * k)}px ${Math.round(24 * k)}px rgb(0 0 0 / .28));` : ` border-radius:${f.radius}px;`}">
         ${screen}${island}
@@ -132,12 +132,20 @@ function callout(c, { w, pad, margin, tint }) {
 // Runs in the page after fonts load (render.mjs calls it): places each card
 // over its anchor, clamped inside the panel, and draws the connector.
 const LAYOUT_CALLOUTS = `window.__layoutCallouts = () => {
-  // Phones start a fixed gap below the title and sub, whatever their length,
-  // so a phone never covers text. offsetY then nudges from there.
+  // The main phone sits on the bottom margin (shot.bottom). Phones behind it
+  // (data-align-top) share its top line. A phone that reaches into the title
+  // marks the page, and render.mjs refuses it.
+  const zones = [...document.querySelectorAll(".shot-zone")];
+  const main = zones.find((z) => !("alignTop" in z.dataset));
+  for (const zone of zones) if (main && "alignTop" in zone.dataset) {
+    zone.style.top = main.offsetTop + "px"; zone.style.bottom = "auto";
+  }
   const text = document.querySelector(".panel > .top");
-  if (text) for (const zone of document.querySelectorAll("[data-follow-text]")) {
-    zone.style.top = (text.offsetTop + text.offsetHeight + (+zone.dataset.followText)) + "px";
-    zone.style.bottom = "auto";
+  const phone = main?.querySelector(".frame");
+  if (text && phone) {
+    const textBottom = text.offsetTop + text.offsetHeight;
+    const phoneTop = main.offsetTop + phone.offsetTop;
+    if (phoneTop < textBottom + 24) document.documentElement.dataset.overlap = String(textBottom + 24 - phoneTop);
   }
   for (const card of document.querySelectorAll("[data-callout]")) {
     const d = card.dataset, cy = +d.cy;
@@ -299,7 +307,7 @@ function portrait(panel, device, tint) {
     ${panel.sub ? `<p class="sub" style="${panel.align === "center" ? "margin-left:auto;margin-right:auto;" : ""}">${rich(panel.sub)}</p>` : ""}
   </div>
   <style>
-    .shot-zone { position:absolute; left:0; right:0; bottom:-90px; display:flex; justify-content:center; }
+    .shot-zone { position:absolute; left:0; right:0; display:flex; justify-content:center; }
     .founder { position:absolute; left:50%; top:46%; transform:translateX(-50%); width:1020px; }
   </style>
   ${(panel.shots ?? []).map((s) => shot(s, device, tint)).join("")}

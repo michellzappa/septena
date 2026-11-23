@@ -210,10 +210,9 @@ reads this table; `appstore/validate.mjs` checks it.
   Callout text is never written by hand.
 - `title` is at most 28 characters, without the `*` marks. Each panel shows
   one shipped feature, and the title names that feature plainly.
-- `sub` is one sentence under the title that says how the feature works, at
-  most 90 characters. The first panel has no `sub`: its title stands alone,
-  larger (experiment 2026-11-23, after Heliophilia's listing; it replaces the
-  2026-11-22 rule of one level of title). Say "your agent", never a vendor: Septena works
+- The title is the only text on a panel; leave `sub` empty. Subtitles were
+  tried on 2026-11-23 and were too small to read in the store. The first
+  panel's title is larger than the others. Say "your agent", never a vendor: Septena works
   with any agent that speaks MCP.
 - No em or en dashes. Every title and sub passes the humanizer skill.
 - Panels next to each other must not look alike. `appstore/panels.septask.mjs`
@@ -226,12 +225,12 @@ reads this table; `appstore/validate.mjs` checks it.
 | slug | scene | callout | title | sub |
 | --- | --- | --- | --- | --- |
 | hook | today/0 | - | Tasks that think with you | |
-| thinking | thinking/1 | - | AI that asks before it acts | Tap Discuss, and Septena asks one short question first. |
-| agent-work | agents/2 | - | Your agents do the work | Hand a task to your agent, and it asks you when it needs a decision. |
-| agent-result | agents/3 | - | You decide when it’s done | Finished work waits in Review until you Accept it. |
-| inbox | capture/1 | - | Today is your call | New tasks wait in the Inbox until you put them on Today. |
-| dates | dates/2 | - | Plan the days ahead | Choose the day you start and the day it’s due. |
-| looks | looks/2 | - | Make it yours | Pick an accent colour and a texture for your lists. |
+| thinking | thinking/1 | - | AI that asks before it acts | |
+| agent-work | agents/2 | - | Your agents do the work | |
+| agent-result | agents/3 | - | You decide when it’s done | |
+| inbox | capture/1 | - | Today is your call | |
+| dates | dates/2 | - | Plan the days ahead | |
+| looks | looks/2 | - | Make it yours | |
 
 ---
 
