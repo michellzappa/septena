@@ -193,6 +193,12 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     list.onToggleInspector = { [weak self] in
       self?.setInspector(visible: inspectorItem.isCollapsed, focusTitle: true)
     }
+    // An inspector attribute row opens the same picker as the row menu and
+    // the composer pill for that attribute. The inspector shows the list's
+    // single selected row, so the picker acts on that row.
+    inspector.onOpenPicker = { [weak list] attributeId, anchor in
+      list?.openPicker(attribute: attributeId, anchor: anchor)
+    }
     // Escape inside the pane closes it — the inspector owns no chrome of its
     // own, so the shell that added the split item does the closing.
     inspector.onRequestClose = { [weak self] in
@@ -345,6 +351,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     }
     // ⌘K also ticks a selected Get started step; nothing else applies to one.
     if command == .toggleComplete { return list?.hasCompletableSelection ?? false }
+    // `task.open` acts on one row, like the row menu item.
+    if command == .open { return list?.hasSingleActionableSelection ?? false }
     return list?.hasActionableSelection ?? false
   }
 
@@ -382,6 +390,9 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     case .createNextCopy: list.createNextCopySelection()
     case .duplicate: list.duplicateSelection()
     case .move: list.presentMoveMenu()
+    // `task.open` runs the row menu's handler (#300): the full composer,
+    // the same as double-click and Return.
+    case .open: list.beginComposingSelectedRow()
     }
   }
 
@@ -389,6 +400,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     case toggleComplete, cancel, toggleToday, toggleStar, editTags, addChecklistItem, rename, when, deadline, reminder, clearSchedule, delete
     case duplicate, move, createNextCopy
     case repeatEditor
+    case open
   }
 
   required init?(coder: NSCoder) { fatalError("SeptaskKitWindowController is code-only") }

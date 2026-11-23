@@ -7,6 +7,12 @@ import SwiftData
 // notes live in the AppKit shell — the equivalent of the SwiftUI drawer
 // inspector, and the reason task detail doesn't need a sheet.
 //
+// The form is the task page (ADR 0029, docs/TASK_PAGE_SPEC.md): its sections
+// follow `RegistrySurfaces.taskPageBlocks(.page, …)`, one builder per block
+// kind, and its attribute rows follow `RegistrySurfaces.taskAttributes`. An
+// attribute row opens the same picker as the row menu and the composer pill
+// (`onOpenPicker` → `SeptaskKitTaskListController.openPicker`).
+//
 // Writes go through TaskMutator like every other surface. Edits commit on
 // blur and on selection change (`flushPendingEdits`), never on every
 // keystroke — a per-keystroke write would push a CloudKit change per letter.
@@ -21,23 +27,22 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let repeatButton = NSButton()
   private let starButton = NSButton()
   private let tagsButton = NSButton()
+  private let listButton = NSButton()
+  private let notesLabel = NSTextField(labelWithString: "")
+  private let notesScroll = NSScrollView()
   private let addChecklistButton = NSButton()
-  private let checklistLabel = NSTextField(labelWithString:
-    RegistrySurfaces.taskAttribute("checklist").label)
+  private let checklistLabel = NSTextField(labelWithString: "")
   private let checklistView = KitChecklistView()
   private let attachFileButton = NSButton()
-  private let attachmentsLabel = NSTextField(labelWithString:
-    RegistrySurfaces.taskAttribute("attachments").label)
+  private let attachmentsLabel = NSTextField(labelWithString: "")
   private let attachmentsView = KitAttachmentsView()
-  private let listLabel = NSTextField(labelWithString: "")
   private let placeholder = NSTextField(labelWithString: String(localized: "No Selection",
                                                                  comment: "SeptaskKit: inspector empty"))
   private let form = NSStackView()
   /// Task Conversations — the agent's work log for this row. Shown only when
   /// a conversation exists; a task with no agent history gets no header and no
   /// empty box (docs/SEPTASK_CONVERSATIONS_PLAN.md).
-  private let conversationLabel = NSTextField(labelWithString:
-    RegistrySurfaces.taskPageBlock(.conversation).label ?? "")
+  private let conversationLabel = NSTextField(labelWithString: "")
   private let conversationView = KitConversationView()
   /// Who changed the task and what (SeptaskKitHistory.swift). Loads only
   /// while open.
@@ -56,6 +61,22 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// same "leave notes" gesture the inline composer answers. The pane stays
   /// open; ⌘↩ is the notes exit, Escape is the pane's.
   var onRequestFocusList: (() -> Void)?
+  /// An attribute row asks for its picker: the attribute id and the row to
+  /// anchor to. The shell routes it to the task list, which opens the same
+  /// picker the row menu opens for that attribute's action.
+  var onOpenPicker: ((String, KitSurfaceAnchor) -> Void)?
+
+  /// The attribute rows the inspector shows, by registry attribute id. The
+  /// form places them in `RegistrySurfaces.taskAttributes` order.
+  private lazy var attributeButtons: [String: NSButton] = [
+    "when": whenButton, "deadline": deadlineButton, "reminder": reminderButton,
+    "repeat": repeatButton, "star": starButton, "list": listButton, "tags": tagsButton,
+  ]
+  /// Attribute rows in registry order, for the form and the key-view loop.
+  private var orderedAttributeButtons: [NSButton] = []
+  /// Width constraints of the views the blocks placed in the form. A block
+  /// the registry leaves out has no view in the form, so it gets none.
+  private var blockConstraints: [NSLayoutConstraint] = []
 
   private var task: SeptenaTask?
   /// What was loaded into the fields, so a commit can tell "the user changed
@@ -85,7 +106,6 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     titleField.delegate = self
     titleField.translatesAutoresizingMaskIntoConstraints = false
 
-    let notesScroll = NSScrollView()
     notesScroll.borderType = .noBorder
     notesScroll.hasVerticalScroller = true
     notesScroll.drawsBackground = false
@@ -101,16 +121,14 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       fontSize: SeptaskKitTheme.notesFontSize)
     notesScroll.documentView = notesView
 
-    let notesLabel = NSTextField(labelWithString: RegistrySurfaces.taskAttribute("notes").label)
-    notesLabel.font = SeptaskKitTheme.chip
-    notesLabel.textColor = SeptaskKitTheme.iconMuted
-
-    for (button, action) in [(whenButton, #selector(editWhen)),
-                             (deadlineButton, #selector(editDeadline)),
-                             (reminderButton, #selector(editReminder)),
-                             (starButton, #selector(toggleStar)),
-                             (tagsButton, #selector(editTags)),
-                             (addChecklistButton, #selector(addChecklistStep)),
+    for (id, button) in attributeButtons {
+      button.bezelStyle = .rounded
+      button.target = self
+      button.action = #selector(attributeRowClicked(_:))
+      button.alignment = .left
+      button.identifier = NSUserInterfaceItemIdentifier(id)
+    }
+    for (button, action) in [(addChecklistButton, #selector(addChecklistStep)),
                              (attachFileButton, #selector(attachFile))] {
       button.bezelStyle = .rounded
       button.target = self
@@ -119,75 +137,27 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     }
     addChecklistButton.title = String(localized: "Add Checklist…", comment: "SeptaskKit: inspector add checklist")
     attachFileButton.title = String(localized: "Attach File…", comment: "SeptaskKit: inspector attach file")
-    repeatButton.bezelStyle = .rounded
-    repeatButton.target = self
-    repeatButton.action = #selector(editRepeat)
-    repeatButton.alignment = .left
-    listLabel.font = SeptaskKitTheme.meta
-    listLabel.textColor = SeptaskKitTheme.inkSecondary
 
     form.orientation = .vertical
     form.alignment = .leading
     form.spacing = 8
     form.edgeInsets = NSEdgeInsets(top: 14, left: 14, bottom: 14, right: 14)
     form.translatesAutoresizingMaskIntoConstraints = false
-    form.addArrangedSubview(titleField)
-    form.addArrangedSubview(listLabel)
-    form.addArrangedSubview(whenButton)
-    form.addArrangedSubview(deadlineButton)
-    form.addArrangedSubview(reminderButton)
-    form.addArrangedSubview(repeatButton)
-    form.addArrangedSubview(starButton)
-    form.addArrangedSubview(tagsButton)
-    form.addArrangedSubview(addChecklistButton)
-    form.addArrangedSubview(attachFileButton)
-    form.addArrangedSubview(notesLabel)
-    form.addArrangedSubview(notesScroll)
-    checklistLabel.font = SeptaskKitTheme.chip
-    checklistLabel.textColor = SeptaskKitTheme.iconMuted
-    checklistView.translatesAutoresizingMaskIntoConstraints = false
-    checklistView.onLeave = { [weak self] delta in
-      guard let self, delta < 0 else { return }
-      self.view.window?.makeFirstResponder(self.notesView)
-      self.notesView.setSelectedRange(NSRange(location: (self.notesView.string as NSString).length, length: 0))
+    // The registry owns which sections show and their order. No section
+    // order is written here.
+    for block in RegistrySurfaces.taskPageBlocks(.page, on: RegistryPlatform.current) {
+      let last: NSView?
+      switch block.kind {
+      case .header: last = addHeaderBlock()
+      case .notes: last = addNotesBlock(block)
+      case .attributes: last = addAttributesBlock()
+      case .checklist: last = addChecklistBlock(block)
+      case .attachments: last = addAttachmentsBlock(block)
+      case .conversation: last = addConversationBlock(block)
+      case .history: last = addHistoryBlock()
+      }
+      if let last { form.setCustomSpacing(14, after: last) }
     }
-    checklistView.onChanged = { [weak self] in
-      guard let self else { return }
-      self.updateChecklistVisibility()
-      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-    }
-    form.addArrangedSubview(checklistLabel)
-    form.addArrangedSubview(checklistView)
-    attachmentsLabel.font = SeptaskKitTheme.chip
-    attachmentsLabel.textColor = SeptaskKitTheme.iconMuted
-    attachmentsView.translatesAutoresizingMaskIntoConstraints = false
-    attachmentsView.onChanged = { [weak self] in
-      guard let self else { return }
-      self.updateAttachmentsVisibility()
-      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-    }
-    form.addArrangedSubview(attachmentsLabel)
-    form.addArrangedSubview(attachmentsView)
-    conversationLabel.font = SeptaskKitTheme.chip
-    conversationLabel.textColor = SeptaskKitTheme.iconMuted
-    conversationView.translatesAutoresizingMaskIntoConstraints = false
-    // A reply appends a turn, which posts a task change; re-read so the new
-    // turn lands in the transcript the same way an agent turn would.
-    conversationView.onAppend = { [weak self] in self?.refresh() }
-    form.addArrangedSubview(conversationLabel)
-    form.addArrangedSubview(conversationView)
-    historyView.translatesAutoresizingMaskIntoConstraints = false
-    historyView.listTitle = { [weak self] id in
-      guard let self else { return nil }
-      let snapshot = StructureCache.snapshot(in: self.context)
-      return snapshot.projects.first { $0.id == id }?.title ?? snapshot.areas.first { $0.id == id }?.title
-    }
-    form.addArrangedSubview(historyView)
-    form.setCustomSpacing(14, after: attachFileButton)
-    form.setCustomSpacing(14, after: notesScroll)
-    form.setCustomSpacing(14, after: checklistView)
-    form.setCustomSpacing(14, after: attachmentsView)
-    form.setCustomSpacing(14, after: conversationView)
 
     placeholder.textColor = SeptaskKitTheme.iconMuted
     placeholder.translatesAutoresizingMaskIntoConstraints = false
@@ -252,36 +222,132 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
         hug.priority = .defaultLow
         return hug
       }(),
-      // -52, not the -28 the notes field uses: the title shares its band with
-      // the close button and must not run under it.
-      titleField.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -52),
       closeButton.topAnchor.constraint(equalTo: root.topAnchor, constant: 12),
       closeButton.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -12),
       closeButton.widthAnchor.constraint(equalToConstant: 20),
       closeButton.heightAnchor.constraint(equalToConstant: 20),
-      notesScroll.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
-      checklistView.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
-      attachmentsView.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
-      conversationView.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
-      historyView.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
-      notesScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 120),
       placeholder.centerXAnchor.constraint(equalTo: root.centerXAnchor),
       placeholder.centerYAnchor.constraint(equalTo: root.centerYAnchor),
-    ])
+    ] + blockConstraints)
     view = root
 
-    // Explicit keyboard order through the pane: title → notes → the date
-    // controls → back to the title. (The buttons join the loop only with
-    // Full Keyboard Access on — AppKit skips them otherwise.)
-    titleField.nextKeyView = notesView
-    notesView.nextKeyView = whenButton
-    whenButton.nextKeyView = deadlineButton
-    deadlineButton.nextKeyView = reminderButton
-    reminderButton.nextKeyView = repeatButton
-    repeatButton.nextKeyView = starButton
-    starButton.nextKeyView = tagsButton
-    tagsButton.nextKeyView = titleField
+    // Explicit keyboard order through the pane: title → notes → the
+    // attribute rows in registry order → back to the title. (The buttons
+    // join the loop only with Full Keyboard Access on — AppKit skips them
+    // otherwise.)
+    let loop: [NSView] = [titleField, notesView] + orderedAttributeButtons
+    for (index, view) in loop.enumerated() {
+      view.nextKeyView = loop[(index + 1) % loop.count]
+    }
     show(nil)
+  }
+
+  // MARK: - Blocks (one builder per `RegistryTaskPageBlockKind`)
+
+  /// Each builder adds its block's views to the form and returns the last
+  /// one, which gets the space between sections.
+
+  /// A section heading in the pane's chip style. The text is the block's
+  /// registry `label`.
+  private func styleHeading(_ label: NSTextField, _ block: RegistryTaskPageBlock) {
+    label.stringValue = block.label ?? ""
+    label.font = SeptaskKitTheme.chip
+    label.textColor = SeptaskKitTheme.iconMuted
+  }
+
+  /// Full pane width less the form's insets.
+  private func fillWidth(_ view: NSView, inset: CGFloat = -28) {
+    blockConstraints.append(view.widthAnchor.constraint(equalTo: form.widthAnchor, constant: inset))
+  }
+
+  private func addHeaderBlock() -> NSView {
+    form.addArrangedSubview(titleField)
+    // -52, not the -28 the notes field uses: the title shares its band with
+    // the close button and must not run under it.
+    fillWidth(titleField, inset: -52)
+    return titleField
+  }
+
+  private func addNotesBlock(_ block: RegistryTaskPageBlock) -> NSView {
+    styleHeading(notesLabel, block)
+    form.addArrangedSubview(notesLabel)
+    form.addArrangedSubview(notesScroll)
+    fillWidth(notesScroll)
+    blockConstraints.append(notesScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 120))
+    return notesScroll
+  }
+
+  /// The attribute rows in `RegistrySurfaces.taskAttributes` order, limited
+  /// to the attributes this pane has a row for and that ship on this
+  /// platform.
+  private func addAttributesBlock() -> NSView? {
+    orderedAttributeButtons = RegistrySurfaces.taskAttributes
+      .filter { $0.applies(to: RegistryPlatform.current) }
+      .compactMap { attributeButtons[$0.id] }
+    for button in orderedAttributeButtons { form.addArrangedSubview(button) }
+    return orderedAttributeButtons.last
+  }
+
+  private func addChecklistBlock(_ block: RegistryTaskPageBlock) -> NSView {
+    styleHeading(checklistLabel, block)
+    checklistView.translatesAutoresizingMaskIntoConstraints = false
+    checklistView.onLeave = { [weak self] delta in
+      guard let self, delta < 0 else { return }
+      self.view.window?.makeFirstResponder(self.notesView)
+      self.notesView.setSelectedRange(NSRange(location: (self.notesView.string as NSString).length, length: 0))
+    }
+    checklistView.onChanged = { [weak self] in
+      guard let self else { return }
+      self.updateChecklistVisibility()
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    }
+    // The heading shows when steps exist, the add button when none do.
+    form.addArrangedSubview(checklistLabel)
+    form.addArrangedSubview(addChecklistButton)
+    form.addArrangedSubview(checklistView)
+    fillWidth(checklistView)
+    return checklistView
+  }
+
+  private func addAttachmentsBlock(_ block: RegistryTaskPageBlock) -> NSView {
+    styleHeading(attachmentsLabel, block)
+    attachmentsView.translatesAutoresizingMaskIntoConstraints = false
+    attachmentsView.onChanged = { [weak self] in
+      guard let self else { return }
+      self.updateAttachmentsVisibility()
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    }
+    form.addArrangedSubview(attachmentsLabel)
+    form.addArrangedSubview(attachmentsView)
+    form.addArrangedSubview(attachFileButton)
+    fillWidth(attachmentsView)
+    return attachFileButton
+  }
+
+  private func addConversationBlock(_ block: RegistryTaskPageBlock) -> NSView {
+    styleHeading(conversationLabel, block)
+    conversationView.translatesAutoresizingMaskIntoConstraints = false
+    // A reply appends a turn, which posts a task change; re-read so the new
+    // turn lands in the transcript the same way an agent turn would.
+    conversationView.onAppend = { [weak self] in self?.refresh() }
+    form.addArrangedSubview(conversationLabel)
+    form.addArrangedSubview(conversationView)
+    fillWidth(conversationView)
+    return conversationView
+  }
+
+  /// History draws its own heading (the block label) on its disclosure
+  /// button, and loads only while open (`KitHistoryView`).
+  private func addHistoryBlock() -> NSView {
+    historyView.translatesAutoresizingMaskIntoConstraints = false
+    historyView.listTitle = { [weak self] id in
+      guard let self else { return nil }
+      let snapshot = StructureCache.snapshot(in: self.context)
+      return snapshot.projects.first { $0.id == id }?.title ?? snapshot.areas.first { $0.id == id }?.title
+    }
+    form.addArrangedSubview(historyView)
+    fillWidth(historyView)
+    return historyView
   }
 
   private var formScroll: NSScrollView?
@@ -455,7 +521,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       reminderButton.title = RegistryActions.alternateTitles["task.reminder"]?["addTitle"]
         ?? RegistrySurfaces.taskAttribute("reminder").label
     }
-    listLabel.stringValue = listDescription(for: next)
+    listButton.title = listDescription(for: next)
 
     let repeatValue = next.recurrence.map { rule in
       let paused = next.recurrencePaused
@@ -654,51 +720,21 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     }
   }
 
-  // MARK: - Dates
+  // MARK: - Attribute rows
 
-  @objc private func editTags() {
-    guard let current = task else { return }
-    SeptaskKitTagPopover.present(
-      taskIDs: [current.id],
-      relativeTo: tagsButton.bounds,
-      of: tagsButton
-    ) { [weak self] in
-      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-      self?.refresh()
+  /// An attribute row: Star toggles in place; every other row opens its
+  /// picker through the task list, the same path as the row menu and the
+  /// composer pill (ADR 0029).
+  @objc private func attributeRowClicked(_ sender: NSButton) {
+    guard task != nil, let id = sender.identifier?.rawValue else { return }
+    if id == "star" {
+      toggleStar()
+      return
     }
+    onOpenPicker?(id, .rect(sender.bounds, sender))
   }
 
-  @objc private func editRepeat() {
-    guard let current = task else { return }
-    SeptaskKitRepeatPopover.present(
-      selection: SeptaskKitRepeatSelection([current]),
-      relativeTo: repeatButton.bounds, of: repeatButton
-    ) { [weak self] result in
-      guard let self else { return }
-      let before = [TaskUndo.ScheduleSnapshot(current)]
-      if result.clears {
-        self.mutator.setRecurrence(id: current.id, recurrence: nil)
-      } else {
-        // Same patch overlay as the list's editor — one row is just a
-        // selection of one.
-        self.mutator.setRecurrence(id: current.id,
-                                   recurrence: result.applied(to: current.recurrence))
-        if result.paused ?? current.recurrencePaused {
-          self.mutator.setRecurrencePaused(id: current.id, paused: true)
-        }
-      }
-      TaskUndo.recordScheduleChange(
-        name: String(localized: "Change Repeat", comment: "SeptaskKit: undo action"),
-        before: before, context: self.context, mutator: self.mutator)
-      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-      self.refresh()
-    }
-  }
-
-  @objc private func editWhen() { presentPopover(kind: .when, from: whenButton) }
-  @objc private func editDeadline() { presentPopover(kind: .deadline, from: deadlineButton) }
-
-  @objc private func toggleStar() {
+  private func toggleStar() {
     guard let current = task else { return }
     let nextStarred = !current.starred
     let before = [TaskUndo.ScheduleSnapshot(current)]
@@ -734,79 +770,6 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     attachFileButton.title = count == 0
       ? String(localized: "Attach File…", comment: "SeptaskKit: inspector attach file")
       : String(localized: "Attach Another File…", comment: "SeptaskKit: inspector attach another file")
-  }
-
-  @objc private func editReminder() {
-    guard let current = task else { return }
-    SeptaskKitReminderPopover.present(
-      initial: current.reminder,
-      relativeTo: reminderButton.bounds,
-      of: reminderButton
-    ) { [weak self] reminder in
-      guard let self else { return }
-      let before = [TaskUndo.ScheduleSnapshot(current)]
-      self.mutator.setReminder(id: current.id, reminder: reminder)
-      TaskUndo.recordScheduleChange(
-        name: String(localized: "Change Reminder", comment: "SeptaskKit: undo action"),
-        before: before, context: self.context, mutator: self.mutator)
-      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-      self.refresh()
-    }
-  }
-
-  private func presentPopover(kind: SeptaskKitDatePopover.Kind, from button: NSButton) {
-    guard let current = task else { return }
-    let initial: Date? = switch kind {
-    case .when: KitDayFormat.date(fromWire: current.scheduled)
-    case .deadline: KitDayFormat.date(fromWire: current.deadline)
-    }
-
-    SeptaskKitDatePopover.present(
-      kind: kind,
-      initial: initial,
-      initialStartTime: kind == .when ? current.startTime : nil,
-      initialDurationMinutes: kind == .when ? current.durationMinutes : nil,
-      relativeTo: button.bounds,
-      of: button,
-      onTimeSlotChange: kind == .when ? { [weak self] start, duration in
-        guard let self else { return }
-        let live = LocalCache.task(id: current.id, in: self.context) ?? current
-        let before = [TaskUndo.ScheduleSnapshot(live)]
-        self.mutator.apply(.setTimeSlot(startTime: start, durationMinutes: duration,
-                                        timeZone: nil), to: live.id)
-        TaskUndo.recordScheduleChange(
-          name: String(localized: "Change Time", comment: "SeptaskKit: undo action"),
-          before: before, context: self.context, mutator: self.mutator)
-        NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-        self.refresh()
-      } : nil
-    ) { [weak self] date, today in
-      guard let self else { return }
-      // Same shared stack as the list's own date popover — an inspector edit
-      // has to be as undoable as the ⌘S one, or ⌘Z means different things on
-      // two panes of one window.
-      let before = [TaskUndo.ScheduleSnapshot(current)]
-      switch kind {
-      // Field rules: `TaskDateActions` (spec §4 A1 / A2 / A5 / A7).
-      case .when:
-        if today {
-          self.mutator.apply(.putOnToday, to: current.id)
-        } else if let date {
-          self.mutator.apply(.scheduleFor(date), to: current.id)
-        } else {
-          self.mutator.apply(.clearWhenDate, to: current.id)
-        }
-      case .deadline:
-        self.mutator.apply(.setDeadline(date), to: current.id)
-      }
-      TaskUndo.recordScheduleChange(
-        name: kind == .when
-          ? String(localized: "Change When", comment: "SeptaskKit: undo action")
-          : String(localized: "Change Deadline", comment: "SeptaskKit: undo action"),
-        before: before, context: self.context, mutator: self.mutator)
-      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-      self.refresh()
-    }
   }
 }
 

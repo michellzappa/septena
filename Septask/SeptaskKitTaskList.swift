@@ -2265,6 +2265,8 @@ final class SeptaskKitTaskListController: NSViewController {
 
   /// Whether a row command has anything to act on — drives menu enablement.
   var hasActionableSelection: Bool { !actionableSelection.isEmpty }
+  /// Exactly one task row is selected: the inspector has one subject.
+  var hasSingleActionableSelection: Bool { actionableSelection.count == 1 }
 
   /// The selected Get started steps. They take Return (open), ⌘K (tick) and
   /// their own context menu; no task command sees them.
@@ -2934,14 +2936,15 @@ final class SeptaskKitTaskListController: NSViewController {
 
   // MARK: - Dates (⌘S When, ⌘⇧D Deadline, ⌘⇧. Clear)
 
-  /// Anchor a date popover to the focused row and apply the choice to the
-  /// whole actionable selection.
-  func presentDatePopover(kind: SeptaskKitDatePopover.Kind) {
+  /// Anchor a date popover to the focused row (or to `anchor`: a composer
+  /// pill or an inspector row) and apply the choice to the whole actionable
+  /// selection. The ONE When / Deadline picker path (ADR 0029).
+  func presentDatePopover(kind: SeptaskKitDatePopover.Kind, anchor: KitSurfaceAnchor? = nil) {
     commitComposerTextIfOpen()
     let selection = actionableSelection
     guard !selection.isEmpty, tableView.selectedRow >= 0 else { return }
+    guard case .rect(let anchorRect, let anchorView)? = anchor ?? selectedRowAnchor else { return }
 
-    let anchor = tableView.rect(ofRow: tableView.selectedRow)
     let initial: Date? = switch kind {
     case .when: KitDayFormat.date(fromWire: selection.first?.scheduled)
     case .deadline: KitDayFormat.date(fromWire: selection.first?.deadline)
@@ -2952,8 +2955,8 @@ final class SeptaskKitTaskListController: NSViewController {
       initial: initial,
       initialStartTime: kind == .when && selection.count == 1 ? selection[0].startTime : nil,
       initialDurationMinutes: kind == .when && selection.count == 1 ? selection[0].durationMinutes : nil,
-      relativeTo: anchor,
-      of: tableView,
+      relativeTo: anchorRect,
+      of: anchorView,
       onTimeSlotChange: kind == .when ? { [weak self] start, duration in
         guard let self else { return }
         let liveSel = selection.map { LocalCache.task(id: $0.id, in: self.context) ?? $0 }
@@ -2974,12 +2977,16 @@ final class SeptaskKitTaskListController: NSViewController {
       repeatTitle: kind == .when
         ? TaskRepeatLabel.title(Set(selection.map(\.recurrence)).count == 1 ? selection.first?.recurrence : nil)
         : nil,
-      onRepeat: kind == .when ? { [weak self] in self?.presentRecurrencePanel() } : nil
+      // The Repeat editor hangs off the same control as this picker.
+      onRepeat: kind == .when ? { [weak self] in self?.presentRecurrencePanel(anchor: anchor) } : nil
     ) { [weak self] date, today in
       guard let self else { return }
-      let before = selection.map(self.scheduleSnapshot)
+      // Read the rows again from the store: a time-slot change in the same
+      // popover can have moved them on since it opened.
+      let liveSel = selection.map { LocalCache.task(id: $0.id, in: self.context) ?? $0 }
+      let before = liveSel.map(self.scheduleSnapshot)
       var deferredTo: Date?
-      for task in selection {
+      for task in liveSel {
         switch kind {
         case .when:
           // Field rules: `TaskDateActions` (spec §4 A1 / A2 / A5).
@@ -3006,7 +3013,38 @@ final class SeptaskKitTaskListController: NSViewController {
           ? String(localized: "Change When", comment: "SeptaskKit: undo action")
           : String(localized: "Change Deadline", comment: "SeptaskKit: undo action"),
         before: before)
+      // The inspector shows the new date when it opened this picker.
+      self.onStoreChanged?()
     }
+  }
+
+  // MARK: - One picker per attribute (ADR 0029)
+
+  /// Open the picker for the action `actionId` (`RegistryActions.opensAttribute`)
+  /// on the current selection. The row menu, the Task menu, the composer
+  /// pills and the inspector rows all come here, so one attribute has one
+  /// picker with the same options from every entry point. `anchor` is the
+  /// control that asked; nil anchors to the selected row.
+  func openPicker(action actionId: String, anchor: KitSurfaceAnchor? = nil) {
+    switch actionId {
+    case "task.when": presentDatePopover(kind: .when, anchor: anchor)
+    case "task.deadline": presentDatePopover(kind: .deadline, anchor: anchor)
+    case "task.reminder": presentReminderPopover(anchor: anchor)
+    case "task.repeat": presentRecurrencePanel(anchor: anchor)
+    case "task.move": presentMoveMenu(anchor: anchor)
+    case "task.tags": presentTagPopover(anchor: anchor)
+    default: assertionFailure("no AppKit picker for \(actionId)")
+    }
+  }
+
+  /// Open the picker for the task attribute `attributeId` (a composer pill or
+  /// an inspector row). The registry names the action that owns the picker.
+  func openPicker(attribute attributeId: String, anchor: KitSurfaceAnchor?) {
+    guard let actionId = RegistryActions.action(opening: attributeId) else {
+      assertionFailure("attribute \(attributeId) has no picker")
+      return
+    }
+    openPicker(action: actionId, anchor: anchor)
   }
 
   /// "Deferred to …" for a new date after today, as the SwiftUI row menu says
@@ -3974,76 +4012,26 @@ final class SeptaskKitTaskListController: NSViewController {
         // ⌘T's own path, so the pill gets the same undo and promote cue.
         self.toggleTodaySelection()
 
+      // Every picker pill opens the picker the row menu opens for the same
+      // attribute (`openPicker`, ADR 0029). It acts on the current selection,
+      // which is this row: selecting it is how compose mode began.
       case .when(let anchor):
-        let liveTask = LocalCache.task(id: task.id, in: self.context) ?? task
-        SeptaskKitDatePopover.present(
-          kind: .when,
-          initial: KitDayFormat.date(fromWire: liveTask.scheduled),
-          initialStartTime: liveTask.startTime,
-          initialDurationMinutes: liveTask.durationMinutes,
-          relativeTo: anchor.bounds,
-          of: anchor,
-          onTimeSlotChange: { [weak self] start, duration in
-            guard let self else { return }
-            let current = LocalCache.task(id: task.id, in: self.context) ?? task
-            let before = [current].map(self.scheduleSnapshot)
-            self.mutator.apply(.setTimeSlot(startTime: start, durationMinutes: duration,
-                                            timeZone: nil), to: current.id)
-            self.refreshComposerRow(taskId: task.id)
-            self.reload()
-            self.recordScheduleUndo(
-              name: String(localized: "Change Time", comment: "SeptaskKit: undo action"),
-              before: before)
-            self.onStoreChanged?()
-          }
-        ) { [weak self] date, today in
-          guard let self else { return }
-          // Capture at the gesture (from the STORE: an earlier pill may have
-          // moved the captured `task` on), record after: the same undo step
-          // the ⌘S popover registers, so ⌘Z takes back a pill change too.
-          let current = LocalCache.task(id: task.id, in: self.context) ?? task
-          let before = [current].map(self.scheduleSnapshot)
-          // Same actions and fixed-repeat prompt as the ⌘S popover.
-          if today {
-            guard let mode = self.rescheduleMode(for: current,
-                                                 newDate: KitDayFormat.todayDate()) else { return }
-            self.mutator.apply(.putOnToday, to: task.id, mode: mode)
-          } else if let date {
-            guard let mode = self.rescheduleMode(for: current, newDate: date) else { return }
-            self.mutator.apply(.scheduleFor(date), to: task.id, mode: mode)
-            self.showDeferredToast(date)
-          } else {
-            self.mutator.apply(.clearWhenDate, to: task.id)
-          }
-          self.refreshComposerRow(taskId: task.id)
-          self.recordScheduleUndo(
-            name: String(localized: "Change When", comment: "SeptaskKit: undo action"),
-            before: before)
-        }
+        self.openPicker(attribute: "when", anchor: .rect(anchor.bounds, anchor))
+        self.refreshComposerRow(taskId: task.id)
 
       case .deadline(let anchor):
-        SeptaskKitDatePopover.present(kind: .deadline,
-                                      initial: KitDayFormat.date(fromWire: task.deadline),
-                                      relativeTo: anchor.bounds, of: anchor) { [weak self] date, _ in
-          guard let self else { return }
-          let before = [LocalCache.task(id: task.id, in: self.context) ?? task]
-            .map(self.scheduleSnapshot)
-          self.mutator.apply(.setDeadline(date), to: task.id)
-          self.refreshComposerRow(taskId: task.id)
-          self.recordScheduleUndo(
-            name: String(localized: "Change Deadline", comment: "SeptaskKit: undo action"),
-            before: before)
-        }
+        self.openPicker(attribute: "deadline", anchor: .rect(anchor.bounds, anchor))
+        self.refreshComposerRow(taskId: task.id)
 
       case .reminder(let anchor):
-        self.presentReminderPopover(anchor: .rect(anchor.bounds, anchor))
+        self.openPicker(attribute: "reminder", anchor: .rect(anchor.bounds, anchor))
         self.refreshComposerRow(taskId: task.id)
 
       case .toggleStar:
         self.toggleStarSelection()
 
       case .tags(let anchor):
-        self.presentTagPopover(anchor: .rect(anchor.bounds, anchor))
+        self.openPicker(attribute: "tags", anchor: .rect(anchor.bounds, anchor))
         self.refreshComposerRow(taskId: task.id)
 
       case .list(let anchor):
@@ -4051,11 +4039,11 @@ final class SeptaskKitTaskListController: NSViewController {
         // second to keep in sync — anchored to the pill the user clicked. It
         // acts on the current selection, which is this row (selecting it is
         // how compose mode began).
-        self.presentMoveMenu(anchor: .rect(anchor.bounds, anchor))
+        self.openPicker(attribute: "list", anchor: .rect(anchor.bounds, anchor))
         self.refreshComposerRow(taskId: task.id)
 
       case .repeatRule(let anchor):
-        self.presentRecurrencePanel(anchor: .rect(anchor.bounds, anchor))
+        self.openPicker(attribute: "repeat", anchor: .rect(anchor.bounds, anchor))
         self.refreshComposerRow(taskId: task.id)
       }
     }
@@ -4116,20 +4104,18 @@ final class SeptaskKitTaskListController: NSViewController {
         guard !selection.isEmpty else { return nil }
         let allStarred = selection.allSatisfy(\.starred)
         return .init(variant: allStarred ? .remove : .add) { self.toggleStarSelection() }
-      case "task.tags": return .init { self.presentTagPopover() }
-      case "task.when": return .init { self.presentDatePopover(kind: .when) }
-      case "task.deadline": return .init { self.presentDatePopover(kind: .deadline) }
+      case "task.tags", "task.when", "task.deadline": return .init { self.openPicker(action: id) }
       case "task.reminder":
         guard single != nil else { return nil }
-        return .init { self.presentReminderPopover() }
+        return .init { self.openPicker(action: id) }
       case "task.clearSchedule":
         guard selection.contains(where: { $0.isOnToday || $0.scheduled != nil || $0.deadline != nil })
         else { return nil }
         return .init { self.clearScheduleSelection() }
-      case "task.move": return .init { self.presentMoveMenu() }
+      case "task.move": return .init { self.openPicker(action: id) }
       case "task.repeat":
         guard single != nil else { return nil }
-        return .init { self.presentRecurrencePanel() }
+        return .init { self.openPicker(action: id) }
       case "task.pauseResumeRepeat":
         guard !selection.isEmpty, selection.allSatisfy({ $0.recurrence != nil }) else { return nil }
         let paused = selection.allSatisfy(\.recurrencePaused)

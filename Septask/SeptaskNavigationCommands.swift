@@ -177,6 +177,7 @@ private struct SeptaskTaskMenu: View {
   private static func kitCommand(for id: String) -> SeptaskKitWindowController.RowCommand? {
     switch id {
     case "task.editDetails": return .rename
+    case "task.open": return .open
     case "task.duplicate": return .duplicate
     case "task.toggleComplete": return .toggleComplete
     case "task.cancel": return .cancel
