@@ -87,6 +87,12 @@ struct TaskAttributeBar: View {
   @State private var showingList = false
   @State private var discussStarted: Bool
   @State private var discussWorking = false
+  /// The Checklist pill was tapped on a task with no steps yet. A task WITH
+  /// steps shows its checklist without this (same as the Mac composer).
+  @State private var checklistOpened = false
+  /// Bumped by the Checklist pill while the checklist already shows: the
+  /// panel appends a step and focuses it (Mac `appendItemAndFocus`).
+  @State private var checklistAddRequest = 0
 
   init(draft: Binding<TaskDraft>, areas: [Area], projects: [Project], accent: Color,
        neutral: Bool = false, focus: FocusState<TaskEditFocus?>.Binding,
@@ -105,13 +111,21 @@ struct TaskAttributeBar: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
+    let edit = discussTask.map(EditOnlyState.init(task:))
+    return VStack(alignment: .leading, spacing: 10) {
+      // Steps sit open under the notes whenever the task has any, so opening a
+      // task shows its checklist without a tap. The pill only starts one.
+      if let task = discussTask, checklistOpened || (edit?.stepsTotal ?? 0) > 0 {
+        TaskChecklistPanel(taskID: task.id, accent: accent, fill: panelFill,
+                           addRequest: checklistAddRequest)
+          .transition(.opacity.combined(with: .move(edge: .top)))
+      }
+
       // Horizontal rail of icon + label capsules — scrolls sideways inside its
       // bounded slot so the rail never widens its card past the screen. "Today"
       // lives inside the When control rather than duplicating the rail.
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 8) {
-          let edit = discussTask.map(EditOnlyState.init(task:))
           ForEach(Attribute.rail) { attr in
             if shows(attr) {
               AttributePill(icon: attr.icon, label: attr.label,
@@ -257,13 +271,10 @@ struct TaskAttributeBar: View {
         if let task = discussTask {
           TaskTagsPanel(taskID: task.id, accent: accent, fill: panelFill)
         }
-      case .checklist:
-        if let task = discussTask {
-          TaskChecklistPanel(taskID: task.id, accent: accent, fill: panelFill)
-        }
       case .attachments:
         if let task = discussTask { TaskAttachmentsPanel(taskID: task.id) }
-      case .discuss, .star, .list, .none: EmptyView()
+      // The checklist is not a pill panel: it renders above the rail.
+      case .discuss, .star, .list, .checklist, .none: EmptyView()
       }
     }
     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -281,6 +292,17 @@ struct TaskAttributeBar: View {
       focus = .pill(.star)
       Haptics.tick()
       a11yAnimate(.snappy(duration: 0.18)) { draft.starred.toggle() }
+      return
+    }
+    // Checklist: open it (the panel seeds a first blank step and focuses it),
+    // or, when it already shows, append a step and focus that.
+    if attr == .checklist {
+      let showing = checklistOpened
+        || discussTask.map { EditOnlyState(task: $0).stepsTotal > 0 } == true
+      a11yAnimate(.snappy(duration: 0.22)) {
+        expanded = nil
+        if showing { checklistAddRequest += 1 } else { checklistOpened = true }
+      }
       return
     }
     // Move the keyboard cursor onto the pill (also drops the title field's
@@ -1029,13 +1051,16 @@ private struct InlineRepeatPanel: View {
 // MARK: - Inline Checklist panel
 
 /// Progressive-disclosure inline checklist editor inside the SwiftUI task editor
-/// (iOS/iPadOS & SwiftUI Mac sheet). Stays quiet until opened; supports inline
-/// add, Return-to-insert-below, multi-line paste split, reorder, and delete with
+/// (iOS/iPadOS & SwiftUI Mac sheet). Shows whenever the task has steps, and
+/// opens from the Checklist pill when it has none; supports inline add,
+/// Return-to-insert-below, multi-line paste split, reorder, and delete with
 /// shared `TaskUndo` recording.
 private struct TaskChecklistPanel: View {
   let taskID: String
   let accent: Color
   let fill: Color
+  /// Each change appends a step and focuses it (the Checklist pill).
+  var addRequest: Int = 0
 
   @State private var items: [ChecklistItem] = []
   @State private var drafts: [String: String] = [:]
@@ -1072,6 +1097,7 @@ private struct TaskChecklistPanel: View {
       reload()
       if items.isEmpty { addStep() }
     }
+    .onChange(of: addRequest) { _, _ in addStep() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
       reload()
     }
