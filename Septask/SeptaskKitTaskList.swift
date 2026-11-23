@@ -288,6 +288,9 @@ final class SeptaskKitTaskListController: NSViewController {
   /// A refresh landed — anything showing this data should re-read.
   var onStoreChanged: (() -> Void)?
   var onToggleInspector: (() -> Void)?
+  /// Open (`task.open`): show the inspector pane for the selection and never
+  /// close it. On the Mac the task page is the inspector (ADR 0029).
+  var onOpenInspector: (() -> Void)?
   var onQuickFind: (() -> Void)?
   /// Jump to another destination — a grouped Today/Anytime area or project
   /// header was clicked, or the title dropdown picked a list. Carries a
@@ -4068,11 +4071,7 @@ final class SeptaskKitTaskListController: NSViewController {
       // inspector follows the selection, so an open pane needs no toggle.
       case "task.open":
         guard single != nil else { return nil }
-        return .init {
-          if !UserDefaults.standard.bool(forKey: SettingsKey.septaskInspectorVisible) {
-            self.onToggleInspector?()
-          }
-        }
+        return .init { self.onOpenInspector?() }
       case "task.share":
         guard !selection.isEmpty else { return nil }
         return .init { self.shareSelection() }

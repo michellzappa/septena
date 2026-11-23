@@ -50,8 +50,8 @@ It replaces the two old submenus, Move and Move to Section.
 
 Open opens the task page (ADR 0029, `docs/TASK_PAGE_SPEC.md`), never the
 inline editor: a row tap is inline, Open is the page. On the Mac it shows
-the inspector pane. Until the SwiftUI page lands (#303), Open on iPhone and
-iPad still expands the row inline.
+the inspector pane. On iPhone it pushes the page; on iPad it shows the
+docked inspector.
 
 Share… sends the task title, then its notes after a blank line, through the
 system share sheet. Several tasks share one title per line, the shape ⌘C

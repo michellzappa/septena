@@ -193,6 +193,9 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     list.onToggleInspector = { [weak self] in
       self?.setInspector(visible: inspectorItem.isCollapsed, focusTitle: true)
     }
+    list.onOpenInspector = { [weak self] in
+      self?.setInspector(visible: true, focusTitle: true)
+    }
     // An inspector attribute row opens the same picker as the row menu and
     // the composer pill for that attribute. The inspector shows the list's
     // single selected row, so the picker acts on that row.
@@ -390,9 +393,9 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     case .createNextCopy: list.createNextCopySelection()
     case .duplicate: list.duplicateSelection()
     case .move: list.presentMoveMenu()
-    // `task.open` runs the row menu's handler (#300): the full composer,
-    // the same as double-click and Return.
-    case .open: list.beginComposingSelectedRow()
+    // `task.open` shows the task page, which on the Mac is the inspector
+    // pane (ADR 0029). Double-click and Return keep the inline composer.
+    case .open: list.onOpenInspector?()
     }
   }
 
