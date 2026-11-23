@@ -623,16 +623,29 @@ struct TaskComposerCard: View {
   /// always visible (no Notes pill) with a quiet "Notes" placeholder when empty.
   /// Return inserts a newline here (it's prose), so — unlike the title — there's
   /// no Return-to-save; Tab still cycles focus.
+  @ViewBuilder
   private var notesField: some View {
-    TaskMarkdownNotesEditor(
+    let editor = TaskMarkdownNotesEditor(
       text: $draft.notes, focus: $focus,
-      onDone: presentation == .inline ? { saveAndCloseFromKeyboard() } : nil
+      onDone: presentation == .inline ? { saveAndCloseFromKeyboard() } : nil,
+      // The page shows notes as a visible text area: a taller box the whole
+      // of which takes a tap. The quick edit keeps the one-line field.
+      minHeight: pageDepth == .page ? 120 : 28
     )
-      // A little extra right margin so wrapped prose doesn't run to the card edge.
-      .padding(.trailing, 12)
       .onKeyPress(keys: [.tab]) { press in
         moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
       }
+    if pageDepth == .page {
+      editor
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Theme.secondaryGroupedBackground,
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(focusRing(visible: focus == .notes, cornerRadius: 18))
+    } else {
+      // A little extra right margin so wrapped prose doesn't run to the card edge.
+      editor.padding(.trailing, 12)
+    }
   }
 
   /// The shared keyboard focus ring drawn on whatever holds the cursor — a

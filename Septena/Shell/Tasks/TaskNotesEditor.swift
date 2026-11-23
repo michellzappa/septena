@@ -30,9 +30,11 @@ struct TaskMarkdownNotesEditor: View {
   /// the text view's own `inputAccessoryView`. Nil shows no bar. Ignored on
   /// macOS (no on-screen keyboard).
   var onDone: (() -> Void)? = nil
+  /// The smallest height of the field. The task page passes a taller value so
+  /// the notes read as a text area and the whole box takes a tap.
+  var minHeight: CGFloat = 28
   @State private var contentHeight: CGFloat = 28
 
-  private let minHeight: CGFloat = 28
   private let maxHeight: CGFloat = 360
 
   #if os(iOS)
@@ -131,10 +133,19 @@ private struct PlatformMarkdownNotesTextView: UIViewRepresentable {
       context.coordinator.applyStyle(to: view)
     }
 
-    if isFocused, !view.isFirstResponder {
-      view.becomeFirstResponder()
-    } else if !isFocused, view.isFirstResponder {
-      view.resignFirstResponder()
+    // Act on a CHANGE of the requested focus only. Nothing in SwiftUI is
+    // `.focused(_, equals: .notes)`, so SwiftUI can drop `.notes` back to nil
+    // right after a tap begins editing. Resigning on that echo closed the
+    // keyboard as soon as it opened. A request that turns on raises the
+    // keyboard; one that turns off (another field took focus) lowers it.
+    let coordinator = context.coordinator
+    if isFocused != coordinator.lastRequestedFocus {
+      if isFocused, !view.isFirstResponder {
+        view.becomeFirstResponder()
+      } else if !isFocused, view.isFirstResponder, !coordinator.isEditing {
+        view.resignFirstResponder()
+      }
+      coordinator.lastRequestedFocus = isFocused
     }
 
     context.coordinator.updateHeight(for: view)
@@ -145,6 +156,10 @@ private struct PlatformMarkdownNotesTextView: UIViewRepresentable {
   final class Coordinator: NSObject, UITextViewDelegate {
     var parent: PlatformMarkdownNotesTextView
     var lastFontSize: CGFloat = 0
+    /// The last focus request seen in `updateUIView`.
+    var lastRequestedFocus = false
+    /// True while UIKit has the text view editing (a tap, not a request).
+    var isEditing = false
     private var applying = false
 
     init(parent: PlatformMarkdownNotesTextView) {
@@ -152,10 +167,14 @@ private struct PlatformMarkdownNotesTextView: UIViewRepresentable {
     }
 
     func textViewDidBeginEditing(_ textView: UITextView) {
+      isEditing = true
+      lastRequestedFocus = true
       parent.isFocused = true
     }
 
     func textViewDidEndEditing(_ textView: UITextView) {
+      isEditing = false
+      lastRequestedFocus = false
       parent.isFocused = false
     }
 

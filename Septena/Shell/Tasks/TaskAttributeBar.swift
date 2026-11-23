@@ -185,21 +185,21 @@ struct TaskAttributeBar: View {
 
   private func rowsBody(edit: EditOnlyState?) -> some View {
     VStack(alignment: .leading, spacing: 18) {
-      VStack(spacing: 0) {
-        let attrs = rowAttributes
-        ForEach(Array(attrs.enumerated()), id: \.element) { index, attr in
+      // Each attribute is its own card, so every one reads as its own place
+      // on the page rather than a line in a list.
+      VStack(spacing: 10) {
+        ForEach(rowAttributes) { attr in
           AttributeRow(icon: attr.icon, label: attr.label,
                        value: value(for: attr, edit: edit), isSet: isSet(attr, edit: edit),
                        opensPicker: attr.presentsSheet,
                        isLoading: attr == .discuss && discussWorking,
                        accent: accent) { select(attr) }
+            .background(Theme.secondaryGroupedBackground,
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .focused($focus, equals: .pill(attr))
             .disabled(attr == .discuss && discussWorking)
-          if index < attrs.count - 1 { Hairline(leadingInset: 44) }
         }
       }
-      .background(Theme.secondaryGroupedBackground,
-                  in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
       if showsChecklist, let task = discussTask {
         pageSection(.checklist) {
