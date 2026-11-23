@@ -177,7 +177,14 @@ pub mod enums {
         pub const STIPPLE_DRIFT: &str = "stippleDrift";
         pub const RIDGES: &str = "ridges";
         pub const WASHI_PAPER: &str = "washiPaper";
-        pub const ALL: &[&str] = &["none", "topography", "fieldMatrix", "stippleDrift", "ridges", "washiPaper"];
+        pub const ALL: &[&str] = &[
+            "none",
+            "topography",
+            "fieldMatrix",
+            "stippleDrift",
+            "ridges",
+            "washiPaper",
+        ];
     }
     pub mod texture_motion {
         pub const STILL: &str = "still";

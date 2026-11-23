@@ -2060,8 +2060,11 @@ function generateRustCore(bundle) {
       lines.push(`        pub const ${name}: &str = ${rustStr(value)};`);
     }
     // rustfmt style (core/rustfmt.toml, max_width 120): core.yml checks it.
-    const all = `        pub const ALL: &[&str] = &[${values.map(rustStr).join(", ")}];`;
-    if (all.length <= 120) lines.push(all);
+    // rustfmt also breaks an array literal wider than `array_width` (60% of
+    // max_width = 72) even when the whole line fits.
+    const array = `[${values.map(rustStr).join(", ")}]`;
+    const all = `        pub const ALL: &[&str] = &${array};`;
+    if (all.length <= 120 && array.length <= 72) lines.push(all);
     else {
       lines.push("        pub const ALL: &[&str] = &[");
       for (const value of values) lines.push(`            ${rustStr(value)},`);
