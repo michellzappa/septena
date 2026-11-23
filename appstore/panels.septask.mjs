@@ -47,9 +47,9 @@ const VISUAL = {
   // the left. All upright. The iPad joins when septena-site#17 adds its layout.
   devices:        {
     fruit: null, texture: "topography",
-    shot: { width: 0.36, offsetX: 0.24, top: 1540, accent: "tamarillo" },
-    shots: [{ src: "today/0", layout: "mac", frame: "laptop", accent: "tamarillo", width: 0.9, top: 980 }],
-    watch: { src: "today/0", from: "tamarillo", accent: "#FF5C67", left: 140, top: 1880, width: 300 },
+    shot: { width: 0.42, offsetX: 0.22, top: 1440, accent: "tamarillo" },
+    shots: [{ src: "today/0", layout: "mac", frame: "laptop", accent: "tamarillo", width: 1.02, top: 860 }],
+    watch: { src: "today/0", from: "tamarillo", accent: "#FF5C67", left: 120, top: 1960, width: 300 },
   },
   thinking:       { fruit: "yuzu", texture: "fieldMatrix" },
   // Agent faces (the site's avatar crew, in our fruit colours) sit on the

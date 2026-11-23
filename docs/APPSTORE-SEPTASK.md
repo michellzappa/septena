@@ -231,7 +231,7 @@ reads this table; `appstore/validate.mjs` checks it.
 | agent-result | agents/3 | - | You decide when it’s done. Finished work waits in Review until you accept it. | |
 | inbox | capture/1 | - | You choose your day. New tasks wait in the Inbox until you put them on Today. | |
 | dates | dates/2 | - | See the week ahead. Every task can have a day to start and a deadline. | |
-| devices | today/0 | - | iPhone, iPad, Mac and Watch | |
+| devices | today/0 | - | One list, every device. iPhone, iPad, Mac and Apple Watch. | |
 | looks | looks/2 | - | Make it yours. Pick an accent colour and a texture for your lists. | |
 
 ---

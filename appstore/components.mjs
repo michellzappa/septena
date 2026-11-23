@@ -180,7 +180,8 @@ function watch(w) {
   const width = w.width ?? 300, h = Math.round(width * 1.22), r = Math.round(width * 0.27);
   const ui = String(theme.fonts.ui).replace(/"/g, "'"); // inside style="…" attributes
   const rows = w.rows.map((t) => `<div style="display:flex; align-items:center; gap:${Math.round(width * 0.05)}px; padding:${Math.round(width * 0.035)}px ${Math.round(width * 0.05)}px; background:#1c1c1e; border-radius:${Math.round(width * 0.07)}px; margin-top:${Math.round(width * 0.03)}px;"><span style="flex:none; width:${Math.round(width * 0.08)}px; height:${Math.round(width * 0.08)}px; border:${Math.max(2, Math.round(width * 0.012))}px solid #8e8e93; border-radius:50%;"></span><span style="font:600 ${Math.round(width * 0.08)}px/1.15 ${ui}; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(t)}</span></div>`).join("");
-  const band = (top) => `<div style="position:absolute; left:${Math.round(width * 0.18)}px; right:${Math.round(width * 0.18)}px; ${top ? "bottom:100%" : "top:100%"}; height:${Math.round(h * 0.42)}px; background:linear-gradient(${top ? "0deg" : "180deg"}, #2c2c2e, #1c1c1e); border-radius:${top ? "30px 30px 0 0" : "0 0 30px 30px"};"></div>`;
+  // Short straps that fade out, so the watch face carries the picture.
+  const band = (top) => `<div style="position:absolute; left:${Math.round(width * 0.18)}px; right:${Math.round(width * 0.18)}px; ${top ? "bottom:100%" : "top:100%"}; height:${Math.round(h * 0.26)}px; background:linear-gradient(${top ? "0deg" : "180deg"}, #2c2c2e, rgb(44 44 46 / 0));"></div>`;
   return `
   <div style="position:absolute; z-index:4; left:${w.left}px; top:${w.top}px; width:${width}px; height:${h}px;">
     ${band(true)}${band(false)}
