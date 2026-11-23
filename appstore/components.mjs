@@ -164,6 +164,23 @@ function linkedEdge(tint) {
     : "box-shadow:0 50px 100px rgb(0 0 0 / .28);";
 }
 
+// ------------------------------------------------------------------ claims
+// A grid of short claims, each with a symbol, for a panel that states facts
+// instead of showing a screen (the "open" panel). Two columns of white tiles.
+function claims(list, tint) {
+  if (!list?.length) return "";
+  const ui = String(theme.fonts.ui).replace(/"/g, "'");
+  const color = list.tint ?? tint;
+  const svg = (node) => `<svg width="132" height="132" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${node.map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).filter(([k]) => k !== "key").map(([k, v]) => `${k}="${esc(String(v))}"`).join(" ")}/>`).join("")}</svg>`;
+  return `
+  <div style="position:absolute; z-index:3; left:110px; right:110px; top:${list.top ?? 880}px; display:grid; grid-template-columns:1fr 1fr; gap:44px;">
+    ${list.map((c) => `<div style="background:#fff; border-radius:56px; padding:64px 56px; min-height:440px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 40px 80px rgb(0 0 0 / .18);">
+      ${svg(c.node)}
+      <div style="font:700 64px/1.12 ${ui}; color:#141518; letter-spacing:-0.01em;">${esc(c.label)}</div>
+    </div>`).join("")}
+  </div>`;
+}
+
 // -------------------------------------------------------------- chat card
 // A message from your agent, as a floating card (not a phone screen, not a
 // vendor's app): your words, then the agent's reply next to its face (the
@@ -507,6 +524,7 @@ function portrait(panel, device, tint) {
   ${watch(panel.watch)}
   ${chat(panel.chat)}
   ${card(panel.card)}
+  ${claims(panel.claims, tint)}
   ${chips(panel.chips)}
   ${founder(panel.founder)}
   ${overlays(panel.overlays)}

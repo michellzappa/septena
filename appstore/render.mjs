@@ -12,7 +12,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, unlinkSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath , pathToFileURL} from "node:url";
 import { execFileSync } from "node:child_process";
 import { stripTypeScriptTypes } from "node:module";
 import { openChrome } from "./chrome.mjs";
@@ -233,6 +233,15 @@ for (const device of activeDevices()) {
         // screen (that screen's .elements.json), never typed by hand.
         // The card's words, from the screen's elements and the app registry.
         card: panel.card && resolveCard(device, panel),
+        // Claims with a Lucide symbol each (the icon set the app's registry maps
+        // to), drawn from the site's lucide-react package.
+        claims: panel.claims && await Promise.all(panel.claims.map(async (c) => {
+          const file = join(SITE, "node_modules", "lucide-react", "dist", "esm", "icons", `${c.icon}.mjs`);
+          if (!existsSync(file)) throw new Error(`${device.key}/${panel.id}: Lucide icon ${c.icon} is not in ${SITE}/node_modules/lucide-react`);
+          const { __iconNode } = await import(pathToFileURL(file).href);
+          if (!__iconNode) throw new Error(`${device.key}/${panel.id}: ${c.icon} is an alias in lucide-react; use the icon it points to`);
+          return { ...c, node: __iconNode };
+        })),
         chat: panel.chat && (() => {
           return { ...panel.chat, face: agentFace(panel.chat.tint) };
         })(),

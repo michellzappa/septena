@@ -57,7 +57,7 @@ const VISUAL = {
   thinking:       {
     fruit: "yuzu", texture: "fieldMatrix",
     shot: { ring: { element: "conversation" } },
-    card: { kind: "discussion", element: "conversation", top: 1800 },
+    card: { kind: "discussion", element: "conversation", top: 2060 },
   },
   // Slide 4: your agent works, and you hold the brakes. The working screen,
   // and a card with the agent's status, Stop, and the Pause all agents switch.
@@ -66,7 +66,7 @@ const VISUAL = {
     // The agent's side: you hand it the task, it says what it is doing. The
     // phone shows the task working, with the agent's status ringed.
     shot: { appearance: "light", ring: { element: "agent-status" } },
-    chat: { top: 1680, you: "Can you take the launch brief?", agent: "On it. I’m drafting it from the task’s notes and will ask if I need you." },
+    chat: { top: 2080, you: "Can you take the launch brief?", agent: "On it. I’m drafting it from the task’s notes and will ask if I need you." },
   },
   // Slide 5: agent work waits in Review until you accept it.
   "agent-result": {
@@ -85,14 +85,21 @@ const VISUAL = {
   // No other app is named on the panel (mz, 2026-11-23).
   "move-in":      {
     fruit: "tamarillo", texture: "topography",
-    shot: { appearance: "dark" },
-    card: { kind: "section", page: "import_export", section: "move_in", top: 1760 },
+    card: { kind: "section", page: "import_export", section: "move_in", top: 2160 },
   },
-  // Slide 8: yours, built in the open. The Privacy & Data page drawn from
-  // registry/settings.json; the ring marks where your data lives.
+  // Slide 8: yours, built in the open. No screen: one symbol per claim
+  // (mz, 2026-11-23). Every claim is in the store description (YOURS, BUILT
+  // IN THE OPEN) and the Privacy & Data page; icons are Lucide names.
   open:           {
     fruit: "haskap", texture: "ridges",
-    shot: { ring: { element: "setting-privacy_explainer" } },
+    claims: [
+      { icon: "code", label: "Open source" },
+      { icon: "scale", label: "MIT License" },
+      { icon: "user-x", label: "No account needed" },
+      { icon: "smartphone", label: "Stays on your device" },
+      { icon: "file-braces", label: "JSON backup anytime" },
+      { icon: "cpu", label: "On-device AI" },
+    ],
   },
   dates:          { fruit: "persimmon", texture: "ridges", shot: { appearance: "dark" } },
   looks:          {
@@ -154,6 +161,7 @@ const iphone = rows.map((row, i) => {
       width: v.shot?.width ?? 0.68, offsetY: 0, rotate: 0, // one size everywhere; the devices panel shares the frame with a Mac
     },
     shots: v.shots,
+    claims: v.claims,
     // The watch title in the fruit's dark-appearance colour (a watch face is dark).
     watch: v.watch && { ...v.watch, accent: tokens.fruitAccents.find((f) => f.id === v.watch.accentFruit)?.dark ?? (() => { throw new Error(`panels.septask.mjs: watch fruit ${v.watch.accentFruit} is not in registry/tokens.json`); })() },
     // Cards, chat and rings take the panel's fruit accent (registry), never a hand-typed hex.
