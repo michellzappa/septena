@@ -70,10 +70,11 @@ const VISUAL = {
     fruit: "jabuticaba", texture: "stippleDrift",
     card: { kind: "review", element: "task-review-brief", top: 1720 },
   },
-  // Slide 6: one Inbox. What you jot and what your agent adds land together.
-  inbox:          {
-    fruit: "carambola", texture: "washiPaper",
-    card: { kind: "list", title: "Inbox", elements: ["task-capture", "task-proposal", "task-inbox-note"], top: 1760 },
+  // Slide 6: the list that lets go (T4). The Faded list, and the weekly
+  // notice from the registry, counted from the screen.
+  "lets-go":      {
+    fruit: "pitaya", texture: "washiPaper",
+    card: { kind: "notice", notice: "weeklySweep", top: 1800 },
   },
   dates:          { fruit: "persimmon", texture: "ridges", shot: { appearance: "dark" } },
   looks:          {
@@ -112,7 +113,7 @@ const iphone = rows.map((row, i) => {
   return {
     id: row.slug,
     // No fruit: the app's light canvas with the texture in a soft grey.
-    background: v.background ?? { style: "texture", fill, tint, ...(fill ? {} : { accent: theme.inkSoft }), texture: textureId(v.texture ?? theme.app.textures[i % theme.app.textures.length]), seed: 42 + i, intensity: 70, fade: 1 },
+    background: v.background ?? { style: "texture", fill, tint, ...(fill ? {} : { accent: theme.inkSoft }), texture: textureId(v.texture ?? theme.app.textures[i % theme.app.textures.length]), seed: 42 + i, intensity: 70, fade: 0.5 },
     photo: v.photo,
     leadSize: v.leadSize,
     // splitTitle: the claim at the top, the rest of the title at the bottom.

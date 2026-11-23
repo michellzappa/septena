@@ -111,6 +111,14 @@ const withFaces = (s) => {
   }) };
 };
 
+// Notices the app shows, from registry/surfaces.json.
+const SURFACES = (() => {
+  const file = JSON.parse(readFileSync(join(ROOT, "..", "registry", "surfaces.json"), "utf8"));
+  const out = [];
+  const walk = (v) => { if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === "object") { if (v.id && v.title && v.kind) out.push(v); Object.values(v).forEach(walk); } };
+  walk(file);
+  return out;
+})();
 // "Pause all agents" and the like: labels the app shows, from registry/settings.json.
 const SETTINGS = JSON.parse(readFileSync(join(ROOT, "..", "registry", "settings.json"), "utf8"));
 const settingLabel = (key) => {
@@ -146,6 +154,14 @@ function resolveCard(device, panel) {
     const lines = el(c.element);
     const actions = lines.slice(-2);
     return { ...base, title: lines[0], subtitle: lines[1], artifact: lines.length > 4 ? lines[2] : null, actions: actions.map((label, i) => ({ label, kind: i === actions.length - 1 ? "primary" : "tinted" })) };
+  }
+  if (c.kind === "notice") {
+    // A registry notice (registry/surfaces.json), its count from the screen.
+    const n = SURFACES.find((x) => x.id === c.notice);
+    if (!n) throw new Error(`${device.key}/${panel.id}: notice ${c.notice} is not in registry/surfaces.json`);
+    const count = (m?.elements ?? []).filter((e) => e.id.startsWith("task-")).length;
+    const title = typeof n.title === "string" ? n.title : (count === 1 ? n.title.one : n.title.other).replace("{count}", String(count));
+    return { ...base, face: null, title, subtitle: n.detail, actions: n.primaryTitle ? [{ label: n.primaryTitle, kind: "primary" }] : [] };
   }
   if (c.kind === "list") {
     const rows = c.elements.map((id) => {

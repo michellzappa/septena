@@ -229,8 +229,7 @@ reads this table; `appstore/validate.mjs` checks it.
 | thinking | thinking/1 | - | Discuss any task. Septena asks what matters, and you answer with a tap. | |
 | agent-work | agents/1 | - | Hand it off, stop it anytime. Your agent works the task while you stay in charge. | |
 | agent-result | review/0 | - | You decide when it’s done. Agent work waits in Review until you accept it. | |
-| inbox | capture/1 | - | Get it out of your head. Jot it down or ask your agent: it all lands in one Inbox. | |
-| dates | dates/2 | - | See the week ahead. Every task can have a day to start and a deadline. | |
+| lets-go | faded/0 | - | The list that lets go. Old tasks fade, and each week Septena asks if you still want them. | |
 | devices | today/0 | - | One list, every device. iPhone, iPad, Mac and Apple Watch. | |
 | looks | looks/2 | - | Make it yours. Pick an accent colour and a texture for your lists. | |
 
