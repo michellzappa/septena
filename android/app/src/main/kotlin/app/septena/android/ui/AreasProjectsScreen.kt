@@ -31,9 +31,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.septena.android.AndroidAppGraph
+import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.stringValue
 import app.septena.core.generated.RegistryActionIds
+import app.septena.core.generated.RegistryPlacesScreenIds
+import app.septena.core.generated.RegistryPromptIds
+import app.septena.core.generated.RegistryTaskAttributeIds
 
 /** Detail content for an area or project. The shell owns navigation and routes callbacks to these details. */
 @Composable
@@ -83,7 +87,7 @@ fun AreasProjectsScreen(
                         value = notesDraft,
                         onValueChange = { notesDraft = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text(localized("Notes", languageTag)) },
+                        label = { Text(surfaceText(RegistryTaskAttributeIds.NOTES, "label", languageTag)) },
                         minLines = 2,
                     )
                 }
@@ -97,7 +101,7 @@ fun AreasProjectsScreen(
 
                 if (destination is AreasProjectsDestination.Area) {
                     item(key = "projects-heading") {
-                        Text(surfaceText("areaProjectsHeading", "label", languageTag))
+                        Text(surfaceText(RegistryPlacesScreenIds.AREA_PROJECTS_HEADING, "label", languageTag))
                     }
                     item(key = "new-project") {
                         Button(onClick = { dialog = PlacesDialog.CreateProject }) {
@@ -106,7 +110,7 @@ fun AreasProjectsScreen(
                     }
                     if (state.projects.isEmpty()) {
                         item(key = "projects-empty") {
-                            Text(surfaceText("emptyAreaProjects", "title", languageTag))
+                            Text(surfaceText(RegistryPlacesScreenIds.EMPTY_AREA_PROJECTS, "title", languageTag))
                         }
                     } else {
                         items(state.projects, key = { "project:${it.id}" }) { project ->
@@ -117,7 +121,7 @@ fun AreasProjectsScreen(
                         }
                     }
                     item(key = "area-tasks-heading") {
-                        Text(surfaceText("tasksHeading", "label", languageTag))
+                        Text(surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag))
                     }
                     item(key = "area-quick-add") {
                         QuickAddRow(
@@ -132,7 +136,7 @@ fun AreasProjectsScreen(
                     }
                     if (state.areaTasks.isEmpty()) {
                         item(key = "area-tasks-empty") {
-                            Text(surfaceText("emptyAreaTasks", "title", languageTag))
+                            Text(surfaceText(RegistryPlacesScreenIds.EMPTY_AREA_TASKS, "title", languageTag))
                         }
                     } else {
                         items(state.areaTasks, key = { "task:${it.id}" }) { task ->
@@ -143,7 +147,7 @@ fun AreasProjectsScreen(
 
                 if (destination is AreasProjectsDestination.Project) {
                     item(key = "sections-heading") {
-                        Text(surfaceText("sectionsHeading", "label", languageTag))
+                        Text(surfaceText(RegistryPlacesScreenIds.SECTIONS_HEADING, "label", languageTag))
                     }
                     item(key = "new-section") {
                         Button(onClick = { dialog = PlacesDialog.CreateSection }) {
@@ -151,7 +155,7 @@ fun AreasProjectsScreen(
                         }
                     }
                     item(key = "project-tasks-heading") {
-                        Text(surfaceText("tasksHeading", "label", languageTag))
+                        Text(surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag))
                     }
                     item(key = "project-quick-add") {
                         QuickAddRow(
@@ -166,7 +170,7 @@ fun AreasProjectsScreen(
                     }
                     if (state.unsectionedTasks.isEmpty() && state.sections.isEmpty()) {
                         item(key = "project-tasks-empty") {
-                            Text(surfaceText("emptyProjectTasks", "title", languageTag))
+                            Text(surfaceText(RegistryPlacesScreenIds.EMPTY_PROJECT_TASKS, "title", languageTag))
                         }
                     }
                     if (state.unsectionedTasks.isNotEmpty()) {
@@ -176,7 +180,7 @@ fun AreasProjectsScreen(
                     }
                     if (state.sections.isEmpty()) {
                         item(key = "project-sections-empty") {
-                            Text(surfaceText("emptyProjectSections", "title", languageTag))
+                            Text(surfaceText(RegistryPlacesScreenIds.EMPTY_PROJECT_SECTIONS, "title", languageTag))
                         }
                     } else {
                         items(state.sections, key = { "section:${it.id}" }) { section ->
@@ -203,10 +207,10 @@ fun AreasProjectsScreen(
     state.errorMessage?.let { message ->
         AlertDialog(
             onDismissRequest = viewModel::clearError,
-            title = { Text(localized("Error", languageTag)) },
+            title = { Text(errorPromptText("title", languageTag)) },
             text = { Text(RegistryCatalog.localizedString(message, languageTag) ?: message) },
             confirmButton = {
-                TextButton(onClick = viewModel::clearError) { Text(localized("OK", languageTag)) }
+                TextButton(onClick = viewModel::clearError) { Text(errorPromptText("confirmTitle", languageTag)) }
             },
         )
     }
@@ -214,13 +218,13 @@ fun AreasProjectsScreen(
     when (val active = dialog) {
         null -> Unit
         PlacesDialog.CreateProject -> TextEntryDialog(
-            promptId = "newProject",
+            promptId = RegistryPromptIds.NEW_PROJECT,
             languageTag = languageTag,
             onDismiss = { dialog = null },
             onConfirm = { viewModel.createProject(it); dialog = null },
         )
         PlacesDialog.CreateSection -> TextEntryDialog(
-            promptId = "newSection",
+            promptId = RegistryPromptIds.NEW_SECTION,
             languageTag = languageTag,
             onDismiss = { dialog = null },
             onConfirm = { viewModel.createSection(it); dialog = null },
@@ -233,7 +237,7 @@ fun AreasProjectsScreen(
             onConfirm = { viewModel.renameSelected(it); dialog = null },
         )
         is PlacesDialog.RenameSection -> TextEntryDialog(
-            promptId = "renameSection",
+            promptId = RegistryPromptIds.RENAME_SECTION,
             languageTag = languageTag,
             initialValue = active.title,
             onDismiss = { dialog = null },
@@ -296,7 +300,7 @@ private fun PlaceSectionBlock(
             }
         }
         if (section.tasks.isEmpty()) {
-            Text(surfaceText("emptySectionTasks", "title", languageTag), modifier = Modifier.padding(start = 12.dp))
+            Text(surfaceText(RegistryPlacesScreenIds.EMPTY_SECTION_TASKS, "title", languageTag), modifier = Modifier.padding(start = 12.dp))
         } else {
             section.tasks.forEach { task -> PlaceTaskItem(task, onOpenTask) }
         }
@@ -336,7 +340,7 @@ private fun TextEntryDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(localized("Cancel", languageTag)) }
+            TextButton(onClick = onDismiss) { Text(promptsText("cancelTitle", languageTag)) }
         },
     )
 }
@@ -347,7 +351,7 @@ private fun DeleteSectionDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    val copy = remember(languageTag) { surfacePrompt("deleteSection", languageTag) }
+    val copy = remember(languageTag) { surfacePrompt(RegistryPromptIds.DELETE_SECTION, languageTag) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(copy.title) },
@@ -356,7 +360,7 @@ private fun DeleteSectionDialog(
             TextButton(onClick = onConfirm) { Text(copy.confirmTitle) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(localized("Cancel", languageTag)) }
+            TextButton(onClick = onDismiss) { Text(promptsText("cancelTitle", languageTag)) }
         },
     )
 }
@@ -395,11 +399,21 @@ private fun surfaceText(id: String, field: String, languageTag: String): String 
     return value.registryLocalized(languageTag)
 }
 
+private val registryPrompts: JsonValue.ObjectValue?
+    get() = RegistryCatalog.document("surfaces").fields["prompts"] as? JsonValue.ObjectValue
+
+/** Shared prompt chrome (surfaces.json `prompts.cancelTitle`, ...), which has no ID of its own. */
+private fun promptsText(field: String, languageTag: String): String =
+    registryPrompts?.fields?.get(field).stringValue().registryLocalized(languageTag)
+
+/** The generic error alert copy (surfaces.json `prompts.error`). */
+private fun errorPromptText(field: String, languageTag: String): String {
+    val error = registryPrompts?.fields?.get("error") as? JsonValue.ObjectValue
+    return error?.fields?.get(field).stringValue().registryLocalized(languageTag)
+}
+
 private fun actionTitle(id: String, languageTag: String): String =
     RegistryCatalog.actionTitle(id, languageTag = languageTag).orEmpty()
-
-private fun localized(value: String, languageTag: String): String =
-    RegistryCatalog.localizedString(value, languageTag) ?: value
 
 private fun String?.registryLocalized(languageTag: String): String =
     this?.let { RegistryCatalog.localizedString(it, languageTag) ?: it }.orEmpty()
@@ -410,6 +424,6 @@ private fun AreasProjectsDestination.renameAction(): String = when (this) {
 }
 
 private fun AreasProjectsDestination.renamePrompt(): String = when (this) {
-    is AreasProjectsDestination.Area -> "renameArea"
-    is AreasProjectsDestination.Project -> "renameProject"
+    is AreasProjectsDestination.Area -> RegistryPromptIds.RENAME_AREA
+    is AreasProjectsDestination.Project -> RegistryPromptIds.RENAME_PROJECT
 }

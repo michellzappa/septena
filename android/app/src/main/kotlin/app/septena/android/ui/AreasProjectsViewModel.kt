@@ -10,6 +10,7 @@ import app.septena.core.TaskSnapshot
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
+import app.septena.core.generated.RegistryPlacesScreenIds
 import app.septena.core.stringValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -235,12 +236,12 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     private suspend fun requireHeading(id: String, projectId: String) {
         val heading = graph.taskStore.record(RegistryEntityNames.TASK, id)
-        require(heading != null && heading.deletedAt == null) { placeError("placeErrorSectionUnavailable") }
+        require(heading != null && heading.deletedAt == null) { placeError(RegistryPlacesScreenIds.PLACE_ERROR_SECTION_UNAVAILABLE) }
         require(heading.fields[RegistryEntityFields.Task.PROJECT].stringValue() == projectId) {
-            placeError("placeErrorSectionWrongProject")
+            placeError(RegistryPlacesScreenIds.PLACE_ERROR_SECTION_WRONG_PROJECT)
         }
         require(heading.fields[RegistryEntityFields.Task.KIND].stringValue() == RegistryEntityEnums.TaskKind.HEADING) {
-            placeError("placeErrorNotASection")
+            placeError(RegistryPlacesScreenIds.PLACE_ERROR_NOT_A_SECTION)
         }
     }
 

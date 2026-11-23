@@ -64,6 +64,7 @@ import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityLimits
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.generated.RegistryEntities
+import app.septena.core.generated.RegistryTaskDetail
 import app.septena.core.stringValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -438,7 +439,7 @@ fun TaskDetailScreen(
                         textIsDirty = true
                         saveFailed = false
                     },
-                    label = { Text(labels.field("title")) },
+                    label = { Text(labels.field(RegistryTaskDetail.Fields.TITLE)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     enabled = canEdit,
@@ -452,7 +453,7 @@ fun TaskDetailScreen(
                         textIsDirty = true
                         saveFailed = false
                     },
-                    label = { Text(labels.field("notes")) },
+                    label = { Text(labels.field(RegistryTaskDetail.Fields.NOTES)) },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3,
                     maxLines = 8,
@@ -466,7 +467,7 @@ fun TaskDetailScreen(
 
                 HorizontalDivider()
                 DateValueRow(
-                    label = labels.field("when"),
+                    label = labels.field(RegistryTaskDetail.Fields.WHEN),
                     value = whenValue,
                     selectLabel = labels.selectDate,
                     clearLabel = labels.clear,
@@ -475,7 +476,7 @@ fun TaskDetailScreen(
                     onClear = { setWhen(null) },
                 )
                 DateValueRow(
-                    label = labels.field("deadline"),
+                    label = labels.field(RegistryTaskDetail.Fields.DEADLINE),
                     value = deadline?.let { formatDay(it, languageTag) } ?: labels.noDate,
                     selectLabel = labels.selectDate,
                     clearLabel = labels.clear,
@@ -485,7 +486,7 @@ fun TaskDetailScreen(
                 )
 
                 SelectorRow(
-                    label = labels.field("area"),
+                    label = labels.field(RegistryTaskDetail.Fields.AREA),
                     value = selectedArea?.title ?: labels.noArea,
                     noneTitle = labels.noArea,
                     choices = data?.areas.orEmpty(),
@@ -493,7 +494,7 @@ fun TaskDetailScreen(
                     onSelect = ::chooseArea,
                 )
                 SelectorRow(
-                    label = labels.field("project"),
+                    label = labels.field(RegistryTaskDetail.Fields.PROJECT),
                     value = selectedProject?.title ?: labels.noProject,
                     noneTitle = labels.noProject,
                     choices = data?.projects.orEmpty(),
@@ -551,12 +552,12 @@ fun TaskDetailScreen(
                 )
 
                 HorizontalDivider()
-                Text(labels.field("checklist"), style = MaterialTheme.typography.titleMedium)
+                Text(labels.field(RegistryTaskDetail.Fields.CHECKLIST), style = MaterialTheme.typography.titleMedium)
                 data?.checklist.orEmpty().forEach { item ->
                     ChecklistRow(
                         item = item,
                         title = checklistDrafts[item.id] ?: item.title,
-                        emptyTitle = labels.field("checklistItem"),
+                        emptyTitle = labels.field(RegistryTaskDetail.Fields.CHECKLIST_ITEM),
                         toggleLabel = toggleChecklistAction,
                         deleteLabel = deleteChecklistAction,
                         enabled = canEdit,
@@ -610,7 +611,7 @@ fun TaskDetailScreen(
 
     if (showWhenPicker) {
         TaskDatePickerDialog(
-            label = labels.field("when"),
+            label = labels.field(RegistryTaskDetail.Fields.WHEN),
             selectLabel = labels.selectDate,
             clearLabel = labels.clear,
             initialDay = scheduled ?: if (isToday) graph.clock.today(graph.clock.now()).toString() else null,
@@ -622,7 +623,7 @@ fun TaskDetailScreen(
     }
     if (showDeadlinePicker) {
         TaskDatePickerDialog(
-            label = labels.field("deadline"),
+            label = labels.field(RegistryTaskDetail.Fields.DEADLINE),
             selectLabel = labels.selectDate,
             clearLabel = labels.clear,
             initialDay = deadline,
@@ -741,8 +742,8 @@ private fun RepeatEditor(
     val selectedOrdinal = ordinals.firstOrNull { it.value == ordinalWeekday?.first }
     val selectedWeekday = calendarWeekdays.firstOrNull { it.value == ordinalWeekday?.second }
     val selectedMonthDayTitle = when (monthDay) {
-        -1 -> labels.control("lastDay")
-        null -> labels.control("dayOfMonth")
+        -1 -> labels.control(RegistryTaskDetail.Controls.LAST_DAY)
+        null -> labels.control(RegistryTaskDetail.Controls.DAY_OF_MONTH)
         else -> monthDay.toString()
     }
 
@@ -754,7 +755,7 @@ private fun RepeatEditor(
 
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         ListItem(
-            headlineContent = { Text(labels.field("repeat")) },
+            headlineContent = { Text(labels.field(RegistryTaskDetail.Fields.REPEAT)) },
             trailingContent = {
                 Switch(
                     checked = selectedUnit != null,
@@ -777,7 +778,7 @@ private fun RepeatEditor(
                             value.toLongOrNull()?.takeIf { it in 1L..99L }?.let(onIntervalChange)
                         }
                     },
-                    label = { Text(labels.field("interval")) },
+                    label = { Text(labels.field(RegistryTaskDetail.Fields.INTERVAL)) },
                     enabled = enabled,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
@@ -802,7 +803,7 @@ private fun RepeatEditor(
                 }
             }
             ListItem(
-                headlineContent = { Text(labels.field("afterCompletion")) },
+                headlineContent = { Text(labels.field(RegistryTaskDetail.Fields.AFTER_COMPLETION)) },
                 trailingContent = {
                     Switch(
                         checked = !hasScheduledDate || afterCompletion,
@@ -815,7 +816,7 @@ private fun RepeatEditor(
                 selectedUnit in setOf(RegistryEntityEnums.RecurrenceUnit.WEEK, RegistryEntityEnums.RecurrenceUnit.MONTH, RegistryEntityEnums.RecurrenceUnit.YEAR)
             ) {
                 TextButton(onClick = { customOptionsOpen = !customOptionsOpen }, enabled = enabled) {
-                    Text(labels.control(if (customOptionsOpen) "hideCustomOptions" else "customOptions"))
+                    Text(labels.control(if (customOptionsOpen) RegistryTaskDetail.Controls.HIDE_CUSTOM_OPTIONS else RegistryTaskDetail.Controls.CUSTOM_OPTIONS))
                 }
                 if (customOptionsOpen && selectedUnit == RegistryEntityEnums.RecurrenceUnit.WEEK) {
                     Row(
@@ -837,13 +838,13 @@ private fun RepeatEditor(
                     FilterChip(
                         selected = selectedWeekdays == setOf(2, 3, 4, 5, 6),
                         onClick = { onWeekdaysChange(setOf(2, 3, 4, 5, 6)) },
-                        label = { Text(labels.control("weekdays")) },
+                        label = { Text(labels.control(RegistryTaskDetail.Controls.WEEKDAYS)) },
                         enabled = enabled,
                     )
                 }
                 if (customOptionsOpen && selectedUnit in setOf(RegistryEntityEnums.RecurrenceUnit.MONTH, RegistryEntityEnums.RecurrenceUnit.YEAR)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(labels.control("monthlyRule"))
+                        Text(labels.control(RegistryTaskDetail.Controls.MONTHLY_RULE))
                         Box {
                             TextButton(onClick = { monthRuleMenuOpen = true }, enabled = enabled) {
                                 Text(monthlyRules.firstOrNull { it.value == monthRule }?.title.orEmpty())
@@ -871,7 +872,7 @@ private fun RepeatEditor(
                                     )
                                 }
                                 DropdownMenuItem(
-                                    text = { Text(labels.control("lastDay")) },
+                                    text = { Text(labels.control(RegistryTaskDetail.Controls.LAST_DAY)) },
                                     onClick = { dayMenuOpen = false; onMonthDayChange(-1) },
                                 )
                             }
@@ -879,10 +880,10 @@ private fun RepeatEditor(
                     }
                     if (monthRule == "ordinal") {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(labels.control("onThe"))
+                            Text(labels.control(RegistryTaskDetail.Controls.ON_THE))
                             Box {
                                 TextButton(onClick = { ordinalMenuOpen = true }, enabled = enabled) {
-                                    Text(selectedOrdinal?.title ?: labels.control("ordinal"))
+                                    Text(selectedOrdinal?.title ?: labels.control(RegistryTaskDetail.Controls.ORDINAL))
                                 }
                                 DropdownMenu(expanded = ordinalMenuOpen, onDismissRequest = { ordinalMenuOpen = false }) {
                                     ordinals.forEach { ordinal ->
@@ -922,7 +923,7 @@ private fun RepeatEditor(
                 }
             }
             if (selectedUnit != null && !hasScheduledDate) {
-                Text(labels.control("noScheduleForFixed"), style = MaterialTheme.typography.bodySmall)
+                Text(labels.control(RegistryTaskDetail.Controls.NO_SCHEDULE_FOR_FIXED), style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -1038,7 +1039,7 @@ private data class TaskDetailLabels(
 
     companion object {
         fun fromRegistry(languageTag: String): TaskDetailLabels {
-            val detail = RegistryCatalog.surface("taskDetail")
+            val detail = RegistryCatalog.surface(RegistryTaskDetail.ID)
             val fields = (detail?.fields?.get("fields") as? JsonValue.ObjectValue)?.fields.orEmpty()
                 .mapNotNull { (id, raw) -> raw.stringValue()?.let { id to localize(it, languageTag) } }
                 .toMap()
@@ -1075,15 +1076,15 @@ private data class TaskDetailLabels(
                 }
             return TaskDetailLabels(
                 title = detail?.fields?.get("title")?.stringValue()?.let { localize(it, languageTag) }.orEmpty(),
-                back = controls["back"].orEmpty(),
-                cancel = controls["cancel"].orEmpty(),
-                saveError = controls["saveError"].orEmpty(),
-                taskUnavailable = controls["taskUnavailable"].orEmpty(),
-                noDate = controls["noDate"].orEmpty(),
-                noArea = controls["noArea"].orEmpty(),
-                noProject = controls["noProject"].orEmpty(),
-                clear = controls["clear"].orEmpty(),
-                selectDate = controls["selectDate"].orEmpty(),
+                back = controls[RegistryTaskDetail.Controls.BACK].orEmpty(),
+                cancel = controls[RegistryTaskDetail.Controls.CANCEL].orEmpty(),
+                saveError = controls[RegistryTaskDetail.Controls.SAVE_ERROR].orEmpty(),
+                taskUnavailable = controls[RegistryTaskDetail.Controls.TASK_UNAVAILABLE].orEmpty(),
+                noDate = controls[RegistryTaskDetail.Controls.NO_DATE].orEmpty(),
+                noArea = controls[RegistryTaskDetail.Controls.NO_AREA].orEmpty(),
+                noProject = controls[RegistryTaskDetail.Controls.NO_PROJECT].orEmpty(),
+                clear = controls[RegistryTaskDetail.Controls.CLEAR].orEmpty(),
+                selectDate = controls[RegistryTaskDetail.Controls.SELECT_DATE].orEmpty(),
                 repeatUnits = units,
                 weekdays = repeatChoices("weekdays", hasShortTitle = true),
                 calendarWeekdays = repeatChoices("calendarWeekdays"),

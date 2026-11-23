@@ -1644,6 +1644,116 @@ object RegistryPlatformIds {
     const val WATCHOS: String = "watchos"
 }
 
+/** Stable IDs generated from the canonical registry: RegistryNoticeIds. */
+object RegistryNoticeIds {
+    const val SIGN_IN: String = "signIn"
+    const val ROLLED_IN: String = "rolledIn"
+    const val GET_STARTED: String = "getStarted"
+    const val TRIAL_END: String = "trialEnd"
+    const val SECOND_DEVICE: String = "secondDevice"
+    const val WEEKLY_SWEEP: String = "weeklySweep"
+    const val FADED_PILE: String = "fadedPile"
+    const val FADE_INTRO: String = "fadeIntro"
+}
+
+/** Stable IDs generated from the canonical registry: RegistryPromptIds. */
+object RegistryPromptIds {
+    const val DELETE_PERMANENTLY: String = "deletePermanently"
+    const val DELETE_SECTION: String = "deleteSection"
+    const val DELETE_AREA: String = "deleteArea"
+    const val DELETE_PROJECT: String = "deleteProject"
+    const val CLEAR_LOGGED: String = "clearLogged"
+    const val DELETE_ACCOUNT: String = "deleteAccount"
+    const val RESCHEDULE_FIXED_REPEAT: String = "rescheduleFixedRepeat"
+    const val NEW_SECTION: String = "newSection"
+    const val RENAME_SECTION: String = "renameSection"
+    const val NEW_AREA: String = "newArea"
+    const val RENAME_AREA: String = "renameArea"
+    const val NEW_PROJECT: String = "newProject"
+    const val RENAME_PROJECT: String = "renameProject"
+}
+
+/** Stable IDs generated from the canonical registry: RegistryPlacesScreenIds. */
+object RegistryPlacesScreenIds {
+    const val AREA_PROJECTS_HEADING: String = "areaProjectsHeading"
+    const val TASKS_HEADING: String = "tasksHeading"
+    const val SECTIONS_HEADING: String = "sectionsHeading"
+    const val EMPTY_AREA_PROJECTS: String = "emptyAreaProjects"
+    const val EMPTY_AREA_TASKS: String = "emptyAreaTasks"
+    const val EMPTY_PROJECT_TASKS: String = "emptyProjectTasks"
+    const val EMPTY_PROJECT_SECTIONS: String = "emptyProjectSections"
+    const val EMPTY_SECTION_TASKS: String = "emptySectionTasks"
+    const val PLACE_ERROR_SECTION_UNAVAILABLE: String = "placeErrorSectionUnavailable"
+    const val PLACE_ERROR_SECTION_WRONG_PROJECT: String = "placeErrorSectionWrongProject"
+    const val PLACE_ERROR_NOT_A_SECTION: String = "placeErrorNotASection"
+}
+
+/** Stable IDs generated from the canonical registry: RegistryFirstRunStepIds. */
+object RegistryFirstRunStepIds {
+    const val WELCOME: String = "welcome"
+    const val ACCOUNT: String = "account"
+    const val CONNECT_CLAUDE: String = "connectClaude"
+    const val DONE: String = "done"
+}
+
+/** Stable IDs generated from the canonical registry: RegistryTaskAttributeIds. */
+object RegistryTaskAttributeIds {
+    const val NOTES: String = "notes"
+    const val WHEN: String = "when"
+    const val DEADLINE: String = "deadline"
+    const val REMINDER: String = "reminder"
+    const val REPEAT: String = "repeat"
+    const val STAR: String = "star"
+    const val LIST: String = "list"
+    const val TAGS: String = "tags"
+    const val CHECKLIST: String = "checklist"
+    const val ATTACHMENTS: String = "attachments"
+    const val DISCUSS: String = "discuss"
+    const val PASTE: String = "paste"
+}
+
+/** Task detail surface (surfaces.json `taskDetail`): its ID and the keys of its field and control labels. */
+object RegistryTaskDetail {
+    const val ID: String = "taskDetail"
+    object Fields {
+        const val TITLE: String = "title"
+        const val NOTES: String = "notes"
+        const val WHEN: String = "when"
+        const val DEADLINE: String = "deadline"
+        const val AREA: String = "area"
+        const val PROJECT: String = "project"
+        const val REPEAT: String = "repeat"
+        const val INTERVAL: String = "interval"
+        const val AFTER_COMPLETION: String = "afterCompletion"
+        const val CHECKLIST: String = "checklist"
+        const val CHECKLIST_ITEM: String = "checklistItem"
+    }
+    object Controls {
+        const val BACK: String = "back"
+        const val SAVE: String = "save"
+        const val SELECT_DATE: String = "selectDate"
+        const val NO_DATE: String = "noDate"
+        const val CLEAR: String = "clear"
+        const val CANCEL: String = "cancel"
+        const val NO_AREA: String = "noArea"
+        const val NO_PROJECT: String = "noProject"
+        const val ADD_CHECKLIST: String = "addChecklist"
+        const val CUSTOM_OPTIONS: String = "customOptions"
+        const val HIDE_CUSTOM_OPTIONS: String = "hideCustomOptions"
+        const val WEEKDAYS: String = "weekdays"
+        const val MONTHLY_RULE: String = "monthlyRule"
+        const val SAME_DAY: String = "sameDay"
+        const val ON_DAY: String = "onDay"
+        const val ORDINAL: String = "ordinal"
+        const val DAY_OF_MONTH: String = "dayOfMonth"
+        const val LAST_DAY: String = "lastDay"
+        const val ON_THE: String = "onThe"
+        const val NO_SCHEDULE_FOR_FIXED: String = "noScheduleForFixed"
+        const val SAVE_ERROR: String = "saveError"
+        const val TASK_UNAVAILABLE: String = "taskUnavailable"
+    }
+}
+
 /** Capability status by canonical feature ID and platform. */
 object RegistryCapabilities {
     val statusByFeatureAndPlatform: Map<String, Map<String, String>> = linkedMapOf(

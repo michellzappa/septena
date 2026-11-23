@@ -71,6 +71,17 @@ Generated outputs (checked in, never hand-edited):
   `TaskFilter.today.title`, `RegistryPrompts.textPrompt(id).title`, ...). Known
   leftovers are in `scripts/registry-literal-allowlist.json`, each with the
   issue that removes it.
+- **Kotlin (ADR 0028, #283).** The same rule scans the Android UI
+  (`android/app/src/main`, `android/ui/src`). A second rule,
+  `registry-id-literal`, fails on a Kotlin literal that equals an action,
+  destination or surface ID (IDs with a capital letter or a dot).
+  `RegistryCatalog` looks entries up at run time, so pass the generated
+  constant (`RegistryActionIds`, `RegistryDestinationIds`,
+  `RegistryPromptIds`, `RegistryPlacesScreenIds`, `RegistryNoticeIds`,
+  `RegistryFirstRunStepIds`, `RegistryTaskAttributeIds`,
+  `RegistryTaskDetail.Fields` / `.Controls`). A removed ID then fails the
+  Kotlin compile instead of showing an empty string. The generator fails when
+  one of these IDs is not unique in `surfaces.json`.
 
 ## Localized copy (ADR 0020)
 

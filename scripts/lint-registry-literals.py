@@ -9,6 +9,14 @@ literal in `Septena/Shell/` or `Septask/` whose text is exactly one of them.
 Read the generated value instead (`RegistryActions.title`, `RegistrySettings.
 label`, `RegistryPrompts.prompt`, ...).
 
+The Android UI (`android/app`, `android/ui`, ADR 0028, #283) gets the same
+check, plus `registry-id-literal`: a Kotlin literal that equals a registry
+action, destination or surface ID fails. `RegistryCatalog` looks these up at
+run time, so a literal ID that the registry renames compiles and shows an
+empty string. Pass the generated constant (`RegistryActionIds`,
+`RegistryDestinationIds`, `RegistryPromptIds`, `RegistryPlacesScreenIds`,
+`RegistryNoticeIds`, `RegistryTaskDetail`, ...).
+
 Exceptions:
   - `// septena-lint:allow registry-owned-literal` on the line, with the reason
     in a comment above (a string that only matches by accident).
@@ -25,7 +33,9 @@ import sys
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 DIRS = ["Septena/Shell", "Septask"]
+KOTLIN_DIRS = ["android/app/src/main", "android/ui/src"]
 RULE = "septena-lint:allow registry-owned-literal"
+ID_RULE = "septena-lint:allow registry-id-literal"
 # A plain literal: no interpolation, no escapes we would have to decode.
 LITERAL = re.compile(r'(?<![\\#])"((?:[^"\\\n]|\\["\\])*)"')
 # Copy short enough to collide with identifiers, keys and log text.
@@ -45,6 +55,65 @@ def registry_strings():
             if isinstance(s, str) and s not in CHROME and len(s) >= MIN_LEN and "%" not in s and "{" not in s and any(c.isupper() for c in s[:1]):
                 out.add(s)
     return out
+
+
+def registry_ids():
+    """Action, destination and surface IDs that a Kotlin UI must not spell out.
+
+    Only IDs with a capital letter or a dot: a plain word ("notes", "today")
+    also names JSON fields and enum values, so a literal of it proves nothing.
+    """
+    def load(name):
+        with open(os.path.join(ROOT, "registry", name), encoding="utf-8") as f:
+            return json.load(f)
+
+    ids = set(load("actions.json")["actions"].keys())
+    ids |= {d["id"] for d in load("destinations.json")["destinations"]}
+
+    def walk(v):
+        if isinstance(v, dict):
+            if isinstance(v.get("id"), str):
+                ids.add(v["id"])
+            for x in v.values():
+                walk(x)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x)
+
+    walk(load("surfaces.json"))
+    return {i for i in ids if "." in i or any(c.isupper() for c in i)}
+
+
+def scan(dirs, ext, check):
+    """Yield (rel, line_no, text) for each literal in `dirs` that `check` flags."""
+    for d in dirs:
+        for dirpath, dirnames, files in os.walk(os.path.join(ROOT, d)):
+            dirnames[:] = [x for x in dirnames if x not in ("generated", "build")]
+            for name in sorted(files):
+                if not name.endswith(ext):
+                    continue
+                full = os.path.join(dirpath, name)
+                rel = os.path.relpath(full, ROOT)
+                with open(full, encoding="utf-8") as f:
+                    in_block = False
+                    for n, raw in enumerate(f, 1):
+                        line = raw.rstrip("\n")
+                        s = line.strip()
+                        if in_block:
+                            if "*/" in s:
+                                in_block = False
+                            continue
+                        if s.startswith("/*"):
+                            in_block = "*/" not in s
+                            continue
+                        if s.startswith("//") or s.startswith("*"):
+                            continue
+                        if re.search(r'\b(Log\.|logger\.|print\(|println\(|os_log|assertionFailure|preconditionFailure|fatalError|error\()', line):
+                            continue
+                        for m in LITERAL.finditer(strip_comment(line)):
+                            text = m.group(1).replace('\\"', '"')
+                            if check(text, line):
+                                yield (rel, n, text)
 
 
 def allowlist():
@@ -73,34 +142,13 @@ def strip_comment(line):
 
 def main():
     owned = registry_strings()
-    hits = []
-    for d in DIRS:
-        for dirpath, _, files in os.walk(os.path.join(ROOT, d)):
-            for name in sorted(files):
-                if not name.endswith(".swift"):
-                    continue
-                full = os.path.join(dirpath, name)
-                rel = os.path.relpath(full, ROOT)
-                with open(full, encoding="utf-8") as f:
-                    in_block = False
-                    for n, raw in enumerate(f, 1):
-                        line = raw.rstrip("\n")
-                        s = line.strip()
-                        if in_block:
-                            if "*/" in s:
-                                in_block = False
-                            continue
-                        if s.startswith("/*"):
-                            in_block = "*/" not in s
-                            continue
-                        if s.startswith("//") or RULE in line:
-                            continue
-                        if re.search(r'\b(Log\.|logger\.|print\(|os_log|assertionFailure|preconditionFailure|fatalError)', line):
-                            continue
-                        for m in LITERAL.finditer(strip_comment(line)):
-                            text = m.group(1).replace('\\"', '"')
-                            if text in owned:
-                                hits.append((rel, n, text))
+    ids = registry_ids()
+    copy = lambda text, line: RULE not in line and text in owned
+    hits = list(scan(DIRS, ".swift", copy)) + list(scan(KOTLIN_DIRS, ".kt", copy))
+    id_hits = [
+        (rel, n, text)
+        for rel, n, text in scan(KOTLIN_DIRS, ".kt", lambda text, line: ID_RULE not in line and text in ids)
+    ]
 
     entries = allowlist()
     allowed = {(e["file"], e["literal"]) for e in entries}
@@ -117,6 +165,8 @@ def main():
     for e in entries:
         if (e["file"], e["literal"]) not in matched:
             problems.append(f'scripts/registry-literal-allowlist.json: {e["file"]} "{e["literal"]}" no longer appears; remove the entry')
+    for rel, n, text in id_hits:
+        problems.append(f'{rel}:{n}: registry-id-literal "{text}"')
     if "--all" in sys.argv:
         for rel, n, text in hits:
             print(f'{rel}:{n}: "{text}"')

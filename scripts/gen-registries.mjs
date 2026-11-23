@@ -1822,6 +1822,50 @@ function generateKotlinCore(bundle) {
   emitIdObject("RegistryIconIds", Object.keys(icons.icons));
   emitIdObject("RegistryPlatformIds", caps.platforms);
 
+  // Surface IDs (#283, ADR 0028). `RegistryCatalog.surface(id)` finds an
+  // object by its `id` anywhere in surfaces.json, so a UI that names these
+  // IDs must use the constants (a removed ID then fails to compile), and an
+  // emitted ID must match exactly one object in the document.
+  const { surfaces } = bundle;
+  const surfaceIdGroups = {
+    RegistryNoticeIds: surfaces.notices.items.map((n) => n.id),
+    RegistryPromptIds: [...surfaces.prompts.items, ...surfaces.prompts.text].map((p) => p.id),
+    RegistryPlacesScreenIds: ["labels", "emptyStates", "errors"]
+      .flatMap((k) => (surfaces.prompts.placesScreen[k] ?? []).map((x) => x.id)),
+    RegistryFirstRunStepIds: surfaces.firstRun.steps.map((s) => s.id),
+    RegistryTaskAttributeIds: surfaces.taskAttributes.map((a) => a.id),
+  };
+  const idCounts = new Map();
+  (function countIds(v) {
+    if (Array.isArray(v)) return v.forEach(countIds);
+    if (v && typeof v === "object") {
+      if (typeof v.id === "string") idCounts.set(v.id, (idCounts.get(v.id) ?? 0) + 1);
+      Object.values(v).forEach(countIds);
+    }
+  })(surfaces);
+  for (const [objectName, ids] of Object.entries(surfaceIdGroups)) {
+    for (const id of ids) {
+      assert(idCounts.get(id) === 1, `surfaces.json: id "${id}" (${objectName}) must be unique in the document; RegistryCatalog.surface looks it up by id alone`);
+    }
+    emitIdObject(objectName, ids);
+  }
+  if (surfaces.taskDetail) {
+    const detail = surfaces.taskDetail;
+    assert(idCounts.get(detail.id) === 1, `surfaces.json: id "${detail.id}" must be unique in the document`);
+    lines.push("/** Task detail surface (surfaces.json `taskDetail`): its ID and the keys of its field and control labels. */");
+    lines.push("object RegistryTaskDetail {");
+    lines.push(`    const val ID: String = ${kotlinStr(detail.id)}`);
+    for (const [objectName, block] of [["Fields", detail.fields], ["Controls", detail.controls]]) {
+      lines.push(`    object ${objectName} {`);
+      for (const key of Object.keys(block ?? {})) {
+        lines.push(`        const val ${kotlinConstName(key)}: String = ${kotlinStr(key)}`);
+      }
+      lines.push("    }");
+    }
+    lines.push("}");
+    lines.push("");
+  }
+
   lines.push("/** Capability status by canonical feature ID and platform. */");
   lines.push("object RegistryCapabilities {");
   lines.push("    val statusByFeatureAndPlatform: Map<String, Map<String, String>> = linkedMapOf(");
