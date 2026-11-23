@@ -35,10 +35,10 @@ const VISUAL = {
   photo:          { photo: { src: "art/photo-today.png" }, background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" }, leadSize: 124 },
   hook:           { fruit: "haskap", texture: "topography" },
   thinking:       { fruit: "yuzu", texture: "fieldMatrix" },
-  // Agent faces (the site's avatar crew) peek out from behind the phone where
-  // agents work. Two on agent-work, one on agent-result; no more.
-  "agent-work":   { fruit: "acai", texture: "ridges", shot: { appearance: "dark", faces: [{ face: 0, side: "right", y: 0.2 }, { face: 1, side: "left", y: 0.48, size: 200 }] } },
-  "agent-result": { fruit: "jabuticaba", texture: "stippleDrift", shot: { faces: [{ face: 2, side: "right", y: 0.36 }] } },
+  // Agent faces (the site's avatar crew, in our fruit colours) sit on the
+  // phone's edge where agents work, over empty screen. Three and two; no more.
+  "agent-work":   { fruit: "acai", texture: "ridges", shot: { appearance: "dark", faces: [{ face: 0, side: "right", y: 0.5 }, { face: 1, side: "left", y: 0.64, size: 180 }, { face: 3, side: "right", y: 0.8, size: 160 }] } },
+  "agent-result": { fruit: "jabuticaba", texture: "stippleDrift", shot: { faces: [{ face: 2, side: "right", y: 0.7 }, { face: 4, side: "left", y: 0.84, size: 180 }] } },
   inbox:          { fruit: "carambola", texture: "washiPaper" },
   dates:          { fruit: "persimmon", texture: "ridges", shot: { appearance: "dark" } },
   looks:          {

@@ -114,16 +114,16 @@ function shot(s, device, tint) {
 }
 
 // ------------------------------------------------------------ agent faces
-// Agent faces peeking out from behind the phone's edge: they sit under the
-// frame (z-index), so only the part past the edge shows. side: "left" |
-// "right"; y: centre as a fraction of the phone's height; size in design px;
-// show: the fraction of the face past the edge.
+// Agent faces on the phone's edge, in front of the device (mz, 2026-11-23):
+// side: "left" | "right"; y: centre as a fraction of the phone's height;
+// size in design px; show: the fraction of the face past the edge. Put them
+// where the screen is empty.
 function faces(list, w) {
   if (!list?.length) return "";
   return list.map((f) => {
-    const size = f.size ?? 230, show = f.show ?? 0.6;
+    const size = f.size ?? 210, show = f.show ?? 0.55;
     const x = f.side === "left" ? -size * show : w - size * (1 - show);
-    return `<svg class="agent-face" width="${size}" height="${size}" viewBox="-120 -120 240 240" style="position:absolute; z-index:0; left:${Math.round(x)}px; top:calc(${(f.y ?? 0.3) * 100}% - ${size / 2}px); overflow:visible; filter:drop-shadow(0 10px 18px rgb(0 0 0 / .22));"><path d="${esc(f.body)}" fill="${esc(f.color)}"/><path d="${esc(f.eyes)}" fill="#fff"/></svg>`;
+    return `<svg class="agent-face" width="${size}" height="${size}" viewBox="-120 -120 240 240" style="position:absolute; z-index:2; left:${Math.round(x)}px; top:calc(${(f.y ?? 0.3) * 100}% - ${size / 2}px); overflow:visible; filter:drop-shadow(0 10px 18px rgb(0 0 0 / .22));"><path d="${esc(f.body)}" fill="${esc(f.color)}"/><path d="${esc(f.eyes)}" fill="#fff"/></svg>`;
   }).join("");
 }
 
