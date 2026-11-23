@@ -323,7 +323,7 @@ extension EnvironmentValues {
 }
 
 extension View {
-  /// Publish a toast store to descendant views (e.g. `TaskRowActions`).
+  /// Publish a toast store to descendant views (e.g. the task list).
   func septenaToastStore(_ store: SeptenaToastStore) -> some View {
     environment(\.septenaToast, store)
   }
@@ -393,7 +393,7 @@ struct SeptenaToastCapsule: View {
   }
 }
 
-/// The toast copy, one wording for both shells (`TaskRowActions`, the
+/// The toast copy, one wording for both shells (the SwiftUI task list, the
 /// AppKit task list). Plain strings, like the call sites always passed.
 extension RegistryToasts {
   /// "Deferred to …" with the date as the schedule headers print it.

@@ -53,8 +53,6 @@ struct SeptaskSettingsView: View {
   private var taskBadge: Bool = RegistrySettings.Defaults.badgeShowOverdue
   @AppStorage(SettingsKey.tasksTitleLines) private var titleLines: Int =
     RegistrySettings.Defaults.tasksTitleLines
-  @AppStorage(SettingsKey.tasksSwipeLeadingAction) private var swipeLeadingActionRaw: String =
-    RegistrySettings.Defaults.tasksSwipeLeadingAction
   @AppStorage(SettingsKey.textSizeStep) private var textSizeStep: Int =
     RegistrySettings.Defaults.textSizeStep
   @AppStorage(SettingsKey.loggingAnimationsEnabled) private var completionAnimations: Bool =
@@ -492,18 +490,6 @@ struct SeptaskSettingsView: View {
           }
         }
       }
-    case "tasksSwipeLeadingAction":
-      #if os(iOS)
-      Picker(selection: $swipeLeadingActionRaw) {
-        ForEach(RegistrySettings.optionsByKey["tasksSwipeLeadingAction"] ?? []) { opt in
-          Text(opt.title).tag(opt.value)
-        }
-      } label: {
-        rowLabel(label, detail: item.detail)
-      }
-      #else
-      EmptyView()
-      #endif
     case "textSizeStep":
       inlineTextSizeRow(label: label)
     default:

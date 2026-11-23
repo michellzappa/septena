@@ -215,27 +215,4 @@ enum SettingsKey {
   /// unchanged. Device-local, like the other display preferences; read by the
   /// `.septenaTextSize()` root modifier in both app targets.
   static let textSizeStep = RegistrySettings.StorageKey.textSizeStep
-  /// Device-local iOS/iPadOS swipe-right quick action on task rows
-  /// (`docs/IOS_SWIPE_ACTIONS_SPEC.md` #132). Raw value of `TaskSwipeLeadingAction`;
-  /// absent → `"today"`. Swipe-left is always toggle-select.
-  static let tasksSwipeLeadingAction = RegistrySettings.StorageKey.tasksSwipeLeadingAction
-}
-
-/// Configurable iOS/iPadOS swipe-right quick action on task rows
-/// (`docs/IOS_SWIPE_ACTIONS_SPEC.md` #132). Device-local because phone thumb
-/// habits differ from iPad.
-enum TaskSwipeLeadingAction: String, CaseIterable, Identifiable {
-  case today
-  case schedule
-  case move
-  case star
-  case complete
-  case none
-
-  var id: String { rawValue }
-
-  /// Option title from `registry/settings.json` (`tasksSwipeLeadingAction`).
-  var title: String {
-    RegistrySettings.optionsByKey["tasksSwipeLeadingAction"]?.first { $0.value == rawValue }?.title ?? rawValue
-  }
 }

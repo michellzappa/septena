@@ -407,10 +407,6 @@ function validateActions(actions, icons, caps, destIds) {
     checkMenuItems(`menuBar.${m.id}`, m.items);
   }
 
-  assert(actions.swipeActions.featureId in caps.capabilities, "actions.json: swipeActions unknown featureId");
-  for (const id of [...actions.swipeActions.leading, ...actions.swipeActions.trailing]) {
-    assert(id in actions.actions, `actions.json: swipeActions references unknown action "${id}"`);
-  }
   for (const grp of actions.shortcutsSheet) {
     for (const id of grp.actionIds) {
       assert(id in actions.actions, `actions.json: shortcutsSheet.${grp.id} references unknown action "${id}"`);
@@ -1142,10 +1138,6 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   }
   lines.push("  ]");
   lines.push("");
-  lines.push("  /// Swipe slots in screen order, left to right (`swipeActions`).");
-  lines.push(`  static let swipeLeading: [String] = [${actions.swipeActions.leading.map(swiftStr).join(", ")}]`);
-  lines.push(`  static let swipeTrailing: [String] = [${actions.swipeActions.trailing.map(swiftStr).join(", ")}]`);
-  lines.push("");
   lines.push("  static let contextMenus: [String: [RegistryMenuItem]] = [");
   for (const [name, items] of Object.entries(actions.contextMenus)) {
     lines.push(`    ${swiftStr(name)}: [`);
@@ -1636,7 +1628,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const ICONS = ${JSON.stringify(icons.icons)} as const;`);
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
-  lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, swipeActions: actions.swipeActions, shortcutsSheet: actions.shortcutsSheet })} as const;`);
+  lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
   lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");

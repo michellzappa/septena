@@ -141,12 +141,6 @@
     },
     {
       "file": "Septask/SeptaskSettingsView.swift",
-      "literal": "Off",
-      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
-      "issue": "#260"
-    },
-    {
-      "file": "Septask/SeptaskSettingsView.swift",
       "literal": "On this device",
       "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
       "issue": "#260"
@@ -166,12 +160,6 @@
     {
       "file": "Septask/TasksSkillPane.swift",
       "literal": "MCP Skills",
-      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
-      "issue": "#260"
-    },
-    {
-      "file": "Septena/Shell/Settings/AISettingsPane.swift",
-      "literal": "Off",
       "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
       "issue": "#260"
     },
@@ -273,12 +261,6 @@
     },
     {
       "file": "Septena/Shell/Tasks/TaskListView.swift",
-      "literal": "Dismiss",
-      "reason": "iOS bulk toolbar or swipe title with no registry action title yet.",
-      "issue": "#260"
-    },
-    {
-      "file": "Septena/Shell/Tasks/TaskListView.swift",
       "literal": "Inbox",
       "reason": "iOS bulk toolbar or swipe title with no registry action title yet.",
       "issue": "#260"
@@ -293,12 +275,6 @@
       "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
       "literal": "Tags",
       "reason": "Checklist or tag picker copy; actions.json has no checklist or tag-picker actions yet.",
-      "issue": "#260"
-    },
-    {
-      "file": "Septena/Shell/Tasks/TaskRowActions.swift",
-      "literal": "Dismiss",
-      "reason": "iOS bulk toolbar or swipe title with no registry action title yet.",
       "issue": "#260"
     },
     {

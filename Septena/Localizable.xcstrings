@@ -3505,7 +3505,7 @@
       }
     },
     "Completion animations" : {
-      "comment" : "Generated from registry settings.pages.appearance.sections.appearance.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.appearance.sections.appearance.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -10310,7 +10310,7 @@
       }
     },
     "Schedule" : {
-      "comment" : "Generated from registry settings.keys.tasksSwipeLeadingAction.options.1.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry actions.actions.task.when.shortTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -10491,6 +10491,10 @@
           }
         }
       }
+    },
+    "Select" : {
+      "comment" : "Generated from registry actions.actions.task.select.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Select main.sqlite or a Things Database.thingsdatabase bundle exported from Things." : {
 
@@ -11395,7 +11399,7 @@
       }
     },
     "Star" : {
-      "comment" : "Generated from registry settings.keys.tasksSwipeLeadingAction.options.3.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry actions.actions.task.toggleStar.addTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {

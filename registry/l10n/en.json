@@ -460,7 +460,6 @@
   "Complete": {
     "text": "Complete",
     "paths": [
-      "settings.keys.tasksSwipeLeadingAction.options.4.title",
       "actions.contextMenus.task.row.complete.title",
       "actions.menuBar.task.items.complete.title"
     ]
@@ -474,7 +473,7 @@
   "Completion animations": {
     "text": "Completion animations",
     "paths": [
-      "settings.pages.appearance.sections.appearance.items.4.label"
+      "settings.pages.appearance.sections.appearance.items.3.label"
     ]
   },
   "Connect Claude": {
@@ -1273,7 +1272,6 @@
   "Move": {
     "text": "Move",
     "paths": [
-      "settings.keys.tasksSwipeLeadingAction.options.2.title",
       "actions.actions.task.move.shortTitle",
       "actions.contextMenus.task.row.move.title"
     ]
@@ -1588,12 +1586,6 @@
     "text": "OK",
     "paths": [
       "surfaces.prompts.error.confirmTitle"
-    ]
-  },
-  "Off": {
-    "text": "Off",
-    "paths": [
-      "settings.keys.tasksSwipeLeadingAction.options.5.title"
     ]
   },
   "Older changes are hidden": {
@@ -2045,7 +2037,6 @@
   "Schedule": {
     "text": "Schedule",
     "paths": [
-      "settings.keys.tasksSwipeLeadingAction.options.1.title",
       "actions.actions.task.when.shortTitle",
       "actions.contextMenus.task.row.schedule.title"
     ]
@@ -2093,6 +2084,12 @@
     "text": "See who changed what and bring back what you deleted. Your files open on every device.",
     "paths": [
       "plans.outcomes.nothing_lost.detail"
+    ]
+  },
+  "Select": {
+    "text": "Select",
+    "paths": [
+      "actions.actions.task.select.title"
     ]
   },
   "Send feedback": {
@@ -2301,7 +2298,6 @@
   "Star": {
     "text": "Star",
     "paths": [
-      "settings.keys.tasksSwipeLeadingAction.options.3.title",
       "actions.actions.task.toggleStar.addTitle",
       "surfaces.taskAttributes.star.label"
     ]
@@ -2353,18 +2349,6 @@
     "paths": [
       "surfaces.taskDetail.weekdays.6.title",
       "surfaces.taskDetail.calendarWeekdays.0.title"
-    ]
-  },
-  "Swipe left on a task to select multiple tasks. Swipe right runs this quick action.": {
-    "text": "Swipe left on a task to select multiple tasks. Swipe right runs this quick action.",
-    "paths": [
-      "settings.pages.appearance.sections.appearance.items.3.detail"
-    ]
-  },
-  "Swipe right": {
-    "text": "Swipe right",
-    "paths": [
-      "settings.pages.appearance.sections.appearance.items.3.label"
     ]
   },
   "Sync & storage diagnostics": {
@@ -2638,7 +2622,6 @@
   "Today": {
     "text": "Today",
     "paths": [
-      "settings.keys.tasksSwipeLeadingAction.options.0.title",
       "destinations.destinations.today.title",
       "actions.actions.task.toggleToday.shortTitle"
     ]

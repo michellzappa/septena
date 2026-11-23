@@ -1,12 +1,9 @@
 import SwiftUI
 
 // The per-row context menu and the modal presenter that hosts the sheets it
-// opens. Shared by the deep task list and `TaskRowActions`. Split out of
-// TaskListView.swift.
+// opens. Split out of TaskListView.swift.
 
 
-// Internal so the shared `TaskRowActions` modifier can host the same
-// When / Deadline / Move / Repeat picker sheets on the Next surface.
 struct TaskListModalPresenter: ViewModifier {
   @Binding var whenSheet: TaskListView.WhenSheet?
   @Binding var showingMoveSheet: Bool
@@ -129,9 +126,6 @@ struct TaskListModalPresenter: ViewModifier {
   }
 }
 
-// Internal (shared with `TaskRowActions`) so the Next surface renders the
-// exact same per-row task menu as the Tasks list — single source of truth.
-//
 // Items, order, titles, icons and shortcuts come from the registry menu
 // `task.row` (`registry/actions.json`), the same tree the AppKit shell's row
 // menu renders. This view only binds each action ID to a handler and fills the
@@ -141,6 +135,9 @@ struct TaskListRowContextMenu: View {
   let filter: TaskFilter
   let rankedSuggestions: [SuggestionEngine.Suggestion]?
   let onDuplicate: (TaskListView.ActionTarget) -> Void
+  /// Starts touch multi-select with this row selected (Select). nil hides
+  /// it: the Mac, or a list that is already selecting.
+  var onSelect: ((SeptenaTask) -> Void)? = nil
   let onOpenDetail: (SeptenaTask) -> Void
   let onApplySuggestion: (SeptenaTask, SuggestionEngine.Suggestion) -> Void
   let onMoveToToday: ([String], Bool) -> Void
@@ -191,6 +188,9 @@ struct TaskListRowContextMenu: View {
       return .init { onOpenDetail(task) }
     case "task.duplicate":
       return .init(variant: plural) { onDuplicate(target) }
+    case "task.select":
+      guard let task = single, let onSelect else { return nil }
+      return .init { onSelect(task) }
     case "task.toggleComplete":
       guard let onToggleComplete else { return nil }
       return .init { onToggleComplete(target.ids) }

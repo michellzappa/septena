@@ -26,7 +26,7 @@ import AppKit
 //   • Accessibility — selected rows carry `.isSelected`.
 //
 // What we intentionally DON'T reproduce, because the migrated surfaces don't use
-// them: `.swipeActions` and `.onMove` reorder. (Tasks has neither.)
+// them: `.swipeActions` and `.onMove` reorder.
 //
 // macOS click modifiers (⌘ / ⇧) are read once from `NSEvent.modifierFlags` at
 // click time — a one-shot state read, NOT an event monitor (the banned pattern):

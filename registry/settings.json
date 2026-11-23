@@ -240,23 +240,6 @@
       "platforms": ["ios", "ipados", "android"],
       "featureId": "settings.display"
     },
-    "tasksSwipeLeadingAction": {
-      "scope": "device",
-      "storageKey": "septena.tasks.swipeLeadingAction",
-      "type": "enum",
-      "values": ["today", "schedule", "move", "star", "complete", "none"],
-      "default": "today",
-      "options": [
-        { "value": "today", "title": "Today" },
-        { "value": "schedule", "title": "Schedule" },
-        { "value": "move", "title": "Move" },
-        { "value": "star", "title": "Star" },
-        { "value": "complete", "title": "Complete" },
-        { "value": "none", "title": "Off" }
-      ],
-      "platforms": ["ios", "ipados"],
-      "featureId": "settings.display"
-    },
     "tasksFilingSuggestions": {
       "scope": "device",
       "storageKey": "septena.tasks.filingSuggestions",
@@ -635,13 +618,6 @@
               "key": "tasksTitleLines",
               "label": "Title lines",
               "platforms": ["ios", "ipados", "android"]
-            },
-            {
-              "kind": "setting",
-              "key": "tasksSwipeLeadingAction",
-              "label": "Swipe right",
-              "detail": "Swipe left on a task to select multiple tasks. Swipe right runs this quick action.",
-              "platforms": ["ios", "ipados"]
             },
             {
               "kind": "setting",

@@ -1,5 +1,7 @@
 # Touch multi-select (swipe to select) & multi-task drag — spec
 
+> **Superseded 2026-11-23.** mz dropped every task-row swipe on iPhone and iPad (the hand-built pan gestures fought scrolling, long-press drag and back-swipe, and swipe-left was the only hidden way into multi-select). Touch multi-select now starts from **Select** in the row context menu (`task.select`, capability `edit.multi-select`). The selection mode, bottom bar and multi-task drag below still apply; every swipe section does not. The watch keeps native `List` `.swipeActions`.
+
 **Status:** building (2026-11-21 — M0–M3 implemented; ready for device testing). Defaults in §10 stand unless mz overrules.
 **Decisions:** [ADR 0007](adr/0007-septena-is-the-task-app.md), [ADR 0002](adr/0002-own-backend-replaces-icloud.md).
 **Builds on:** `Septena/Shell/Tasks/TaskListView.swift`, `Septena/Shell/UI/SelectableScrollList.swift`, `Septena/Shell/Tasks/TaskListChrome.swift`, `Septena/Shell/Tasks/TaskComponents.swift`, `Septena/Shell/Sidebar/SidebarView.swift`, `Septena/Shell/Sidebar/AreasProjectsView.swift`, `Septask/SeptaskRootView.swift`, `SeptenaCore/CloudKit/TasksBackend.swift`, `SeptenaCore/TaskUndo.swift`, [DRAG_AND_DROP.md](DRAG_AND_DROP.md), [DesignSpec.md](DesignSpec.md) (§4.5).

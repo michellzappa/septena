@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Canonical actions, platform-neutral shortcuts, context menus, menu bar groups, swipe slots, and generated shortcuts catalogue (ADR 0015).",
+  "description": "Canonical actions, platform-neutral shortcuts, context menus, menu bar groups, and generated shortcuts catalogue (ADR 0015).",
   "actions": {
     "task.editDetails": {
       "title": "Edit Details…",
@@ -28,6 +28,7 @@
       "availability": { "selection": "any" },
       "featureId": "lists.today"
     },
+    "task.select": { "title": "Select", "icon": "action.checklist", "role": "default", "availability": { "selection": "single", "platforms": ["ios", "ipados"], "excludeDestinations": ["recentlyDeleted"] }, "featureId": "edit.multi-select" },
     "task.duplicate": {
       "title": "Duplicate",
       "pluralTitle": "Duplicate Tasks",
@@ -434,6 +435,7 @@
       { "kind": "action", "id": "task.editDetails" },
       { "kind": "action", "id": "task.toggleInfo" },
       { "kind": "action", "id": "task.duplicate" },
+      { "kind": "action", "id": "task.select" },
       { "kind": "divider" },
       {
         "kind": "submenu",
@@ -620,7 +622,6 @@
     },
     { "id": "help", "title": "Help", "system": "help", "items": [{ "kind": "action", "id": "app.keyboardShortcuts" }] }
   ],
-  "swipeActions": { "featureId": "edit.swipe-actions", "leading": ["task.toggleToday", "task.when"], "trailing": ["task.move", "task.delete"] },
   "shortcutsSheet": [
     {
       "id": "general",
