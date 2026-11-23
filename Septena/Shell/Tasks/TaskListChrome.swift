@@ -357,14 +357,6 @@ final class MagicPlusDragState {
 
   /// Non-observed registry so scrolling rows never trigger SwiftUI view invalidations.
   @ObservationIgnored private var zones: [String: Zone] = [:]
-  /// Zone frames frozen at drag start. Targets resolve against this REST
-  /// layout, never the live one: the open slot pushes every zone under it down
-  /// by a slot height, and resolving against those moved frames fed the slot
-  /// back into the hit test (the probe fell into the slot it had just opened,
-  /// the nearest-zone fallback picked a neighbour, the slot moved, repeat).
-  /// The list cannot scroll during the drag (the finger is on the orb), so the
-  /// rest layout stays true for the whole gesture.
-  @ObservationIgnored private var restFrames: [String: CGRect] = [:]
 
   func register(
     id: String,
@@ -375,16 +367,10 @@ final class MagicPlusDragState {
   ) {
     guard frame.width > 0, frame.height > 0 else { return }
     zones[id] = Zone(id: id, kind: kind, priority: priority, frame: frame, onDrop: onDrop)
-    // A zone that first appears mid-drag joins the rest layout only while no
-    // slot is open; with a slot open its frame is already shifted.
-    if isDragging, restFrames[id] == nil, activeTarget == nil {
-      restFrames[id] = frame
-    }
   }
 
   func unregister(id: String) {
     zones.removeValue(forKey: id)
-    restFrames.removeValue(forKey: id)
     if activeTarget?.id == id {
       activeTarget = nil
     }
@@ -395,7 +381,6 @@ final class MagicPlusDragState {
     isOverCancelSocket = false
     fingerLocation = location
     activeTarget = nil
-    restFrames = zones.mapValues(\.frame)
     Haptics.press()
     resolveTarget(for: location)
   }
@@ -415,7 +400,6 @@ final class MagicPlusDragState {
       isOverCancelSocket = false
       activeTarget = nil
     }
-    restFrames.removeAll()
     if let hit, let action {
       action(hit.before)
     } else if !isOverHome(location) {
@@ -434,7 +418,6 @@ final class MagicPlusDragState {
     isOverCancelSocket = false
     activeTarget = nil
     zones.removeAll()
-    restFrames.removeAll()
   }
 
   private func resolveTarget(for location: CGPoint) {
@@ -463,47 +446,40 @@ final class MagicPlusDragState {
     // Aim slightly above the fingertip where the floating ghost card sits.
     let probeY = location.y - 24
 
-    // The model is the one iOS uses for reordering: a list of INSERTION
-    // POINTS (gaps), resolved in DISPLAY space, where the open slot takes
-    // room. Built from the rest layout (`restFrames`), then the open slot's
-    // height is added under it, which is exactly what the user sees. So
-    // "past the middle of the row you see" is what moves the slot, and the
-    // slot's own height is the hysteresis: once it moves, the finger sits
-    // half a slot inside the new region, never on a boundary.
+    // One list of insertion points (`insertionPoints`), and the list does
+    // not move during the drag, so the target is the nearest point to what
+    // the user sees. A small margin keeps the current point until another is
+    // clearly nearer, so a finger resting between two points never flickers.
     let gaps = insertionPoints()
     guard !gaps.isEmpty else {
       if activeTarget != nil {
-        a11yAnimate(.snappy(duration: 0.18)) { activeTarget = nil }
+        a11yAnimate(.snappy(duration: 0.15)) { activeTarget = nil }
       }
       return
     }
-    let slot = MagicPlusRowDropModifier.gapHeight
     let open = activeTarget.flatMap { t in
       gaps.firstIndex { $0.id == t.id && $0.before == t.before }
-    }
-    // Representative display y of each gap: the open one is its slot's
-    // middle; gaps under it moved down by one slot.
-    func displayY(_ k: Int) -> CGFloat {
-      guard let open else { return gaps[k].y }
-      if k == open { return gaps[k].y + slot / 2 }
-      return k > open ? gaps[k].y + slot : gaps[k].y
     }
     var bestIndex = 0
     var bestDistance = CGFloat.infinity
     for k in gaps.indices {
-      let d = abs(displayY(k) - probeY)
+      let d = abs(gaps[k].y - probeY)
       if d < bestDistance { bestDistance = d; bestIndex = k }
+    }
+    if let open, open != bestIndex,
+       abs(gaps[open].y - probeY) - bestDistance < 10 {
+      return
     }
     let g = gaps[bestIndex]
     if bestIndex == open { return }
     let next = ActiveTarget(id: g.id, kind: g.kind, before: g.before, frame: g.frame)
     Haptics.selection()
-    a11yAnimate(.snappy(duration: 0.18)) {
+    a11yAnimate(.snappy(duration: 0.15)) {
       activeTarget = next
     }
   }
 
-  /// One insertion point: where a slot opens, and which zone owns the drop.
+  /// One insertion point: where the mark shows, and which zone owns the drop.
   private struct Gap {
     let y: CGFloat
     let id: String
@@ -515,7 +491,7 @@ final class MagicPlusDragState {
     let rank: Int
   }
 
-  /// Every insertion point in the rest layout, top to bottom, one per place.
+  /// Every insertion point on screen, top to bottom, one per place.
   /// A row offers its top and its bottom; a header offers the place under
   /// it. Points closer than 16pt are ONE place ("after A" / "before B" on
   /// touching rows; "under the header" / "before the first row"), so the
@@ -524,7 +500,7 @@ final class MagicPlusDragState {
   private func insertionPoints() -> [Gap] {
     var points: [Gap] = []
     for zone in zones.values {
-      let frame = restFrames[zone.id] ?? zone.frame
+      let frame = zone.frame
       switch zone.kind {
       case .taskRow:
         points.append(Gap(y: frame.minY, id: zone.id, kind: zone.kind,
@@ -565,7 +541,6 @@ extension EnvironmentValues {
 /// Registers a reorderable task row as a live Magic Plus gap-parting target.
 /// Opens a 48pt ghost-row slot above or below the row as the finger hovers.
 struct MagicPlusRowDropModifier: ViewModifier {
-  static let gapHeight: CGFloat = 48
 
   @Environment(\.magicPlusDrag) private var drag
   let id: String
@@ -583,21 +558,20 @@ struct MagicPlusRowDropModifier: ViewModifier {
   func body(content: Content) -> some View {
     if enabled, let drag {
       content
-        // Capture un-parted global frame before gap padding shifts it.
         .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { rect in
           drag.register(id: id, kind: .taskRow(context: context), priority: 2,
                         frame: rect, onDrop: onDrop)
         }
         .onDisappear { drag.unregister(id: id) }
-        .padding(.top, hoverBefore == true ? Self.gapHeight : 0)
-        .padding(.bottom, hoverBefore == false ? Self.gapHeight : 0)
+        // The list never moves during the drag: the mark draws OVER the row
+        // edge instead of opening a gap (see `MagicPlusInsertionMark`).
         .overlay(alignment: .top) {
-          if hoverBefore == true { MagicPlusGhostSlot() }
+          if hoverBefore == true { MagicPlusInsertionMark() }
         }
         .overlay(alignment: .bottom) {
-          if hoverBefore == false { MagicPlusGhostSlot() }
+          if hoverBefore == false { MagicPlusInsertionMark() }
         }
-        .a11yAnimation(.snappy(duration: 0.2), value: hoverBefore)
+        .a11yAnimation(.snappy(duration: 0.15), value: hoverBefore)
     } else {
       content
     }
@@ -605,24 +579,29 @@ struct MagicPlusRowDropModifier: ViewModifier {
 
 }
 
-/// The glass new-task slot: the ONE landing mark of a Magic Plus drag. A row
-/// gap, a header and a Tasks index row all show it, so the drop always reads
-/// as "a new task goes here" and never as "this row is the target".
-struct MagicPlusGhostSlot: View {
+/// The insertion mark: the ONE landing mark of a Magic Plus drag. A row gap,
+/// a header and a Tasks index row all show it, so the drop always reads as
+/// "a new task goes here" and never as "this row is the target".
+///
+/// It is a thin tinted glass bar drawn over the row edge, and the list does
+/// NOT part around it (decided 2026-11-23). A parting gap moved every row
+/// under the finger, and every hit-test model built on top of that motion
+/// (live frames, rest frames, display-space gaps) still felt flaky. With a
+/// still list, the target is just the nearest edge of what the user sees.
+/// The new row animates in on drop.
+struct MagicPlusInsertionMark: View {
   var body: some View {
-    // A tinted glass pane, the same material as the orb and the toolbar
-    // circles (decided 2026-11-23: the dashed outline read as a wireframe).
     Color.clear
-      .glassCard(cornerRadius: 12, tint: AppearancePreferences.shared.magicPlusSwiftUIColor)
+      .glassCard(cornerRadius: 3, tint: AppearancePreferences.shared.magicPlusSwiftUIColor)
+      .frame(height: 6)
       .padding(.horizontal, TaskCardMetrics.margin)
-      .padding(.vertical, 4)
-      .frame(height: MagicPlusRowDropModifier.gapHeight)
+      .allowsHitTesting(false)
   }
 }
 
 /// Registers a section header, heading, Upcoming day, or Tasks index row as a
-/// Magic Plus target. Hovering it opens the glass new-task slot under it (the
-/// first place in that list); the row itself gets no highlight.
+/// Magic Plus target. Hovering it shows the insertion mark under it (the first
+/// place in that list); the row itself gets no highlight.
 struct MagicPlusSectionDropModifier: ViewModifier {
   @Environment(\.magicPlusDrag) private var drag
   let id: String
@@ -638,18 +617,16 @@ struct MagicPlusSectionDropModifier: ViewModifier {
   func body(content: Content) -> some View {
     if let drag {
       content
-        // Capture the un-parted frame before the slot padding grows it.
         .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { rect in
           drag.register(id: id, kind: kind, priority: priority, frame: rect) { _ in
             onDrop()
           }
         }
         .onDisappear { drag.unregister(id: id) }
-        .padding(.bottom, isTargeted ? MagicPlusRowDropModifier.gapHeight : 0)
         .overlay(alignment: .bottom) {
-          if isTargeted { MagicPlusGhostSlot() }
+          if isTargeted { MagicPlusInsertionMark() }
         }
-        .a11yAnimation(.snappy(duration: 0.2), value: isTargeted)
+        .a11yAnimation(.snappy(duration: 0.15), value: isTargeted)
     } else {
       content
     }
