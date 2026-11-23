@@ -778,7 +778,8 @@ struct TaskListView: View {
     .environment(\.rowVInset, Theme.rowVPaddingTight)
     .scrollDismissesKeyboard(.interactively)
     .modifier(TaskListToolbarChrome(showsEmbeddedNewTask: showsEmbeddedNewTaskToolbar,
-                                    onNew: { handleExternalCreateTrigger() }))
+                                    onNew: { handleExternalCreateTrigger() },
+                                    onNewSection: projectSectionCreateAction))
     // Unified chrome (docs/PAGE_CHROME_SPEC.md): standalone task lists get the
     // constant gear (→ Settings) and a contextual "+" (new task). On iPad
     // regular the "+" merges with the sidebar's "···" in the tab bar; on iPhone
@@ -1145,7 +1146,11 @@ struct TaskListView: View {
     // the cards below slid on the spring: the rows below did not move as one.
     a11yAnimate(.snappy(duration: 0.28)) {
       quickAddGroupTarget = groupTarget
-      quickAddDraftAtTop = showsQuickAddAtTop
+      // With no idle trigger row, an empty list opens the draft at the top
+      // (its own card); a list with rows opens it at the foot of the card.
+      quickAddDraftAtTop = usesMagicPlusInsteadOfInboxTrigger
+        ? filter != .today && filter != .triage && showsEmptyTaskList
+        : showsQuickAddAtTop
       quickAddDraftId = task.id
       items.append(task)
       beginEdit(task)
@@ -1420,7 +1425,7 @@ struct TaskListView: View {
   /// capture happens via Magic Plus / New task / ⌘N, matching AppKit).
   private var showsGroupedHeaderQuickAdd: Bool { false }
 
-  /// Septena has no idle "New task" trigger row in Inbox on any platform:
+  /// Septena has no idle "New task" trigger row on any list or platform:
   /// capture starts from Magic Plus (iPhone), the toolbar "+" (iPad) or ⌘N
   /// (Mac), and the capture slot mounts only while an inline draft is open.
   /// The AppKit list makes the same choice (no "New task" line on Today).
@@ -1835,8 +1840,8 @@ struct TaskListView: View {
   /// Inline quick-add under the title when a creatable list is empty. Today
   /// hosts capture in the Inbox section instead (see `triageSection`).
   private var showsQuickAddAtTop: Bool {
-    if usesMagicPlusInsteadOfInboxTrigger && filter == .triage {
-      return quickAddDraftAtTop && quickAddDraftId != nil
+    if usesMagicPlusInsteadOfInboxTrigger && filter != .today {
+      return allowsInlineCreate && quickAddDraftAtTop && quickAddDraftId != nil
     }
     return filter != .today && allowsInlineCreate && (showsEmptyTaskList || quickAddDraftAtTop)
   }
@@ -1844,8 +1849,8 @@ struct TaskListView: View {
   /// Things-style foot quick-add once the list has content. Today captures
   /// through the Inbox card, not at the foot of the full day list.
   private var showsQuickAddAtFoot: Bool {
-    if usesMagicPlusInsteadOfInboxTrigger && filter == .triage {
-      return !quickAddDraftAtTop && quickAddDraftId != nil
+    if usesMagicPlusInsteadOfInboxTrigger && filter != .today {
+      return allowsInlineCreate && !quickAddDraftAtTop && quickAddDraftId != nil
     }
     return filter != .today && allowsInlineCreate && !showsEmptyTaskList && !quickAddDraftAtTop
   }
@@ -2022,12 +2027,13 @@ struct TaskListView: View {
       }
   }
 
-  /// On Septask iPhone/iPad the Starred filter is a toolbar toggle beside
-  /// Search (`StarFilterToolbarButton`), not a chip. Embedded lists have no
-  /// toolbar of their own and macOS has no slot there, so they keep the chip.
+  /// On Septask iPhone/iPad the Starred filter is a toolbar toggle
+  /// (`StarFilterToolbarButton`), never a chip: Today, Anytime and the
+  /// embedded area / project pages all publish it into the nav bar. macOS has
+  /// no slot there, so the SwiftUI Mac shell keeps the chip.
   private var starFilterInToolbar: Bool {
     #if os(iOS) && SEPTASK
-    return !embedded
+    return true
     #else
     return false
     #endif
@@ -2734,7 +2740,20 @@ struct TaskListView: View {
       let members = visibleItems.filter { $0.heading == heading.id }
       cardedRows(members, reorderable: true, grouped: true, magicContext: heading.title)
     }
+    #if !(os(iOS) && SEPTASK)
+    // Septask iOS makes sections from the "+" (Magic Plus menu on iPhone, the
+    // toolbar "+" menu on iPad), so the foot line would be a second entry.
     addSectionButton
+    #endif
+  }
+
+  /// The toolbar "+" menu's New Section on a project page; nil elsewhere.
+  private var projectSectionCreateAction: (() -> Void)? {
+    guard case .project(let pid) = filter else { return nil }
+    return {
+      headingDraftTitle = ""
+      headingCreateProject = pid
+    }
   }
 
   /// A section-divider row: the heading title styled like a group header, but a
@@ -3126,9 +3145,7 @@ struct TaskListView: View {
   /// sentinel id joins `keyboardOrderedTaskIds` at the trigger's render position
   /// so ↑/↓ can land on it and Return activates it (see `activateRow`).
   private var showsQuickAddTriggerRow: Bool {
-    if usesMagicPlusInsteadOfInboxTrigger && (filter == .today || filter == .triage) {
-      return false
-    }
+    if usesMagicPlusInsteadOfInboxTrigger { return false }
     return allowsInlineCreate && quickAddDraftId == nil
   }
 
@@ -4001,6 +4018,10 @@ struct TaskListView: View {
         // The capture slot's open editor keeps its menu. Its card chrome is
         // applied by the caller, which also carries the trigger row (no menu).
         .contextMenu { taskContextMenu(for: task) }
+    } else if usesMagicPlusInsteadOfInboxTrigger {
+      // No idle "New task" row in Septena: the slot is empty until a draft's
+      // editor is open in it.
+      EmptyView()
     } else if quickAddDraftId == nil {
       // The primary trigger is a first-class *selectable* row: it carries the
       // quick-add sentinel id (also in `keyboardOrderedTaskIds`), so arrow-nav

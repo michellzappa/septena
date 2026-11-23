@@ -36,10 +36,6 @@ struct SeptaskRootView: View {
   /// True while the software keyboard is up. The orb hides then: while the
   /// user types, it covers the field and the rows around it.
   @State private var keyboardVisible = false
-  @State private var showingNewProjectSheet = false
-  @State private var newProjectInitialAreaId: String? = nil
-  @State private var showingNewAreaAlert = false
-  @State private var newAreaName = ""
   /// The first run (`SeptaskFirstRun.swift`), shown once per account.
   @State private var showingFirstRun = false
   /// Settings ▸ About ▸ Show Welcome Again sets this; observed so the flow
@@ -114,22 +110,6 @@ struct SeptaskRootView: View {
       #if os(iOS)
       .sheet(isPresented: $nav.showSettings) {
         withEnvironment(SeptaskSettingsView())
-      }
-      .sheet(isPresented: $showingNewProjectSheet, onDismiss: { newProjectInitialAreaId = nil }) {
-        let areas = StructureCache.snapshot(in: modelContext).areas
-        withEnvironment(
-          NewProjectSheet(areas: areas,
-                          initialAreaId: newProjectInitialAreaId) { title, areaId in
-            createProject(title: title, areaId: areaId)
-          }
-        )
-        .presentationDetents([.medium])
-        .septenaSheetChrome()
-      }
-      .alert(RegistryPrompts.textPrompt("newArea").title, isPresented: $showingNewAreaAlert) {
-        TextField(RegistryPrompts.textPrompt("newArea").placeholder, text: $newAreaName)
-        Button(RegistryPrompts.textPrompt("newArea").confirmTitle) { createArea() }
-        Button(RegistryPrompts.cancelTitle, role: .cancel) { newAreaName = "" }
       }
       .fullScreenCover(isPresented: $showingFirstRun) {
         withEnvironment(SeptaskFirstRunView { showingFirstRun = false })
@@ -206,17 +186,8 @@ struct SeptaskRootView: View {
       MagicPlusOrb(
         drag: magicPlusDrag,
         isViewingProject: isViewingProject,
-        isViewingToday: isViewingToday,
         onNewTask: { triggerInlineNewTask() },
-        onNewSection: { nav.shouldCreateHeading = true },
-        onNewProject: {
-          newProjectInitialAreaId = activeAreaIdForNewProject
-          showingNewProjectSheet = true
-        },
-        onNewArea: {
-          newAreaName = ""
-          showingNewAreaAlert = true
-        }
+        onNewSection: { nav.shouldCreateHeading = true }
       )
       .padding(.trailing, 16)
       .padding(.bottom, 8)
@@ -246,38 +217,11 @@ struct SeptaskRootView: View {
     }
   }
 
-  /// Today never creates areas or projects, so the orb's tap there makes a
-  /// task directly instead of opening the create menu.
-  private var isViewingToday: Bool {
-    if case .filter(.today) = nav.path.last { return true }
-    return false
-  }
-
+  /// The orb only makes tasks. On a project it also makes a section, so its
+  /// tap there opens a two-row menu; everywhere else the tap makes a task.
   private var isViewingProject: Bool {
     if case .project = nav.path.last { return true }
     return false
-  }
-
-  private var activeAreaIdForNewProject: String? {
-    if case .area(let id) = nav.path.last { return id }
-    return nil
-  }
-
-  private func createProject(title: String, areaId: String?) {
-    let trimmed = title.trimmingCharacters(in: .whitespaces)
-    guard !trimmed.isEmpty else { return }
-    Task {
-      _ = try? await projectsMutator.create(title: trimmed, area: areaId)
-    }
-  }
-
-  private func createArea() {
-    let name = newAreaName.trimmingCharacters(in: .whitespaces)
-    newAreaName = ""
-    guard !name.isEmpty else { return }
-    Task {
-      _ = try? await areasMutator.create(title: name)
-    }
   }
   #endif
 }
@@ -287,8 +231,8 @@ struct SeptaskRootView: View {
 /// the iPhone navigation stack:
 /// - Solid accent circle + subtle 6-dot grip beneath `+` communicates a
 ///   grabbable object rather than a flat tap-only tab icon.
-/// - Tap opens a native popover quick menu (`New Task` inline, `New Section`
-///   in projects, `New Project`, `New Area`).
+/// - Tap makes a task. On a project it opens a popover with `New Task` and
+///   `New Section`. Areas and projects are made from the lists page.
 /// - Instant drag (no hold delay) detaches the orb to follow the finger 1:1
 ///   and morphs live into a ghost task card or contextual action pill over
 ///   every row gap, heading, Today/Anytime group, Upcoming day, or Tasks
@@ -304,11 +248,8 @@ private struct MagicPlusOrb: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   let isViewingProject: Bool
-  let isViewingToday: Bool
   let onNewTask: () -> Void
   let onNewSection: () -> Void
-  let onNewProject: () -> Void
-  let onNewArea: () -> Void
 
   var body: some View {
     let appearance = AppearancePreferences.shared
@@ -376,7 +317,7 @@ private struct MagicPlusOrb: View {
       guard !drag.isDragging else { return }
       Haptics.press()
       if !reduceMotion { popTick += 1 }
-      if isViewingToday { onNewTask() } else { showingMenu = true }
+      if isViewingProject { showingMenu = true } else { onNewTask() }
     }
     .simultaneousGesture(
       DragGesture(minimumDistance: 0)
@@ -398,9 +339,9 @@ private struct MagicPlusOrb: View {
     )
     .accessibilityAddTraits(.isButton)
     .accessibilityLabel("New")
-    .accessibilityHint(isViewingToday
-      ? Text("Tap for a new task, or drag onto a list position.")
-      : Text("Tap for create options, or drag onto a list position."))
+    .accessibilityHint(isViewingProject
+      ? Text("Tap for a new task or section, or drag onto a list position.")
+      : Text("Tap for a new task, or drag onto a list position."))
     .popover(isPresented: $showingMenu, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
       quickMenu
         .presentationCompactAdaptation(.popover)
@@ -434,16 +375,6 @@ private struct MagicPlusOrb: View {
           showingMenu = false
           onNewSection()
         }
-      }
-      Divider()
-        .padding(.vertical, 4)
-      menuRow(title: RegistryActions.title("sidebar.newProject"), icon: "number") {
-        showingMenu = false
-        onNewProject()
-      }
-      menuRow(title: RegistryActions.title("sidebar.newArea"), icon: "square.stack.3d.up") {
-        showingMenu = false
-        onNewArea()
       }
     }
     .padding(.vertical, 8)

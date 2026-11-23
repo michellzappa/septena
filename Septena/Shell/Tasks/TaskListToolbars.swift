@@ -99,15 +99,49 @@ struct TaskListToolbarChrome: ViewModifier {
   /// The owning list's own create action, so its "+" can't be answered by a
   /// different (hidden) list.
   var onNew: (() -> Void)? = nil
+  /// A project page's New Section. When set, the "+" opens a menu with New
+  /// Task and New Section, the same two rows as the iPhone Magic Plus menu.
+  var onNewSection: (() -> Void)? = nil
 
   func body(content: Content) -> some View {
     content.toolbar {
       if showsEmbeddedNewTask {
         ToolbarItem(placement: .primaryAction) {
-          TaskListNewTaskButton(action: onNew)
+          if let onNewSection {
+            TaskListNewMenuButton(onNewTask: onNew, onNewSection: onNewSection)
+          } else {
+            TaskListNewTaskButton(action: onNew)
+          }
         }
       }
     }
+  }
+}
+
+/// The project page's "+": a menu with New Task and New Section. Areas and
+/// projects are made from the lists page, never from here.
+struct TaskListNewMenuButton: View {
+  @Environment(NavigationState.self) private var nav
+  @Environment(SectionTheme.self) private var theme
+  var onNewTask: (() -> Void)?
+  let onNewSection: () -> Void
+
+  var body: some View {
+    Menu {
+      Button {
+        if let onNewTask { onNewTask() } else { nav.requestNewTask() }
+      } label: {
+        Label(RegistryActions.title("app.newTask"), systemImage: "checkmark.circle")
+      }
+      Button(action: onNewSection) {
+        Label(RegistryActions.title("section.new"), systemImage: "rectangle.split.1x2")
+      }
+    } label: {
+      Image(systemName: "plus")
+    }
+    .glassProminentButtonStyleCompat()
+    .tint(AdaptiveColor.fillForWhiteInk(theme.color(for: "tasks")))
+    .accessibilityLabel(RegistryActions.title("app.newTask"))
   }
 }
 
@@ -132,6 +166,19 @@ struct TaskListStandaloneChrome: ViewModifier {
     if let onNew { onNew() } else { nav.requestNewTask() }
   }
 
+  #if os(iOS)
+  /// An embedded area / project page has no page chrome of its own, but its
+  /// Starred filter still sits in the nav bar, as on Today.
+  @ToolbarContentBuilder
+  private var embeddedStarItem: some ToolbarContent {
+    if let starFilter {
+      ToolbarItem(placement: .topBarTrailing) {
+        StarFilterToolbarButton(isOn: starFilter)
+      }
+    }
+  }
+  #endif
+
   func body(content: Content) -> some View {
     #if os(iOS)
     if usesPushNavigation {
@@ -143,7 +190,7 @@ struct TaskListStandaloneChrome: ViewModifier {
       // in a per-page "···" (decided 2026-11-23). The sidebar owns leading Quick Find / Settings,
       // and `NavigationSplitView` supplies the native sidebar toggle.
       if embedded {
-        content
+        content.toolbar { embeddedStarItem }
       } else {
         content.toolbar {
           if let starFilter {
@@ -166,7 +213,7 @@ struct TaskListStandaloneChrome: ViewModifier {
       content
       #endif
     } else if embedded {
-      content
+      content.toolbar { embeddedStarItem }
     } else {
       content.pageChrome(
         id: "tasks",
