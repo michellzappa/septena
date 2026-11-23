@@ -49,6 +49,6 @@
     "agents.stop-pause": { "title": "Stop one task, pause all agents", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "sync.backend": { "title": "Sync through api.septena.app", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "planned" },
     "account.delete": { "title": "Delete account", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
-    "settings.display": { "title": "Display, badge and privacy preferences", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" }
+    "settings.display": { "title": "Display, badge and privacy preferences", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" }
   }
 }

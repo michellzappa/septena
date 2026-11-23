@@ -11274,6 +11274,10 @@
         }
       }
     },
+    "Sign out" : {
+      "comment" : "Generated from registry actions.actions.account.signOut.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Signing in…" : {
 
     },
@@ -11865,6 +11869,10 @@
     },
     "Symptoms" : {
 
+    },
+    "Sync" : {
+      "comment" : "Generated from registry settings.pages.account.sections.sync.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Sync & storage diagnostics" : {
       "comment" : "Generated from registry settings.pages.advanced.sections.diagnostics.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

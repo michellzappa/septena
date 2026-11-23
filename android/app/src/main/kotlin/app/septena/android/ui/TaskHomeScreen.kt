@@ -56,6 +56,7 @@ import kotlinx.coroutines.withContext
 fun TaskHomeScreen(graph: AndroidAppGraph) {
     var openedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var quickFindOpen by rememberSaveable { mutableStateOf(false) }
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
     val factory = remember(graph) { TaskHomeViewModelFactory(graph) }
     val homeViewModel: TaskHomeViewModel = viewModel(factory = factory)
     val state by homeViewModel.state.collectAsStateWithLifecycle()
@@ -106,6 +107,10 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
     ).orEmpty()
     val quickFindTitle = RegistryCatalog.actionTitle(
         RegistryActionIds.APP_QUICK_FIND,
+        languageTag = languageTag,
+    ).orEmpty()
+    val settingsTitle = RegistryCatalog.actionTitle(
+        RegistryActionIds.APP_SETTINGS,
         languageTag = languageTag,
     ).orEmpty()
     val pauseAgentsTitle = RegistryCatalog.actionTitle(
@@ -168,12 +173,16 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                             languageTag = languageTag,
                             areasTitle = areasTitle,
                             projectsTitle = projectsTitle,
+                            settingsTitle = settingsTitle,
                             onSelect = homeViewModel::select,
+                            onOpenSettings = { settingsOpen = true },
                         )
                     }
                 }
             ) {
-                if (quickFindOpen) {
+                if (settingsOpen) {
+                    SettingsScreen(graph, onBack = { settingsOpen = false })
+                } else if (quickFindOpen) {
                     QuickFindScreen(graph, onBack = { quickFindOpen = false }, onSelect = openQuickFindTarget)
                 } else if (openedTaskId != null) {
                     TaskDetailScreen(graph, openedTaskId!!, onBack = { openedTaskId = null })
@@ -212,15 +221,22 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                             languageTag = languageTag,
                             areasTitle = areasTitle,
                             projectsTitle = projectsTitle,
+                            settingsTitle = settingsTitle,
                             onSelect = { location ->
                                 homeViewModel.select(location)
+                                scope.launch { drawerState.close() }
+                            },
+                            onOpenSettings = {
+                                settingsOpen = true
                                 scope.launch { drawerState.close() }
                             },
                         )
                     }
                 }
             ) {
-                if (quickFindOpen) {
+                if (settingsOpen) {
+                    SettingsScreen(graph, onBack = { settingsOpen = false })
+                } else if (quickFindOpen) {
                     QuickFindScreen(graph, onBack = { quickFindOpen = false }, onSelect = openQuickFindTarget)
                 } else if (openedTaskId != null) {
                     TaskDetailScreen(graph, openedTaskId!!, onBack = { openedTaskId = null })
@@ -265,7 +281,9 @@ private fun TaskHomeNavigation(
     languageTag: String,
     areasTitle: String,
     projectsTitle: String,
+    settingsTitle: String,
     onSelect: (TaskHomeLocation) -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -309,6 +327,13 @@ private fun TaskHomeNavigation(
                 )
             }
         }
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+        NavigationDrawerItem(
+            label = { Text(settingsTitle) },
+            selected = false,
+            onClick = onOpenSettings,
+            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+        )
     }
 }
 

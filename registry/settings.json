@@ -656,6 +656,7 @@
         },
         {
           "id": "sync",
+          "header": "Sync",
           "items": [
             { "kind": "customSurface", "surface": "sync_account_status" }
           ]

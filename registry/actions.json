@@ -453,6 +453,20 @@
       "availability": { "selection": "none", "platforms": ["android"] },
       "featureId": "edit.undo"
     },
+    "account.signOut": {
+      "title": "Sign out",
+      "icon": "action.cancel",
+      "role": "destructive",
+      "availability": { "selection": "none", "platforms": ["android"] },
+      "featureId": "sync.backend"
+    },
+    "settings.save": {
+      "title": "Save",
+      "icon": "action.complete",
+      "role": "default",
+      "availability": { "selection": "none", "platforms": ["android"] },
+      "featureId": "settings.display"
+    },
     "app.keyboardShortcuts": {
       "title": "Keyboard Shortcuts",
       "icon": "settings.about",

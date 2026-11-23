@@ -2065,7 +2065,8 @@
   "Save": {
     "text": "Save",
     "paths": [
-      "actions.actions.task.detail.save.title"
+      "actions.actions.task.detail.save.title",
+      "actions.actions.settings.save.title"
     ]
   },
   "Save Notes": {
@@ -2335,6 +2336,12 @@
       "surfaces.notices.items.signIn.primaryTitle"
     ]
   },
+  "Sign out": {
+    "text": "Sign out",
+    "paths": [
+      "actions.actions.account.signOut.title"
+    ]
+  },
   "Small": {
     "text": "Small",
     "paths": [
@@ -2414,6 +2421,12 @@
     "paths": [
       "surfaces.taskDetail.weekdays.6.title",
       "surfaces.taskDetail.calendarWeekdays.0.title"
+    ]
+  },
+  "Sync": {
+    "text": "Sync",
+    "paths": [
+      "settings.pages.account.sections.sync.header"
     ]
   },
   "Sync & storage diagnostics": {
