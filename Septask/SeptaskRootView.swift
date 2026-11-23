@@ -296,6 +296,12 @@ struct SeptaskRootView: View {
 private struct MagicPlusOrb: View {
   let drag: MagicPlusDragState
   @State private var showingMenu = false
+  /// Finger-down state: the orb sinks while touched, so the press reads as
+  /// received before the tap even ends.
+  @GestureState private var isPressed = false
+  /// Bumped on each tap: drives the release pop (grow, then settle back).
+  @State private var popTick = 0
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   let isViewingProject: Bool
   let isViewingToday: Bool
@@ -332,6 +338,16 @@ private struct MagicPlusOrb: View {
         }
         .offset(y: 2)
       }
+      .scaleEffect(isPressed && !drag.isDragging ? 0.88 : 1)
+      .a11yAnimation(.spring(response: 0.22, dampingFraction: 0.6), value: isPressed)
+      // Release pop: overshoot past rest, then spring back. Reduce Motion never
+      // bumps `popTick`, so the keyframes never play there.
+      .keyframeAnimator(initialValue: CGFloat(1), trigger: popTick) { content, scale in
+        content.scaleEffect(scale)
+      } keyframes: { _ in
+        SpringKeyframe(1.14, duration: 0.12, spring: .snappy)
+        SpringKeyframe(1, duration: 0.32, spring: .bouncy)
+      }
       .opacity(drag.isDragging ? 0 : 1)
       .scaleEffect(drag.isDragging ? 0.75 : 1)
 
@@ -366,8 +382,13 @@ private struct MagicPlusOrb: View {
     .onTapGesture {
       guard !drag.isDragging else { return }
       Haptics.tap()
+      if !reduceMotion { popTick += 1 }
       if isViewingToday { onNewTask() } else { showingMenu = true }
     }
+    .simultaneousGesture(
+      DragGesture(minimumDistance: 0)
+        .updating($isPressed) { _, pressed, _ in pressed = true }
+    )
     .simultaneousGesture(
       DragGesture(minimumDistance: 8, coordinateSpace: .global)
         .onChanged { value in

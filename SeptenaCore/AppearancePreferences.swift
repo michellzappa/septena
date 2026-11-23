@@ -239,7 +239,7 @@ final class AppearancePreferences {
     RegistryTokens.fruitAccents.first { $0.id == accentColorID }
       ?? RegistryTokens.fruitAccents.first
       ?? RegistryFruitAccent(
-        id: "colorful", name: "Colorful", origin: "Default · Blue + semantic",
+        id: "colorful", name: "Colorful", origin: "System · Blue + semantic",
         lightHex: "#007AFF", darkHex: "#0A84FF",
         checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: true
       )

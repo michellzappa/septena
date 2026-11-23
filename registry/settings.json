@@ -97,7 +97,7 @@
       "storageKey": "septena.appearance.accentColor",
       "type": "enum",
       "enum": "accentColor",
-      "default": "colorful",
+      "default": "persimmon",
       "ui": false,
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
       "featureId": "settings.display"

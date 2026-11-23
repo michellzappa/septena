@@ -1110,23 +1110,29 @@ struct TaskListView: View {
       return
     }
     var seed = TaskDraft(filter: filter)
+    let groupTarget: QuickAddGroupTarget?
     if let projectId {
       seed.projectId = projectId
-      quickAddGroupTarget = .project(projectId)
+      groupTarget = .project(projectId)
     } else if let areaId {
       seed.areaId = areaId
-      quickAddGroupTarget = .area(areaId)
+      groupTarget = .area(areaId)
     } else if filter == .today {
-      quickAddGroupTarget = .inbox
+      groupTarget = .inbox
     } else {
-      quickAddGroupTarget = nil
+      groupTarget = nil
     }
     let task = seed.create(via: mutator, deferPush: true, atBottom: true)
     model.noteCreated(task.id)
     draftEditIds.insert(task.id)
-    quickAddDraftAtTop = showsQuickAddAtTop
-    quickAddDraftId = task.id
-    a11yAnimate(.snappy(duration: 0.22)) {
+    // Every layout-shaping change goes in ONE animated transaction. The slot
+    // state (`quickAddGroupTarget`, `quickAddDraftAtTop`, `quickAddDraftId`)
+    // used to change outside it, so the capture slot mounted un-animated while
+    // the cards below slid on the spring: the rows below did not move as one.
+    a11yAnimate(.snappy(duration: 0.28)) {
+      quickAddGroupTarget = groupTarget
+      quickAddDraftAtTop = showsQuickAddAtTop
+      quickAddDraftId = task.id
       items.append(task)
       beginEdit(task)
     }
