@@ -1241,9 +1241,12 @@ final class SeptaskKitTaskListController: NSViewController {
   /// has keeps its ON-SCREEN value (the restyled-done copy, or the pre-edit
   /// copy under a live editor, whose cell must not be reconfigured); one the
   /// fresh read dropped is put back after the nearest surviving row that sat
-  /// above it. Everything else takes the fresh read. The pins come off when
-  /// their state ends — settle end, composer collapse and edit commit all
-  /// reload, and then the rows go wherever the data says.
+  /// above it. The group headers above a pinned row are pinned with it: when
+  /// the last open task of a project is completed, the fresh read drops the
+  /// project header, and without its header the lingering row reads as part
+  /// of the group above. Everything else takes the fresh read. The pins come
+  /// off when their state ends — settle end, composer collapse and edit
+  /// commit all reload, and then the rows go wherever the data says.
   private func pinned(_ fresh: [Row], liveEditors: Set<String>) -> [Row] {
     let pins = liveEditors.union(settlingIDs)
     guard !pins.isEmpty else { return fresh }
@@ -1254,9 +1257,12 @@ final class SeptaskKitTaskListController: NSViewController {
             let old = oldByKey[result[index].key] else { continue }
       result[index] = old
     }
+    let pinnedHeaderKeys = headerKeys(above: pins)
     var present = Set(result.map(\.key))
     for (oldIndex, old) in rows.enumerated() {
-      guard let id = old.task?.id, pins.contains(id), !present.contains(old.key) else { continue }
+      let isPinnedTask = old.task.map { pins.contains($0.id) } ?? false
+      guard isPinnedTask || pinnedHeaderKeys.contains(old.key),
+            !present.contains(old.key) else { continue }
       var insertAt = 0
       for above in stride(from: oldIndex - 1, through: 0, by: -1) {
         if let anchor = result.firstIndex(where: { $0.key == rows[above].key }) {
@@ -1268,6 +1274,23 @@ final class SeptaskKitTaskListController: NSViewController {
       present.insert(old.key)
     }
     return result
+  }
+
+  /// Keys of the on-screen group headers that own the given task rows: the
+  /// nearest header above each row, plus any header stacked directly above
+  /// that one (an area header over its first project header).
+  private func headerKeys(above taskIDs: Set<String>) -> Set<String> {
+    var keys: Set<String> = []
+    for (index, row) in rows.enumerated() {
+      guard let id = row.task?.id, taskIDs.contains(id) else { continue }
+      var above = index - 1
+      while above >= 0, case .task = rows[above] { above -= 1 }
+      while above >= 0, case .header = rows[above] {
+        keys.insert(rows[above].key)
+        above -= 1
+      }
+    }
+    return keys
   }
 
   /// The task that should take the selection once every selected row has
