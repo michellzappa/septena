@@ -83,6 +83,28 @@ pub(crate) struct DateFacts {
 
 pub(crate) fn date_facts(task: &TaskSnapshot, today: Day) -> DateFacts {
     let open = task.status == enums::task_status::OPEN;
+    let is_heading = task.kind.as_deref() == Some(enums::task_kind::HEADING);
+    let active = open && !is_heading && task.deleted_at.is_none() && task.faded_at.is_none();
+    let scheduled = parse_day(&task.scheduled);
+    let deadline = parse_day(&task.deadline);
+    let is_on_today =
+        active && (task.today || scheduled.is_some_and(|d| d <= today) || deadline.is_some_and(|d| d <= today));
+    DateFacts {
+        active,
+        scheduled,
+        deadline,
+        is_on_today,
+    }
+}
+
+/// List membership for one task. `today` is `YYYY-MM-DD` and `now` an
+/// ISO-8601 instant, both from the host's day clock.
+#[cfg_attr(feature = "ffi", uniffi::export)]
+pub fn task_view_membership(task: TaskSnapshot, today: String, now: String) -> Result<TaskViewMembership, CoreError> {
+    let today = day(&today, "today")?;
+    let now = instant(&now, "now")?;
+
+    let open = task.status == enums::task_status::OPEN;
     let DateFacts {
         active,
         scheduled,
