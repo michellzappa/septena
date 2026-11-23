@@ -430,27 +430,34 @@ struct SidebarRootView: View {
     Section {
       ForEach(smartListSpecs, id: \.title) { spec in
         #if os(iOS)
-        compactRow { smartListRow(for: spec) }
+        compactRow { smartListRow(for: spec, position: .solo) }
         #else
-        compactRow(route: spec.route) { smartListRow(for: spec) }
+        compactRow(route: spec.route) { smartListRow(for: spec, position: .solo) }
         #endif
       }
     }
   }
 
   @ViewBuilder
-  private func smartListRow(for spec: SmartListSpec) -> some View {
-    let row = navRow(spec.route) {
+  private func smartListRow(for spec: SmartListSpec, position: TaskCardPosition) -> some View {
+    #if os(macOS)
+    navRow(spec.route) {
       SmartListRow(icon: spec.icon,
                    iconColor: spec.color,
                    title: spec.title,
                    count: spec.count)
     }
     .contextMenu { smartListContextMenu(for: spec) }
-    #if os(macOS)
-    row.modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
+    .modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
     #else
-    row
+    cardRow(spec.route, position: position) {
+      SmartListRow(icon: spec.icon,
+                   iconColor: spec.color,
+                   title: spec.title,
+                   count: spec.count)
+    } menu: {
+      smartListContextMenu(for: spec)
+    }
     #endif
   }
 
@@ -766,6 +773,39 @@ struct SidebarRootView: View {
     #endif
   }
 
+  #if os(iOS)
+  /// An iOS sidebar row as one slice of its section's card — the same model
+  /// as a task row (`taskCardContextMenu`). The row paints its own fill
+  /// across the whole cell, and the context menu sits on that painted row
+  /// with the card-slice preview shape, so a long-press lifts the row as it
+  /// looks in place: same width, same corners, same fill. It used to lift a
+  /// separate padded preview, which the system drew as a floating pill.
+  ///
+  /// The fill is the one selection token: selected, or pressed from
+  /// touch-down (`NavigationPressStyle`).
+  @ViewBuilder
+  private func cardRow<Content: View, Menu: View>(
+    _ route: Route,
+    position: TaskCardPosition,
+    @ViewBuilder content: () -> Content,
+    @ViewBuilder menu: @escaping () -> Menu
+  ) -> some View {
+    let selected = isSelected(route)
+    let label = content()
+    NavigationPressReader { pressed in
+      navRow(route) {
+        label
+          .padding(.horizontal, 16)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .contentShape(Rectangle())
+      }
+      .background(SelectableListRowBackground(isSelected: selected || pressed))
+      .contentShape(.contextMenuPreview, position.cardShape)
+      .contextMenu(menuItems: menu)
+    }
+  }
+  #endif
+
   /// Every route the sidebar can currently select — visible smart lists, areas,
   /// and every active project. Used to resolve a `Route.id` tag back to its
   /// full `Route` for the selection binding.
@@ -857,41 +897,55 @@ struct SidebarRootView: View {
 
   @ViewBuilder
   private func areaProjectSections() -> some View {
-    if !topLevelProjects.isEmpty {
+    // Each row knows its slice of the section's card, so a long-press lifts
+    // exactly that slice (`cardRow`).
+    let topLevel = topLevelProjects
+    if !topLevel.isEmpty {
       Section {
-        ForEach(topLevelProjects) { project in
-          compactRow(route: .project(id: project.id)) { projectRow(project, parent: nil) }
+        ForEach(Array(topLevel.enumerated()), id: \.element.id) { idx, project in
+          compactRow(route: .project(id: project.id)) {
+            projectRow(project, parent: nil,
+                       position: TaskCardPosition(index: idx, count: topLevel.count))
+          }
         }
       }
     }
     ForEach(areas, id: \.id) { area in
       let areaProjects = projects.filter { $0.area == area.id && $0.status == .active }
       let collapsed = collapsedAreas.contains(area.id)
+      let rowCount = 1 + (collapsed ? 0 : areaProjects.count)
       Section {
         compactRow(route: .area(id: area.id)) {
-          areaRow(area, hasProjects: !areaProjects.isEmpty, collapsed: collapsed)
+          areaRow(area, hasProjects: !areaProjects.isEmpty, collapsed: collapsed,
+                  position: TaskCardPosition(index: 0, count: rowCount))
         }
         if !collapsed {
-          ForEach(areaProjects) { project in
-            compactRow(route: .project(id: project.id)) { projectRow(project, parent: area.id) }
+          ForEach(Array(areaProjects.enumerated()), id: \.element.id) { idx, project in
+            compactRow(route: .project(id: project.id)) {
+              projectRow(project, parent: area.id,
+                         position: TaskCardPosition(index: idx + 1, count: rowCount))
+            }
           }
         }
       }
     }
-    if !bottomSmartListSpecs.isEmpty {
+    let bottomSpecs = bottomSmartListSpecs
+    if !bottomSpecs.isEmpty {
       Section {
-        ForEach(bottomSmartListSpecs, id: \.route.id) { spec in
-          compactRow(route: spec.route) { smartListRow(for: spec) }
+        ForEach(Array(bottomSpecs.enumerated()), id: \.element.route.id) { idx, spec in
+          compactRow(route: spec.route) {
+            smartListRow(for: spec, position: TaskCardPosition(index: idx, count: bottomSpecs.count))
+          }
         }
       }
     }
   }
 
   /// Tightens a sidebar list row to Reminders-like density. The row views carry
-  /// their own height (`Theme.sidebar*RowHeight`), so the List's default vertical
-  /// inset otherwise stacks on top and makes rows too tall — we zero it and keep
-  /// a 16pt horizontal inset for the iOS grouped cards. macOS uses the system
-  /// sidebar's row metrics, which respond to the person's sidebar size setting.
+  /// their own height (`Theme.sidebar*RowHeight`), so the List's default insets
+  /// are zeroed; on iOS `cardRow` puts the 16pt side inset back INSIDE the row,
+  /// so the row paints the whole cell. macOS uses the system sidebar's row
+  /// metrics, which respond to the person's sidebar size setting.
   @ViewBuilder
   private func compactRow<V: View>(route: Route? = nil,
                                    @ViewBuilder _ row: () -> V) -> some View {
@@ -899,13 +953,11 @@ struct SidebarRootView: View {
     #if os(iOS)
     // Custom neutral fill only — suppress UIKit's accent capsule / selection
     // ring so rows don't grow or glow on tap (same pattern as the task-list
-    // detail). The row wears that fill from touch-down, not from the push:
-    // `NavigationPressReader` + `navRow`'s `NavigationPressStyle`.
-    let rowView = row()
-    NavigationPressReader { pressed in
-      rowView.listRowBackground(SelectableListRowBackground(isSelected: selected || pressed))
-    }
-      .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+    // detail). `cardRow` paints the same fill over the whole cell, pressed
+    // state included; this cell fill sits under it.
+    row()
+      .listRowInsets(EdgeInsets())
+      .listRowBackground(SelectableListRowBackground(isSelected: selected))
       .septenaSuppressListCellSelection()
     #else
     row()
@@ -918,27 +970,34 @@ struct SidebarRootView: View {
     #endif
   }
 
-  /// The area's own row — tappable to its detail, with rename / reorder / delete
-  /// in the context menu (and, on macOS, a task drop target). Sits at the top of
-  /// its section's grouped card, projects underneath.
+  /// The tappable row and its context menu; `areaRow` adds the drop targets.
   @ViewBuilder
-  private func areaRow(_ area: Area, hasProjects: Bool, collapsed: Bool) -> some View {
+  private func areaRowBase(_ area: Area, hasProjects: Bool, collapsed: Bool, position: TaskCardPosition) -> some View {
+    #if os(iOS)
+    cardRow(.area(id: area.id), position: position) {
+      SidebarAreaRow(name: area.title, emoji: area.emoji, count: areaOpenCount[area.id] ?? 0,
+                     isCollapsed: hasProjects ? collapsed : nil,
+                     onToggleCollapse: hasProjects ? { toggleAreaCollapsed(area.id) } : nil)
+    } menu: {
+      areaMenu(area)
+    }
+    #else
     navRow(.area(id: area.id)) {
       SidebarAreaRow(name: area.title, emoji: area.emoji, count: areaOpenCount[area.id] ?? 0,
                      isCollapsed: hasProjects ? collapsed : nil,
                      onToggleCollapse: hasProjects ? { toggleAreaCollapsed(area.id) } : nil)
     }
-    #if os(iOS)
-    .contextMenu {
-      areaMenu(area)
-    } preview: {
-      SidebarAreaRow(name: area.title, emoji: area.emoji, count: areaOpenCount[area.id] ?? 0)
-        .padding(.horizontal, 14).padding(.vertical, 6)
-        .background(Theme.cardSurface)
-    }
-    #else
     .contextMenu { areaMenu(area) }
     #endif
+  }
+
+  /// The area's own row — tappable to its detail, with rename / reorder / delete
+  /// in the context menu (and, on macOS, a task drop target). Sits at the top of
+  /// its section's grouped card, projects underneath.
+  @ViewBuilder
+  private func areaRow(_ area: Area, hasProjects: Bool, collapsed: Bool,
+                       position: TaskCardPosition) -> some View {
+    areaRowBase(area, hasProjects: hasProjects, collapsed: collapsed, position: position)
     // Drag-a-task-here re-home on co-visible sidebar+list (iPad/Mac).
     .modifier(SidebarTaskDrop(kind: .area(area.id), mutator: taskMutator) {
       newProjectInArea = area.id
@@ -954,26 +1013,31 @@ struct SidebarRootView: View {
     }
   }
 
+  /// The tappable row and its context menu; `projectRow` adds the drop targets.
   @ViewBuilder
-  private func projectRow(_ project: Project, parent: String?) -> some View {
+  private func projectRowBase(_ project: Project, position: TaskCardPosition) -> some View {
+    #if os(iOS)
+    cardRow(.project(id: project.id), position: position) {
+      SidebarProjectRow(name: project.title,
+                        progress: projectProgress[project.id] ?? 0,
+                        count: projectOpenCount[project.id] ?? 0)
+    } menu: {
+      projectMenu(project)
+    }
+    #else
     navRow(.project(id: project.id)) {
       SidebarProjectRow(name: project.title,
                         progress: projectProgress[project.id] ?? 0,
                         count: projectOpenCount[project.id] ?? 0)
     }
-    #if os(iOS)
-    .contextMenu {
-      projectMenu(project)
-    } preview: {
-      SidebarProjectRow(name: project.title,
-                        progress: projectProgress[project.id] ?? 0,
-                        count: projectOpenCount[project.id] ?? 0)
-        .padding(.horizontal, 14).padding(.vertical, 6)
-        .background(Theme.cardSurface)
-    }
-    #else
     .contextMenu { projectMenu(project) }
     #endif
+  }
+
+  @ViewBuilder
+  private func projectRow(_ project: Project, parent: String?,
+                          position: TaskCardPosition) -> some View {
+    projectRowBase(project, position: position)
     // Drag-a-task-here re-home on co-visible sidebar+list (iPad/Mac).
     .modifier(SidebarTaskDrop(kind: .project(project.id), mutator: taskMutator) {
       newProjectInArea = parent
