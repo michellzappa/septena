@@ -347,8 +347,8 @@ function portrait(panel, device, tint) {
     .shot-zone { position:absolute; left:0; right:0; display:flex; justify-content:center; }
     .founder { position:absolute; left:50%; top:46%; transform:translateX(-50%); width:1020px; }
   </style>
-  ${panel.photo ? `<div class="photo" style="position:absolute; inset:0; background:url(${panel.photo.img}) ${panel.photo.focus ?? "50% 40%"}/auto ${Math.round((panel.photo.zoom ?? 1.15) * 100)}% no-repeat;"></div>
-  <div style="position:absolute; inset:0; background:linear-gradient(to bottom, rgb(0 0 0 / ${panel.photo.shade ?? 0.55}) 0, rgb(0 0 0 / ${(panel.photo.shade ?? 0.55) * 0.5}) ${panel.photo.fade ?? 640}px, transparent ${(panel.photo.fade ?? 640) * 1.6}px);"></div>` : ""}
+  ${panel.photo ? `<div class="photo" style="position:absolute; left:0; right:0; bottom:0; top:${panel.photo.top ?? 160}px; background:url(${panel.photo.img}) ${panel.photo.focus ?? "50% 40%"}/auto ${Math.round((panel.photo.zoom ?? 1.15) * 100)}% no-repeat;"></div>
+  <div style="position:absolute; inset:0; background:linear-gradient(to bottom, #0B0B0C 0, #0B0B0C ${panel.photo.top ?? 160}px, rgb(11 11 12 / ${panel.photo.shade ?? 0.7}) ${(panel.photo.top ?? 160) + 160}px, rgb(11 11 12 / 0) ${panel.photo.fade ?? 900}px);"></div>` : ""}
   ${(panel.shots ?? []).map((s) => shot(s, device, tint)).join("")}
   ${shot(panel.shot, device, tint)}
   ${chips(panel.chips)}
