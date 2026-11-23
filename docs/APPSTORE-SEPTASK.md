@@ -54,7 +54,7 @@ Tasks that think with you
 
 ### promotional_text
 
-Tasks that think with you, on iPhone, iPad and Mac. Your agents do the work. You decide when it’s done. AI asks before it acts.
+Open source, on iPhone, iPad and Mac. Bring your tasks over from the app you use now, and let your agents do the work while you decide what’s done.
 
 ### description
 
@@ -134,7 +134,7 @@ Tasks that think with you
 
 ### promotional_text
 
-Tasks that think with you, built for the Mac. Your agents do the work. You decide when it’s done. Keyboard first, with Quick Entry from anywhere.
+Open source and built for the Mac. Bring your tasks over from the app you use now, and let your agents do the work while you decide what’s done.
 
 ### description
 
@@ -230,6 +230,8 @@ reads this table; `appstore/validate.mjs` checks it.
 | agent-work | agents/1 | - | Hand off the work. Your agent works from the task’s notes, and you can stop it anytime. | |
 | agent-result | review/0 | - | You decide when it’s done. Agent work waits in Review until you accept it. | |
 | lets-go | faded/0 | - | The list that lets go. Old tasks fade, and each week Septena asks if you still want them. | |
+| move-in | plan/0 | - | Bring your tasks with you. Import your areas, projects and tasks from your existing app. | |
+| open | privacy/0 | - | Yours, built in the open. Open source, and it works without an account. | |
 | looks | looks/2 | - | Make it yours. Pick an accent colour and a texture for your lists. | |
 | devices | today/0 | - | One list, every device. iPhone, iPad, Mac and Apple Watch. | |
 

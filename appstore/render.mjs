@@ -163,6 +163,13 @@ function resolveCard(device, panel) {
     const title = typeof n.title === "string" ? n.title : (count === 1 ? n.title.one : n.title.other).replace("{count}", String(count));
     return { ...base, face: null, title, subtitle: n.detail, actions: n.primaryTitle && c.actions !== false ? [{ label: n.primaryTitle, kind: "primary" }] : [] };
   }
+  if (c.kind === "section") {
+    // A settings section's own header and footer (registry/settings.json), not its rows.
+    const page = SETTINGS.pages?.find((x) => x.id === c.page);
+    const section = page?.sections.find((x) => x.id === c.section);
+    if (!section?.header) throw new Error(`${device.key}/${panel.id}: settings section ${c.page}/${c.section} with a header is not in registry/settings.json`);
+    return { ...base, face: null, title: section.header, subtitle: section.footer ?? null, actions: [] };
+  }
   if (c.kind === "list") {
     const rows = c.elements.map((id) => {
       const [title, meta] = el(id);

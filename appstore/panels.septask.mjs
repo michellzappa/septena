@@ -80,6 +80,20 @@ const VISUAL = {
     fruit: "pitaya", texture: "washiPaper",
     card: { kind: "notice", notice: "weeklySweep", top: 1800, actions: false },
   },
+  // Slide 7: bring your tasks with you. Anytime with areas and projects, and
+  // the app's own "Move from another app" words from registry/settings.json.
+  // No other app is named on the panel (mz, 2026-11-23).
+  "move-in":      {
+    fruit: "tamarillo", texture: "topography",
+    shot: { appearance: "dark" },
+    card: { kind: "section", page: "import_export", section: "move_in", top: 1760 },
+  },
+  // Slide 8: yours, built in the open. The Privacy & Data page drawn from
+  // registry/settings.json; the ring marks where your data lives.
+  open:           {
+    fruit: "haskap", texture: "ridges",
+    shot: { ring: { element: "setting-privacy_explainer" } },
+  },
   dates:          { fruit: "persimmon", texture: "ridges", shot: { appearance: "dark" } },
   looks:          {
     // Neutral canvas, so the three looks carry the colour: colourful in front,

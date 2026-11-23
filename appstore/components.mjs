@@ -151,7 +151,17 @@ function ring(r, { w, pad }) {
   const k = (w - 2 * pad) / (r.screenWidth ?? 402);
   const [x, y, fw, fh] = r.frame;
   const g = 24; // breathing room around the element
-  return `<div style="position:absolute; z-index:2; left:${pad + x * k - g}px; top:${pad + y * k - g}px; width:${fw * k + 2 * g}px; height:${fh * k + 2 * g}px; border:7px solid ${r.color ?? "#fff"}; border-radius:28px; box-shadow:0 0 0 8px color-mix(in oklab, ${r.color ?? "#fff"} 22%, transparent);"></div>`;
+  return `<div data-ring="${r.color ?? "#fff"}" style="position:absolute; z-index:2; left:${pad + x * k - g}px; top:${pad + y * k - g}px; width:${fw * k + 2 * g}px; height:${fh * k + 2 * g}px; border:7px solid ${r.color ?? "#fff"}; border-radius:28px; box-shadow:0 0 0 8px color-mix(in oklab, ${r.color ?? "#fff"} 22%, transparent);"></div>`;
+}
+
+// A card that zooms in on a ringed element wears the ring's outline, and a
+// thin line in the same accent joins the two (mz, 2026-11-23), so the eye
+// reads the card as the ringed element, larger. The line is drawn after
+// layout (LAYOUT_CALLOUTS), when both boxes are known.
+function linkedEdge(tint) {
+  return tint
+    ? `box-shadow:0 0 0 7px ${tint}, 0 0 0 15px color-mix(in oklab, ${tint} 22%, transparent), 0 50px 100px rgb(0 0 0 / .28);`
+    : "box-shadow:0 50px 100px rgb(0 0 0 / .28);";
 }
 
 // -------------------------------------------------------------- chat card
@@ -165,7 +175,7 @@ function chat(c) {
   const bubble = (text, mine) => `<div style="max-width:${mine ? 82 : 78}%; ${mine ? "margin-left:auto;" : ""} padding:30px 38px; border-radius:40px; ${mine ? "border-bottom-right-radius:12px;" : "border-bottom-left-radius:12px;"} background:${mine ? (c.tint ?? "#1D63DC") : "#F2F2F7"}; color:${mine ? "#fff" : "#141518"}; font:500 46px/1.25 ${ui};">${esc(text)}</div>`;
   const face = c.face ? `<svg width="96" height="96" viewBox="-120 -120 240 240" style="flex:none; overflow:visible;"><path d="${esc(c.face.body)}" fill="${esc(c.face.color)}"/><path d="${esc(c.face.eyes)}" fill="#fff"/></svg>` : "";
   return `
-  <div style="position:absolute; z-index:5; left:${c.left ?? 110}px; right:${c.right ?? 110}px; top:${c.top}px; padding:40px; background:#fff; border-radius:56px; box-shadow:0 40px 90px rgb(0 0 0 / .28); display:flex; flex-direction:column; gap:26px;">
+  <div data-linked style="position:absolute; z-index:5; left:${c.left ?? 110}px; right:${c.right ?? 110}px; top:${c.top}px; padding:40px; background:#fff; border-radius:56px; ${linkedEdge(c.tint)} display:flex; flex-direction:column; gap:26px;">
     ${bubble(c.you, true)}
     <div style="display:flex; align-items:flex-end; gap:20px;">${face}${bubble(c.agent, false)}</div>
   </div>`;
@@ -213,7 +223,7 @@ function card(c) {
       ${r.face ? avatar(r.face, 64) : ""}${r.meta ? `<span style="font:400 36px/1 ${ui}; color:#8E8E93;">${esc(r.meta)}</span>` : ""}
     </div>`).join("")}</div>` : "";
   return `
-  <div style="position:absolute; z-index:5; left:${c.left ?? 90}px; right:${c.right ?? 90}px; top:${c.top}px; padding:52px 56px; background:#fff; border-radius:56px; box-shadow:0 50px 100px rgb(0 0 0 / .28);">
+  <div data-linked style="position:absolute; z-index:5; left:${c.left ?? 90}px; right:${c.right ?? 90}px; top:${c.top}px; padding:52px 56px; background:#fff; border-radius:56px; ${linkedEdge(c.tint)}">
     ${head}${question}${chips}${artifact}${actions}${toggle}${rows}
   </div>`;
 }
@@ -300,6 +310,29 @@ const LAYOUT_CALLOUTS = `window.__layoutCallouts = () => {
     const textBottom = text.offsetTop + text.offsetHeight;
     const phoneTop = main.offsetTop + phone.offsetTop;
     if (phoneTop < textBottom + 24) document.documentElement.dataset.overlap = String(textBottom + 24 - phoneTop);
+  }
+  // Join a ring to its zoomed-in card: a thin accent line from the ring's
+  // nearer edge to the card's nearer edge, a dot at each end. Skipped when
+  // the two touch or overlap.
+  const panelEl = document.querySelector(".panel");
+  const ringEl = document.querySelector("[data-ring]");
+  const linked = document.querySelector("[data-linked]");
+  if (panelEl && ringEl && linked) {
+    const P = panelEl.getBoundingClientRect(), s = panelEl.offsetWidth / P.width;
+    const box = (el) => { const b = el.getBoundingClientRect(); return { l: (b.left - P.left) * s, t: (b.top - P.top) * s, r: (b.right - P.left) * s, b: (b.bottom - P.top) * s }; };
+    const R = box(ringEl), C = box(linked), gap = 22;
+    const below = C.t > R.b + gap, above = C.b < R.t - gap;
+    if (below || above) {
+      const x = Math.max(Math.max(R.l, C.l) + 80, Math.min(Math.min(R.r, C.r) - 80, (R.l + R.r) / 2));
+      const y1 = below ? R.b + 8 : R.t - 8, y2 = below ? C.t - 14 : C.b + 14;
+      const color = ringEl.dataset.ring;
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("width", panelEl.offsetWidth); svg.setAttribute("height", panelEl.offsetHeight);
+      svg.style.cssText = "position:absolute; left:0; top:0; z-index:4; pointer-events:none; overflow:visible;";
+      svg.innerHTML = '<line x1="' + x + '" y1="' + y1 + '" x2="' + x + '" y2="' + y2 + '" stroke="' + color + '" stroke-width="7" stroke-linecap="round" stroke-dasharray="2 18"/>'
+        + '<circle cx="' + x + '" cy="' + y1 + '" r="13" fill="' + color + '"/><circle cx="' + x + '" cy="' + y2 + '" r="13" fill="' + color + '"/>';
+      panelEl.appendChild(svg);
+    }
   }
   for (const card of document.querySelectorAll("[data-callout]")) {
     const d = card.dataset, cy = +d.cy;
