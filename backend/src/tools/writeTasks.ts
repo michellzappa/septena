@@ -152,7 +152,18 @@ export const updateTaskJsonSchema = {
     area: { type: ["string", "null"] },
     project: { type: ["string", "null"] },
     status: { type: "string", enum: ["open", "cancelled"] },
-    notes: { type: ["string", "null"], description: 'Free-text note body, or null/"" to clear' },
+    notes: { type: ["string", "null"], description: 'Replace the whole note body, or null/"" to clear. To add or change one part, use notes_append or notes_section instead, so you never overwrite edits made since your read.' },
+    notes_append: { type: "string", minLength: 1, description: "Add this text on a new line at the end of the notes. Cannot be combined with notes or notes_section." },
+    notes_section: {
+      type: "object",
+      required: ["heading", "body"],
+      properties: {
+        heading: { type: "string", minLength: 1, description: "The section heading, e.g. 'Decisions' (matches '## Decisions' or 'DECISIONS')." },
+        body: { type: "string", description: "The new text under that heading. A missing heading is added at the end." },
+      },
+      description: "Replace the text under one heading of the notes, up to the next heading. Cannot be combined with notes or notes_append.",
+    },
+    notes_rev: { type: "string", description: "The notesRev from your last tasks_get. When the notes changed since, the update is refused with the current notes and rev." },
     recurrence: recurrenceJsonSchema,
     reminder_at: {
       type: ["string", "null"],
@@ -235,6 +246,9 @@ export interface UpdateTaskInput {
   project?: string | null;
   status?: "open" | "cancelled";
   notes?: string | null;
+  notes_append?: string;
+  notes_section?: { heading: string; body: string };
+  notes_rev?: string;
   recurrence?: RecurrenceInput | null;
   reminder_at?: string | null;
   reminderAt?: string | null;
