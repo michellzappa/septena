@@ -51,18 +51,30 @@ const VISUAL = {
     shots: [{ src: "today/0", layout: "mac", frame: "laptop", accent: "tamarillo", width: 1.34, offsetX: -0.1, top: 760 }],
     watch: { src: "today/0", from: "tamarillo", accent: "#FF5C67", left: 120, top: 1960, width: 300 },
   },
-  // Slide 3: Discuss. The conversation, enlarged in a card over the phone's
-  // empty lower half, and a ring around it on the screen.
+  // Slide 3: Discuss. The conversation in an iOS-style card over the phone's
+  // empty lower half, with the agent's face; a ring marks it on the screen.
   thinking:       {
     fruit: "yuzu", texture: "fieldMatrix",
     shot: { ring: { element: "conversation", color: "#C28500" } },
-    discussion: { element: "conversation", top: 1820, tint: "#C28500" },
+    card: { kind: "discussion", element: "conversation", face: 1, top: 1800, tint: "#C28500" },
   },
-  // Agent faces (the site's avatar crew, in our fruit colours) sit on the
-  // phone's edge where agents work, over empty screen. Three and two; no more.
-  "agent-work":   { fruit: "acai", texture: "ridges", shot: { appearance: "dark", faces: [{ face: 0, side: "right", y: 0.5 }, { face: 1, side: "left", y: 0.64, size: 180 }, { face: 3, side: "right", y: 0.8, size: 160 }] } },
-  "agent-result": { fruit: "jabuticaba", texture: "stippleDrift", shot: { faces: [{ face: 2, side: "right", y: 0.7 }, { face: 4, side: "left", y: 0.84, size: 180 }] } },
-  inbox:          { fruit: "carambola", texture: "washiPaper" },
+  // Slide 4: your agent works, and you hold the brakes. The working screen,
+  // and a card with the agent's status, Stop, and the Pause all agents switch.
+  "agent-work":   {
+    fruit: "acai", texture: "ridges",
+    shot: { appearance: "dark" },
+    card: { kind: "agent", element: "agent-status", face: 0, top: 1700, tint: "#6544D6", toggleSetting: "agentsPaused" },
+  },
+  // Slide 5: agent work waits in Review until you accept it.
+  "agent-result": {
+    fruit: "jabuticaba", texture: "stippleDrift",
+    card: { kind: "review", element: "task-review-brief", face: 2, top: 1720, tint: "#27272E" },
+  },
+  // Slide 6: one Inbox. What you jot and what your agent adds land together.
+  inbox:          {
+    fruit: "carambola", texture: "washiPaper",
+    card: { kind: "list", title: "Inbox", elements: ["task-capture", "task-proposal", "task-inbox-note"], face: 3, top: 1760, tint: "#5B8C00" },
+  },
   dates:          { fruit: "persimmon", texture: "ridges", shot: { appearance: "dark" } },
   looks:          {
     // Neutral canvas, so the three looks carry the colour: colourful in front,
@@ -124,7 +136,7 @@ const iphone = rows.map((row, i) => {
     shots: v.shots,
     watch: v.watch,
     chat: v.chat,
-    discussion: v.discussion,
+    card: v.card,
   };
 });
 

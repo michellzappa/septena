@@ -171,25 +171,50 @@ function chat(c) {
   </div>`;
 }
 
-// ------------------------------------------------------------- discussion
-// The task conversation, enlarged in a card over the phone's empty lower half:
-// the task, Septena's question and the answers to tap. Every word comes from
-// the scene's .elements.json (render.mjs), so the card says what the screen
-// says. top in design px; tint: the panel's accent.
-function discussion(d) {
-  if (!d) return "";
+// ------------------------------------------------------------------- card
+// One floating card, drawn like an iOS sheet: an avatar and a title, then a
+// question with answer buttons, action buttons, a switch, or a short list.
+// No eyebrows, no capitals: system type, system grey, the panel's tint for
+// actions. Every word comes from the scene's .elements.json or the app's
+// registry (render.mjs resolves it), so the card says what the app says.
+function card(c) {
+  if (!c) return "";
   const ui = String(theme.fonts.ui).replace(/"/g, "'");
-  const chips = d.options.map((o, i) => {
-    const other = /…$/.test(o);
-    return `<span style="padding:22px 36px; border-radius:999px; font:600 42px/1 ${ui}; ${other ? "color:#6e6e73; border:3px solid #d1d1d6;" : `color:${d.tint}; border:3px solid color-mix(in oklab, ${d.tint} 45%, white); background:color-mix(in oklab, ${d.tint} 10%, white);`}">${esc(o)}</span>`;
-  }).join("");
+  const tint = c.tint ?? "#007AFF";
+  const avatar = (f, size) => f ? `<svg width="${size}" height="${size}" viewBox="-120 -120 240 240" style="flex:none; overflow:visible;"><path d="${esc(f.body)}" fill="${esc(f.color)}"/><path d="${esc(f.eyes)}" fill="#fff"/></svg>` : "";
+  const button = (label, kind) => {
+    const style = kind === "primary" ? `background:${tint}; color:#fff;`
+      : kind === "destructive" ? "background:rgb(255 59 48 / .12); color:#FF3B30;"
+      : kind === "muted" ? "background:#F2F2F7; color:#8E8E93;"
+      : `background:color-mix(in oklab, ${tint} 13%, white); color:${tint};`;
+    return `<span style="padding:24px 40px; border-radius:999px; font:600 42px/1 ${ui}; ${style}">${esc(label)}</span>`;
+  };
+  const head = c.title ? `
+    <div style="display:flex; align-items:center; gap:26px;">
+      ${avatar(c.face, 104)}
+      <div style="min-width:0;">
+        <div style="font:600 46px/1.2 ${ui}; color:#141518;">${esc(c.title)}</div>
+        ${c.subtitle ? `<div style="font:400 38px/1.3 ${ui}; color:#8E8E93; margin-top:6px;">${esc(c.subtitle)}</div>` : ""}
+      </div>
+    </div>` : "";
+  const question = c.question ? `<div style="font:700 62px/1.18 ${ui}; color:#141518; margin-top:40px;">${esc(c.question)}</div>` : "";
+  const chips = c.chips?.length ? `<div style="display:flex; flex-wrap:wrap; gap:20px; margin-top:40px;">${c.chips.map((x) => button(x, /…$/.test(x) ? "muted" : "tinted")).join("")}</div>` : "";
+  const artifact = c.artifact ? `<div style="display:inline-flex; align-items:center; gap:14px; margin-top:30px; padding:18px 28px; border-radius:22px; background:#F2F2F7; font:500 38px/1 ${ui}; color:#3A3A3C;">${esc(c.artifact)}</div>` : "";
+  const actions = c.actions?.length ? `<div style="display:flex; flex-wrap:wrap; gap:20px; margin-top:40px;">${c.actions.map((x) => button(x.label, x.kind)).join("")}</div>` : "";
+  const toggle = c.toggle ? `
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:30px; margin-top:40px; padding-top:34px; border-top:2px solid #E5E5EA;">
+      <span style="font:500 44px/1.2 ${ui}; color:#141518;">${esc(c.toggle)}</span>
+      <span style="flex:none; width:128px; height:78px; border-radius:999px; background:#E9E9EB; position:relative;"><span style="position:absolute; left:6px; top:6px; width:66px; height:66px; border-radius:50%; background:#fff; box-shadow:0 3px 8px rgb(0 0 0 / .2);"></span></span>
+    </div>` : "";
+  const rows = c.rows?.length ? `<div style="margin-top:${c.title ? 30 : 0}px;">${c.rows.map((r, i) => `
+    <div style="display:flex; align-items:center; gap:26px; padding:28px 0; ${i ? "border-top:2px solid #E5E5EA;" : ""}">
+      <span style="flex:none; width:50px; height:50px; border-radius:14px; border:4px ${r.proposal ? "dashed" : "solid"} #C7C7CC;"></span>
+      <span style="flex:1; min-width:0; font:500 46px/1.2 ${ui}; color:#141518;">${esc(r.title)}</span>
+      ${r.face ? avatar(r.face, 64) : ""}${r.meta ? `<span style="font:400 36px/1 ${ui}; color:#8E8E93;">${esc(r.meta)}</span>` : ""}
+    </div>`).join("")}</div>` : "";
   return `
-  <div style="position:absolute; z-index:5; left:${d.left ?? 90}px; right:${d.right ?? 90}px; top:${d.top}px; padding:54px 56px; background:#fff; border-radius:60px; box-shadow:0 50px 100px rgb(0 0 0 / .3); font-family:${ui};">
-    <div style="display:flex; align-items:center; gap:18px; font:600 34px/1 ${ui}; color:#6e6e73; text-transform:uppercase; letter-spacing:.08em;">
-      <span style="width:22px; height:22px; border-radius:50%; background:${d.tint};"></span>Discuss · ${esc(d.task)}
-    </div>
-    <div style="margin-top:34px; font:700 64px/1.18 ${ui}; color:#141518;">${esc(d.question)}</div>
-    <div style="display:flex; flex-wrap:wrap; gap:22px; margin-top:44px;">${chips}</div>
+  <div style="position:absolute; z-index:5; left:${c.left ?? 90}px; right:${c.right ?? 90}px; top:${c.top}px; padding:52px 56px; background:#fff; border-radius:56px; box-shadow:0 50px 100px rgb(0 0 0 / .28);">
+    ${head}${question}${chips}${artifact}${actions}${toggle}${rows}
   </div>`;
 }
 
@@ -448,7 +473,7 @@ function portrait(panel, device, tint) {
   ${shot(panel.shot, device, tint)}
   ${watch(panel.watch)}
   ${chat(panel.chat)}
-  ${discussion(panel.discussion)}
+  ${card(panel.card)}
   ${chips(panel.chips)}
   ${founder(panel.founder)}
   ${overlays(panel.overlays)}

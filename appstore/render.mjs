@@ -111,6 +111,48 @@ const withFaces = (s) => {
   }) };
 };
 
+// "Pause all agents" and the like: labels the app shows, from registry/settings.json.
+const SETTINGS = JSON.parse(readFileSync(join(ROOT, "..", "registry", "settings.json"), "utf8"));
+const settingLabel = (key) => {
+  for (const g of SETTINGS.rootGroups) for (const item of g.items ?? []) if (item.key === key) return item.label;
+  throw new Error(`setting ${key} is not in registry/settings.json`);
+};
+// Builds a panel's card from what its screen shows (see card() in components.mjs).
+function resolveCard(device, panel) {
+  const c = panel.card;
+  const m = shotElements(device, panel.shot.src, panel.shot.appearance, panel.shot.accent);
+  const el = (id) => {
+    const e = m?.elements.find((x) => x.id === id);
+    if (!e) throw new Error(`${device.key}/${panel.id}: card element "${id}" is not on screen ${panel.shot.src}`);
+    return e.label.split("\n").map((l) => l.trim()).filter(Boolean);
+  };
+  const face = c.face == null ? null : CREW[c.face];
+  if (c.face != null && !face) throw new Error(`${device.key}/${panel.id}: card face ${c.face} is not in the avatar crew`);
+  const base = { top: c.top, left: c.left, right: c.right, tint: c.tint, face };
+  if (c.kind === "discussion") {
+    const [question, ...chips] = el(c.element);
+    return { ...base, title: el(c.taskElement ?? "task-detail")[0], subtitle: c.subtitle, question, chips };
+  }
+  if (c.kind === "agent") {
+    const [status, ...buttons] = el(c.element);
+    return { ...base, title: el(c.taskElement ?? "task-detail")[0], subtitle: status, actions: buttons.map((label) => ({ label, kind: label === "Stop" ? "destructive" : "tinted" })), toggle: c.toggleSetting ? settingLabel(c.toggleSetting) : null };
+  }
+  if (c.kind === "review") {
+    const lines = el(c.element);
+    const actions = lines.slice(-2);
+    return { ...base, title: lines[0], subtitle: lines[1], artifact: lines.length > 4 ? lines[2] : null, actions: actions.map((label, i) => ({ label, kind: i === actions.length - 1 ? "primary" : "tinted" })) };
+  }
+  if (c.kind === "list") {
+    const rows = c.elements.map((id) => {
+      const [title, meta] = el(id);
+      const proposal = meta === "Proposal";
+      return { title, meta, proposal, face: proposal ? face : null };
+    });
+    return { ...base, face: null, title: c.title ?? null, rows };
+  }
+  throw new Error(`${device.key}/${panel.id}: unknown card kind ${c.kind}`);
+}
+
 const chrome = await openChrome();
 
 for (const device of activeDevices()) {
@@ -161,16 +203,8 @@ for (const device of activeDevices()) {
         },
         // A small watch: its rows are the first task titles on the named scene's
         // screen (that screen's .elements.json), never typed by hand.
-        // The discussion card's words: the conversation element's lines
-        // (question, then answers) and the task's title, from the screen itself.
-        discussion: panel.discussion && (() => {
-          const m = shotElements(device, panel.shot.src, panel.shot.appearance, panel.shot.accent);
-          const conv = m?.elements.find((e) => e.id === panel.discussion.element);
-          const task = m?.elements.find((e) => e.id === (panel.discussion.taskElement ?? "task-detail"));
-          if (!conv || !task) throw new Error(`${device.key}/${panel.id}: discussion elements are not on screen ${panel.shot.src}`);
-          const [question, ...options] = conv.label.split("\n").map((l) => l.trim()).filter(Boolean);
-          return { ...panel.discussion, question, options, task: task.label.split("\n")[0] };
-        })(),
+        // The card's words, from the screen's elements and the app registry.
+        card: panel.card && resolveCard(device, panel),
         chat: panel.chat && (() => {
           const face = panel.chat.face == null ? null : CREW[panel.chat.face];
           if (panel.chat.face != null && !face) throw new Error(`${device.key}/${panel.id}: chat face ${panel.chat.face} is not in the avatar crew`);
