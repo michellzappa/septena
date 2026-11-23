@@ -146,6 +146,11 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     checklistLabel.font = SeptaskKitTheme.chip
     checklistLabel.textColor = SeptaskKitTheme.iconMuted
     checklistView.translatesAutoresizingMaskIntoConstraints = false
+    checklistView.onLeave = { [weak self] delta in
+      guard let self, delta < 0 else { return }
+      self.view.window?.makeFirstResponder(self.notesView)
+      self.notesView.setSelectedRange(NSRange(location: (self.notesView.string as NSString).length, length: 0))
+    }
     checklistView.onChanged = { [weak self] in
       guard let self else { return }
       self.updateChecklistVisibility()
@@ -637,6 +642,12 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       return true
     case #selector(NSResponder.insertBacktab(_:)):
       view.window?.selectPreviousKeyView(textView)
+      return true
+    // ↓ on the last line of notes walks into the checklist steps, like the
+    // open row's composer; ↑ off the first step comes back (`onLeave`).
+    case #selector(NSResponder.moveDown(_:))
+      where checklistView.hasItems && textView.caretOnLastLine:
+      checklistView.focusFirstItem()
       return true
     default:
       return false

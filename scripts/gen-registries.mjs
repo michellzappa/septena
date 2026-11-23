@@ -148,6 +148,12 @@ function validateTokens(tokens) {
       assert(typeof t.name === "string" && t.name.length > 0, `tokens.json: texture ${t.id} missing name`);
     }
   }
+  if (tokens.multicolorGlyphs !== undefined) {
+    for (const [icon, role] of Object.entries(tokens.multicolorGlyphs.glyphs ?? {})) {
+      assert(icons.icons?.[icon], `tokens.json: multicolorGlyphs icon "${icon}" is not in icons.json`);
+      assert(/^#[0-9a-fA-F]{6}$/.test(tokens.colors?.[role] ?? ""), `tokens.json: multicolorGlyphs "${icon}" role "${role}" must name a hex in colors`);
+    }
+  }
   assert(Array.isArray(tokens.textScale?.steps) && tokens.textScale.steps.length === 5, "tokens.json: textScale must have 5 steps");
 }
 
@@ -747,6 +753,9 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     lines.push(`    RegistryFruitAccent(id: ${swiftStr(a.id)}, name: ${L(a.name, a, "name")}, origin: ${swiftStr(a.origin)}, lightHex: ${swiftStr(a.light)}, darkHex: ${swiftStr(a.dark)}, checkLightHex: ${swiftStr(a.checkLight)}, checkDarkHex: ${swiftStr(a.checkDark)}, multicolor: ${Boolean(a.multicolor)}),`);
   }
   lines.push("  ]");
+  lines.push("  /// Icon id → hex for icons that keep their semantic color under the");
+  lines.push("  /// multicolor fruit (`multicolorGlyphs`); other fruits tint them with the accent.");
+  lines.push(`  static let multicolorGlyphHex: [String: String] = [${Object.entries(tokens.multicolorGlyphs?.glyphs ?? {}).map(([icon, role]) => `${swiftStr(icon)}: ${swiftStr(tokens.colors[role])}`).join(", ") || ":"}]`);
   lines.push("  static let textures: [RegistryTextureOption] = [");
   for (const t of tokens.textures ?? []) {
     lines.push(`    RegistryTextureOption(id: ${swiftStr(t.id)}, name: ${L(t.name, t, "name")}, tag: ${L(t.tag, t, "tag")}),`);
@@ -1625,7 +1634,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESTINATIONS = ${JSON.stringify(dests.destinations)} as const;`);
   lines.push(`export const GENERIC_EMPTY_STATE = ${JSON.stringify(dests.genericEmptyState)} as const;`);
   lines.push(`export const ICONS = ${JSON.stringify(icons.icons)} as const;`);
-  lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
+  lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, swipeActions: actions.swipeActions, shortcutsSheet: actions.shortcutsSheet })} as const;`);
   lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes })} as const;`);

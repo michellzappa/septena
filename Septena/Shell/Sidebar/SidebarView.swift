@@ -722,10 +722,11 @@ struct SidebarRootView: View {
   }
 
   private func smartListColor(_ route: Route) -> Color {
-    // Only Today wears the user's active accent color — it's the bucket you
-    // act on. The other special lists recede to quiet secondary ink.
+    // Only Today wears color — it's the bucket you act on: gold under
+    // Colorful, else the accent (`tokens.json` `multicolorGlyphs`). The other
+    // special lists recede to quiet secondary ink.
     switch route {
-    case .filter(.today): return AppearancePreferences.shared.accentSwiftUIColor
+    case .filter(.today): return AppearancePreferences.shared.glyphSwiftUIColor(TaskFilter.today.registryDestination?.iconId ?? "list.today")
     default:              return .secondary
     }
   }

@@ -277,6 +277,9 @@ enum RegistryTokens {
     RegistryFruitAccent(id: "pitaya", name: RegistryL10n.t("Pitaya"), origin: "Mesoamerica · Dragonfruit", lightHex: "#D4266C", darkHex: "#FF5C9B", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: false),
     RegistryFruitAccent(id: "jabuticaba", name: RegistryL10n.t("Jabuticaba"), origin: "Brazil · Obsidian ink", lightHex: "#27272E", darkHex: "#E4E4EA", checkLightHex: "#FFFFFF", checkDarkHex: "#141518", multicolor: false),
   ]
+  /// Icon id → hex for icons that keep their semantic color under the
+  /// multicolor fruit (`multicolorGlyphs`); other fruits tint them with the accent.
+  static let multicolorGlyphHex: [String: String] = ["list.today": "#F5C721"]
   static let textures: [RegistryTextureOption] = [
     RegistryTextureOption(id: "none", name: RegistryL10n.t("Pure Canvas"), tag: RegistryL10n.t("Baseline")),
     RegistryTextureOption(id: "topography", name: RegistryL10n.t("Topography"), tag: RegistryL10n.t("Height Map")),

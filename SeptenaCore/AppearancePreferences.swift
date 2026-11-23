@@ -311,6 +311,16 @@ final class AppearancePreferences {
     return Self.dynamicColor(light: light, dark: dark)
   }
 
+  /// The color for an icon (`icons.json` id) that carries meaning: its
+  /// semantic color while the multicolor fruit is the accent
+  /// (`tokens.json` `multicolorGlyphs`, e.g. the Today sun in gold), the
+  /// accent under every other fruit.
+  func glyphSwiftUIColor(_ iconID: String) -> Color {
+    guard isColorful, let hex = RegistryTokens.multicolorGlyphHex[iconID] else { return accentSwiftUIColor }
+    let c = RGBTriple.fromHex(hex)
+    return Color(.sRGB, red: c.r, green: c.g, blue: c.b, opacity: 1)
+  }
+
   var checkInkSwiftUIColor: Color {
     let f = currentFruit
     let light = RGBTriple.fromHex(f.checkLightHex)
@@ -338,6 +348,13 @@ final class AppearancePreferences {
       let c = isDark ? dark : light
       return NSColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: 1)
     }
+  }
+
+  /// AppKit twin of `glyphSwiftUIColor(_:)`.
+  func glyphNSColor(_ iconID: String) -> NSColor {
+    guard isColorful, let hex = RegistryTokens.multicolorGlyphHex[iconID] else { return accentNSColor }
+    let c = RGBTriple.fromHex(hex)
+    return NSColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: 1)
   }
 
   var checkInkNSColor: NSColor {

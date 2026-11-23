@@ -674,17 +674,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
   /// Whether the caret sits on the last visual line of a wrapped text view —
   /// ↓ there leaves the field; ↓ on an earlier line is a normal line move.
-  private func caretOnLastLine(of view: NSTextView) -> Bool {
-    guard let manager = view.layoutManager, let container = view.textContainer else { return true }
-    manager.ensureLayout(for: container)
-    let glyphCount = manager.numberOfGlyphs
-    let length = (view.string as NSString).length
-    guard glyphCount > 0, length > 0 else { return true }
-    let caret = min(view.selectedRange().location, length - 1)
-    let glyph = min(manager.glyphIndexForCharacter(at: caret), glyphCount - 1)
-    let line = manager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
-    return line.maxY >= manager.usedRect(for: container).maxY - 1
-  }
+  private func caretOnLastLine(of view: NSTextView) -> Bool { view.caretOnLastLine }
 
   // MARK: - Measurement
 
@@ -932,6 +922,28 @@ final class KitNestedScrollView: NSScrollView {
 /// glyph will land — an overlaid label never quite lines up with a text
 /// container's origin. Reminders' "Add Note" / Things' "Notes" do the same.
 @MainActor
+extension NSTextView {
+  /// Whether the caret sits on the last visual line — ↓ there leaves the
+  /// field for whatever sits below it. The caret at the very end counts too:
+  /// after a trailing line break it sits on AppKit's extra empty line, which
+  /// has no glyph of its own, so the glyph test alone missed it.
+  var caretOnLastLine: Bool {
+    guard let manager = layoutManager, let container = textContainer else { return true }
+    let length = (string as NSString).length
+    if selectedRange().location >= length { return true }
+    manager.ensureLayout(for: container)
+    let glyphCount = manager.numberOfGlyphs
+    guard glyphCount > 0, length > 0 else { return true }
+    let caret = min(selectedRange().location, length - 1)
+    let glyph = min(manager.glyphIndexForCharacter(at: caret), glyphCount - 1)
+    let line = manager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+    let bottom = manager.extraLineFragmentRect.isEmpty
+      ? manager.usedRect(for: container).maxY
+      : manager.extraLineFragmentRect.minY
+    return line.maxY >= bottom - 1
+  }
+}
+
 final class KitComposerTextView: NSTextView {
   var placeholder = "" {
     didSet { needsDisplay = true }
@@ -1029,9 +1041,7 @@ final class KitPillButton: NSButton {
   /// Nil for free-text pills (conversation), which keep a plain text stadium.
   var attribute: RegistryTaskAttribute? {
     didSet {
-      guard let attribute else { return }
-      image = NSImage(systemSymbolName: attribute.sfSymbol, accessibilityDescription: nil)?
-        .withSymbolConfiguration(.init(pointSize: 12, weight: .semibold))
+      guard attribute != nil else { return }
       imagePosition = .imageLeading
       heightConstraint.constant = Self.attributeHeight
       show(value: nil)
@@ -1148,8 +1158,26 @@ final class KitPillButton: NSButton {
         .foregroundColor: isOn ? SeptaskKitTheme.inkPrimary : SeptaskKitTheme.inkSecondary,
       ])
     contentTintColor = isOn ? SeptaskKitTheme.inkPrimary : SeptaskKitTheme.inkSecondary
+    if let attribute { image = symbolImage(attribute.sfSymbol, ink: contentTintColor ?? .labelColor) }
     isRestyling = false
     applyCapsule()
+  }
+
+  /// The symbol drawn in the pill's ink, resolved for this appearance. A
+  /// template image tinted by `contentTintColor` rendered near-black under
+  /// the glass in dark mode (the icons vanished), so the color is baked into
+  /// the symbol's palette instead; `viewDidChangeEffectiveAppearance` redraws.
+  private func symbolImage(_ name: String, ink: NSColor) -> NSImage? {
+    var resolved = ink
+    effectiveAppearance.performAsCurrentDrawingAppearance {
+      resolved = ink.usingColorSpace(.sRGB) ?? ink
+    }
+    let config = NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+      .applying(NSImage.SymbolConfiguration(paletteColors: [resolved]))
+    let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+      .withSymbolConfiguration(config)
+    image?.isTemplate = false
+    return image
   }
 
   private func applyCapsule() {

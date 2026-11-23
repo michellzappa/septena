@@ -1100,8 +1100,10 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         ? SeptaskKitTheme.inkSecondary
         : SeptaskKitTheme.inkPrimary
       let isToday = filter == .today
+      // Today wears its glyph color: gold under Colorful, else the accent
+      // (`tokens.json` `multicolorGlyphs`).
       let tint: NSColor = isToday
-        ? AppearancePreferences.shared.accentNSColor
+        ? AppearancePreferences.shared.glyphNSColor(TaskFilter.today.registryDestination?.iconId ?? "list.today")
         : SeptaskKitTheme.inkSecondary
       let tag = isToday ? "accent:\(AppearancePreferences.shared.accentColorID)" : "secondary"
       cell.imageView?.image = KitGlyph.symbol(symbol, color: tint, cacheTag: tag)
