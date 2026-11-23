@@ -79,11 +79,21 @@ object RegistryCatalog {
     fun destinationTitle(id: String, languageTag: String = "en"): String? =
         destination(id)?.stringAt("title")?.let { localizedString(it, languageTag) ?: it }
 
+    fun destinationSupportsInlineCreate(id: String): Boolean =
+        (destination(id)?.fields?.get(DESTINATION_INLINE_CREATE_FIELD) as? JsonValue.BooleanValue)?.value == true
+
     fun destinationEmptyTitle(id: String, languageTag: String = "en"): String? =
         destination(id)?.objectAt("emptyState")?.stringAt("title")?.let { localizedString(it, languageTag) ?: it }
 
     fun actionTitle(id: String, field: String = "title", languageTag: String = "en"): String? =
         action(id)?.stringAt(field)?.let { localizedString(it, languageTag) ?: it }
+
+    fun actionAddTitle(id: String, languageTag: String = "en"): String? =
+        actionTitle(id, field = ACTION_ADD_TITLE_FIELD, languageTag = languageTag)
+
+    fun capabilityTitle(id: String, languageTag: String = "en"): String? =
+        capabilities(RegistryPlatformIds.ANDROID).firstOrNull { it.id == id }?.title
+            ?.let { localizedString(it, languageTag) ?: it }
 
     fun surface(id: String): JsonValue.ObjectValue? = findObjectWithId(document("surfaces"), id)
 
@@ -119,4 +129,7 @@ object RegistryCatalog {
         is JsonValue.ArrayValue -> value.values.firstNotNullOfOrNull { findObjectWithId(it, id) }
         else -> null
     }
+
+    private const val DESTINATION_INLINE_CREATE_FIELD = "supportsInlineCreate"
+    private const val ACTION_ADD_TITLE_FIELD = "addTitle"
 }
