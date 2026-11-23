@@ -502,6 +502,19 @@ final class MagicPlusDragState {
       return a.priority > b.priority
     }
 
+    // Stickiness in the dead space between two lists (the end of one area and
+    // the header of the next): when the probe sits in no zone, keep the current
+    // target until another zone is clearly nearer. Picking the strictly
+    // nearest zone flipped between the two lists at every pixel around the
+    // midpoint.
+    if candidates.isEmpty, let current = activeTarget,
+       let currentZone = layout.first(where: { $0.id == current.id }),
+       let best, best.id != current.id,
+       Self.distance(from: probe, to: currentZone.frame)
+         < Self.distance(from: probe, to: best.frame) + 20 {
+      return
+    }
+
     guard let best else {
       if activeTarget != nil {
         a11yAnimate(.snappy(duration: 0.18)) { activeTarget = nil }

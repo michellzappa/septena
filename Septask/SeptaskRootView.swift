@@ -353,17 +353,10 @@ private struct MagicPlusOrb: View {
 
       // Cancel drop socket — appears in the bottom-right spot during drag so
       // dragging back here unmistakably cancels the action.
+      // Plain glass, like the toolbar circles: no dashed ring (decided
+      // 2026-11-23). It turns red glass while the finger is over it.
       ZStack {
-        Circle()
-          .fill(drag.isOverCancelSocket ? Color.red.opacity(0.24) : Color.secondary.opacity(0.14))
-          .overlay(
-            Circle()
-              .strokeBorder(
-                drag.isOverCancelSocket ? Color.red.opacity(0.85) : Color.secondary.opacity(0.45),
-                style: StrokeStyle(lineWidth: drag.isOverCancelSocket ? 2 : 1.5,
-                                   dash: drag.isOverCancelSocket ? [] : [5, 4])
-              )
-          )
+        Color.clear
         Image(systemName: "xmark")
           .scaledFont(size: 18, weight: .semibold)
           .foregroundStyle(drag.isOverCancelSocket ? Color.red : Color.secondary)
