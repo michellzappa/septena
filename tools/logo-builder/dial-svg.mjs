@@ -76,6 +76,43 @@ export const FRUIT_PALETTES = [
 
 export const DIAL_PALETTES = FRUIT_PALETTES;
 
+// The app icon matrix: every finish (registry/entities.json enum appIconFinish)
+// in every colour. scripts/generate-app-icons.mjs bakes it into the asset
+// catalog, and the website's brand page renders the same list. Framed + Mono is
+// left out because it draws the same icon as Obsidian + Mono.
+export const APP_ICON_COLORS = [
+  { id: 'persimmon', suffix: 'Persimmon', paletteId: 'persimmon', mono: false },
+  { id: 'haskap',    suffix: 'Haskap',    paletteId: 'haskap',    mono: false },
+  { id: 'tamarillo', suffix: 'Tamarillo', paletteId: 'tamarillo', mono: false },
+  { id: 'yuzu',      suffix: 'Yuzu',      paletteId: 'yuzu',      mono: false },
+  { id: 'carambola', suffix: 'Carambola', paletteId: 'carambola', mono: false },
+  { id: 'acai',      suffix: 'Acai',      paletteId: 'acai',      mono: false },
+  { id: 'pitaya',    suffix: 'Pitaya',    paletteId: 'pitaya',    mono: false },
+  { id: 'mono',      suffix: 'Mono',      paletteId: 'jabuticaba', mono: true },
+];
+
+export const APP_ICON_FINISHES = [
+  // title: the name Settings shows (SeptenaCore/AppIconCatalog.swift).
+  { id: 'obsidian', prefix: 'Obsidian', title: 'Default', shellMode: 'black' },
+  { id: 'ceramic',  prefix: 'Ceramic',  title: 'Light',   shellMode: 'white' },
+  { id: 'framed',   prefix: 'Framed',   title: 'Framed',  shellMode: 'color' },
+];
+
+export function appIconSets() {
+  const paletteById = Object.fromEntries(FRUIT_PALETTES.map(p => [p.id, p]));
+  const sets = [];
+  for (const finish of APP_ICON_FINISHES) {
+    for (const color of APP_ICON_COLORS) {
+      if (finish.id === 'framed' && color.mono) continue;
+      const palette = paletteById[color.paletteId];
+      if (!palette) throw new Error(`No palette for app icon colour ${color.id}`);
+      const isDefault = finish.id === 'obsidian' && color.id === 'persimmon';
+      sets.push({ setName: isDefault ? 'AppIcon' : `AppIcon${finish.prefix}${color.suffix}`, finish, color, palette, isDefault });
+    }
+  }
+  return sets;
+}
+
 export const DIAL_PROPOSALS = [
   {
     id: 'septena-compass',

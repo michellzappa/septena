@@ -14,46 +14,16 @@ import os from 'os';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { FRUIT_PALETTES, renderDialSVG } from '../tools/logo-builder/dial-svg.mjs';
+import { FRUIT_PALETTES, appIconSets, renderDialSVG } from '../tools/logo-builder/dial-svg.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
 const assetsDir = path.join(repoRoot, 'Septask', 'Assets.xcassets');
 
-const COLOR_SPECS = [
-  { id: 'persimmon', suffix: 'Persimmon', paletteId: 'persimmon', mono: false },
-  { id: 'haskap',    suffix: 'Haskap',    paletteId: 'haskap',    mono: false },
-  { id: 'tamarillo', suffix: 'Tamarillo', paletteId: 'tamarillo', mono: false },
-  { id: 'yuzu',      suffix: 'Yuzu',      paletteId: 'yuzu',      mono: false },
-  { id: 'carambola', suffix: 'Carambola', paletteId: 'carambola', mono: false },
-  { id: 'acai',      suffix: 'Acai',      paletteId: 'acai',      mono: false },
-  { id: 'pitaya',    suffix: 'Pitaya',    paletteId: 'pitaya',    mono: false },
-  { id: 'mono',      suffix: 'Mono',      paletteId: 'jabuticaba', mono: true },
-];
-
-const FINISH_SPECS = [
-  { id: 'obsidian', prefix: 'Obsidian', shellMode: 'black' },
-  { id: 'ceramic',  prefix: 'Ceramic',  shellMode: 'white' },
-  { id: 'framed',   prefix: 'Framed',   shellMode: 'color' },
-];
-
+// The finish x colour matrix is shared with the website's brand page
+// (septena-site scripts/sync-brand.mjs), so it lives in dial-svg.mjs.
+const iconSets = appIconSets();
 const paletteById = Object.fromEntries(FRUIT_PALETTES.map(p => [p.id, p]));
-
-// Build the exact 23-asset list (3 finishes x 8 colors, minus duplicate Framed+Mono)
-const iconSets = [];
-for (const fin of FINISH_SPECS) {
-  for (const col of COLOR_SPECS) {
-    if (fin.id === 'framed' && col.mono) continue;
-    const isDefault = fin.id === 'obsidian' && col.id === 'persimmon';
-    const setName = isDefault ? 'AppIcon' : `AppIcon${fin.prefix}${col.suffix}`;
-    iconSets.push({
-      setName,
-      finish: fin,
-      color: col,
-      palette: paletteById[col.paletteId],
-    });
-  }
-}
 
 console.log(`Generating ${iconSets.length} AppIcon asset sets in ${path.relative(repoRoot, assetsDir)}…`);
 
