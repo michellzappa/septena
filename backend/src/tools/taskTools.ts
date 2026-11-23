@@ -71,6 +71,18 @@ export const listProjectsJsonSchema = {
   },
 } as const;
 
+export const searchTasksJsonSchema = {
+  type: "object",
+  properties: {
+    query: { type: "string", minLength: 1, description: "Words to find in task titles and notes. Case and accents are ignored; a word also matches longer words that start with it." },
+    area: { type: "string", description: "Only tasks in this area (as tasks_list shows it)." },
+    project: { type: "string", description: "Only tasks in this project (as tasks_list shows it)." },
+    status: { type: "string", enum: ["open", "completed", "all"], default: "open", description: "open (default), completed, or all." },
+    limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+  },
+  required: ["query"],
+} as const;
+
 export const TASK_TOOLS: Tool[] = [
   {
     name: "tasks_list",
@@ -79,6 +91,13 @@ export const TASK_TOOLS: Tool[] = [
       "List Septena tasks for a given view (today, inbox, review, upcoming, anytime, completed). 'today' is the whole Today page the user sees: the Inbox section first, then the filed tasks on Today. 'inbox' is that Inbox section alone: unfiled tasks (no area or project) plus your proposals the user has not accepted. 'review' lists open tasks waiting for the user to check and accept (`needs_verify`). The user sees ONE Inbox; never describe it as two piles. Each row carries `inbox: true` when it sits in the Inbox, and `daysOnToday: N` when it has carried over on Today undone for N days (the app darkens its checkbox; flag rows at 7+ as stuck). Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
     inputSchema: listTasksJsonSchema,
     annotations: { title: "List tasks", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "tasks_search",
+    title: "Search tasks",
+    description: "Find tasks by words in their title or notes, best match first, with near matches so near-duplicates surface. Call it before tasks_create to check that the task does not exist yet. Filter by area, project and status (open by default; completed or all). Rows have the tasks_list shape plus `matched` (title or notes). Returns {tasks, total, truncated}.",
+    inputSchema: searchTasksJsonSchema,
+    annotations: { title: "Search tasks", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
     name: "tasks_get",
@@ -112,7 +131,7 @@ export const TASK_TOOLS: Tool[] = [
   {
     name: "tasks_create",
     title: "Create task",
-    description: "Create a new Septena task. Returns the new id and its placement. Set `origin` to declare provenance: `user_request` when the user explicitly asked (lands committed, placed where specified) or `agent_suggestion` when you surfaced it yourself (lands as a PROPOSAL in the user's inbox to review). Omit → Septena files it as a proposal (secure by default).",
+    description: "Create a new Septena task. Call tasks_search first so you do not create a duplicate. Returns the new id and its placement. Set `origin` to declare provenance: `user_request` when the user explicitly asked (lands committed, placed where specified) or `agent_suggestion` when you surfaced it yourself (lands as a PROPOSAL in the user's inbox to review). Omit → Septena files it as a proposal (secure by default).",
     inputSchema: createTaskJsonSchema,
     annotations: { title: "Create task", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   },

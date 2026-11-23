@@ -34,6 +34,7 @@ import {
   type TaskConvo,
   type TaskOut,
   annotate,
+  searchMatch,
   awaitsReasoning,
   convoSummary,
   inboxFirst,
@@ -66,6 +67,7 @@ const INSTRUCTIONS =
   "task conversations in the Septena task backend, and create, change and complete " +
   "tasks and their conversations. It is the same data the user's Septena app shows, " +
   "and changes reach the app within seconds.\n\n" +
+  "Before you create a task, call tasks_search to check that it does not exist yet.\n\n" +
   "Working a task as an agent: find work with tasks_pending_reasoning (or tasks_agent_events with a cursor), " +
   "tasks_claim it with your agent name before you write, renew the claim while you work, write each step as a " +
   "conversation turn, and tasks_release with one line on what you did. Ask the user with a provider turn that has " +
@@ -138,6 +140,13 @@ const zArgs = {
     limit: zLimit(500).optional(),
   }),
   tasks_list_tags: z.object({}),
+  tasks_search: z.object({
+    query: z.string().min(1),
+    area: z.string().min(1).optional(),
+    project: z.string().min(1).optional(),
+    status: z.enum(["open", "completed", "all"]).optional(),
+    limit: zLimit(100).optional(),
+  }),
   tasks_pending_reasoning: z.object({ limit: zLimit(500).optional() }),
 };
 type ReadToolName = keyof typeof zArgs;
@@ -296,6 +305,9 @@ async function callTool(
   switch (name as ReadToolName) {
     case "tasks_list":
       result = await listTasks(store, timeZone, a.view, a.limit as number | undefined, a.tag as string | string[] | undefined);
+      break;
+    case "tasks_search":
+      result = await searchTasks(store, timeZone, a as unknown as SearchArgs);
       break;
     case "tasks_get": {
       const r = await store.readTask(a.id as string);
@@ -525,6 +537,34 @@ export async function listTasks(
     tasks: tasks.slice(0, limit).map((t) => stripDays(annotate(t, today, nowMs))),
     total: matched.length,
     truncated: matched.length > limit,
+  };
+}
+
+interface SearchArgs { query: string; area?: string; project?: string; status?: "open" | "completed" | "all"; limit?: number }
+
+/// `tasks_search`: open tasks (all of them) and/or the newest 500 done ones,
+/// filtered by area and project, ranked by `searchMatch`.
+export async function searchTasks(store: StoreRpc, timeZone: string, a: SearchArgs) {
+  const status = a.status ?? "open";
+  const limit = a.limit ?? 20;
+  const tagMap = tagNameMap(await store.readTags());
+  const rows: Row[] = [];
+  if (status !== "completed") rows.push(...(await store.readTasks("open", 500)).rows);
+  if (status !== "open") rows.push(...(await store.readTasks("done", 500)).rows);
+  const same = (have: string | undefined, want: string | undefined) =>
+    want === undefined || (have ?? "").toLowerCase() === want.toLowerCase();
+  const today = todayYMD(timeZone);
+  const nowMs = Date.now();
+  const hits = rows
+    .map((row) => taskOut(row, tagMap))
+    .filter((t) => same(t.area, a.area) && same(t.project, a.project))
+    .map((t, i) => ({ t, i, m: searchMatch(t, a.query) }))
+    .filter((x): x is { t: TaskOut; i: number; m: NonNullable<ReturnType<typeof searchMatch>> } => x.m !== null)
+    .sort((x, y) => y.m.score - x.m.score || x.i - y.i);
+  return {
+    tasks: hits.slice(0, limit).map(({ t, m }) => ({ ...stripDays(annotate(t, today, nowMs)), matched: m.matched })),
+    total: hits.length,
+    truncated: hits.length > limit,
   };
 }
 

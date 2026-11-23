@@ -238,3 +238,35 @@ export function convoSummary(c: TaskConvo) {
     pendingReasoning: awaitsReasoning(c),
   };
 }
+
+// ---- Search (tasks_search) ----
+
+/// Lower-case, diacritics stripped, punctuation folded to spaces.
+export function foldText(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+/// How well a task matches a search query, or null for no match. Ranks an
+/// exact title first, then every query word in the title, then partial word
+/// overlap, so near-duplicates surface. A query word matches a title or note
+/// word that starts with it ("remind" matches "reminders").
+export function searchMatch(
+  t: Pick<TaskOut, "title" | "notes">, query: string,
+): { score: number; matched: "title" | "notes" } | null {
+  const q = foldText(query);
+  if (q.length === 0) return null;
+  const words = [...new Set(q.split(" "))];
+  const title = foldText(t.title);
+  const titleWords = title.split(" ");
+  const noteWords = foldText(t.notes ?? "").split(" ");
+  const hits = (have: string[]) => words.filter((w) => have.some((h) => h.startsWith(w))).length;
+  if (title === q) return { score: 100, matched: "title" };
+  const inTitle = hits(titleWords);
+  if (inTitle === words.length) return { score: 80 + (title.includes(q) ? 10 : 0), matched: "title" };
+  const inNotes = hits(noteWords);
+  if (inNotes === words.length) return { score: 40 + 20 * (inTitle / words.length), matched: "notes" };
+  // Near match: at least half the query words, in title and notes together.
+  const either = words.filter((w) => [...titleWords, ...noteWords].some((h) => h.startsWith(w))).length;
+  if (either * 2 < words.length || either === 0) return null;
+  return { score: 30 * (either / words.length) + 10 * (inTitle / words.length), matched: inTitle > 0 ? "title" : "notes" };
+}
