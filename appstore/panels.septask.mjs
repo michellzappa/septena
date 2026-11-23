@@ -32,8 +32,10 @@ import { parseScreenshots } from "./metadata.mjs";
 const VISUAL = {
   hook:           { fruit: "haskap", texture: "topography" },
   thinking:       { fruit: "yuzu", texture: "fieldMatrix" },
-  "agent-work":   { fruit: "acai", texture: "ridges", shot: { appearance: "dark" } },
-  "agent-result": { fruit: "jabuticaba", texture: "stippleDrift" },
+  // Agent faces (the site's avatar crew) peek out from behind the phone where
+  // agents work. Two on agent-work, one on agent-result; no more.
+  "agent-work":   { fruit: "acai", texture: "ridges", shot: { appearance: "dark", faces: [{ face: 0, side: "right", y: 0.2 }, { face: 1, side: "left", y: 0.48, size: 200 }] } },
+  "agent-result": { fruit: "jabuticaba", texture: "stippleDrift", shot: { faces: [{ face: 2, side: "right", y: 0.36 }] } },
   inbox:          { fruit: "carambola", texture: "washiPaper" },
   dates:          { fruit: "persimmon", texture: "ridges", shot: { appearance: "dark" } },
   looks:          {

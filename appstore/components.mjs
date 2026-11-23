@@ -104,12 +104,27 @@ function shot(s, device, tint) {
   return `
   <div class="shot-zone"${s.alignTop ? " data-align-top" : ""}${s.alignMiddle != null ? ` data-align-middle="${s.alignMiddle}"` : ""} style="bottom:${s.bottom ?? 110}px; transform: translate(${Math.round((s.offsetX ?? 0) * 100)}%, ${Math.round((s.offsetY ?? 0) * 100)}%);">
     <div class="shot-wrap" style="width:${w}px; transform: rotate(${s.rotate ?? 0}deg);">
-      <div class="frame" style="width:${w}px; padding:${f.pad}px;${f.bezel ? ` background:${PHONE.case} center/100% 100% no-repeat; box-shadow:none; overflow:visible; filter:drop-shadow(0 ${Math.round(20 * k)}px ${Math.round(24 * k)}px rgb(0 0 0 / .28));` : ` border-radius:${f.radius}px;`}">
+      ${faces(s.faces, w)}
+      <div class="frame" style="position:relative; z-index:1; width:${w}px; padding:${f.pad}px;${f.bezel ? ` background:${PHONE.case} center/100% 100% no-repeat; box-shadow:none; overflow:visible; filter:drop-shadow(0 ${Math.round(20 * k)}px ${Math.round(24 * k)}px rgb(0 0 0 / .28));` : ` border-radius:${f.radius}px;`}">
         ${screen}${island}
       </div>
       ${s.img ? callout(s.callout, { w, pad: f.pad, margin: (dw - w) / 2, tint }) : ""}
     </div>
   </div>`;
+}
+
+// ------------------------------------------------------------ agent faces
+// Agent faces peeking out from behind the phone's edge: they sit under the
+// frame (z-index), so only the part past the edge shows. side: "left" |
+// "right"; y: centre as a fraction of the phone's height; size in design px;
+// show: the fraction of the face past the edge.
+function faces(list, w) {
+  if (!list?.length) return "";
+  return list.map((f) => {
+    const size = f.size ?? 230, show = f.show ?? 0.6;
+    const x = f.side === "left" ? -size * show : w - size * (1 - show);
+    return `<svg class="agent-face" width="${size}" height="${size}" viewBox="-120 -120 240 240" style="position:absolute; z-index:0; left:${Math.round(x)}px; top:calc(${(f.y ?? 0.3) * 100}% - ${size / 2}px); overflow:visible; filter:drop-shadow(0 10px 18px rgb(0 0 0 / .22));"><path d="${esc(f.body)}" fill="${esc(f.color)}"/><path d="${esc(f.eyes)}" fill="#fff"/></svg>`;
+  }).join("");
 }
 
 // --------------------------------------------------------------- callout

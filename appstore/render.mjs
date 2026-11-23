@@ -96,6 +96,21 @@ const washCode = (() => {
   return stripTypeScriptTypes(`${data}\n${src.slice(start, end)}`.replace(/^export /gm, ""));
 })();
 
+// Vendor-free agent faces (the site's content/agent-avatars.json "crew", from
+// Starlings' avatar recipe), for panels that show agents at work.
+const CREW = (() => {
+  const file = join(SITE, "content", "agent-avatars.json");
+  return existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).crew ?? [] : [];
+})();
+const withFaces = (s) => {
+  if (!s?.faces) return s;
+  return { ...s, faces: s.faces.map((f) => {
+    const face = CREW[f.face];
+    if (!face) throw new Error(`agent face ${f.face} is not in ${SITE}/content/agent-avatars.json crew (run scripts/sync-agent-avatars.mjs there)`);
+    return { ...f, ...face };
+  }) };
+};
+
 const chrome = await openChrome();
 
 for (const device of activeDevices()) {
@@ -130,7 +145,7 @@ for (const device of activeDevices()) {
     const html = renderPanelHTML(
       {
         ...panel,
-        shot: panel.shot && { ...panel.shot, img: shotDataURL(device, panel.shot.src, panel.shot.appearance, panel.shot.accent) },
+        shot: panel.shot && { ...withFaces(panel.shot), img: shotDataURL(device, panel.shot.src, panel.shot.appearance, panel.shot.accent) },
         // Extra phones behind the main one (a fan). Fails closed: every one needs a real capture.
         shots: (panel.shots ?? []).map((s) => {
           const img = shotDataURL(device, s.src, s.appearance, s.accent);
