@@ -161,6 +161,16 @@ for (const device of activeDevices()) {
         },
         // A small watch: its rows are the first task titles on the named scene's
         // screen (that screen's .elements.json), never typed by hand.
+        // The discussion card's words: the conversation element's lines
+        // (question, then answers) and the task's title, from the screen itself.
+        discussion: panel.discussion && (() => {
+          const m = shotElements(device, panel.shot.src, panel.shot.appearance, panel.shot.accent);
+          const conv = m?.elements.find((e) => e.id === panel.discussion.element);
+          const task = m?.elements.find((e) => e.id === (panel.discussion.taskElement ?? "task-detail"));
+          if (!conv || !task) throw new Error(`${device.key}/${panel.id}: discussion elements are not on screen ${panel.shot.src}`);
+          const [question, ...options] = conv.label.split("\n").map((l) => l.trim()).filter(Boolean);
+          return { ...panel.discussion, question, options, task: task.label.split("\n")[0] };
+        })(),
         chat: panel.chat && (() => {
           const face = panel.chat.face == null ? null : CREW[panel.chat.face];
           if (panel.chat.face != null && !face) throw new Error(`${device.key}/${panel.id}: chat face ${panel.chat.face} is not in the avatar crew`);

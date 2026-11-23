@@ -171,6 +171,28 @@ function chat(c) {
   </div>`;
 }
 
+// ------------------------------------------------------------- discussion
+// The task conversation, enlarged in a card over the phone's empty lower half:
+// the task, Septena's question and the answers to tap. Every word comes from
+// the scene's .elements.json (render.mjs), so the card says what the screen
+// says. top in design px; tint: the panel's accent.
+function discussion(d) {
+  if (!d) return "";
+  const ui = String(theme.fonts.ui).replace(/"/g, "'");
+  const chips = d.options.map((o, i) => {
+    const other = /…$/.test(o);
+    return `<span style="padding:22px 36px; border-radius:999px; font:600 42px/1 ${ui}; ${other ? "color:#6e6e73; border:3px solid #d1d1d6;" : `color:${d.tint}; border:3px solid color-mix(in oklab, ${d.tint} 45%, white); background:color-mix(in oklab, ${d.tint} 10%, white);`}">${esc(o)}</span>`;
+  }).join("");
+  return `
+  <div style="position:absolute; z-index:5; left:${d.left ?? 90}px; right:${d.right ?? 90}px; top:${d.top}px; padding:54px 56px; background:#fff; border-radius:60px; box-shadow:0 50px 100px rgb(0 0 0 / .3); font-family:${ui};">
+    <div style="display:flex; align-items:center; gap:18px; font:600 34px/1 ${ui}; color:#6e6e73; text-transform:uppercase; letter-spacing:.08em;">
+      <span style="width:22px; height:22px; border-radius:50%; background:${d.tint};"></span>Discuss · ${esc(d.task)}
+    </div>
+    <div style="margin-top:34px; font:700 64px/1.18 ${ui}; color:#141518;">${esc(d.question)}</div>
+    <div style="display:flex; flex-wrap:wrap; gap:22px; margin-top:44px;">${chips}</div>
+  </div>`;
+}
+
 // ------------------------------------------------------------------ watch
 // A small Apple Watch with Today's first tasks (rows come from a scene's
 // elements, see render.mjs). Drawn, not captured: the scene builder has no
@@ -423,6 +445,7 @@ function portrait(panel, device, tint) {
   ${shot(panel.shot, device, tint)}
   ${watch(panel.watch)}
   ${chat(panel.chat)}
+  ${discussion(panel.discussion)}
   ${chips(panel.chips)}
   ${founder(panel.founder)}
   ${overlays(panel.overlays)}

@@ -51,7 +51,13 @@ const VISUAL = {
     shots: [{ src: "today/0", layout: "mac", frame: "laptop", accent: "tamarillo", width: 1.34, offsetX: -0.1, top: 760 }],
     watch: { src: "today/0", from: "tamarillo", accent: "#FF5C67", left: 120, top: 1960, width: 300 },
   },
-  thinking:       { fruit: "yuzu", texture: "fieldMatrix" },
+  // Slide 3: Discuss. The conversation, enlarged in a card over the phone's
+  // empty lower half, and a ring around it on the screen.
+  thinking:       {
+    fruit: "yuzu", texture: "fieldMatrix",
+    shot: { ring: { element: "conversation", color: "#C28500" } },
+    discussion: { element: "conversation", top: 1820, tint: "#C28500" },
+  },
   // Agent faces (the site's avatar crew, in our fruit colours) sit on the
   // phone's edge where agents work, over empty screen. Three and two; no more.
   "agent-work":   { fruit: "acai", texture: "ridges", shot: { appearance: "dark", faces: [{ face: 0, side: "right", y: 0.5 }, { face: 1, side: "left", y: 0.64, size: 180 }, { face: 3, side: "right", y: 0.8, size: 160 }] } },
@@ -118,6 +124,7 @@ const iphone = rows.map((row, i) => {
     shots: v.shots,
     watch: v.watch,
     chat: v.chat,
+    discussion: v.discussion,
   };
 });
 
