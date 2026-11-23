@@ -110,7 +110,11 @@ task from the pile is a gesture and is on the undo stack.
 ## 5. The weekly sweep
 
 Once a week (Sunday *(default)*), the Inbox band shows one row: "N tasks
-faded this week. Still want any?". Tapping it opens the sweep sheet.
+faded this week. Still want any of them?" with a **Review** button. Tapping
+it opens the sweep sheet. The row shows on the sweep day only: if the user
+ignores it, it is gone on Monday and comes back next Sunday. The Faded pile
+opens the same sheet on any day. "Sweep" is the internal name; the UI says
+"Review".
 
 - The sheet lists the tasks that faded since the last sweep.
 - Each row has one control: **Keep**. Kept tasks go back to their list.

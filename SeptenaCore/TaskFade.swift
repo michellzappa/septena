@@ -149,15 +149,17 @@ enum TaskFade {
   }
 
   /// Whether the weekly sweep banner should appear in the Inbox band (§5).
-  /// True once the Sunday anchor has passed since the last sweep (and the user
-  /// hasn't dismissed this week's banner), and at least one task faded since
-  /// the last sweep.
+  /// True only on the sweep day itself (Sunday by default), when the user has
+  /// not swept or dismissed this week, and at least one task faded since the
+  /// last sweep. An ignored banner goes away on Monday; the Faded pile still
+  /// opens the same sheet on any day.
   static func isSweepDue(now: Date,
                          lastSweepAt: Date?,
                          dismissedWeek: Date?,
                          fadedDates: [Date],
                          calendar: Calendar = .current) -> Bool {
     let anchor = mostRecentSweepAnchor(now: now, calendar: calendar)
+    guard calendar.startOfDay(for: now) == anchor else { return false }
     if let lastSweepAt, lastSweepAt >= anchor { return false }
     if let dismissedWeek, dismissedWeek >= anchor { return false }
     return fadedDates.contains { isInCurrentSweep(fadedAt: $0, lastSweepAt: lastSweepAt) }
