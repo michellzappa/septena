@@ -37,7 +37,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// a conversation exists; a task with no agent history gets no header and no
   /// empty box (docs/SEPTASK_CONVERSATIONS_PLAN.md).
   private let conversationLabel = NSTextField(labelWithString:
-    String(localized: "Conversation", comment: "SeptaskKit: inspector section"))
+    RegistrySurfaces.taskPageBlock(.conversation).label ?? "")
   private let conversationView = KitConversationView()
   /// Who changed the task and what (SeptaskKitHistory.swift). Loads only
   /// while open.

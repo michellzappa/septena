@@ -81,7 +81,7 @@ final class KitHistoryView: NSStackView {
   }
 
   private func updateToggle() {
-    toggle.title = String(localized: "History", comment: "SeptaskKit: inspector section")
+    toggle.title = RegistrySurfaces.taskPageBlock(.history).label ?? ""
     toggle.image = NSImage(systemSymbolName: expanded ? "chevron.down" : "chevron.right",
                            accessibilityDescription: nil)?
       .withSymbolConfiguration(.init(pointSize: 9, weight: .semibold))

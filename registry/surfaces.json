@@ -324,6 +324,19 @@
     { "id": "discuss", "label": "Discuss", "workingLabel": "Thinking…", "icon": "action.discuss", "commitContract": "closeCommits", "surfaceTier": "inline", "featureId": "ai.discuss", "editOnly": true },
     { "id": "paste", "label": "Paste", "icon": "action.paste", "commitContract": "pickCommits", "surfaceTier": "chip", "featureId": "capture.quick-entry" }
   ],
+  "taskPage": {
+    "id": "taskPage",
+    "featureId": "task.page",
+    "blocks": [
+      { "id": "taskPage.header", "kind": "header", "depths": ["inline", "page"], "featureId": "lists.today" },
+      { "id": "taskPage.notes", "kind": "notes", "attribute": "notes", "depths": ["inline", "page"], "featureId": "task.notes" },
+      { "id": "taskPage.attributes", "kind": "attributes", "depths": ["inline", "page"], "featureId": "lists.today" },
+      { "id": "taskPage.checklist", "kind": "checklist", "attribute": "checklist", "depths": ["page"], "featureId": "task.checklists", "editOnly": true },
+      { "id": "taskPage.attachments", "kind": "attachments", "attribute": "attachments", "depths": ["page"], "featureId": "task.attachments", "editOnly": true },
+      { "id": "taskPage.conversation", "kind": "conversation", "label": "Conversation", "depths": ["page"], "featureId": "ai.discuss", "editOnly": true },
+      { "id": "taskPage.history", "kind": "history", "label": "History", "depths": ["page"], "featureId": "task.history", "editOnly": true }
+    ]
+  },
   "taskDetail": {
     "id": "taskDetail",
     "title": "Task Details",

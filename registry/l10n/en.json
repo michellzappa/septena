@@ -516,6 +516,12 @@
       "surfaces.firstRun.steps.connectClaude.afterDone.title"
     ]
   },
+  "Conversation": {
+    "text": "Conversation",
+    "paths": [
+      "surfaces.taskPage.blocks.taskPage.conversation.label"
+    ]
+  },
   "Copy": {
     "text": "Copy",
     "paths": [
@@ -993,6 +999,12 @@
     "text": "Hide Sidebar Counts",
     "paths": [
       "actions.actions.app.toggleSidebarCounts.activeTitle"
+    ]
+  },
+  "History": {
+    "text": "History",
+    "paths": [
+      "surfaces.taskPage.blocks.taskPage.history.label"
     ]
   },
   "How AI helps with your tasks": {

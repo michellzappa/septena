@@ -16,7 +16,7 @@
       "icon": "action.open",
       "role": "default",
       "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted"] },
-      "featureId": "lists.today"
+      "featureId": "task.page"
     },
     "task.share": {
       "title": "Share…",
@@ -46,7 +46,7 @@
       "role": "default",
       "shortcut": { "key": "i", "modifiers": ["primary", "alt"] },
       "availability": { "selection": "any", "platforms": ["macos", "web", "windows"] },
-      "featureId": "mac.keyboard"
+      "featureId": "task.page"
     },
     "task.copy": {
       "title": "Copy",
@@ -105,6 +105,7 @@
       "featureId": "lists.starred"
     },
     "task.tags": {
+      "opensAttribute": "tags",
       "title": "Tags…",
       "icon": "action.tag",
       "role": "default",
@@ -142,6 +143,7 @@
       "featureId": "task.checklists"
     },
     "task.when": {
+      "opensAttribute": "when",
       "title": "When…",
       "shortTitle": "Schedule",
       "icon": "action.when",
@@ -151,6 +153,7 @@
       "featureId": "task.when-deadline"
     },
     "task.deadline": {
+      "opensAttribute": "deadline",
       "title": "Deadline…",
       "icon": "action.deadline",
       "role": "default",
@@ -159,6 +162,7 @@
       "featureId": "task.when-deadline"
     },
     "task.reminder": {
+      "opensAttribute": "reminder",
       "title": "Reminder…",
       "addTitle": "Add Reminder…",
       "icon": "action.reminder",
@@ -168,6 +172,7 @@
       "featureId": "task.alerts"
     },
     "task.move": {
+      "opensAttribute": "list",
       "title": "Move…",
       "pluralTitle": "Move Tasks",
       "shortTitle": "Move",
@@ -194,6 +199,7 @@
       "featureId": "task.when-deadline"
     },
     "task.repeat": {
+      "opensAttribute": "repeat",
       "title": "Repeat…",
       "icon": "action.repeat",
       "role": "default",
