@@ -217,8 +217,9 @@ reads this table; `appstore/validate.mjs` checks it.
   with any agent that speaks MCP.
 - No em or en dashes. Every title and sub passes the humanizer skill.
 - Panels next to each other must not look alike. `appstore/panels.septask.mjs`
-  varies the fill, light or dark screen, tilt, phone size, callout and number
-  of phones per slug (decided 2026-11-23).
+  varies the fill, light or dark screen, phone size and number of phones per
+  slug. Phones never tilt. Each screen shows the app in the panel's own accent
+  (decided 2026-11-23).
 
 ### iPhone
 
@@ -226,11 +227,11 @@ reads this table; `appstore/validate.mjs` checks it.
 | --- | --- | --- | --- | --- |
 | hook | today/0 | - | Tasks that think with you | |
 | thinking | thinking/1 | - | AI that asks before it acts | Tap Discuss, and Septena asks one short question first. |
-| agent-work | agents/2 | agent-status | Your agents do the work | Hand a task to your agent, and it asks you when it needs a decision. |
-| agent-result | agents/3 | agent-status | You decide when it’s done | Finished work waits in Review until you Accept it. |
-| inbox | capture/1 | task-capture | New tasks wait in the Inbox | Nothing lands on Today until you put it there. |
-| dates | dates/2 | - | Pick When, keep the Deadline | When is the day you start, and the Deadline is the day it’s due. |
-| looks | looks/0 | - | Make it yours | Pick an accent colour and a texture for your lists. |
+| agent-work | agents/2 | - | Your agents do the work | Hand a task to your agent, and it asks you when it needs a decision. |
+| agent-result | agents/3 | - | You decide when it’s done | Finished work waits in Review until you Accept it. |
+| inbox | capture/1 | - | Today is your call | New tasks wait in the Inbox until you put them on Today. |
+| dates | dates/2 | - | Plan the days ahead | Choose the day you start and the day it’s due. |
+| looks | looks/2 | - | Make it yours | Pick an accent colour and a texture for your lists. |
 
 ---
 
@@ -249,8 +250,7 @@ it.
 
 ```bash
 cd ../septena-site && npx next build                 # 1. build the site (scene pages)
-SCENE_OUTPUT=../septena/appstore/scenes SCENE_SCALE=3 SCENE_LAYOUTS=phone \
-  node scripts/capture-scenes.mjs                    # 2. export phone screens at 3x
+cd ../septena/appstore && node export-scenes.mjs     # 2. export phone screens at 3x, one set per panel accent
 cd ../septena/appstore && npm run all:septask        # 3. metadata + render + validate
 npm run viz:septask                                  # 4. review at 127.0.0.1:4477/viz/
 fastlane deliver --app_identifier com.septena.tasks --platform ios \

@@ -49,15 +49,15 @@ const fontFace = [
     : "/* New York Semibold Italic not found — falling back to system serif italic */",
 ].join("\n");
 
-const shotDataURL = (device, src, look = appearance) => {
-  const { png } = shotPaths(device, src, look);
+const shotDataURL = (device, src, look = appearance, accent = null) => {
+  const { png } = shotPaths(device, src, look ?? appearance, accent);
   return existsSync(png) ? `data:image/png;base64,${readFileSync(png).toString("base64")}` : null;
 };
 // The scene's element list ({ width, height, elements:[{id,label,frame}] }),
 // so a callout can point at real on-screen text. Fails closed: a callout
 // whose element is missing stops the render.
-const shotElements = (device, src, look = appearance) => {
-  const { elements } = shotPaths(device, src, look);
+const shotElements = (device, src, look = appearance, accent = null) => {
+  const { elements } = shotPaths(device, src, look ?? appearance, accent);
   return elements && existsSync(elements) ? JSON.parse(readFileSync(elements, "utf8")) : null;
 };
 
@@ -121,7 +121,7 @@ for (const device of activeDevices()) {
     if (onlyPanel && panel.id !== onlyPanel) continue;
     // A shot may pick its own appearance (shot.appearance), so one set mixes
     // light and dark screens.
-    const meta = panel.shot?.callout ? shotElements(device, panel.shot.src, panel.shot.appearance) : null;
+    const meta = panel.shot?.callout ? shotElements(device, panel.shot.src, panel.shot.appearance, panel.shot.accent) : null;
     if (panel.shot?.callout) {
       const el = meta?.elements.find((e) => e.id === panel.shot.callout.element);
       if (!el) throw new Error(`${device.key}/${panel.id}: callout element "${panel.shot.callout.element}" is not on screen ${panel.shot.src}`);
@@ -130,10 +130,10 @@ for (const device of activeDevices()) {
     const html = renderPanelHTML(
       {
         ...panel,
-        shot: panel.shot && { ...panel.shot, img: shotDataURL(device, panel.shot.src, panel.shot.appearance) },
+        shot: panel.shot && { ...panel.shot, img: shotDataURL(device, panel.shot.src, panel.shot.appearance, panel.shot.accent) },
         // Extra phones behind the main one (a fan). Fails closed: every one needs a real capture.
         shots: (panel.shots ?? []).map((s) => {
-          const img = shotDataURL(device, s.src, s.appearance);
+          const img = shotDataURL(device, s.src, s.appearance, s.accent);
           if (!img) throw new Error(`${device.key}/${panel.id}: no capture for extra shot ${s.src} (${s.appearance ?? appearance})`);
           return { ...s, img };
         }),
@@ -147,7 +147,7 @@ for (const device of activeDevices()) {
     await chrome.screenshot(htmlFile, file, { width: device.width, height: device.height, ready: "window.__layoutCallouts?.()" });
     flattenAlpha(file);
     exported.push({ order: i, slug: panel.id, file: `${i}_${device.key}_${panel.id}.png`, title: panel.headline.replace(/\*/g, "") });
-    const missing = panel.shot && shotDataURL(device, panel.shot.src, panel.shot.appearance) === null;
+    const missing = panel.shot && shotDataURL(device, panel.shot.src, panel.shot.appearance, panel.shot.accent) === null;
     console.log(`✓ ${device.key} ${i}_${panel.id} ${device.width}×${device.height}${missing ? "  (placeholder shot)" : ""}`);
   }
   // One manifest per device class, in Bipe's store-set shape. The website's

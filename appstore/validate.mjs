@@ -132,7 +132,11 @@ const deviceReport = Object.entries(allDevices()).map(([key, d]) => {
     const have = new Set((raw.light ?? []).map((r) => r.file));
     for (const p of panelsFor(key)) {
       if (!p.shot?.src) continue;
-      const { png, elements } = shotPaths(d, p.shot.src, "light");
+      // Each shot in the appearance and accent it renders with (export-scenes.mjs).
+      for (const extra of p.shots ?? []) {
+        if (d.sceneDir && !existsSync(shotPaths(d, extra.src, extra.appearance ?? "light", extra.accent ?? null).png)) err(`${key}/${p.id}: extra phone "${extra.src}" is missing. ${d.captureNote}.`);
+      }
+      const { png, elements } = shotPaths(d, p.shot.src, p.shot.appearance ?? "light", p.shot.accent ?? null);
       const ok = d.sceneDir ? existsSync(png) : have.has(`${p.shot.src}.png`);
       if (!ok) {
         err(`${key}/${p.id}: panel copy promises a screenshot but "${p.shot.src}" is missing → a placeholder would ship. ${d.captureNote}.`);
@@ -145,7 +149,9 @@ const deviceReport = Object.entries(allDevices()).map(([key, d]) => {
       }
     }
     if (d.sceneDir) {
-      const mf = join(ROOT, d.sceneDir, "manifest.json");
+      // The scene-colour set and every accent set carry a manifest; read the first one.
+      const sets = [join(ROOT, d.sceneDir, "manifest.json"), ...[...new Set(panelsFor(key).map((p) => p.shot?.accent).filter(Boolean))].map((a) => join(ROOT, d.sceneDir, `accent-${a}`, "manifest.json"))];
+      const mf = sets.find(existsSync) ?? sets[0];
       if (!existsSync(mf)) err(`${key}: ${d.sceneDir}/manifest.json missing. ${d.captureNote}.`);
       else {
         const m = JSON.parse(readFileSync(mf, "utf8"));

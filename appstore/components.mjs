@@ -96,7 +96,7 @@ function shot(s, device, tint) {
   const c = IPHONE.cutout;
   const island = f.island && !s.img ? `<div class="island" style="top:${Math.round((IPHONE.bezel + c.top) * k)}px; width:${Math.round(c.width * k)}px; height:${Math.round(c.height * k)}px;"></div>` : "";
   return `
-  <div class="shot-zone" style="transform: translate(${Math.round((s.offsetX ?? 0) * 100)}%, ${Math.round((s.offsetY ?? 0) * 100)}%);">
+  <div class="shot-zone"${s.followText === false ? "" : ` data-follow-text="${s.gap ?? 80}"`} style="transform: translate(${Math.round((s.offsetX ?? 0) * 100)}%, ${Math.round((s.offsetY ?? 0) * 100)}%);">
     <div class="shot-wrap" style="width:${w}px; transform: rotate(${s.rotate ?? 0}deg);">
       <div class="frame" style="width:${w}px; padding:${f.pad}px;${f.bezel ? ` background:${PHONE.case} center/100% 100% no-repeat; box-shadow:none; overflow:visible; filter:drop-shadow(0 ${Math.round(20 * k)}px ${Math.round(24 * k)}px rgb(0 0 0 / .28));` : ` border-radius:${f.radius}px;`}">
         ${screen}${island}
@@ -132,6 +132,13 @@ function callout(c, { w, pad, margin, tint }) {
 // Runs in the page after fonts load (render.mjs calls it): places each card
 // over its anchor, clamped inside the panel, and draws the connector.
 const LAYOUT_CALLOUTS = `window.__layoutCallouts = () => {
+  // Phones start a fixed gap below the title and sub, whatever their length,
+  // so a phone never covers text. offsetY then nudges from there.
+  const text = document.querySelector(".panel > .top");
+  if (text) for (const zone of document.querySelectorAll("[data-follow-text]")) {
+    zone.style.top = (text.offsetTop + text.offsetHeight + (+zone.dataset.followText)) + "px";
+    zone.style.bottom = "auto";
+  }
   for (const card of document.querySelectorAll("[data-callout]")) {
     const d = card.dataset, cy = +d.cy;
     const cw = card.offsetWidth, ch = card.offsetHeight;
@@ -241,7 +248,7 @@ h1 { font-family:${theme.fonts.display}; font-weight:600; font-size:${panel.head
   line-height:1.06; letter-spacing:-0.025em; text-wrap:balance; }
 h1 em { font-style:normal; color:${tint}; }
 ${panel.background?.fill ? `h1, h1 em { color:#fff; } h1 { font-weight:700; text-shadow:0 2px 24px rgb(0 0 0 / 0.12); }
-.panel .sub { color:rgb(255 255 255 / 0.92); font-weight:600; margin-top:36px; text-wrap:balance; }
+.panel .sub { color:rgb(255 255 255 / 0.94); font-weight:600; font-size:84px; line-height:1.22; margin-top:40px; max-width:1160px; text-wrap:balance; }
 .co-line { filter: drop-shadow(0 0 4px rgb(0 0 0 / 0.35)); }` : ""}
 .bg-wash { position:absolute; inset:0; width:100%; height:100%; }
 .sub { font-size:62px; line-height:1.32; color:${theme.inkSecondary};
