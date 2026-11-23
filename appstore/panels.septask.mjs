@@ -34,6 +34,13 @@ const VISUAL = {
   // the photo filling the rest. art/: committed images, no screen capture.
   photo:          { photo: { src: "art/photo-today.png" }, background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" }, leadSize: 124 },
   hook:           { fruit: "haskap", texture: "topography" },
+  // Native on each device: the Mac window behind, the iPhone in front. The
+  // iPad joins when the scene builder has an iPad layout (septena-site#17).
+  devices:        {
+    fruit: "tamarillo", texture: "topography",
+    shot: { width: 0.46, offsetX: 0.24 },
+    shots: [{ src: "today/0", layout: "mac", accent: "tamarillo", width: 0.88, offsetX: -0.03, top: 680 }],
+  },
   thinking:       { fruit: "yuzu", texture: "fieldMatrix" },
   // Agent faces (the site's avatar crew, in our fruit colours) sit on the
   // phone's edge where agents work, over empty screen. Three and two; no more.
@@ -94,7 +101,7 @@ const iphone = rows.map((row, i) => {
       // the title and its sub on the others.
       accent: v.fruit ?? null,
       ...(v.shot ?? {}),
-      width: 0.68, offsetY: 0, rotate: 0,
+      width: v.shot?.width ?? 0.68, offsetY: 0, rotate: 0, // one size everywhere; the devices panel shares the frame with a Mac
     },
     shots: v.shots,
   };

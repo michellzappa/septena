@@ -83,6 +83,15 @@ const FRAME = {
 
 function shot(s, device, tint) {
   if (!s) return "";
+  // A Mac window from the scene builder's mac layout (it carries its own window
+  // bar): rounded and shadowed, positioned like a phone.
+  if (s.layout === "mac") {
+    const w = Math.round(device.designWidth * (s.width ?? 1));
+    return `
+  <div class="shot-zone"${s.alignTop ? " data-align-top" : ""}${s.alignMiddle != null ? ` data-align-middle="${s.alignMiddle}"` : ""} style="${s.top != null ? `top:${s.top}px` : `bottom:${s.bottom ?? 110}px`}; transform: translate(${Math.round((s.offsetX ?? 0) * 100)}%, ${Math.round((s.offsetY ?? 0) * 100)}%);">
+    <div class="shot-wrap" style="width:${w}px;"><img src="${s.img}" alt="" style="display:block; width:100%; border-radius:${Math.round(w * 0.02)}px; border:2px solid rgb(0 0 0 / .18); box-shadow:0 40px 90px rgb(0 0 0 / .32);"></div>
+  </div>`;
+  }
   const dw = device.designWidth;
   const w = Math.round(dw * (s.width ?? 0.74));
   // Phone: the canonical iPhone (registry/device-frames.json), scaled to this width.

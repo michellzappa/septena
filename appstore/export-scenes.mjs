@@ -18,20 +18,21 @@ const SITE = process.env.SEPTENA_SITE ?? join(ROOT, "../../_/septena-site");
 if (!existsSync(join(SITE, "out", "scenes.html"))) throw new Error(`Build the site first: cd ${SITE} && npx next build`);
 const { septaskPanels } = await import("./panels.septask.mjs");
 
-const jobs = new Map(); // accent ("" = scene colours) -> scene ids
+const jobs = new Map(); // accent ("" = scene colours) -> { scenes, layouts }
 for (const panel of septaskPanels.iphone69) {
   for (const s of [panel.shot, ...(panel.shots ?? [])].filter(Boolean)) {
     const key = s.accent ?? "";
-    if (!jobs.has(key)) jobs.set(key, new Set());
-    jobs.get(key).add(String(s.src).split("/")[0]);
+    if (!jobs.has(key)) jobs.set(key, { scenes: new Set(), layouts: new Set() });
+    jobs.get(key).scenes.add(String(s.src).split("/")[0]);
+    jobs.get(key).layouts.add(s.layout ?? "phone");
   }
 }
-for (const [accent, scenes] of jobs) {
+for (const [accent, { scenes, layouts }] of jobs) {
   const out = join(ROOT, "scenes", accent ? `accent-${accent}` : "");
   console.log(`· ${accent || "scene colours"}: ${[...scenes].join(", ")}`);
   execFileSync("node", ["scripts/capture-scenes.mjs"], {
     cwd: SITE, stdio: ["ignore", "ignore", "inherit"],
-    env: { ...process.env, SCENE_OUTPUT: out, SCENE_SCALE: "3", SCENE_LAYOUTS: "phone", SCENE_IDS: [...scenes].join(","), ...(accent ? { SCENE_ACCENT: accent } : {}) },
+    env: { ...process.env, SCENE_OUTPUT: out, SCENE_SCALE: "3", SCENE_LAYOUTS: [...layouts].join(","), SCENE_IDS: [...scenes].join(","), ...(accent ? { SCENE_ACCENT: accent } : {}) },
   });
 }
 console.log("✓ scenes exported");

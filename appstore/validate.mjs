@@ -141,7 +141,7 @@ const deviceReport = Object.entries(allDevices()).map(([key, d]) => {
       if (!p.shot?.src) continue;
       // Each shot in the appearance and accent it renders with (export-scenes.mjs).
       for (const extra of p.shots ?? []) {
-        if (d.sceneDir && !existsSync(shotPaths(d, extra.src, extra.appearance ?? "light", extra.accent ?? null).png)) err(`${key}/${p.id}: extra phone "${extra.src}" is missing. ${d.captureNote}.`);
+        if (d.sceneDir && !existsSync(shotPaths(d, extra.src, extra.appearance ?? "light", extra.accent ?? null, extra.layout ?? null).png)) err(`${key}/${p.id}: extra phone "${extra.src}" is missing. ${d.captureNote}.`);
       }
       const { png, elements } = shotPaths(d, p.shot.src, p.shot.appearance ?? "light", p.shot.accent ?? null);
       const ok = d.sceneDir ? existsSync(png) : have.has(`${p.shot.src}.png`);

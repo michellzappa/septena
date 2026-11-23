@@ -101,11 +101,12 @@ export const activeDevices = () =>
 // Where a panel's screen lives. A scene source "<scene id>/<step>" resolves to
 // the scene builder export (scenes/<scene>/<layout>/<appearance>/<step>.png
 // plus its .elements.json); anything else is a raw capture name in rawDir.
-export function shotPaths(device, src, appearance = "light", accent = null) {
+export function shotPaths(device, src, appearance = "light", accent = null, layout = null) {
   if (device.sceneDir) {
     const [scene, step = "0"] = String(src).split("/");
     // accent: the screen captured in that fruit accent (export-scenes.mjs).
-    const base = join(ROOT, device.sceneDir, accent ? `accent-${accent}` : "", scene, device.sceneLayout, appearance, step);
+    // layout: a shot from another scene layout (the Mac window on the devices panel).
+    const base = join(ROOT, device.sceneDir, accent ? `accent-${accent}` : "", scene, layout ?? device.sceneLayout, appearance, step);
     return { png: `${base}.png`, elements: `${base}.elements.json` };
   }
   return { png: join(ROOT, device.rawDir, appearance, `${src}.png`), elements: null };

@@ -226,6 +226,7 @@ reads this table; `appstore/validate.mjs` checks it.
 | --- | --- | --- | --- | --- |
 | photo | - | - | Tasks that think with you. A native task app for iPhone, iPad and Mac. | |
 | hook | today/0 | - | Tasks that think with you. A native task app for iPhone, iPad and Mac. | |
+| devices | today/0 | - | Native on iPhone, iPad and Mac. Each app is built for its device. | |
 | thinking | thinking/1 | - | AI that asks before it acts. It works on one task and asks you with buttons. | |
 | agent-work | agents/2 | - | Your agents do the work. Give your agent a task, and it asks you when it needs you. | |
 | agent-result | agents/3 | - | You decide when it’s done. Finished work waits in Review until you accept it. | |

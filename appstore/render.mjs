@@ -49,8 +49,8 @@ const fontFace = [
     : "/* New York Semibold Italic not found — falling back to system serif italic */",
 ].join("\n");
 
-const shotDataURL = (device, src, look = appearance, accent = null) => {
-  const { png } = shotPaths(device, src, look ?? appearance, accent);
+const shotDataURL = (device, src, look = appearance, accent = null, layout = null) => {
+  const { png } = shotPaths(device, src, look ?? appearance, accent, layout);
   return existsSync(png) ? `data:image/png;base64,${readFileSync(png).toString("base64")}` : null;
 };
 // The scene's element list ({ width, height, elements:[{id,label,frame}] }),
@@ -156,7 +156,7 @@ for (const device of activeDevices()) {
         shot: panel.shot && { ...withFaces(panel.shot), img: shotDataURL(device, panel.shot.src, panel.shot.appearance, panel.shot.accent) },
         // Extra phones behind the main one (a fan). Fails closed: every one needs a real capture.
         shots: (panel.shots ?? []).map((s) => {
-          const img = shotDataURL(device, s.src, s.appearance, s.accent);
+          const img = shotDataURL(device, s.src, s.appearance, s.accent, s.layout);
           if (!img) throw new Error(`${device.key}/${panel.id}: no capture for extra shot ${s.src} (${s.appearance ?? appearance})`);
           return { ...s, img };
         }),
