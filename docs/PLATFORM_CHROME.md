@@ -117,7 +117,8 @@ The web preview is a browser window with neutral chrome. It claims no OS.
 ## Plan
 
 1. Move the system chrome out of `TaskScreen` into one component keyed by
-   `system.chrome`, reading the device registry (no visual change). (site #15)
+   `system.chrome`, reading the device registry (no visual change). (site #15,
+   done 2026-11-23: `components/task-ui/system-chrome.tsx`)
 2. iOS 27 audit: redraw the status bar glyphs and toolbar from the iOS 27 kit;
    decide on SF Symbols for app glyphs (licence check, rule 5). (site #16)
 3. iPad layout: an `ipad` capture layout with iPadOS chrome and the split
