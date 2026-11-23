@@ -32,6 +32,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0024](0024-no-iphone-tab-bar.md) | No tab bar on iPhone: the list is the root of one navigation stack | accepted |
 | [0025](0025-shared-rust-core.md) | Put task rules and sync decisions in one shared Rust core | accepted (amends 0013 W0, 0015) |
 | [0026](0026-plus-on-any-store-stripe-for-web.md) | Sell Plus on any store, one account entitlement, Stripe for web | accepted |
+| [0027](0027-task-date-rules-are-core-actions.md) | Task date rules are actions in the shared core | proposed |
 | [0028](0028-registry-owns-vocabulary-platforms-own-interaction.md) | The registry owns vocabulary; each platform owns layout and interaction | accepted |
 
 ## Template
