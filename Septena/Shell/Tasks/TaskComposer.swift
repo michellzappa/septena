@@ -410,10 +410,22 @@ struct TaskComposerCard: View {
         showsHistory: kinds.contains(.history),
         // Paste leads the rail when it shows, as on the Mac composer: the
         // registry lists it first (`taskAttributes` `paste`, tier `chip`).
-        leading: showsPasteChip ? AnyView(pasteChip) : nil
+        leading: showsPasteChip ? AnyView(pasteChip) : nil,
+        // The quick edit keeps the pill rail; the page lays the attributes
+        // out as a column of rows with checklist and attachments as sections.
+        layout: pageDepth == .page ? .rows : .rail
       ))
-    case .checklist, .attachments, .history:
-      return AnyView(EmptyView()) // rendered by the attribute rail, see `.attributes`
+    case .checklist, .attachments:
+      return AnyView(EmptyView()) // rendered by the attribute bar, see `.attributes`
+    case .history:
+      // On the page, history is its own section in registry order.
+      guard let task = editingTask, TaskHistory.isAvailable else { return AnyView(EmptyView()) }
+      return AnyView(VStack(alignment: .leading, spacing: 8) {
+        Text(block.label ?? "")
+          .font(.septenaLabel)
+          .foregroundStyle(Theme.inkSecondary)
+        TaskHistoryPanel(taskID: task.id)
+      })
     case .conversation:
       guard let task = editingTask else { return AnyView(EmptyView()) }
       return AnyView(ConversationSection(task: task, accent: accent))
@@ -470,9 +482,10 @@ struct TaskComposerCard: View {
       if kinds.contains(.header) { titleNotesCard }
 
       VStack(alignment: .leading, spacing: inline ? 10 : 14) {
-        // Header draws above this column; checklist, attachments and history
-        // draw inside the attribute rail.
-        ForEach(blocks.filter { ![.header, .checklist, .attachments, .history].contains($0.kind) }) { block in
+        // Header draws above this column; checklist and attachments draw
+        // inside the attribute bar. History draws here on the page only (the
+        // inline depth has no history block).
+        ForEach(blocks.filter { ![.header, .checklist, .attachments].contains($0.kind) }) { block in
           blockView(block, kinds: kinds)
         }
       }

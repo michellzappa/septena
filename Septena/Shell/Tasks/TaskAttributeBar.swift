@@ -44,6 +44,12 @@ struct TaskAttributeBar: View {
   /// A chip drawn at the front of the rail, before the pills: the Paste chip
   /// on a blank new task. The composer owns it (it reads the clipboard).
   var leading: AnyView? = nil
+  /// How the attributes lay out (ADR 0029). `.rail` is the quick edit: one
+  /// sideways row of pills. `.rows` is the task page: a column with one
+  /// full-width row per attribute, then the checklist and attachments as
+  /// their own sections. Both open the same pickers.
+  enum Layout { case rail, rows }
+  var layout: Layout = .rail
 
   /// The electives. Order, label and icon come from the registry
   /// (`registry/surfaces.json` `taskAttributes`, ADR 0020) so the AppKit
@@ -119,7 +125,7 @@ struct TaskAttributeBar: View {
        discussVisible: Binding<Bool> = .constant(false),
        moveFocus: ((Bool) -> Void)? = nil,
        showsChecklist: Bool = true, showsAttachments: Bool = true,
-       showsHistory: Bool = false, leading: AnyView? = nil) {
+       showsHistory: Bool = false, leading: AnyView? = nil, layout: Layout = .rail) {
     _draft = draft
     self.areas = areas
     self.projects = projects
@@ -134,13 +140,102 @@ struct TaskAttributeBar: View {
     self.showsAttachments = showsAttachments
     self.showsHistory = showsHistory
     self.leading = leading
+    self.layout = layout
     _discussStarted = State(initialValue: discussTask?.conversation.hasStarted ?? true)
   }
 
   var body: some View {
     let _ = editRevision
     let edit = discussTask.map(EditOnlyState.init(task:))
-    return VStack(alignment: .leading, spacing: 10) {
+    return Group {
+      switch layout {
+      case .rail: railBody(edit: edit)
+      case .rows: rowsBody(edit: edit)
+      }
+    }
+    .onAppear(perform: reloadDiscussState)
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+      reloadDiscussState()
+      editRevision += 1
+    }
+    .sheet(item: $picker, onDismiss: {
+      editRevision += 1
+      if let next = pendingPicker {
+        pendingPicker = nil
+        picker = next
+      }
+    }) { attr in
+      pickerSheet(attr)
+    }
+    // Keyboard Space / Return on a focused pill arrives here.
+    .onChange(of: activate) { _, attr in
+      guard let attr else { return }
+      activate = nil
+      select(attr)
+    }
+  }
+
+  // MARK: - Page layout (rows)
+
+  /// The attributes that get a row on the page. Checklist, attachments and
+  /// history are sections, not rows.
+  private var rowAttributes: [Attribute] {
+    Attribute.rail.filter { shows($0) && ![.checklist, .attachments, .history].contains($0) }
+  }
+
+  private func rowsBody(edit: EditOnlyState?) -> some View {
+    VStack(alignment: .leading, spacing: 18) {
+      VStack(spacing: 0) {
+        let attrs = rowAttributes
+        ForEach(Array(attrs.enumerated()), id: \.element) { index, attr in
+          AttributeRow(icon: attr.icon, label: attr.label,
+                       value: value(for: attr, edit: edit), isSet: isSet(attr, edit: edit),
+                       opensPicker: attr.presentsSheet,
+                       isLoading: attr == .discuss && discussWorking,
+                       accent: accent) { select(attr) }
+            .focused($focus, equals: .pill(attr))
+            .disabled(attr == .discuss && discussWorking)
+          if index < attrs.count - 1 { Hairline(leadingInset: 44) }
+        }
+      }
+      .background(Theme.secondaryGroupedBackground,
+                  in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+      if showsChecklist, let task = discussTask {
+        pageSection(.checklist) {
+          VStack(alignment: .leading, spacing: 8) {
+            if checklistOpened || (edit?.stepsTotal ?? 0) > 0 {
+              TaskChecklistPanel(taskID: task.id, addRequest: checklistAddRequest,
+                                 focus: $focus, moveFocus: moveFocus)
+            }
+            AttributeRow(icon: "plus", label: RegistryActions.title("task.addChecklistItem"),
+                         value: nil, isSet: false, opensPicker: false, isLoading: false,
+                         accent: accent) { select(.checklist) }
+          }
+        }
+      }
+
+      if showsAttachments, let task = discussTask {
+        pageSection(.attachments) { TaskAttachmentsPanel(taskID: task.id) }
+      }
+    }
+  }
+
+  /// A page section: the block's registry heading over its content.
+  private func pageSection<Content: View>(_ kind: RegistryTaskPageBlockKind,
+                                          @ViewBuilder content: () -> Content) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(RegistrySurfaces.taskPageBlock(kind).label ?? "")
+        .font(.septenaLabel)
+        .foregroundStyle(Theme.inkSecondary)
+      content()
+    }
+  }
+
+  // MARK: - Quick edit layout (rail)
+
+  private func railBody(edit: EditOnlyState?) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
       // Steps sit open under the notes whenever the task has any, so opening a
       // task shows its checklist without a tap. The pill only starts one.
       if showsChecklist, let task = discussTask, checklistOpened || (edit?.stepsTotal ?? 0) > 0 {
@@ -177,26 +272,6 @@ struct TaskAttributeBar: View {
       .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
 
       inlineEditor
-    }
-    .onAppear(perform: reloadDiscussState)
-    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
-      reloadDiscussState()
-      editRevision += 1
-    }
-    .sheet(item: $picker, onDismiss: {
-      editRevision += 1
-      if let next = pendingPicker {
-        pendingPicker = nil
-        picker = next
-      }
-    }) { attr in
-      pickerSheet(attr)
-    }
-    // Keyboard Space / Return on a focused pill arrives here.
-    .onChange(of: activate) { _, attr in
-      guard let attr else { return }
-      activate = nil
-      select(attr)
     }
   }
 
@@ -427,6 +502,53 @@ struct TaskAttributeBar: View {
     if cal.isDateInToday(d) { return String(localized: "Today", comment: "Relative date") }
     if cal.isDateInTomorrow(d) { return String(localized: "Tomorrow", comment: "Relative date") }
     return SeptenaDate.monthDay(d)
+  }
+}
+
+// MARK: - Page row
+
+/// One attribute on the task page: icon, label, current value. A picker
+/// attribute shows a chevron and opens the same sheet as its pill.
+private struct AttributeRow: View {
+  let icon: String
+  let label: String
+  let value: String?
+  let isSet: Bool
+  let opensPicker: Bool
+  let isLoading: Bool
+  let accent: Color
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: Theme.iconTextGap) {
+        Image(systemName: icon)
+          .font(.septenaSidebarRow)
+          .foregroundStyle(isSet ? accent : Theme.inkSecondary)
+          .frame(width: 22)
+        Text(label)
+          .font(.septenaSidebarRow)
+          .foregroundStyle(Theme.inkPrimary)
+        Spacer(minLength: 8)
+        if isLoading {
+          ProgressView().controlSize(.small)
+        } else if let value {
+          Text(value)
+            .font(.septenaSidebarRow)
+            .foregroundStyle(isSet ? Theme.inkPrimary : Theme.inkSecondary)
+            .lineLimit(1)
+        }
+        if opensPicker {
+          Image(systemName: "chevron.right")
+            .font(.septenaBadge)
+            .foregroundStyle(Theme.inkSecondary)
+        }
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 11)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
   }
 }
 
