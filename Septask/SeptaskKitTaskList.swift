@@ -5220,6 +5220,16 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       // as SwiftUI's `TaskNavMenu`. Built fresh per click via the closure
       // rather than once here, so it can never show a stale structure.
       cell.onOpenNavMenu = { [weak self] in self?.buildNavMenu() }
+      if case .area(let areaID) = filter {
+        cell.onPickGlyph = { [weak self] anchor in
+          guard let self,
+                let area = StructureCache.snapshot(in: self.context).areas.first(where: { $0.id == areaID })
+          else { return }
+          KitEmojiPopover.present(for: area, relativeTo: anchor.bounds, of: anchor)
+        }
+      } else {
+        cell.onPickGlyph = nil
+      }
       return cell
 
     case .tagFilterBar(let tags, let active):
@@ -6348,6 +6358,15 @@ final class KitScreenTitleCell: NSTableCellView {
   /// on why this isn't built once and cached. Optional-returning to match
   /// the `[weak self]` closure the controller wires it up with.
   var onOpenNavMenu: (() -> NSMenu?)?
+  /// An area page's glyph opens the emoji picker, anchored on the glyph — the
+  /// same affordance as the SwiftUI area page's icon button. Nil on every
+  /// other page, which leaves the glyph inert.
+  var onPickGlyph: ((NSView) -> Void)? {
+    didSet { glyphButton.isHidden = onPickGlyph == nil }
+  }
+  /// A borderless, title-less `NSButton` over the glyph slot — an
+  /// `NSControl` for the same reason as `button` above.
+  private let glyphButton = NSButton()
 
   private static var font: NSFont { .systemFont(ofSize: SeptenaTypeScale.size(.title2), weight: .bold) }
 
@@ -6376,12 +6395,23 @@ final class KitScreenTitleCell: NSTableCellView {
     button.refusesFirstResponder = true
     button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
+    glyphButton.translatesAutoresizingMaskIntoConstraints = false
+    glyphButton.isBordered = false
+    glyphButton.bezelStyle = .inline
+    glyphButton.title = ""
+    glyphButton.target = self
+    glyphButton.action = #selector(pickGlyph)
+    glyphButton.refusesFirstResponder = true
+    glyphButton.isHidden = true
+    glyphButton.setAccessibilityLabel(RegistryActions.title("area.changeEmoji"))
+
     icon.kitA11yIgnore()
     emoji.kitA11yIgnore()
 
     addSubview(icon)
     addSubview(emoji)
     addSubview(button)
+    addSubview(glyphButton)
     leadingConstraint = icon.centerXAnchor.constraint(
       equalTo: leadingAnchor,
       constant: KitCardRowView.horizontalInset + SeptaskKitLayout.leadingGlyphCenterX)
@@ -6397,12 +6427,20 @@ final class KitScreenTitleCell: NSTableCellView {
       icon.widthAnchor.constraint(equalToConstant: 18),
       emoji.centerXAnchor.constraint(equalTo: icon.centerXAnchor),
       emoji.centerYAnchor.constraint(equalTo: icon.centerYAnchor),
+      glyphButton.centerXAnchor.constraint(equalTo: icon.centerXAnchor),
+      glyphButton.centerYAnchor.constraint(equalTo: icon.centerYAnchor),
+      glyphButton.widthAnchor.constraint(equalToConstant: 28),
+      glyphButton.heightAnchor.constraint(equalToConstant: 28),
       button.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
       trailingConstraint,
     ])
   }
 
   required init?(coder: NSCoder) { fatalError("KitScreenTitleCell is code-only") }
+
+  @objc private func pickGlyph() {
+    onPickGlyph?(glyphButton)
+  }
 
   /// Fired by the button's own target/action — no hand-tracked mouse handling.
   @objc private func openNavMenu() {

@@ -113,6 +113,9 @@ struct SidebarRootView: View {
   @State private var renameProjectTarget: Project?
   @State private var renameAreaTarget: Area?
   @State private var renameDraft = ""
+  /// Right-click → Change Emoji. The picker the area page's icon opens.
+  @State private var emojiAreaTarget: Area?
+  @State private var emojiDraft = ""
 
   /// Right-click → Delete (confirm before mutating).
   @State private var deleteProjectTarget: Project?
@@ -124,14 +127,31 @@ struct SidebarRootView: View {
 
   var body: some View {
     #if os(macOS)
-    sidebarMac.modifier(rightClickAlerts)
+    sidebarMac.modifier(rightClickAlerts).sheet(item: $emojiAreaTarget, content: areaEmojiSheet)
     #else
     if usesPushNavigation {
-      sidebarSplit.modifier(rightClickAlerts)
+      sidebarSplit.modifier(rightClickAlerts).sheet(item: $emojiAreaTarget, content: areaEmojiSheet)
     } else {
-      sidebarPhone.modifier(rightClickAlerts)
+      sidebarPhone.modifier(rightClickAlerts).sheet(item: $emojiAreaTarget, content: areaEmojiSheet)
     }
     #endif
+  }
+
+  private func areaEmojiSheet(_ area: Area) -> some View {
+    EmojiPickerContent(emoji: $emojiDraft) { setAreaEmoji(area, $0) }
+  }
+
+  private func setAreaEmoji(_ area: Area, _ value: String) {
+    let emoji: String? = value.isEmpty ? nil : value
+    guard emoji != area.emoji else { return }
+    Task {
+      do {
+        try await areasMutator.setEmoji(id: area.id, emoji: emoji)
+        await load()
+      } catch {
+        errorMessage = error.localizedDescription
+      }
+    }
   }
 
   // MARK: - Right-click alerts (rename / delete)
@@ -1037,6 +1057,11 @@ struct SidebarRootView: View {
           return .init {
             renameDraft = area.title
             renameAreaTarget = area
+          }
+        case "area.changeEmoji":
+          return .init {
+            emojiDraft = area.emoji ?? ""
+            emojiAreaTarget = area
           }
         case "area.moveUp":
           guard let idx else { return nil }

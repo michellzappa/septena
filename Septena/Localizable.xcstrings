@@ -3014,6 +3014,18 @@
     "Carry over missed items" : {
 
     },
+    "Change Emoji…" : {
+      "comment" : "Generated from registry actions.actions.area.changeEmoji.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mudar emoji…"
+          }
+        }
+      }
+    },
     "Change history" : {
       "comment" : "Generated from registry plans.outcomes.nothing_lost.rows.history.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"

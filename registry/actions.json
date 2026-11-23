@@ -227,6 +227,7 @@
       "featureId": "places.projects"
     },
     "area.rename": { "title": "Rename", "icon": "action.rename", "role": "default", "availability": { "selection": "single" }, "featureId": "places.areas" },
+    "area.changeEmoji": { "title": "Change Emoji…", "icon": "action.emoji", "role": "default", "availability": { "selection": "single" }, "featureId": "places.areas" },
     "area.moveUp": {
       "title": "Move Up",
       "icon": "action.move_up",
@@ -483,6 +484,7 @@
       { "kind": "action", "id": "area.newProject" },
       { "kind": "divider" },
       { "kind": "action", "id": "area.rename" },
+      { "kind": "action", "id": "area.changeEmoji" },
       { "kind": "action", "id": "area.moveUp" },
       { "kind": "action", "id": "area.moveDown" },
       { "kind": "divider" },

@@ -176,6 +176,7 @@
 		51B4D2D48D1717EB980ECF4F /* TaskConvo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B9559BEC76161CBDBE76A10 /* TaskConvo.swift */; };
 		51BC127F946098C68D24E5E8 /* TaskHistorySection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F367B45111BCD92DD817039 /* TaskHistorySection.swift */; };
 		52286494D2D4D1EF227B5FAE /* StoreHealthState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A88F7C6B3D0D2356B2CBB3B /* StoreHealthState.swift */; };
+		52484CFEC0504E79F41C6EFD /* SeptaskKitEmojiPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0E896DC9E4B31764ABA8378 /* SeptaskKitEmojiPopover.swift */; };
 		52DCE995492A8C47A2F262F9 /* AISettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D07DADA5E9A976961EF5822 /* AISettingsPane.swift */; };
 		53401A017C87ADC3E632E44A /* SeptaskKitWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F00F31B7DD6B0E3BC0D347B /* SeptaskKitWindow.swift */; };
 		541ECEDC846F14325B27E894 /* MirrorReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69C2FC56403DB06F53DD4601 /* MirrorReader.swift */; };
@@ -242,6 +243,7 @@
 		6FC8424CAB78CA0285DE519C /* TasksWidgetWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC669F29CAAD92C342D2F4E1 /* TasksWidgetWire.swift */; };
 		706B9995FE946C39A04F1586 /* StoreHealthNotice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D5C93363C52E8B564A3A13B /* StoreHealthNotice.swift */; };
 		71A9C3461F715FD55CF46C9B /* Changelog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46077D40BFADE69BDE238E84 /* Changelog.swift */; };
+		72393BDDE39F6B8CA0A99542 /* SeptaskKitEmojiPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0E896DC9E4B31764ABA8378 /* SeptaskKitEmojiPopover.swift */; };
 		72A830B71AAF7B411E6CBCD0 /* BadgeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */; };
 		72B96392DE3026F6AE69E1A8 /* TextSizeScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42633764DDF43F00D2D74256 /* TextSizeScale.swift */; };
 		72EDC2807EEF87C4760B3EB0 /* SeptaskKitSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C172F628CB1EBADF1BAC84EB /* SeptaskKitSidebar.swift */; };
@@ -892,6 +894,7 @@
 		CED676C371E5BCB0A607CF2E /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		CF16D9CDF344D10FEF6ECA07 /* SeptaskRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskRootView.swift; sourceTree = "<group>"; };
 		D0915B27ABB464AF9B858A74 /* TaskFadeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskFadeTests.swift; sourceTree = "<group>"; };
+		D0E896DC9E4B31764ABA8378 /* SeptaskKitEmojiPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskKitEmojiPopover.swift; sourceTree = "<group>"; };
 		D12ECFD48C475A93B6DAC4C1 /* TasksSkill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksSkill.swift; sourceTree = "<group>"; };
 		D24AEA8BED7F4888DF4EEB9D /* ImportLegacyThingsLineage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportLegacyThingsLineage.swift; sourceTree = "<group>"; };
 		D26C27D6A377796108D4A027 /* SettingsColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsColor.swift; sourceTree = "<group>"; };
@@ -998,6 +1001,7 @@
 				C3D50EE8598280D8894D1D7B /* SeptaskKitContainerNotes.swift */,
 				E9E231F8E416B0C85AC1261E /* SeptaskKitConversation.swift */,
 				4B18EDB9E7BAD9DBAEE25B42 /* SeptaskKitDatePopover.swift */,
+				D0E896DC9E4B31764ABA8378 /* SeptaskKitEmojiPopover.swift */,
 				DCCD5FC9C17ECAC668D04988 /* SeptaskKitFirstRun.swift */,
 				621DD0CD55814BA28960803E /* SeptaskKitHeaderWash.swift */,
 				B753271F085B69D066BB22C6 /* SeptaskKitHistory.swift */,
@@ -2174,6 +2178,7 @@
 				2062100F187D4CD89A3E0628 /* SeptaskKitContainerNotes.swift in Sources */,
 				CE3532E1E9FF023636C105D0 /* SeptaskKitConversation.swift in Sources */,
 				19C0597AEE065C2BF91B87D3 /* SeptaskKitDatePopover.swift in Sources */,
+				72393BDDE39F6B8CA0A99542 /* SeptaskKitEmojiPopover.swift in Sources */,
 				6EF34181DEBE7B0F8BD7AEA2 /* SeptaskKitFirstRun.swift in Sources */,
 				8CFE7D4D2B070CD9BD4FB5AD /* SeptaskKitHeaderWash.swift in Sources */,
 				E49C19225CF1BA1367383F5E /* SeptaskKitHistory.swift in Sources */,
@@ -2451,6 +2456,7 @@
 				60643B990FF69DBCCCFAF4C5 /* SeptaskKitContainerNotes.swift in Sources */,
 				795247E9C5E83E6C6FC9D372 /* SeptaskKitConversation.swift in Sources */,
 				AAE6566A47B0E58920280EDB /* SeptaskKitDatePopover.swift in Sources */,
+				52484CFEC0504E79F41C6EFD /* SeptaskKitEmojiPopover.swift in Sources */,
 				54FC214B36C0B2C248941739 /* SeptaskKitFirstRun.swift in Sources */,
 				7A5233D26BBD4D167D5431AC /* SeptaskKitHeaderWash.swift in Sources */,
 				964DD28D0669285C9635A832 /* SeptaskKitHistory.swift in Sources */,

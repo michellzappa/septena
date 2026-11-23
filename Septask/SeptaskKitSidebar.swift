@@ -1375,6 +1375,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         switch id {
         case "area.newProject": return .init { self.newProjectInSelectedArea() }
         case "area.rename": return .init { self.renameSelected() }
+        case "area.changeEmoji": return .init { self.changeEmojiOfSelectedArea() }
         case "area.delete": return .init { self.deleteSelected() }
         default: return nil
         }
@@ -1575,6 +1576,22 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   @objc private func renameSelected() {
     guard let key = selectedKey() else { return }
     beginRename(key: key)
+  }
+
+  /// The area glyph picker, anchored on the row's glyph slot — the same
+  /// picker the area page's icon opens.
+  private func changeEmojiOfSelectedArea() {
+    let row = outlineView.selectedRow
+    guard row >= 0, let node = outlineView.item(atRow: row) as? Node,
+          case .area(let area) = node.content else { return }
+    if let cell = outlineView.view(atColumn: 0, row: row, makeIfNecessary: false) as? SidebarCell,
+       let anchor = cell.imageView {
+      KitEmojiPopover.present(for: area, relativeTo: anchor.bounds, of: anchor,
+                              preferredEdge: .maxX)
+    } else {
+      KitEmojiPopover.present(for: area, relativeTo: outlineView.rect(ofRow: row),
+                              of: outlineView, preferredEdge: .maxX)
+    }
   }
 
   /// Turn the row's label into a field and write the result through the

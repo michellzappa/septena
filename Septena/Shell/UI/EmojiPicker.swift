@@ -79,6 +79,9 @@ struct EmojiSlotPicker: View {
 struct EmojiPickerContent: View {
   @Binding var emoji: String
   var onSelect: ((String) -> Void)? = nil
+  /// Closes a presentation SwiftUI does not own — the Mac shell hosts this in
+  /// an `NSPopover`, where `dismiss` reaches nothing.
+  var onDismiss: (() -> Void)? = nil
 
   @Environment(\.dismiss) private var dismiss
   /// Mirrors `emoji` so the free-form field can clamp to a single grapheme
@@ -123,7 +126,7 @@ struct EmojiPickerContent: View {
           emoji = clamped
           onSelect?(clamped)
         }
-        .onSubmit { dismiss() }
+        .onSubmit { close() }
       // Full set, straight from the OS: macOS Character Viewer, iOS emoji
       // keyboard (both have search + skin tones, and stay current with the OS).
       Button { openSystemPicker() } label: {
@@ -182,7 +185,12 @@ struct EmojiPickerContent: View {
     emoji = value
     freeform = value
     onSelect?(value)
+    close()
+  }
+
+  private func close() {
     dismiss()
+    onDismiss?()
   }
 }
 

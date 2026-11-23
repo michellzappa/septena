@@ -360,6 +360,12 @@
       "tokens.fruitAccents.carambola.name"
     ]
   },
+  "Change Emoji…": {
+    "text": "Change Emoji…",
+    "paths": [
+      "actions.actions.area.changeEmoji.title"
+    ]
+  },
   "Change history": {
     "text": "Change history",
     "paths": [
