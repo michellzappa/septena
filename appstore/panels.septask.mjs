@@ -88,9 +88,9 @@ const VISUAL = {
   // No other app is named on the panel (mz, 2026-11-23).
   "move-in":      {
     fruit: "tamarillo", texture: "topography",
-    // Tasks arriving from your other app: copies of three rows slide in from
-    // the left edge onto their own rows. Titles come from the screen.
-    shot: { width: 0.56, offsetX: 0.2, incoming: ["task-reply", "task-dentist", "task-receipts"] },
+    // Tasks arriving from your other app: copies of four rows slide in from
+    // both edges onto their own rows. Same centred phone as every panel.
+    shot: { incoming: ["task-reply", "task-dentist", "task-receipts", "task-photos"] },
     card: { kind: "section", page: "import_export", section: "move_in", top: 2160 },
   },
   // Slide 8: yours, built in the open. No screen: one symbol per claim

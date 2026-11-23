@@ -140,7 +140,7 @@ function shot(s, device, tint) {
       </div>
       ${s.img ? callout(s.callout, { w, pad: f.pad, margin: (dw - w) / 2, tint }) : ""}
       ${s.img && s.ring?.frame ? ring(s.ring, { w, pad: f.pad }) : ""}
-      ${s.img && s.incoming ? incoming(s.incoming, { w, pad: f.pad, tint }) : ""}
+      ${s.img && s.incoming ? incoming(s.incoming, { w, pad: f.pad, tint, margin: (dw - w) / 2 }) : ""}
     </div>
   </div>`;
 }
@@ -150,21 +150,22 @@ function shot(s, device, tint) {
 // left, its right end over the phone's edge at the row it lands on, with an
 // accent trail behind it. Rows further down sit further out, still on their
 // way. Titles and positions come from the screen's .elements.json.
-function incoming(inc, { w, pad, tint }) {
+function incoming(inc, { w, pad, tint, margin }) {
   const k = (w - 2 * pad) / (inc.screenWidth ?? 402);
   const ui = String(theme.fonts.ui).replace(/"/g, "'");
+  // Each copy sits on the row it lands on, alternating left and right: its
+  // outer end near the panel edge, the rest over the phone, about to settle
+  // on its row. The whole title always shows.
+  const edge = 56 - margin; // the panel edge, in the phone's coordinates
   return inc.rows.map((r, i) => {
-
-    // Spaced wider than the rows, so the copies never overlap: they line up
-    // with the first row and stream down from there.
-    const top = pad + (inc.rows[0].frame[1] + inc.rows[0].frame[3] / 2) * k + i * 150;
-    const enter = 40 - i * 90; // how far into the phone the pill's right end reaches
-    // Anchored by its right end, so each pill is as wide as its title.
-    return `<div style="position:absolute; z-index:4; right:calc(100% - ${enter}px); top:${top}px; transform:translateY(-50%); display:flex; align-items:center; opacity:${1 - i * 0.12};">
-      <span style="width:300px; height:10px; border-radius:6px; background:linear-gradient(90deg, transparent, color-mix(in oklab, ${tint} 70%, white));"></span>
-      <span style="display:flex; align-items:center; gap:26px; padding:24px 32px; background:#fff; border-radius:28px; box-shadow:0 0 0 4px ${tint}, 0 24px 50px rgb(0 0 0 / .28); font:500 36px/1.2 ${ui}; color:#141518; white-space:nowrap;">
-        <span style="flex:none; width:44px; height:44px; border:4px solid #C7C7CC; border-radius:12px;"></span>${esc(r.label)}
-      </span>
+    const [, y, , h] = r.frame;
+    const top = pad + (y + h / 2) * k;
+    const left = i % 2 === 0;
+    const pill = `<span style="display:flex; align-items:center; gap:22px; padding:22px 30px; background:#fff; border-radius:26px; box-shadow:0 0 0 4px ${tint}, 0 24px 50px rgb(0 0 0 / .28); font:500 34px/1.2 ${ui}; color:#141518; white-space:nowrap;">
+        <span style="flex:none; width:40px; height:40px; border:4px solid #C7C7CC; border-radius:11px;"></span>${esc(r.label)}
+      </span>`;
+    return `<div style="position:absolute; z-index:4; ${left ? `left:${edge}px` : `right:${edge}px`}; top:${top}px; transform:translateY(-50%); display:flex; align-items:center;">
+      ${pill}
     </div>`;
   }).join("");
 }

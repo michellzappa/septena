@@ -225,15 +225,15 @@ reads this table; `appstore/validate.mjs` checks it.
 | slug | scene | callout | title | sub |
 | --- | --- | --- | --- | --- |
 | photo | - | - | Tasks that think with you. Septena is the task app for you and your agents. | |
-| from-agent | today/0 | - | Your agent adds tasks, too. Plan out loud with it, and Septena is its memory. | |
-| thinking | thinking/1 | - | Discuss any task. Septena asks what matters, and you answer with a tap. | |
-| agent-work | agents/1 | - | Hand off the work. Your agent works from the task’s notes, and you can stop it anytime. | |
-| agent-result | review/0 | - | You decide when it’s done. Agent work waits in Review until you accept it. | |
-| lets-go | faded/0 | - | The list that lets go. Old tasks fade, and each week Septena asks if you still want them. | |
-| move-in | plan/0 | - | Bring your tasks with you. Import your areas, projects and tasks from your existing app. | |
-| open | - | - | Yours, built in the open. Open source, and your tasks stay yours. | |
-| looks | looks/2 | - | Make it yours. Pick an accent colour and a texture for your lists. | |
-| devices | today/0 | - | One list, every device. iPhone, iPad, Mac and Apple Watch. | |
+| from-agent | today/0 | - | Septena is your agent’s memory. Plan out loud, and every task waits in your Inbox. | |
+| thinking | thinking/1 | - | Septena asks before it acts. Discuss any task, and answer with a tap. | |
+| agent-work | agents/1 | - | Hand off the work. Your agent works in Septena from the task’s notes. Stop it anytime. | |
+| agent-result | review/0 | - | You decide when it’s done. Agent work waits in Septena’s Review until you accept it. | |
+| lets-go | faded/0 | - | Septena lets go of old tasks. They fade, and once a week you choose what stays. | |
+| move-in | plan/0 | - | Bring your tasks to Septena. Import your areas, projects and tasks from your existing app. | |
+| open | - | - | Septena is built in the open. Open source, and your tasks stay yours. | |
+| looks | looks/2 | - | Make Septena yours. Pick an accent colour and a texture for your lists. | |
+| devices | today/0 | - | Septena on every device. iPhone, iPad, Mac and Apple Watch. | |
 
 ---
 
