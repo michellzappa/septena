@@ -117,6 +117,12 @@ const settingLabel = (key) => {
   for (const g of SETTINGS.rootGroups) for (const item of g.items ?? []) if (item.key === key) return item.label;
   throw new Error(`setting ${key} is not in registry/settings.json`);
 };
+// The agent's face: always the same shape (the crew's first face), always in
+// the panel's accent, so every slide shows the same agent (mz, 2026-11-23).
+const agentFace = (color) => {
+  if (!CREW[0]) throw new Error(`no agent face in ${SITE}/content/agent-avatars.json (run scripts/sync-agent-avatars.mjs there)`);
+  return { ...CREW[0], color };
+};
 // Builds a panel's card from what its screen shows (see card() in components.mjs).
 function resolveCard(device, panel) {
   const c = panel.card;
@@ -126,8 +132,7 @@ function resolveCard(device, panel) {
     if (!e) throw new Error(`${device.key}/${panel.id}: card element "${id}" is not on screen ${panel.shot.src}`);
     return e.label.split("\n").map((l) => l.trim()).filter(Boolean);
   };
-  const face = c.face == null ? null : CREW[c.face];
-  if (c.face != null && !face) throw new Error(`${device.key}/${panel.id}: card face ${c.face} is not in the avatar crew`);
+  const face = c.face === false ? null : agentFace(c.tint);
   const base = { top: c.top, left: c.left, right: c.right, tint: c.tint, face };
   if (c.kind === "discussion") {
     const [question, ...chips] = el(c.element);
@@ -206,9 +211,7 @@ for (const device of activeDevices()) {
         // The card's words, from the screen's elements and the app registry.
         card: panel.card && resolveCard(device, panel),
         chat: panel.chat && (() => {
-          const face = panel.chat.face == null ? null : CREW[panel.chat.face];
-          if (panel.chat.face != null && !face) throw new Error(`${device.key}/${panel.id}: chat face ${panel.chat.face} is not in the avatar crew`);
-          return { ...panel.chat, face };
+          return { ...panel.chat, face: agentFace(panel.chat.tint) };
         })(),
         watch: panel.watch && (() => {
           const meta = shotElements(device, panel.watch.src, "light", panel.watch.from ?? null);

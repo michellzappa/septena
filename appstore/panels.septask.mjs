@@ -39,8 +39,8 @@ const VISUAL = {
   // art, not store copy, and it matches the proposal on the today scene.
   "from-agent":   {
     fruit: "haskap", texture: "topography",
-    shot: { width: 0.62, ring: { element: "task-proposal", color: "#1D63DC" } },
-    chat: { top: 730, face: 0, tint: "#1D63DC", you: "Remind me to check the download links before the launch.", agent: "Done. It’s in your Septena Inbox." },
+    shot: { width: 0.62, ring: { element: "task-proposal" } },
+    chat: { top: 730, you: "Remind me to check the download links before the launch.", agent: "Done. It’s in your Septena Inbox." },
   },
   // Every device, after TickTick's platforms panel: a neutral canvas, the Mac
   // on a MacBook at the back, the iPhone in front at the right, the watch at
@@ -49,31 +49,31 @@ const VISUAL = {
     fruit: null, texture: "topography",
     shot: { width: 0.42, offsetX: 0.22, top: 1440, accent: "tamarillo" },
     shots: [{ src: "today/0", layout: "mac", frame: "laptop", accent: "tamarillo", width: 1.34, offsetX: -0.1, top: 760 }],
-    watch: { src: "today/0", from: "tamarillo", accent: "#FF5C67", left: 120, top: 1960, width: 300 },
+    watch: { src: "today/0", from: "tamarillo", accentFruit: "tamarillo", left: 120, top: 1960, width: 300 },
   },
   // Slide 3: Discuss. The conversation in an iOS-style card over the phone's
   // empty lower half, with the agent's face; a ring marks it on the screen.
   thinking:       {
     fruit: "yuzu", texture: "fieldMatrix",
-    shot: { ring: { element: "conversation", color: "#C28500" } },
-    card: { kind: "discussion", element: "conversation", face: 1, top: 1800, tint: "#C28500" },
+    shot: { ring: { element: "conversation" } },
+    card: { kind: "discussion", element: "conversation", top: 1800 },
   },
   // Slide 4: your agent works, and you hold the brakes. The working screen,
   // and a card with the agent's status, Stop, and the Pause all agents switch.
   "agent-work":   {
     fruit: "acai", texture: "ridges",
-    shot: { appearance: "dark" },
-    card: { kind: "agent", element: "agent-status", face: 0, top: 1700, tint: "#6544D6", toggleSetting: "agentsPaused" },
+    shot: { appearance: "light" },
+    card: { kind: "agent", element: "agent-status", top: 1700, toggleSetting: "agentsPaused" },
   },
   // Slide 5: agent work waits in Review until you accept it.
   "agent-result": {
     fruit: "jabuticaba", texture: "stippleDrift",
-    card: { kind: "review", element: "task-review-brief", face: 2, top: 1720, tint: "#27272E" },
+    card: { kind: "review", element: "task-review-brief", top: 1720 },
   },
   // Slide 6: one Inbox. What you jot and what your agent adds land together.
   inbox:          {
     fruit: "carambola", texture: "washiPaper",
-    card: { kind: "list", title: "Inbox", elements: ["task-capture", "task-proposal", "task-inbox-note"], face: 3, top: 1760, tint: "#5B8C00" },
+    card: { kind: "list", title: "Inbox", elements: ["task-capture", "task-proposal", "task-inbox-note"], top: 1760 },
   },
   dates:          { fruit: "persimmon", texture: "ridges", shot: { appearance: "dark" } },
   looks:          {
@@ -131,12 +131,15 @@ const iphone = rows.map((row, i) => {
       // the title and its sub on the others.
       accent: v.fruit ?? null,
       ...(v.shot ?? {}),
+      ...(v.shot?.ring ? { ring: { ...v.shot.ring, color: fill } } : {}),
       width: v.shot?.width ?? 0.68, offsetY: 0, rotate: 0, // one size everywhere; the devices panel shares the frame with a Mac
     },
     shots: v.shots,
-    watch: v.watch,
-    chat: v.chat,
-    card: v.card,
+    // The watch title in the fruit's dark-appearance colour (a watch face is dark).
+    watch: v.watch && { ...v.watch, accent: tokens.fruitAccents.find((f) => f.id === v.watch.accentFruit)?.dark ?? (() => { throw new Error(`panels.septask.mjs: watch fruit ${v.watch.accentFruit} is not in registry/tokens.json`); })() },
+    // Cards, chat and rings take the panel's fruit accent (registry), never a hand-typed hex.
+    chat: v.chat && { ...v.chat, tint: fill },
+    card: v.card && { ...v.card, tint: fill },
   };
 });
 
