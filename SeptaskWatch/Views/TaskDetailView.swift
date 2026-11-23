@@ -77,7 +77,7 @@ struct TaskDetailView: View {
       case .overdue:
         fact("flag.fill", "Due \(TaskMetaLine.short(task.deadline ?? ""))", .red)
       case .dueToday:
-        fact("flag.fill", String(localized: "Due today"), .orange)
+        fact("flag.fill", String(localized: "Due today"), .red)
       case .none:
         if let d = task.deadline { fact("flag", "Due \(TaskMetaLine.short(d))", .orange) }
       }

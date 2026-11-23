@@ -196,9 +196,14 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// agent cue. Self-clearing with NO stored state: tomorrow the date no longer
   /// equals today, so it evaporates on its own — no field, no migration, no
   /// CloudKit deploy. Agent rows are excluded; they carry their own cue and the
-  /// row never shows two dots.
+  /// row never shows two dots. A pinned row was placed by hand, so it never
+  /// counts.
+  ///
+  /// `docs/TASK_DATES_SPEC.md` R8 (decision Q7): this is the ONE "arrived on
+  /// its own" rule. The row dot and the rolled-into-Today notice both read it.
   func showsArrivedToday() -> Bool {
-    guard status == .open, source != TaskSource.mcp,
+    guard status == .open, !isHeading, fadedAt == nil, deletedAt == nil, !today,
+          source != TaskSource.mcp,
           let created, created < SeptenaDate.today else { return false }
     let today = SeptenaDate.today
     return scheduled == today || deadline == today
@@ -262,9 +267,26 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// rolled into Today; it never turns red. A deadline of *today or earlier*
   /// counts as overdue (red + badged). Shared by row styling and the
   /// badge/sidebar count so they never drift.
+  ///
+  /// `docs/TASK_DATES_SPEC.md` R3 / R4 (decision Q4): a deadline of today is
+  /// `dueToday` (red, labelled "Today"), an earlier one is `overdue` (red,
+  /// labelled "Overdue"). Both render red, so `isOverdue` means "red".
   var isOverdue: Bool {
-    guard status == .open, let d = deadline else { return false }
-    return d <= SeptenaDate.today
+    switch deadlineState() {
+    case .dueToday, .overdue: return true
+    case .none, .later: return false
+    }
+  }
+
+  /// R3: the one due-state rule. Only an active task (open, not a heading,
+  /// not deleted, not faded) has one. Every row, badge, widget and watch
+  /// label reads this instead of comparing dates itself.
+  func deadlineState(today: String = SeptenaDate.today) -> DeadlineState {
+    guard status == .open, !isHeading, deletedAt == nil, fadedAt == nil,
+          let d = deadline.map({ String($0.prefix(10)) }), !d.isEmpty else { return .none }
+    if d < today { return .overdue }
+    if d == today { return .dueToday }
+    return .later
   }
 
   /// Whether this open task is on the Today list — the DTO mirror of
@@ -279,6 +301,15 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     if let s = scheduled, s <= SeptenaDate.today { return true }
     if let d = deadline, d <= SeptenaDate.today { return true }
     return false
+  }
+
+  /// `docs/TASK_DATES_SPEC.md` R5: open, not on Today, and a When date or
+  /// deadline after today. A task is never on Today and in Upcoming at once
+  /// (decision Q3). Every Upcoming list and count reads this.
+  var isUpcoming: Bool {
+    guard status == .open, !isHeading, fadedAt == nil, !isOnToday else { return false }
+    let today = SeptenaDate.today
+    return (scheduled.map { $0 > today } ?? false) || (deadline.map { $0 > today } ?? false)
   }
 
   /// Sort rank for Today-surface lists (Next ▸ Tasks Today, Tasks tab Today).
@@ -746,6 +777,11 @@ struct Recurrence: Codable, Hashable {
 /// How a fixed-schedule repeating task responds when its visible date moves.
 /// Completion-based repeats never need this choice; their next date is always
 /// anchored to the completion date.
+/// A task's deadline relative to today (`docs/TASK_DATES_SPEC.md` R3).
+enum DeadlineState: Equatable {
+  case none, later, dueToday, overdue
+}
+
 enum RecurrenceRescheduleMode: Hashable {
   /// Move only this occurrence. The series keeps its prior logical slot.
   case makeException

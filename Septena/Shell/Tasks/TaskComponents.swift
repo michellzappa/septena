@@ -820,12 +820,18 @@ struct TaskRow: View {
         .font(.septenaMeta)
         .foregroundStyle(Theme.inkSecondary)
     } else if let due = task.deadline.flatMap(SeptenaDate.parse) {
-      let dueDay = cal.startOfDay(for: due)
-      if dueDay <= today {
-        Text(cal.isDateInToday(due) ? "Today" : Self.shortDate(due))
+      // `docs/TASK_DATES_SPEC.md` R3 / R4: due today and overdue are both
+      // red; the label says which.
+      switch task.deadlineState(today: SeptenaDate.format(today) ?? SeptenaDate.today) {
+      case .dueToday:
+        Text(String(localized: "Today", comment: "Deadline label: due today"))
           .font(.septenaMeta.weight(.semibold))
           .foregroundStyle(Theme.overdueRed)
-      } else {
+      case .overdue:
+        Text(String(localized: "Overdue", comment: "Deadline label: past due"))
+          .font(.septenaMeta.weight(.semibold))
+          .foregroundStyle(Theme.overdueRed)
+      case .none, .later:
         HStack(spacing: 4) {
           Image(systemName: "flag.fill").scaledFont(size: 12)
           Text(Self.shortDate(due)).font(.septenaMeta)

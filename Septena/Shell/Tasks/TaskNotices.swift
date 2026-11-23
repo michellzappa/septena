@@ -278,15 +278,13 @@ enum TaskNotices {
 
   private static var signIn: TaskNotice { notice(.signIn) }
 
-  /// Tasks that arrived on Today on their own: scheduled STRICTLY before today.
-  /// A task scheduled for today, or merely due today, was placed by the user.
+  /// Tasks that arrived on Today on their own. Same rule as the row's arrived
+  /// dot (`SeptenaTask.showsArrivedToday`, `docs/TASK_DATES_SPEC.md` R8), so
+  /// the notice never counts a task that carries no dot, or the reverse.
   private static func rolledIn(pool: [SeptenaTask], today: String,
                                context: ModelContext) -> TaskNotice? {
     guard SettingsMirror.rolledInDismissedOn(context: context) != today else { return nil }
-    let count = pool.filter { task in
-      guard task.status == .open, let scheduled = task.scheduled, !scheduled.isEmpty else { return false }
-      return String(scheduled.prefix(10)) < today
-    }.count
+    let count = pool.filter { $0.showsArrivedToday() }.count
     guard count > 0 else { return nil }
     return notice(.rolledIn, title: RegistryNotices.rolledInTitle(count: count))
   }

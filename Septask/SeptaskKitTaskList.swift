@@ -2951,10 +2951,8 @@ final class SeptaskKitTaskListController: NSViewController {
         let liveSel = selection.map { LocalCache.task(id: $0.id, in: self.context) ?? $0 }
         let before = liveSel.map(self.scheduleSnapshot)
         for task in liveSel {
-          self.mutator.setTimeSlot(id: task.id, startTime: start, durationMinutes: duration)
-          if start != nil, !task.today, task.scheduled == nil {
-            self.mutator.moveToToday(id: task.id)
-          }
+          self.mutator.apply(.setTimeSlot(startTime: start, durationMinutes: duration,
+                                          timeZone: nil), to: task.id)
           self.refreshComposerRow(taskId: task.id)
         }
         self.reload()
@@ -2970,22 +2968,21 @@ final class SeptaskKitTaskListController: NSViewController {
       for task in selection {
         switch kind {
         case .when:
+          // Field rules: `TaskDateActions` (spec §4 A1 / A2 / A5).
           if today {
             let target = KitDayFormat.todayDate()
             guard let mode = self.rescheduleMode(for: task, newDate: target) else { continue }
-            self.mutator.reschedule(id: task.id, date: target, mode: mode)
-            self.mutator.schedule(id: task.id, date: nil)
-            self.mutator.moveToToday(id: task.id)
-          } else {
+            self.mutator.apply(.putOnToday, to: task.id, mode: mode)
+          } else if let date {
             guard let mode = self.rescheduleMode(for: task, newDate: date) else { continue }
-            self.mutator.reschedule(id: task.id, date: date, mode: mode)
-            self.mutator.removeFromToday(id: task.id)
+            self.mutator.apply(.scheduleFor(date), to: task.id, mode: mode)
             deferredTo = date
+          } else {
+            self.mutator.apply(.clearWhenDate, to: task.id)
           }
         case .deadline:
-          self.mutator.setDeadline(id: task.id, date: date)
+          self.mutator.apply(.setDeadline(date), to: task.id)
         }
-        self.mutator.acknowledge(id: task.id)
         self.refreshComposerRow(taskId: task.id)
       }
       self.reload()
@@ -3026,7 +3023,7 @@ final class SeptaskKitTaskListController: NSViewController {
   func clearScheduleSelection() {
     let before = actionableSelection.map(scheduleSnapshot)
     for task in actionableSelection {
-      mutator.clearSchedule(id: task.id)
+      mutator.apply(.clearWhen, to: task.id)
     }
     reload()
     recordScheduleUndo(name: String(localized: "Clear Dates",
@@ -3039,16 +3036,11 @@ final class SeptaskKitTaskListController: NSViewController {
     // the store must already hold what was typed.
     commitComposerTextIfOpen()
     let before = actionableSelection.map(scheduleSnapshot)
-    for task in actionableSelection {
-      if task.today {
-        mutator.removeFromToday(id: task.id)
-      } else {
-        mutator.moveToToday(id: task.id)
-        pendingPromoteFlash.insert(task.id)
-      }
-      mutator.acknowledge(id: task.id)
-      refreshComposerRow(taskId: task.id)
-    }
+    // Spec §4 A4: decided on `isOnToday` (pin OR arrived date), the same
+    // test the menu label uses, never the raw pin.
+    let joined = mutator.toggleToday(ids: actionableSelection.map(\.id))
+    pendingPromoteFlash.formUnion(joined)
+    for task in actionableSelection { refreshComposerRow(taskId: task.id) }
     reload()
     playPendingPromoteFlashes()
     recordScheduleUndo(name: RegistryActions.title("task.toggleToday"), before: before)
@@ -3979,10 +3971,8 @@ final class SeptaskKitTaskListController: NSViewController {
             guard let self else { return }
             let current = LocalCache.task(id: task.id, in: self.context) ?? task
             let before = [current].map(self.scheduleSnapshot)
-            self.mutator.setTimeSlot(id: task.id, startTime: start, durationMinutes: duration)
-            if start != nil, !current.today, current.scheduled == nil {
-              self.mutator.moveToToday(id: task.id)
-            }
+            self.mutator.apply(.setTimeSlot(startTime: start, durationMinutes: duration,
+                                            timeZone: nil), to: current.id)
             self.refreshComposerRow(taskId: task.id)
             self.reload()
             self.recordScheduleUndo(
@@ -3995,16 +3985,20 @@ final class SeptaskKitTaskListController: NSViewController {
           // Capture at the gesture (from the STORE: an earlier pill may have
           // moved the captured `task` on), record after: the same undo step
           // the ⌘S popover registers, so ⌘Z takes back a pill change too.
-          let before = [LocalCache.task(id: task.id, in: self.context) ?? task]
-            .map(self.scheduleSnapshot)
+          let current = LocalCache.task(id: task.id, in: self.context) ?? task
+          let before = [current].map(self.scheduleSnapshot)
+          // Same actions and fixed-repeat prompt as the ⌘S popover.
           if today {
-            self.mutator.moveToToday(id: task.id)
-          } else {
-            self.mutator.schedule(id: task.id, date: date)
-            self.mutator.removeFromToday(id: task.id)
+            guard let mode = self.rescheduleMode(for: current,
+                                                 newDate: KitDayFormat.todayDate()) else { return }
+            self.mutator.apply(.putOnToday, to: task.id, mode: mode)
+          } else if let date {
+            guard let mode = self.rescheduleMode(for: current, newDate: date) else { return }
+            self.mutator.apply(.scheduleFor(date), to: task.id, mode: mode)
             self.showDeferredToast(date)
+          } else {
+            self.mutator.apply(.clearWhenDate, to: task.id)
           }
-          self.mutator.acknowledge(id: task.id)
           self.refreshComposerRow(taskId: task.id)
           self.recordScheduleUndo(
             name: String(localized: "Change When", comment: "SeptaskKit: undo action"),
@@ -4018,8 +4012,7 @@ final class SeptaskKitTaskListController: NSViewController {
           guard let self else { return }
           let before = [LocalCache.task(id: task.id, in: self.context) ?? task]
             .map(self.scheduleSnapshot)
-          self.mutator.setDeadline(id: task.id, date: date)
-          self.mutator.acknowledge(id: task.id)
+          self.mutator.apply(.setDeadline(date), to: task.id)
           self.refreshComposerRow(taskId: task.id)
           self.recordScheduleUndo(
             name: String(localized: "Change Deadline", comment: "SeptaskKit: undo action"),
@@ -4983,9 +4976,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       // The bucket `upcomingBuckets` filed it under — already there: no-op.
       let bucket = [task.scheduled, task.deadline].compactMap { $0 }.filter { $0 > today }.min()
       guard bucket != dayKey, let mode = rescheduleMode(for: task, newDate: date) else { continue }
-      mutator.reschedule(id: id, date: date, mode: mode)
-      mutator.removeFromToday(id: id)
-      mutator.acknowledge(id: id)
+      mutator.apply(.scheduleFor(date), to: id, mode: mode)
       changed = true
     }
     return changed
@@ -5988,15 +5979,18 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       return
     }
 
-    if let deadline = task.deadline, let date = KitDayFormat.date(fromWire: deadline) {
-      let today = KitDayFormat.todayDate() ?? Date()
-      let dueDay = Calendar.current.startOfDay(for: date)
-      let todayDay = Calendar.current.startOfDay(for: today)
-      if dueDay <= todayDay {
+    if let deadline = task.deadline, KitDayFormat.date(fromWire: deadline) != nil {
+      // `docs/TASK_DATES_SPEC.md` R3 / R4: due today and overdue are both
+      // red; the label says which.
+      let todayISO = SeptenaDate.format(KitDayFormat.todayDate()) ?? SeptenaDate.today
+      let state = task.deadlineState(today: todayISO)
+      if state == .dueToday || state == .overdue {
         detail.font = .monospacedDigitSystemFont(
           ofSize: SeptenaTypeScale.size(.footnote), weight: .semibold)
         detail.textColor = SeptaskKitTheme.overdueRed
-        detail.stringValue = KitDayFormat.taskDate(deadline)
+        detail.stringValue = state == .overdue
+          ? String(localized: "Overdue", comment: "Deadline label: past due")
+          : String(localized: "Today", comment: "Deadline label: due today")
       } else {
         configureScheduleGlyph(named: "flag.fill", color: SeptaskKitTheme.inkSecondary)
         detail.stringValue = KitDayFormat.taskDate(deadline)

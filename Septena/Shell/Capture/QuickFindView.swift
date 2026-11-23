@@ -150,7 +150,7 @@ struct QuickFindView: View {
       out.append(QuickFindHit(
         id: "t:\(t.id)",
         taskID: t.id,
-        kind: .task(done: t.status == .done, today: t.today),
+        kind: .task(done: t.status == .done, today: t.isOnToday),
         title: t.title,
         subtitle: taskSubtitle(t),
         score: s + (t.status == .done ? -1 : 0),

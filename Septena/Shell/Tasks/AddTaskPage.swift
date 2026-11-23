@@ -197,7 +197,7 @@ struct AddTaskPage: View {
 
   private func pullToToday(_ task: SeptenaTask) {
     let before = TaskUndo.ScheduleSnapshot(task)
-    mutator.moveToToday(id: task.id)
+    mutator.apply(.putOnToday, to: task.id)
     TaskUndo.recordScheduleChange(
       name: RegistryActions.title("task.toggleToday", .add),
       before: [before], context: modelContext, mutator: mutator)

@@ -1234,15 +1234,8 @@ struct SidebarRootView: View {
       if t.isInInbox { inbox += 1 }
       // The triage band (unratified) sits above Today and is excluded from it.
       if t.isInTriageBand { triage += 1 }
-      if !t.isInTriageBand {
-        if t.today { todayN += 1 }
-        else if let s = t.scheduled, s <= today { todayN += 1 }
-        else if let d = t.deadline, d <= today { todayN += 1 }
-      }
-      if !t.today {
-        if let s = t.scheduled, s > today { upcoming += 1 }
-        else if let d = t.deadline, d > today { upcoming += 1 }
-      }
+      if !t.isInTriageBand, t.isOnToday { todayN += 1 }
+      if t.isUpcoming { upcoming += 1 }
       if !t.today, t.scheduled == nil, t.deadline == nil { unscheduled += 1 }
     }
     // Lump the today-screen sum into `todayCount` and leave `reviewCount`
@@ -1965,9 +1958,7 @@ private struct SidebarTaskDrop: ViewModifier {
     case .project(let projectId):
       mutator.moveToList(ids: ids, area: nil, project: projectId, acknowledge: true)
     case .today:
-      for id in ids {
-        mutator.moveToToday(id: id, today: true)
-      }
+      for id in ids { mutator.apply(.putOnToday, to: id) }
     }
   }
 }
