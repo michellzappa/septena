@@ -132,6 +132,19 @@ window.LANGUAGE_DATA = [
     weak: "Whether you're making a grocery list or managing a complex project, GoodTask is the perfect tool for you.",
     note: "A clear position in the hero (a layer on Reminders). Stock SaaS headings below it." },
 
+  // Added 2026-11-23 (read that day; the rest of the set was read 2026-11-22).
+  { name: "Stuff", slug: "stuff", tier: "Secondary", url: "https://www.themitycompany.com/",
+    hero: "Get stuff done.", subhead: "Stuff is the playful, focused to-do list for doers. Capture tasks in seconds, organize everything, and actually finish what you start.",
+    cta: ["Download free", "Start free trial", "Choose annual"], heads: ["Organize everything", "Beat the deadline", "Add tasks at the speed of thought", "Do stuff together", "See your story, one task at a time", "Stuff goes where you go."],
+    words: ["doers", "playful", "speed of thought", "Adventure Log", "Extra Stuff", "one-person team"],
+    register: "lifestyle", jargon: "low", person: "you / imperative", heroShape: "Imperative outcome", aiStance: "Branded feature",
+    aiLine: "Listen Mode (speech to tasks) and Scan Mode (camera to tasks), named as capture modes. No agent or MCP copy.",
+    proof: "“4.9 on the App Store” (the US listing showed 4.57 from 89 ratings on 2026-11-23); press quotes from Apple, The Verge, Hiro Report",
+    promise: "finish what you start, and enjoy it",
+    best: "Capture tasks in seconds, organize everything, and actually finish what you start.",
+    weak: "proof that you do, in fact, do stuff.",
+    note: "The name carries every pun (Basic Stuff, Extra Stuff, Do stuff together). “Speed of thought” repeats Todoist’s line word for word. “Made with care by a one-person team” is the same maker claim Septena makes." },
+
   // ---------- Agent ----------
   { name: "Roma", slug: "roma", tier: "Agent", url: "https://roma.app",
     hero: "The to-do list for your AI agents.", subhead: "Roma connects to all your apps and gives every task to the right agent.",

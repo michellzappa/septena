@@ -238,6 +238,20 @@
     "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/e3/93/2d/e3932d94-2359-242f-ffd5-6143db8e5dfc/AppIcon-Default-0-0-1x_U007epad-0-0-0-1-0-0-85-220.png/512x512bb.jpg"
   },
   {
+    "name": "Stuff",
+    "slug": "stuff",
+    "tier": "Secondary",
+    "motif": "Checkmark in Box",
+    "dominantColor": "Blue",
+    "bgTone": "Saturated",
+    "style": "Tactile 3D / Skeuomorphic",
+    "whyItWorks": "A soft 3D white task row, tilted on a bright blue gradient, with one blue check at its start. The tilt and depth give it some life, but blue plus checkmark puts it in the most crowded corner of the set.",
+    "status": "found",
+    "file": "icons/stuff.png",
+    "source": "iTunes App Store (id=6502721156)",
+    "sourceUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/9d/cb/18/9dcb188a-e7bd-dcd9-13da-e1673a50026f/AppIcon-0-0-1x_U007epad-0-0-0-1-0-sRGB-85-220.jpeg/512x512bb.jpg"
+  },
+  {
     "name": "Roma",
     "slug": "roma",
     "tier": "Agent",
