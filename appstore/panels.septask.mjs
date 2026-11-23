@@ -42,15 +42,14 @@ const VISUAL = {
     shot: { width: 0.62, ring: { element: "task-proposal", color: "#1D63DC" } },
     chat: { top: 730, face: 0, tint: "#1D63DC", you: "Remind me to check the download links before the launch.", agent: "Done. It’s in your Septena Inbox." },
   },
-  // Native on each device: the Mac window behind, the iPhone in front. The
-  // iPad joins when the scene builder has an iPad layout (septena-site#17).
+  // Every device, after TickTick's platforms panel: a neutral canvas, the Mac
+  // on a MacBook at the back, the iPhone in front at the right, the watch at
+  // the left. All upright. The iPad joins when septena-site#17 adds its layout.
   devices:        {
-    fruit: "tamarillo", texture: "topography",
-    // The phone sits on the Mac window (in front, overlapping it), and a small
-    // watch stands next to the phone.
-    shot: { width: 0.46, offsetX: 0.2, top: 1080 },
-    shots: [{ src: "today/0", layout: "mac", accent: "tamarillo", width: 0.88, offsetX: -0.04, top: 640 }],
-    watch: { src: "today/0", from: "tamarillo", accent: "#FF7A85", left: 170, top: 1800, width: 330 },
+    fruit: null, texture: "topography",
+    shot: { width: 0.36, offsetX: 0.24, top: 1540, accent: "tamarillo" },
+    shots: [{ src: "today/0", layout: "mac", frame: "laptop", accent: "tamarillo", width: 0.9, top: 980 }],
+    watch: { src: "today/0", from: "tamarillo", accent: "#FF5C67", left: 140, top: 1880, width: 300 },
   },
   thinking:       { fruit: "yuzu", texture: "fieldMatrix" },
   // Agent faces (the site's avatar crew, in our fruit colours) sit on the

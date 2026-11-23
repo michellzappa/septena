@@ -23,6 +23,8 @@ import { phoneShape } from "../registry/device-shape.mjs";
 // The one iPhone shape (registry/device-frames.json), shared with the website scenes.
 const IPHONE = JSON.parse(readFileSync(new URL("../registry/device-frames.json", import.meta.url), "utf8")).devices.iphone;
 const IPHONE_CASE_WIDTH = IPHONE.screen.width + 2 * IPHONE.bezel;
+// The MacBook (registry/device-frames.json): lid rim, glass bezel, screen, base.
+const MACBOOK = JSON.parse(readFileSync(new URL("../registry/device-frames.json", import.meta.url), "utf8")).devices.macbook;
 // Case drawing and screen mask from registry/device-shape.mjs (continuous corners).
 // phoneShape returns CSS url("…") values; they go inside double-quoted style
 // attributes here, so escape the quotes or the attribute ends early.
@@ -85,6 +87,25 @@ function shot(s, device, tint) {
   if (!s) return "";
   // A Mac window from the scene builder's mac layout (it carries its own window
   // bar): rounded and shadowed, positioned like a phone.
+  if (s.layout === "mac" && s.frame === "laptop") {
+    // The window capture on a MacBook screen, drawn from the registry's macbook.
+    const w = Math.round(device.designWidth * (s.width ?? 0.9));
+    const k = w / (MACBOOK.screen.width + 2 * MACBOOK.bezel);
+    const fin = MACBOOK.finish, base = MACBOOK.base;
+    const rim = `linear-gradient(${fin.angle}deg, ${fin.stops.map(([p, c]) => `${c} ${p * 100}%`).join(", ")})`;
+    const zone = `${s.top != null ? `top:${s.top}px` : `bottom:${s.bottom ?? 110}px`}; transform: translate(${Math.round((s.offsetX ?? 0) * 100)}%, 0);`;
+    return `
+  <div class="shot-zone" style="${zone}">
+    <div style="width:${w}px; filter:drop-shadow(0 40px 60px rgb(0 0 0 / .25));">
+      <div style="background:${rim}; padding:${Math.max(2, Math.round(3 * k))}px; border-radius:${Math.round(MACBOOK.outerRadius * k)}px ${Math.round(MACBOOK.outerRadius * k)}px ${Math.round(MACBOOK.hingeRadius * k)}px ${Math.round(MACBOOK.hingeRadius * k)}px;">
+        <div style="background:${fin.glass}; padding:${Math.round(MACBOOK.bezel * k)}px; border-radius:${Math.round((MACBOOK.outerRadius - 3) * k)}px ${Math.round((MACBOOK.outerRadius - 3) * k)}px ${Math.round(MACBOOK.hingeRadius * k)}px ${Math.round(MACBOOK.hingeRadius * k)}px;">
+          <img src="${s.img}" alt="" style="display:block; width:100%; border-radius:${Math.round(6 * k)}px;">
+        </div>
+      </div>
+      <div style="height:${Math.round(base.height * k)}px; margin:0 -${Math.round(base.overhang * k)}px; background:${base.gradient}; border-radius:0 0 ${Math.round(18 * k)}px ${Math.round(18 * k)}px;"></div>
+    </div>
+  </div>`;
+  }
   if (s.layout === "mac") {
     const w = Math.round(device.designWidth * (s.width ?? 1));
     return `
