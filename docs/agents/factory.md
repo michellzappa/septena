@@ -52,12 +52,12 @@ Set up 2026-11-19 so planned work keeps moving without mz.
 - **Gateway (`backend/`)**: the Cloudflare Worker lives in `backend/` in this
   repo (#83). Commit it here like any other change; this repo is public, so
   never commit `.dev.vars` or secret values. The old
-  `/Users/mz/Dev/septena-mcp-gateway` checkout is frozen (mz archives it):
+  `/Users/mz/Dev/Septena/septena-mcp-gateway` checkout is frozen (mz archives it):
   never commit, push or deploy from it. Gate with
   `cd backend && ./node_modules/.bin/tsc --noEmit` (same as
   `pnpm typecheck`). When `backend/node_modules` is missing, symlink the
   frozen checkout's copy
-  (`ln -s /Users/mz/Dev/septena-mcp-gateway/node_modules backend/node_modules`,
+  (`ln -s /Users/mz/Dev/Septena/septena-mcp-gateway/node_modules backend/node_modules`,
   gitignored) instead of `pnpm install`: an install downloads packages, and
   downloads need mz's yes. Once that checkout is archived, ask mz before the
   first `pnpm install --frozen-lockfile`. Deploys run from `backend/`
