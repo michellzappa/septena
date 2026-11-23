@@ -594,19 +594,15 @@ struct MagicPlusRowDropModifier: ViewModifier {
 
 }
 
-/// The dotted new-task slot: the ONE landing mark of a Magic Plus drag. A row
+/// The glass new-task slot: the ONE landing mark of a Magic Plus drag. A row
 /// gap, a header and a Tasks index row all show it, so the drop always reads
 /// as "a new task goes here" and never as "this row is the target".
 struct MagicPlusGhostSlot: View {
   var body: some View {
-    let accent = AppearancePreferences.shared.magicPlusSwiftUIColor
-    RoundedRectangle(cornerRadius: 10, style: .continuous)
-      .strokeBorder(accent.opacity(0.45),
-                    style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-      .background(
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-          .fill(accent.opacity(0.06))
-      )
+    // A tinted glass pane, the same material as the orb and the toolbar
+    // circles (decided 2026-11-23: the dashed outline read as a wireframe).
+    Color.clear
+      .glassCard(cornerRadius: 12, tint: AppearancePreferences.shared.magicPlusSwiftUIColor)
       .padding(.horizontal, TaskCardMetrics.margin)
       .padding(.vertical, 4)
       .frame(height: MagicPlusRowDropModifier.gapHeight)
@@ -614,7 +610,7 @@ struct MagicPlusGhostSlot: View {
 }
 
 /// Registers a section header, heading, Upcoming day, or Tasks index row as a
-/// Magic Plus target. Hovering it opens the dotted new-task slot under it (the
+/// Magic Plus target. Hovering it opens the glass new-task slot under it (the
 /// first place in that list); the row itself gets no highlight.
 struct MagicPlusSectionDropModifier: ViewModifier {
   @Environment(\.magicPlusDrag) private var drag
