@@ -3,7 +3,8 @@
 **Status:** accepted (2026-11-22). C0 passed (#246, PR #258). C5 done (#251,
 PR #261; releases `core-v0.1.0`, `core-v0.2.0`). C4 in progress (#250): the
 Apple apps call the core for fade (#270) and the conversation projection,
-predicates and Agent stage (#275). C1–C3 open.
+predicates and Agent stage (#275), and recurrence and timed reminders. The
+watch compiles no rule code (`TasksWatchWire.swift` only). C1–C3 open.
 
 **Rests on:** ADR 0025 (shared Rust core), ADR 0015 (shared registries),
 ADR 0013 (Windows on the Android code), ADR 0002 (own backend).
@@ -125,7 +126,7 @@ parsing, the watch.
 | Question | Default |
 |---|---|
 | Time zone for a date-only `created` in fade | The host passes its UTC offset in seconds *(default)* |
-| Watch recurrence | The phone runs the core for a wrist completion; the watch drops `DateParser` (C4) *(default)* |
+| Watch recurrence | The phone runs the core for a wrist completion; the watch compiles no `DateParser` (settled in C4) |
 | List membership on Apple | Moves to the core only after mz checks list scrolling on a device with the core calls already in place (#250) *(default)* |
 | Single-field conversation reads | `isTerminal`, `isClaimed`, `needsHumanReview` stay in Swift: one field each, a core call would only add cost *(default)* |
 | Android packaging | Releases ship `jniLibs` + Kotlin bindings, not an AAR; C1 packages them in the `android/` Gradle build *(default)* |
