@@ -26,6 +26,12 @@ name: Septena iOS TestFlight
 #                         Distribution identities of team 992N457T8D
 #   IOS_SIGNING_P12_PASSWORD
 # Until the secrets exist, the job skips with a notice instead of failing.
+#
+# Distribution: after the upload, the `distribute` job (Linux, so the wait for
+# Apple's processing does not use macOS minutes) adds the build to the
+# external group "Public beta", which owns the public link, and sends it to
+# beta review (scripts/testflight-distribute.mjs). Apple holds one build in
+# review at a time; a refused submission is a notice, not a failure.
 
 on:
   push:
@@ -52,6 +58,9 @@ jobs:
   upload:
     name: Archive and upload (iOS)
     runs-on: macos-26
+    outputs:
+      ready: ${{ steps.gate.outputs.ready }}
+      build_number: ${{ steps.stamp.outputs.build_number }}
     steps:
       - name: Check signing secrets
         id: gate
@@ -82,9 +91,11 @@ jobs:
         run: brew install xcodegen
 
       - name: Stamp build number and generate project
+        id: stamp
         if: steps.gate.outputs.ready == 'true'
         run: |
           scripts/stamp-version.sh
+          echo "build_number=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
           xcodegen generate
 
       - name: Import signing identities and API key
@@ -167,3 +178,29 @@ jobs:
         run: |
           security delete-keychain "$RUNNER_TEMP/septena-ios.keychain-db" || true
           rm -f "$ASC_KEY_PATH"
+
+  distribute:
+    name: Add to Public beta and send to review
+    needs: upload
+    if: needs.upload.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/testflight-distribute.mjs
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Distribute build ${{ needs.upload.outputs.build_number }}
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          ASC_APP_ID: "6836809027"
+          BUILD_NUMBER: ${{ needs.upload.outputs.build_number }}
+          TESTFLIGHT_GROUP: Public beta
+        run: node scripts/testflight-distribute.mjs
