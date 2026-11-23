@@ -64,6 +64,7 @@ internal fun TaskConversationSection(
     taskId: String,
     isTaskOpen: Boolean,
     canWrite: Boolean,
+    heading: String? = null,
 ) {
     val dataVersion by graph.sync.dataVersion.collectAsStateWithLifecycle()
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
@@ -185,6 +186,8 @@ internal fun TaskConversationSection(
         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        // The heading shows only when the conversation has started, so an empty task shows no empty section.
+        if (heading != null) Text(heading, style = MaterialTheme.typography.titleMedium)
         transcript.forEach { line ->
             val text = when (line.role) {
                 RegistryEntityEnums.ConvoTurnRole.PROVIDER -> line.question ?: line.note

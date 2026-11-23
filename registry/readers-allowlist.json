@@ -78,7 +78,7 @@
   },
   "kotlin": {
     "RegistryTaskPageBlockIds.*": {
-      "reason": "Android renders TaskDetailScreen by hand until it renders from taskPage.blocks (ADR 0029).",
+      "reason": "Android renders taskPage.blocks by kind (ADR 0029, #305) and reads no block by its ID.",
       "issue": "#305"
     },
     "RegistryActionIds.*": {
@@ -110,7 +110,7 @@
       "issue": "#174"
     },
     "RegistryTaskAttributeIds.*": {
-      "reason": "Android implements a subset of the registry; members gain readers as features ship (ADR 0028). Reminder, star, list, attachments, discuss and paste attributes.",
+      "reason": "Android implements a subset of the registry; members gain readers as features ship (ADR 0028). Reminder, star, discuss and paste attributes.",
       "issue": "#174"
     },
     "RegistryPlatformIds.*": {
