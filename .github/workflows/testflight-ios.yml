@@ -44,9 +44,12 @@ on:
       - "**/*.md"
   workflow_dispatch:
 
+# Several sessions push to main within minutes of each other. Cancelling the
+# running upload on each push meant no run ever finished. A running upload now
+# finishes; GitHub keeps only the newest pending run behind it.
 concurrency:
   group: testflight-ios
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
