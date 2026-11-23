@@ -55,6 +55,8 @@ import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.SyncRecord
+import app.septena.core.TaskPageBlockKinds
+import app.septena.core.TaskPageDepths
 import app.septena.core.WireTimestamp
 import app.septena.core.booleanValue
 import app.septena.core.generated.RegistryActionIds
@@ -64,6 +66,7 @@ import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityLimits
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.generated.RegistryEntities
+import app.septena.core.generated.RegistryTaskAttributeIds
 import app.septena.core.generated.RegistryTaskDetail
 import app.septena.core.stringValue
 import kotlinx.coroutines.Dispatchers
@@ -116,6 +119,10 @@ fun TaskDetailScreen(
 ) {
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val labels = remember(languageTag) { TaskDetailLabels.fromRegistry(languageTag) }
+    val pageBlocks = remember(languageTag) {
+        RegistryCatalog.taskPageBlocks(TaskPageDepths.PAGE, languageTag = languageTag)
+    }
+    val attributes = remember(languageTag) { RegistryCatalog.taskAttributes(languageTag) }
     val dataVersion by graph.sync.dataVersion.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val checklistDrafts = remember(taskId) { mutableStateMapOf<String, String>() }
@@ -269,8 +276,37 @@ fun TaskDetailScreen(
         }
     }
 
+    // One editor per attribute (ADR 0029). Each attribute writes through one
+    // function, and each picker opens through one function, so that the page and
+    // a future row menu (#300) use the same editor.
+
     fun setWhen(day: String?) {
         write { check(graph.taskMutator.setWhen(taskId, day) != null) }
+    }
+
+    fun setDeadline(day: String?) {
+        write { check(graph.taskMutator.setDeadline(taskId, day) != null) }
+    }
+
+    fun openWhenPicker() {
+        if (canEdit) showWhenPicker = true
+    }
+
+    fun openDeadlinePicker() {
+        if (canEdit) showDeadlinePicker = true
+    }
+
+    /**
+     * Opens the picker for a task attribute (actions.json `opensAttribute`).
+     * Repeat and list edit in place on this page, through [setRepeat],
+     * [moveToArea] and [moveToProject]. The other attributes have no Android
+     * editor yet.
+     */
+    fun openAttribute(attributeId: String) {
+        when (attributeId) {
+            RegistryTaskAttributeIds.WHEN -> openWhenPicker()
+            RegistryTaskAttributeIds.DEADLINE -> openDeadlinePicker()
+        }
     }
 
     fun setRepeat(
@@ -336,7 +372,7 @@ fun TaskDetailScreen(
         write { check(graph.taskMutator.updateFields(taskId, changes) != null) }
     }
 
-    fun chooseArea(areaId: String?) {
+    fun moveToArea(areaId: String?) {
         write {
             check(
                 graph.taskMutator.updateFields(
@@ -361,7 +397,7 @@ fun TaskDetailScreen(
         }
     }
 
-    fun chooseProject(projectId: String?) {
+    fun moveToProject(projectId: String?) {
         write {
             check(
                 graph.taskMutator.updateFields(
@@ -436,184 +472,221 @@ fun TaskDetailScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                OutlinedTextField(
-                    value = titleDraft,
-                    onValueChange = {
-                        titleDraft = it.take(RegistryEntityLimits.TEXT_MAX.toInt())
-                        textIsDirty = true
-                        saveFailed = false
-                    },
-                    label = { Text(labels.field(RegistryTaskDetail.Fields.TITLE)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = canEdit,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                )
-
-                OutlinedTextField(
-                    value = notesDraft,
-                    onValueChange = {
-                        notesDraft = it.take(RegistryEntityLimits.NOTES_MAX.toInt())
-                        textIsDirty = true
-                        saveFailed = false
-                    },
-                    label = { Text(labels.field(RegistryTaskDetail.Fields.NOTES)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
-                    maxLines = 8,
-                    enabled = canEdit,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
-                )
-
-                if (saveFailed) {
-                    Text(labels.saveError, color = MaterialTheme.colorScheme.error)
-                }
-
-                HorizontalDivider()
-                DateValueRow(
-                    label = labels.field(RegistryTaskDetail.Fields.WHEN),
-                    value = whenValue,
-                    selectLabel = labels.selectDate,
-                    clearLabel = labels.clear,
-                    enabled = canEdit,
-                    onSelect = { showWhenPicker = true },
-                    onClear = { setWhen(null) },
-                )
-                DateValueRow(
-                    label = labels.field(RegistryTaskDetail.Fields.DEADLINE),
-                    value = deadline?.let { formatDay(it, languageTag) } ?: labels.noDate,
-                    selectLabel = labels.selectDate,
-                    clearLabel = labels.clear,
-                    enabled = canEdit,
-                    onSelect = { showDeadlinePicker = true },
-                    onClear = { write { check(graph.taskMutator.setDeadline(taskId, null) != null) } },
-                )
-
-                SelectorRow(
-                    label = labels.field(RegistryTaskDetail.Fields.AREA),
-                    value = selectedArea?.title ?: labels.noArea,
-                    noneTitle = labels.noArea,
-                    choices = data?.areas.orEmpty(),
-                    enabled = canEdit,
-                    onSelect = ::chooseArea,
-                )
-                SelectorRow(
-                    label = labels.field(RegistryTaskDetail.Fields.PROJECT),
-                    value = selectedProject?.title ?: labels.noProject,
-                    noneTitle = labels.noProject,
-                    choices = data?.projects.orEmpty(),
-                    enabled = canEdit,
-                    onSelect = ::chooseProject,
-                )
-
-                HorizontalDivider()
-                RepeatEditor(
-                    labels = labels,
-                    units = labels.repeatUnits,
-                    selectedUnit = repeatUnit,
-                    interval = repeatInterval,
-                    afterCompletion = repeatAfterCompletion,
-                    paused = recurrencePaused,
-                    pauseAction = repeatPauseAction,
-                    weekdays = labels.weekdays,
-                    monthlyRules = labels.monthlyRules,
-                    calendarWeekdays = labels.calendarWeekdays,
-                    ordinals = labels.ordinals,
-                    selectedWeekdays = recurrenceWeekdays,
-                    monthDay = recurrenceMonthDay,
-                    ordinalWeekday = recurrenceOrdinal,
-                    hasScheduledDate = scheduled != null,
-                    enabled = canEdit,
-                    onToggle = { enabled ->
-                        if (enabled) setRepeat(repeatUnit ?: RegistryEntityEnums.RecurrenceUnit.WEEK)
-                        else setRepeat(null)
-                    },
-                    onUnitChange = { setRepeat(it) },
-                    onIntervalChange = { setRepeat(repeatUnit, it) },
-                    onAfterCompletionChange = { setRepeat(repeatUnit, repeatInterval, it) },
-                    onWeekdaysChange = { setRepeat(repeatUnit, repeatInterval, false, it, null, null) },
-                    onMonthDayChange = { setRepeat(repeatUnit, repeatInterval, false, emptySet(), it, null) },
-                    onOrdinalWeekdayChange = { setRepeat(repeatUnit, repeatInterval, false, emptySet(), null, it) },
-                    onMonthRuleChange = { mode ->
-                        val date = (scheduled ?: graph.clock.today(graph.clock.now()).toString()).let(LocalDate::parse)
-                        val day = date.dayOfMonth
-                        val weekday = date.dayOfWeek.value % 7 + 1
-                        val ordinal = minOf(4, ((day - 1) / 7) + 1)
-                        when (mode) {
-                            "anchor" -> setRepeat(repeatUnit, repeatInterval, false, emptySet(), null, null)
-                            "dayOfMonth" -> setRepeat(repeatUnit, repeatInterval, false, emptySet(), recurrenceMonthDay ?: day, null)
-                            "ordinal" -> setRepeat(
-                                repeatUnit,
-                                repeatInterval,
-                                false,
-                                emptySet(),
-                                null,
-                                recurrenceOrdinal ?: (ordinal to weekday),
+                // The registry owns the order and the headings of the sections (ADR 0029).
+                // Android writes one renderer per block kind.
+                pageBlocks.forEach { block ->
+                    val heading = RegistryCatalog.taskPageBlockHeading(block, languageTag)
+                    when (block.kind) {
+                        TaskPageBlockKinds.HEADER -> {
+                            OutlinedTextField(
+                                value = titleDraft,
+                                onValueChange = {
+                                    titleDraft = it.take(RegistryEntityLimits.TEXT_MAX.toInt())
+                                    textIsDirty = true
+                                    saveFailed = false
+                                },
+                                label = { Text(labels.field(RegistryTaskDetail.Fields.TITLE)) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                enabled = canEdit,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                             )
-                        }
-                    },
-                    onPauseToggle = ::setRepeatPaused,
-                )
 
-                HorizontalDivider()
-                Text(labels.field(RegistryTaskDetail.Fields.CHECKLIST), style = MaterialTheme.typography.titleMedium)
-                data?.checklist.orEmpty().forEach { item ->
-                    ChecklistRow(
-                        item = item,
-                        title = checklistDrafts[item.id] ?: item.title,
-                        emptyTitle = labels.field(RegistryTaskDetail.Fields.CHECKLIST_ITEM),
-                        toggleLabel = toggleChecklistAction,
-                        deleteLabel = deleteChecklistAction,
-                        enabled = canEdit,
-                        onTitleChange = { checklistDrafts[item.id] = it.take(CHECKLIST_TITLE_MAX_LENGTH.toInt()) },
-                        onFocusChange = { focused ->
-                            focusedChecklistId = if (focused) item.id else focusedChecklistId.takeUnless { it == item.id }
-                        },
-                        onCommitTitle = { saveChecklistTitle(item) },
-                        onToggle = { checked ->
-                            val checkedAt = if (checked) WireTimestamp.format(graph.clock.now()) else null
-                            write {
-                                check(
-                                    graph.registryEntityMutator.update(
-                                        RegistryEntityNames.CHECKLIST_ITEM,
-                                        item.id,
-                                        mapOf(
-                                            RegistryEntityFields.ChecklistItem.CHECKED to JsonValue.BooleanValue(checked),
-                                            RegistryEntityFields.ChecklistItem.CHECKED_AT to JsonValue.stringOrNull(checkedAt),
-                                        ),
-                                    ) != null,
+                            // The save error shows below the text fields. With no notes block, it shows below the header.
+                            if (saveFailed && pageBlocks.none { it.kind == TaskPageBlockKinds.NOTES }) {
+                                Text(labels.saveError, color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                        TaskPageBlockKinds.NOTES -> {
+                            OutlinedTextField(
+                                value = notesDraft,
+                                onValueChange = {
+                                    notesDraft = it.take(RegistryEntityLimits.NOTES_MAX.toInt())
+                                    textIsDirty = true
+                                    saveFailed = false
+                                },
+                                label = { Text(heading ?: labels.field(RegistryTaskDetail.Fields.NOTES)) },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 3,
+                                maxLines = 8,
+                                enabled = canEdit,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+                            )
+
+                            if (saveFailed) {
+                                Text(labels.saveError, color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                        TaskPageBlockKinds.ATTRIBUTES -> {
+                            HorizontalDivider()
+                            // The attributes block holds no list of its own: it renders the
+                            // registry task attributes in their order. Notes, checklist,
+                            // attachments and discuss have their own blocks. Reminder, star,
+                            // tags and paste have no editor on Android yet.
+                            attributes.forEach { attribute ->
+                                when (attribute.id) {
+                                    RegistryTaskAttributeIds.WHEN -> DateValueRow(
+                                        label = labels.field(RegistryTaskDetail.Fields.WHEN),
+                                        value = whenValue,
+                                        selectLabel = labels.selectDate,
+                                        clearLabel = labels.clear,
+                                        enabled = canEdit,
+                                        onSelect = { openAttribute(RegistryTaskAttributeIds.WHEN) },
+                                        onClear = { setWhen(null) },
+                                    )
+                                    RegistryTaskAttributeIds.DEADLINE -> DateValueRow(
+                                        label = labels.field(RegistryTaskDetail.Fields.DEADLINE),
+                                        value = deadline?.let { formatDay(it, languageTag) } ?: labels.noDate,
+                                        selectLabel = labels.selectDate,
+                                        clearLabel = labels.clear,
+                                        enabled = canEdit,
+                                        onSelect = { openAttribute(RegistryTaskAttributeIds.DEADLINE) },
+                                        onClear = { setDeadline(null) },
+                                    )
+                                    RegistryTaskAttributeIds.LIST -> {
+                                        SelectorRow(
+                                            label = labels.field(RegistryTaskDetail.Fields.AREA),
+                                            value = selectedArea?.title ?: labels.noArea,
+                                            noneTitle = labels.noArea,
+                                            choices = data?.areas.orEmpty(),
+                                            enabled = canEdit,
+                                            onSelect = ::moveToArea,
+                                        )
+                                        SelectorRow(
+                                            label = labels.field(RegistryTaskDetail.Fields.PROJECT),
+                                            value = selectedProject?.title ?: labels.noProject,
+                                            noneTitle = labels.noProject,
+                                            choices = data?.projects.orEmpty(),
+                                            enabled = canEdit,
+                                            onSelect = ::moveToProject,
+                                        )
+                                    }
+                                    RegistryTaskAttributeIds.REPEAT -> {
+                                        HorizontalDivider()
+                                        RepeatEditor(
+                                            labels = labels,
+                                            units = labels.repeatUnits,
+                                            selectedUnit = repeatUnit,
+                                            interval = repeatInterval,
+                                            afterCompletion = repeatAfterCompletion,
+                                            paused = recurrencePaused,
+                                            pauseAction = repeatPauseAction,
+                                            weekdays = labels.weekdays,
+                                            monthlyRules = labels.monthlyRules,
+                                            calendarWeekdays = labels.calendarWeekdays,
+                                            ordinals = labels.ordinals,
+                                            selectedWeekdays = recurrenceWeekdays,
+                                            monthDay = recurrenceMonthDay,
+                                            ordinalWeekday = recurrenceOrdinal,
+                                            hasScheduledDate = scheduled != null,
+                                            enabled = canEdit,
+                                            onToggle = { enabled ->
+                                                if (enabled) setRepeat(repeatUnit ?: RegistryEntityEnums.RecurrenceUnit.WEEK)
+                                                else setRepeat(null)
+                                            },
+                                            onUnitChange = { setRepeat(it) },
+                                            onIntervalChange = { setRepeat(repeatUnit, it) },
+                                            onAfterCompletionChange = { setRepeat(repeatUnit, repeatInterval, it) },
+                                            onWeekdaysChange = { setRepeat(repeatUnit, repeatInterval, false, it, null, null) },
+                                            onMonthDayChange = { setRepeat(repeatUnit, repeatInterval, false, emptySet(), it, null) },
+                                            onOrdinalWeekdayChange = { setRepeat(repeatUnit, repeatInterval, false, emptySet(), null, it) },
+                                            onMonthRuleChange = { mode ->
+                                                val date = (scheduled ?: graph.clock.today(graph.clock.now()).toString()).let(LocalDate::parse)
+                                                val day = date.dayOfMonth
+                                                val weekday = date.dayOfWeek.value % 7 + 1
+                                                val ordinal = minOf(4, ((day - 1) / 7) + 1)
+                                                when (mode) {
+                                                    "anchor" -> setRepeat(repeatUnit, repeatInterval, false, emptySet(), null, null)
+                                                    "dayOfMonth" -> setRepeat(repeatUnit, repeatInterval, false, emptySet(), recurrenceMonthDay ?: day, null)
+                                                    "ordinal" -> setRepeat(
+                                                        repeatUnit,
+                                                        repeatInterval,
+                                                        false,
+                                                        emptySet(),
+                                                        null,
+                                                        recurrenceOrdinal ?: (ordinal to weekday),
+                                                    )
+                                                }
+                                            },
+                                            onPauseToggle = ::setRepeatPaused,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        TaskPageBlockKinds.CHECKLIST -> {
+                            HorizontalDivider()
+                            Text(
+                                heading ?: labels.field(RegistryTaskDetail.Fields.CHECKLIST),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            data?.checklist.orEmpty().forEach { item ->
+                                ChecklistRow(
+                                    item = item,
+                                    title = checklistDrafts[item.id] ?: item.title,
+                                    emptyTitle = labels.field(RegistryTaskDetail.Fields.CHECKLIST_ITEM),
+                                    toggleLabel = toggleChecklistAction,
+                                    deleteLabel = deleteChecklistAction,
+                                    enabled = canEdit,
+                                    onTitleChange = { checklistDrafts[item.id] = it.take(CHECKLIST_TITLE_MAX_LENGTH.toInt()) },
+                                    onFocusChange = { focused ->
+                                        focusedChecklistId = if (focused) item.id else focusedChecklistId.takeUnless { it == item.id }
+                                    },
+                                    onCommitTitle = { saveChecklistTitle(item) },
+                                    onToggle = { checked ->
+                                        val checkedAt = if (checked) WireTimestamp.format(graph.clock.now()) else null
+                                        write {
+                                            check(
+                                                graph.registryEntityMutator.update(
+                                                    RegistryEntityNames.CHECKLIST_ITEM,
+                                                    item.id,
+                                                    mapOf(
+                                                        RegistryEntityFields.ChecklistItem.CHECKED to JsonValue.BooleanValue(checked),
+                                                        RegistryEntityFields.ChecklistItem.CHECKED_AT to JsonValue.stringOrNull(checkedAt),
+                                                    ),
+                                                ) != null,
+                                            )
+                                        }
+                                    },
+                                    onDelete = {
+                                        write { check(graph.registryEntityMutator.delete(RegistryEntityNames.CHECKLIST_ITEM, item.id) != null) }
+                                    },
                                 )
                             }
-                        },
-                        onDelete = {
-                            write { check(graph.registryEntityMutator.delete(RegistryEntityNames.CHECKLIST_ITEM, item.id) != null) }
-                        },
-                    )
-                }
-                TextButton(
-                    onClick = {
-                        val nextPosition = data?.checklist.orEmpty().maxOfOrNull(ChecklistLine::position)?.plus(1.0) ?: 0.0
-                        write {
-                            val item = graph.registryEntityMutator.create(
-                                RegistryEntityNames.CHECKLIST_ITEM,
-                                mapOf(
-                                    RegistryEntityFields.ChecklistItem.TASK_ID to JsonValue.StringValue(taskId),
-                                    RegistryEntityFields.ChecklistItem.TITLE to JsonValue.StringValue(""),
-                                    RegistryEntityFields.ChecklistItem.POSITION to JsonValue.DecimalValue(nextPosition),
-                                ),
-                            )
-                            checklistDrafts[item.id] = ""
+                            TextButton(
+                                onClick = {
+                                    val nextPosition = data?.checklist.orEmpty().maxOfOrNull(ChecklistLine::position)?.plus(1.0) ?: 0.0
+                                    write {
+                                        val item = graph.registryEntityMutator.create(
+                                            RegistryEntityNames.CHECKLIST_ITEM,
+                                            mapOf(
+                                                RegistryEntityFields.ChecklistItem.TASK_ID to JsonValue.StringValue(taskId),
+                                                RegistryEntityFields.ChecklistItem.TITLE to JsonValue.StringValue(""),
+                                                RegistryEntityFields.ChecklistItem.POSITION to JsonValue.DecimalValue(nextPosition),
+                                            ),
+                                        )
+                                        checklistDrafts[item.id] = ""
+                                    }
+                                },
+                                enabled = canEdit && data?.checklist.orEmpty().size.toLong() < RegistryEntityLimits.MAX_CHECKLIST_ITEMS_PER_TASK,
+                                modifier = Modifier.align(Alignment.Start),
+                            ) { Text(addChecklistAction) }
                         }
-                    },
-                    enabled = canEdit && data?.checklist.orEmpty().size.toLong() < RegistryEntityLimits.MAX_CHECKLIST_ITEMS_PER_TASK,
-                    modifier = Modifier.align(Alignment.Start),
-                ) { Text(addChecklistAction) }
-                TaskConversationSection(
-                    graph = graph,
-                    taskId = taskId,
-                    isTaskOpen = taskFields[RegistryEntityFields.Task.STATUS].stringValue() == RegistryEntityEnums.TaskStatus.OPEN && !deleted,
-                    canWrite = canEdit,
-                )
+                        TaskPageBlockKinds.CONVERSATION -> TaskConversationSection(
+                            graph = graph,
+                            taskId = taskId,
+                            isTaskOpen = taskFields[RegistryEntityFields.Task.STATUS].stringValue() == RegistryEntityEnums.TaskStatus.OPEN && !deleted,
+                            canWrite = canEdit,
+                            heading = heading,
+                        )
+                        // Android has no attachment store yet (task.attachments is planned): skip.
+                        TaskPageBlockKinds.ATTACHMENTS -> Unit
+                        // Android does not read the task change log yet (task.history is planned): skip.
+                        TaskPageBlockKinds.HISTORY -> Unit
+                        // A kind that a newer registry adds has no Android renderer yet: skip.
+                        else -> Unit
+                    }
+                }
                 }
             }
         }
@@ -639,11 +712,8 @@ fun TaskDetailScreen(
             initialDay = deadline,
             cancelLabel = labels.cancel,
             onDismiss = { showDeadlinePicker = false },
-            onSelect = { day ->
-                showDeadlinePicker = false
-                write { check(graph.taskMutator.setDeadline(taskId, day) != null) }
-            },
-            onClear = { showDeadlinePicker = false; write { check(graph.taskMutator.setDeadline(taskId, null) != null) } },
+            onSelect = { day -> showDeadlinePicker = false; setDeadline(day) },
+            onClear = { showDeadlinePicker = false; setDeadline(null) },
         )
     }
 }
