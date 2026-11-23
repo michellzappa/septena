@@ -14,9 +14,10 @@ on Today. The Inbox header's tray icon changes into a check mark that draws
 itself, holds, and then settles into the empty tray. A matched haptic plays
 with it. A setting turns it off.
 
-It is local to the Inbox header. It is NOT a canvas flourish. Clearing the
-Inbox happens several times a day, and the canvas is reserved for the
-once-a-day `.arc` (last Today task done, `TaskCelebration.completed`).
+It is local to the Inbox header. It is NOT a canvas flourish. The canvas is
+reserved for the `.arc` (last Today task done, `TaskCelebration.completed`).
+It plays at most once a day (§2a), so it stays a moment and does not become
+noise.
 
 ## 2. Trigger
 
@@ -41,7 +42,21 @@ It does NOT play when:
 - the Inbox is folded (`inboxCollapsed`), because the header icon is the only
   thing on screen and the user did not act on a row;
 - the same gesture also clears the last open Today task. Then only the `.arc`
-  plays (one celebration per gesture, the larger one wins).
+  plays (one celebration per gesture, the larger one wins);
+- it already played today (§2a).
+
+### 2a. Once a day (decided by mz, 2026-11-23)
+
+- The motion plays at most once per day per device. "Day" is the
+  `DayClock.today` day, so day rollover and time travel work.
+- Store the last day it played in `UserDefaults` (device scope, not synced),
+  key `septena.ui.inboxZeroMotionLastDay`. Each device keeps its own budget.
+- A run uses the day's budget when it starts. A run that an undo cancels
+  (§5) still counts, so undo and redo cannot replay it.
+- When the budget is used, a later Inbox zero that day gets no motion and no
+  extra haptic. The VoiceOver announcement (§6) still posts every time.
+- The budget check lives in the shared trigger helper (§8), next to the
+  other §2 rules.
 
 Implementation hint: record the gesture with the task id at the gesture site
 (the same pattern as `model.noteCompleted`), and fire when the next reload
@@ -130,7 +145,8 @@ iOS and Mac rules cannot drift. Shared code: build all four Apple schemes.
 
 ## 9. Done when
 
-- Emptying the Inbox by each §2 gesture plays the motion once on iOS and Mac.
+- Emptying the Inbox by each §2 gesture plays the motion on iOS and Mac, at
+  most once a day per device. A second Inbox zero the same day plays nothing.
 - None of the §2 exclusions plays it.
 - Turning the setting off stops the motion and the extra haptic, and keeps the
   VoiceOver announcement.
@@ -150,4 +166,4 @@ Silence means the default stands.
 | Separate toggle, or reuse "Completion animations"? | Separate toggle *(default)*. mz asked for it as its own option. |
 | On or off by default? | On *(default)*. It is quiet and local. |
 | Size: header moment, or a once-a-day canvas flourish? | Header moment *(default)*. The canvas stays reserved for `.arc`. |
-| Limit to once a day? | No limit *(default)*. A local motion does not wear out like a canvas one. |
+| Limit to once a day? | **Decided (mz, 2026-11-23):** yes, once per day per device (§2a). |
