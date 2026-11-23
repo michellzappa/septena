@@ -1507,6 +1507,12 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// New Area lands a named row and opens it for editing, the way Finder
   /// lands "untitled folder". It used to stop the whole app with a modal text
   /// prompt to ask for a string the row can take directly.
+  ///
+  /// The new row is also OPENED in the detail pane, before the rename. The
+  /// rebuild selects it as a restore, which never fires `onSelect`, and the
+  /// rename's own select is a no-op on an already-selected row — so the row
+  /// showed selected while the list still held the previous page. `show`
+  /// leaves the keyboard in the sidebar, so the rename field still gets it.
   @objc func newArea() {
     Task { [weak self] in
       guard let self,
@@ -1515,6 +1521,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       else { return }
       self.recordAreaCreate(area)
       self.rebuild(preserving: "area:\(area.id)")
+      self.onSelect?(.filter(.area(area.id), title: area.title))
       self.beginRename(key: "area:\(area.id)")
     }
   }
@@ -1560,6 +1567,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       else { return }
       self.recordProjectCreate(project)
       self.rebuild(preserving: "project:\(project.id)")
+      self.onSelect?(.filter(.project(project.id), title: project.title))
       self.beginRename(key: "project:\(project.id)")
     }
   }

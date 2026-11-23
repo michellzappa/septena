@@ -270,6 +270,14 @@ final class SeptaskKitTaskListController: NSViewController {
   /// until the whole batch lands; otherwise an intermediate diff can remove a
   /// row before the rest of the batch has been written.
   private var isApplyingMove = false
+  /// Composer rows still running their close animation. The commit that
+  /// closed them posts a change notification, and its scheduled reload lands
+  /// mid-fold: a new task's reload also brings back the "New task" line and
+  /// the row's filing capsule, so the diff re-rendered the row as a closed
+  /// cell in the still-tall frame and the title jumped. Scheduled reloads
+  /// wait for the fold, whose completion reloads anyway. Direct `reload()`
+  /// calls (⌘N, a list switch) still run at once.
+  private var foldingComposerIDs: Set<String> = []
   private var checklistCounts: [String: (done: Int, total: Int)] = [:]
   private var attachmentCounts: [String: Int] = [:]
   private var tagsByID: [String: TaskTag] = [:]
@@ -971,6 +979,8 @@ final class SeptaskKitTaskListController: NSViewController {
     let work = DispatchWorkItem { [weak self] in
       guard let self else { return }
       self.reloadWorkItem = nil
+      // The fold's own completion reloads and takes the queued ids.
+      guard self.foldingComposerIDs.isEmpty else { return }
       self.reload()
     }
     reloadWorkItem = work
@@ -3707,8 +3717,10 @@ final class SeptaskKitTaskListController: NSViewController {
     // sits in the closed-row band, so the glyphs stay put as pills clip away.
     // Swapping to the task cell *before* the shrink would center the title
     // in the still-tall frame (a visible jump).
+    foldingComposerIDs.insert(taskId)
     animateComposerHeight(ofRow: row, animated: animated, reveal: false) { [weak self] in
       guard let self else { return }
+      self.foldingComposerIDs.remove(taskId)
       // By ID, not the index captured before the fold: a reload during the
       // animation can have moved the row.
       if let closed = self.rows.firstIndex(where: { $0.task?.id == taskId }),
@@ -7712,8 +7724,14 @@ final class SeptaskKitTableView: NSTableView {
     onDragEnded?()
   }
 
+  /// `draggingEnded:` is an OPTIONAL `NSDraggingDestination` method, and
+  /// NSTableView does not implement it on macOS 27: an unguarded
+  /// `super.draggingEnded` threw "unrecognized selector" and killed the app
+  /// at the end of a drag (Inbox row onto a project).
   override func draggingEnded(_ sender: any NSDraggingInfo) {
-    super.draggingEnded(sender)
+    if NSTableView.instancesRespond(to: #selector(NSDraggingDestination.draggingEnded(_:))) {
+      super.draggingEnded(sender)
+    }
     onDragEnded?()
   }
 }
