@@ -73,9 +73,9 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
   private let checkbox = KitCheckboxView()
   private let titleView = KitComposerTextView()
-  private let titleScroll = NSScrollView()
+  private let titleScroll = KitNestedScrollView()
   private let notesView = KitComposerTextView()
-  private let notesScroll = NSScrollView()
+  private let notesScroll = KitNestedScrollView()
   private let checklistView = KitChecklistView()
   private let attachmentsView = KitAttachmentsView()
   /// Title, notes, checklist (when shown), attachments (when shown), pills — stacked.
@@ -83,7 +83,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private let pillRow = NSStackView()
   /// Holds `pillRow` so the rail scrolls sideways (trackpad, shift-wheel)
   /// when the labelled pills are wider than the card, instead of clipping.
-  private let pillScroll = NSScrollView()
+  private let pillScroll = KitNestedScrollView()
 
   private let whenPill = KitPillButton()
   private let deadlinePill = KitPillButton()
@@ -880,6 +880,48 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     titleView.textStorage?.setAttributedString(
       NSAttributedString(string: flat, attributes: Self.titleAttributes))
     titleView.setSelectedRange(NSRange(location: (flat as NSString).length, length: 0))
+  }
+}
+
+// MARK: - Nested scroll view
+
+/// A scroll view inside a list row (the composer's title, notes and pill
+/// rail). AppKit sends a wheel or trackpad scroll to the innermost scroll view
+/// under the pointer, and a plain `NSScrollView` keeps it even when it has
+/// nothing to scroll — so over an open editor the list stopped moving and the
+/// field rubber-banded instead. This one keeps a scroll gesture only when its
+/// content overflows on that gesture's axis; every other gesture goes up the
+/// responder chain to the list. The choice is made once per gesture (at its
+/// first event that moves) so a trackpad swipe and its momentum never split
+/// between the two scroll views.
+final class KitNestedScrollView: NSScrollView {
+  /// This gesture's owner: nil until an event shows its axis, then true when
+  /// the list takes it.
+  private var forwardsGesture: Bool?
+
+  override func scrollWheel(with event: NSEvent) {
+    // A mouse wheel has no phases: every click is its own gesture.
+    if event.phase.contains(.began) || (event.phase.isEmpty && event.momentumPhase.isEmpty) {
+      forwardsGesture = nil
+    }
+    if forwardsGesture == nil, event.scrollingDeltaX != 0 || event.scrollingDeltaY != 0 {
+      forwardsGesture = !canScroll(along: event)
+    }
+    // Undecided (a began event with no movement yet) goes to the list too.
+    if forwardsGesture ?? true {
+      nextResponder?.scrollWheel(with: event)
+    } else {
+      super.scrollWheel(with: event)
+    }
+  }
+
+  private func canScroll(along event: NSEvent) -> Bool {
+    guard let document = documentView else { return false }
+    let visible = contentView.bounds.size
+    if abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) {
+      return document.frame.width > visible.width + 0.5
+    }
+    return document.frame.height > visible.height + 0.5
   }
 }
 

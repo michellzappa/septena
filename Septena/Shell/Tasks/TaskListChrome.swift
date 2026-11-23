@@ -944,7 +944,7 @@ private struct TaskRowHorizontalSwipeModifier: ViewModifier {
     }
   }
 
-  private func handlePanEnded(_ rawDx: CGFloat) {
+  private func handlePanEnded(_ rawDx: CGFloat, _ velocityX: CGFloat) {
     let dir = activeDirection
     let shouldCommit = armed
     a11yAnimate(.snappy(duration: 0.22)) {
@@ -1029,11 +1029,16 @@ private struct OptionalA11yAction: ViewModifier {
 /// First-party SwiftUI wrapper over `UIPanGestureRecognizer` that claims only
 /// deliberate horizontal pans in allowed directions, immediately yielding
 /// vertical pans to `ScrollView` and leading-edge swipes to `NavigationStack`.
-private struct HorizontalPanGesture: UIGestureRecognizerRepresentable {
+/// Every horizontal row swipe on iOS uses it (this one and the swipe-action
+/// reveal in `TaskRowActions.swift`). A SwiftUI `DragGesture` on a row inside
+/// a `ScrollView` competes with the scroll for every touch, and when it wins
+/// the list does not move — the "drag on a task doesn't scroll" bug.
+struct HorizontalPanGesture: UIGestureRecognizerRepresentable {
   let allowLeft: Bool
   let allowRight: Bool
   let onChanged: (CGFloat) -> Void
-  let onEnded: (CGFloat) -> Void
+  /// Final horizontal translation and velocity (points per second).
+  let onEnded: (CGFloat, CGFloat) -> Void
   let onCancelled: () -> Void
 
   func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator {
@@ -1058,7 +1063,7 @@ private struct HorizontalPanGesture: UIGestureRecognizerRepresentable {
     case .began, .changed:
       onChanged(dx)
     case .ended:
-      onEnded(dx)
+      onEnded(dx, recognizer.velocity(in: recognizer.view).x)
     case .cancelled, .failed:
       onCancelled()
     default:
@@ -1087,6 +1092,14 @@ private struct HorizontalPanGesture: UIGestureRecognizerRepresentable {
       if velocity.x < -20 { return allowLeft }
       if velocity.x > 20 { return allowRight }
       return false
+    }
+
+    /// A row stacks two of these (swipe-to-select and the swipe-action
+    /// reveal); both follow the same horizontal swipe, as before. Every other
+    /// recognizer — the scroll view's pan included — stays exclusive.
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+      other.delegate is Coordinator
     }
   }
 }

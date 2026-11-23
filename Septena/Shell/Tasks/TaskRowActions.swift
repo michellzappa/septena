@@ -604,10 +604,8 @@ private struct TaskRowSwipeContainer<Content: View>: View {
 
   @State private var settledOffset: CGFloat = 0
   @State private var dragDelta: CGFloat = 0
-  @State private var dragAxis: DragAxis? = nil
+  @State private var isPanning = false
   @State private var crossedFullSwipe = false
-
-  private enum DragAxis { case horizontal, vertical }
 
   private var leadingWidth: CGFloat { CGFloat(leading.count) * Self.buttonWidth }
   private var trailingWidth: CGFloat { CGFloat(trailing.count) * Self.buttonWidth }
@@ -684,63 +682,18 @@ private struct TaskRowSwipeContainer<Content: View>: View {
         }
     }
     .clipped()
-    .simultaneousGesture(
-      DragGesture(minimumDistance: 12, coordinateSpace: .local)
-        .onChanged { value in
-          let dx = value.translation.width
-          let dy = value.translation.height
-          if dragAxis == nil {
-            if abs(dx) > abs(dy) * 1.25, abs(dx) > 12 {
-              dragAxis = .horizontal
-              NotificationCenter.default.post(name: .septenaSwipeRowOpened, object: rowID)
-            } else if abs(dy) > 10 {
-              dragAxis = .vertical
-              return
-            } else {
-              return
-            }
-          }
-          guard dragAxis == .horizontal else { return }
-          dragDelta = dx
-          let armed = isLeadingFullSwipeArmed || isTrailingFullSwipeArmed
-          if armed && !crossedFullSwipe {
-            crossedFullSwipe = true
-            Haptics.tick()
-          } else if !armed && crossedFullSwipe {
-            crossedFullSwipe = false
-          }
-        }
-        .onEnded { value in
-          defer {
-            dragAxis = nil
-            dragDelta = 0
-            crossedFullSwipe = false
-          }
-          guard dragAxis == .horizontal else { return }
-          let finalOffset = effectiveOffset
-          if allowsLeadingFullSwipe, finalOffset >= leadingFullThreshold, let primary = leading.first {
-            a11yAnimate(.snappy(duration: 0.22)) { settledOffset = 0 }
-            primary.perform()
-            return
-          }
-          if allowsTrailingFullSwipe, -finalOffset >= trailingFullThreshold, let primary = trailing.first {
-            a11yAnimate(.snappy(duration: 0.22)) { settledOffset = 0 }
-            primary.perform()
-            return
-          }
-          let projected = finalOffset + value.predictedEndTranslation.width * 0.2
-          a11yAnimate(.snappy(duration: 0.22)) {
-            if projected > 44, !leading.isEmpty {
-              settledOffset = leadingWidth
-              NotificationCenter.default.post(name: .septenaSwipeRowOpened, object: rowID)
-            } else if projected < -44, !trailing.isEmpty {
-              settledOffset = -trailingWidth
-              NotificationCenter.default.post(name: .septenaSwipeRowOpened, object: rowID)
-            } else {
-              settledOffset = 0
-            }
-          }
-        }
+    // UIKit pan, not a SwiftUI `DragGesture`: it begins only on a clearly
+    // horizontal move and leaves every vertical drag to the scroll view.
+    // A left swipe is allowed on an open leading reveal (and a right swipe on
+    // an open trailing one) so the same swipe can close it.
+    .gesture(
+      HorizontalPanGesture(
+        allowLeft: !trailing.isEmpty || settledOffset > 0,
+        allowRight: !leading.isEmpty || settledOffset < 0,
+        onChanged: handlePanChanged,
+        onEnded: handlePanEnded,
+        onCancelled: handlePanCancelled
+      )
     )
     .onReceive(NotificationCenter.default.publisher(for: .septenaSwipeRowOpened)) { note in
       if let openedID = note.object as? String, openedID != rowID, settledOffset != 0 {
@@ -769,6 +722,61 @@ private struct TaskRowSwipeContainer<Content: View>: View {
     }
     .buttonStyle(.plain)
     .accessibilityLabel(Text(action.title))
+  }
+
+  private func handlePanChanged(_ dx: CGFloat) {
+    if !isPanning {
+      isPanning = true
+      NotificationCenter.default.post(name: .septenaSwipeRowOpened, object: rowID)
+    }
+    dragDelta = dx
+    let armed = isLeadingFullSwipeArmed || isTrailingFullSwipeArmed
+    if armed && !crossedFullSwipe {
+      crossedFullSwipe = true
+      Haptics.tick()
+    } else if !armed && crossedFullSwipe {
+      crossedFullSwipe = false
+    }
+  }
+
+  private func handlePanEnded(_ dx: CGFloat, _ velocityX: CGFloat) {
+    defer {
+      isPanning = false
+      dragDelta = 0
+      crossedFullSwipe = false
+    }
+    let finalOffset = effectiveOffset
+    if allowsLeadingFullSwipe, finalOffset >= leadingFullThreshold, let primary = leading.first {
+      a11yAnimate(.snappy(duration: 0.22)) { settledOffset = 0 }
+      primary.perform()
+      return
+    }
+    if allowsTrailingFullSwipe, -finalOffset >= trailingFullThreshold, let primary = trailing.first {
+      a11yAnimate(.snappy(duration: 0.22)) { settledOffset = 0 }
+      primary.perform()
+      return
+    }
+    // A fast flick settles open (or shut) a little earlier, like the
+    // system swipe actions.
+    let projected = finalOffset + velocityX * 0.05
+    a11yAnimate(.snappy(duration: 0.22)) {
+      if projected > 44, !leading.isEmpty {
+        settledOffset = leadingWidth
+        NotificationCenter.default.post(name: .septenaSwipeRowOpened, object: rowID)
+      } else if projected < -44, !trailing.isEmpty {
+        settledOffset = -trailingWidth
+        NotificationCenter.default.post(name: .septenaSwipeRowOpened, object: rowID)
+      } else {
+        settledOffset = 0
+      }
+      dragDelta = 0
+    }
+  }
+
+  private func handlePanCancelled() {
+    isPanning = false
+    crossedFullSwipe = false
+    close()
   }
 
   private func close() {
