@@ -44,17 +44,9 @@ const VISUAL = {
     shot: { width: 0.62, ring: { element: "task-proposal" } },
     chat: { top: 730, you: "Remind me to check the download links before the launch.", agent: "Done. It’s in your Septena Inbox." },
   },
-  // Every device, after TickTick's platforms panel: a neutral canvas, the Mac
-  // on a MacBook at the back, the iPhone in front at the right, the watch at
-  // the left. All upright. The iPad joins when septena-site#17 adds its layout.
-  devices:        {
-    // Black, like the photo panel: the devices carry the light.
-    // Charcoal with the topography texture, softer than black (mz, 2026-11-23).
-    fruit: null, texture: "topography", background: { style: "texture", fill: "#2A2B30", texture: "topography", seed: 51, intensity: 55, fade: 0.5 },
-    shot: { width: 0.42, offsetX: 0.22, top: 1440, accent: "tamarillo" },
-    shots: [{ src: "today/0", layout: "mac", frame: "laptop", accent: "tamarillo", width: 1.34, offsetX: -0.1, top: 760 }],
-    watch: { src: "today/0", from: "tamarillo", accentFruit: "tamarillo", left: 120, top: 1960, width: 300 },
-  },
+  // Every device: a photo of the Mac, iPhone and Apple Watch on a desk
+  // (mz, 2026-11-23), replacing the drawn devices. Its dark top holds the title.
+  devices:        { photo: { src: "art/photo-devices.png", zoom: 1, focus: "50% 100%", shade: 0.55, fade: 700 }, background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" } },
   // Slide 3: Discuss. The conversation in an iOS-style card over the phone's
   // empty lower half, with the agent's face; a ring marks it on the screen.
   thinking:       {

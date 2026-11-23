@@ -233,7 +233,7 @@ reads this table; `appstore/validate.mjs` checks it.
 | move-in | plan/0 | - | Bring your tasks to Septena. Import your areas, projects and tasks from your existing app. | |
 | open | - | - | Septena is built in the open. Open source, and your tasks stay yours. | |
 | looks | looks/2 | - | Make Septena yours. Pick an accent colour and a texture for your lists. | |
-| devices | today/0 | - | Septena on every device. iPhone, iPad, Mac and Apple Watch. | |
+| devices | - | - | Septena on every device. iPhone, iPad, Mac and Apple Watch. | |
 
 ---
 
