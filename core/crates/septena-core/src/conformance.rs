@@ -24,6 +24,7 @@ pub const CONFORMANCE_FIXTURES: &[&str] = &[
     "recurrence",
     "reminders",
     "sync-engine",
+    "task-dates",
     "task-fade",
     "task-views",
 ];
@@ -55,6 +56,22 @@ pub fn run_conformance(fixture: String, json: String) -> Result<ConformanceRepor
             for case in cases(&doc, "cases") {
                 let input = json!({ "task": case["task"], "today": doc["today"], "now": doc["nowIso"] });
                 run.check("cases", case, "taskViewMembership", input, false);
+            }
+        }
+        "task-dates" => {
+            let today = &doc["today"];
+            let now = &doc["now"];
+            for case in cases(&doc, "actions") {
+                let input = json!({ "task": case["task"], "action": case["action"], "today": today, "now": now });
+                run.check("actions", case, "applyDateAction", input, false);
+            }
+            for case in cases(&doc, "normalize") {
+                let input = json!({ "task": case["task"], "today": today });
+                run.check("normalize", case, "normalizeTaskDates", input, false);
+            }
+            for case in cases(&doc, "nextOccurrence") {
+                let input = json!({ "task": case["task"], "nextScheduled": case["nextScheduled"], "now": now });
+                run.check("nextOccurrence", case, "nextOccurrenceDates", input, false);
             }
         }
         "recurrence" => {

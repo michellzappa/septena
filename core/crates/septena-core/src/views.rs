@@ -1,5 +1,8 @@
-//! Smart-list membership: Today, its Inbox band, Upcoming, Anytime.
-//! Vectors: `task-views.json`.
+//! Smart-list membership: Today, its Inbox band, Upcoming, Anytime, and the
+//! due state (`docs/TASK_DATES_SPEC.md` §5). Vectors: `task-views.json`.
+//!
+//! A stored day that is not a valid `YYYY-MM-DD` date reads as no date
+//! (invariant I3). Every day comparison uses a parsed `Day`.
 
 use serde::{Deserialize, Serialize};
 
@@ -8,7 +11,7 @@ use crate::error::CoreError;
 use crate::fade::{day, instant};
 use crate::registry::{enums, rules};
 
-/// The task fields that list membership reads.
+/// The task fields that list membership and the date actions read.
 #[derive(Clone, Debug, Default, PartialEq, Deserialize)]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase", default)]
@@ -31,6 +34,17 @@ pub struct TaskSnapshot {
     pub recurrence_unit: Option<String>,
     pub deleted_at: Option<String>,
     pub faded_at: Option<String>,
+    /// `HH:MM` on the task's day.
+    pub start_time: Option<String>,
+    pub duration_minutes: Option<i32>,
+    pub time_zone: Option<String>,
+    pub reminder_at: Option<String>,
+    pub reminder_snoozed_until: Option<String>,
+    pub reminder_dismissed_at: Option<String>,
+    /// False for a fixed repeat. Read only when `recurrence_unit` is set.
+    pub recurrence_after_completion: Option<bool>,
+    /// The logical slot of a fixed repeat.
+    pub recurrence_anchor_date: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -48,6 +62,39 @@ pub struct TaskViewMembership {
     pub matches_inbox: bool,
     pub matches_upcoming: bool,
     pub matches_anytime: bool,
+    /// R3: `overdue` (deadline before today) or `dueToday`. None for a task
+    /// that is not active or has no arrived deadline.
+    pub due_state: Option<String>,
+    /// R4: the deadline renders red. A When date never does.
+    pub deadline_red: bool,
+    /// R5: the Upcoming day, the earlier future date. None outside Upcoming.
+    pub upcoming_day: Option<String>,
+    /// R8: the task landed on Today this morning by its own date.
+    pub arrived_on_own: bool,
+}
+
+/// The values the date actions and the read model share.
+pub(crate) struct DateFacts {
+    pub active: bool,
+    pub scheduled: Option<Day>,
+    pub deadline: Option<Day>,
+    pub is_on_today: bool,
+}
+
+pub(crate) fn date_facts(task: &TaskSnapshot, today: Day) -> DateFacts {
+    let open = task.status == enums::task_status::OPEN;
+    let is_heading = task.kind.as_deref() == Some(enums::task_kind::HEADING);
+    let active = open && !is_heading && task.deleted_at.is_none() && task.faded_at.is_none();
+    let scheduled = parse_day(&task.scheduled);
+    let deadline = parse_day(&task.deadline);
+    let is_on_today =
+        active && (task.today || scheduled.is_some_and(|d| d <= today) || deadline.is_some_and(|d| d <= today));
+    DateFacts {
+        active,
+        scheduled,
+        deadline,
+        is_on_today,
+    }
 }
 
 /// List membership for one task. `today` is `YYYY-MM-DD` and `now` an
@@ -58,13 +105,14 @@ pub fn task_view_membership(task: TaskSnapshot, today: String, now: String) -> R
     let now = instant(&now, "now")?;
 
     let open = task.status == enums::task_status::OPEN;
-    let is_heading = task.kind.as_deref() == Some(enums::task_kind::HEADING);
-    let active = open && !is_heading && task.deleted_at.is_none() && task.faded_at.is_none();
+    let DateFacts {
+        active,
+        scheduled,
+        deadline,
+        is_on_today,
+    } = date_facts(&task, today);
     let unfiled = task.area.is_none() && task.project.is_none();
-    let scheduled = parse_day(&task.scheduled);
-    let deadline = parse_day(&task.deadline);
-    let is_on_today =
-        active && (task.today || scheduled.is_some_and(|d| d <= today) || deadline.is_some_and(|d| d <= today));
+    let has_date = scheduled.is_some() || deadline.is_some();
     let is_inbox = active && unfiled;
     let is_mcp = task.source.as_deref() == Some(enums::task_source::MCP);
     let fresh_proposal = is_mcp
@@ -76,17 +124,34 @@ pub fn task_view_membership(task: TaskSnapshot, today: String, now: String) -> R
     let in_triage_band = is_inbox
         && if is_mcp {
             fresh_proposal
-                && if task.today || task.scheduled.is_some() || task.deadline.is_some() {
+                && if task.today || has_date {
                     task.acknowledged_at.is_none()
                 } else {
                     true
                 }
         } else {
-            task.scheduled.is_none() && task.deadline.is_none() && !task.today
+            !has_date && !task.today
         };
     let in_today_inbox = in_triage_band || (is_inbox && is_on_today);
     let has_agent_cue = is_mcp && task.acknowledged_at.is_none() && fresh_proposal;
     let days_on_today = carried_days(&task, today, open, is_on_today, has_agent_cue);
+
+    let due_state = match deadline {
+        Some(d) if active && d < today => Some(DUE_OVERDUE.to_string()),
+        Some(d) if active && d == today => Some(DUE_TODAY.to_string()),
+        _ => None,
+    };
+    let upcoming_day = if active && !is_on_today {
+        [scheduled, deadline].into_iter().flatten().filter(|d| *d > today).min()
+    } else {
+        None
+    };
+    let created_before_today = parse_day(&task.created).is_some_and(|c| c < today);
+    let arrived_on_own = active
+        && !task.today
+        && !is_mcp
+        && created_before_today
+        && (scheduled == Some(today) || deadline == Some(today));
 
     Ok(TaskViewMembership {
         is_unfiled: unfiled,
@@ -97,12 +162,18 @@ pub fn task_view_membership(task: TaskSnapshot, today: String, now: String) -> R
         days_on_today,
         matches_today: active && (is_on_today || in_triage_band),
         matches_inbox: in_today_inbox,
-        matches_upcoming: active
-            && !task.today
-            && (scheduled.is_some_and(|d| d > today) || deadline.is_some_and(|d| d > today)),
-        matches_anytime: active && !task.today && task.scheduled.is_none() && task.deadline.is_none(),
+        matches_upcoming: upcoming_day.is_some(),
+        matches_anytime: active && !task.today && !has_date,
+        deadline_red: due_state.is_some(),
+        due_state,
+        upcoming_day: upcoming_day.map(|d| d.to_string()),
+        arrived_on_own,
     })
 }
+
+/// R3 values of `TaskViewMembership::due_state`.
+pub const DUE_OVERDUE: &str = "overdue";
+pub const DUE_TODAY: &str = "dueToday";
 
 fn carried_days(task: &TaskSnapshot, today: Day, open: bool, is_on_today: bool, has_agent_cue: bool) -> i64 {
     if !open || !is_on_today || has_agent_cue {
@@ -124,6 +195,6 @@ fn carried_days(task: &TaskSnapshot, today: Day, open: bool, is_on_today: bool, 
     (today.days() - floor.days()).max(0)
 }
 
-fn parse_day(raw: &Option<String>) -> Option<Day> {
+pub(crate) fn parse_day(raw: &Option<String>) -> Option<Day> {
     raw.as_deref().and_then(Day::parse)
 }

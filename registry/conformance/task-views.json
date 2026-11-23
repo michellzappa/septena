@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Golden conformance vectors for task view membership (isUnfiled, isInboxMember, inTriageBand, isOnToday, inInbox, daysOnToday, matchesView).",
+  "description": "Golden conformance vectors for task view membership (isUnfiled, isInboxMember, inTriageBand, isOnToday, inInbox, daysOnToday, matchesView) and the date read model of docs/TASK_DATES_SPEC.md §5 (dueState R3, deadlineRed R4, upcomingDay R5, arrivedOnOwn R8). An invalid day reads as no date (I3).",
   "today": "2026-11-21",
   "nowIso": "2026-11-21T12:00:00Z",
   "cases": [
@@ -10,7 +10,8 @@
       "expected": {
         "isUnfiled": true, "isInboxMember": true, "inTriageBand": true, "isOnToday": false, "inInbox": true,
         "daysOnToday": 0,
-        "matchesView": { "today": true, "inbox": true, "upcoming": false, "anytime": true }
+        "matchesView": { "today": true, "inbox": true, "upcoming": false, "anytime": true },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": false
       }
     },
     {
@@ -19,7 +20,8 @@
       "expected": {
         "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": true, "inInbox": false,
         "daysOnToday": 3,
-        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false }
+        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": false
       }
     },
     {
@@ -28,7 +30,8 @@
       "expected": {
         "isUnfiled": true, "isInboxMember": true, "inTriageBand": false, "isOnToday": true, "inInbox": true,
         "daysOnToday": 1,
-        "matchesView": { "today": true, "inbox": true, "upcoming": false, "anytime": false }
+        "matchesView": { "today": true, "inbox": true, "upcoming": false, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": false
       }
     },
     {
@@ -37,7 +40,8 @@
       "expected": {
         "isUnfiled": true, "isInboxMember": true, "inTriageBand": true, "isOnToday": false, "inInbox": true,
         "daysOnToday": 0,
-        "matchesView": { "today": true, "inbox": true, "upcoming": true, "anytime": false }
+        "matchesView": { "today": true, "inbox": true, "upcoming": true, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": "2026-11-25", "arrivedOnOwn": false
       }
     },
     {
@@ -46,7 +50,8 @@
       "expected": {
         "isUnfiled": true, "isInboxMember": true, "inTriageBand": false, "isOnToday": false, "inInbox": false,
         "daysOnToday": 0,
-        "matchesView": { "today": false, "inbox": false, "upcoming": true, "anytime": false }
+        "matchesView": { "today": false, "inbox": false, "upcoming": true, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": "2026-11-25", "arrivedOnOwn": false
       }
     },
     {
@@ -55,7 +60,8 @@
       "expected": {
         "isUnfiled": true, "isInboxMember": true, "inTriageBand": false, "isOnToday": false, "inInbox": false,
         "daysOnToday": 0,
-        "matchesView": { "today": false, "inbox": false, "upcoming": false, "anytime": true }
+        "matchesView": { "today": false, "inbox": false, "upcoming": false, "anytime": true },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": false
       }
     },
     {
@@ -64,7 +70,8 @@
       "expected": {
         "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": true, "inInbox": false,
         "daysOnToday": 2,
-        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false }
+        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": false
       }
     },
     {
@@ -73,7 +80,8 @@
       "expected": {
         "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": false, "inInbox": false,
         "daysOnToday": 0,
-        "matchesView": { "today": false, "inbox": false, "upcoming": false, "anytime": false }
+        "matchesView": { "today": false, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": false
       }
     },
     {
@@ -82,7 +90,128 @@
       "expected": {
         "isUnfiled": true, "isInboxMember": false, "inTriageBand": false, "isOnToday": false, "inInbox": false,
         "daysOnToday": 0,
-        "matchesView": { "today": false, "inbox": false, "upcoming": false, "anytime": false }
+        "matchesView": { "today": false, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": false
+      }
+    },
+    {
+      "name": "deadline only, overdue: on Today, red",
+      "task": { "id": "v1", "title": "Pay invoice", "status": "open", "today": false, "area": "work", "source": "app", "deadline": "2026-11-19", "created": "2026-11-10" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": true, "inInbox": false,
+        "daysOnToday": 2,
+        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": "overdue", "deadlineRed": true, "upcomingDay": null, "arrivedOnOwn": false
+      }
+    },
+    {
+      "name": "deadline only, due today: on Today, red, arrived on its own",
+      "task": { "id": "v2", "title": "Send report", "status": "open", "today": false, "area": "work", "source": "app", "deadline": "2026-11-21", "created": "2026-11-15" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": true, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": "dueToday", "deadlineRed": true, "upcomingDay": null, "arrivedOnOwn": true
+      }
+    },
+    {
+      "name": "deadline only, in the future: Upcoming on the deadline day",
+      "task": { "id": "v3", "title": "Book flights", "status": "open", "today": false, "area": "work", "source": "app", "deadline": "2026-11-28", "created": "2026-11-15" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": false, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": false, "inbox": false, "upcoming": true, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": "2026-11-28", "arrivedOnOwn": false
+      }
+    },
+    {
+      "name": "When date is today: on Today, arrived on its own",
+      "task": { "id": "v4", "title": "Water plants", "status": "open", "today": false, "source": "app", "scheduled": "2026-11-21", "created": "2026-11-20", "project": "p1" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": true, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": true
+      }
+    },
+    {
+      "name": "When date is today on a task created today: not arrived on its own",
+      "task": { "id": "v5", "title": "New today", "status": "open", "today": false, "area": "work", "source": "app", "scheduled": "2026-11-21", "created": "2026-11-21" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": true, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": false
+      }
+    },
+    {
+      "name": "arrived When date and a future deadline: on Today, not in Upcoming",
+      "task": { "id": "v6", "title": "Draft talk", "status": "open", "today": false, "area": "work", "source": "app", "scheduled": "2026-11-20", "deadline": "2026-11-30", "created": "2026-11-18" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": true, "inInbox": false,
+        "daysOnToday": 1,
+        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": false
+      }
+    },
+    {
+      "name": "deleted task is excluded from every view",
+      "task": { "id": "v7", "title": "Deleted", "status": "open", "today": true, "area": "work", "source": "app", "todaySetOn": "2026-11-20", "deadline": "2026-11-19", "created": "2026-11-10", "deletedAt": "2026-11-20T10:00:00Z" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": false, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": false, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": false
+      }
+    },
+    {
+      "name": "faded task with an arrived When date is not on Today",
+      "task": { "id": "v8", "title": "Faded", "status": "open", "today": false, "area": "work", "source": "app", "scheduled": "2026-11-15", "created": "2026-11-01", "fadedAt": "2026-11-20T10:00:00Z" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": false, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": false, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": false
+      }
+    },
+    {
+      "name": "invalid When date reads as no date",
+      "task": { "id": "v9", "title": "Bad date", "status": "open", "today": false, "area": "work", "source": "app", "scheduled": "2026-02-30", "created": "2026-11-01" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": false, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": false, "inbox": false, "upcoming": false, "anytime": true },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": false
+      }
+    },
+    {
+      "name": "pin with a future When date (old data): on Today, not in Upcoming",
+      "task": { "id": "v10", "title": "Pinned and planned", "status": "open", "today": true, "area": "work", "source": "app", "todaySetOn": "2026-11-20", "scheduled": "2026-11-25", "created": "2026-11-01" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": true, "inInbox": false,
+        "daysOnToday": 1,
+        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": false
+      }
+    },
+    {
+      "name": "pin set after the task was created counts from the pin",
+      "task": { "id": "v11", "title": "Pinned later", "status": "open", "today": true, "area": "work", "source": "app", "todaySetOn": "2026-11-19", "created": "2026-11-17" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": true, "inInbox": false,
+        "daysOnToday": 2,
+        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": false
+      }
+    },
+    {
+      "name": "agent row due today is red but not arrived on its own",
+      "task": { "id": "v12", "title": "Agent deadline", "status": "open", "today": false, "area": "work", "source": "mcp", "deadline": "2026-11-21", "created": "2026-11-15", "createdAt": "2026-11-15T08:00:00Z", "acknowledgedAt": "2026-11-15T09:00:00Z" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": true, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": "dueToday", "deadlineRed": true, "upcomingDay": null, "arrivedOnOwn": false
       }
     }
   ]

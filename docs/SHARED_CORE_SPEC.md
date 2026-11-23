@@ -38,10 +38,11 @@ where a date-only value needs one.
 | Module | Functions | Vectors |
 |---|---|---|
 | `fade` | `row_opacity`, `should_fade`, `fade_fill` | `task-fade.json` |
-| `views` | `task_view_membership` | `task-views.json` |
+| `views` | `task_view_membership` (lists, due state, Upcoming day, arrived on its own) | `task-views.json` |
+| `task_dates` | `apply_date_action`, `normalize_task_dates`, `next_occurrence_dates` (ADR 0027) | `task-dates.json` |
 | `recurrence` | `next_scheduled_date`, `occurrence_id` | `recurrence.json` |
 | `reminders` | `shift_reminder_for_recurrence`, `shift_reminder_on_reschedule`, `should_arm_reminder` | `reminders.json` |
-| `convo` | `derive_conversation` | `convo-derived.json` |
+| `convo` | `derive_conversation`, `conversation_state` | `convo-derived.json` |
 | `sync` | `check_pull_page`, `plan_pull_row`, `plan_push_response`, `server_rejection_reason` | `sync-engine.json` |
 | `conformance` | `run_conformance(fixture, json)` runs one vector file inside the core | all |
 
