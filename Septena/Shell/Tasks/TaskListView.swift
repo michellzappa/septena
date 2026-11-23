@@ -2001,7 +2001,7 @@ struct TaskListView: View {
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 6) {
           if showsStarFilterPill {
-            SelectableChip(isSelected: starredOnlyFilter, tint: Theme.todayAccent) {
+            SelectableChip(isSelected: starredOnlyFilter, tint: Theme.todayAccent, onCanvas: true) {
               Haptics.tick()
               a11yAnimate(.snappy(duration: 0.18)) { starredOnlyFilter.toggle() }
             } label: {
@@ -2015,7 +2015,8 @@ struct TaskListView: View {
           ForEach(listTags) { tag in
             let isOn = selectedTagIDs.contains(tag.id)
             SelectableChip(isSelected: isOn,
-                           tint: tag.color != nil ? TagColorPalette.color(for: tag.color) : theme.color(for: "tasks")) {
+                           tint: tag.color != nil ? TagColorPalette.color(for: tag.color) : theme.color(for: "tasks"),
+                           onCanvas: true) {
               Haptics.tick()
               a11yAnimate(.snappy(duration: 0.18)) {
                 if isOn { selectedTagIDs.remove(tag.id) }

@@ -112,7 +112,10 @@ enum TaskNotices {
     if requiresSignIn, !hasSeen(.signIn) { out.append(signIn) }
     if let upsell = upsell(context: context) { out.append(upsell) }
     if let sweep = weeklySweep(context: context) { out.append(sweep) }
-    if let rolled = rolledIn(pool: pool, today: today, context: context) { out.append(rolled) }
+    // The "N tasks rolled into Today" banner is hidden (2026-11-23): the
+    // carry-over is daily noise the user dismisses every morning. Today's
+    // rollover behavior (Ask vs. Clean slate, like Microsoft To Do's My Day)
+    // decides what replaces it: #139. `rolledIn` stays for that work.
     // Onboarding counts as the one explainer slot: never a tip and a
     // checklist at once.
     if let start = getStarted(context: context) {

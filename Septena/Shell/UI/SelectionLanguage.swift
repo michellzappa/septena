@@ -92,8 +92,12 @@ enum SelectableChipStyle {
   /// because ink and fill share a hue and only differ in opacity.
   static let selectedFillOpacity: Double = RegistryTokens.Selection.chipSelectedFillOpacity
 
-  static func fill(tint: Color, isSelected: Bool) -> Color {
-    isSelected ? tint.opacity(selectedFillOpacity) : Theme.mutedSurface
+  static func fill(tint: Color, isSelected: Bool, onCanvas: Bool = false) -> Color {
+    if isSelected { return tint.opacity(selectedFillOpacity) }
+    // On iOS `mutedSurface` (tertiary grouped) equals the grouped canvas in
+    // light mode, so a resting chip placed straight on the canvas has no
+    // visible surface and reads as a stray label. There it lifts like a card.
+    return onCanvas ? Theme.cardSurface : Theme.mutedSurface
   }
 
   static func ink(tint: Color, isSelected: Bool) -> Color {
@@ -112,6 +116,9 @@ struct SelectableChip<Label: View>: View {
   var shape: SelectableChipShape = .capsule
   /// Fill the available width — for chips laid out in an even grid.
   var fillsWidth: Bool = false
+  /// The chip sits on the page canvas, not inside a card: rest on the card
+  /// surface so it stays visible.
+  var onCanvas: Bool = false
   let action: () -> Void
   @ViewBuilder let label: () -> Label
 
@@ -123,7 +130,8 @@ struct SelectableChip<Label: View>: View {
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.xs + 2)
         .frame(maxWidth: fillsWidth ? .infinity : nil)
-        .background(shape.fill(SelectableChipStyle.fill(tint: tint, isSelected: isSelected)))
+        .background(shape.fill(SelectableChipStyle.fill(tint: tint, isSelected: isSelected,
+                                                         onCanvas: onCanvas)))
         .contentShape(shape == .capsule ? AnyShape(Capsule())
                                         : AnyShape(RoundedRectangle(
                                             cornerRadius: Theme.cornerRadiusSmall,
