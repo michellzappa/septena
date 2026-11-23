@@ -608,6 +608,12 @@ fun TaskDetailScreen(
                     enabled = canEdit && data?.checklist.orEmpty().size.toLong() < RegistryEntityLimits.MAX_CHECKLIST_ITEMS_PER_TASK,
                     modifier = Modifier.align(Alignment.Start),
                 ) { Text(addChecklistAction) }
+                TaskConversationSection(
+                    graph = graph,
+                    taskId = taskId,
+                    isTaskOpen = taskFields[RegistryEntityFields.Task.STATUS].stringValue() == RegistryEntityEnums.TaskStatus.OPEN && !deleted,
+                    canWrite = canEdit,
+                )
                 }
             }
         }

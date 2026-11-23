@@ -153,10 +153,6 @@
       "reason": "Task conversations are not on Android yet.",
       "issue": "#242"
     },
-    "RegistryEntityEnums.ConvoTurnRole.*": {
-      "reason": "Task conversations are not on Android yet.",
-      "issue": "#242"
-    },
     "RegistryEntityEnums.ConvoTurnStep.*": {
       "reason": "Task conversations are not on Android yet.",
       "issue": "#242"

@@ -10069,6 +10069,14 @@
         }
       }
     },
+    "Reply to thread" : {
+      "comment" : "Generated from registry surfaces.prompts.text.conversationReply.placeholder. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Reply…" : {
+      "comment" : "Generated from registry actions.actions.task.conversation.reply.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Required" : {
       "localizations" : {
         "pt-BR" : {
@@ -10155,6 +10163,14 @@
     },
     "Restore Task" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
+    },
+    "Resume" : {
+      "comment" : "Generated from registry actions.actions.task.conversation.stop.activeTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Resume all agents" : {
+      "comment" : "Generated from registry actions.actions.app.pauseAgents.activeTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Resume Repeat" : {
       "comment" : "Generated from registry actions.actions.task.pauseResumeRepeat.activeTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -11547,6 +11563,10 @@
           }
         }
       }
+    },
+    "Stop" : {
+      "comment" : "Generated from registry actions.actions.task.conversation.stop.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Storage" : {
 
@@ -12989,6 +13009,10 @@
           }
         }
       }
+    },
+    "Type your answer" : {
+      "comment" : "Generated from registry surfaces.prompts.text.conversationOther.placeholder. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Undated tasks fade after 14 days without activity and move to Faded. Open or edit a task to bring it back. You can turn this off in Settings." : {
       "comment" : "Generated from registry surfaces.notices.items.fadeIntro.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

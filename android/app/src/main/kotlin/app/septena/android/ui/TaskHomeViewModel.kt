@@ -11,6 +11,7 @@ import app.septena.core.SmartListResolver
 import app.septena.core.TaskFadeRules
 import app.septena.core.TaskSnapshot
 import app.septena.core.TaskViewRules
+import app.septena.core.booleanValue
 import app.septena.core.stringValue
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryDestinationIds
@@ -18,6 +19,7 @@ import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames as EntityNames
 import app.septena.core.generated.RegistryPlatformIds
+import app.septena.core.generated.RegistrySettingKeys
 import app.septena.ui.TaskListItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -50,6 +52,7 @@ data class TaskHomeUiState(
     val tasks: List<TaskListItem> = emptyList(),
     val canQuickAdd: Boolean = false,
     val canComplete: Boolean = false,
+    val agentsPaused: Boolean = false,
     val draftTitle: String = "",
     val errorMessage: String? = null,
 )
@@ -63,6 +66,7 @@ private data class LoadedTaskHome(
     val tasks: List<TaskListItem>,
     val canQuickAdd: Boolean,
     val canComplete: Boolean,
+    val agentsPaused: Boolean,
 )
 
 /** Reads the store on IO and refreshes from the sync controller's data version flow. */
@@ -94,6 +98,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             tasks = home.tasks,
             canQuickAdd = home.canQuickAdd,
             canComplete = home.canComplete,
+            agentsPaused = home.agentsPaused,
             draftTitle = draft,
             errorMessage = error,
         )
@@ -141,6 +146,22 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
+    fun setAgentsPaused(paused: Boolean) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.syncedSettingsMutator.set(
+                        RegistrySettingKeys.AGENTS_PAUSED,
+                        JsonValue.BooleanValue(paused),
+                    )
+                }
+            }.onSuccess {
+                errorMessage.value = null
+                noteLocalChangeAndSync()
+            }.onFailure { errorMessage.value = it.message }
+        }
+    }
+
     private fun noteLocalChangeAndSync() {
         graph.sync.noteLocalChange()
         graph.sync.requestSync()
@@ -155,6 +176,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         tasks = emptyList(),
         canQuickAdd = false,
         canComplete = true,
+        agentsPaused = false,
     )
 
     private suspend fun load(selected: TaskHomeLocation): LoadedTaskHome {
@@ -173,6 +195,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     TaskHomeNavigationItem(TaskHomeLocation.Project(record.id, title), title)
                 }
             }
+
+        val agentsPaused = graph.syncedSettings.value(RegistrySettingKeys.AGENTS_PAUSED).booleanValue() ?: false
 
         val nonEmptyDestinations = buildSet {
             if (taskRecords.any { it.deletedAt != null }) add(RegistryDestinationIds.RECENTLY_DELETED)
@@ -275,6 +299,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             tasks = visible.sortedTaskItems(destinationId),
             canQuickAdd = canQuickAdd,
             canComplete = canComplete,
+            agentsPaused = agentsPaused,
         )
     }
 

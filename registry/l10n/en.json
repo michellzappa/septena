@@ -1680,6 +1680,13 @@
       "surfaces.taskDetail.monthlyRules.2.title"
     ]
   },
+  "Other…": {
+    "text": "Other…",
+    "paths": [
+      "actions.actions.task.conversation.other.title",
+      "surfaces.prompts.text.conversationOther.title"
+    ]
+  },
   "Overdue app icon badge": {
     "text": "Overdue app icon badge",
     "paths": [
@@ -1707,7 +1714,8 @@
   "Pause all agents": {
     "text": "Pause all agents",
     "paths": [
-      "settings.rootGroups.ai_agents_root.items.1.label"
+      "settings.rootGroups.ai_agents_root.items.1.label",
+      "actions.actions.app.pauseAgents.title"
     ]
   },
   "Persimmon": {
@@ -1959,6 +1967,19 @@
       "actions.actions.task.repeat.title"
     ]
   },
+  "Reply to thread": {
+    "text": "Reply to thread",
+    "paths": [
+      "surfaces.prompts.text.conversationReply.placeholder"
+    ]
+  },
+  "Reply…": {
+    "text": "Reply…",
+    "paths": [
+      "actions.actions.task.conversation.reply.title",
+      "surfaces.prompts.text.conversationReply.title"
+    ]
+  },
   "Reschedule repeating task?": {
     "text": "Reschedule repeating task?",
     "paths": [
@@ -1983,10 +2004,22 @@
       "plans.actions.restore"
     ]
   },
+  "Resume": {
+    "text": "Resume",
+    "paths": [
+      "actions.actions.task.conversation.stop.activeTitle"
+    ]
+  },
   "Resume Repeat": {
     "text": "Resume Repeat",
     "paths": [
       "actions.actions.task.pauseResumeRepeat.activeTitle"
+    ]
+  },
+  "Resume all agents": {
+    "text": "Resume all agents",
+    "paths": [
+      "actions.actions.app.pauseAgents.activeTitle"
     ]
   },
   "Review": {
@@ -2090,6 +2123,14 @@
     "text": "Select",
     "paths": [
       "actions.actions.task.select.title"
+    ]
+  },
+  "Send": {
+    "text": "Send",
+    "paths": [
+      "actions.actions.task.conversation.send.title",
+      "surfaces.prompts.text.conversationOther.confirmTitle",
+      "surfaces.prompts.text.conversationReply.confirmTitle"
     ]
   },
   "Send feedback": {
@@ -2324,6 +2365,12 @@
     "text": "Stipple Drift",
     "paths": [
       "tokens.textures.stippleDrift.name"
+    ]
+  },
+  "Stop": {
+    "text": "Stop",
+    "paths": [
+      "actions.actions.task.conversation.stop.title"
     ]
   },
   "Subscribe": {
@@ -2685,6 +2732,12 @@
     "text": "Type above to add your first task.",
     "paths": [
       "destinations.genericEmptyState.detail"
+    ]
+  },
+  "Type your answer": {
+    "text": "Type your answer",
+    "paths": [
+      "surfaces.prompts.text.conversationOther.placeholder"
     ]
   },
   "Undated tasks fade after 14 days without activity and move to Faded. Open or edit a task to bring it back. You can turn this off in Settings.": {

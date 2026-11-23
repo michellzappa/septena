@@ -209,7 +209,9 @@
       { "id": "newArea", "title": "New Area", "placeholder": "Area name", "confirmTitle": "Create", "featureId": "places.areas" },
       { "id": "renameArea", "title": "Rename Area", "placeholder": "Area name", "confirmTitle": "Rename", "featureId": "places.areas" },
       { "id": "newProject", "title": "New Project", "placeholder": "Project name", "confirmTitle": "Create", "featureId": "places.projects" },
-      { "id": "renameProject", "title": "Rename Project", "placeholder": "Project name", "confirmTitle": "Rename", "featureId": "places.projects" }
+      { "id": "renameProject", "title": "Rename Project", "placeholder": "Project name", "confirmTitle": "Rename", "featureId": "places.projects" },
+      { "id": "conversationOther", "title": "Other…", "placeholder": "Type your answer", "confirmTitle": "Send", "featureId": "ai.discuss" },
+      { "id": "conversationReply", "title": "Reply…", "placeholder": "Reply to thread", "confirmTitle": "Send", "featureId": "ai.discuss" }
     ],
     "placesScreen": {
       "id": "placesScreen",

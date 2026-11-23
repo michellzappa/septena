@@ -349,6 +349,43 @@
       "availability": { "selection": "none" },
       "featureId": "find.quick-find"
     },
+    "app.pauseAgents": {
+      "title": "Pause all agents",
+      "activeTitle": "Resume all agents",
+      "icon": "settings.ai_agents",
+      "role": "default",
+      "availability": { "selection": "none", "platforms": ["android"] },
+      "featureId": "agents.stop-pause"
+    },
+    "task.conversation.stop": {
+      "title": "Stop",
+      "activeTitle": "Resume",
+      "icon": "action.cancel",
+      "role": "destructive",
+      "availability": { "selection": "single", "platforms": ["android"] },
+      "featureId": "agents.stop-pause"
+    },
+    "task.conversation.other": {
+      "title": "Other…",
+      "icon": "action.edit_details",
+      "role": "default",
+      "availability": { "selection": "single", "platforms": ["android"] },
+      "featureId": "ai.discuss"
+    },
+    "task.conversation.send": {
+      "title": "Send",
+      "icon": "action.complete",
+      "role": "default",
+      "availability": { "selection": "single", "platforms": ["android"] },
+      "featureId": "ai.discuss"
+    },
+    "task.conversation.reply": {
+      "title": "Reply…",
+      "icon": "action.edit_details",
+      "role": "default",
+      "availability": { "selection": "single", "platforms": ["android"] },
+      "featureId": "ai.discuss"
+    },
     "app.toggleSidebar": {
       "title": "Show / Hide Sidebar",
       "addTitle": "Show Sidebar",

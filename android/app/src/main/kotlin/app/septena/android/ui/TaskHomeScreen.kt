@@ -108,6 +108,11 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
         RegistryActionIds.APP_QUICK_FIND,
         languageTag = languageTag,
     ).orEmpty()
+    val pauseAgentsTitle = RegistryCatalog.actionTitle(
+        RegistryActionIds.APP_PAUSE_AGENTS,
+        field = if (state.agentsPaused) "activeTitle" else "title",
+        languageTag = languageTag,
+    ).orEmpty()
     val completeTitle = RegistryCatalog.actionTitle(
         RegistryActionIds.TASK_TOGGLE_COMPLETE,
         languageTag = languageTag,
@@ -180,6 +185,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         sidebarActionTitle = sidebarActionTitle,
                         quickAddTitle = quickAddTitle,
                         quickFindTitle = quickFindTitle,
+                        pauseAgentsTitle = pauseAgentsTitle,
                         completeTitle = completeTitle,
                         emptyTitle = emptyTitle,
                         inboxTitle = inboxTitle,
@@ -189,6 +195,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         onComplete = homeViewModel::complete,
                         onOpenTask = { openedTaskId = it },
                         onQuickFind = { quickFindOpen = true },
+                        onToggleAgentsPaused = { homeViewModel.setAgentsPaused(!state.agentsPaused) },
                         onSelectHomeLocation = homeViewModel::select,
                     )
                 }
@@ -225,6 +232,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         sidebarActionTitle = sidebarActionTitle,
                         quickAddTitle = quickAddTitle,
                         quickFindTitle = quickFindTitle,
+                        pauseAgentsTitle = pauseAgentsTitle,
                         completeTitle = completeTitle,
                         emptyTitle = emptyTitle,
                         inboxTitle = inboxTitle,
@@ -235,6 +243,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         onComplete = homeViewModel::complete,
                         onOpenTask = { openedTaskId = it },
                         onQuickFind = { quickFindOpen = true },
+                        onToggleAgentsPaused = { homeViewModel.setAgentsPaused(!state.agentsPaused) },
                         onSelectHomeLocation = homeViewModel::select,
                     )
                 }
@@ -321,6 +330,7 @@ private fun TaskHomeScaffold(
     sidebarActionTitle: String,
     quickAddTitle: String,
     quickFindTitle: String,
+    pauseAgentsTitle: String,
     completeTitle: String,
     emptyTitle: String,
     inboxTitle: String,
@@ -331,6 +341,7 @@ private fun TaskHomeScaffold(
     onComplete: (String) -> Unit,
     onOpenTask: (String) -> Unit,
     onQuickFind: () -> Unit,
+    onToggleAgentsPaused: () -> Unit,
     onSelectHomeLocation: (TaskHomeLocation) -> Unit,
 ) {
     Scaffold(
@@ -347,6 +358,9 @@ private fun TaskHomeScaffold(
                     {}
                 },
                 actions = {
+                    TextButton(onClick = onToggleAgentsPaused) {
+                        Text(pauseAgentsTitle)
+                    }
                     TextButton(onClick = onQuickFind) {
                         Text(quickFindTitle)
                     }
