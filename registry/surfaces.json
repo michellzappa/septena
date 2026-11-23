@@ -311,6 +311,7 @@
     ]
   },
   "taskAttributes": [
+    { "id": "paste", "label": "Paste", "icon": "action.paste", "commitContract": "pickCommits", "surfaceTier": "chip", "featureId": "capture.quick-entry" },
     { "id": "notes", "label": "Notes", "icon": "action.notes", "commitContract": "closeCommits", "surfaceTier": "field", "featureId": "task.notes" },
     { "id": "when", "label": "When", "icon": "action.when", "commitContract": "pickCommits", "surfaceTier": "popover", "featureId": "task.when-deadline" },
     { "id": "deadline", "label": "Deadline", "icon": "action.deadline", "commitContract": "pickCommits", "surfaceTier": "popover", "featureId": "task.when-deadline" },
@@ -322,8 +323,7 @@
     { "id": "checklist", "label": "Checklist", "icon": "action.checklist", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "task.checklists", "editOnly": true },
     { "id": "attachments", "label": "Attachments", "countLabel": { "one": "{count} file", "other": "{count} files" }, "icon": "action.attachment", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "task.attachments", "editOnly": true },
     { "id": "discuss", "label": "Discuss", "workingLabel": "Thinking…", "icon": "action.discuss", "commitContract": "closeCommits", "surfaceTier": "inline", "featureId": "ai.discuss", "editOnly": true },
-    { "id": "history", "label": "History", "icon": "action.history", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "task.history", "editOnly": true },
-    { "id": "paste", "label": "Paste", "icon": "action.paste", "commitContract": "pickCommits", "surfaceTier": "chip", "featureId": "capture.quick-entry" }
+    { "id": "history", "label": "History", "icon": "action.history", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "task.history", "editOnly": true }
   ],
   "taskPage": {
     "id": "taskPage",

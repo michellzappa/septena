@@ -407,7 +407,10 @@ struct TaskComposerCard: View {
         moveFocus: { moveFocus(forward: $0) },
         showsChecklist: kinds.contains(.checklist),
         showsAttachments: kinds.contains(.attachments),
-        showsHistory: kinds.contains(.history)
+        showsHistory: kinds.contains(.history),
+        // Paste leads the rail when it shows, as on the Mac composer: the
+        // registry lists it first (`taskAttributes` `paste`, tier `chip`).
+        leading: showsPasteChip ? AnyView(pasteChip) : nil
       ))
     case .checklist, .attachments, .history:
       return AnyView(EmptyView()) // rendered by the attribute rail, see `.attributes`
@@ -676,10 +679,8 @@ struct TaskComposerCard: View {
   private var quickEntryChips: some View {
     let tokens = detectedTokens
     let suggestion = listSuggestion
-    let paste = showsPasteChip
-    if !tokens.isEmpty || suggestion != nil || paste {
+    if !tokens.isEmpty || suggestion != nil {
       FlowLayout(spacing: 8) {
-        if paste { pasteChip }
         ForEach(tokens) { token in
           chip(icon: token.icon, leading: "plus", text: token.displayText) { apply(token) }
         }

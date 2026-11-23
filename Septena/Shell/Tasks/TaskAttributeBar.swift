@@ -41,6 +41,9 @@ struct TaskAttributeBar: View {
   var showsAttachments: Bool = true
   /// The task page's `history` block is on at this depth (page only).
   var showsHistory: Bool = false
+  /// A chip drawn at the front of the rail, before the pills: the Paste chip
+  /// on a blank new task. The composer owns it (it reads the clipboard).
+  var leading: AnyView? = nil
 
   /// The electives. Order, label and icon come from the registry
   /// (`registry/surfaces.json` `taskAttributes`, ADR 0020) so the AppKit
@@ -116,7 +119,7 @@ struct TaskAttributeBar: View {
        discussVisible: Binding<Bool> = .constant(false),
        moveFocus: ((Bool) -> Void)? = nil,
        showsChecklist: Bool = true, showsAttachments: Bool = true,
-       showsHistory: Bool = false) {
+       showsHistory: Bool = false, leading: AnyView? = nil) {
     _draft = draft
     self.areas = areas
     self.projects = projects
@@ -130,6 +133,7 @@ struct TaskAttributeBar: View {
     self.showsChecklist = showsChecklist
     self.showsAttachments = showsAttachments
     self.showsHistory = showsHistory
+    self.leading = leading
     _discussStarted = State(initialValue: discussTask?.conversation.hasStarted ?? true)
   }
 
@@ -150,6 +154,7 @@ struct TaskAttributeBar: View {
       // lives inside the When control rather than duplicating the rail.
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 8) {
+          if let leading { leading }
           ForEach(Attribute.rail) { attr in
             if shows(attr) {
               AttributePill(icon: attr.icon, label: attr.label,

@@ -1404,6 +1404,7 @@ struct RegistryTaskAttribute: Sendable, Hashable, Identifiable {
 
 enum RegistrySurfaces {
   static let taskAttributes: [RegistryTaskAttribute] = [
+    RegistryTaskAttribute(id: "paste", label: RegistryL10n.t("Paste"), iconId: "action.paste", sfSymbol: "doc.on.clipboard", commitContract: "pickCommits", surfaceTier: "chip", featureId: "capture.quick-entry", editOnly: false, workingLabel: nil),
     RegistryTaskAttribute(id: "notes", label: RegistryL10n.t("Notes"), iconId: "action.notes", sfSymbol: "text.alignleft", commitContract: "closeCommits", surfaceTier: "field", featureId: "task.notes", editOnly: false, workingLabel: nil),
     RegistryTaskAttribute(id: "when", label: RegistryL10n.t("When"), iconId: "action.when", sfSymbol: "calendar", commitContract: "pickCommits", surfaceTier: "popover", featureId: "task.when-deadline", editOnly: false, workingLabel: nil),
     RegistryTaskAttribute(id: "deadline", label: RegistryL10n.t("Deadline"), iconId: "action.deadline", sfSymbol: "flag", commitContract: "pickCommits", surfaceTier: "popover", featureId: "task.when-deadline", editOnly: false, workingLabel: nil),
@@ -1416,7 +1417,6 @@ enum RegistrySurfaces {
     RegistryTaskAttribute(id: "attachments", label: RegistryL10n.t("Attachments"), iconId: "action.attachment", sfSymbol: "paperclip", commitContract: "pickCommits", surfaceTier: "inline", featureId: "task.attachments", editOnly: true, workingLabel: nil),
     RegistryTaskAttribute(id: "discuss", label: RegistryL10n.t("Discuss"), iconId: "action.discuss", sfSymbol: "bubble.left.and.bubble.right", commitContract: "closeCommits", surfaceTier: "inline", featureId: "ai.discuss", editOnly: true, workingLabel: RegistryL10n.t("Thinking…")),
     RegistryTaskAttribute(id: "history", label: RegistryL10n.t("History"), iconId: "action.history", sfSymbol: "clock.arrow.circlepath", commitContract: "pickCommits", surfaceTier: "inline", featureId: "task.history", editOnly: true, workingLabel: nil),
-    RegistryTaskAttribute(id: "paste", label: RegistryL10n.t("Paste"), iconId: "action.paste", sfSymbol: "doc.on.clipboard", commitContract: "pickCommits", surfaceTier: "chip", featureId: "capture.quick-entry", editOnly: false, workingLabel: nil),
   ]
   /// The pills that show on `platform`, in rail order (every attribute except
   /// fields and chips, whose capability ships there).
