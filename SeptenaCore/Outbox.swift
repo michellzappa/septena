@@ -205,6 +205,19 @@ final class TaskMutator {
     cloudBackend.removeFromToday(id: id)
   }
 
+  /// "Clear When" (`task.clearSchedule`): drop the When date, the deadline
+  /// and the Today pin, and send the row to Anytime. Every shell calls this
+  /// one write so the platforms cannot disagree about what the action
+  /// clears. The deadline goes before the pin: `setDeadline` can pin a row
+  /// that only its deadline held on Today, and the unpin after it undoes
+  /// that. Undo is recorded by the caller at the gesture, not here.
+  func clearSchedule(id: String) {
+    schedule(id: id, date: nil)
+    setDeadline(id: id, date: nil)
+    moveToToday(id: id, today: false)
+    acknowledge(id: id)
+  }
+
   func schedule(id: String, date: Date?) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] schedule called before CK bound — dropping", nil)

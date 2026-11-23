@@ -142,12 +142,7 @@ struct TaskRowActions: ViewModifier {
           onClearSchedule: { ids in
             Haptics.tick()
             recordingSchedule(RegistryActions.title("task.clearSchedule"), ids) {
-              for id in ids {
-                mutator.schedule(id: id, date: nil)
-                mutator.setDeadline(id: id, date: nil)
-                mutator.moveToToday(id: id, today: false)
-                mutator.acknowledge(id: id)
-              }
+              for id in ids { mutator.clearSchedule(id: id) }
             }
             onChange?()
           },

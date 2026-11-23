@@ -3021,14 +3021,12 @@ final class SeptaskKitTaskListController: NSViewController {
     }
   }
 
-  /// ⌘⇧. — drop both the schedule and the Today pin, leaving the task in
-  /// Anytime. Matches the registry shortcut of `task.clearSchedule`.
+  /// ⌘⇧. — drop the When date, the deadline and the Today pin, leaving the
+  /// task in Anytime. Matches the registry shortcut of `task.clearSchedule`.
   func clearScheduleSelection() {
     let before = actionableSelection.map(scheduleSnapshot)
     for task in actionableSelection {
-      mutator.schedule(id: task.id, date: nil)
-      mutator.removeFromToday(id: task.id)
-      mutator.acknowledge(id: task.id)
+      mutator.clearSchedule(id: task.id)
     }
     reload()
     recordScheduleUndo(name: String(localized: "Clear Dates",

@@ -3427,13 +3427,21 @@ struct TaskListView: View {
     if touchSelectionActive { clearSelection() }
   }
 
-  /// ⌘. — clear schedule + today, sending the row back to Anytime.
+  /// ⌘⇧. — clear the When date, the deadline and Today, sending the row back
+  /// to Anytime.
   private func clearScheduleForSelected() {
-    let ids = orderedActionIDs()
+    clearSchedule(orderedActionIDs())
+  }
+
+  /// `task.clearSchedule` from the shortcut and the context menu. One undo
+  /// entry for the whole selection.
+  private func clearSchedule(_ ids: [String]) {
     guard !ids.isEmpty else { return }
-    for id in ids {
-      applyWhen(id: id, kind: .scheduled, date: nil)
+    Haptics.tick()
+    recordingSchedule(RegistryActions.title("task.clearSchedule"), ids) {
+      for id in ids { mutator.clearSchedule(id: id) }
     }
+    Task { await load() }
   }
 
   private func copySelected() {
@@ -4106,9 +4114,7 @@ struct TaskListView: View {
         onOpenTags: { target in
           tagsTargetIds = target.ids
         },
-        onClearSchedule: { ids in
-          for id in ids { applyWhen(id: id, kind: .scheduled, date: nil) }
-        },
+        onClearSchedule: { ids in clearSchedule(ids) },
         onOpenMove: { target in
           moveTargetIds = target.ids
           showingMoveSheet = true
