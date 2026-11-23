@@ -22,8 +22,11 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
@@ -42,6 +45,7 @@ import kotlinx.coroutines.launch
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun TaskHomeScreen(graph: AndroidAppGraph) {
+    var openedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     val factory = remember(graph) { TaskHomeViewModelFactory(graph) }
     val homeViewModel: TaskHomeViewModel = viewModel(factory = factory)
     val state by homeViewModel.state.collectAsStateWithLifecycle()
@@ -86,19 +90,24 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                 }
             },
         ) {
-            TaskHomeScaffold(
-                state = state,
-                title = pageTitle,
-                sidebarActionTitle = sidebarActionTitle,
-                quickAddTitle = quickAddTitle,
-                completeTitle = completeTitle,
-                emptyTitle = emptyTitle,
-                inboxTitle = inboxTitle,
-                showNavigationAction = false,
-                onDraftTitleChange = homeViewModel::updateDraft,
-                onQuickAdd = homeViewModel::quickAdd,
-                onComplete = homeViewModel::complete,
-            )
+            if (openedTaskId != null) {
+                TaskDetailScreen(graph, openedTaskId!!, onBack = { openedTaskId = null })
+            } else {
+                TaskHomeScaffold(
+                    state = state,
+                    title = pageTitle,
+                    sidebarActionTitle = sidebarActionTitle,
+                    quickAddTitle = quickAddTitle,
+                    completeTitle = completeTitle,
+                    emptyTitle = emptyTitle,
+                    inboxTitle = inboxTitle,
+                    showNavigationAction = false,
+                    onDraftTitleChange = homeViewModel::updateDraft,
+                    onQuickAdd = homeViewModel::quickAdd,
+                    onComplete = homeViewModel::complete,
+                    onOpenTask = { openedTaskId = it },
+                )
+            }
         }
     } else {
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -120,20 +129,25 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                 }
             },
         ) {
-            TaskHomeScaffold(
-                state = state,
-                title = pageTitle,
-                sidebarActionTitle = sidebarActionTitle,
-                quickAddTitle = quickAddTitle,
-                completeTitle = completeTitle,
-                emptyTitle = emptyTitle,
-                inboxTitle = inboxTitle,
-                showNavigationAction = true,
-                onOpenNavigation = { scope.launch { drawerState.open() } },
-                onDraftTitleChange = homeViewModel::updateDraft,
-                onQuickAdd = homeViewModel::quickAdd,
-                onComplete = homeViewModel::complete,
-            )
+            if (openedTaskId != null) {
+                TaskDetailScreen(graph, openedTaskId!!, onBack = { openedTaskId = null })
+            } else {
+                TaskHomeScaffold(
+                    state = state,
+                    title = pageTitle,
+                    sidebarActionTitle = sidebarActionTitle,
+                    quickAddTitle = quickAddTitle,
+                    completeTitle = completeTitle,
+                    emptyTitle = emptyTitle,
+                    inboxTitle = inboxTitle,
+                    showNavigationAction = true,
+                    onOpenNavigation = { scope.launch { drawerState.open() } },
+                    onDraftTitleChange = homeViewModel::updateDraft,
+                    onQuickAdd = homeViewModel::quickAdd,
+                    onComplete = homeViewModel::complete,
+                    onOpenTask = { openedTaskId = it },
+                )
+            }
         }
     }
 }
@@ -215,6 +229,7 @@ private fun TaskHomeScaffold(
     onDraftTitleChange: (String) -> Unit,
     onQuickAdd: () -> Unit,
     onComplete: (String) -> Unit,
+    onOpenTask: (String) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -248,6 +263,7 @@ private fun TaskHomeScaffold(
             onDraftTitleChange = onDraftTitleChange,
             onQuickAdd = onQuickAdd,
             onComplete = onComplete,
+            onOpenTask = onOpenTask,
         )
     }
 }

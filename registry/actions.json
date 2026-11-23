@@ -91,6 +91,27 @@
       "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "task.checklists"
     },
+    "task.detail.save": {
+      "title": "Save",
+      "icon": "action.edit_details",
+      "role": "default",
+      "availability": { "selection": "none", "platforms": ["android"] },
+      "featureId": "task.notes"
+    },
+    "task.toggleChecklistItem": {
+      "title": "Toggle Checklist Item",
+      "icon": "action.complete",
+      "role": "default",
+      "availability": { "selection": "single", "platforms": ["android"] },
+      "featureId": "task.checklists"
+    },
+    "task.deleteChecklistItem": {
+      "title": "Delete Checklist Item",
+      "icon": "action.delete",
+      "role": "destructive",
+      "availability": { "selection": "single", "platforms": ["android"] },
+      "featureId": "task.checklists"
+    },
     "task.when": {
       "title": "When…",
       "shortTitle": "Schedule",

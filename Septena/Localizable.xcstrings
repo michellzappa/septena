@@ -1256,6 +1256,10 @@
       "comment" : "Generated from registry plans.outcomes.everywhere.rows.devices.cells.device. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "1st" : {
+      "comment" : "Generated from registry surfaces.taskDetail.ordinals.0.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "2 years" : {
       "localizations" : {
         "pt-BR" : {
@@ -1268,6 +1272,18 @@
     },
     "2–24 characters: lowercase letters, numbers, or underscores." : {
 
+    },
+    "2nd" : {
+      "comment" : "Generated from registry surfaces.taskDetail.ordinals.1.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "3rd" : {
+      "comment" : "Generated from registry surfaces.taskDetail.ordinals.2.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "4th" : {
+      "comment" : "Generated from registry surfaces.taskDetail.ordinals.3.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "6 months" : {
       "localizations" : {
@@ -4297,6 +4313,10 @@
     "Delete Area…" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
+    "Delete Checklist Item" : {
+      "comment" : "Generated from registry actions.actions.task.deleteChecklistItem.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Delete Permanently" : {
       "comment" : "SeptaskKit localization pass 2026-08-09",
       "localizations" : {
@@ -5324,6 +5344,10 @@
           }
         }
       }
+    },
+    "Friday" : {
+      "comment" : "Generated from registry surfaces.taskDetail.weekdays.4.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "From Reminders" : {
       "localizations" : {
@@ -6661,6 +6685,10 @@
         }
       }
     },
+    "Last" : {
+      "comment" : "Generated from registry surfaces.taskDetail.ordinals.4.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "last 7 days" : {
 
     },
@@ -7406,6 +7434,10 @@
           }
         }
       }
+    },
+    "Monday" : {
+      "comment" : "Generated from registry surfaces.taskDetail.weekdays.0.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "month" : {
 
@@ -8646,6 +8678,10 @@
     "On Automatic, every step runs on your device first — it leaves only for the steps on-device can't do (↗), never wholesale." : {
 
     },
+    "On day" : {
+      "comment" : "Generated from registry surfaces.taskDetail.monthlyRules.1.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "On every device" : {
       "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.0.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -8919,6 +8955,10 @@
           }
         }
       }
+    },
+    "Ordinal" : {
+      "comment" : "Generated from registry surfaces.taskDetail.monthlyRules.2.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Other…" : {
 
@@ -10166,6 +10206,10 @@
         }
       }
     },
+    "Same day" : {
+      "comment" : "Generated from registry surfaces.taskDetail.monthlyRules.0.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Saturated Fat" : {
       "localizations" : {
         "pt-BR" : {
@@ -10175,6 +10219,10 @@
           }
         }
       }
+    },
+    "Saturday" : {
+      "comment" : "Generated from registry surfaces.taskDetail.weekdays.5.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Save" : {
 
@@ -11556,6 +11604,10 @@
         }
       }
     },
+    "Sunday" : {
+      "comment" : "Generated from registry surfaces.taskDetail.weekdays.6.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Supplement" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11912,6 +11964,10 @@
           }
         }
       }
+    },
+    "Task Details" : {
+      "comment" : "Generated from registry surfaces.taskDetail.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Task list" : {
       "comment" : "Generated from registry actions.shortcutsSheet.taskList.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -12469,6 +12525,10 @@
     "Throbbing" : {
 
     },
+    "Thursday" : {
+      "comment" : "Generated from registry surfaces.taskDetail.weekdays.3.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Time of day" : {
       "localizations" : {
         "pt-BR" : {
@@ -12505,6 +12565,10 @@
     },
     "Tint the checkbox as a task carries over day after day." : {
 
+    },
+    "Title" : {
+      "comment" : "Generated from registry surfaces.taskDetail.fields.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Title lines" : {
       "comment" : "Generated from registry settings.pages.appearance.sections.appearance.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -12578,6 +12642,10 @@
     },
     "Today, Inbox, Upcoming, Anytime and Logbook" : {
       "comment" : "Generated from registry plans.cards.free.points.0. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Toggle Checklist Item" : {
+      "comment" : "Generated from registry actions.actions.task.toggleChecklistItem.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Toggle Star" : {
@@ -12747,6 +12815,10 @@
     },
     "Try Plus free for 14 days" : {
       "comment" : "Generated from registry plans.paywall.startTrial. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Tuesday" : {
+      "comment" : "Generated from registry surfaces.taskDetail.weekdays.1.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Turn a reflection into goals" : {
@@ -13191,6 +13263,10 @@
     "Weave your calendar's events into Today and Upcoming. Grant access and choose which calendars to show in Related Settings below." : {
 
     },
+    "Wednesday" : {
+      "comment" : "Generated from registry surfaces.taskDetail.weekdays.2.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "week" : {
 
     },
@@ -13571,6 +13647,10 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Year" : {
+      "comment" : "Generated from registry surfaces.taskDetail.repeatUnits.3.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Yellow" : {
       "localizations" : {

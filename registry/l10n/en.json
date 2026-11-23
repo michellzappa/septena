@@ -23,6 +23,18 @@
       "plans.outcomes.agents.rows.runs.cells.account"
     ]
   },
+  "1st": {
+    "text": "1st",
+    "paths": [
+      "surfaces.taskDetail.ordinals.0.title"
+    ]
+  },
+  "2nd": {
+    "text": "2nd",
+    "paths": [
+      "surfaces.taskDetail.ordinals.1.title"
+    ]
+  },
   "30 days": {
     "text": "30 days",
     "paths": [
@@ -35,6 +47,18 @@
     "text": "365 days",
     "paths": [
       "plans.outcomes.nothing_lost.rows.history.cells.plus"
+    ]
+  },
+  "3rd": {
+    "text": "3rd",
+    "paths": [
+      "surfaces.taskDetail.ordinals.2.title"
+    ]
+  },
+  "4th": {
+    "text": "4th",
+    "paths": [
+      "surfaces.taskDetail.ordinals.3.title"
     ]
   },
   "90 days": {
@@ -531,6 +555,12 @@
       "plans.upsells.connector_cap.title"
     ]
   },
+  "Day": {
+    "text": "Day",
+    "paths": [
+      "surfaces.taskDetail.repeatUnits.0.title"
+    ]
+  },
   "Deadline": {
     "text": "Deadline",
     "paths": [
@@ -573,6 +603,12 @@
     "text": "Delete Area",
     "paths": [
       "actions.actions.area.delete.title"
+    ]
+  },
+  "Delete Checklist Item": {
+    "text": "Delete Checklist Item",
+    "paths": [
+      "actions.actions.task.deleteChecklistItem.title"
     ]
   },
   "Delete Permanently": {
@@ -851,6 +887,13 @@
       "plans.headline"
     ]
   },
+  "Friday": {
+    "text": "Friday",
+    "paths": [
+      "surfaces.taskDetail.weekdays.4.title",
+      "surfaces.taskDetail.calendarWeekdays.5.title"
+    ]
+  },
   "General": {
     "text": "General",
     "paths": [
@@ -1057,6 +1100,12 @@
       "tokens.textScale.steps.xLarge.label"
     ]
   },
+  "Last": {
+    "text": "Last",
+    "paths": [
+      "surfaces.taskDetail.ordinals.4.title"
+    ]
+  },
   "Last 90 days": {
     "text": "Last 90 days",
     "paths": [
@@ -1182,6 +1231,19 @@
     "text": "Medium",
     "paths": [
       "tokens.textScale.steps.normal.label"
+    ]
+  },
+  "Monday": {
+    "text": "Monday",
+    "paths": [
+      "surfaces.taskDetail.weekdays.0.title",
+      "surfaces.taskDetail.calendarWeekdays.1.title"
+    ]
+  },
+  "Month": {
+    "text": "Month",
+    "paths": [
+      "surfaces.taskDetail.repeatUnits.2.title"
     ]
   },
   "Move": {
@@ -1504,6 +1566,12 @@
       "plans.upsells.history_edge.title"
     ]
   },
+  "On day": {
+    "text": "On day",
+    "paths": [
+      "surfaces.taskDetail.monthlyRules.1.title"
+    ]
+  },
   "On every device": {
     "text": "On every device",
     "paths": [
@@ -1576,6 +1644,12 @@
     "text": "Or press ⌃⌥Space anywhere on your Mac",
     "paths": [
       "surfaces.notices.items.getStarted.steps.addTask.platformDetails.0.detail"
+    ]
+  },
+  "Ordinal": {
+    "text": "Ordinal",
+    "paths": [
+      "surfaces.taskDetail.monthlyRules.2.title"
     ]
   },
   "Overdue app icon badge": {
@@ -1908,6 +1982,25 @@
       "tokens.textures.ridges.name"
     ]
   },
+  "Same day": {
+    "text": "Same day",
+    "paths": [
+      "surfaces.taskDetail.monthlyRules.0.title"
+    ]
+  },
+  "Saturday": {
+    "text": "Saturday",
+    "paths": [
+      "surfaces.taskDetail.weekdays.5.title",
+      "surfaces.taskDetail.calendarWeekdays.6.title"
+    ]
+  },
+  "Save": {
+    "text": "Save",
+    "paths": [
+      "actions.actions.task.detail.save.title"
+    ]
+  },
   "Save Notes": {
     "text": "Save Notes",
     "paths": [
@@ -2208,6 +2301,13 @@
       "settings.rootGroups.lists_root.items.5.label"
     ]
   },
+  "Sunday": {
+    "text": "Sunday",
+    "paths": [
+      "surfaces.taskDetail.weekdays.6.title",
+      "surfaces.taskDetail.calendarWeekdays.0.title"
+    ]
+  },
   "Swipe left on a task to select multiple tasks. Swipe right runs this quick action.": {
     "text": "Swipe left on a task to select multiple tasks. Swipe right runs this quick action.",
     "paths": [
@@ -2284,6 +2384,12 @@
     "text": "Task",
     "paths": [
       "actions.menuBar.task.title"
+    ]
+  },
+  "Task Details": {
+    "text": "Task Details",
+    "paths": [
+      "surfaces.taskDetail.title"
     ]
   },
   "Task conversations with the on-device model": {
@@ -2463,6 +2569,19 @@
       "settings.keys.tasksTitleLines.options.2.title"
     ]
   },
+  "Thursday": {
+    "text": "Thursday",
+    "paths": [
+      "surfaces.taskDetail.weekdays.3.title",
+      "surfaces.taskDetail.calendarWeekdays.4.title"
+    ]
+  },
+  "Title": {
+    "text": "Title",
+    "paths": [
+      "surfaces.taskDetail.fields.title"
+    ]
+  },
   "Title lines": {
     "text": "Title lines",
     "paths": [
@@ -2489,6 +2608,12 @@
       "plans.cards.free.points.0"
     ]
   },
+  "Toggle Checklist Item": {
+    "text": "Toggle Checklist Item",
+    "paths": [
+      "actions.actions.task.toggleChecklistItem.title"
+    ]
+  },
   "Toggle Star": {
     "text": "Toggle Star",
     "paths": [
@@ -2511,6 +2636,13 @@
     "text": "Try Plus free for 14 days",
     "paths": [
       "plans.paywall.startTrial"
+    ]
+  },
+  "Tuesday": {
+    "text": "Tuesday",
+    "paths": [
+      "surfaces.taskDetail.weekdays.1.title",
+      "surfaces.taskDetail.calendarWeekdays.2.title"
     ]
   },
   "Two": {
@@ -2594,6 +2726,19 @@
       "plans.promises.no_hostage.title"
     ]
   },
+  "Wednesday": {
+    "text": "Wednesday",
+    "paths": [
+      "surfaces.taskDetail.weekdays.2.title",
+      "surfaces.taskDetail.calendarWeekdays.3.title"
+    ]
+  },
+  "Week": {
+    "text": "Week",
+    "paths": [
+      "surfaces.taskDetail.repeatUnits.1.title"
+    ]
+  },
   "Welcome back": {
     "text": "Welcome back",
     "paths": [
@@ -2665,6 +2810,12 @@
     "text": "Working",
     "paths": [
       "destinations.destinations.agent.groups.working.title"
+    ]
+  },
+  "Year": {
+    "text": "Year",
+    "paths": [
+      "surfaces.taskDetail.repeatUnits.3.title"
     ]
   },
   "You can cancel at any time in Settings.": {

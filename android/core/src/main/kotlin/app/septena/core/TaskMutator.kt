@@ -146,6 +146,27 @@ class TaskMutator(
         return updateFields(id, changes)
     }
 
+    /** Sets the user-visible When value in one queued write, keeping Today and its date exclusive. */
+    suspend fun setWhen(id: String, day: String?): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.deletedAt != null) return null
+        val today = clock.today(clock.now()).toString()
+        val isToday = day == today
+        val scheduled = day?.takeUnless { isToday }
+        val oldScheduled = existing.fields[RegistryEntityFields.Task.SCHEDULED].stringValue()
+        val oldReminder = existing.fields[RegistryEntityFields.Task.REMINDER_AT].stringValue()
+        val shiftedReminder = TaskReminderRules.shiftOnReschedule(oldReminder, oldScheduled, scheduled)
+        val changes = linkedMapOf<String, JsonValue>(
+            RegistryEntityFields.Task.SCHEDULED to JsonValue.stringOrNull(scheduled),
+            RegistryEntityFields.Task.TODAY to JsonValue.BooleanValue(isToday),
+            RegistryEntityFields.Task.TODAY_SET_ON to JsonValue.stringOrNull(if (isToday) today else null),
+        )
+        if (shiftedReminder != oldReminder) {
+            changes[RegistryEntityFields.Task.REMINDER_AT] = JsonValue.stringOrNull(shiftedReminder)
+        }
+        return updateFields(id, changes)
+    }
+
     suspend fun setTimeSlot(id: String, startTime: String?, durationMinutes: Long?, timeZone: String?): TaskRecord? =
         updateFields(
             id,

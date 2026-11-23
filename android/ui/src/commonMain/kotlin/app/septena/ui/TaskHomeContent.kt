@@ -1,5 +1,6 @@
 package app.septena.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -41,6 +42,7 @@ fun TaskHomeContent(
     onDraftTitleChange: (String) -> Unit,
     onQuickAdd: () -> Unit,
     onComplete: (String) -> Unit,
+    onOpenTask: (String) -> Unit,
 ) {
     Column(
         modifier = modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 12.dp),
@@ -67,7 +69,7 @@ fun TaskHomeContent(
             }
             if (isToday && inboxTasks.isNotEmpty()) {
                 items(inboxTasks, key = TaskListItem::id) { task ->
-                    TaskRow(task, completeTitle, canComplete, onComplete)
+                    TaskRow(task, completeTitle, canComplete, onComplete, onOpenTask)
                 }
             }
             if (isToday && canQuickAdd) {
@@ -85,7 +87,7 @@ fun TaskHomeContent(
                 }
             }
             items(tasks, key = TaskListItem::id) { task ->
-                TaskRow(task, completeTitle, canComplete, onComplete)
+                TaskRow(task, completeTitle, canComplete, onComplete, onOpenTask)
             }
         }
     }
@@ -121,9 +123,10 @@ private fun TaskRow(
     completeTitle: String,
     canComplete: Boolean,
     onComplete: (String) -> Unit,
+    onOpenTask: (String) -> Unit,
 ) {
     ListItem(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable { onOpenTask(task.id) },
         headlineContent = { Text(task.title, style = MaterialTheme.typography.bodyLarge) },
         leadingContent = if (canComplete) {
             {

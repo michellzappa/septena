@@ -321,5 +321,83 @@
     { "id": "attachments", "label": "Attachments", "countLabel": { "one": "{count} file", "other": "{count} files" }, "icon": "action.attachment", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "task.attachments", "editOnly": true },
     { "id": "discuss", "label": "Discuss", "workingLabel": "Thinking…", "icon": "action.discuss", "commitContract": "closeCommits", "surfaceTier": "inline", "featureId": "ai.discuss", "editOnly": true },
     { "id": "paste", "label": "Paste", "icon": "action.paste", "commitContract": "pickCommits", "surfaceTier": "chip", "featureId": "capture.quick-entry" }
-  ]
+  ],
+  "taskDetail": {
+    "id": "taskDetail",
+    "title": "Task Details",
+    "fields": {
+      "title": "Title",
+      "notes": "Notes",
+      "when": "When",
+      "deadline": "Deadline",
+      "area": "Area",
+      "project": "Project",
+      "repeat": "Repeat",
+      "interval": "Interval",
+      "afterCompletion": "After completion",
+      "checklist": "Checklist",
+      "checklistItem": "Checklist item"
+    },
+    "controls": {
+      "back": "Back",
+      "save": "Save",
+      "selectDate": "Select",
+      "noDate": "No date",
+      "clear": "Clear",
+      "cancel": "Cancel",
+      "noArea": "No area",
+      "noProject": "No project",
+      "addChecklist": "Add checklist item",
+      "customOptions": "Custom options",
+      "hideCustomOptions": "Hide custom options",
+      "weekdays": "Weekdays (Monday to Friday)",
+      "monthlyRule": "Repeat pattern",
+      "sameDay": "Same day",
+      "onDay": "On day",
+      "ordinal": "Ordinal",
+      "dayOfMonth": "Day of month",
+      "lastDay": "Last day",
+      "onThe": "On the",
+      "noScheduleForFixed": "Choose a date to repeat on a fixed schedule.",
+      "saveError": "Could not save changes.",
+      "taskUnavailable": "Task is no longer available."
+    },
+    "repeatUnits": [
+      { "value": "day", "title": "Day" },
+      { "value": "week", "title": "Week" },
+      { "value": "month", "title": "Month" },
+      { "value": "year", "title": "Year" }
+    ],
+    "weekdays": [
+      { "value": 2, "title": "Monday", "shortTitle": "M" },
+      { "value": 3, "title": "Tuesday", "shortTitle": "T" },
+      { "value": 4, "title": "Wednesday", "shortTitle": "W" },
+      { "value": 5, "title": "Thursday", "shortTitle": "T" },
+      { "value": 6, "title": "Friday", "shortTitle": "F" },
+      { "value": 7, "title": "Saturday", "shortTitle": "S" },
+      { "value": 1, "title": "Sunday", "shortTitle": "S" }
+    ],
+    "calendarWeekdays": [
+      { "value": 1, "title": "Sunday" },
+      { "value": 2, "title": "Monday" },
+      { "value": 3, "title": "Tuesday" },
+      { "value": 4, "title": "Wednesday" },
+      { "value": 5, "title": "Thursday" },
+      { "value": 6, "title": "Friday" },
+      { "value": 7, "title": "Saturday" }
+    ],
+    "monthlyRules": [
+      { "value": "anchor", "title": "Same day" },
+      { "value": "dayOfMonth", "title": "On day" },
+      { "value": "ordinal", "title": "Ordinal" }
+    ],
+    "ordinals": [
+      { "value": 1, "title": "1st" },
+      { "value": 2, "title": "2nd" },
+      { "value": 3, "title": "3rd" },
+      { "value": 4, "title": "4th" },
+      { "value": -1, "title": "Last" }
+    ],
+    "featureId": "task.notes"
+  }
 }
