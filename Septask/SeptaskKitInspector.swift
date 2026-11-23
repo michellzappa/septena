@@ -761,10 +761,8 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
         guard let self else { return }
         let live = LocalCache.task(id: current.id, in: self.context) ?? current
         let before = [TaskUndo.ScheduleSnapshot(live)]
-        self.mutator.setTimeSlot(id: current.id, startTime: start, durationMinutes: duration)
-        if start != nil, !live.today, live.scheduled == nil {
-          self.mutator.moveToToday(id: current.id)
-        }
+        self.mutator.apply(.setTimeSlot(startTime: start, durationMinutes: duration,
+                                        timeZone: nil), to: live.id)
         TaskUndo.recordScheduleChange(
           name: String(localized: "Change Time", comment: "SeptaskKit: undo action"),
           before: before, context: self.context, mutator: self.mutator)
@@ -778,17 +776,18 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       // two panes of one window.
       let before = [TaskUndo.ScheduleSnapshot(current)]
       switch kind {
+      // Field rules: `TaskDateActions` (spec §4 A1 / A2 / A5 / A7).
       case .when:
         if today {
-          self.mutator.moveToToday(id: current.id)
+          self.mutator.apply(.putOnToday, to: current.id)
+        } else if let date {
+          self.mutator.apply(.scheduleFor(date), to: current.id)
         } else {
-          self.mutator.schedule(id: current.id, date: date)
-          self.mutator.removeFromToday(id: current.id)
+          self.mutator.apply(.clearWhenDate, to: current.id)
         }
       case .deadline:
-        self.mutator.setDeadline(id: current.id, date: date)
+        self.mutator.apply(.setDeadline(date), to: current.id)
       }
-      self.mutator.acknowledge(id: current.id)
       TaskUndo.recordScheduleChange(
         name: kind == .when
           ? String(localized: "Change When", comment: "SeptaskKit: undo action")

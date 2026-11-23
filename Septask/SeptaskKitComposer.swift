@@ -530,7 +530,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   func refreshPills(with task: SeptenaTask, listName: String?) {
     checkbox.isDone = task.status != .open
     checkbox.isDashed = task.status == .open && task.isInTriageBand
-    checkbox.isToday = task.today
+    checkbox.isToday = task.isOnToday
     checkbox.tenureFill = TaskRowFlags.agingEnabled ? task.fadeFill() : nil
     checkbox.cornerDot = task.conversation.hasStarted && !task.isInTriageBand
     checkbox.agentCue = task.showsAgentCue()

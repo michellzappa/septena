@@ -499,11 +499,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let smartCounts: [TaskFilter: Int] = [
       .review: reviewCount,
       .agent: agentCount,
-      .upcoming: open.filter { task in
-        guard !task.today else { return false }
-        return task.scheduled.map { $0 > today } == true
-          || task.deadline.map { $0 > today } == true
-      }.count,
+      .upcoming: open.filter(\.isUpcoming).count,
       .repeating: open.filter { $0.recurrenceUnit != nil && $0.recurrence != nil }.count,
       .unscheduled: open.filter {
         !$0.today && $0.scheduled == nil && $0.deadline == nil
@@ -749,22 +745,22 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     case .project(let projectId):
       mutator.moveToList(ids: ids, area: nil, project: projectId, acknowledge: true)
     case .today, .scheduleTomorrow, .anytime:
+      // Field rules: `TaskDateActions` (spec §4). Each action also clears
+      // the agent cue: a drop is a disposition, like filing from the list.
+      // A drop on Anytime is Clear When (A6, decision Q6): it must land the
+      // task in Anytime, so a deadline goes too.
       for id in ids {
         switch action {
         case .today:
-          mutator.moveToToday(id: id)
+          mutator.apply(.putOnToday, to: id)
         case .scheduleTomorrow:
-          mutator.schedule(id: id, date: KitDayFormat.tomorrow())
-          mutator.removeFromToday(id: id)
+          guard let tomorrow = KitDayFormat.tomorrow() else { continue }
+          mutator.apply(.scheduleFor(tomorrow), to: id)
         case .anytime:
-          mutator.schedule(id: id, date: nil)
-          mutator.removeFromToday(id: id)
+          mutator.apply(.clearWhen, to: id)
         case .area, .project:
           break
         }
-        // A drop is a disposition, like filing from the list: it clears the
-        // agent cue, so a proposal leaves the Inbox once the user has placed it.
-        mutator.acknowledge(id: id)
       }
     }
     switch action {

@@ -94,15 +94,11 @@ struct TaskRowActions: ViewModifier {
                               ids) {
               if today {
                 for id in ids {
-                  mutator.moveToToday(id: id, today: true)
-                  mutator.acknowledge(id: id)
+                  mutator.apply(.putOnToday, to: id)
                   promoteFlash.flash(id)
                 }
               } else {
-                for id in ids {
-                  mutator.removeFromToday(id: id)
-                  mutator.acknowledge(id: id)
-                }
+                for id in ids { mutator.apply(.removeFromToday, to: id) }
               }
             }
             onChange?()
@@ -142,7 +138,7 @@ struct TaskRowActions: ViewModifier {
           onClearSchedule: { ids in
             Haptics.tick()
             recordingSchedule(RegistryActions.title("task.clearSchedule"), ids) {
-              for id in ids { mutator.clearSchedule(id: id) }
+              for id in ids { mutator.apply(.clearWhen, to: id) }
             }
             onChange?()
           },
@@ -232,8 +228,8 @@ struct TaskRowActions: ViewModifier {
       ))
   }
 
-  // Mirrors `TaskListView.applyWhen` — Things-style "Today" pin vs. future
-  // scheduled date vs. cleared. Kept in lockstep with that method.
+  // The field rules live in `TaskDateActions` (spec §4: A1, A2, A5, A7);
+  // this only picks the undo name and the feedback.
   private func applyWhen(id: String, kind: TaskListView.WhenKind, date: Date?) {
     Haptics.tick()
     let name = kind == .deadline
@@ -242,24 +238,19 @@ struct TaskRowActions: ViewModifier {
     recordingSchedule(name, [id]) {
       switch kind {
       case .deadline:
-        mutator.setDeadline(id: id, date: date)
+        mutator.apply(.setDeadline(date), to: id)
       case .scheduled:
         if let d = date {
-          if Calendar.current.isDateInToday(d) {
-            mutator.schedule(id: id, date: nil)
-            mutator.moveToToday(id: id, today: true)
+          mutator.apply(.scheduleFor(d), to: id)
+          if let iso = SeptenaDate.format(d), iso <= SeptenaDate.today {
             promoteFlash.flash(id)
           } else {
-            mutator.moveToToday(id: id, today: false)
-            mutator.schedule(id: id, date: d)
             toastStore?.show(RegistryToasts.deferred(to: d))
           }
         } else {
-          mutator.schedule(id: id, date: nil)
-          mutator.moveToToday(id: id, today: false)
+          mutator.apply(.clearWhenDate, to: id)
         }
       }
-      mutator.acknowledge(id: id)
     }
     onChange?()
   }
@@ -327,8 +318,7 @@ struct TaskRowActions: ViewModifier {
                            tint: .gray) {
             Haptics.tick()
             recordingSchedule(RegistryActions.title(id, .remove), [task.id]) {
-              mutator.removeFromToday(id: task.id)
-              mutator.acknowledge(id: task.id)
+              mutator.apply(.removeFromToday, to: task.id)
             }
             onChange?()
           }
@@ -347,8 +337,7 @@ struct TaskRowActions: ViewModifier {
   private func moveToToday() {
     Haptics.tick()
     recordingSchedule(RegistryActions.title("task.toggleToday", .add), [task.id]) {
-      mutator.moveToToday(id: task.id, today: true)
-      mutator.acknowledge(id: task.id)
+      mutator.apply(.putOnToday, to: task.id)
       promoteFlash.flash(task.id)
     }
     onChange?()

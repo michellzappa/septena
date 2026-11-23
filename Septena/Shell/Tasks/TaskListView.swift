@@ -3353,10 +3353,7 @@ struct TaskListView: View {
   private func applyRemoveFromToday(_ ids: [String]) {
     Haptics.tick()
     let undoBefore = scheduleSnapshots(ids)
-    for id in ids {
-      mutator.removeFromToday(id: id)
-      mutator.acknowledge(id: id)
-    }
+    for id in ids { mutator.apply(.removeFromToday, to: id) }
     TaskUndo.recordScheduleChange(
       name: RegistryActions.title("task.toggleToday", .remove),
       before: undoBefore, context: modelContext, mutator: mutator)
@@ -3373,7 +3370,7 @@ struct TaskListView: View {
   private func promoteToToday(_ ids: [String]) {
     let undoBefore = scheduleSnapshots(ids)
     for id in ids {
-      mutator.moveToToday(id: id, today: true)
+      mutator.apply(.putOnToday, to: id)
       promoteFlash.flash(id)
     }
     // Recorded here rather than at each caller so no entry point can forget.
@@ -3439,7 +3436,7 @@ struct TaskListView: View {
     guard !ids.isEmpty else { return }
     Haptics.tick()
     recordingSchedule(RegistryActions.title("task.clearSchedule"), ids) {
-      for id in ids { mutator.clearSchedule(id: id) }
+      for id in ids { mutator.apply(.clearWhen, to: id) }
     }
     Task { await load() }
   }
@@ -5168,7 +5165,7 @@ struct TaskListView: View {
     case .deadline:
       recordingSchedule(String(localized: "Set Deadline", comment: "Undo action name"),
                         [id]) {
-        mutator.setDeadline(id: id, date: date)
+        mutator.apply(.setDeadline(date), to: id)
       }
     case .scheduled:
       // Things-style mapping:
@@ -5207,23 +5204,20 @@ struct TaskListView: View {
         name: String(localized: "Schedule Task", comment: "Undo action name"),
         before: undoBefore, context: modelContext, mutator: mutator)
     }
+    // The field rules live in `TaskDateActions` (spec §4: A1, A2, A5). A day
+    // on or before today is A1 there, so this only picks the feedback.
     if let d = date {
-      if Calendar.current.isDateInToday(d) {
-        mutator.reschedule(id: id, date: d, mode: mode)
-        mutator.schedule(id: id, date: nil)
-        promoteToToday([id])
+      mutator.apply(.scheduleFor(d), to: id, mode: mode)
+      if let iso = SeptenaDate.format(d), iso <= SeptenaDate.today {
+        promoteFlash.flash(id)
       } else {
-        mutator.moveToToday(id: id, today: false)
-        mutator.reschedule(id: id, date: d, mode: mode)
         // Deferring drops the row off Today; confirm where it landed. No
         // Undo — re-opening the When picker is the natural reversal.
         showToast(RegistryToasts.deferred(to: d))
       }
     } else {
-      mutator.reschedule(id: id, date: nil, mode: .makeException)
-      mutator.moveToToday(id: id, today: false)
+      mutator.apply(.clearWhenDate, to: id)
     }
-    mutator.acknowledge(id: id)
     Task { await load() }
   }
 

@@ -189,15 +189,22 @@ struct TaskDraft: Equatable {
     let filingChanged = projectId != prior.projectId
       || (projectId == nil && areaId != prior.areaId)
 
-    if storedScheduled != prior.storedScheduled {
-      mutator.schedule(id: id, date: storedScheduled)
-    }
-    if pinToday != prior.pinToday {
-      if pinToday { mutator.moveToToday(id: id, today: true) }
-      else { mutator.removeFromToday(id: id) }
+    // Date fields go through the spec §4 actions (`TaskDateActions`), in
+    // When → deadline → time slot order, so each sees the fields before it.
+    // Turning Today off here is "clear the When date" (A5), not Remove from
+    // Today (A3): the deadline is its own field in this editor, and A3 would
+    // delete an overdue one behind the user's back.
+    if storedScheduled != prior.storedScheduled || pinToday != prior.pinToday {
+      if pinToday {
+        mutator.apply(.putOnToday, to: id)
+      } else if let storedScheduled {
+        mutator.apply(.scheduleFor(storedScheduled), to: id)
+      } else {
+        mutator.apply(.clearWhenDate, to: id)
+      }
     }
     if deadline != prior.deadline {
-      mutator.setDeadline(id: id, date: deadline)
+      mutator.apply(.setDeadline(deadline), to: id)
     }
     if reminder != prior.reminder {
       mutator.setReminder(id: id, reminder: reminder)
@@ -212,7 +219,8 @@ struct TaskDraft: Equatable {
       mutator.setStarred(id: id, starred: starred)
     }
     if startTime != prior.startTime || durationMinutes != prior.durationMinutes {
-      mutator.setTimeSlot(id: id, startTime: startTime, durationMinutes: durationMinutes)
+      mutator.apply(.setTimeSlot(startTime: startTime, durationMinutes: durationMinutes,
+                                 timeZone: nil), to: id)
     }
     // Project and area are mutually exclusive: a project owns its area, and the
     // backend's `moveToProject` clears area (create() does the same via

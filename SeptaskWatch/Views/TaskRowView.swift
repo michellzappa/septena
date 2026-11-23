@@ -95,7 +95,7 @@ struct TaskMetaLine: View {
     case .overdue:
       out.append(AnyView(Text("Overdue").foregroundStyle(.red)))
     case .dueToday:
-      out.append(AnyView(Text("Due today").foregroundStyle(.orange)))
+      out.append(AnyView(Text("Today").foregroundStyle(.red)))
     case .none:
       if let deadline = task.deadline, deadline > today {
         out.append(AnyView(Text(Self.short(deadline)).foregroundStyle(.orange)))

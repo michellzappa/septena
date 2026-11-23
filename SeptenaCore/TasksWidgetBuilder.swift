@@ -67,8 +67,12 @@ enum TasksWidgetBuilder {
         today: today,
         isRedacted: redacted,
         subtitleFor: { task in
-          if let s = task.scheduled { return relativeDayLabel(s, today: today) }
-          if let d = task.deadline { return relativeDayLabel(d, today: today) }
+          // The day the row sits under in Upcoming: the earlier of its
+          // future dates (`docs/TASK_DATES_SPEC.md` R5), never a past When.
+          if let day = [task.scheduled, task.deadline].compactMap({ $0 })
+            .filter({ $0 > today }).min() {
+            return relativeDayLabel(day, today: today)
+          }
           return containerSubtitle(for: task, areaByID: areaByID, projectByID: projectByID, fallbackInbox: false)
         }
       ),
@@ -161,7 +165,10 @@ enum TasksWidgetBuilder {
           TasksWidgetTaskItem(
             id: task.id,
             title: task.title,
-            isOverdue: task.isOverdue,
+            isOverdue: {
+              let state = task.deadlineState(today: today)
+              return state == .dueToday || state == .overdue
+            }(),
             isStarred: task.starred,
             subtitle: subtitleFor(task),
             timeBadge: formatTimeBadge(startTime: task.startTime, durationMinutes: task.durationMinutes),

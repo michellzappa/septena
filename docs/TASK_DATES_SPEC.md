@@ -130,10 +130,11 @@ platform derives them itself.
 - **R7 Today view.** on Today, or in the triage band. The Inbox band is the
   triage band plus the Inbox rows that are on Today
   ([Inbox is a band on Today](TRIAGE_BAND_SPEC.md)).
-- **R8 rolled in.** On Today, not pinned, and an arrived date before T
-  (`scheduled < T` or `deadline < T`), and not an agent row. This is the one
-  definition of "arrived on its own". It replaces both `TaskNotices.rolledIn`
-  and `showsArrivedToday`, which disagree today. **(Q7)**
+- **R8 arrived on its own.** active, not pinned, created before T, not an
+  agent row, and `scheduled == T` or `deadline == T`: the task landed on
+  Today this morning by its date, not by hand. One rule for the row's arrived
+  dot and the "rolled into Today" notice (decision Q7). It clears itself the
+  next day. Before D2, the notice counted `scheduled < T` instead.
 - **R9 days on Today.** The earliest of `todaySetOn` (if pinned), an arrived
   `scheduled`, an arrived `deadline`; floored at `created`; T minus that day.
   0 when not on Today or when the agent cue shows.

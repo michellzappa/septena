@@ -33,6 +33,8 @@ struct WatchTask: Codable, Identifiable, Equatable, Hashable, Sendable {
   /// Where the row lives, for the meta line: project beats area.
   var container: String? { project ?? area }
 
+  /// `docs/TASK_DATES_SPEC.md` R3: the same split as
+  /// `SeptenaTask.deadlineState`. Both states render red (R4, decision Q4).
   enum DueState: Equatable { case none, dueToday, overdue }
   func due(today: String) -> DueState {
     guard let deadline else { return .none }

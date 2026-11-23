@@ -317,6 +317,15 @@ final class TaskEntity {
     return false
   }
 
+  /// `docs/TASK_DATES_SPEC.md` R5: open, not on Today, and a When date or
+  /// deadline after today. A task is never on Today and in Upcoming at once
+  /// (decision Q3). Every Upcoming list and count reads this.
+  var isUpcoming: Bool {
+    guard status == .open, !isHeading, fadedAt == nil, !isOnToday else { return false }
+    let today = SeptenaDate.today
+    return (scheduled.map { $0 > today } ?? false) || (deadline.map { $0 > today } ?? false)
+  }
+
   /// Filed nowhere: no area, no project. See `TaskInbox`.
   var isUnfiled: Bool { TaskInbox.isUnfiled(area: area, project: project) }
 
@@ -1474,10 +1483,7 @@ enum LocalCache {
             e.conversation.agentStage(at: Date()) != nil else { return nil }
       return SeptenaTask(e)
     case .upcoming:
-      guard e.status == .open, !e.today else { return nil }
-      if let s = e.scheduled, s > today { return SeptenaTask(e) }
-      if let d = e.deadline, d > today { return SeptenaTask(e) }
-      return nil
+      return e.isUpcoming ? SeptenaTask(e) : nil
     case .repeating:
       guard e.status == .open, e.recurrence != nil else { return nil }
       return SeptenaTask(e)
@@ -1636,7 +1642,7 @@ enum LocalCache {
     let today = SeptenaDate.today
     let rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>())
     return rows.reduce(0) { acc, e in
-      guard e.deletedAt == nil, !e.pendingDeletion,
+      guard e.deletedAt == nil, !e.pendingDeletion, !e.isHeading,
             e.status == .open, !e.isFaded, let d = e.deadline, d <= today else { return acc }
       return acc + 1
     }
