@@ -382,12 +382,6 @@ struct SidebarRootView: View {
                 newAreaName = ""
                 showingNewArea = true
               })
-      .magicPlusSectionDrop(id: "mp-sidebar-new-area", kind: .newArea,
-                            priority: 1, highlights: false) {
-        Haptics.commit()
-        newAreaName = ""
-        showingNewArea = true
-      }
       #endif
       .modifier(IOSSidebarListChrome())
       .septenaNeutralListSelection()
@@ -939,24 +933,23 @@ struct SidebarRootView: View {
     #else
     .contextMenu { areaMenu(area) }
     #endif
-    // Drag-a-task-here re-home on co-visible sidebar+list (iPad/Mac); on compact
-    // iPhone Septena, dropping Magic Plus on an Area creates a New Project in it.
+    // Drag-a-task-here re-home on co-visible sidebar+list (iPad/Mac).
     .modifier(SidebarTaskDrop(kind: .area(area.id), mutator: taskMutator) {
       newProjectInArea = area.id
       showingNewProject = true
     })
+    // Magic Plus over an Area makes a new task in that Area. The orb only
+    // ever makes tasks (decided 2026-11-23).
     .magicPlusSectionDrop(id: "mp-sidebar-area-\(area.id)",
-                          kind: .newProject(label: "New Project in \(area.title)")) {
+                          kind: .taskSection(label: "New Task in \(area.title)")) {
       Haptics.commit()
-      newProjectInArea = area.id
-      showingNewProject = true
+      nav.go(to: .area(id: area.id))
+      nav.requestNewTask()
     }
   }
 
   @ViewBuilder
   private func projectRow(_ project: Project, parent: String?) -> some View {
-    let parentTitle = parent.flatMap { pid in areas.first(where: { $0.id == pid })?.title }
-    let magicLabel = parentTitle.map { "New Project in \($0)" } ?? "New Project"
     navRow(.project(id: project.id)) {
       SidebarProjectRow(name: project.title,
                         progress: projectProgress[project.id] ?? 0,
@@ -975,17 +968,17 @@ struct SidebarRootView: View {
     #else
     .contextMenu { projectMenu(project) }
     #endif
-    // Drag-a-task-here re-home on co-visible sidebar+list (iPad/Mac); on compact
-    // iPhone Septena, dropping Magic Plus on a Project creates a sibling Project.
+    // Drag-a-task-here re-home on co-visible sidebar+list (iPad/Mac).
     .modifier(SidebarTaskDrop(kind: .project(project.id), mutator: taskMutator) {
       newProjectInArea = parent
       showingNewProject = true
     })
+    // Magic Plus over a Project makes a new task in that Project.
     .magicPlusSectionDrop(id: "mp-sidebar-proj-\(project.id)",
-                          kind: .newProject(label: magicLabel)) {
+                          kind: .taskSection(label: "New Task in \(project.title)")) {
       Haptics.commit()
-      newProjectInArea = parent
-      showingNewProject = true
+      nav.go(to: .project(id: project.id))
+      nav.requestNewTask()
     }
   }
 

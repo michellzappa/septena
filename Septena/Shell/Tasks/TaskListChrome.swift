@@ -313,12 +313,10 @@ extension View {
 enum MagicPlusDropKind: Equatable {
   /// Between two rows in a reorderable list (parts a full ghost-row gap).
   case taskRow(context: String?)
-  /// Onto a section/heading/group/day header or non-reorderable card.
+  /// Onto a section/heading/group/day header, a non-reorderable card, or a
+  /// list row on the Tasks index. Every target makes a new task: the orb never
+  /// makes an Area or a Project.
   case taskSection(label: String)
-  /// Onto an Area or Project on the Tasks index.
-  case newProject(label: String)
-  /// Onto the Tasks index background / between Area cards.
-  case newArea
 }
 
 /// Live coordinator for the iPhone Magic Plus finger-tracking & morphing drag.
@@ -546,10 +544,10 @@ struct MagicPlusRowDropModifier: ViewModifier {
         .padding(.top, hoverBefore == true ? Self.gapHeight : 0)
         .padding(.bottom, hoverBefore == false ? Self.gapHeight : 0)
         .overlay(alignment: .top) {
-          if hoverBefore == true { ghostSlotPlaceholder }
+          if hoverBefore == true { MagicPlusGhostSlot() }
         }
         .overlay(alignment: .bottom) {
-          if hoverBefore == false { ghostSlotPlaceholder }
+          if hoverBefore == false { MagicPlusGhostSlot() }
         }
         .a11yAnimation(.snappy(duration: 0.2), value: hoverBefore)
     } else {
@@ -557,10 +555,15 @@ struct MagicPlusRowDropModifier: ViewModifier {
     }
   }
 
-  /// Subtle dashed-outline landing slot revealed in the parted row gap.
-  private var ghostSlotPlaceholder: some View {
+}
+
+/// The dotted new-task slot: the ONE landing mark of a Magic Plus drag. A row
+/// gap, a header and a Tasks index row all show it, so the drop always reads
+/// as "a new task goes here" and never as "this row is the target".
+struct MagicPlusGhostSlot: View {
+  var body: some View {
     let accent = AppearancePreferences.shared.magicPlusSwiftUIColor
-    return RoundedRectangle(cornerRadius: 10, style: .continuous)
+    RoundedRectangle(cornerRadius: 10, style: .continuous)
       .strokeBorder(accent.opacity(0.45),
                     style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
       .background(
@@ -569,18 +572,18 @@ struct MagicPlusRowDropModifier: ViewModifier {
       )
       .padding(.horizontal, TaskCardMetrics.margin)
       .padding(.vertical, 4)
-      .frame(height: Self.gapHeight)
+      .frame(height: MagicPlusRowDropModifier.gapHeight)
   }
 }
 
 /// Registers a section header, heading, Upcoming day, or Tasks index row as a
-/// Magic Plus target with canonical `Theme.listSelectionFill` highlight.
+/// Magic Plus target. Hovering it opens the dotted new-task slot under it (the
+/// first place in that list); the row itself gets no highlight.
 struct MagicPlusSectionDropModifier: ViewModifier {
   @Environment(\.magicPlusDrag) private var drag
   let id: String
   let kind: MagicPlusDropKind
   let priority: Int
-  let highlights: Bool
   let onDrop: () -> Void
 
   private var isTargeted: Bool {
@@ -591,19 +594,18 @@ struct MagicPlusSectionDropModifier: ViewModifier {
   func body(content: Content) -> some View {
     if let drag {
       content
-        .background {
-          if highlights {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-              .fill(isTargeted ? Theme.listSelectionFill : Color.clear)
-              .a11yAnimation(.easeOut(duration: 0.14), value: isTargeted)
-          }
-        }
+        // Capture the un-parted frame before the slot padding grows it.
         .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { rect in
           drag.register(id: id, kind: kind, priority: priority, frame: rect) { _ in
             onDrop()
           }
         }
         .onDisappear { drag.unregister(id: id) }
+        .padding(.bottom, isTargeted ? MagicPlusRowDropModifier.gapHeight : 0)
+        .overlay(alignment: .bottom) {
+          if isTargeted { MagicPlusGhostSlot() }
+        }
+        .a11yAnimation(.snappy(duration: 0.2), value: isTargeted)
     } else {
       content
     }
@@ -624,11 +626,10 @@ extension View {
     id: String,
     kind: MagicPlusDropKind,
     priority: Int = 2,
-    highlights: Bool = true,
     onDrop: @escaping () -> Void
   ) -> some View {
     modifier(MagicPlusSectionDropModifier(id: id, kind: kind, priority: priority,
-                                          highlights: highlights, onDrop: onDrop))
+                                          onDrop: onDrop))
   }
 }
 
@@ -698,8 +699,6 @@ struct MagicPlusFloatingOverlay: View {
     switch drag.activeTarget?.kind {
     case .taskRow(let context):   return (context?.isEmpty ?? true) ? nil : context
     case .taskSection(let label): return label
-    case .newProject(let label):  return label
-    case .newArea:                return RegistryActions.title("sidebar.newArea")
     case nil:                     return nil
     }
   }

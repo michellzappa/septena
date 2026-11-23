@@ -479,6 +479,9 @@ private struct PageChromeModifier: ViewModifier {
       }
       if let accessory = accessory() {
         ToolbarItem(placement: .topBarTrailing) { accessory }
+        // A fixed spacer splits the shared glass pill: the accessory (Star)
+        // and Search read as two separate circles, not one joined control.
+        ToolbarSpacer(.fixed, placement: .topBarTrailing)
       }
       ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }
     } else {
