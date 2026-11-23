@@ -1,4 +1,5 @@
 import Foundation
+import SeptenaSharedCore
 
 // ─── Natural Language Date Parser ─────────────────────────────────────────────
 
@@ -8,9 +9,9 @@ import Foundation
 ///
 /// Relative to the `today` the caller passes, never the wall clock: app
 /// callers pass DayClock's today (`DayClock.today` / `SeptenaDate.today`) so
-/// time travel and day rollover hold. This file also compiles into the watch
-/// targets and the Foundation-only test bundle, which have no DayClock — hence
-/// the parameter instead of reading DayClock here.
+/// time travel and day rollover hold. This file also compiles into the
+/// SeptenaCoreTests bundle, which has no DayClock — hence the parameter
+/// instead of reading DayClock here.
 struct SeptenaDateParser {
   /// Parse what a person types into a day. Day precision only; returns the
   /// start of that day.
@@ -216,136 +217,11 @@ struct RecurrenceOrdinalWeekday: Codable, Hashable, Sendable {
   var weekday: Int   // 1 = Sunday ... 7 = Saturday
 }
 
-/// Pure date arithmetic for task recurrence. Kept beside the date utilities
-/// because the lightweight core test target includes this file without the
-/// full SwiftData-backed task model.
-/// LOCKSTEP with `backend/src/recurrence.ts` and `registry/conformance/recurrence.json`.
+/// Task recurrence arithmetic. The rule lives once, in the shared Rust core
+/// (`core/crates/septena-core/src/recurrence.rs`, ADR 0025); this enum only
+/// adapts Swift values to it. Vectors: `registry/conformance/recurrence.json`.
+/// The backend's `backend/src/recurrence.ts` is the one copy left (C3, #249).
 enum RecurrenceDateCalculator {
-  private struct CivilDate: Comparable {
-    let y: Int
-    let m: Int // 1..12
-    let d: Int // 1..31
-
-    static func < (lhs: CivilDate, rhs: CivilDate) -> Bool {
-      if lhs.y != rhs.y { return lhs.y < rhs.y }
-      if lhs.m != rhs.m { return lhs.m < rhs.m }
-      return lhs.d < rhs.d
-    }
-  }
-
-  private static let utcCalendar: Calendar = {
-    var cal = Calendar(identifier: .gregorian)
-    cal.timeZone = TimeZone(secondsFromGMT: 0)!
-    return cal
-  }()
-
-  private static func parseYMD(_ ymd: String) -> CivilDate? {
-    let prefix = String(ymd.prefix(10))
-    let parts = prefix.split(separator: "-")
-    guard parts.count == 3,
-          let y = Int(parts[0]),
-          let m = Int(parts[1]),
-          let d = Int(parts[2]),
-          (1...12).contains(m),
-          (1...31).contains(d) else { return nil }
-    return CivilDate(y: y, m: m, d: d)
-  }
-
-  private static func formatYMD(_ p: CivilDate) -> String {
-    String(format: "%04d-%02d-%02d", p.y, p.m, p.d)
-  }
-
-  private static func toUTCDate(_ p: CivilDate) -> Date? {
-    utcCalendar.date(from: DateComponents(year: p.y, month: p.m, day: p.d))
-  }
-
-  private static func fromUTCDate(_ date: Date) -> CivilDate {
-    let c = utcCalendar.dateComponents([.year, .month, .day], from: date)
-    return CivilDate(y: c.year ?? 1970, m: c.month ?? 1, d: c.day ?? 1)
-  }
-
-  private static func daysInMonth(year: Int, month: Int) -> Int {
-    guard let d = utcCalendar.date(from: DateComponents(year: year, month: month, day: 1)),
-          let range = utcCalendar.range(of: .day, in: .month, for: d) else { return 30 }
-    return range.upperBound - 1
-  }
-
-  private static func addDays(_ p: CivilDate, _ n: Int) -> CivilDate? {
-    guard let d = toUTCDate(p),
-          let next = utcCalendar.date(byAdding: .day, value: n, to: d) else { return nil }
-    return fromUTCDate(next)
-  }
-
-  /// 1 = Sunday ... 7 = Saturday.
-  private static func weekdayOf(_ p: CivilDate) -> Int {
-    guard let d = toUTCDate(p) else { return 1 }
-    return utcCalendar.component(.weekday, from: d)
-  }
-
-  /// ISO Monday-first offset: Mon=0, Tue=1, ..., Sat=5, Sun=6.
-  private static func isoOffset(_ weekday: Int) -> Int {
-    (weekday + 5) % 7
-  }
-
-  private static func addMonthsRaw(year: Int, month: Int, delta: Int) -> (Int, Int) {
-    let total = year * 12 + (month - 1) + delta
-    let y = Int(floor(Double(total) / 12.0))
-    let m = ((total % 12) + 12) % 12 + 1
-    return (y, m)
-  }
-
-  private static func addMonths(_ p: CivilDate, _ delta: Int, keepMonthEnd: Bool) -> CivilDate {
-    let (y, m) = addMonthsRaw(year: p.y, month: p.m, delta: delta)
-    let dim = daysInMonth(year: y, month: m)
-    if keepMonthEnd && p.d == daysInMonth(year: p.y, month: p.m) {
-      return CivilDate(y: y, m: m, d: dim)
-    }
-    return CivilDate(y: y, m: m, d: min(p.d, dim))
-  }
-
-  private static func resolveMonthDay(year: Int, month: Int, monthDay: Int) -> CivilDate? {
-    let dim = daysInMonth(year: year, month: month)
-    if monthDay == -1 { return CivilDate(y: year, m: month, d: dim) }
-    if (1...31).contains(monthDay) { return CivilDate(y: year, m: month, d: min(monthDay, dim)) }
-    return nil
-  }
-
-  private static func resolveOrdinalWeekday(year: Int, month: Int, ow: RecurrenceOrdinalWeekday) -> CivilDate? {
-    guard (1...7).contains(ow.weekday),
-          ow.ordinal == -1 || (1...4).contains(ow.ordinal) else { return nil }
-    let dim = daysInMonth(year: year, month: month)
-    if ow.ordinal == -1 {
-      let lastWd = weekdayOf(CivilDate(y: year, m: month, d: dim))
-      let back = (lastWd - ow.weekday + 7) % 7
-      return CivilDate(y: year, m: month, d: dim - back)
-    }
-    let firstWd = weekdayOf(CivilDate(y: year, m: month, d: 1))
-    let delta = (ow.weekday - firstWd + 7) % 7
-    let day = 1 + delta + (ow.ordinal - 1) * 7
-    guard day <= dim else { return nil }
-    return CivilDate(y: year, m: month, d: day)
-  }
-
-  private static func normalizeIsoWeekdays(_ weekdays: [Int]?) -> [Int] {
-    guard let weekdays, !weekdays.isEmpty else { return [] }
-    let unique = Set(weekdays.filter { (1...7).contains($0) })
-    return unique.sorted { isoOffset($0) < isoOffset($1) }
-  }
-
-  private static func advanceWeeklyByWeekdays(_ p: CivilDate, step: Int, isoOrderedWeekdays: [Int]) -> CivilDate? {
-    let curOffset = isoOffset(weekdayOf(p))
-    for w in isoOrderedWeekdays {
-      let off = isoOffset(w)
-      if off > curOffset {
-        return addDays(p, off - curOffset)
-      }
-    }
-    guard let weekMonday = addDays(p, -curOffset),
-          let nextWeekMonday = addDays(weekMonday, step * 7),
-          let first = isoOrderedWeekdays.first else { return nil }
-    return addDays(nextWeekMonday, isoOffset(first))
-  }
-
   static func nextDate(completedOn: String,
                        scheduled: String?,
                        logicalScheduled: String? = nil,
@@ -355,74 +231,24 @@ enum RecurrenceDateCalculator {
                        weekdays: [Int]? = nil,
                        monthDay: Int? = nil,
                        ordinalWeekday: RecurrenceOrdinalWeekday? = nil) -> String? {
-    guard let completed = parseYMD(completedOn) else { return nil }
-    let anchor: CivilDate
-    if afterCompletion {
-      anchor = completed
-    } else {
-      anchor = (logicalScheduled ?? scheduled).flatMap(parseYMD) ?? completed
-    }
-    let step = max(1, interval)
-    let isFixed = !afterCompletion
-    let isoWeekdays = isFixed ? normalizeIsoWeekdays(weekdays) : []
-    let fixedMonthDay = isFixed ? monthDay : nil
-    let fixedOrdinal = isFixed ? ordinalWeekday : nil
-    let keepMonthEnd = isFixed && fixedMonthDay == nil && fixedOrdinal == nil
-
-    func advance(_ p: CivilDate) -> CivilDate? {
-      switch unit {
-      case "day":
-        return addDays(p, step)
-      case "week":
-        if !isoWeekdays.isEmpty {
-          return advanceWeeklyByWeekdays(p, step: step, isoOrderedWeekdays: isoWeekdays)
-        }
-        return addDays(p, step * 7)
-      case "month":
-        if let ow = fixedOrdinal {
-          let (y, m) = addMonthsRaw(year: p.y, month: p.m, delta: step)
-          return resolveOrdinalWeekday(year: y, month: m, ow: ow)
-        }
-        if let md = fixedMonthDay {
-          let (y, m) = addMonthsRaw(year: p.y, month: p.m, delta: step)
-          return resolveMonthDay(year: y, month: m, monthDay: md)
-        }
-        return addMonths(p, step, keepMonthEnd: keepMonthEnd)
-      case "year":
-        let y = p.y + step
-        let m = p.m
-        if let ow = fixedOrdinal {
-          return resolveOrdinalWeekday(year: y, month: m, ow: ow)
-        }
-        if let md = fixedMonthDay {
-          return resolveMonthDay(year: y, month: m, monthDay: md)
-        }
-        let dim = daysInMonth(year: y, month: m)
-        return CivilDate(y: y, m: m, d: min(p.d, dim))
-      default:
-        return nil
-      }
-    }
-
-    guard var next = advance(anchor) else { return nil }
-    if !afterCompletion {
-      var guardRail = 0
-      while next <= completed {
-        guardRail += 1
-        guard guardRail <= 10_000, let advanced = advance(next) else { return nil }
-        next = advanced
-      }
-    }
-    return formatYMD(next)
+    let rule = SeptenaSharedCore.RecurrenceRule(
+      unit: unit,
+      interval: Int32(clamping: interval),
+      afterCompletion: afterCompletion,
+      weekdays: weekdays?.map { Int32(clamping: $0) },
+      monthDay: monthDay.map { Int32(clamping: $0) },
+      ordinalWeekday: ordinalWeekday.map {
+        SeptenaSharedCore.OrdinalWeekday(ordinal: Int32(clamping: $0.ordinal),
+                                         weekday: Int32(clamping: $0.weekday))
+      })
+    return SeptenaSharedCore.nextScheduledDate(completedOn: completedOn,
+                                               scheduled: scheduled,
+                                               logicalScheduled: logicalScheduled,
+                                               rule: rule)
   }
 
   static func occurrenceID(sourceTaskID: String, scheduled: String) -> String {
-    var hash: UInt64 = 14695981039346656037
-    for byte in "\(sourceTaskID)|\(scheduled)".utf8 {
-      hash ^= UInt64(byte)
-      hash = hash &* 1099511628211
-    }
-    return "recur-\(String(format: "%016llx", hash))"
+    SeptenaSharedCore.occurrenceId(sourceTaskId: sourceTaskID, scheduled: scheduled)
   }
 }
 
@@ -461,68 +287,26 @@ struct TaskReminder: Codable, Hashable, Sendable {
   }
 }
 
-/// Pure timed-reminder arithmetic and arming rules.
-/// LOCKSTEP with `backend/src/reminders.ts` and `registry/conformance/reminders.json`.
+/// Timed-reminder arithmetic and arming rules. The rules live once, in the
+/// shared Rust core (`core/crates/septena-core/src/reminders.rs`, ADR 0025);
+/// this enum only adapts Swift values to it. Vectors:
+/// `registry/conformance/reminders.json`. The backend's
+/// `backend/src/reminders.ts` is the one copy left (C3, #249).
 enum TaskReminderRules {
-  private static let utcCalendar: Calendar = {
-    var cal = Calendar(identifier: .gregorian)
-    cal.timeZone = TimeZone(secondsFromGMT: 0)!
-    return cal
-  }()
-
-  private static func parseYMD(_ ymd: String) -> Date? {
-    let prefix = String(ymd.prefix(10))
-    let parts = prefix.split(separator: "-")
-    guard parts.count == 3,
-          let y = Int(parts[0]),
-          let m = Int(parts[1]),
-          let d = Int(parts[2]),
-          (1...12).contains(m),
-          (1...31).contains(d) else { return nil }
-    return utcCalendar.date(from: DateComponents(year: y, month: m, day: d))
-  }
-
-  private static func formatYMD(_ date: Date) -> String {
-    let c = utcCalendar.dateComponents([.year, .month, .day], from: date)
-    return String(format: "%04d-%02d-%02d", c.year ?? 1970, c.month ?? 1, c.day ?? 1)
-  }
-
   static func shiftForRecurrence(sourceReminderAt: String?,
                                  sourceScheduled: String?,
                                  nextScheduled: String?) -> String? {
-    guard let src = sourceReminderAt,
-          let nextDay = nextScheduled,
-          src.count > 10 else { return nil }
-    let idx = src.index(src.startIndex, offsetBy: 10)
-    guard src[idx] == "T" else { return nil }
-    let remDayStr = String(src[..<idx])
-    let timeSuffix = String(src[idx...])
-    guard let nextDate = parseYMD(nextDay) else { return nil }
-
-    var offsetDays = 0
-    if let sched = sourceScheduled,
-       let remDate = parseYMD(remDayStr),
-       let schedDate = parseYMD(sched) {
-      offsetDays = utcCalendar.dateComponents([.day], from: schedDate, to: remDate).day ?? 0
-    }
-    guard let target = utcCalendar.date(byAdding: .day, value: offsetDays, to: nextDate) else {
-      return nil
-    }
-    return formatYMD(target) + timeSuffix
+    SeptenaSharedCore.shiftReminderForRecurrence(sourceReminderAt: sourceReminderAt,
+                                                 sourceScheduled: sourceScheduled,
+                                                 nextScheduled: nextScheduled)
   }
 
   static func shiftOnReschedule(reminderAt: String?,
                                 oldScheduled: String?,
                                 newScheduled: String?) -> String? {
-    guard let rem = reminderAt else { return nil }
-    guard let oldS = oldScheduled, let newS = newScheduled, rem.count > 10 else { return rem }
-    let idx = rem.index(rem.startIndex, offsetBy: 10)
-    guard rem[idx] == "T" else { return rem }
-    let remDay = String(rem[..<idx])
-    let oldDay = String(oldS.prefix(10))
-    let newDay = String(newS.prefix(10))
-    guard remDay == oldDay else { return rem }
-    return newDay + String(rem[idx...])
+    SeptenaSharedCore.shiftReminderOnReschedule(reminderAt: reminderAt,
+                                                oldScheduled: oldScheduled,
+                                                newScheduled: newScheduled)
   }
 
   static func shouldArm(status: String,
@@ -531,12 +315,12 @@ enum TaskReminderRules {
                         isUnratifiedProposal: Bool,
                         reminderAt: String?,
                         reminderDismissedAt: String?) -> Bool {
-    guard status == "open",
-          !isDeleted,
-          !isHeading,
-          !isUnratifiedProposal,
-          let rem = reminderAt, !rem.isEmpty,
-          reminderDismissedAt == nil else { return false }
-    return true
+    SeptenaSharedCore.shouldArmReminder(input: SeptenaSharedCore.ReminderArmInput(
+      status: status,
+      isDeleted: isDeleted,
+      isHeading: isHeading,
+      isUnratifiedProposal: isUnratifiedProposal,
+      reminderAt: reminderAt,
+      reminderDismissedAt: reminderDismissedAt))
   }
 }
