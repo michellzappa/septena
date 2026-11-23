@@ -270,3 +270,46 @@ export function searchMatch(
   if (either * 2 < words.length || either === 0) return null;
   return { score: 30 * (either / words.length) + 10 * (inTitle / words.length), matched: inTitle > 0 ? "title" : "notes" };
 }
+
+// ---- Task notes edits (tasks_update notes_append / notes_section) ----
+
+/// A short version stamp of a task's notes: FNV-1a over the text, hex. An
+/// agent passes it back as `notes_rev` so an edit made since its read is
+/// refused, never silently overwritten. Empty and absent notes share one rev.
+export function notesRev(notes: string | null | undefined): string {
+  let h = 0x811c9dc5;
+  for (const ch of notes ?? "") {
+    h ^= ch.codePointAt(0)!;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
+
+/// Add `text` on a new line at the end of the notes.
+export function appendNotes(notes: string | null | undefined, text: string): string {
+  const cur = (notes ?? "").replace(/\s+$/, "");
+  return cur.length === 0 ? text : `${cur}\n${text}`;
+}
+
+/// Replace the body under one heading line, up to the next heading. A heading
+/// line is `#`-style (`## Decisions`) or a line in capitals (`DECISIONS`),
+/// matched case-insensitively with the `#`s and a trailing colon ignored. A
+/// missing heading is added at the end as `## <heading>`.
+export function replaceNotesSection(notes: string | null | undefined, heading: string, body: string): string {
+  const isHeading = (line: string) =>
+    /^#{1,6}\s+\S/.test(line) || (/^[^a-z]*[A-Z][^a-z]*$/.test(line.trim()) && line.trim().length <= 60);
+  const key = (line: string) => line.trim().replace(/^#{1,6}\s+/, "").replace(/:$/, "").trim().toLowerCase();
+  const want = key(heading);
+  const lines = (notes ?? "").split("\n");
+  const start = lines.findIndex((l) => isHeading(l) && key(l) === want);
+  const cleanBody = body.replace(/\s+$/, "");
+  if (start < 0) {
+    const cur = (notes ?? "").replace(/\s+$/, "");
+    const section = `## ${heading.replace(/^#{1,6}\s+/, "").trim()}\n${cleanBody}`;
+    return cur.length === 0 ? section : `${cur}\n\n${section}`;
+  }
+  let end = lines.findIndex((l, i) => i > start && isHeading(l));
+  if (end < 0) end = lines.length;
+  const out = [...lines.slice(0, start + 1), ...(cleanBody ? cleanBody.split("\n") : []), ...(end < lines.length ? ["", ...lines.slice(end)] : [])];
+  return out.join("\n");
+}

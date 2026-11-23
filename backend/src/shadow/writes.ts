@@ -22,7 +22,7 @@ import {
   unknownContainerMessage,
   updateNeedsStoredSchedule,
 } from "../tools/writeTasks.js";
-import type { ConvoTurn } from "../tools/taskShared.js";
+import { type ConvoTurn, appendNotes, notesRev, replaceNotesSection } from "../tools/taskShared.js";
 
 // Task WRITE tools for the connector on api.septena.app (src/shadow/mcp.ts),
 // executed as TaskStore pushes. Same names, arguments, result shapes and error
@@ -136,6 +136,9 @@ export const zWriteArgs = {
     project: z.string().nullable().optional(),
     status: z.enum(["open", "cancelled"]).optional(),
     notes: z.string().nullable().optional(),
+    notes_append: z.string().min(1).optional(),
+    notes_section: z.object({ heading: z.string().min(1), body: z.string() }).optional(),
+    notes_rev: z.string().min(1).max(64).optional(),
     recurrence: zRecurrence.optional(),
     reminder_at: z.string().nullable().optional(),
     reminderAt: z.string().nullable().optional(),
@@ -481,6 +484,7 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
   const current = await store.readTask(input.id);
   if (!current) throw new Error(`Task not found: ${input.id}`);
   const old = current.task;
+  input = resolveNotesEdit(input, str(old.notes));
   const storedScheduled = updateNeedsStoredSchedule(input) ? (str(old.scheduled) ?? null) : undefined;
   const { fields: p, updated } = planUpdate(input, storedScheduled);
   const hasTagChange = input.tags !== undefined;
@@ -567,7 +571,26 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
 
   const results = await push(store, ctx.actor, ops);
   requireApplied(results[taskOpIdx], input.id);
-  return { id: input.id, updated };
+  return { id: input.id, updated, ...(p.notes !== undefined ? { notesRev: notesRev(clear(p.notes)) } : {}) };
+}
+
+/// Turns notes_append / notes_section into a plain `notes` write against the
+/// stored text, after the notes_rev check. Throws a conflict that carries the
+/// current notes and rev when the notes changed since the agent's read.
+function resolveNotesEdit(input: UpdateTaskInput, stored: string | undefined): UpdateTaskInput {
+  const edits = [input.notes !== undefined, input.notes_append !== undefined, input.notes_section !== undefined]
+    .filter(Boolean).length;
+  if (edits > 1) throw new Error("Pass only one of notes, notes_append and notes_section.");
+  if (input.notes_rev !== undefined && input.notes_rev !== notesRev(stored)) {
+    throw new Error(
+      `conflict: the notes changed since notes_rev ${input.notes_rev}. Nothing was written. ` +
+      `Current notesRev: ${notesRev(stored)}. Current notes:\n${stored ?? ""}`,
+    );
+  }
+  const { notes_append, notes_section, notes_rev: _rev, ...rest } = input;
+  if (notes_append !== undefined) return { ...rest, notes: appendNotes(stored, notes_append) };
+  if (notes_section !== undefined) return { ...rest, notes: replaceNotesSection(stored, notes_section.heading, notes_section.body) };
+  return rest;
 }
 
 async function completeTask(ctx: WriteContext, id: string) {
