@@ -339,6 +339,11 @@ struct TaskListView: View {
   // a `deferPush` draft row and opens the inline expand-in-place editor.
   @State private var creating = false
 
+  /// The task whose task page is open (ADR 0029, `task.open`). On iPhone the
+  /// page is pushed onto the navigation stack; on iPad and the Mac it is the
+  /// docked inspector, which follows the selection.
+  @State private var pageTaskId: String?
+
   // MARK: - Inline editing (the Reminders/Things "type-a-line" model)
   //
   // Title editing and quick-create are one behavior: an editable title field.
@@ -1042,6 +1047,23 @@ struct TaskListView: View {
         )
       }
     }
+    // iPhone: the task page is a pushed page in the one navigation stack
+    // (ADR 0024, ADR 0029). Back autosaves (the card's `.onDisappear`).
+    .navigationDestination(item: pushedPageId) { id in
+      if let task = currentTask(id: id) {
+        TaskComposerCard(
+          mode: .edit(task),
+          areas: areas,
+          projects: projects,
+          accent: theme.color(for: "tasks"),
+          presentation: .page,
+          onDone: {
+            repatchTask(id: task.id)
+            reloadOrDeferWhileEditing()
+          }
+        )
+      }
+    }
   }
 
   /// The drawer composer is Upcoming-only — every other creatable list spawns
@@ -1049,13 +1071,30 @@ struct TaskListView: View {
   /// existing task expands inline in its row (`expandedEditId`), not here.
   private var composerMode: TaskComposerCard.Mode? {
     if creating { return .create(filter) }
+    if !usesPushNavigation, let task = currentTask(id: pageTaskId) { return .edit(task) }
     return nil
+  }
+
+  /// Open the task page (`task.open`). The open inline editor folds first, so
+  /// it saves before the page reads the task.
+  private func openPage(_ task: SeptenaTask) {
+    if expandedEditId != nil { collapseEdit() }
+    if composerIsOpen { closeComposer() }
+    selection = [task.id]
+    pageTaskId = task.id
+  }
+
+  /// The pushed page on iPhone. Nil on wide screens, where the inspector hosts it.
+  private var pushedPageId: Binding<String?> {
+    Binding(get: { usesPushNavigation ? pageTaskId : nil },
+            set: { pageTaskId = $0 })
   }
   /// True while the create drawer is up. (Editing is inline — see
   /// `expandedEditId` / `listInputActive`.)
   private var composerIsOpen: Bool { creating }
   private var composerBinding: Binding<Bool> {
-    Binding(get: { composerIsOpen }, set: { if !$0 { closeComposer() } })
+    Binding(get: { composerIsOpen || (!usesPushNavigation && pageTaskId != nil) },
+            set: { if !$0 { closeComposer(); pageTaskId = nil } })
   }
   private func closeComposer() {
     creating = false
@@ -1465,6 +1504,11 @@ struct TaskListView: View {
     // arrow keys are suppressed (`listInputActive`), so selection only moves via
     // an explicit click on a different row.
     .onChange(of: selection) { _, sel in
+      // The docked task page follows the selection (ADR 0029).
+      if !usesPushNavigation, pageTaskId != nil, sel.count == 1, let id = sel.first,
+         currentTask(id: id) != nil {
+        pageTaskId = id
+      }
       #if os(iOS)
       if sel.isEmpty && isTouchSelecting {
         isTouchSelecting = false
@@ -4042,7 +4086,7 @@ struct TaskListView: View {
         onDuplicate: { target in duplicate(target.ids) },
         onSelect: allowsTouchMultiSelect && !touchSelectionActive
           ? { task in beginTouchSelection(task.id) } : nil,
-        onOpenDetail: { task in beginEdit(task) },
+        onOpenDetail: { task in openPage(task) },
         onApplySuggestion: applySuggestion,
         onMoveToToday: { ids, today in
           if today {

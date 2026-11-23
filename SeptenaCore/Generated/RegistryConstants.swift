@@ -1439,8 +1439,8 @@ enum RegistrySurfaces {
     RegistryTaskPageBlock(id: "taskPage.header", kind: .header, depths: [.inline, .page], label: nil, attributeId: nil, featureId: "lists.today", editOnly: false),
     RegistryTaskPageBlock(id: "taskPage.notes", kind: .notes, depths: [.inline, .page], label: RegistryL10n.t("Notes"), attributeId: "notes", featureId: "task.notes", editOnly: false),
     RegistryTaskPageBlock(id: "taskPage.attributes", kind: .attributes, depths: [.inline, .page], label: nil, attributeId: nil, featureId: "lists.today", editOnly: false),
-    RegistryTaskPageBlock(id: "taskPage.checklist", kind: .checklist, depths: [.page], label: RegistryL10n.t("Checklist"), attributeId: "checklist", featureId: "task.checklists", editOnly: true),
-    RegistryTaskPageBlock(id: "taskPage.attachments", kind: .attachments, depths: [.page], label: RegistryL10n.t("Attachments"), attributeId: "attachments", featureId: "task.attachments", editOnly: true),
+    RegistryTaskPageBlock(id: "taskPage.checklist", kind: .checklist, depths: [.inline, .page], label: RegistryL10n.t("Checklist"), attributeId: "checklist", featureId: "task.checklists", editOnly: true),
+    RegistryTaskPageBlock(id: "taskPage.attachments", kind: .attachments, depths: [.inline, .page], label: RegistryL10n.t("Attachments"), attributeId: "attachments", featureId: "task.attachments", editOnly: true),
     RegistryTaskPageBlock(id: "taskPage.conversation", kind: .conversation, depths: [.page], label: RegistryL10n.t("Conversation"), attributeId: nil, featureId: "ai.discuss", editOnly: true),
     RegistryTaskPageBlock(id: "taskPage.history", kind: .history, depths: [.page], label: RegistryL10n.t("History"), attributeId: nil, featureId: "task.history", editOnly: true),
   ]

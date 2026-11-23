@@ -23,8 +23,8 @@ First cut:
 | header | header (checkbox, title) | yes | yes |
 | notes | notes | yes | yes |
 | attributes | attributes (pills inline, rows on the page) | yes | yes |
-| checklist | checklist | no | yes |
-| attachments | attachments | no | yes |
+| checklist | checklist | yes (from its pill) | yes |
+| attachments | attachments | yes (from its pill) | yes |
 | conversation | conversation | no | yes |
 | history | history | no | yes |
 

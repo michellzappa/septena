@@ -62,7 +62,9 @@ struct TaskComposerCard: View {
   /// chrome. `.inline` is the Things-style expand-in-place editor: the bare form
   /// rendered straight into the expanded task row — no scaffold, no inner
   /// ScrollView (the list scrolls), autosaving on collapse.
-  enum Presentation { case drawer, inline }
+  /// `.page` is the task page pushed onto the iPhone navigation stack (ADR
+  /// 0029): every page block, no Cancel/Save chrome, autosaving on Back.
+  enum Presentation { case drawer, inline, page }
 
   let mode: Mode
   let areas: [Area]
@@ -355,6 +357,65 @@ struct TaskComposerCard: View {
         #endif
     case .drawer:
       drawerBody
+    case .page:
+      ScrollView {
+        formBody
+      }
+      .scrollDismissesKeyboard(.interactively)
+      .navigationTitle(headerTitle)
+      .septenaInlineTitle()
+    }
+  }
+
+  /// The task page depth this host shows (ADR 0029): the row editor is the
+  /// quick edit, the drawer and the pushed page are the full page.
+  private var pageDepth: RegistryTaskPageDepth { presentation == .inline ? .inline : .page }
+
+  /// The blocks to render, in registry order. A create, or an inline create
+  /// held as a placeholder row, has no saved task, so `editOnly` blocks drop.
+  private var pageBlocks: [RegistryTaskPageBlock] {
+    RegistrySurfaces.taskPageBlocks(pageDepth, on: RegistryPlatform.current,
+                                    isEditing: editingTask != nil && !deferredCreate)
+  }
+
+  /// One renderer per block kind. Each branch is type-erased: a large
+  /// `@ViewBuilder` switch nests into one deep generic type, which overflowed
+  /// the iOS main-thread stack at launch once before (AGENTS.md).
+  private func blockView(_ block: RegistryTaskPageBlock, kinds: Set<RegistryTaskPageBlockKind>) -> AnyView {
+    switch block.kind {
+    case .header:
+      return AnyView(EmptyView()) // drawn above the indented column, see `formBody`
+    case .notes:
+      return AnyView(VStack(alignment: .leading, spacing: presentation == .inline ? 10 : 14) {
+        notesField
+        quickEntryChips
+        pastedImagesStrip
+      })
+    case .attributes:
+      // The rail hosts the checklist and attachments panels; their blocks
+      // gate them (`kinds`), so the registry decides where they show.
+      return AnyView(TaskAttributeBar(
+        draft: $draft,
+        areas: areas,
+        projects: projects,
+        accent: accent,
+        neutral: presentation == .inline,
+        focus: $focus,
+        activate: $pendingPillActivate,
+        discussTask: editingTask,
+        discussVisible: $discussKickoffVisible,
+        moveFocus: { moveFocus(forward: $0) },
+        showsChecklist: kinds.contains(.checklist),
+        showsAttachments: kinds.contains(.attachments)
+      ))
+    case .checklist, .attachments:
+      return AnyView(EmptyView()) // rendered by the attribute rail, see `.attributes`
+    case .conversation:
+      guard let task = editingTask else { return AnyView(EmptyView()) }
+      return AnyView(ConversationSection(task: task, accent: accent))
+    case .history:
+      guard let task = editingTask else { return AnyView(EmptyView()) }
+      return AnyView(TaskHistorySection(taskID: task.id))
     }
   }
 
@@ -399,35 +460,19 @@ struct TaskComposerCard: View {
     // inset); the drawer keeps a roomier 16pt card. Pills/conversation indent a
     // touch past the checkbox so they hang off the title, Things-style.
     let inline = presentation == .inline
+    // The blocks come from the registry (`surfaces.json` `taskPage`, ADR 0029):
+    // their order and the depth each shows at. Inline is the quick edit; the
+    // drawer and the pushed page add the conversation and the history.
+    let blocks = pageBlocks
+    let kinds = Set(blocks.map(\.kind))
     return VStack(alignment: .leading, spacing: inline ? 10 : 14) {
-      titleNotesCard
+      if kinds.contains(.header) { titleNotesCard }
 
-      Group {
-        notesField
-
-        quickEntryChips
-
-        pastedImagesStrip
-
-        TaskAttributeBar(
-          draft: $draft,
-          areas: areas,
-          projects: projects,
-          accent: accent,
-          neutral: inline,
-          focus: $focus,
-          activate: $pendingPillActivate,
-          discussTask: editingTask,
-          discussVisible: $discussKickoffVisible,
-          moveFocus: { moveFocus(forward: $0) }
-        )
-
-        // Edit mode only — a not-yet-created task has no id/conversation.
-        // docs/TASK_CONVERSATIONS_PHASE1.md.
-        if let task = editingTask {
-          ConversationSection(task: task, accent: accent)
-          // Not for an inline create held as a placeholder row: it has no log.
-          if !deferredCreate { TaskHistorySection(taskID: task.id) }
+      VStack(alignment: .leading, spacing: inline ? 10 : 14) {
+        // Header draws above this column; checklist and attachments draw
+        // inside the attribute rail.
+        ForEach(blocks.filter { ![.header, .checklist, .attachments].contains($0.kind) }) { block in
+          blockView(block, kinds: kinds)
         }
       }
       // Indent the rail/conversation to align with the title text (past the

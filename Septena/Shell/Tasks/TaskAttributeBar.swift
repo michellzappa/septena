@@ -35,6 +35,10 @@ struct TaskAttributeBar: View {
   /// The composer's Tab loop, handed to the checklist so arrows and Tab walk
   /// out of the steps the same way they walk between them.
   var moveFocus: ((Bool) -> Void)? = nil
+  /// The task page blocks this host shows (ADR 0029). Off hides the pill and
+  /// its panel.
+  var showsChecklist: Bool = true
+  var showsAttachments: Bool = true
 
   /// The electives. Order, label and icon come from the registry
   /// (`registry/surfaces.json` `taskAttributes`, ADR 0020) so the AppKit
@@ -106,7 +110,8 @@ struct TaskAttributeBar: View {
        neutral: Bool = false, focus: FocusState<TaskEditFocus?>.Binding,
        activate: Binding<Attribute?>, discussTask: SeptenaTask? = nil,
        discussVisible: Binding<Bool> = .constant(false),
-       moveFocus: ((Bool) -> Void)? = nil) {
+       moveFocus: ((Bool) -> Void)? = nil,
+       showsChecklist: Bool = true, showsAttachments: Bool = true) {
     _draft = draft
     self.areas = areas
     self.projects = projects
@@ -117,6 +122,8 @@ struct TaskAttributeBar: View {
     self.discussTask = discussTask
     _discussVisible = discussVisible
     self.moveFocus = moveFocus
+    self.showsChecklist = showsChecklist
+    self.showsAttachments = showsAttachments
     _discussStarted = State(initialValue: discussTask?.conversation.hasStarted ?? true)
   }
 
@@ -126,7 +133,7 @@ struct TaskAttributeBar: View {
     return VStack(alignment: .leading, spacing: 10) {
       // Steps sit open under the notes whenever the task has any, so opening a
       // task shows its checklist without a tap. The pill only starts one.
-      if let task = discussTask, checklistOpened || (edit?.stepsTotal ?? 0) > 0 {
+      if showsChecklist, let task = discussTask, checklistOpened || (edit?.stepsTotal ?? 0) > 0 {
         TaskChecklistPanel(taskID: task.id, addRequest: checklistAddRequest,
                            focus: $focus, moveFocus: moveFocus)
           .transition(.opacity.combined(with: .move(edge: .top)))
@@ -190,6 +197,8 @@ struct TaskAttributeBar: View {
   /// Discuss only shows before a conversation exists.
   private func shows(_ attr: Attribute) -> Bool {
     if attr == .discuss { return showsDiscuss }
+    if attr == .checklist && !showsChecklist { return false }
+    if attr == .attachments && !showsAttachments { return false }
     return !attr.editOnly || discussTask != nil
   }
 
