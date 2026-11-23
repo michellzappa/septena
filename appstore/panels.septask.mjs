@@ -38,7 +38,9 @@ const VISUAL = {
   // proposal in the Inbox, has a ring. Message text stays here: it is panel
   // art, not store copy, and it matches the proposal on the today scene.
   "from-agent":   {
-    fruit: "haskap", texture: "topography",
+    // Persimmon, the photo's glow on panel 1, so the first two panels match
+    // (mz, 2026-11-23); blue stays for the open panel.
+    fruit: "persimmon", texture: "topography",
     shot: { width: 0.62, ring: { element: "task-proposal" } },
     chat: { top: 730, you: "Remind me to check the download links before the launch.", agent: "Done. It’s in your Septena Inbox." },
   },
