@@ -280,7 +280,7 @@ api.get("/sync/pull", async (c) => {
   ));
 });
 
-api.get("/sync/ws", async (c) => {
+async function liveSocket(c: Ctx) {
   if (c.req.header("Upgrade") !== "websocket") return c.json({ error: "expected_websocket" }, 426);
   // Without live sync the app polls `/sync/pull` (spec §3).
   const plan = c.get("plan");
@@ -289,7 +289,9 @@ api.get("/sync/ws", async (c) => {
     if (decide(c.env, c.get("userId"), "sync_live", plan, breach) === "block") return limitRefusal(c, "live_sync_not_in_plan", breach);
   }
   return storeFor(c.env, c.get("userId")).fetch(c.req.raw);
-});
+}
+
+api.get("/sync/ws", liveSocket);
 
 // ---- change history (who changed what, with before/after values) ----
 
@@ -434,6 +436,10 @@ api.delete("/devices/push-token", async (c) => {
 
 // ---- task views and verbs for thin clients (src/api/tasksRest.ts) ----
 
+// The same socket for a companion device (docs/COMPANION_DEVICES_SPEC.md §4):
+// it has no task store, so it takes no sync device slot. It carries a revision
+// number only.
+api.get("/tasks/live", liveSocket);
 api.route("/tasks", tasksRest);
 
 api.post("/pair/approve", async (c) => {

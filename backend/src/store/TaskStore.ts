@@ -1213,7 +1213,7 @@ export class TaskStore extends DurableObject<Env> {
 
   /// Open non-heading tasks awaiting human review (`convos.endState = 'needs_verify'`),
   /// newest hand-off first. Mirrors `TaskConvo.needsHumanReview` in SeptenaCore.
-  readReviewTasks(limit: number): { rows: Row[]; notes: Record<string, string | null>; total: number } {
+  readReviewTasks(limit: number): { rows: Row[]; notes: Record<string, string | null>; ats: Record<string, string | null>; total: number } {
     const spec: EntitySpec = ENTITIES.task;
     const n = Math.min(Math.max(limit, 1), 500);
     const where =
@@ -1223,16 +1223,18 @@ export class TaskStore extends DurableObject<Env> {
       `SELECT COUNT(*) AS n FROM tasks t JOIN convos c ON c.id = t.id WHERE ${where}`,
     ).one().n;
     const raw = this.sql.exec(
-      `SELECT t.*, c.endStateNote AS _reviewNote FROM tasks t JOIN convos c ON c.id = t.id WHERE ${where} ORDER BY c.updatedAt DESC, c.rev DESC LIMIT ?`,
+      `SELECT t.*, c.endStateNote AS _reviewNote, c.endStateAt AS _reviewAt FROM tasks t JOIN convos c ON c.id = t.id WHERE ${where} ORDER BY c.updatedAt DESC, c.rev DESC LIMIT ?`,
       n,
     ).toArray();
+    const ats: Record<string, string | null> = {};
     const notes: Record<string, string | null> = {};
     const rows: Row[] = raw.map((r) => {
       const id = r.id as string;
       notes[id] = (r._reviewNote as string | null | undefined) ?? null;
+      ats[id] = (r._reviewAt as string | null | undefined) ?? null;
       return decodeRow(spec, r) as Row;
     });
-    return { rows, notes, total };
+    return { rows, notes, ats, total };
   }
 
   /// One live task with its conversation row and turns (oldest first).

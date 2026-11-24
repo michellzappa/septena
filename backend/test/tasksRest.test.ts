@@ -94,4 +94,70 @@ describe("tasks REST surface (desk orb)", () => {
     const out = clientTask({ id: "t1", title: "Draft", reviewNote: "Drafted the reply; check the tone." } as never, new Map());
     assert.equal(out.reviewNote, "Drafted the reply; check the tone.");
   });
+
+  it("carries when the agent handed the task over", async () => {
+    const { store, rpc } = await harness();
+    const withReview = { ...rpc, readReviewTasks: async (n: number) => store.readReviewTasks(n) };
+    store.push([
+      { clientOpId: "r1", op: "upsert", entity: "task", id: "task-r", fields: { title: "Draft", status: "open" } },
+      { clientOpId: "r2", op: "upsert", entity: "convo", id: "task-r", fields: { assignee: "claude", endState: "needs_verify", endStateNote: "Check it" } },
+    ], "app:test");
+    const { listTasks } = await import("../src/shadow/mcp.ts");
+    const { clientTask } = await import("../src/api/tasksRest.ts");
+    const list = await listTasks(withReview as never, "UTC", "review", 10);
+    const out = clientTask(list.tasks[0] as never, new Map());
+    assert.equal(out.reviewNote, "Check it");
+    assert.ok(Number.isFinite(Date.parse(out.reviewAt ?? "")));
+  });
+
+  it("added view: newest first, names the agent, skips imports, repeats, old and untitled rows", async () => {
+    const { addedTasks } = await import("../src/api/tasksRest.ts");
+    const now = Date.parse("2026-11-24T12:00:00Z");
+    const ago = (min: number) => new Date(now - min * 60_000).toISOString();
+    const row = (id: string, min: number, extra: object = {}) => ({ id, title: `Task ${id}`, status: "open", createdAt: ago(min), source: "app", notes: "private", ...extra });
+    const { tasks, total } = addedTasks([
+      row("mine", 10),
+      row("agent", 2, { source: "mcp", sourceClient: "Codex" }),
+      row("agent2", 3, { source: "mcp", sourceClient: null }),
+      row("things", 1, { source: "things" }),
+      row("import", 1, { source: "import:todoist" }),
+      row("repeat", 1, { recurrenceSeriesID: "mine" }),
+      row("seriesHead", 20, { recurrenceSeriesID: "seriesHead" }),
+      row("old", 25 * 60),
+      row("draft", 1, { title: " " }),
+      row("faded", 1, { fadedAt: ago(0) }),
+      row("undated", 1, { createdAt: null }),
+    ] as never[], new Map(), now);
+    assert.deepEqual(tasks.map((t) => t.id), ["agent", "agent2", "mine", "seriesHead"]);
+    assert.equal(total, 4);
+    assert.deepEqual([tasks[0].addedBy, tasks[0].agentName], ["agent", "Codex"]);
+    assert.equal(tasks[1].agentName, "Claude");
+    assert.deepEqual([tasks[2].addedBy, tasks[2].agentName], ["you", undefined]);
+    assert.ok(tasks.every((t) => t.notes === undefined));
+  });
+
+  it("a person completing a Claude-assigned repeating task starts the next occurrence (#423)", async () => {
+    const { store, rpc } = await harness();
+    const { runWriteTool } = await import("../src/shadow/writes.ts");
+    const readChecklistItems = async (id: string) => store.readChecklistItems(id);
+    const ctxStore = { ...rpc, readChecklistItems } as never;
+    store.push([
+      {
+        clientOpId: "c1", op: "upsert", entity: "task", id: "weekly-1",
+        fields: { title: "Weekly report", status: "open", scheduled: "2026-11-23", recurrenceUnit: "week", recurrenceInterval: 1 },
+      },
+      { clientOpId: "c2", op: "upsert", entity: "convo", id: "weekly-1", fields: { assignee: "claude", endState: "needs_verify" } },
+    ], "app:test");
+    const agent = (await runWriteTool({ store: ctxStore, timeZone: "UTC" }, "tasks_complete", { id: "weekly-1" })) as { reason?: string };
+    assert.equal(agent.reason, "human_accepts");
+    assert.equal(store.readTasks("open", 10).rows.length, 1, "a refused agent leaves no orphan occurrence");
+    const done = (await runWriteTool(
+      { store: ctxStore, timeZone: "UTC", actor: "app:septask-watch" }, "tasks_complete", { id: "weekly-1" },
+    )) as { status?: string; nextOccurrence?: { id: string } };
+    assert.equal(done.status, "done");
+    assert.ok(done.nextOccurrence, "the series goes on");
+    const open = store.readTasks("open", 10).rows;
+    assert.equal(open.length, 1);
+    assert.equal(open[0].id, done.nextOccurrence!.id);
+  });
 });
