@@ -1,0 +1,9 @@
+models/
+renders/
+screens/
+*.blend
+*.blend1
+*.glb
+*.gltf
+*.png
+*.jpg
