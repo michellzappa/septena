@@ -229,10 +229,13 @@ for (const device of activeDevices()) {
       const m = shotElements(device, panel.shot.src, panel.shot.appearance, panel.shot.accent);
       // An entry is a row id, or { id, icon } when the style draws a symbol.
       panel.shot.incoming = { screenWidth: m.width, style: panel.shot.incomingStyle ?? "pill", rows: await Promise.all(panel.shot.incoming.map(async (entry) => {
-        const { id, icon } = typeof entry === "string" ? { id: entry } : entry;
+        const { id, icon, y, side, over } = typeof entry === "string" ? { id: entry } : entry;
+        const node = icon && await lucideNode(icon, `${device.key}/${panel.id}`);
+        // An entry without a row id is a free symbol at a screen height y (points).
+        if (!id) return { frame: [0, y, 0, 0], label: icon, node, side, over };
         const el = m?.elements.find((e) => e.id === id);
         if (!el) throw new Error(`${device.key}/${panel.id}: incoming element "${id}" is not on screen ${panel.shot.src}`);
-        return { frame: el.frame, label: el.label.split("\n")[0], node: icon && await lucideNode(icon, `${device.key}/${panel.id}`) };
+        return { frame: el.frame, label: el.label.split("\n")[0], node, side, over };
       })) };
     }
     if (panel.shot?.callout) {

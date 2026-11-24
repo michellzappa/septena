@@ -83,14 +83,20 @@ const VISUAL = {
   // No other app is named on the panel (mz, 2026-11-23).
   "move-in":      {
     fruit: "tamarillo", texture: "topography",
-    // Tasks arriving from your other app: copies of four rows slide in from
-    // both edges onto their own rows. Same centred phone as every panel.
+    // Symbols for the tasks arriving from your other app (mz, 2026-11-24):
+    // one per row at its height, plus free ones above and below. Some slide
+    // in under the phone, some over it, each with a fading trail.
     shot: {
-      incomingStyle: "pill",
+      incomingStyle: "icons",
       incoming: [
-        { id: "task-reply", icon: "mail" }, { id: "task-dentist", icon: "calendar" },
-        { id: "task-receipts", icon: "receipt" }, { id: "task-brief", icon: "file-text" },
-        { id: "task-photos", icon: "image" },
+        { icon: "bell", y: 140, side: "left", over: true },
+        { icon: "repeat", y: 175, side: "right", over: false },
+        { id: "task-reply", icon: "mail", side: "left", over: false },
+        { id: "task-dentist", icon: "calendar", side: "right", over: true },
+        { id: "task-receipts", icon: "receipt", side: "left", over: true },
+        { id: "task-brief", icon: "file-text", side: "right", over: false },
+        { id: "task-photos", icon: "image", side: "left", over: false },
+        { icon: "tag", y: 560, side: "right", over: false },
       ],
     },
     card: { kind: "section", page: "import_export", section: "move_in", top: 2160 },

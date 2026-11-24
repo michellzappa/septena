@@ -164,16 +164,19 @@ function incoming(inc, { w, pad, tint, margin }) {
       if (!r.node) throw new Error(`incoming icons: row "${r.label}" has no icon`);
       const [, y, , h] = r.frame;
       const top = pad + (y + h / 2) * k;
-      const left = i % 2 === 0;
+      const left = r.side ? r.side === "left" : i % 2 === 0;
+      const over = r.over ?? i % 2 === 1;
       const tilt = (left ? -1 : 1) * (6 + (i % 3) * 3);
-      // The tile closest to the phone tucks 40% under its edge; the trail
-      // tiles sit further out, smaller and fainter.
-      const steps = [{ out: 0.6, scale: 1, alpha: 1 }, { out: 1.55, scale: 0.74, alpha: 0.5 }, { out: 2.3, scale: 0.52, alpha: 0.22 }];
+      // A tile under the phone tucks 40% behind its edge. A tile over the
+      // phone sits across the edge, already arriving. The trail tiles sit
+      // further out, smaller and fainter.
+      const first = over ? -0.2 : -0.38;
+      const steps = [{ out: first, scale: 1, alpha: 1 }, { out: 0.8, scale: 0.74, alpha: 0.5 }, { out: 1.55, scale: 0.52, alpha: 0.22 }];
       return steps.map((st, j) => {
         const size = Math.round(S * st.scale);
-        const off = Math.round(S * st.out); // distance of the tile's centre outside the phone edge
+        const off = Math.round(S * st.out + size / 2); // the tile centre, outside the phone edge
         const x = left ? `left:${-off - size / 2}px` : `right:${-off - size / 2}px`;
-        return `<div style="position:absolute; z-index:0; ${x}; top:${top}px; width:${size}px; height:${size}px; transform:translateY(-50%) rotate(${tilt}deg); opacity:${st.alpha}; display:flex; align-items:center; justify-content:center; background:${deep}; border-radius:${Math.round(size * 0.27)}px; box-shadow:0 0 0 ${Math.max(2, Math.round(4 * st.scale))}px rgb(255 255 255 / .9), 0 ${Math.round(24 * st.scale)}px ${Math.round(50 * st.scale)}px rgb(0 0 0 / .3);">${j === 0 || st.alpha > 0.3 ? glyph(r.node, Math.round(size * 0.52)) : ""}</div>`;
+        return `<div style="position:absolute; z-index:${over && j === 0 ? 4 : 0}; ${x}; top:${top}px; width:${size}px; height:${size}px; transform:translateY(-50%) rotate(${tilt}deg); opacity:${st.alpha}; display:flex; align-items:center; justify-content:center; background:${deep}; border-radius:${Math.round(size * 0.27)}px; box-shadow:0 0 0 ${Math.max(2, Math.round(4 * st.scale))}px rgb(255 255 255 / .9), 0 ${Math.round(24 * st.scale)}px ${Math.round(50 * st.scale)}px rgb(0 0 0 / .3);">${st.alpha > 0.3 ? glyph(r.node, Math.round(size * 0.52)) : ""}</div>`;
       }).join("");
     }).join("");
   }
