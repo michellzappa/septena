@@ -1,6 +1,6 @@
 # Companion devices
 
-Status: proposal (2026-11-24). Rests on ADR 0034 and ADR 0035 (both proposed).
+Status: building (2026-11-24; CD0, CD1 and CD3 built). Rests on ADR 0034 and ADR 0035 (both proposed).
 This spec is the backend contract. The desk orb's firmware and its own roadmap
 are in `michellzappa/tinyseptena` (private).
 
@@ -23,42 +23,35 @@ what the device can do. Devices & Access lists the session.
 An orb that is already signed in keeps its full session until it signs in
 again, so the release notes say to sign it out once.
 
-### 2. Needs-you feed
+### 2. What waits for the user
 
-`GET /v1/needs-you`: one list, newest first, of everything that waits for the
-user.
+Built as two views of `GET /v1/tasks`, newest first, so a device reads them
+like every other list. A companion response carries no task notes in the
+questions and added views.
 
-| Field | Meaning |
-|---|---|
-| `kind` | `review` or `question` |
-| `key` | Stable for one request, new when the same task asks again. Review: task id and `endStateAt`. Question: task id and turn seq. |
-| `task` | id, title, area, project, as in `clientTask`, no notes |
-| `text` | `reviewNote`, or the turn's `question`. Cut at a length the response states. |
-| `options` | Question only: the turn's options, in order |
-| `at` | `endStateAt` or the turn's time |
+- `view=review`: `reviewNote` (what to check) and `reviewAt` (when it was
+  handed over).
+- `view=questions`: open tasks whose last turn is an agent's question with
+  options (`TaskStore.readOpenQuestions`, the rule of `awaitsHuman`). Each has
+  `question`, `options` and `turnSeq`. A stopped task is not in it.
 
-A question is in the list when the last turn is a provider turn with options
-(`TaskStore.awaitsHuman`). One server function decides both, and the apps'
-counts must agree with it. A task can be in Review and have an open question:
-the question wins, one row.
+A request is identified by the task id with `reviewAt`, or the task id with
+`turnSeq`. That is what makes arrival reliable: a task sent back and handed
+over again between two reads has a new `reviewAt`.
 
-The `key` is what makes arrival reliable. A device that polls sees that a key is
-new. Without it, a task sent back and handed over again between two polls looks
-unchanged.
+### 3. Answer, accept, send back
 
-### 3. Answer and send back
+- `POST /v1/tasks/:id/answer` with `inReplyTo` (the `turnSeq`) and `option` (its
+  index) or `chosen` (its text). The turn takes the question's own step.
+- `POST /v1/tasks/:id/accept` with an optional `reviewAt`. Same effect as Accept
+  in the apps: complete, start the next occurrence of a repeat, and acknowledge
+  a task an agent added.
+- `POST /v1/tasks/:id/send_back` with an optional `note` and `reviewAt`. Same
+  effect as Send back in the apps. Without a note the agent reads "Sent back
+  without a note."
 
-- `POST /v1/tasks/:id/answer` with `key` and the option's index or text. It
-  appends the same user turn as the apps. A stale key (already answered, or a
-  newer question) is refused as `409 stale`, and the device reloads.
-- `POST /v1/tasks/:id/accept` with `key`. `complete` today accepts a task
-  without checking which hand-off the user saw. It also skips the next
-  occurrence of a Claude-assigned repeating task (#423), and the apps
-  acknowledge an agent-made task on Accept. The new verb does all of it.
-- `POST /v1/tasks/:id/send_back` with `key` and an optional note. Same effect as
-  the apps' Send back.
-
-All three are idempotent on the key, because a device on Wi-Fi retries.
+A request that is no longer the open one is refused with `422` and
+`reason: "stale"`. A repeat of an answer or an accept that landed returns `200`.
 
 ### 4. Live nudge
 
@@ -93,10 +86,10 @@ list: nobody added it. Nor is an import.
 
 | Phase | What | Needs |
 |---|---|---|
-| CD0 (#430) | Added feed | nothing |
-| CD1 (#424) | Needs-you feed, `accept` / `send_back` / `answer` | #423 |
+| CD0 (#430) | Added feed | done |
+| CD1 (#424) | Questions view, `accept` / `send_back` / `answer` | done |
 | CD2 (#358) | Companion scope, device list | ADR 0034 accepted |
-| CD3 (#425) | Live nudge | CD2 |
+| CD3 (#425) | Live nudge | done, before CD2: open to every session |
 | CD4 (#426) | Voice transcription | ADR 0009, ADR 0035, CD2 |
 
 CD2 gates any release outside mz's desk.

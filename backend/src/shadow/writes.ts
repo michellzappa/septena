@@ -59,7 +59,7 @@ const ORDER_GAP = 1024;
 /// The DO's methods as plain async calls. Typed from TaskStore's own
 /// declarations: the generated RPC stub type recurses too deep on JSON rows.
 type StoreMethod =
-  | "readTasks" | "readReviewTasks" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates" | "readTaskLinks"
+  | "readTasks" | "readReviewTasks" | "readOpenQuestions" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates" | "readTaskLinks"
   | "readTaskRefs" | "findByRef" | "newRefId"
   | "readChecklistItems" | "readChecklistItem" | "readChecklistCounts"
   | "readTags" | "readTagByName"
@@ -998,6 +998,30 @@ async function threadAppend(
   requireApplied(results[0], input.id);
   const r = results[0];
   return { id: input.id, seq: r.status === "applied" ? r.seq : undefined };
+}
+
+/// The app's Send back (`TasksBackend.sendBackConvo`): the user's note as a
+/// turn, the task open again and back with the agent. One push.
+export async function sendBackReview(ctx: WriteContext, id: string, note: string): Promise<{ id: string; seq?: number }> {
+  const results = await push(ctx.store, ctx.actor, [
+    { op: "appendTurn", taskId: id, turn: { role: "user", step: "work", note, ts: new Date().toISOString() } },
+    { op: "upsert", entity: "convo", id, fields: { endState: "open", endStateNote: null, stoppedAt: null, assignee: "claude" } },
+  ]);
+  requireApplied(results[0], id);
+  requireApplied(results[1], id);
+  const r = results[0];
+  return { id, seq: r.status === "applied" ? r.seq : undefined };
+}
+
+/// The app's Accept on a review: complete the task, then acknowledge one an
+/// agent added (`TasksBackend.acknowledge`).
+export async function acceptReview(ctx: WriteContext, id: string): Promise<object> {
+  const before = await ctx.store.readTask(id);
+  const done = await completeTask(ctx, id);
+  if (before?.task.source === "mcp" && !before.task.acknowledgedAt) {
+    await push(ctx.store, ctx.actor, [{ op: "upsert", entity: "task", id, fields: { acknowledgedAt: new Date().toISOString() } }]);
+  }
+  return done;
 }
 
 async function writeConvo(ctx: WriteContext, id: string, fields: Record<string, unknown>): Promise<void> {
