@@ -1,4 +1,5 @@
 import { DOMAIN_RULES, VIEW_ALIASES } from "../generated/registries.js";
+import { taskViewMembership, type CoreMembership, type CoreTask } from "../core/index.js";
 
 // Pure task logic shared by the live CloudKit tools (listTasks.ts,
 // writeTasks.ts) and the read-only task-backend preview (src/shadow/). No
@@ -37,6 +38,9 @@ export interface TaskOut {
   // Row shape: "heading" = a project section divider, not a task. Filtered out
   // of every view (mirrors iOS TaskEntity.isHeading). Absent = task.
   kind?: string;
+  // Set when the task has faded (docs/TASK_FADE_SPEC.md §4). A faded task
+  // is in no list view, as in the apps.
+  fadedAt?: string;
   // Emitted in the SAME shape tasks_create/tasks_update accept, so a read
   // round-trips into a write unchanged.
   recurrence?: {
@@ -128,112 +132,111 @@ export function normalizeView(view: unknown): TaskView {
 // Agent-cue decay window — generated from `registry/rules.json` (ADR 0015).
 export const CUE_DECAY_MS = DOMAIN_RULES.cueDecayDays * 24 * 60 * 60 * 1000;
 
-/// THE Inbox rule — mirrors SeptenaCore `TaskInbox` (Models.swift); keep the
-/// two in lockstep. Inbox = open, not deleted, not a heading, no area, no
-/// project. Deleted rows never reach these helpers (the readers drop them).
-/// Deleting an area or project never sends tasks here: the deleting device
-/// moves them to Recently Deleted.
+/// List membership is the shared core's (`views.rs`, ADR 0025 C3 #249): the
+/// same rule the apps run, verified by `registry/conformance/task-views.json`.
+/// These helpers only map a row into the core's snapshot and read one field.
+/// Deleted rows never reach them (the readers drop them).
+
+/// The row as the core reads it.
+export function coreTask(t: TaskOut): CoreTask {
+  return {
+    id: t.id,
+    title: t.title,
+    status: t.status,
+    kind: t.kind ?? null,
+    area: t.area ?? null,
+    project: t.project ?? null,
+    created: t.created ?? null,
+    createdAt: t.createdAt !== undefined ? new Date(t.createdAt).toISOString() : null,
+    scheduled: t.scheduled ?? null,
+    deadline: t.deadline ?? null,
+    today: t.today,
+    todaySetOn: t.todaySetOn ?? null,
+    source: t.source ?? null,
+    acknowledgedAt: t.acknowledgedAt !== undefined ? new Date(t.acknowledgedAt).toISOString() : null,
+    starred: t.starred === true,
+    recurrenceUnit: t.recurrence?.unit ?? null,
+    recurrenceAfterCompletion: t.recurrence ? t.recurrence.after_completion : null,
+    fadedAt: t.fadedAt ?? null,
+    startTime: t.startTime ?? null,
+    durationMinutes: t.durationMinutes ?? null,
+    timeZone: t.timeZone ?? null,
+    reminderAt: t.reminderAt ?? null,
+    reminderSnoozedUntil: t.reminderSnoozedUntil ?? null,
+  };
+}
+
+// One core call per row, day and instant: a list request asks several
+// questions of each row.
+const memo = new WeakMap<TaskOut, { key: string; m: CoreMembership }>();
+
+/// The core's membership of one row on `today` at `nowMs`.
+export function membership(t: TaskOut, today: string, nowMs: number): CoreMembership {
+  const key = `${today}|${nowMs}`;
+  const hit = memo.get(t);
+  if (hit && hit.key === key) return hit.m;
+  const m = taskViewMembership(coreTask(t), today, new Date(nowMs).toISOString());
+  memo.set(t, { key, m });
+  return m;
+}
+
+
+/// No area and no project.
 export function isUnfiled(t: TaskOut): boolean {
   return !t.area && !t.project;
 }
 
-export function isInboxMember(t: TaskOut): boolean {
-  return t.status === "open" && t.kind !== "heading" && isUnfiled(t);
+/// The unratified Inbox members, the layer above Today.
+export function inTriageBand(t: TaskOut, today: string, nowMs: number): boolean {
+  return membership(t, today, nowMs).inTriageBand;
 }
 
-/// Mirrors SeptenaCore TaskInbox.isUnratified + TaskEntity.isInTriageBand —
-/// the unratified Inbox members, the layer above Today. Agent arm: an
-/// MCP-authored row inside the freshness window (reuses the agent-cue, so
-/// cue-decay = ratification-by-timeout); a dated proposal leaves once
-/// acknowledged, an undated one stays for the whole window. Human arm: a
-/// capture with no disposition at all (no Today pin, no date).
-export function inTriageBand(t: TaskOut, nowMs: number): boolean {
-  if (!isInboxMember(t)) return false;
-  if (t.source === "mcp") {
-    if (!t.createdAt) return false;
-    if (nowMs - t.createdAt >= CUE_DECAY_MS) return false;
-    if (t.today || t.scheduled || t.deadline) return !t.acknowledgedAt;
-    return true;
-  }
-  return !t.today && !t.scheduled && !t.deadline;
+/// A Today pin, or a When date or deadline that has arrived.
+export function isOnToday(t: TaskOut, today: string, nowMs: number): boolean {
+  return membership(t, today, nowMs).isOnToday;
 }
 
-/// Mirrors SeptenaCore SeptenaTask.isOnToday: a `today` pin, or a scheduled /
-/// deadline date that has arrived.
-export function isOnToday(t: TaskOut, today: string): boolean {
-  if (t.status !== "open" || t.kind === "heading") return false;
-  return t.today || (!!t.scheduled && t.scheduled <= today) || (!!t.deadline && t.deadline <= today);
-}
-
-/// Today's Inbox section in the app — mirrors TaskInbox.showsInTodayInbox:
-/// the triage band, then the Inbox members on Today. One bucket: the user
-/// never sees "unratified" and "unfiled" as two states.
+/// Today's Inbox section in the app.
 export function inInbox(t: TaskOut, today: string, nowMs: number): boolean {
-  return inTriageBand(t, nowMs) || (isInboxMember(t) && isOnToday(t, today));
+  return membership(t, today, nowMs).inInbox;
 }
 
-/// Mirrors SeptenaCore SeptenaTask.daysOnToday: whole days since the task
-/// landed on Today (earliest of the pin stamp and any arrived scheduled /
-/// deadline date, floored at `created`). 0 for a fresh agent proposal (it
-/// carries its own cue) and for a legacy pin with no `todaySetOn`.
+/// Whole days the row has carried over on Today undone.
 export function daysOnToday(t: TaskOut, today: string, nowMs: number): number {
-  if (!isOnToday(t, today) || showsAgentCue(t, nowMs)) return 0;
-  const landed: string[] = [];
-  if (t.today && t.todaySetOn) landed.push(t.todaySetOn);
-  if (t.scheduled && t.scheduled <= today) landed.push(t.scheduled);
-  if (t.deadline && t.deadline <= today) landed.push(t.deadline);
-  if (landed.length === 0) return 0;
-  let earliest = landed.sort()[0].slice(0, 10);
-  if (t.created && t.created.slice(0, 10) > earliest) earliest = t.created.slice(0, 10);
-  const from = Date.parse(`${earliest}T00:00:00Z`);
-  const to = Date.parse(`${today}T00:00:00Z`);
-  if (!Number.isFinite(from) || !Number.isFinite(to)) return 0;
-  return Math.max(0, Math.round((to - from) / 86_400_000));
-}
-
-/// Mirrors SeptenaTask.showsAgentCue: an unacknowledged MCP-authored row
-/// inside the decay window.
-function showsAgentCue(t: TaskOut, nowMs: number): boolean {
-  if (t.source !== "mcp" || t.acknowledgedAt || !t.createdAt) return false;
-  return nowMs - t.createdAt < CUE_DECAY_MS;
+  return membership(t, today, nowMs).daysOnToday;
 }
 
 /// Adds the derived `inbox` and `daysOnToday` fields to an output row.
 export function annotate(t: TaskOut, today: string, nowMs: number): TaskOut {
+  const m = membership(t, today, nowMs);
   const out = { ...t };
-  if (inInbox(t, today, nowMs)) out.inbox = true;
-  const days = daysOnToday(t, today, nowMs);
-  if (days > 0) out.daysOnToday = days;
+  if (m.inInbox) out.inbox = true;
+  if (m.daysOnToday > 0) out.daysOnToday = m.daysOnToday;
   return out;
 }
 
 /// Today in the app's order: the Inbox section first (triage band, then the
 /// loose Today rows), then the filed rows. Stable within each part.
 export function inboxFirst(tasks: TaskOut[], today: string, nowMs: number): TaskOut[] {
-  const rank = (t: TaskOut) => (inTriageBand(t, nowMs) ? 0 : inInbox(t, today, nowMs) ? 1 : 2);
+  const rank = (t: TaskOut) => {
+    const m = membership(t, today, nowMs);
+    return m.inTriageBand ? 0 : m.inInbox ? 1 : 2;
+  };
   return tasks.map((t, i) => ({ t, i })).sort((a, b) => rank(a.t) - rank(b.t) || a.i - b.i).map((x) => x.t);
 }
 
-/// Mirrors Persistence.swift LocalCache.tasks(filter:). Keep in lockstep
-/// with iOS so the two surfaces never disagree on what "Today" means.
+/// The app's lists. `today`, `inbox`, `upcoming` and `anytime` are the
+/// core's; any other view (completed, review) filters elsewhere and only
+/// needs an open, non-heading row here.
 export function matchesView(t: TaskOut, view: TaskView, today: string, nowMs: number): boolean {
-  if (t.status !== "open" || t.kind === "heading") return false;
   switch (view) {
     case "today":
-      // The whole Today page, as the app draws it: the Inbox section (which
-      // includes the unratified band) plus every row due today.
-      return inTriageBand(t, nowMs) || isOnToday(t, today);
     case "inbox":
-      return inInbox(t, today, nowMs);
     case "upcoming":
-      if (t.today) return false;
-      return (!!t.scheduled && t.scheduled > today) || (!!t.deadline && t.deadline > today);
     case "anytime":
-      // The app's Anytime list (LocalCache .unscheduled): open, not on Today,
-      // no date at all.
-      return !t.today && !t.scheduled && !t.deadline;
+      return membership(t, today, nowMs).matchesView[view];
     default:
-      return true;
+      return t.status === "open" && t.kind !== "heading";
   }
 }
 
