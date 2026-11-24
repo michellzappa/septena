@@ -640,7 +640,9 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   Septena (the Septask targets), with UI names vs code names, status per
   platform, and how features connect. Read it before you write copy, specs,
   issues or agent briefs. When you ship, remove or rename a user-facing feature,
-  update its row in the same session. Code wins over the map.
+  update its row in the same session. Code wins over the map. Status per
+  platform is generated from `registry/capabilities.json` into
+  `docs/FEATURE_MAP.md`; edit the JSON, then run the generator.
   (`/strategy/feature-catalog` is the older Septena Life catalog.)
 - Match surrounding code: comment density, naming, idiom.
 - **Maker voice & identity** (the "made by mz" story across app, site, support,
