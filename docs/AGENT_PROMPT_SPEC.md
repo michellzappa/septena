@@ -1,6 +1,7 @@
 # Agent prompt: one pattern for every agent exchange
 
-Status: building (2026-11-24). Applies to iPhone, iPad, Mac and Android.
+Status: building (2026-11-24). Shipped on iPhone, iPad and Mac (#396). Android has
+the agent prompt and the review page; its Review list rows are open (#412).
 
 ## Problem
 
@@ -41,7 +42,9 @@ One **agent prompt** has four parts, top to bottom:
    while the user switches away inside the session.
 
 The free-text copy comes from `registry/surfaces.json` `prompts.text`:
-`sendBackReview`, `conversationOther`, `conversationReply`.
+`sendBackReview`, `conversationOther`, `conversationReply`. The kickers and
+fallbacks come from the `conversation` block in the same file (`askKicker`,
+`reviewKicker`, `reviewFallback`, `acceptedLabel`).
 
 ## The three uses
 

@@ -755,6 +755,14 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
+
+
+
+
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
 // N.B. the name of the extension is very misleading, since it is 
 // rather `InterfaceTooLargeException`, caused by too many methods 
@@ -784,15 +792,21 @@ fun uniffi_septena_core_checksum_func_derive_conversation(
 ): Short
 fun uniffi_septena_core_checksum_func_fade_fill(
 ): Short
+fun uniffi_septena_core_checksum_func_find_issue_refs(
+): Short
 fun uniffi_septena_core_checksum_func_invoke_json(
 ): Short
 fun uniffi_septena_core_checksum_func_next_occurrence_dates(
 ): Short
 fun uniffi_septena_core_checksum_func_next_scheduled_date(
 ): Short
+fun uniffi_septena_core_checksum_func_normalize_ref_key(
+): Short
 fun uniffi_septena_core_checksum_func_normalize_task_dates(
 ): Short
 fun uniffi_septena_core_checksum_func_occurrence_id(
+): Short
+fun uniffi_septena_core_checksum_func_parse_ref(
 ): Short
 fun uniffi_septena_core_checksum_func_plan_pull_row(
 ): Short
@@ -811,6 +825,8 @@ fun uniffi_septena_core_checksum_func_shift_reminder_on_reschedule(
 fun uniffi_septena_core_checksum_func_should_arm_reminder(
 ): Short
 fun uniffi_septena_core_checksum_func_should_fade(
+): Short
+fun uniffi_septena_core_checksum_func_task_ref_id(
 ): Short
 fun uniffi_septena_core_checksum_func_task_view_membership(
 ): Short
@@ -873,15 +889,21 @@ fun uniffi_septena_core_fn_func_derive_conversation(`conversation`: RustBuffer.B
 ): RustBuffer.ByValue
 fun uniffi_septena_core_fn_func_fade_fill(`input`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
+fun uniffi_septena_core_fn_func_find_issue_refs(`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
 fun uniffi_septena_core_fn_func_invoke_json(`function`: RustBuffer.ByValue,`inputJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_septena_core_fn_func_next_occurrence_dates(`task`: RustBuffer.ByValue,`nextScheduled`: RustBuffer.ByValue,`now`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_septena_core_fn_func_next_scheduled_date(`completedOn`: RustBuffer.ByValue,`scheduled`: RustBuffer.ByValue,`logicalScheduled`: RustBuffer.ByValue,`rule`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
+fun uniffi_septena_core_fn_func_normalize_ref_key(`key`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
 fun uniffi_septena_core_fn_func_normalize_task_dates(`task`: RustBuffer.ByValue,`today`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_septena_core_fn_func_occurrence_id(`sourceTaskId`: RustBuffer.ByValue,`scheduled`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_septena_core_fn_func_parse_ref(`input`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_septena_core_fn_func_plan_pull_row(`entity`: RustBuffer.ByValue,`rowJson`: RustBuffer.ByValue,`currentFieldsJson`: RustBuffer.ByValue,`pendingFields`: RustBuffer.ByValue,`pendingDelete`: Byte,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
@@ -901,6 +923,8 @@ fun uniffi_septena_core_fn_func_should_arm_reminder(`input`: RustBuffer.ByValue,
 ): Byte
 fun uniffi_septena_core_fn_func_should_fade(`input`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): Byte
+fun uniffi_septena_core_fn_func_task_ref_id(`taskId`: RustBuffer.ByValue,`key`: RustBuffer.ByValue,`deletedCount`: Int,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
 fun uniffi_septena_core_fn_func_task_view_membership(`task`: RustBuffer.ByValue,`today`: RustBuffer.ByValue,`now`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun ffi_septena_core_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -1050,6 +1074,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_septena_core_checksum_func_fade_fill() != 48489.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_septena_core_checksum_func_find_issue_refs() != 62982.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_septena_core_checksum_func_invoke_json() != 29059.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1059,10 +1086,16 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_septena_core_checksum_func_next_scheduled_date() != 10335.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_septena_core_checksum_func_normalize_ref_key() != 43412.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_septena_core_checksum_func_normalize_task_dates() != 27973.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_septena_core_checksum_func_occurrence_id() != 31912.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_septena_core_checksum_func_parse_ref() != 855.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_septena_core_checksum_func_plan_pull_row() != 54836.toShort()) {
@@ -1090,6 +1123,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_septena_core_checksum_func_should_fade() != 20672.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_septena_core_checksum_func_task_ref_id() != 40151.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_septena_core_checksum_func_task_view_membership() != 3717.toShort()) {
@@ -1695,6 +1731,66 @@ public object FfiConverterTypeOrdinalWeekday: FfiConverterRustBuffer<OrdinalWeek
     override fun write(value: OrdinalWeekday, buf: ByteBuffer) {
             FfiConverterInt.write(value.`ordinal`, buf)
             FfiConverterInt.write(value.`weekday`, buf)
+    }
+}
+
+
+
+/**
+ * One parsed reference.
+ */
+data class ParsedRef (
+    /**
+     * `<kind>:<id>` in normal form. The lookup key.
+     */
+    var `key`: kotlin.String, 
+    var `kind`: kotlin.String, 
+    /**
+     * The part of `key` after the kind.
+     */
+    var `id`: kotlin.String, 
+    /**
+     * The id before normalisation, for the resolver (`snapshot.rawId`). A
+     * Message-ID has no angle brackets and no white space here.
+     */
+    var `rawId`: kotlin.String, 
+    /**
+     * The web address of the item, when the input was one.
+     */
+    var `url`: kotlin.String?
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeParsedRef: FfiConverterRustBuffer<ParsedRef> {
+    override fun read(buf: ByteBuffer): ParsedRef {
+        return ParsedRef(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ParsedRef) = (
+            FfiConverterString.allocationSize(value.`key`) +
+            FfiConverterString.allocationSize(value.`kind`) +
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterString.allocationSize(value.`rawId`) +
+            FfiConverterOptionalString.allocationSize(value.`url`)
+    )
+
+    override fun write(value: ParsedRef, buf: ByteBuffer) {
+            FfiConverterString.write(value.`key`, buf)
+            FfiConverterString.write(value.`kind`, buf)
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterString.write(value.`rawId`, buf)
+            FfiConverterOptionalString.write(value.`url`, buf)
     }
 }
 
@@ -3429,6 +3525,34 @@ public object FfiConverterSequenceTypeConversationTurn: FfiConverterRustBuffer<L
         }
     }
 }
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeParsedRef: FfiConverterRustBuffer<List<ParsedRef>> {
+    override fun read(buf: ByteBuffer): List<ParsedRef> {
+        val len = buf.getInt()
+        return List<ParsedRef>(len) {
+            FfiConverterTypeParsedRef.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<ParsedRef>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeParsedRef.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<ParsedRef>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeParsedRef.write(it, buf)
+        }
+    }
+}
         /**
          * Applies one date action to one task. A heading or a deleted task has no
          * dates to change: the patch is empty. Every action also clears the agent
@@ -3529,6 +3653,18 @@ public object FfiConverterSequenceTypeConversationTurn: FfiConverterRustBuffer<L
     
 
         /**
+         * Every GitHub issue or pull request URL in a text, in order, one per key.
+         */ fun `findIssueRefs`(`text`: kotlin.String): List<ParsedRef> {
+            return FfiConverterSequenceTypeParsedRef.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_septena_core_fn_func_find_issue_refs(
+        FfiConverterString.lower(`text`),_status)
+}
+    )
+    }
+    
+
+        /**
          * Calls one core function by name with a JSON object and returns its result
          * as JSON. A plan or decision comes back in the vectors' JSON shape; a core
          * error comes back as `{"error": "<message>"}` so hosts can log it as data.
@@ -3574,6 +3710,19 @@ public object FfiConverterSequenceTypeConversationTurn: FfiConverterRustBuffer<L
     
 
         /**
+         * The normal form of a key. A URL is not a key: use `parse_ref`.
+         */
+    @Throws(CoreException::class) fun `normalizeRefKey`(`key`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.INSTANCE.uniffi_septena_core_fn_func_normalize_ref_key(
+        FfiConverterString.lower(`key`),_status)
+}
+    )
+    }
+    
+
+        /**
          * A12 and restore: the task's fields brought to invariants I1–I7. A pin
          * with a future When date loses the pin; a pin with an arrived When date
          * loses the date. An empty or invalid day becomes none.
@@ -3595,6 +3744,19 @@ public object FfiConverterSequenceTypeConversationTurn: FfiConverterRustBuffer<L
     uniffiRustCall() { _status ->
     UniffiLib.INSTANCE.uniffi_septena_core_fn_func_occurrence_id(
         FfiConverterString.lower(`sourceTaskId`),FfiConverterString.lower(`scheduled`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Parses a key, a web URL or a `message://` link.
+         */
+    @Throws(CoreException::class) fun `parseRef`(`input`: kotlin.String): ParsedRef {
+            return FfiConverterTypeParsedRef.lift(
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.INSTANCE.uniffi_septena_core_fn_func_parse_ref(
+        FfiConverterString.lower(`input`),_status)
 }
     )
     }
@@ -3712,6 +3874,20 @@ public object FfiConverterSequenceTypeConversationTurn: FfiConverterRustBuffer<L
     uniffiRustCallWithError(CoreException) { _status ->
     UniffiLib.INSTANCE.uniffi_septena_core_fn_func_should_fade(
         FfiConverterTypeFadeInput.lower(`input`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * The id of a `taskRef` row: FNV-1a 64 over `"<task id>|<key>|<n>"`, where
+         * `n` is the number of deleted rows with the same task and key. Two offline
+         * devices that add the same reference mint the same id.
+         */ fun `taskRefId`(`taskId`: kotlin.String, `key`: kotlin.String, `deletedCount`: kotlin.UInt): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_septena_core_fn_func_task_ref_id(
+        FfiConverterString.lower(`taskId`),FfiConverterString.lower(`key`),FfiConverterUInt.lower(`deletedCount`),_status)
 }
     )
     }

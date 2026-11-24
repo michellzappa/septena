@@ -32,6 +32,16 @@ function ensureReady(): void {
   initCore(new WebAssembly.Module(bytes));
 }
 
+/// The core refused an input. `reason` is the core's text. It never holds the
+/// input, so it is safe to log.
+export class CoreInputError extends Error {
+  readonly reason: string;
+  constructor(fn: string, reason: string) {
+    super(`septena-core ${fn}: ${reason}`);
+    this.reason = reason;
+  }
+}
+
 /// Calls one core function. A core error comes back as `{"error": …}`; it
 /// is thrown here, so a bad input fails the request instead of turning into
 /// a silent default.
@@ -41,7 +51,7 @@ export function callCore<T>(fn: string, input: unknown): T {
   if (out !== null && typeof out === "object" && !Array.isArray(out)) {
     const o = out as Record<string, unknown>;
     if (typeof o.error === "string" && Object.keys(o).length === 1) {
-      throw new Error(`septena-core ${fn}: ${o.error}`);
+      throw new CoreInputError(fn, o.error);
     }
   }
   return out as T;
@@ -232,4 +242,31 @@ export interface CoreProjection {
 /// conversation (`convo.rs`, vectors `convo-derived.json`).
 export function deriveConversation(conversation: CoreConversation, now: string): CoreProjection {
   return callCore("deriveConversation", { conversation, now });
+}
+
+/// A parsed reference (`refs.rs`, vectors `refs.json`).
+export interface CoreRef {
+  key: string;
+  kind: string;
+  id: string;
+  /// The id before normalisation (`snapshot.rawId`).
+  rawId: string;
+  /// The web address of the item, when the input was one.
+  url: string | null;
+}
+
+/// Parses a key, a web URL or a `message://` link. Throws `CoreInputError`.
+export function parseRef(input: string): CoreRef {
+  return callCore("parseRef", { input });
+}
+
+/// Every GitHub issue or pull request URL in a text, in order, one per key.
+export function findIssueRefs(text: string): CoreRef[] {
+  return callCore("findIssueRefs", { text });
+}
+
+/// The id of a `taskRef` row. `deletedCount`: the deleted rows with the same
+/// task and key.
+export function taskRefId(taskId: string, key: string, deletedCount: number): string {
+  return callCore("taskRefId", { taskId, key, deletedCount });
 }

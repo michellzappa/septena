@@ -8,6 +8,7 @@ import { addDaysYMD, isValidTz, todayYMD } from "../tz.js";
 import type { TaskOut } from "../tools/taskShared.js";
 import { matchesView } from "../tools/taskShared.js";
 import { listTasks } from "../shadow/mcp.js";
+import { MAX_REF_INPUT, findByRef, zRefs } from "../shadow/refs.js";
 import { DESIGN_TOKENS } from "../generated/registries.js";
 import { rpcStoreFor, runWriteTool, zWriteArgs, type StoreRpc, type WriteContext, type WriteToolName } from "../shadow/writes.js";
 
@@ -67,6 +68,8 @@ export interface ClientTask {
   daysOnToday?: number;
   checklistCount?: number;
   checklistDoneCount?: number;
+  /// How many references the task has (docs/TASK_REFERENCES_SPEC.md).
+  refCount?: number;
   /// What the agent said when it handed the task over (the review view).
   reviewNote?: string;
 }
@@ -96,6 +99,7 @@ export function clientTask(t: TaskOut, names: Map<string, string>): ClientTask {
   if (t.recurrence) out.repeats = true;
   if (t.starred) out.starred = true;
   if (t.completedAt) out.completedAt = t.completedAt;
+  if (t.refCount) out.refCount = t.refCount;
   if (t.reviewNote) out.reviewNote = t.reviewNote;
   if (t.daysOnToday) out.daysOnToday = t.daysOnToday;
   if (t.checklistCount) {
@@ -262,16 +266,33 @@ tasksRest.get("/", async (c) => {
   });
 });
 
+/// The tasks that point at a key, a URL or a `message://` link. The key is in
+/// the body, never in the URL: request logs hold URLs, and a key is content.
+tasksRest.post("/by-ref", async (c) => {
+  const body = await json(c, z.object({
+    key: z.string().min(1).max(MAX_REF_INPUT),
+    limit: z.number().int().min(1).max(200).default(50),
+  }).strict());
+  if (body instanceof Response) return body;
+  try {
+    return c.json(await findByRef(rpcStoreFor(c.env, c.get("userId")), body.key, body.limit));
+  } catch (e) {
+    return c.json({ error: "rejected", message: e instanceof Error ? e.message : String(e) }, 422);
+  }
+});
+
 const zWhen = z.enum(["inbox", "today", "tomorrow"]);
 
 tasksRest.post("/", async (c) => {
   const body = await json(c, z.object({
     title: z.string().trim().min(1).max(500),
     when: zWhen.default("inbox"),
+    refs: zRefs.optional(),
   }).strict());
   if (body instanceof Response) return body;
   const ctx = await writeContext(c);
   const args: Record<string, unknown> = { title: body.title };
+  if (body.refs) args.refs = body.refs;
   if (body.when === "today") args.today = true;
   if (body.when === "tomorrow") args.scheduled = addDaysYMD(todayYMD(ctx.timeZone), 1);
   return run(c, ctx, "tasks_create", args, 201);
