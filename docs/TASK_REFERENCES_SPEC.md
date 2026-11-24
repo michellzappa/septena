@@ -66,6 +66,14 @@ Rules:
 - **One item, one key.** A `github.com/…/issues/7` URL becomes an `issue:`
   key, a `message://` URL becomes an `email:` key, a Starlings URL becomes a
   `door:` or `task:` key. `url:` is only the fallback.
+- **Details that the vectors fix** (`refs.json`). A kind is
+  `[a-z][a-z0-9_-]{0,31}`. The limit counts UTF-16 units. Domains and hosts are
+  lowercased in ASCII. A URL with no path gets `/`. A URL with a user name or
+  a password, or with white space, is an error. `www.github.com` is GitHub. A
+  Starlings URL is a page under `.starlings.work` whose path names one record
+  (`/work/<kind>/<id>`, `/docs/document/<id>`, `/calendar/event/<id>`,
+  `/team/thread/<id>`); any other page stays `url:`. An iCloud path with `.`,
+  `..` or an empty part is an error. Control characters are an error.
 - **Unknown kinds are kept.** A client that does not know a kind shows the
   snapshot and never drops the row. The store accepts any kind that matches
   the kind pattern.

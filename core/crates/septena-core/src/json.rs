@@ -8,12 +8,13 @@ use serde_json::{Value, json};
 use crate::error::CoreError;
 use crate::task_dates::patch_json;
 use crate::{
-    ConversationProjection, DateAction, FadeInput, OrdinalWeekday, PullPageHeader, PushOutcome, RecurrenceRule,
-    ReminderArmInput, TaskConversation, TaskSnapshot, TaskViewMembership, apply_date_action, check_pull_page,
-    checklist_occurrence_id, conversation_state, derive_conversation, fade_fill, next_occurrence_dates,
-    next_scheduled_date, normalize_task_dates, occurrence_id, plan_pull_row, plan_push_response, row_opacity,
+    ConversationProjection, DateAction, EmailRefInput, FadeInput, OrdinalWeekday, ParsedRef, PullPageHeader,
+    PushOutcome, RecurrenceRule, ReminderArmInput, TaskConversation, TaskSnapshot, TaskViewMembership,
+    apply_date_action, check_pull_page, checklist_occurrence_id, conversation_state, derive_conversation,
+    email_ref_keys, fade_fill, find_issue_refs, next_occurrence_dates, next_scheduled_date, normalize_ref_key,
+    normalize_task_dates, occurrence_id, parse_ref, plan_pull_row, plan_push_response, row_opacity,
     server_rejection_reason, shift_reminder_for_recurrence, shift_reminder_on_reschedule, should_arm_reminder,
-    should_fade, task_view_membership,
+    should_fade, task_ref_id, task_view_membership,
 };
 
 /// The functions `invoke_json` accepts.
@@ -37,6 +38,11 @@ pub const JSON_FUNCTIONS: &[&str] = &[
     "planPullRow",
     "planPushResponse",
     "serverRejectionReason",
+    "parseRef",
+    "normalizeRefKey",
+    "findIssueRefs",
+    "emailRefKeys",
+    "taskRefId",
 ];
 
 /// Calls one core function by name with a JSON object and returns its result
@@ -165,8 +171,32 @@ pub(crate) fn invoke_value(function: &str, input: Value) -> Result<Value, CoreEr
             let args: RejectionArgs = decode(input).map_err(|e| parse(&e))?;
             Ok(json!(server_rejection_reason(args.status, args.body)))
         }
+        "parseRef" => Ok(parse_ref(text_arg(&input, "input").ok_or_else(|| parse("input"))?)?.to_json()),
+        "normalizeRefKey" => Ok(json!(normalize_ref_key(
+            text_arg(&input, "key").ok_or_else(|| parse("key"))?
+        )?)),
+        "findIssueRefs" => {
+            let refs = find_issue_refs(text_arg(&input, "text").ok_or_else(|| parse("text"))?);
+            Ok(Value::Array(refs.iter().map(ParsedRef::to_json).collect()))
+        }
+        "emailRefKeys" => {
+            let args = EmailRefInput::from_json(&input).ok_or_else(|| parse("message"))?;
+            Ok(email_ref_keys(&args).to_json())
+        }
+        "taskRefId" => {
+            let deleted = input["deletedCount"].as_u64().and_then(|n| u32::try_from(n).ok());
+            Ok(json!(task_ref_id(
+                text_arg(&input, "taskId").ok_or_else(|| parse("taskId"))?,
+                text_arg(&input, "key").ok_or_else(|| parse("key"))?,
+                deleted.ok_or_else(|| parse("deletedCount"))?,
+            )))
+        }
         other => Err(CoreError::invalid(format!("Unknown core function: {other}"))),
     }
+}
+
+fn text_arg(input: &Value, name: &str) -> Option<String> {
+    input[name].as_str().map(str::to_string)
 }
 
 fn decode<T: for<'de> Deserialize<'de>>(input: Value) -> Result<T, String> {

@@ -33,6 +33,9 @@
     "maxTagsPerTask": 20,
     "tagNameMax": 64,
     "maxSubtasks": 500,
+    "maxRefsPerTask": 20,
+    "refKeyMax": 1000,
+    "refSnapshotMax": 2048,
     "maxArtifactRefs": 100,
     "turnProviderMax": 32,
     "turnQuestionMax": 10000,
@@ -64,6 +67,7 @@
     "convoHandoffActionType": ["open_url", "compose", "call", "none"],
     "convoTurnRole": ["user", "provider"],
     "convoTurnStep": ["confirm", "ground", "scope", "decide", "work"],
+    "taskRefRole": ["about", "from", "blocked_by", "follow_up"],
     "telemetryLevel": ["none", "minimal", "balanced", "full"],
     "appearanceMode": ["system", "light", "dark"],
     "accentColor": ["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "haskap", "acai", "pitaya", "jabuticaba"],
@@ -180,6 +184,23 @@
         "checked": { "kind": "bool", "default": 0 },
         "checkedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
         "position": { "kind": "real", "nullable": true },
+        "createdAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true }
+      }
+    },
+    "taskRef": {
+      "table": "task_refs",
+      "deletable": true,
+      "requiredOnInsert": ["taskId", "key"],
+      "updatable": ["role", "snapshot", "position"],
+      "columns": {
+        "taskId": { "kind": "text", "format": "id", "nullable": false },
+        "key": { "kind": "text", "max": 1000, "nullable": false },
+        "kind": { "kind": "text", "max": 32, "serverOwned": true },
+        "role": { "kind": "text", "enum": "taskRefRole", "default": "about" },
+        "snapshot": { "kind": "json", "maxJsonLength": 2048, "nullable": true },
+        "position": { "kind": "real", "nullable": true },
+        "createdBy": { "kind": "text", "serverOwned": true },
+        "lastSeenAt": { "kind": "text", "serverOwned": true },
         "createdAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true }
       }
     },

@@ -42,6 +42,9 @@ enum RegistryEntityLimits {
   static let maxTagsPerTask: Int = 20
   static let tagNameMax: Int = 64
   static let maxSubtasks: Int = 500
+  static let maxRefsPerTask: Int = 20
+  static let refKeyMax: Int = 1000
+  static let refSnapshotMax: Int = 2048
   static let maxArtifactRefs: Int = 100
   static let turnProviderMax: Int = 32
   static let turnQuestionMax: Int = 10000
@@ -73,14 +76,15 @@ enum RegistryEntityEnums {
   static let convoHandoffActionType: [String] = ["open_url", "compose", "call", "none"]
   static let convoTurnRole: [String] = ["user", "provider"]
   static let convoTurnStep: [String] = ["confirm", "ground", "scope", "decide", "work"]
+  static let taskRefRole: [String] = ["about", "from", "blocked_by", "follow_up"]
   static let telemetryLevel: [String] = ["none", "minimal", "balanced", "full"]
   static let appearanceMode: [String] = ["system", "light", "dark"]
   static let accentColor: [String] = ["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "haskap", "acai", "pitaya", "jabuticaba"]
   static let appIconFinish: [String] = ["obsidian", "ceramic", "framed"]
   static let canvasTexture: [String] = ["none", "topography", "fieldMatrix", "stippleDrift", "ridges", "washiPaper"]
   static let textureMotion: [String] = ["still", "slowDrift"]
-  static let entityNames: [String] = ["task", "area", "project", "attachment", "checklistItem", "tag", "convo", "setting"]
-  static let deletableEntities: [String] = ["task", "area", "project", "attachment", "checklistItem", "tag"]
+  static let entityNames: [String] = ["task", "area", "project", "attachment", "checklistItem", "taskRef", "tag", "convo", "setting"]
+  static let deletableEntities: [String] = ["task", "area", "project", "attachment", "checklistItem", "taskRef", "tag"]
 }
 
 /// Canonical conversation turn fields shared with the backend (`registry/entities.json`).
