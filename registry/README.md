@@ -44,6 +44,7 @@ Generated outputs (checked in, never hand-edited):
 - `backend/src/generated/registries.ts`
 - `android/core/src/main/kotlin/app/septena/core/generated/RegistryConstants.kt`
 - `core/crates/septena-core/src/generated/registry.rs` (the shared Rust core, ADR 0025)
+- `docs/FEATURE_MAP.md` (the capability ledger as a table)
 - `registry/l10n/en.json`
 - the registry entries in `Septena/Localizable.xcstrings` (their comment
   starts "Generated from registry")
