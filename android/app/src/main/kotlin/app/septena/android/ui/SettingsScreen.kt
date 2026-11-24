@@ -58,6 +58,7 @@ private data class RegistrySettingRow(
     val key: String? = null,
     val page: String? = null,
     val surface: String? = null,
+    val statusKey: String? = null,
     val label: String? = null,
     val detail: String? = null,
     val visibility: String = "always",
@@ -96,6 +97,7 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
     var loading by remember { mutableStateOf(true) }
     var saveFailed by remember { mutableStateOf(false) }
     var signingOut by remember { mutableStateOf(false) }
+    val accessModel = remember(graph) { AccessSettingsModel(graph, scope) }
 
     LaunchedEffect(graph, dataVersion) {
         loading = true
@@ -120,6 +122,17 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
 
     fun titleFor(pageId: String?): String = pageId?.let { pages[it]?.title }.orEmpty()
     val currentPageId = pageStack.lastOrNull()
+
+    // The root page shows the agent count (AI & Agents, `agentsStatus`); the
+    // Agents and Devices pages show the lists. Each reloads when it opens.
+    LaunchedEffect(signedIn, currentPageId) {
+        if (currentPageId == null ||
+            currentPageId == AccessSettingsModel.AGENTS_PAGE ||
+            currentPageId == AccessSettingsModel.DEVICES_PAGE
+        ) {
+            accessModel.refresh(signedIn)
+        }
+    }
     val currentTitle = currentPageId?.let(::titleFor)?.takeIf(String::isNotEmpty)
         ?: RegistryCatalog.actionTitle(RegistryActionIds.APP_SETTINGS, languageTag = languageTag).orEmpty()
     val backTitle = RegistryCatalog.surface(RegistryTaskDetail.ID)
@@ -217,6 +230,7 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
                                     saveTitle = saveTitle,
                                     signedIn = signedIn,
                                     signingOut = signingOut,
+                                    accessModel = accessModel,
                                     onPage = { target -> if (target in pages) pageStack.add(target) },
                                     onValueChange = ::saveSetting,
                                     onSignOut = ::signOut,
@@ -248,6 +262,7 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
                                         saveTitle = saveTitle,
                                         signedIn = signedIn,
                                         signingOut = signingOut,
+                                        accessModel = accessModel,
                                         onPage = { target -> if (target in pages) pageStack.add(target) },
                                         onValueChange = ::saveSetting,
                                         onSignOut = ::signOut,
@@ -283,6 +298,7 @@ private fun SettingsRegistryRow(
     saveTitle: String,
     signedIn: Boolean,
     signingOut: Boolean,
+    accessModel: AccessSettingsModel,
     onPage: (String) -> Unit,
     onValueChange: (String, JsonValue) -> Unit,
     onSignOut: () -> Unit,
@@ -292,10 +308,22 @@ private fun SettingsRegistryRow(
             val target = item.page ?: return
             val page = pages[target]
             val title = item.label ?: page?.title ?: return
+            val status = when (item.statusKey) {
+                AccessSettingsModel.AGENTS_STATUS_KEY -> accessModel.agentsStatus(languageTag)
+                else -> null
+            }
             ListItem(
                 headlineContent = { Text(title) },
                 modifier = Modifier.fillMaxWidth().clickable { onPage(target) },
-                trailingContent = { Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                trailingContent = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        status?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                },
             )
         }
         "setting" -> {
@@ -322,6 +350,8 @@ private fun SettingsRegistryRow(
                         }
                     }
                 }
+                "access_devices" -> AccessDevicesList(accessModel, signedIn, languageTag)
+                "access_agents" -> AccessAgentsList(accessModel, signedIn, languageTag)
                 "account_profile_editor" -> {
                     val key = item.ownsKeys.firstOrNull() ?: return
                     val definition = definitions[key] ?: return
@@ -536,6 +566,7 @@ private fun JsonValue?.asSettingsItem(languageTag: String): RegistrySettingRow? 
         key = item.string("key"),
         page = item.string("page"),
         surface = item.string("surface"),
+        statusKey = item.string("statusKey"),
         label = item.string("label")?.localized(languageTag),
         detail = item.string("detail")?.localized(languageTag),
         visibility = item.string("visibility") ?: "always",
