@@ -206,6 +206,12 @@
       "destinations.destinations.today.emptyState.detail"
     ]
   },
+  "Add time": {
+    "text": "Add time",
+    "paths": [
+      "surfaces.taskDateBoard.rows.dateBoard.time.label"
+    ]
+  },
   "Add your first task": {
     "text": "Add your first task",
     "paths": [
@@ -556,6 +562,12 @@
     "text": "Clear",
     "paths": [
       "surfaces.prompts.items.clearLogged.confirmTitle"
+    ]
+  },
+  "Clear (Anytime)": {
+    "text": "Clear (Anytime)",
+    "paths": [
+      "surfaces.taskDateBoard.rows.dateBoard.clear.label"
     ]
   },
   "Clear Logged…": {
@@ -1722,6 +1734,12 @@
       "destinations.destinations.inbox.emptyState.detail"
     ]
   },
+  "No Deadline": {
+    "text": "No Deadline",
+    "paths": [
+      "surfaces.taskDateBoard.rows.dateBoard.clear.attributeLabels.0.label"
+    ]
+  },
   "No Deleted Tasks": {
     "text": "No Deleted Tasks",
     "paths": [
@@ -2091,6 +2109,21 @@
     "text": "Persimmon",
     "paths": [
       "tokens.fruitAccents.persimmon.name"
+    ]
+  },
+  "Pick another date": {
+    "text": "Pick another date",
+    "paths": [
+      "surfaces.taskDateBoard.rows.dateBoard.calendar.label"
+    ]
+  },
+  "Pick another date ({date})": {
+    "text": "Pick another date ({date})",
+    "placeholders": [
+      "date"
+    ],
+    "paths": [
+      "surfaces.taskDateBoard.rows.dateBoard.calendar.valueLabel"
     ]
   },
   "Pitaya": {
@@ -3224,6 +3257,12 @@
     "text": "Toggle Today",
     "paths": [
       "actions.actions.task.toggleToday.title"
+    ]
+  },
+  "Tomorrow": {
+    "text": "Tomorrow",
+    "paths": [
+      "surfaces.taskDateBoard.rows.dateBoard.tomorrow.label"
     ]
   },
   "Topography": {

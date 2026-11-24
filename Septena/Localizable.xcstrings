@@ -1952,6 +1952,18 @@
         }
       }
     },
+    "Add time" : {
+      "comment" : "Generated from registry surfaces.taskDateBoard.rows.dateBoard.time.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar horário"
+          }
+        }
+      }
+    },
     "Add to Claude" : {
       "localizations" : {
         "pt-BR" : {
@@ -3414,7 +3426,15 @@
       }
     },
     "Clear (Anytime)" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpar (A qualquer momento)"
+          }
+        }
+      }
     },
     "Clear %lld logged items from “%@”?" : {
       "comment" : "Generated from registry surfaces.prompts.items.clearLogged.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -8319,7 +8339,15 @@
       }
     },
     "No Deadline" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem prazo"
+          }
+        }
+      }
     },
     "No Deleted Tasks" : {
       "comment" : "Generated from registry destinations.destinations.recentlyDeleted.emptyState.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -9594,7 +9622,26 @@
 
     },
     "Pick another date" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher outra data"
+          }
+        }
+      }
+    },
+    "Pick another date (%@)" : {
+      "comment" : "Generated from registry surfaces.taskDateBoard.rows.dateBoard.calendar.valueLabel. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher outra data (%@)"
+          }
+        }
+      }
     },
     "Pick up to %@ sections. Each one becomes a shortcut in the Home Screen long-press menu, opening directly into that section." : {
       "localizations" : {
@@ -13259,7 +13306,15 @@
       }
     },
     "Tomorrow" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amanhã"
+          }
+        }
+      }
     },
     "Tomorrow · Health" : {
 

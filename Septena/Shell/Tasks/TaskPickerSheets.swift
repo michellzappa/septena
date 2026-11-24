@@ -57,7 +57,7 @@ struct TaskPickerFilterField: View {
 /// the composer's When and Deadline pills expand and the AppKit shell's ⌘S /
 /// ⌘⇧D popover mirrors.
 ///
-/// Only the title and the clear label differ between When and Deadline. Each
+/// Only the title and the registry rows differ between When and Deadline. Each
 /// control commits and dismisses, so there is no confirm button. What this
 /// replaced: a four-chip quick row (Today / Tomorrow / This weekend / Next
 /// week) above a strip that ALREADY held every one of those days — Today
@@ -68,10 +68,10 @@ struct DatePickerSheet: View {
   @Environment(DayClock.self) private var clock
   @Environment(SectionTheme.self) private var theme
   let title: String
+  let attribute: RegistryDateBoardAttribute
   let initialDate: Date?
   /// The Today flag is set and no date is. The board marks today's cell.
   let initialToday: Bool
-  let clearLabel: String      // e.g. "No Date" / "Remove Deadline"
   /// When only: the Repeat row's title. nil hides the row.
   let repeatLabel: String?
   /// The Repeat row: the caller opens the Repeat editor once this sheet has
@@ -88,15 +88,16 @@ struct DatePickerSheet: View {
   @State private var durationMinutes: Int?
   @State private var showTimeControls: Bool
 
-  init(title: String, initialDate: Date?, initialToday: Bool = false, clearLabel: String,
+  init(title: String, attribute: RegistryDateBoardAttribute,
+       initialDate: Date?, initialToday: Bool = false,
        initialStartTime: String? = nil, initialDurationMinutes: Int? = nil,
        onTimeSlotChange: ((String?, Int?) -> Void)? = nil,
        repeatLabel: String? = nil, onRepeat: (() -> Void)? = nil,
        onPick: @escaping (Date?) -> Void) {
     self.title = title
+    self.attribute = attribute
     self.initialDate = initialDate
     self.initialToday = initialToday
-    self.clearLabel = clearLabel
     self.onTimeSlotChange = onTimeSlotChange
     self.repeatLabel = repeatLabel
     self.onRepeat = onRepeat
@@ -111,11 +112,11 @@ struct DatePickerSheet: View {
     cal.startOfDay(for: SeptenaDate.parse(clock.today) ?? clock.now)
   }
 
-  /// Fitted sheet height: 7-day strip (today first) + calendar button + Clear.
-  /// `.large` stays available as a drag-up fallback for big Dynamic Type.
-  static let sheetHeight: CGFloat = 276
+  /// Fitted sheet height: 7-day strip (today first) + the Tomorrow, calendar and
+  /// Clear rows. `.large` stays available as a drag-up fallback for big Dynamic Type.
+  static let sheetHeight: CGFloat = 288
   /// Extra height when the board carries the Repeat row.
-  static let repeatRowHeight: CGFloat = 52
+  static let repeatRowHeight: CGFloat = 44
   /// Extra height for the When sheet's time row (and its duration chips once open).
   static let timeRowHeight: CGFloat = 96
 
@@ -152,22 +153,20 @@ struct DatePickerSheet: View {
   private var content: some View {
     VStack(spacing: 0) {
       TaskDateBoard(
+        attribute: attribute,
         selected: initialDate.map { cal.startOfDay(for: $0) },
         todayActive: initialToday
           || (initialDate.map { cal.isDate($0, inSameDayAs: anchorDay) } ?? false),
-        clearLabel: clearLabel,
         repeatLabel: onRepeat == nil ? nil : repeatLabel,
         onRepeat: onRepeat.map { open in { close(); open() } },
+        onAddTime: onTimeSlotChange == nil || timeControlsOpen ? nil : { openTimeControls() },
         onToday: { commit(anchorDay) },
         onPick: { commit($0) },
         onClear: { commit(nil) })
       .padding(.horizontal, Theme.hPadding)
       .padding(.top, 6)
 
-      if onTimeSlotChange != nil {
-        Divider()
-          .padding(.horizontal, Theme.hPadding)
-          .padding(.vertical, 8)
+      if onTimeSlotChange != nil, timeControlsOpen {
         timeControls
           .padding(.horizontal, Theme.hPadding)
       }
@@ -180,72 +179,61 @@ struct DatePickerSheet: View {
     if let embedding { embedding.close() } else { dismiss() }
   }
 
-  /// Start time and duration, the same controls as the AppKit date popover.
-  @ViewBuilder
-  private var timeControls: some View {
-    if showTimeControls || startTime != nil {
-      VStack(alignment: .leading, spacing: 8) {
-        HStack {
-          Label("Time", systemImage: "clock")
-            .font(.septenaLabel)
-            .foregroundStyle(Theme.inkPrimary)
-          Spacer()
-          DatePicker(
-            "Start time",
-            selection: Binding(
-              get: { TaskTimeSlot.pickerDate(from: startTime) },
-              set: { setSlot(TaskTimeSlot.hhmm(from: $0), durationMinutes) }
-            ),
-            displayedComponents: .hourAndMinute
-          )
-          .labelsHidden()
-          Button("Clear") {
-            a11yAnimate(.snappy(duration: 0.18)) {
-              setSlot(nil, nil)
-              showTimeControls = false
-            }
-          }
-          .buttonStyle(.plain)
-          .font(.septenaCaption)
-          .foregroundStyle(Theme.inkSecondary)
-          .contentShape(Rectangle())
-        }
+  private var timeControlsOpen: Bool { showTimeControls || startTime != nil }
 
-        HStack(spacing: 6) {
-          ForEach(TaskTimeSlot.quickDurations, id: \.minutes) { preset in
-            SelectableChip(preset.label,
-                           isSelected: durationMinutes == preset.minutes,
-                           tint: theme.accent) {
-              Haptics.selection()
-              a11yAnimate(.snappy(duration: 0.18)) {
-                setSlot(startTime ?? "09:00",
-                        durationMinutes == preset.minutes ? nil : preset.minutes)
-              }
-            }
+  private func openTimeControls() {
+    a11yAnimate(.snappy(duration: 0.2)) {
+      showTimeControls = true
+      setSlot(startTime ?? "09:00", durationMinutes)
+    }
+  }
+
+  /// Start time and duration, the same controls as the AppKit date popover.
+  /// They replace the board's Add time row and keep its inset.
+  private var timeControls: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        TaskDateBoardRowLabel(symbol: RegistryIcons.sfSymbol(for: "date.time"),
+                              title: String(localized: "Time"))
+        Spacer()
+        DatePicker(
+          "Start time",
+          selection: Binding(
+            get: { TaskTimeSlot.pickerDate(from: startTime) },
+            set: { setSlot(TaskTimeSlot.hhmm(from: $0), durationMinutes) }
+          ),
+          displayedComponents: .hourAndMinute
+        )
+        .labelsHidden()
+        Button("Clear") {
+          a11yAnimate(.snappy(duration: 0.18)) {
+            setSlot(nil, nil)
+            showTimeControls = false
           }
-          Spacer(minLength: 0)
         }
-      }
-    } else {
-      Button {
-        a11yAnimate(.snappy(duration: 0.2)) {
-          showTimeControls = true
-          setSlot(startTime ?? "09:00", durationMinutes)
-        }
-      } label: {
-        HStack(spacing: 6) {
-          Image(systemName: "clock")
-            .scaledFont(size: 12)
-          Text("Add time")
-            .font(.septenaLabel)
-          Spacer(minLength: 0)
-        }
+        .buttonStyle(.plain)
+        .font(.septenaCaption)
         .foregroundStyle(Theme.inkSecondary)
-        .padding(.vertical, 2)
         .contentShape(Rectangle())
       }
-      .buttonStyle(.plain)
+
+      HStack(spacing: 6) {
+        ForEach(TaskTimeSlot.quickDurations, id: \.minutes) { preset in
+          SelectableChip(preset.label,
+                         isSelected: durationMinutes == preset.minutes,
+                         tint: theme.accent) {
+            Haptics.selection()
+            a11yAnimate(.snappy(duration: 0.18)) {
+              setSlot(startTime ?? "09:00",
+                      durationMinutes == preset.minutes ? nil : preset.minutes)
+            }
+          }
+        }
+        Spacer(minLength: 0)
+      }
     }
+    .padding(.horizontal, TaskDateBoardRow.horizontalPadding)
+    .padding(.vertical, 8)
   }
 
   private func setSlot(_ start: String?, _ duration: Int?) {

@@ -419,11 +419,6 @@
     },
     {
       "file": "Septena/Shell/Tasks/TaskComponents.swift",
-      "literal": "Pick another date",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/TaskComponents.swift",
       "literal": "Set Date",
       "reasonId": "predates-rule"
     },
@@ -485,16 +480,6 @@
     {
       "file": "Septena/Shell/Tasks/TaskPatternsSection.swift",
       "literal": "Check a few things off and your completion pattern shows up here.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
-      "literal": "Time",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
-      "literal": "Add time",
       "reasonId": "predates-rule"
     },
     {
