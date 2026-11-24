@@ -345,6 +345,8 @@ export class TaskStore extends DurableObject<Env> {
         updatedAt TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS checklist_items_task ON checklist_items(taskId);
+      CREATE INDEX IF NOT EXISTS task_refs_task ON task_refs(taskId);
+      CREATE INDEX IF NOT EXISTS task_refs_key ON task_refs(key);
       CREATE INDEX IF NOT EXISTS tags_name_ci ON tags(lower(name));
       CREATE TABLE IF NOT EXISTS devices (
         sid TEXT PRIMARY KEY, client TEXT, firstSeen INTEGER NOT NULL,
@@ -483,6 +485,12 @@ export class TaskStore extends DurableObject<Env> {
       }
     }
     if (op.op === "appendTurn") return this.appendTurn(op.clientOpId, op.taskId, op.turn, actor, now);
+
+    // A key must be in normal form, and the core that normalises it is not
+    // pinned yet (core/release/README.md).
+    if (op.op === "upsert" && op.entity === "taskRef") {
+      return { clientOpId: op.clientOpId, status: "rejected", reason: "not_supported:taskRef" };
+    }
 
     const spec: EntitySpec = ENTITIES[op.entity];
     const row = this.sql.exec(`SELECT * FROM ${spec.table} WHERE id = ?`, op.id).toArray()[0];
@@ -872,7 +880,11 @@ export class TaskStore extends DurableObject<Env> {
   /// `includeSettings`: the client syncs the `setting` entity. Clients built
   /// before it existed decode pulled entities strictly and would fail on it,
   /// so they get no setting rows (their cursor still moves past them).
-  pull(since: number, limit: number, includeSettings = false, includeChecklists = false, includeTags = false): PullResult {
+  /// The other flags do the same for entities that came later.
+  pull(
+    since: number, limit: number, includeSettings = false, includeChecklists = false, includeTags = false,
+    includeRefs = false,
+  ): PullResult {
     const n = Math.min(Math.max(limit, 1), MAX_PULL);
     if (since > 0 && since < this.meta("purgedThrough")) {
       return { resetRequired: true, changes: [], nextSince: 0, hasMore: true };
@@ -884,6 +896,7 @@ export class TaskStore extends DurableObject<Env> {
       if (name === "setting" && !includeSettings) continue;
       if (name === "checklistItem" && !includeChecklists) continue;
       if (name === "tag" && !includeTags) continue;
+      if (name === "taskRef" && !includeRefs) continue;
       const spec: EntitySpec = ENTITIES[name];
       for (const raw of this.sql.exec(`SELECT * FROM ${spec.table} WHERE rev > ? ORDER BY rev LIMIT ?`, since, n)) {
         merged.push({ rev: raw.rev as number, entity: name, row: decodeRow(spec, raw) });

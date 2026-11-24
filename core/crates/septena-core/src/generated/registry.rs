@@ -36,6 +36,9 @@ pub mod limits {
     pub const MAX_TAGS_PER_TASK: i64 = 20;
     pub const TAG_NAME_MAX: i64 = 64;
     pub const MAX_SUBTASKS: i64 = 500;
+    pub const MAX_REFS_PER_TASK: i64 = 20;
+    pub const REF_KEY_MAX: i64 = 1000;
+    pub const REF_SNAPSHOT_MAX: i64 = 2048;
     pub const MAX_ARTIFACT_REFS: i64 = 100;
     pub const TURN_PROVIDER_MAX: i64 = 32;
     pub const TURN_QUESTION_MAX: i64 = 10000;
@@ -129,6 +132,13 @@ pub mod enums {
         pub const WORK: &str = "work";
         pub const ALL: &[&str] = &["confirm", "ground", "scope", "decide", "work"];
     }
+    pub mod task_ref_role {
+        pub const ABOUT: &str = "about";
+        pub const FROM: &str = "from";
+        pub const BLOCKED_BY: &str = "blocked_by";
+        pub const FOLLOW_UP: &str = "follow_up";
+        pub const ALL: &[&str] = &["about", "from", "blocked_by", "follow_up"];
+    }
     pub mod telemetry_level {
         pub const NONE: &str = "none";
         pub const MINIMAL: &str = "minimal";
@@ -200,6 +210,7 @@ pub mod entity_names {
     pub const PROJECT: &str = "project";
     pub const ATTACHMENT: &str = "attachment";
     pub const CHECKLIST_ITEM: &str = "checklistItem";
+    pub const TASK_REF: &str = "taskRef";
     pub const TAG: &str = "tag";
     pub const CONVO: &str = "convo";
     pub const SETTING: &str = "setting";

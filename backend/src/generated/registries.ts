@@ -23,6 +23,9 @@ export const ENTITY_LIMITS = {
   maxTagsPerTask: 20,
   tagNameMax: 64,
   maxSubtasks: 500,
+  maxRefsPerTask: 20,
+  refKeyMax: 1000,
+  refSnapshotMax: 2048,
   maxArtifactRefs: 100,
   turnProviderMax: 32,
   turnQuestionMax: 10000,
@@ -45,6 +48,7 @@ export const ENTITY_ENUMS = {
   convoHandoffActionType: ["open_url","compose","call","none"] as const,
   convoTurnRole: ["user","provider"] as const,
   convoTurnStep: ["confirm","ground","scope","decide","work"] as const,
+  taskRefRole: ["about","from","blocked_by","follow_up"] as const,
   telemetryLevel: ["none","minimal","balanced","full"] as const,
   appearanceMode: ["system","light","dark"] as const,
   accentColor: ["colorful","tamarillo","persimmon","yuzu","carambola","haskap","acai","pitaya","jabuticaba"] as const,
@@ -55,7 +59,7 @@ export const ENTITY_ENUMS = {
 
 export const TURN_FIELDS = ["role","step","provider","confidence","question","options","chosen","otherText","inReplyTo","note","ts"] as const;
 
-export const DELETABLE_ENTITIES = ["task","area","project","attachment","checklistItem","tag"] as const;
+export const DELETABLE_ENTITIES = ["task","area","project","attachment","checklistItem","taskRef","tag"] as const;
 
 export const DOMAIN_RULES = {
   cueDecayDays: 7,

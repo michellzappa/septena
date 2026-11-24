@@ -54,6 +54,22 @@ const zAttachmentPointer = z.record(z.unknown()).refine(
   "attachment pointer too large",
 );
 
+// What a reference shows when its target is gone or cannot be opened here
+// (docs/TASK_REFERENCES_SPEC.md §4.1). No body, no excerpt. The cap counts
+// the bytes of the stored JSON.
+export const zRefSnapshot = z.object({
+  title: z.string(),
+  subtitle: z.string(),
+  date: z.string(),
+  url: z.string().regex(/^https?:\/\/\S+$/i, "expected an http or https URL"),
+  rawId: z.string(),
+  account: z.string(),
+}).partial().strict().refine(
+  (v) => new TextEncoder().encode(JSON.stringify(v)).length <= ENTITY_LIMITS.refSnapshotMax,
+  "snapshot too large",
+);
+export type RefSnapshot = z.infer<typeof zRefSnapshot>;
+
 // Synced app settings (Septask), one row per key in the `settings` table:
 // `id` = the key, `value` = its JSON value (null = not set). Only these keys
 // are accepted, each with its own schema, so validation stays as strict as a
@@ -109,6 +125,7 @@ export const MAX_ATTACHMENT_BYTES = ENTITY_LIMITS.maxAttachmentBytes;
 export const MAX_USER_ATTACHMENT_BYTES = ENTITY_LIMITS.maxUserAttachmentBytes;
 export const MAX_CHECKLIST_ITEMS_PER_TASK = ENTITY_LIMITS.maxChecklistItemsPerTask;
 export const MAX_TAGS_PER_TASK = ENTITY_LIMITS.maxTagsPerTask;
+export const MAX_REFS_PER_TASK = ENTITY_LIMITS.maxRefsPerTask;
 export const TAG_NAME_MAX = ENTITY_LIMITS.tagNameMax;
 
 export interface EntitySpec {
@@ -255,6 +272,27 @@ export const ENTITIES = {
     },
     requiredOnInsert: ["taskId", "title"],
     updatable: ["title", "checked", "checkedAt", "position"],
+  },
+  // What a task is about (docs/TASK_REFERENCES_SPEC.md §4, ADR 0031): a
+  // canonical key and a small snapshot. It never syncs fields with its target.
+  taskRef: {
+    table: "task_refs",
+    columns: {
+      taskId: { kind: "text", zod: zId },
+      key: { kind: "text", zod: z.string().min(1).max(ENTITY_LIMITS.refKeyMax) },
+      // Derived from `key` by the store. Never pushed.
+      kind: { kind: "text", zod: z.never() },
+      role: { kind: "text", zod: z.enum(ENTITY_ENUMS.taskRefRole), dflt: "about" },
+      snapshot: json(zRefSnapshot),
+      position: real(),
+      // The actor of the insert. Never pushed.
+      createdBy: { kind: "text", zod: z.never() },
+      // The last time a capture path met this key (§6.2). Never pushed.
+      lastSeenAt: { kind: "text", zod: z.never() },
+      createdAt: stamp(),
+    },
+    requiredOnInsert: ["taskId", "key"],
+    updatable: ["role", "snapshot", "position"],
   },
   // Flat tags catalog (docs/TAGS_SPEC.md). Tasks reference canonical `tag.id`s
   // in `task.tags`; renaming updates one row, soft-deleting never storms tasks.

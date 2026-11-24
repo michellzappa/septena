@@ -33,6 +33,9 @@ object RegistryEntityLimits {
     const val MAX_TAGS_PER_TASK: Long = 20L
     const val TAG_NAME_MAX: Long = 64L
     const val MAX_SUBTASKS: Long = 500L
+    const val MAX_REFS_PER_TASK: Long = 20L
+    const val REF_KEY_MAX: Long = 1000L
+    const val REF_SNAPSHOT_MAX: Long = 2048L
     const val MAX_ARTIFACT_REFS: Long = 100L
     const val TURN_PROVIDER_MAX: Long = 32L
     const val TURN_QUESTION_MAX: Long = 10000L
@@ -54,6 +57,9 @@ object RegistryEntityLimits {
         "maxTagsPerTask" to MAX_TAGS_PER_TASK,
         "tagNameMax" to TAG_NAME_MAX,
         "maxSubtasks" to MAX_SUBTASKS,
+        "maxRefsPerTask" to MAX_REFS_PER_TASK,
+        "refKeyMax" to REF_KEY_MAX,
+        "refSnapshotMax" to REF_SNAPSHOT_MAX,
         "maxArtifactRefs" to MAX_ARTIFACT_REFS,
         "turnProviderMax" to TURN_PROVIDER_MAX,
         "turnQuestionMax" to TURN_QUESTION_MAX,
@@ -78,6 +84,7 @@ object RegistryEntityEnums {
         "convoHandoffActionType" to listOf("open_url", "compose", "call", "none"),
         "convoTurnRole" to listOf("user", "provider"),
         "convoTurnStep" to listOf("confirm", "ground", "scope", "decide", "work"),
+        "taskRefRole" to listOf("about", "from", "blocked_by", "follow_up"),
         "telemetryLevel" to listOf("none", "minimal", "balanced", "full"),
         "appearanceMode" to listOf("system", "light", "dark"),
         "accentColor" to listOf("colorful", "tamarillo", "persimmon", "yuzu", "carambola", "haskap", "acai", "pitaya", "jabuticaba"),
@@ -144,6 +151,12 @@ object RegistryEntityEnums {
         const val SCOPE: String = "scope"
         const val DECIDE: String = "decide"
         const val WORK: String = "work"
+    }
+    object TaskRefRole {
+        const val ABOUT: String = "about"
+        const val FROM: String = "from"
+        const val BLOCKED_BY: String = "blocked_by"
+        const val FOLLOW_UP: String = "follow_up"
     }
     object TelemetryLevel {
         const val NONE: String = "none"
@@ -1068,6 +1081,113 @@ object RegistryEntities {
                 ),
             ),
         ),
+        "taskRef" to RegistryEntitySpec(
+            table = "task_refs",
+            deletable = true,
+            requiredOnInsert = setOf("taskId", "key"),
+            updatable = setOf("role", "snapshot", "position"),
+            columns = linkedMapOf(
+                "taskId" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "id",
+                    enumName = null,
+                    nullable = false,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "key" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = false,
+                    min = null,
+                    max = 1000L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "kind" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = null,
+                    min = null,
+                    max = 32L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = true,
+                ),
+                "role" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = "taskRefRole",
+                    nullable = null,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = "\"about\"",
+                    serverOwned = false,
+                ),
+                "snapshot" to RegistryColumnSpec(
+                    kind = "json",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = 2048L,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "position" to RegistryColumnSpec(
+                    kind = "real",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "createdBy" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = null,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = true,
+                ),
+                "lastSeenAt" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = null,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = true,
+                ),
+                "createdAt" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "stamp",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 40L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+            ),
+        ),
         "tag" to RegistryEntitySpec(
             table = "tags",
             deletable = true,
@@ -1357,6 +1477,17 @@ object RegistryEntityFields {
         const val POSITION: String = "position"
         const val CREATED_AT: String = "createdAt"
     }
+    object TaskRef {
+        const val TASK_ID: String = "taskId"
+        const val KEY: String = "key"
+        const val KIND: String = "kind"
+        const val ROLE: String = "role"
+        const val SNAPSHOT: String = "snapshot"
+        const val POSITION: String = "position"
+        const val CREATED_BY: String = "createdBy"
+        const val LAST_SEEN_AT: String = "lastSeenAt"
+        const val CREATED_AT: String = "createdAt"
+    }
     object Tag {
         const val NAME: String = "name"
         const val COLOR: String = "color"
@@ -1387,11 +1518,12 @@ object RegistryEntityNames {
     const val PROJECT: String = "project"
     const val ATTACHMENT: String = "attachment"
     const val CHECKLIST_ITEM: String = "checklistItem"
+    const val TASK_REF: String = "taskRef"
     const val TAG: String = "tag"
     const val CONVO: String = "convo"
     const val SETTING: String = "setting"
-    val all: List<String> = listOf("task", "area", "project", "attachment", "checklistItem", "tag", "convo", "setting")
-    val deletable: Set<String> = setOf("task", "area", "project", "attachment", "checklistItem", "tag")
+    val all: List<String> = listOf("task", "area", "project", "attachment", "checklistItem", "taskRef", "tag", "convo", "setting")
+    val deletable: Set<String> = setOf("task", "area", "project", "attachment", "checklistItem", "taskRef", "tag")
 }
 
 /** Numeric domain constants shared with the backend and Apple clients. */
@@ -2379,7 +2511,7 @@ object RegistryCapabilities {
 /** Complete canonical registry documents for Kotlin/JVM clients. */
 object RegistryDocuments {
     val entitiesJson: String = listOf(
-        "{\"version\":1,\"turnFields\":[\"role\",\"step\",\"provider\",\"confidence\",\"question\",\"options\",\"chosen\",\"otherText\",\"inReplyTo\",\"note\",\"ts\"],\"patterns\":{\"id\":\"^[A-Za-z0-9._:-]{1,128}\$\",\"clientOpId\":\"^[A-Za-z0-9_-]{8,64}\$\",\"day\":\"^\\\\d{4}-\\\\d{2}-\\\\d{2}\$\",\"time24\":\"^([01]\\\\d|2[0-3]):[0-5]\\\\d\$\",\"stamp\":\"^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}\"},\"limits\":{\"textMax\":2000,\"notesMax\":100000,\"attachmentPointerMax\":4000,\"stampMax\":40,\"maxAttachmentBytes\":26214400,\"maxUserAttachmentBytes\":2147483648,\"maxOpsPerPush\":500,\"maxPull\":1000,\"maxChecklistItemsPerTask\":200,\"maxTagsPerTask\":20,\"tagNameMax\":64,\"maxSubtasks\":500,\"maxArtifactRefs\":100,\"turnProviderMax\":32,\"turnQuestionMax\":10000,\"turnOptionMax\":500,\"turnMaxOptions\":20,\"turnChosenMax\":500,\"turnOtherTextMax\":10000,\"turnNoteMax\":100000},\"enums\":{\"taskStatus\":[\"open\",\"done\",\"cancelled\"],\"taskSource\":[\"app\",\"mcp\"],\"projectStatus\":[\"active\",\"done\",\"cancelled\"],\"taskKind\":[\"heading\"],\"recurrenceUnit\":[\"day\",\"week\",\"month\",\"year\"],\"reminderMode\":[\"floating\",\"fixed\"],\"convoAssignee\":[\"me\",\"local\",\"claude\"],\"convoEndState\":[\"agent_done\",\"human_done\",\"agent_assisted_done\",\"needs_verify\",\"decomposed\",\"reminder_set\",\"promoted_to_today\",\"wont_do\",\"open\"],\"convoHandoffActionType\":[\"open_url\",\"compose\",\"call\",\"none\"],\"convoTurnRole\":[\"user\",\"provider\"],\"convoTurnStep\":[\"confirm\",\"ground\",\"scope\",\"decide\",\"work\"],\"telemetryLevel\":[\"none\",\"minimal\",\"balanced\",\"full\"],\"appearanceMode\":[\"system\",\"light\",\"dark\"],\"accentColor\":[\"colorful\",\"tamarillo\",\"persimmon\",\"yuzu\",\"carambola\",\"haskap\",\"acai\",\"pitaya\",\"jabuticaba\"],\"appIconFinish\":[\"obsidian\",\"ceramic\",\"framed\"],\"canvasTexture\":[\"none\",\"topography\",\"fieldMatrix\",\"stippleDrift\",\"ridges\",\"washiPaper\"],\"textureMotion\":[\"still\",\"slowDrift\"]},\"entities\":{\"task\":{\"table\":\"tasks\",\"deletable\":true,\"requiredOnInsert\":[\"title\",\"status\"],\"columns\":{\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":true},\"status\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"kind\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"heading\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"area\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"project\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"created\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"scheduled\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"startTime\":{\"kind\":\"text\",\"format\":\"time24\",\"max\":5,\"nullable\":true},\"durationMinutes\":{\"kind\":\"int\",\"min\":5,\"max\":1440,\"nullable\":true},\"timeZone\":{\"kind\":\"text\",\"max\":64,\"nullable\":true},\"deadline\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"today\":{\"kind\":\"bool\",\"default\":0},\"starred\":{\"kind\":\"bool\",\"default\":0},\"tags\":{\"kind\":\"json\",\"maxJsonLength\":4000,\"nullable\":true},\"todaySetOn\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"completedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"notes\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"position\":{\"kind\":\"real\",\"nullable\":true},\"todayPosition\":{\"kind\":\"real\",\"nullable\":true},\"recurrenceUnit\":{\"kind\":\"text\",\"max\":16,\"nullable\":true},\"recurrenceInterval\":{\"kind\":\"int\",\"nullable\":true},\"recurrenceAfterCompletion\":{\"kind\":\"bool\",\"default\":0},\"recurrencePaused\":{\"kind\":\"bool\",\"default\":0},\"recurrenceSeriesID\":{\"kind\":\"text\",\"max\":128,\"nullable\":true},\"recurrenceAnchorDate\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"recurrenceWeekdays\":{\"kind\":\"json\",\"nullable\":true},\"recurrenceMonthDay\":{\"kind\":\"int\",\"min\":-1,\"max\":31,\"nullable\":true},\"recurrenceOrdinalWeekday\":{\"kind\":\"json\",\"nullable\":true},\"reminderAt\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"reminderMode\":{\"kind\":\"text\",\"enum\":\"reminderMode\",\"nullable\":true},\"reminderSnoozedUntil\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"reminderDismissedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"source\":{\"kind\":\"text\",\"max\":64,\"nullable\":true},\"sourceClient\":{\"kind\":\"text\",\"max\":64,\"nullable\":true},\"acknowledgedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"touchedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"deferCount\":{\"kind\":\"int\",\"min\":0,\"default\":0},\"fadedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"dropReason\":{\"kind\":\"text\",\"max\":16,\"nullable\":true},\"effort\":{\"kind\":\"text\",\"max\":16,\"nullable\":true}}},\"area\":{\"table\":\"areas\",\"deletable\":true,\"requiredOnInsert\":[\"title\"],\"columns\":{\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":true},\"context\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"noteRev\":{\"kind\":\"int\",\"serverOwned\":true},\"notesProposal\":{\"kind\":\"json\",\"maxJsonLength\":101000,\"nullable\":true},\"emoji\":{\"kind\":\"text\",\"max\":16,\"nullable\":true},\"attachment\":{\"kind\":\"json\",\"maxJsonLength\":4000,\"nullable\":true},\"position\":{\"kind\":\"int\",\"nullable\":true}}},\"project\":{\"table\":\"projects\",\"deletable\":true,\"requiredOnInsert\":[\"title\",\"status\"],\"columns\":{\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":true},\"status\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"area\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"created\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"completedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"notes\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"context\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"noteRev\":{\"kind\":\"int\",\"serverOwned\":true},\"notesProposal\":{\"kind\":\"json\",\"maxJsonLength\":101000,\"nullable\":true},\"githubRepo\":{\"kind\":\"text\",\"max\":200,\"nullable\":true},\"attachment\":{\"kind\":\"json\",\"maxJsonLength\":4000,\"nullable\":true},\"position\":{\"kind\":\"int\",\"nullable\":true}}},\"attachment\":{\"table\":\"attachments\",\"deletable\":true,\"requiredOnInsert\":[\"taskId\",\"filename\",\"contentType\",\"byteCount\"],\"updatable\":[\"filename\",\"position\"],\"columns\":{\"taskId\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":false},\"filename\":{\"kind\":\"text\",\"max\":512,\"nullable\":true},\"contentType\":{\"kind\":\"text\",\"max\":200,\"nullable\":true},\"byteCount\":{\"kind\":\"int\",\"min\":0,\"max\":26214400,\"nullable\":false},\"position\":{\"kind\":\"real\",\"nullable\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"uploadedAt\":{\"kind\":\"text\",\"serverOwned\":true}}},\"checklistItem\":{\"table\":\"checklist_items\",\"deletable\":true,\"requiredOnInsert\":[\"taskId\",\"title\"],\"updatable\":[\"title\",\"checked\",\"checkedAt\",\"position\"],\"columns\":{\"taskId\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":false},\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":false},\"checked\":{\"kind\":\"bool\",\"default\":0},\"checkedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"position\":{\"kind\":\"real\",\"nullable\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true}}},\"tag\":{\"table\":\"tags\",\"deletable\":true,\"requiredOnInsert\":[\"name\"],\"updatable\":[\"name\",\"color\",\"position\"],\"columns\":{\"name\":{\"kind\":\"text\",\"max\":64,\"nullable\":false},\"color\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"position\":{\"kind\":\"int\",\"nullable\":true}}},\"convo\":{\"table\":\"convos\",\"deletable\":false,\"requiredOnInsert\":[],\"columns\":{\"confirmedIntent\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"acceptance\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"subtasks\":{\"kind\":\"json\",\"nullable\":true},\"artifact\":{\"kind\":\"json\",\"nullable\":true},\"handoff\":{\"kind\":\"json\",\"nullable\":true},\"endState\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"endStateNote\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"assignee\":{\"kind\":\"text\",\"enum\":\"convoAssignee\",\"nullable\":true},\"stoppedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"claimedBy\":{\"kind\":\"text\",\"serverOwned\":true},\"claimUntil\":{\"kind\":\"text\",\"serverOwned\":true},\"runsSinceUser\":{\"kind\":\"int\",\"serverOwned\":true}}},\"setting\":{\"table\":\"settings\",\"deletable\":false,\"requiredOnInsert\":[],\"columns\":{\"value\":{\"kind\":\"json\",\"nullable\":true}}}}}",
+        "{\"version\":1,\"turnFields\":[\"role\",\"step\",\"provider\",\"confidence\",\"question\",\"options\",\"chosen\",\"otherText\",\"inReplyTo\",\"note\",\"ts\"],\"patterns\":{\"id\":\"^[A-Za-z0-9._:-]{1,128}\$\",\"clientOpId\":\"^[A-Za-z0-9_-]{8,64}\$\",\"day\":\"^\\\\d{4}-\\\\d{2}-\\\\d{2}\$\",\"time24\":\"^([01]\\\\d|2[0-3]):[0-5]\\\\d\$\",\"stamp\":\"^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}\"},\"limits\":{\"textMax\":2000,\"notesMax\":100000,\"attachmentPointerMax\":4000,\"stampMax\":40,\"maxAttachmentBytes\":26214400,\"maxUserAttachmentBytes\":2147483648,\"maxOpsPerPush\":500,\"maxPull\":1000,\"maxChecklistItemsPerTask\":200,\"maxTagsPerTask\":20,\"tagNameMax\":64,\"maxSubtasks\":500,\"maxRefsPerTask\":20,\"refKeyMax\":1000,\"refSnapshotMax\":2048,\"maxArtifactRefs\":100,\"turnProviderMax\":32,\"turnQuestionMax\":10000,\"turnOptionMax\":500,\"turnMaxOptions\":20,\"turnChosenMax\":500,\"turnOtherTextMax\":10000,\"turnNoteMax\":100000},\"enums\":{\"taskStatus\":[\"open\",\"done\",\"cancelled\"],\"taskSource\":[\"app\",\"mcp\"],\"projectStatus\":[\"active\",\"done\",\"cancelled\"],\"taskKind\":[\"heading\"],\"recurrenceUnit\":[\"day\",\"week\",\"month\",\"year\"],\"reminderMode\":[\"floating\",\"fixed\"],\"convoAssignee\":[\"me\",\"local\",\"claude\"],\"convoEndState\":[\"agent_done\",\"human_done\",\"agent_assisted_done\",\"needs_verify\",\"decomposed\",\"reminder_set\",\"promoted_to_today\",\"wont_do\",\"open\"],\"convoHandoffActionType\":[\"open_url\",\"compose\",\"call\",\"none\"],\"convoTurnRole\":[\"user\",\"provider\"],\"convoTurnStep\":[\"confirm\",\"ground\",\"scope\",\"decide\",\"work\"],\"taskRefRole\":[\"about\",\"from\",\"blocked_by\",\"follow_up\"],\"telemetryLevel\":[\"none\",\"minimal\",\"balanced\",\"full\"],\"appearanceMode\":[\"system\",\"light\",\"dark\"],\"accentColor\":[\"colorful\",\"tamarillo\",\"persimmon\",\"yuzu\",\"carambola\",\"haskap\",\"acai\",\"pitaya\",\"jabuticaba\"],\"appIconFinish\":[\"obsidian\",\"ceramic\",\"framed\"],\"canvasTexture\":[\"none\",\"topography\",\"fieldMatrix\",\"stippleDrift\",\"ridges\",\"washiPaper\"],\"textureMotion\":[\"still\",\"slowDrift\"]},\"entities\":{\"task\":{\"table\":\"tasks\",\"deletable\":true,\"requiredOnInsert\":[\"title\",\"status\"],\"columns\":{\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":true},\"status\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"kind\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"heading\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"area\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"project\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"created\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"scheduled\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"startTime\":{\"kind\":\"text\",\"format\":\"time24\",\"max\":5,\"nullable\":true},\"durationMinutes\":{\"kind\":\"int\",\"min\":5,\"max\":1440,\"nullable\":true},\"timeZone\":{\"kind\":\"text\",\"max\":64,\"nullable\":true},\"deadline\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"today\":{\"kind\":\"bool\",\"default\":0},\"starred\":{\"kind\":\"bool\",\"default\":0},\"tags\":{\"kind\":\"json\",\"maxJsonLength\":4000,\"nullable\":true},\"todaySetOn\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"completedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"notes\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"position\":{\"kind\":\"real\",\"nullable\":true},\"todayPosition\":{\"kind\":\"real\",\"nullable\":true},\"recurrenceUnit\":{\"kind\":\"text\",\"max\":16,\"nullable\":true},\"recurrenceInterval\":{\"kind\":\"int\",\"nullable\":true},\"recurrenceAfterCompletion\":{\"kind\":\"bool\",\"default\":0},\"recurrencePaused\":{\"kind\":\"bool\",\"default\":0},\"recurrenceSeriesID\":{\"kind\":\"text\",\"max\":128,\"nullable\":true},\"recurrenceAnchorDate\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"recurrenceWeekdays\":{\"kind\":\"json\",\"nullable\":true},\"recurrenceMonthDay\":{\"kind\":\"int\",\"min\":-1,\"max\":31,\"nullable\":true},\"recurrenceOrdinalWeekday\":{\"kind\":\"json\",\"nullable\":true},\"reminderAt\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"reminderMode\":{\"kind\":\"text\",\"enum\":\"reminderMode\",\"nullable\":true},\"reminderSnoozedUntil\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"reminderDismissedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"source\":{\"kind\":\"text\",\"max\":64,\"nullable\":true},\"sourceClient\":{\"kind\":\"text\",\"max\":64,\"nullable\":true},\"acknowledgedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"touchedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"deferCount\":{\"kind\":\"int\",\"min\":0,\"default\":0},\"fadedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"dropReason\":{\"kind\":\"text\",\"max\":16,\"nullable\":true},\"effort\":{\"kind\":\"text\",\"max\":16,\"nullable\":true}}},\"area\":{\"table\":\"areas\",\"deletable\":true,\"requiredOnInsert\":[\"title\"],\"columns\":{\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":true},\"context\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"noteRev\":{\"kind\":\"int\",\"serverOwned\":true},\"notesProposal\":{\"kind\":\"json\",\"maxJsonLength\":101000,\"nullable\":true},\"emoji\":{\"kind\":\"text\",\"max\":16,\"nullable\":true},\"attachment\":{\"kind\":\"json\",\"maxJsonLength\":4000,\"nullable\":true},\"position\":{\"kind\":\"int\",\"nullable\":true}}},\"project\":{\"table\":\"projects\",\"deletable\":true,\"requiredOnInsert\":[\"title\",\"status\"],\"columns\":{\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":true},\"status\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"area\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"created\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"completedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"notes\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"context\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"noteRev\":{\"kind\":\"int\",\"serverOwned\":true},\"notesProposal\":{\"kind\":\"json\",\"maxJsonLength\":101000,\"nullable\":true},\"githubRepo\":{\"kind\":\"text\",\"max\":200,\"nullable\":true},\"attachment\":{\"kind\":\"json\",\"maxJsonLength\":4000,\"nullable\":true},\"position\":{\"kind\":\"int\",\"nullable\":true}}},\"attachment\":{\"table\":\"attachments\",\"deletable\":true,\"requiredOnInsert\":[\"taskId\",\"filename\",\"contentType\",\"byteCount\"],\"updatable\":[\"filename\",\"position\"],\"columns\":{\"taskId\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":false},\"filename\":{\"kind\":\"text\",\"max\":512,\"nullable\":true},\"contentType\":{\"kind\":\"text\",\"max\":200,\"nullable\":true},\"byteCount\":{\"kind\":\"int\",\"min\":0,\"max\":26214400,\"nullable\":false},\"position\":{\"kind\":\"real\",\"nullable\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"uploadedAt\":{\"kind\":\"text\",\"serverOwned\":true}}},\"checklistItem\":{\"table\":\"checklist_items\",\"deletable\":true,\"requiredOnInsert\":[\"taskId\",\"title\"],\"updatable\":[\"title\",\"checked\",\"checkedAt\",\"position\"],\"columns\":{\"taskId\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":false},\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":false},\"checked\":{\"kind\":\"bool\",\"default\":0},\"checkedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"position\":{\"kind\":\"real\",\"nullable\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true}}},\"taskRef\":{\"table\":\"task_refs\",\"deletable\":true,\"requiredOnInsert\":[\"taskId\",\"key\"],\"updatable\":[\"role\",\"snapshot\",\"position\"],\"columns\":{\"taskId\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":false},\"key\":{\"kind\":\"text\",\"max\":1000,\"nullable\":false},\"kind\":{\"kind\":\"text\",\"max\":32,\"serverOwned\":true},\"role\":{\"kind\":\"text\",\"enum\":\"taskRefRole\",\"default\":\"about\"},\"snapshot\":{\"kind\":\"json\",\"maxJsonLength\":2048,\"nullable\":true},\"position\":{\"kind\":\"real\",\"nullable\":true},\"createdBy\":{\"kind\":\"text\",\"serverOwned\":true},\"lastSeenAt\":{\"kind\":\"text\",\"serverOwned\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true}}},\"tag\":{\"table\":\"tags\",\"deletable\":true,\"requiredOnInsert\":[\"name\"],\"updatable\":[\"name\",\"color\",\"position\"],\"columns\":{\"name\":{\"kind\":\"text\",\"max\":64,\"nullable\":false},\"color\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"position\":{\"kind\":\"int\",\"nullable\":true}}},\"convo\":{\"table\":\"convos\",\"deletable\":false,\"requiredOnInsert\":[],\"columns\":{\"confirmedIntent\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"acceptance\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"subtasks\":{\"kind\":\"json\",\"nullable\":true},\"artifact\":{\"kind\":\"json\",\"nullable\":true},\"handoff\":{\"kind\":\"json\",\"nullable\":true},\"endState\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"endStateNote\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"assignee\":{\"kind\":\"text\",\"enum\":\"convoAssignee\",\"nullable\":true},\"stoppedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"claimedBy\":{\"kind\":\"text\",\"serverOwned\":true},\"claimUntil\":{\"kind\":\"text\",\"serverOwned\":true},\"runsSinceUser\":{\"kind\":\"int\",\"serverOwned\":true}}},\"setting\":{\"table\":\"settings\",\"deletable\":false,\"requiredOnInsert\":[],\"columns\":{\"value\":{\"kind\":\"json\",\"nullable\":true}}}}}",
     ).joinToString("")
     val rulesJson: String = listOf(
         "{\"version\":1,\"cueDecayDays\":7,\"fadeWindowDays\":14,\"fadeGraceDays\":1,\"fadeMinOpacity\":0.55,\"fadeSweepWeekday\":1,\"recentlyDeletedDays\":30,\"upcomingCalendarDays\":30,\"toastDurationSeconds\":7,\"agentRunBudget\":5,\"claimTtlDefaultSeconds\":1800,\"claimTtlMaxSeconds\":14400,\"tombstoneTtlDays\":90,\"clientOpTtlDays\":30,\"changeLogTtlDays\":365,\"deleteGraceSeconds\":120}",
