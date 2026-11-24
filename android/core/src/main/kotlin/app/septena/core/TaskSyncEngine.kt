@@ -84,7 +84,7 @@ class TaskSyncEngine(
         when (plan) {
             PushPlan.ApplyResults -> error("A push failure cannot apply results")
             is PushPlan.RejectOne -> store.applyPushResults(
-                listOf(SyncOperationResult(plan.clientOpId, SyncResultStatus.REJECTED, plan.reason)),
+                listOf(SyncOperationResult(plan.clientOpId, SyncResultStatus.REJECTED, reason = plan.reason)),
                 clock.now(),
             )
             is PushPlan.Bisect -> {
