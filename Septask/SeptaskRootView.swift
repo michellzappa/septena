@@ -181,8 +181,10 @@ struct SeptaskRootView: View {
     ZStack(alignment: .bottomTrailing) {
       ContentView()
 
+      // An open task (inline editor or pushed page) hides the orb: it showed
+      // through the editor. It fades with the push, not after it.
       let hideMagicPlus = nav.isTaskMultiSelectActive || SeptenaToastActivity.shared.hasActiveToast
-        || keyboardVisible
+        || keyboardVisible || nav.isTaskEditorOpen
       MagicPlusOrb(
         drag: magicPlusDrag,
         isViewingProject: isViewingProject,
@@ -196,7 +198,7 @@ struct SeptaskRootView: View {
       .padding(.bottom, 8)
       .opacity(hideMagicPlus ? 0 : 1)
       .allowsHitTesting(!hideMagicPlus)
-      .a11yAnimation(.snappy(duration: 0.2), value: hideMagicPlus)
+      .a11yAnimation(.easeInOut(duration: 0.25), value: hideMagicPlus)
 
     }
     .environment(\.magicPlusDrag, magicPlusDrag)
