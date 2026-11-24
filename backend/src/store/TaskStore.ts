@@ -1237,6 +1237,31 @@ export class TaskStore extends DurableObject<Env> {
     return { rows, notes, ats, total };
   }
 
+  /// Open non-heading tasks whose last turn is an agent's question with
+  /// options (`awaitsHuman`), newest question first. A stopped task is not in
+  /// it: the user already said no.
+  readOpenQuestions(limit: number): { rows: Row[]; turns: Record<string, Row>; total: number } {
+    const n = Math.min(Math.max(limit, 1), 100);
+    const raw = this.sql.exec(`
+      SELECT t.id AS id FROM tasks t
+      JOIN turns q ON q.taskId = t.id AND q.seq = (SELECT MAX(seq) FROM turns WHERE taskId = t.id)
+      LEFT JOIN convos c ON c.id = t.id AND c.deletedAt IS NULL
+      WHERE t.deletedAt IS NULL AND t.status = 'open' AND (t.kind IS NULL OR t.kind != 'heading')
+        AND c.stoppedAt IS NULL
+        AND q.role = 'provider' AND q.options IS NOT NULL AND q.options != '[]'
+      ORDER BY q.rev DESC`).toArray();
+    const rows: Row[] = [];
+    const turns: Record<string, Row> = {};
+    for (const { id } of raw.slice(0, n) as { id: string }[]) {
+      const read = this.readTask(id);
+      const last = read?.turns[read.turns.length - 1];
+      if (!read || !last) continue;
+      rows.push(read.task);
+      turns[id] = last;
+    }
+    return { rows, turns, total: raw.length };
+  }
+
   /// One live task with its conversation row and turns (oldest first).
   readTask(id: string): { task: Row; convo: Row | null; turns: Row[] } | null {
     const raw = this.sql.exec("SELECT * FROM tasks WHERE id = ? AND deletedAt IS NULL", id).toArray()[0];

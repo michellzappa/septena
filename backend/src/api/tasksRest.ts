@@ -9,8 +9,8 @@ import type { TaskOut } from "../tools/taskShared.js";
 import { matchesView } from "../tools/taskShared.js";
 import { listTasks, taskOut } from "../shadow/mcp.js";
 import { MAX_REF_INPUT, findByRef, zRefs } from "../shadow/refs.js";
-import { DESIGN_TOKENS } from "../generated/registries.js";
-import { AGENT_FALLBACK_NAME, rpcStoreFor, runWriteTool, zWriteArgs, type StoreRpc, type WriteContext, type WriteToolName } from "../shadow/writes.js";
+import { DESIGN_TOKENS, ENTITY_LIMITS } from "../generated/registries.js";
+import { AGENT_FALLBACK_NAME, acceptReview, rpcStoreFor, runWriteTool, sendBackReview, zWriteArgs, type StoreRpc, type WriteContext, type WriteToolName } from "../shadow/writes.js";
 
 // A small REST surface over the MCP task tools for thin app clients, first of
 // all the Apple Watch (docs/WATCH.md in the app repo). The watch has no task
@@ -79,6 +79,10 @@ export interface ClientTask {
   createdAt?: number;
   addedBy?: "you" | "agent";
   agentName?: string;
+  /// The open question (the questions view). `turnSeq` names it in an answer.
+  question?: string;
+  options?: string[];
+  turnSeq?: number;
 }
 
 /// The user's synced accent with its hexes, so a thin client that has no
@@ -159,7 +163,7 @@ function containerNames(areas: Row[], projects: Row[]): Map<string, string> {
   return m;
 }
 
-const zView = z.enum(["today", "inbox", "upcoming", "repeating", "anytime", "completed", "starred", "review", "added"]);
+const zView = z.enum(["today", "inbox", "upcoming", "repeating", "anytime", "completed", "starred", "review", "added", "questions"]);
 
 /// Mirrors `TaskStructureOrder.positionOrdered` in SeptenaCore: positive
 /// `position` ascending, unset (`0` / missing) sinks to the bottom, ties break
@@ -259,6 +263,33 @@ tasksRest.get("/", async (c) => {
   if (!q.success) return c.json({ error: "invalid_request" }, 400);
   const store = rpcStoreFor(c.env, c.get("userId"));
   const timeZone = await timeZoneFor(c, store);
+  if (q.data.view === "questions") {
+    const [open, areas, projects, accentSetting] = await Promise.all([
+      store.readOpenQuestions(q.data.limit),
+      store.readAreas(500),
+      store.readProjects("active", 500),
+      store.readSetting("accentColor"),
+    ]);
+    const names = containerNames(areas, projects);
+    const tasks = open.rows.map((row) => {
+      const out = clientTask(taskOut(row), names);
+      delete out.notes;
+      const turn = open.turns[out.id];
+      const text = turn.question ?? turn.note;
+      if (typeof text === "string" && text) out.question = text;
+      out.options = (turn.options as string[]) ?? [];
+      out.turnSeq = turn.seq as number;
+      return out;
+    });
+    return c.json({
+      view: "questions",
+      today: todayYMD(timeZone),
+      accent: accentFor(accentSetting),
+      total: open.total,
+      truncated: open.total > tasks.length,
+      tasks,
+    });
+  }
   if (q.data.view === "added") {
     const [open, areas, projects, accentSetting] = await Promise.all([
       store.readTasks("open", 500),
@@ -359,26 +390,83 @@ tasksRest.post("/", async (c) => {
 
 const zVerb = z.enum(["complete", "today", "untoday", "tomorrow", "defer", "cancel"]);
 
-/// Answers an open agent question turn from a thin client (Apple Watch
-/// interactive notification action, F1b #213). Runs `tasks_thread_append` as
-/// the human app actor so the run budget resets and the turn syncs everywhere.
+/// Answers an open agent question turn from a thin client (the Apple Watch's
+/// notification action, F1b #213, and the desk orb). Runs
+/// `tasks_thread_append` as the human app actor so the run budget resets and
+/// the turn syncs everywhere. `chosen` is the answer's text; `option` is its
+/// index in the question's list, for a client that cannot hold the full text.
+/// With `inReplyTo` a question that is no longer the open one is refused, and
+/// the same answer sent again is not written again.
 tasksRest.post("/:id/answer", async (c) => {
   const id = zId.safeParse(c.req.param("id"));
   if (!id.success) return c.json({ error: "invalid_request" }, 400);
   const body = await json(c, z.object({
-    chosen: z.string().trim().min(1).max(200),
+    chosen: z.string().trim().min(1).max(ENTITY_LIMITS.turnChosenMax).optional(),
+    option: z.number().int().min(0).max(ENTITY_LIMITS.turnMaxOptions - 1).optional(),
     inReplyTo: z.number().int().min(1).optional(),
     step: z.enum(["confirm", "ground", "scope", "decide", "work"]).default("decide"),
+  }).strict().refine((b) => (b.chosen === undefined) !== (b.option === undefined), "chosen or option")
+    .refine((b) => b.option === undefined || b.inReplyTo !== undefined, "option needs inReplyTo"));
+  if (body instanceof Response) return body;
+  const ctx = await writeContext(c);
+  let { chosen, step } = body as { chosen?: string; step: string };
+  if (body.inReplyTo !== undefined) {
+    const read = await ctx.store.readTask(id.data);
+    if (!read) return c.json({ error: "not_found" }, 404);
+    const asked = read.turns.find((t) => t.seq === body.inReplyTo);
+    const options = Array.isArray(asked?.options) ? (asked.options as string[]) : [];
+    if (body.option !== undefined) chosen = options[body.option];
+    if (!asked || asked.role !== "provider" || !chosen) return c.json({ error: "invalid_request" }, 400);
+    const same = read.turns.find((t) => t.role === "user" && t.inReplyTo === asked.seq);
+    if (same && same.chosen === chosen) return c.json({ id: id.data, seq: same.seq, alreadyAnswered: true });
+    if (read.turns[read.turns.length - 1].seq !== asked.seq) return stale(c);
+    step = typeof asked.step === "string" ? asked.step : step;
+  }
+  const turn: Record<string, unknown> = { role: "user", step, chosen };
+  if (body.inReplyTo !== undefined) turn.inReplyTo = body.inReplyTo;
+  return run(c, ctx, "tasks_thread_append", { id: id.data, turn });
+});
+
+function stale(c: Ctx): Response {
+  return c.json({ error: "rejected", reason: "stale", message: "This was already handled, or the agent has asked again." }, 422);
+}
+
+/// The hand-off a person acts on must be the one they saw: `reviewAt` from the
+/// review view. Returns a response to send, or null to go on.
+async function reviewGate(c: Ctx, ctx: WriteContext, id: string, reviewAt: string | undefined): Promise<Response | null> {
+  const read = await ctx.store.readTask(id);
+  if (!read) return c.json({ error: "not_found" }, 404);
+  if (read.task.status !== "open" || read.convo?.endState !== "needs_verify") return stale(c);
+  if (reviewAt && read.convo.endStateAt !== reviewAt) return stale(c);
+  return null;
+}
+
+tasksRest.post("/:id/accept", async (c) => {
+  const id = zId.safeParse(c.req.param("id"));
+  if (!id.success) return c.json({ error: "invalid_request" }, 400);
+  const body = await json(c, z.object({ reviewAt: z.string().max(40).optional() }).strict());
+  if (body instanceof Response) return body;
+  const ctx = await writeContext(c);
+  // A repeat of an accept that landed: say so, do not refuse it.
+  const read = await ctx.store.readTask(id.data);
+  if (read?.task.status === "done") return c.json({ id: id.data, status: "done", alreadyComplete: true });
+  const gate = await reviewGate(c, ctx, id.data, body.reviewAt);
+  if (gate) return gate;
+  return attempt(c, "accept", () => acceptReview(ctx, id.data));
+});
+
+tasksRest.post("/:id/send_back", async (c) => {
+  const id = zId.safeParse(c.req.param("id"));
+  if (!id.success) return c.json({ error: "invalid_request" }, 400);
+  const body = await json(c, z.object({
+    note: z.string().trim().min(1).max(10_000).default("Sent back without a note."),
+    reviewAt: z.string().max(40).optional(),
   }).strict());
   if (body instanceof Response) return body;
   const ctx = await writeContext(c);
-  const turn: Record<string, unknown> = {
-    role: "user",
-    step: body.step,
-    chosen: body.chosen,
-  };
-  if (body.inReplyTo !== undefined) turn.inReplyTo = body.inReplyTo;
-  return run(c, ctx, "tasks_thread_append", { id: id.data, turn });
+  const gate = await reviewGate(c, ctx, id.data, body.reviewAt);
+  if (gate) return gate;
+  return attempt(c, "send_back", () => sendBackReview(ctx, id.data, body.note));
 });
 
 tasksRest.post("/:id/:verb", async (c) => {
@@ -431,10 +519,14 @@ async function run(
 ): Promise<Response> {
   const parsed = zWriteArgs[name].safeParse(args);
   if (!parsed.success) return c.json({ error: "invalid_request" }, 400);
+  return attempt(c, name, () => runWriteTool(ctx, name, parsed.data as Record<string, unknown>) as Promise<object>, okStatus);
+}
+
+async function attempt(c: Ctx, name: string, write: () => Promise<object>, okStatus: 200 | 201 = 200): Promise<Response> {
   try {
-    const result = await runWriteTool(ctx, name, parsed.data as Record<string, unknown>);
+    const result = await write();
     logEvent("tasks_rest", { tool: name, ok: true });
-    return c.json(result as object, okStatus);
+    return c.json(result, okStatus);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     logEvent("tasks_rest", { tool: name, ok: false });
