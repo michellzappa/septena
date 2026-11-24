@@ -21,20 +21,13 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.PermanentDrawerSheet
 import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.Scaffold
@@ -45,7 +38,6 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -53,7 +45,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -80,15 +71,14 @@ import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryActionIds
-import app.septena.core.generated.RegistryCapabilityIds
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.ui.CheckmarkGlyph
 import app.septena.ui.ChevronDownGlyph
+import app.septena.ui.ChevronLeftGlyph
 import app.septena.ui.LocalMagicPlusDrag
 import app.septena.ui.MagicPlusDragState
-import app.septena.ui.MoreDotsGlyph
 import app.septena.ui.SeptenaGlyph
 import app.septena.ui.SeptenaIconKind
 import app.septena.ui.StarGlyph
@@ -98,7 +88,6 @@ import app.septena.ui.TaskRowMenuAction
 import app.septena.ui.TaskSelection
 import app.septena.ui.insertionPosition
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -108,11 +97,15 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
     var openedTaskAttribute by rememberSaveable { mutableStateOf<String?>(null) }
     var quickFindOpen by rememberSaveable { mutableStateOf(false) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    // On mobile, opens on Today with the Lists Homepage one Back away (Things / iOS `SeptaskRootView`).
+    var showingListsHome by rememberSaveable { mutableStateOf(false) }
+    var homeQuickAddOpen by rememberSaveable { mutableStateOf(false) }
     val factory = remember(graph) { TaskHomeViewModelFactory(graph) }
     val homeViewModel: TaskHomeViewModel = viewModel(factory = factory)
     val state by homeViewModel.state.collectAsStateWithLifecycle()
     val selectHomeLocation: (TaskHomeLocation) -> Unit = { location ->
         homeViewModel.select(location)
+        showingListsHome = false
     }
     val undoSnackbarHostState = remember { SnackbarHostState() }
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
@@ -218,8 +211,6 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
         RegistryActionIds.APP_TOGGLE_SIDEBAR,
         languageTag = languageTag,
     ).orEmpty()
-    val areasTitle = RegistryCatalog.capabilityTitle(RegistryCapabilityIds.PLACES_AREAS, languageTag).orEmpty()
-    val projectsTitle = RegistryCatalog.capabilityTitle(RegistryCapabilityIds.PLACES_PROJECTS, languageTag).orEmpty()
     val inboxTitle = RegistryCatalog.destinationTitle(RegistryDestinationIds.INBOX, languageTag).orEmpty()
     val todayTitle = RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag).orEmpty()
     val fadedTitle = RegistryCatalog.destinationTitle(RegistryDestinationIds.FADED, languageTag).orEmpty()
@@ -269,20 +260,45 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
         }
     }
 
+    val isDark = LocalSeptenaDarkTheme.current
+    val appearance = LocalAppearance.current
+
+    if (homeQuickAddOpen) {
+        QuickAddSheet(
+            today = graph.clock.today(graph.clock.now()),
+            errorMessage = state.errorMessage,
+            areas = state.areas,
+            projects = state.projects,
+            languageTag = languageTag,
+            initialDraft = QuickAddDraft(today = true),
+            onDismiss = { homeQuickAddOpen = false },
+            onAdd = { draft -> homeViewModel.quickAdd(draft) { homeQuickAddOpen = false } },
+        )
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         if (wideLayout) {
             PermanentNavigationDrawer(
                 drawerContent = {
-                    PermanentDrawerSheet {
-                        TaskHomeNavigation(
+                    PermanentDrawerSheet(
+                        drawerContainerColor = if (isDark) {
+                            MaterialTheme.colorScheme.surfaceContainerLow
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainer
+                        },
+                    ) {
+                        ListsHomeContent(
                             state = state,
                             languageTag = languageTag,
-                            areasTitle = areasTitle,
-                            projectsTitle = projectsTitle,
                             settingsTitle = settingsTitle,
+                            isDark = isDark,
+                            hasActiveTexture = appearance.hasActiveTexture,
+                            highlightSelection = true,
+                            showSettingsRow = true,
                             onSelect = selectHomeLocation,
                             onSetAreaEmoji = homeViewModel::setAreaEmoji,
                             onOpenSettings = { settingsOpen = true },
+                            modifier = Modifier.padding(top = 8.dp),
                         )
                     }
                 }
@@ -331,74 +347,74 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                 }
             }
         } else {
-            val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-            val scope = rememberCoroutineScope()
-            ModalNavigationDrawer(
-                drawerState = drawerState,
-                drawerContent = {
-                    ModalDrawerSheet {
-                        TaskHomeNavigation(
-                            state = state,
-                            languageTag = languageTag,
-                            areasTitle = areasTitle,
-                            projectsTitle = projectsTitle,
-                            settingsTitle = settingsTitle,
-                            onSetAreaEmoji = homeViewModel::setAreaEmoji,
-                            onSelect = { location ->
-                                selectHomeLocation(location)
-                                scope.launch { drawerState.close() }
-                            },
-                            onOpenSettings = {
-                                settingsOpen = true
-                                scope.launch { drawerState.close() }
-                            },
-                        )
-                    }
-                }
+            // Mobile phone layout: Things / iOS root Lists Homepage (no hamburger drawer).
+            // Back gesture from any list returns to the Lists Homepage.
+            BackHandler(
+                enabled = !showingListsHome && !settingsOpen && !quickFindOpen && openedTaskId == null && state.selectedIds.isEmpty(),
             ) {
-                if (settingsOpen) {
-                    SettingsScreen(graph, onBack = { settingsOpen = false })
-                } else if (quickFindOpen) {
-                    QuickFindScreen(graph, onBack = { quickFindOpen = false }, onSelect = openQuickFindTarget)
-                } else if (openedTaskId != null) {
-                    TaskDetailScreen(
-                        graph,
-                        openedTaskId!!,
-                        onBack = { openedTaskId = null; openedTaskAttribute = null },
-                        initialAttribute = openedTaskAttribute,
-                    )
-                } else {
-                    TaskHomeScaffold(
-                        graph = graph,
-                        state = state,
-                        title = pageTitle,
-                        sidebarActionTitle = sidebarActionTitle,
-                        quickAddTitle = quickAddTitle,
-                        quickFindTitle = quickFindTitle,
-                        starredFilterTitle = starredFilterTitle,
-                        settingsTitle = settingsTitle,
-                        completeTitle = completeTitle,
-                        emptyTitle = emptyTitle,
-                        emptyDescription = emptyDescription,
-                        inboxTitle = inboxTitle,
-                        todayTitle = todayTitle,
-                        fadedTitle = fadedTitle,
-                        homeViewModel = homeViewModel,
-                        languageTag = languageTag,
-                        showNavigationAction = true,
-                        onOpenNavigation = { scope.launch { drawerState.open() } },
-                        onComplete = homeViewModel::complete,
-                        rowMenuGroups = rowMenuGroups,
-                        rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                        onOpenTask = { openTaskWithAttribute(it, null) },
-                        onTaskAction = onTaskAction,
-                        onToggleStarFilter = homeViewModel::toggleStarFilter,
-                        onQuickFind = { quickFindOpen = true },
-                        onOpenSettings = { settingsOpen = true },
-                        onSelectHomeLocation = selectHomeLocation,
-                        snackbarVisible = undoSnackbarHostState.currentSnackbarData != null,
-                    )
-                }
+                showingListsHome = true
+            }
+            if (settingsOpen) {
+                SettingsScreen(graph, onBack = { settingsOpen = false })
+            } else if (quickFindOpen) {
+                QuickFindScreen(graph, onBack = { quickFindOpen = false }, onSelect = openQuickFindTarget)
+            } else if (openedTaskId != null) {
+                TaskDetailScreen(
+                    graph,
+                    openedTaskId!!,
+                    onBack = { openedTaskId = null; openedTaskAttribute = null },
+                    initialAttribute = openedTaskAttribute,
+                )
+            } else if (showingListsHome) {
+                ListsHomePage(
+                    state = state,
+                    languageTag = languageTag,
+                    quickFindTitle = quickFindTitle,
+                    settingsTitle = settingsTitle,
+                    quickAddTitle = quickAddTitle,
+                    onSelectLocation = selectHomeLocation,
+                    onSetAreaEmoji = homeViewModel::setAreaEmoji,
+                    onQuickFind = { quickFindOpen = true },
+                    onOpenSettings = { settingsOpen = true },
+                    onNewTask = { homeQuickAddOpen = true },
+                    onCreateArea = { title ->
+                        homeViewModel.createArea(title) { created -> selectHomeLocation(created) }
+                    },
+                    onCreateProject = { title ->
+                        homeViewModel.createProject(title) { created -> selectHomeLocation(created) }
+                    },
+                )
+            } else {
+                TaskHomeScaffold(
+                    graph = graph,
+                    state = state,
+                    title = pageTitle,
+                    sidebarActionTitle = sidebarActionTitle,
+                    quickAddTitle = quickAddTitle,
+                    quickFindTitle = quickFindTitle,
+                    starredFilterTitle = starredFilterTitle,
+                    settingsTitle = settingsTitle,
+                    completeTitle = completeTitle,
+                    emptyTitle = emptyTitle,
+                    emptyDescription = emptyDescription,
+                    inboxTitle = inboxTitle,
+                    todayTitle = todayTitle,
+                    fadedTitle = fadedTitle,
+                    homeViewModel = homeViewModel,
+                    languageTag = languageTag,
+                    showNavigationAction = true,
+                    onOpenNavigation = { showingListsHome = true },
+                    onComplete = homeViewModel::complete,
+                    rowMenuGroups = rowMenuGroups,
+                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    onOpenTask = { openTaskWithAttribute(it, null) },
+                    onTaskAction = onTaskAction,
+                    onToggleStarFilter = homeViewModel::toggleStarFilter,
+                    onQuickFind = { quickFindOpen = true },
+                    onOpenSettings = { settingsOpen = true },
+                    onSelectHomeLocation = selectHomeLocation,
+                    snackbarVisible = undoSnackbarHostState.currentSnackbarData != null,
+                )
             }
         }
 
@@ -411,224 +427,6 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                 .padding(horizontal = 16.dp, vertical = 16.dp),
         )
     }
-}
-
-@Composable
-private fun TaskHomeNavigation(
-    state: TaskHomeUiState,
-    languageTag: String,
-    areasTitle: String,
-    projectsTitle: String,
-    settingsTitle: String,
-    onSelect: (TaskHomeLocation) -> Unit,
-    onSetAreaEmoji: (String, String?) -> Unit,
-    onOpenSettings: () -> Unit,
-) {
-    val todayTint = MaterialTheme.colorScheme.secondary
-    val mutedIcon = MaterialTheme.colorScheme.onSurfaceVariant
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(vertical = 12.dp),
-    ) {
-        // Top smart lists (identical to iOS `sidebarRoutes(in: .top)`).
-        state.topSmartLists.forEach { item ->
-            val location = item.location as TaskHomeLocation.SmartList
-            val title = RegistryCatalog.destinationTitle(location.destinationId, languageTag).orEmpty()
-            val iconKind = destinationIconKind(location.destinationId)
-            val iconTint = if (iconKind == SeptenaIconKind.Today || iconKind == SeptenaIconKind.Starred) todayTint else mutedIcon
-            NavigationDrawerItem(
-                icon = {
-                    Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
-                        SeptenaGlyph(kind = iconKind, tint = iconTint, size = 19.dp)
-                    }
-                },
-                label = { Text(title) },
-                selected = state.location == item.location,
-                onClick = { onSelect(item.location) },
-                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
-            )
-        }
-
-        val areaIds = state.areas.mapNotNull { (it.location as? TaskHomeLocation.Area)?.id }.toSet()
-        val projectsByArea = state.projects.groupBy { it.parentAreaId }
-        val standaloneProjects = state.projects.filter { it.parentAreaId == null || it.parentAreaId !in areaIds }
-
-        if (state.areas.isNotEmpty() || standaloneProjects.isNotEmpty()) {
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-        }
-        if (projectsTitle.isNotEmpty() && standaloneProjects.isNotEmpty()) {
-            standaloneProjects.forEach { item ->
-                NavigationDrawerItem(
-                    icon = {
-                        Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
-                            SeptenaGlyph(kind = SeptenaIconKind.Project, tint = mutedIcon, size = 16.dp)
-                        }
-                    },
-                    label = { Text(item.title.orEmpty()) },
-                    selected = state.location == item.location,
-                    onClick = { onSelect(item.location) },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
-                )
-            }
-        }
-        if (areasTitle.isNotEmpty() && state.areas.isNotEmpty()) {
-            DrawerGroupTitle(areasTitle)
-            state.areas.forEach { item ->
-                val area = item.location as TaskHomeLocation.Area
-                AreaNavigationDrawerItem(
-                    item = item,
-                    selected = state.location == item.location,
-                    languageTag = languageTag,
-                    onSelect = { onSelect(item.location) },
-                    onSetEmoji = { emoji -> onSetAreaEmoji(area.id, emoji) },
-                )
-                projectsByArea[area.id].orEmpty().forEach { projectItem ->
-                    NavigationDrawerItem(
-                        icon = {
-                            Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
-                                SeptenaGlyph(kind = SeptenaIconKind.Project, tint = mutedIcon, size = 16.dp)
-                            }
-                        },
-                        label = { Text(projectItem.title.orEmpty()) },
-                        selected = state.location == projectItem.location,
-                        onClick = { onSelect(projectItem.location) },
-                        modifier = Modifier
-                            .padding(NavigationDrawerItemDefaults.ItemPadding)
-                            .padding(start = 20.dp),
-                    )
-                }
-            }
-        }
-        // Bottom smart lists (identical to iOS `sidebarRoutes(in: .bottom)`: Logbook, Faded, Deleted, etc.).
-        if (state.bottomSmartLists.isNotEmpty()) {
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            state.bottomSmartLists.forEach { item ->
-                val location = item.location as TaskHomeLocation.SmartList
-                val title = RegistryCatalog.destinationTitle(location.destinationId, languageTag).orEmpty()
-                val iconKind = destinationIconKind(location.destinationId)
-                val iconTint = if (iconKind == SeptenaIconKind.Today || iconKind == SeptenaIconKind.Starred) todayTint else mutedIcon
-                NavigationDrawerItem(
-                    icon = {
-                        Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
-                            SeptenaGlyph(kind = iconKind, tint = iconTint, size = 19.dp)
-                        }
-                    },
-                    label = { Text(title) },
-                    selected = state.location == item.location,
-                    onClick = { onSelect(item.location) },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
-                )
-            }
-        }
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-        NavigationDrawerItem(
-            icon = {
-                Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
-                    SeptenaGlyph(kind = SeptenaIconKind.Settings, tint = mutedIcon, size = 19.dp)
-                }
-            },
-            label = { Text(settingsTitle) },
-            selected = false,
-            onClick = onOpenSettings,
-            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
-        )
-    }
-}
-
-@Composable
-private fun AreaNavigationDrawerItem(
-    item: TaskHomeNavigationItem,
-    selected: Boolean,
-    languageTag: String,
-    onSelect: () -> Unit,
-    onSetEmoji: (String?) -> Unit,
-) {
-    val area = item.location as? TaskHomeLocation.Area ?: return
-    var menuExpanded by rememberSaveable(area.id) { mutableStateOf(false) }
-    var emojiPickerOpen by rememberSaveable(area.id) { mutableStateOf(false) }
-    val menuActions = remember {
-        RegistryCatalog.menuActionIds("sidebar.area")
-    }
-    val actionContext = remember {
-        RegistryActionContext(
-            platform = RegistryPlatformIds.ANDROID,
-            destinationId = null,
-            selectedCount = 1,
-        )
-    }
-    val changeEmojiAvailable = RegistryActionIds.AREA_CHANGE_EMOJI in menuActions &&
-        RegistryActionResolver.isAvailable(RegistryActionIds.AREA_CHANGE_EMOJI, actionContext)
-    val changeEmojiTitle = RegistryCatalog.actionTitle(
-        RegistryActionIds.AREA_CHANGE_EMOJI,
-        languageTag = languageTag,
-    ).orEmpty()
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(NavigationDrawerItemDefaults.ItemPadding),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        NavigationDrawerItem(
-            icon = {
-                Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
-                    if (item.emoji != null) {
-                        Text(item.emoji, fontSize = 18.sp)
-                    } else {
-                        SeptenaGlyph(
-                            kind = SeptenaIconKind.Area,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            size = 18.dp,
-                        )
-                    }
-                }
-            },
-            label = { Text(item.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            selected = selected,
-            onClick = onSelect,
-            modifier = Modifier.weight(1f),
-        )
-        if (changeEmojiAvailable) {
-            Box {
-                IconButton(
-                    onClick = { menuExpanded = true },
-                    modifier = Modifier.semantics { contentDescription = changeEmojiTitle },
-                ) {
-                    MoreDotsGlyph(tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 18.dp)
-                }
-                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                    DropdownMenuItem(
-                        text = { Text(changeEmojiTitle) },
-                        onClick = {
-                            menuExpanded = false
-                            emojiPickerOpen = true
-                        },
-                    )
-                }
-            }
-        }
-    }
-    if (emojiPickerOpen) {
-        AreaEmojiPickerSheet(
-            initialEmoji = item.emoji,
-            languageTag = languageTag,
-            onDismissRequest = { emojiPickerOpen = false },
-            onSelect = onSetEmoji,
-        )
-    }
-}
-
-@Composable
-private fun DrawerGroupTitle(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 28.dp, top = 12.dp, bottom = 4.dp),
-    )
 }
 
 /**
@@ -1087,7 +885,7 @@ private fun TaskHomeScaffold(
                                     onClick = onOpenNavigation,
                                     modifier = Modifier.semantics { contentDescription = sidebarActionTitle },
                                 ) {
-                                    SidebarMenuGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                                    ChevronLeftGlyph(tint = MaterialTheme.colorScheme.onSurface)
                                 }
                             }
                         } else {
@@ -1255,20 +1053,7 @@ private fun defaultQuickAddDraft(location: TaskHomeLocation): QuickAddDraft = wh
 }
 
 @Composable
-private fun SidebarMenuGlyph(tint: Color) {
-    Canvas(modifier = Modifier.size(22.dp)) {
-        val stroke = 2.dp.toPx()
-        val left = 2.dp.toPx()
-        val right = size.width - 2.dp.toPx()
-        val ys = listOf(size.height * 0.25f, size.height * 0.50f, size.height * 0.75f)
-        ys.forEach { y ->
-            drawLine(tint, Offset(left, y), Offset(right, y), strokeWidth = stroke, cap = StrokeCap.Round)
-        }
-    }
-}
-
-@Composable
-private fun SearchGlyph(tint: Color) {
+internal fun SearchGlyph(tint: Color) {
     Canvas(modifier = Modifier.size(21.dp)) {
         val stroke = 1.9.dp.toPx()
         val radius = size.minDimension * 0.30f

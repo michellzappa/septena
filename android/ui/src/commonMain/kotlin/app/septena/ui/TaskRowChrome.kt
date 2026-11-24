@@ -1019,6 +1019,62 @@ fun ChevronRightGlyph(tint: Color, size: Dp = 14.dp, modifier: Modifier = Modifi
 }
 
 @Composable
+fun ChevronLeftGlyph(tint: Color, size: Dp = 22.dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val stroke = (w * 0.10f).coerceAtLeast(2.dp.toPx())
+        val path = Path().apply {
+            moveTo(w * 0.62f, h * 0.20f)
+            lineTo(w * 0.32f, h * 0.50f)
+            lineTo(w * 0.62f, h * 0.80f)
+        }
+        drawPath(path, tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}
+
+/** Circular project progress glyph matching iOS `ProjectProgressIcon`: ring + inner pie fill. */
+@Composable
+fun ProjectProgressRingGlyph(
+    progress: Float,
+    tint: Color,
+    size: Dp = 17.dp,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier = modifier.size(size)) {
+        val stroke = (this.size.minDimension * 0.105f).coerceAtLeast(1.4.dp.toPx())
+        val radius = this.size.minDimension * 0.40f
+        val center = Offset(this.size.width / 2f, this.size.height / 2f)
+        drawCircle(color = tint, radius = radius, center = center, style = Stroke(width = stroke))
+        val clamped = progress.coerceIn(0f, 1f)
+        if (clamped > 0.01f) {
+            val innerPad = (this.size.minDimension / 2f) - (radius - stroke * 1.15f)
+            val innerDiameter = (this.size.minDimension - innerPad * 2f).coerceAtLeast(0f)
+            drawArc(
+                color = tint,
+                startAngle = -90f,
+                sweepAngle = clamped * 360f,
+                useCenter = true,
+                topLeft = Offset(innerPad, innerPad),
+                size = Size(innerDiameter, innerDiameter),
+            )
+        }
+    }
+}
+
+/** Muted filled dot for an Area with no custom emoji, matching iOS `AreaIcon`. */
+@Composable
+fun AreaDotGlyph(tint: Color, size: Dp = 18.dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(size)) {
+        drawCircle(
+            color = tint,
+            radius = this.size.minDimension * 0.22f,
+            center = Offset(this.size.width / 2f, this.size.height / 2f),
+        )
+    }
+}
+
+@Composable
 fun MoreDotsGlyph(tint: Color, size: Dp = 16.dp, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.size(size)) {
         val cx = this.size.width / 2f
