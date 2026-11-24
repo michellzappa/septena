@@ -63,6 +63,10 @@ fi
 # without the dependency, xcodebuild never resolves a watch destination.
 if grep -q 'WATCH_EMBED_DISABLED' "$REPO/project.yml" 2>/dev/null; then
   :
+# A concrete physical device (`id=<udid>` that is not a simulator) builds the
+# watch app for the watchOS device SDK, so no simulator runtime is needed.
+elif [[ "$DEST" == id=* ]] && ! xcrun simctl list devices 2>/dev/null | grep -q "${DEST#id=}"; then
+  :
 elif [ "$SCHEME" = "Septena" ] || [ "$SCHEME" = "Septask" ]; then
   want="$(xcodebuild -showsdks 2>/dev/null \
           | sed -n 's/.*-sdk watchsimulator\([0-9][0-9.]*\).*/\1/p' | head -1)"
