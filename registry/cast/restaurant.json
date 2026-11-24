@@ -1,0 +1,61 @@
+{
+  "version": 1, "id": "restaurant",
+  "who": "Owns a neighbourhood restaurant and is opening a second, smaller place.",
+  "people": ["Kofi", "Mira"],
+  "look": { "accent": "persimmon", "texture": "topography", "appearance": "light" },
+  "areas": [{ "title": "Kitchen", "emoji": "🍳" }, { "title": "Floor", "emoji": "🍷" }, { "title": "Books", "emoji": "📒" }, { "title": "Me", "emoji": "🚲" }],
+  "projects": [{ "title": "Canal Street", "area": "Kitchen" }, { "title": "Winter menu", "area": "Kitchen", "progress": 0.7 }, { "title": "Allotment", "area": "Me", "progress": 0.2 }],
+  "moments": [{
+    "id": "opening", "plot": "The second place opens in three weeks and has no extractor hood.",
+    "project": "Canal Street", "order": ["Canal Street", "Winter menu", "Floor"], "rolledIn": 3,
+    "tasks": [
+      { "id": "hood", "title": "Choose the extractor hood", "group": "Canal Street", "today": true, "unread": true, "notes": "It has to go out through the back wall. Upstairs sleeps above the front." },
+      { "id": "tables", "title": "Measure for the long table", "group": "Canal Street", "today": true, "notes": "Leave enough room for a tray and a person. Mira walks it with a tray first." },
+      { "id": "menuboard", "title": "Chalkboard or paper?", "group": "Canal Street", "today": true },
+      { "id": "keys", "title": "Get a third set of keys cut", "group": "Canal Street", "today": true },
+      { "id": "lease", "title": "Sign the lease", "group": "Canal Street", "done": true },
+      { "id": "stools", "title": "Ask the school about their old stools", "group": "Inbox", "today": true, "proposal": true },
+      { "id": "quince", "title": "quince??", "group": "Inbox", "today": true, "muted": true },
+      { "id": "flatbread", "title": "Taste the new flatbread with Kofi", "group": "Winter menu", "today": true },
+      { "id": "squash", "title": "Second squash supplier", "group": "Winter menu", "today": true, "muted": true },
+      { "id": "rota", "title": "Swap Mira’s {weekday+2}", "group": "Floor", "today": true }
+    ],
+    "capture": { "title": "Ask Kofi for the dough ratio", "group": "Winter menu" },
+    "anytime": ["tables", "keys", "flatbread", "squash", "rota"], "picked": ["tables", "flatbread"],
+    "open": ["tables", "hood"],
+    "file": { "title": "Who fixes the back door?", "notes": "It sticks when it rains. The lease says the owner, the owner says the lease.", "with": ["stools", "tables", "flatbread"] },
+    "dated": { "title": "Friends and family night", "notes": "Twenty people, no menu. Kofi cooks what is left from {weekday+4}.", "when": 5, "due": 7 },
+    "repeating": { "title": "Order fish before ten", "group": "Kitchen", "notes": "No skate until they fix the price.", "repeat": "Every {weekday}", "with": ["tables", "rota"] },
+    "attachments": { "task": "menuboard", "notes": "Paper changes faster, chalk looks better from the street. Mira took photos of both. The printer needs the text two days before.", "files": ["board-street.jpg", "paper-menu.jpg", "menu-text.pdf"] },
+    "upcoming": [
+      { "in": 1, "tasks": [{ "id": "wine", "title": "Taste three reds with Mira", "group": "Floor" }] },
+      { "in": 2, "tasks": [{ "id": "leeks", "title": "Dig up the leeks", "group": "Allotment" }] },
+      { "in": 3, "tasks": [{ "ref": "squash", "due": 9 }, { "id": "wages", "title": "Wages", "group": "Books", "repeat": "Every month" }] },
+      { "in": 4, "tasks": [{ "id": "inspection", "title": "Kitchen inspection at nine", "group": "Canal Street", "files": ["checklist.pdf"] }] },
+      { "in": 5, "tasks": ["keys"] },
+      { "in": 7, "tasks": ["repeating", { "id": "tips", "title": "Share out the tips", "group": "Floor", "repeat": "Every {weekday}" }] }
+    ],
+    "agent": {
+      "title": "Line up the three hood quotes", "notes": "Three PDFs, three ways of hiding the installation cost. I need one number each.", "due": 4,
+      "question": "Which should count more?", "options": ["Installed before the opening", "Lowest total"],
+      "artifact": "Hood quotes",
+      "bodies": ["Only the first firm can install before the opening. Its total is €7,150 with the wall work. The other two start in January.", "The third firm is the cheapest at €6,320 with the wall work, but it installs in the second week of January."],
+      "otherBody": "The totals with wall work are €7,150, €6,840 and €6,320. Looking at it your way: {answer}",
+      "handoff": "Read the totals", "acceptance": "You can call one firm and say yes."
+    },
+    "discuss": {
+      "title": "Answer the neighbour upstairs", "group": "Canal Street", "notes": "Worried about smell and late noise. Friendly letter, three pages.",
+      "question": "What do you want to promise?", "options": ["Back wall, closed at eleven", "Come and see the plans"],
+      "artifact": "Letter to the neighbour",
+      "bodies": ["Thank you for writing. The hood goes out through the back wall, away from your windows, and the kitchen closes at eleven every night.", "Thank you for writing. Would you like to come down and see the plans? The hood goes out at the back, and I would rather show you than explain it."],
+      "otherBody": "Thank you for writing. About the smell and the noise: {answer}",
+      "draftHandoff": "Read the letter", "handoff": "Your next step: put it through the door", "acceptance": "The neighbour has an answer.",
+      "with": ["hood", "tables", "flatbread", "rota"]
+    },
+    "review": [
+      { "title": "Line up the three hood quotes", "group": "Canal Street", "note": "One total each. The second quote leaves out the crane, so I added it.", "artifact": "Hood quotes" },
+      { "title": "Write the allergen sheet", "group": "Winter menu", "note": "Fourteen dishes. Please check the flatbread, the recipe says two things.", "artifact": "Allergen sheet" }
+    ],
+    "faded": ["Redo the staff playlist", "Pickle the green tomatoes", "Learn to sharpen properly", "Photo of the old sign", "Ask about the corner bench", "A proper roast, just once", "Write down the stock recipe", "Replace the wobbly coat stand", "Bike basket", "Cookbook club", "Call the beekeeper", "Better apron pockets", "Fix the oven light", "Try the rye again", "Label the freezer"]
+  }]
+}

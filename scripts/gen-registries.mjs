@@ -13,6 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as L10N from "./registry-l10n.mjs";
 import { checkReaders } from "./registry-readers.mjs";
+import { validateCast } from "./registry-cast.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, "..");
@@ -2178,6 +2179,13 @@ checkOpensAttribute({ actions, surfaces });
 validateFirstRun(surfaces, icons, caps, settings);
 validatePlans(plans, icons, caps);
 validateConformance();
+// Marketing content only: no generated bindings, no localized strings (ADR 0030).
+validateCast(
+  fs.readdirSync(path.join(REPO, "registry/cast")).filter((name) => name.endsWith(".json")).sort()
+    .map((file) => ({ file, person: readJSON(`registry/cast/${file}`) })),
+  { tokens, caps, inboxTitle: dests.destinations.find((item) => item.id === "inbox").title },
+  assert,
+);
 
 BY_KEY = L10N.collectStrings({ settings, destinations: dests, actions, surfaces, tokens, plans }, assert);
 

@@ -1,0 +1,61 @@
+{
+  "version": 1, "id": "translator",
+  "who": "Translates novels from Japanese and is slowly repairing an old wooden house in the mountains.",
+  "people": ["Kenji", "Hana"],
+  "look": { "accent": "haskap", "texture": "washiPaper", "appearance": "light" },
+  "areas": [{ "title": "Translation", "emoji": "📖" }, { "title": "House", "emoji": "🏚️" }, { "title": "Village", "emoji": "🍵" }],
+  "projects": [{ "title": "The ferry novel", "area": "Translation" }, { "title": "Roof", "area": "House", "progress": 0.65 }, { "title": "Bathroom floor", "area": "House", "progress": 0.1 }],
+  "moments": [{
+    "id": "proofs", "plot": "Proofs of the ferry novel are due, and the snow comes early this year.",
+    "project": "The ferry novel", "order": ["The ferry novel", "Roof", "Village"],
+    "tasks": [
+      { "id": "ch12", "title": "Proofs, chapters 12 to 15", "group": "The ferry novel", "today": true, "notes": "Read the dialogue aloud. The captain never says please." },
+      { "id": "weather", "title": "Nine words for drizzle", "group": "The ferry novel", "today": true, "notes": "The author has nine and English has three. Keep two, describe the rest." },
+      { "id": "editor", "title": "Hana’s question about the last line", "group": "The ferry novel", "today": true, "unread": true, "notes": "She wants it longer. I want it shorter. The author is not answering." },
+      { "id": "names", "title": "Check the boat names", "group": "The ferry novel", "today": true },
+      { "id": "titlepage", "title": "Approve the title page", "group": "The ferry novel", "done": true },
+      { "id": "woodorder", "title": "Order wood before the road closes", "group": "Inbox", "today": true, "proposal": true },
+      { "id": "owl", "title": "owl or pump?", "group": "Inbox", "today": true, "muted": true },
+      { "id": "tiles", "title": "Count the cracked tiles with Kenji", "group": "Roof", "today": true },
+      { "id": "gutter", "title": "Copper or plastic gutter", "group": "Roof", "today": true, "muted": true },
+      { "id": "persimmons", "title": "Take persimmons next door", "group": "Village", "today": true }
+    ],
+    "capture": { "title": "Ask Kenji about the attic beam", "group": "Roof" },
+    "anytime": ["ch12", "names", "tiles", "gutter", "persimmons"], "picked": ["ch12", "persimmons"],
+    "open": ["ch12", "weather"],
+    "file": { "title": "Is there a word for ferry smell?", "notes": "Diesel, rope, oranges. Chapter 4 needs it in one line.", "with": ["woodorder", "ch12", "persimmons"] },
+    "dated": { "title": "Return the proofs", "notes": "Scan them on {weekday+4} at the post office. The machine is slow before ten.", "when": 4, "due": 6 },
+    "repeating": { "title": "Walk round the roof", "group": "House", "notes": "Look for new gaps after the wind. Kenji has the long ladder.", "repeat": "Every {weekday}", "with": ["ch12", "persimmons"] },
+    "attachments": { "task": "names", "notes": "Six boats, two with the same name on purpose. Hana made a list. The harbour photo shows how they were painted.", "files": ["boats-hana.pdf", "harbour-1961.jpg"] },
+    "upcoming": [
+      { "in": 1, "tasks": [{ "id": "market", "title": "Morning market, get miso", "group": "Village" }] },
+      { "in": 3, "tasks": [{ "ref": "gutter", "due": 8 }, { "id": "postcards", "title": "Answer the reader in Osaka", "group": "Translation" }] },
+      { "in": 4, "tasks": [{ "id": "floor", "title": "Lift the first floorboard", "group": "Bathroom floor" }] },
+      { "in": 5, "tasks": [{ "id": "class", "title": "English class at the school", "group": "Village", "repeat": "Every {weekday}", "files": ["class-songs.pdf"] }] },
+      { "in": 6, "tasks": ["tiles"] },
+      { "in": 7, "tasks": ["repeating", { "id": "invoice", "title": "Invoice for part two", "group": "Translation" }] }
+    ],
+    "agent": {
+      "title": "Find where the captain changes tone", "notes": "I think I made him politer from chapter 9. List the lines so I can check.", "due": 4,
+      "question": "How much should I show you?", "options": ["Only the lines", "Lines with the page before"],
+      "artifact": "Captain’s lines",
+      "bodies": ["Seven lines from chapter 9 on are politer than before. Four say “please”, two say “would you”, and one apologises to a dog.", "Seven lines from chapter 9 on are politer than before. Each one is below with the page that leads to it. The dog scene starts it."],
+      "otherBody": "Seven lines from chapter 9 on are politer than before. Your direction: {answer}",
+      "handoff": "Read the lines", "acceptance": "You know which lines to change."
+    },
+    "discuss": {
+      "title": "Answer Hana about the last line", "group": "The ferry novel", "notes": "Mine has six words. Hers has fourteen and explains the bell.",
+      "question": "What would you defend?", "options": ["Keep six words", "Meet in the middle"],
+      "artifact": "Reply to Hana",
+      "bodies": ["Dear Hana, I would like to keep the six words. The bell has rung in every chapter, and I think the reader hears it without us.", "Dear Hana, could we keep the bell but not explain it? Here is a version with nine words. I can live with nine."],
+      "otherBody": "Dear Hana, about the last line: {answer}",
+      "draftHandoff": "Read the reply", "handoff": "Your next step: send it to Hana", "acceptance": "Hana has an answer about the last line.",
+      "with": ["ch12", "editor", "tiles", "persimmons"]
+    },
+    "review": [
+      { "title": "Find where the captain changes tone", "group": "The ferry novel", "note": "Seven lines. The one with the dog may be on purpose.", "artifact": "Captain’s lines" },
+      { "title": "Compare two gutter offers", "group": "Roof", "note": "Copper costs twice as much. Only one offer says how long it lasts.", "artifact": "Gutter offers" }
+    ],
+    "faded": ["Translate one poem for fun", "Learn to plaster", "Write to the author’s sister", "Mend the paper door", "Try the drum group", "Sort the dictionary shelf", "Photograph the well", "Plant tea", "Reply to the podcast", "Learn the tractor", "Read in Korean again", "Fix the radio", "Walk to the far shrine", "Catalogue the old tools", "Make plum wine"]
+  }]
+}
