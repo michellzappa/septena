@@ -10,10 +10,10 @@ use crate::task_dates::patch_json;
 use crate::{
     ConversationProjection, DateAction, FadeInput, OrdinalWeekday, PullPageHeader, PushOutcome, RecurrenceRule,
     ReminderArmInput, TaskConversation, TaskSnapshot, TaskViewMembership, apply_date_action, check_pull_page,
-    checklist_occurrence_id, conversation_state, derive_conversation, fade_fill, next_occurrence_dates, next_scheduled_date,
-    normalize_task_dates, occurrence_id, plan_pull_row, plan_push_response, row_opacity, server_rejection_reason,
-    shift_reminder_for_recurrence, shift_reminder_on_reschedule, should_arm_reminder, should_fade,
-    task_view_membership,
+    checklist_occurrence_id, conversation_state, derive_conversation, fade_fill, next_occurrence_dates,
+    next_scheduled_date, normalize_task_dates, occurrence_id, plan_pull_row, plan_push_response, row_opacity,
+    server_rejection_reason, shift_reminder_for_recurrence, shift_reminder_on_reschedule, should_arm_reminder,
+    should_fade, task_view_membership,
 };
 
 /// The functions `invoke_json` accepts.
@@ -101,7 +101,11 @@ pub(crate) fn invoke_value(function: &str, input: Value) -> Result<Value, CoreEr
         }
         "checklistOccurrenceId" => {
             let args: ChecklistOccurrenceArgs = decode(input).map_err(|e| parse(&e))?;
-            Ok(json!(checklist_occurrence_id(args.new_task_id, args.index, args.source_item_id)))
+            Ok(json!(checklist_occurrence_id(
+                args.new_task_id,
+                args.index,
+                args.source_item_id
+            )))
         }
         "shiftReminderForRecurrence" => {
             let args: ShiftRecurrenceArgs = decode(input).map_err(|e| parse(&e))?;

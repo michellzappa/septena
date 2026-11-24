@@ -141,7 +141,10 @@ pub fn occurrence_id(source_task_id: String, scheduled: String) -> String {
 /// completing the same task copy the same items to the same ids.
 #[cfg_attr(feature = "ffi", uniffi::export)]
 pub fn checklist_occurrence_id(new_task_id: String, index: u32, source_item_id: String) -> String {
-    format!("chk-{}", fnv1a64(&format!("{new_task_id}|chk|{index}|{source_item_id}")))
+    format!(
+        "chk-{}",
+        fnv1a64(&format!("{new_task_id}|chk|{index}|{source_item_id}"))
+    )
 }
 
 fn fnv1a64(input: &str) -> String {
