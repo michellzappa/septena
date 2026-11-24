@@ -1,0 +1,61 @@
+{
+  "version": 1, "id": "techlead",
+  "who": "Leads a small platform team. Back from parental leave last week, sleeping badly.",
+  "people": ["Tobias", "Maren"],
+  "look": { "accent": "jabuticaba", "texture": "fieldMatrix", "appearance": "light" },
+  "areas": [{ "title": "Platform", "emoji": "🛠️" }, { "title": "Team", "emoji": "🧑‍🚀" }, { "title": "Family", "emoji": "🍼" }, { "title": "Flat", "emoji": "🔑" }],
+  "projects": [{ "title": "Login outage", "area": "Platform" }, { "title": "Database move", "area": "Platform", "progress": 0.55 }, { "title": "Nursery place", "area": "Family", "progress": 0.3 }],
+  "moments": [{
+    "id": "back", "plot": "Logins were down for forty minutes on Tuesday, and the nursery wants an answer.",
+    "project": "Login outage", "order": ["Login outage", "Team", "Nursery place"], "rolledIn": 2,
+    "tasks": [
+      { "id": "timeline", "title": "Agree the timeline with Maren", "group": "Login outage", "today": true, "unread": true, "notes": "The alert fired at 14:06. The first person saw it at 14:19. Talk about those thirteen minutes, kindly." },
+      { "id": "cert", "title": "Alert 30 days before a certificate ends", "group": "Login outage", "today": true, "notes": "Page the team, not one person. One person was on leave. It was me." },
+      { "id": "runbook", "title": "Rewrite the login runbook", "group": "Login outage", "today": true },
+      { "id": "customers", "title": "Tell the two customers who wrote in", "group": "Login outage" },
+      { "id": "renew", "title": "Renew the certificate", "group": "Login outage", "done": true },
+      { "id": "calendar", "title": "Add the other four to the calendar", "group": "Inbox", "today": true, "proposal": true },
+      { "id": "pager", "title": "pager sound is too nice", "group": "Inbox", "today": true, "muted": true },
+      { "id": "oncall", "title": "Swap on-call with Tobias", "group": "Team", "today": true },
+      { "id": "oneonone", "title": "Ask Maren about the conference talk", "group": "Team", "today": true, "muted": true },
+      { "id": "nursery", "title": "Nursery: yes", "group": "Nursery place", "today": true }
+    ],
+    "capture": { "title": "Thank Tobias for the night shift", "group": "Team" },
+    "anytime": ["cert", "runbook", "oncall", "oneonone", "nursery"], "picked": ["cert", "nursery"],
+    "open": ["cert", "timeline"],
+    "file": { "title": "Who owns the status page?", "notes": "It said everything was fine for the whole forty minutes.", "with": ["calendar", "cert", "oncall"] },
+    "dated": { "title": "Walk the team through the outage", "notes": "Half an hour, no slides. Maren tells it, because she saw it first.", "when": 4, "due": 5 },
+    "repeating": { "title": "Hand over on-call", "group": "Team", "notes": "What woke you up, and what should not have.", "repeat": "Every {weekday}", "with": ["cert", "oncall"] },
+    "attachments": { "task": "runbook", "notes": "Start with what you see, then what to do. Tobias found two steps that no longer exist. The graphs are from {weekday-3}.", "files": ["runbook-old.pdf", "login-errors.png", "alert-log.txt"] },
+    "upcoming": [
+      { "in": 1, "tasks": [{ "id": "pram", "title": "Fetch the pram from Tobias", "group": "Family" }] },
+      { "in": 3, "tasks": ["customers", { "id": "replica", "title": "Second test of the database copy", "group": "Database move" }] },
+      { "in": 4, "tasks": [{ "ref": "oneonone", "due": 11 }] },
+      { "in": 5, "tasks": [{ "id": "checkup", "title": "Nursery visit at eight", "group": "Nursery place", "files": ["nursery-form.pdf"] }] },
+      { "in": 6, "tasks": [{ "id": "boiler", "title": "Let the boiler person in", "group": "Flat" }] },
+      { "in": 7, "tasks": ["repeating", { "id": "meter", "title": "Read the meter", "group": "Flat", "repeat": "Every month" }] }
+    ],
+    "agent": {
+      "title": "Write the outage timeline from the logs", "notes": "Alerts, chat and deploys from {weekday-3}, 14:00 to 15:00. Times only, no blame.", "due": 3,
+      "question": "Who will read it?", "options": ["The team", "The two customers"],
+      "artifact": "Timeline",
+      "bodies": ["14:02 certificate ends. 14:06 first alert. 14:19 Maren sees it. 14:31 new certificate requested. 14:42 logins work again.", "Between 14:02 and 14:42 you could not sign in. A certificate had ended. We replaced it, and nobody’s data was affected."],
+      "otherBody": "Logins failed between 14:02 and 14:42 because a certificate had ended. Your direction: {answer}",
+      "handoff": "Read the timeline", "acceptance": "The timeline is ready to share."
+    },
+    "discuss": {
+      "title": "Ask for a later stand-up", "group": "Team", "notes": "Nursery drop-off is at 8:45. Stand-up is at nine, across town.",
+      "question": "What would you like to ask for?", "options": ["Half past nine", "Written stand-up twice a week"],
+      "artifact": "Message to the team",
+      "bodies": ["Hi all, could we move stand-up to half past nine? I do the nursery run now and arrive out of breath. Say so if it breaks your morning.", "Hi all, could we do stand-up in writing on two days a week? I do the nursery run now, and I think we would all read faster than we talk."],
+      "otherBody": "Hi all, I do the nursery run now and would like to change stand-up. {answer}",
+      "draftHandoff": "Read the message", "handoff": "Your next step: post it", "acceptance": "The team knows what you are asking.",
+      "with": ["timeline", "cert", "oncall", "nursery"]
+    },
+    "review": [
+      { "title": "Write the outage timeline from the logs", "group": "Login outage", "note": "Five entries. Two clocks disagree by a minute, so I used the alert log.", "artifact": "Timeline" },
+      { "title": "List every certificate we own", "group": "Platform", "note": "Nine found. One has no owner.", "artifact": "Certificates" }
+    ],
+    "faded": ["Fix the squeaky pram wheel", "Try the new terminal", "Read the queue paper", "Sell the road bike", "Sourdough, again", "Talk proposal about flags", "Label the cables", "Reorganise the wiki", "Learn the ukulele song", "Photo book, first month", "Second monitor arm", "Garden chairs in the cellar", "Clean the coffee grinder", "Old laptop to the school", "Finish the side project"]
+  }]
+}

@@ -1,5 +1,6 @@
 package app.septena.core
 
+import app.septena.core.generated.RegistryEntityFields
 import app.septena.sharedcore.conversationState
 import app.septena.sharedcore.deriveConversation
 import java.time.Instant
@@ -23,6 +24,12 @@ data class TaskConversation(
     val assignee: String? = null,
     val stoppedAt: String? = null,
     val claimUntil: String? = null,
+    /**
+     * When `endState` last changed (`convos.endStateAt`). Server-owned: the app
+     * reads it for "{ago}" on the agent prompt and never writes it. Kotlin-side
+     * only; the core's conversation rules do not use it.
+     */
+    val endStateAt: String? = null,
 ) {
     /** The core's predicates (`convo.rs`). A live claim needs a clock; these do not. */
     private fun state(now: Instant = Instant.now()) = conversationState(toCore(), now.toString())
@@ -32,6 +39,9 @@ data class TaskConversation(
     val hasOpenProviderQuestion: Boolean get() = state().hasOpenProviderQuestion
     val awaitsHuman: Boolean get() = state().awaitsHuman
     val hasStarted: Boolean get() = state().hasStarted
+
+    /** An agent holds a live claim on the task (it is working now). */
+    fun isClaimed(now: Instant = Instant.now()): Boolean = state(now).isClaimed
 
     /** The Agent list stage (queued, working, yourTurn, review, done), or null when not agent work. */
     fun agentStage(now: Instant = Instant.now()): String? = state(now).agentStage
@@ -80,7 +90,9 @@ data class TaskConversation(
                 endStateNote = fields["endStateNote"].stringValue(),
                 assignee = fields["assignee"].stringValue(),
                 stoppedAt = fields["stoppedAt"].stringValue(),
-                claimUntil = fields["claimUntil"].stringValue(),
+                // The core reads a claim only when it has a claimant (`convo.rs`, `is_claimed`).
+                claimUntil = fields["claimUntil"].stringValue().takeIf { fields["claimedBy"].stringValue() != null },
+                endStateAt = fields[RegistryEntityFields.Convo.END_STATE_AT].stringValue(),
             )
         }
     }

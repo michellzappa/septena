@@ -291,6 +291,9 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Open (`task.open`): show the inspector pane for the selection and never
   /// close it. On the Mac the task page is the inspector (ADR 0029).
   var onOpenInspector: (() -> Void)?
+  /// Send back on a Review row: open the inspector for the selected row with
+  /// its Send back field open and focused.
+  var onOpenSendBack: (() -> Void)?
   var onQuickFind: (() -> Void)?
   /// Jump to another destination — a grouped Today/Anytime area or project
   /// header was clicked, or the title dropdown picked a list. Carries a
@@ -379,7 +382,6 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
-  private var sendBackPopover: KitSendBackPopover?
 
   /// An empty list is a lie while the first pull from the task backend is still
   /// running for a signed-in account — the list is empty because the data
@@ -463,7 +465,7 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.selectionHighlightStyle = .none
     // Default `.gap` punches a row-height hole at the drop, which splits a
     // per-row card into two and leaves a chrome-less duplicate in the gap.
-    // `.none` keeps the card intact; we draw SwiftUI's insertion line instead.
+    // `.none` keeps the card intact; we draw SwiftUI's `TaskInsertionMark` instead.
     tableView.draggingDestinationFeedbackStyle = .none
     tableView.dataSource = self
     tableView.delegate = self
@@ -3570,6 +3572,12 @@ final class SeptaskKitTaskListController: NSViewController {
       beginEditingRow(row)
       return
     }
+    // A Review row opens the task page (the inspector), same as iPhone. It
+    // never expands inline: the review cell is not a task row.
+    if filter == .review {
+      onOpenInspector?()
+      return
+    }
     beginComposing(id: task.id)
   }
 
@@ -4169,12 +4177,10 @@ final class SeptaskKitTaskListController: NSViewController {
             of: tableView, preferredEdge: .maxY)
   }
 
-  /// Send Back… from the row menu: the same popover as the row's button,
-  /// anchored to the row.
+  /// Send Back… from the row menu: the same path as the row's button — the
+  /// inspector opens with the Send back field open and focused.
   private func presentSendBackForSelectedRow(taskID: String) {
-    let row = tableView.selectedRow
-    guard row >= 0, let anchor = tableView.rowView(atRow: row, makeIfNecessary: false) else { return }
-    presentSendBackPopover(taskID: taskID, anchor: anchor)
+    openSendBack(taskID: taskID)
   }
 
   /// The trash's own vocabulary (registry `task.recentlyDeleted`) — nothing
@@ -4680,7 +4686,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         return composerRowHeight ?? KitComposerCell.baseHeight
       }
       if filter == .review {
-        return KitReviewTaskCell.height(for: task, width: tableView.bounds.width)
+        return KitReviewTaskCell.height(for: task,
+                                        contextText: KitListPath.text(for: task, in: context),
+                                        width: tableView.bounds.width)
       }
       return SeptaskKitTheme.rowHeight
     case .event: return SeptaskKitTheme.rowHeight
@@ -4828,12 +4836,13 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       rowView.dropLine = .none
       return
     }
-    if drop == row {
-      rowView.dropLine = .top
-    } else if drop >= rows.count && row == rows.count - 1 {
-      rowView.dropLine = .bottom
+    // Above a card row the bar sits on the row before it, like SwiftUI's
+    // `taskInsertionMark`: between cells, and clear of the card's rounded top.
+    let onRowBefore = drop > 0 && (drop >= rows.count || rows[drop].isCardRow)
+    if onRowBefore {
+      rowView.dropLine = row == min(drop, rows.count) - 1 ? .bottom : .none
     } else {
-      rowView.dropLine = .none
+      rowView.dropLine = row == drop ? .top : .none
     }
   }
 
@@ -5399,9 +5408,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         let identifier = NSUserInterfaceItemIdentifier("reviewTaskCell")
         let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitReviewTaskCell
           ?? KitReviewTaskCell(identifier: identifier)
-        cell.configure(with: task, contextText: taskContextText(for: task))
+        cell.configure(with: task, contextText: KitListPath.text(for: task, in: context))
         cell.onAccept = { [weak self] id in self?.acceptReviewTask(id: id) }
-        cell.onSendBack = { [weak self] id, anchor in self?.presentSendBackPopover(taskID: id, anchor: anchor) }
+        cell.onSendBack = { [weak self] id in self?.openSendBack(taskID: id) }
         return cell
       }
       let identifier = NSUserInterfaceItemIdentifier("taskCell")
@@ -5476,21 +5485,14 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     reload()
   }
 
-  /// Send a `needs_verify` task back to the agent with a user turn note (with undo).
-  private func presentSendBackPopover(taskID: String, anchor: NSView) {
-    sendBackPopover = KitSendBackPopover.present(
-      relativeTo: anchor,
-      onSend: { [weak self] note in
-        guard let self else { return }
-        let before = self.mutator.conversation(id: taskID) ?? TaskConvo()
-        self.mutator.sendBackConvo(id: taskID, note: note)
-        let after = self.mutator.conversation(id: taskID) ?? before
-        TaskUndo.recordSendBack(id: taskID, before: before, after: after, mutator: self.mutator)
-        self.reload()
-      },
-      onClose: { [weak self] in
-        self?.sendBackPopover = nil
-      })
+  /// Send back from a Review row: the row does not open a field of its own.
+  /// It selects the row (so the inspector shows this task) and asks the
+  /// shell to open the inspector with the Send back field open and focused
+  /// (docs/AGENT_PROMPT_SPEC.md). The send, its undo and the reload run in
+  /// the inspector's conversation view, the same path as its own Send back.
+  private func openSendBack(taskID: String) {
+    guard select(taskId: taskID) else { return }
+    onOpenSendBack?()
   }
 }
 
@@ -7183,7 +7185,7 @@ final class KitReminderCell: NSTableCellView {
       return TaskFilter.today.title
     }
     if cal.isDateInTomorrow(date) {
-      return String(localized: "Tomorrow", comment: "Relative day label")
+      return RegistrySurfaces.tomorrowLabel
     }
     return SeptenaDate.monthDay(date)
   }
@@ -7495,7 +7497,7 @@ enum KitDayFormat {
     let calendar = Calendar.current
     if calendar.isDate(date, inSameDayAs: today) { return "Today" }
     if let tomorrow = calendar.date(byAdding: .day, value: 1, to: today),
-       calendar.isDate(date, inSameDayAs: tomorrow) { return "Tomorrow" }
+       calendar.isDate(date, inSameDayAs: tomorrow) { return RegistrySurfaces.tomorrowLabel }
     return render.string(from: date)
   }
 

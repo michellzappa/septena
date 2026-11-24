@@ -59,8 +59,20 @@ data class TaskHomeUiState(
     val canQuickAdd: Boolean = false,
     val canComplete: Boolean = false,
     val agentsPaused: Boolean = false,
-    val draftTitle: String = "",
+    /** Task ids picked by a long-press; non-empty means the list is in selection mode. */
+    val selectedIds: Set<String> = emptySet(),
     val errorMessage: String? = null,
+)
+
+/** The fields of the Quick Add sheet. */
+data class QuickAddDraft(
+    val title: String = "",
+    val notes: String = "",
+    val whenDay: String? = null,
+    val deadline: String? = null,
+    val starred: Boolean = false,
+    val areaId: String? = null,
+    val projectId: String? = null,
 )
 
 private data class LoadedTaskHome(
@@ -81,7 +93,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private val location = MutableStateFlow<TaskHomeLocation>(
         TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY),
     )
-    private val draftTitle = MutableStateFlow("")
+    private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
     private val errorMessage = MutableStateFlow<String?>(null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -95,7 +107,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         initialValue = loadInitial(),
     )
 
-    val state: StateFlow<TaskHomeUiState> = combine(loaded, draftTitle, errorMessage) { home, draft, error ->
+    val state: StateFlow<TaskHomeUiState> = combine(loaded, selectedIds, errorMessage) { home, selected, error ->
         TaskHomeUiState(
             hasLoaded = home.hasLoaded,
             location = home.location,
@@ -107,7 +119,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             canQuickAdd = home.canQuickAdd,
             canComplete = home.canComplete,
             agentsPaused = home.agentsPaused,
-            draftTitle = draft,
+            selectedIds = selected,
             errorMessage = error,
         )
     }.stateIn(
@@ -117,7 +129,17 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     )
 
     fun select(location: TaskHomeLocation) {
+        selectedIds.value = emptySet()
         this.location.value = location
+    }
+
+    /** Long-press enters selection with the row; in selection a tap adds or removes a row. */
+    fun toggleSelection(id: String) {
+        selectedIds.value = selectedIds.value.let { if (id in it) it - id else it + id }
+    }
+
+    fun clearSelection() {
+        selectedIds.value = emptySet()
     }
 
     fun setAreaEmoji(areaId: String, emoji: String?) {
@@ -137,22 +159,119 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
-    fun updateDraft(title: String) {
-        draftTitle.value = title
-        errorMessage.value = null
-    }
+    /** True while a Quick Add write runs, so a second tap on Add cannot create a second task. */
+    private var quickAddRunning = false
 
-    fun quickAdd() {
-        val title = draftTitle.value.trim()
-        if (title.isEmpty()) return
+    /**
+     * Creates the Quick Add task. The core decides the date fields (When and
+     * deadline go through the same date actions as the task page), and Undo
+     * removes the new task in one step. Once the row exists the sheet closes,
+     * also when a later field write fails: a retry would create it twice.
+     */
+    fun quickAdd(draft: QuickAddDraft, onSaved: () -> Unit) {
+        val title = draft.title.trim()
+        if (title.isEmpty() || quickAddRunning) return
+        quickAddRunning = true
+        errorMessage.value = null
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { graph.taskMutator.create(title) } }
-                .onSuccess {
-                    draftTitle.value = ""
-                    errorMessage.value = null
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val created = graph.taskMutator.create(
+                        title = title,
+                        area = if (draft.projectId == null) draft.areaId else null,
+                        project = draft.projectId,
+                        notes = draft.notes.trim().takeIf(String::isNotEmpty),
+                    )
+                    val fields = runCatching {
+                        draft.whenDay?.let { graph.taskMutator.setWhen(created.id, it) }
+                        draft.deadline?.let { graph.taskMutator.setDeadline(created.id, it) }
+                        if (draft.starred) graph.taskMutator.setStarred(created.id, true)
+                    }
+                    graph.taskUndoHistory.recordCreated(created.asSyncRecord())
+                    fields.exceptionOrNull()
+                }
+            }
+                .onSuccess { fieldError ->
+                    errorMessage.value = fieldError?.message
                     noteLocalChangeAndSync()
+                    onSaved()
                 }
                 .onFailure { errorMessage.value = it.message }
+            quickAddRunning = false
+        }
+    }
+
+    /** The selected titles, one per line in list order, for the clipboard. */
+    fun copySelection(onReady: (String) -> Unit) {
+        val ids = selectedIds.value
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val order = state.value.let { home -> (home.inboxTasks + home.tasks).map { it.id } }
+                    ids.sortedBy { id -> order.indexOf(id).let { if (it < 0) Int.MAX_VALUE else it } }
+                        .mapNotNull { id ->
+                            graph.taskStore.record(EntityNames.TASK, id)
+                                ?.fields?.get(RegistryEntityFields.Task.TITLE).stringValue()
+                        }
+                        .joinToString("\n")
+                }
+            }.onSuccess { text ->
+                clearSelection()
+                if (text.isNotEmpty()) onReady(text)
+            }.onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    /** Selects every row of the list, or clears the selection when all are selected. */
+    fun toggleSelectAll() {
+        val visible = state.value.let { home -> (home.inboxTasks + home.tasks).map { it.id } }.toSet()
+        selectedIds.value = if (selectedIds.value.containsAll(visible)) emptySet() else visible
+    }
+
+    /** True when every task in [ids] is on Today, so the batch Today action removes them. */
+    suspend fun allOnToday(ids: Set<String>): Boolean = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext false
+        val now = graph.clock.now()
+        val today = graph.clock.today(now)
+        ids.all { id ->
+            val record = graph.taskStore.record(EntityNames.TASK, id) ?: return@all false
+            val snapshot = runCatching { TaskSnapshot.from(record) }.getOrNull() ?: return@all false
+            TaskViewRules.membership(snapshot, today, now).isOnToday
+        }
+    }
+
+    /** Complete, Cancel, Delete or Today on the whole selection, as one undo step. */
+    fun applyToSelection(actionId: String, todayEnabled: Boolean = true) {
+        batch { id ->
+            when (actionId) {
+                RegistryActionIds.TASK_TOGGLE_COMPLETE -> graph.taskMutator.complete(id)
+                RegistryActionIds.TASK_CANCEL -> graph.taskMutator.cancel(id)
+                RegistryActionIds.TASK_DELETE -> graph.taskMutator.delete(id)
+                RegistryActionIds.TASK_TOGGLE_TODAY -> graph.taskMutator.setToday(id, todayEnabled)
+                else -> error("Unsupported batch action: $actionId")
+            }
+        }
+    }
+
+    /** When for the whole selection; null clears it. */
+    fun setWhenForSelection(day: String?) {
+        batch { id -> graph.taskMutator.setWhen(id, day) }
+    }
+
+    /** Move the whole selection to an area, a project, or (both null) the Inbox. */
+    fun moveSelection(areaId: String?, projectId: String?) {
+        batch { id -> graph.taskMutator.moveToList(id, areaId, projectId) }
+    }
+
+    private fun batch(write: suspend (String) -> Unit) {
+        val ids = selectedIds.value
+        if (ids.isEmpty()) return
+        selectedIds.value = emptySet()
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { graph.captureTaskEdits(ids) { id -> write(id) } }
+            }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
+                .onFailure { errorMessage.value = it.message; noteLocalChangeAndSync() }
         }
     }
 
@@ -191,6 +310,24 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             runCatching {
                 withContext(Dispatchers.IO) {
                     graph.captureTaskEdit(id) { check(graph.taskMutator.delete(id) != null) }
+                }
+            }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
+                .onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    fun acceptReview(id: String) = editTask(id) { graph.taskMutator.acceptReview(id) }
+
+    fun keepFaded(id: String) = editTask(id) { graph.taskMutator.keepFaded(id) }
+
+    fun letGoFaded(id: String) = editTask(id) { graph.taskMutator.letGoFaded(id) }
+
+    /** One undoable task edit off the main thread, then a sync. */
+    private fun editTask(id: String, edit: suspend () -> Any?) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.captureTaskEdit(id) { check(edit() != null) }
                 }
             }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
                 .onFailure { errorMessage.value = it.message }

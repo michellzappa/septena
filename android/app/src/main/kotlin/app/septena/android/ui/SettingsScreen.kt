@@ -354,6 +354,16 @@ private fun SettingsRegistryRow(
             val key = item.key ?: return
             val definition = definitions[key] ?: return
             val label = item.label ?: return
+            if (key == RegistrySettingKeys.TEXT_SIZE_STEP) {
+                TextSizeSettingRow(label, languageTag)
+                return
+            }
+            if (key == RegistrySettingKeys.AI_MODE) {
+                // Where AI runs: each mode with what it means (AiModeSettings.kt), as on iPhone.
+                val current = (values[key] ?: definition.fields["default"]).stringValue().orEmpty()
+                AiModePicker(current, languageTag) { onValueChange(key, JsonValue.StringValue(it)) }
+                return
+            }
             RegistrySettingControl(
                 key = key,
                 label = label,
@@ -376,6 +386,7 @@ private fun SettingsRegistryRow(
                 }
                 "access_devices" -> AccessDevicesList(accessModel, signedIn, languageTag)
                 "access_agents" -> AccessAgentsList(accessModel, signedIn, languageTag)
+                APPEARANCE_PICKER_SURFACE -> AppearancePicker(languageTag)
                 "account_profile_editor" -> {
                     val key = item.ownsKeys.firstOrNull() ?: return
                     val definition = definitions[key] ?: return

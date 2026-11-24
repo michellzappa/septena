@@ -47,6 +47,17 @@ class AppCredentials(
         saved?.let { runCatching { auth.signOut(it.refreshToken) } }
     }
 
+    /**
+     * Forgets the session on this device without a sign-out call: after account deletion the server's
+     * store is empty, so the refresh token fails its next rotation anyway (same as iOS).
+     */
+    suspend fun forgetSession() = mutex.withLock {
+        store.clear()
+        access = null
+        accessExpiresAtMs = 0L
+        _signedIn.value = false
+    }
+
     private suspend fun refresh(stale: String?): String? = mutex.withLock {
         val current = access
         if (current != null && current != stale && nowMs() < accessExpiresAtMs - EXPIRY_MARGIN_MS) return current

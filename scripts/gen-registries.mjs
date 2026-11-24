@@ -13,6 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as L10N from "./registry-l10n.mjs";
 import { checkReaders } from "./registry-readers.mjs";
+import { validateCast } from "./registry-cast.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, "..");
@@ -480,6 +481,10 @@ function validateFirstRun(surfaces, icons, caps, settings) {
     assert(FIRST_RUN_KINDS.has(st.kind), `surfaces.json: firstRun ${st.id} unknown kind "${st.kind}"`);
     assert(st.icon in icons.icons, `surfaces.json: firstRun ${st.id} unknown icon "${st.icon}"`);
     assert(typeof st.title === "string" && st.title.length > 0, `surfaces.json: firstRun ${st.id} missing title`);
+    // `platforms` limits a step to those platforms (absent: every platform);
+    // `featureId` skips it where that capability does not ship (ADR 0015).
+    for (const p of st.platforms ?? []) assert(platforms.has(p), `surfaces.json: firstRun ${st.id} unknown platform "${p}"`);
+    if (st.featureId !== undefined) assert(st.featureId in caps.capabilities, `surfaces.json: firstRun ${st.id} unknown featureId "${st.featureId}"`);
     for (const c of [st.skipWhen, st.requires]) {
       if (c !== undefined) assert(FIRST_RUN_CONDITIONS.has(c), `surfaces.json: firstRun ${st.id} unknown condition "${c}"`);
     }
@@ -549,6 +554,13 @@ function validateSurfaces(surfaces, icons, caps, plans) {
     if (["checklist", "attachments", "conversation", "history"].includes(b.kind)) {
       assert(typeof b.label === "string" || b.attribute !== undefined, `surfaces.json: taskPage block ${b.id} needs a label or an attribute`);
     }
+    // The agent prompt copy (docs/AGENT_PROMPT_SPEC.md): the kickers, the
+    // question when a hand-off has no note, and the line after Accept.
+    if (b.kind === "conversation") {
+      for (const k of ["askKicker", "reviewKicker", "reviewFallback", "acceptedLabel"]) {
+        assert(typeof b[k] === "string" && b[k].length > 0, `surfaces.json: taskPage block ${b.id} needs ${k}`);
+      }
+    }
     // Provenance (who added the task) is permanent metadata: the label, the
     // name a human author shows as, the name for an agent row that carries
     // no `sourceClient`, and the agent glyph the row and the page share.
@@ -563,6 +575,28 @@ function validateSurfaces(surfaces, icons, caps, plans) {
     assert(page.blocks.filter((b) => b.kind === kind).length === 1, `surfaces.json: taskPage needs exactly one "${kind}" block`);
   }
 }
+
+// The date board (docs/TASK_ROW_MENU_SPEC.md): the rows under the day strip of
+// the When and Deadline pickers, from a closed set of kinds in one order.
+function checkTaskDateBoard({ surfaces, icons, caps, actions }) {
+  const rows = surfaces.taskDateBoard?.rows ?? [];
+  const attrIds = new Set(surfaces.taskAttributes.map((a) => a.id));
+  for (const kind of DATE_BOARD_ROW_KINDS) {
+    assert(rows.filter((r) => r.kind === kind).length === 1, `surfaces.json: taskDateBoard needs exactly one "${kind}" row`);
+  }
+  for (const r of rows) {
+    assert(DATE_BOARD_ROW_KINDS.has(r.kind), `surfaces.json: taskDateBoard row ${r.id} unknown kind "${r.kind}"`);
+    assert(r.icon in icons.icons, `surfaces.json: taskDateBoard row ${r.id} unknown icon "${r.icon}"`);
+    assert(r.featureId in caps.capabilities, `surfaces.json: taskDateBoard row ${r.id} unknown featureId "${r.featureId}"`);
+    assert((typeof r.label === "string") !== (r.action in actions.actions), `surfaces.json: taskDateBoard row ${r.id} needs a label or a known action`);
+    assert(Array.isArray(r.attributes) && r.attributes.length > 0, `surfaces.json: taskDateBoard row ${r.id} needs attributes`);
+    for (const a of [...r.attributes, ...(r.attributeLabels ?? []).map((l) => l.attribute)]) {
+      assert(DATE_BOARD_ATTRIBUTES.has(a) && attrIds.has(a), `surfaces.json: taskDateBoard row ${r.id} unknown attribute "${a}"`);
+    }
+  }
+}
+const DATE_BOARD_ROW_KINDS = new Set(["tomorrow", "calendar", "clear", "repeatRule", "time"]);
+const DATE_BOARD_ATTRIBUTES = new Set(["when", "deadline"]);
 
 // One picker per attribute (ADR 0029): every popover attribute is opened by
 // exactly one action, so the pill, the page row, the context menu, the menu
@@ -582,7 +616,7 @@ function checkOpensAttribute({ actions, surfaces }) {
   }
 }
 const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checklist", "attachments", "conversation", "provenance", "history"]);
-const TASK_PAGE_DEPTHS = new Set(["inline", "page"]);
+const TASK_PAGE_DEPTHS = new Set(["inline", "page", "review"]);
 
 // ---- plans.json (ADR 0010, ADR 0023) ----
 const PLAN_LEVELS = ["device", "account", "plus"];
@@ -1529,16 +1563,66 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static func taskPageBlocks(_ depth: RegistryTaskPageDepth, on platform: String, isEditing: Bool = true) -> [RegistryTaskPageBlock] {");
   lines.push("    taskPageBlocks.filter { $0.depths.contains(depth) && $0.applies(to: platform) && (isEditing || !$0.editOnly) }");
   lines.push("  }");
+  lines.push("  /// The rows under the date board's day strip, in order (`surfaces.json` `taskDateBoard`).");
+  lines.push("  static let dateBoardRows: [RegistryDateBoardRow] = [");
+  for (const r of surfaces.taskDateBoard.rows) {
+    const action = actions.actions[r.action];
+    const label = action ? L(action.title, action, "title") : L(r.label, r, "label");
+    const own = (r.attributeLabels ?? []).map((l) => `.${l.attribute}: ${L(l.label, l, "label")}`).join(", ");
+    lines.push(`    RegistryDateBoardRow(id: ${swiftStr(r.id)}, kind: .${r.kind}, label: ${label}, attributeLabels: [${own || ":"}], sfSymbol: ${swiftStr(icons.icons[r.icon].sfSymbol)}, attributes: [${r.attributes.map((a) => "." + a).join(", ")}], featureId: ${swiftStr(r.featureId)}),`);
+  }
+  lines.push("  ]");
+  lines.push("  static func dateBoardRows(for attribute: RegistryDateBoardAttribute, on platform: String) -> [RegistryDateBoardRow] {");
+  lines.push("    dateBoardRows.filter { $0.applies(to: attribute, on: platform) }");
+  lines.push("  }");
+  const cal = surfaces.taskDateBoard.rows.find((r) => r.kind === "calendar");
+  lines.push("  /// The calendar row when the task has a date past the day strip.");
+  lines.push(tmplFn("dateBoardCalendarLabel", tmplKey(cal.valueLabel, cal, "valueLabel")));
+  const tmrw = surfaces.taskDateBoard.rows.find((r) => r.kind === "tomorrow");
+  lines.push("  /// The word for the day after today, in the date board and in date labels.");
+  lines.push(`  static let tomorrowLabel: String = ${L(tmrw.label, tmrw, "label")}`);
   const prov = surfaces.taskPage.blocks.find((b) => b.kind === "provenance");
   lines.push("  /// Provenance block (`taskPage.provenance`): the name a task you added shows as,");
   lines.push("  /// the name for an agent row with no `sourceClient`, and the agent glyph.");
   lines.push(`  static let provenanceSelfLabel: String = ${L(prov.selfLabel, prov, "selfLabel")}`);
   lines.push(`  static let provenanceAgentFallbackName: String = ${swiftStr(prov.agentFallbackName)}`);
   lines.push(`  static let provenanceAgentSymbol: String = ${swiftStr(icons.icons[prov.icon].sfSymbol)}`);
+  const convoBlock = surfaces.taskPage.blocks.find((b) => b.kind === "conversation");
+  lines.push("  /// Agent prompt copy (`taskPage.conversation`, docs/AGENT_PROMPT_SPEC.md).");
+  for (const k of ["askKicker", "reviewKicker", "reviewFallback", "acceptedLabel"]) {
+    lines.push(`  static let agentPrompt${k[0].toUpperCase()}${k.slice(1)}: String = ${L(convoBlock[k], convoBlock, k)}`);
+  }
   lines.push("  /// The block of `kind`. Each kind appears exactly once (the generator checks it).");
   lines.push("  static func taskPageBlock(_ kind: RegistryTaskPageBlockKind) -> RegistryTaskPageBlock {");
   lines.push("    guard let b = taskPageBlocks.first(where: { $0.kind == kind }) else { preconditionFailure(\"no task page block \\(kind)\") }");
   lines.push("    return b");
+  lines.push("  }");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// The attributes that the date board edits.");
+  lines.push("enum RegistryDateBoardAttribute: String, Sendable, Hashable {");
+  for (const a of DATE_BOARD_ATTRIBUTES) lines.push(`  case ${a}`);
+  lines.push("}");
+  lines.push("");
+  lines.push("/// The closed set of date board rows. Each platform writes one handler per kind.");
+  lines.push("enum RegistryDateBoardRowKind: String, Sendable, Hashable {");
+  for (const k of DATE_BOARD_ROW_KINDS) lines.push(`  case ${k}`);
+  lines.push("}");
+  lines.push("");
+  lines.push("/// One row under the date board's day strip (`surfaces.json` `taskDateBoard.rows`).");
+  lines.push("struct RegistryDateBoardRow: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let kind: RegistryDateBoardRowKind");
+  lines.push("  let label: String");
+  lines.push("  /// Attribute → label that replaces `label` in that attribute's picker.");
+  lines.push("  let attributeLabels: [RegistryDateBoardAttribute: String]");
+  lines.push("  let sfSymbol: String");
+  lines.push("  let attributes: [RegistryDateBoardAttribute]");
+  lines.push("  let featureId: String");
+  lines.push("  func label(for attribute: RegistryDateBoardAttribute) -> String { attributeLabels[attribute] ?? label }");
+  lines.push("  /// The row shows in `attribute`'s picker on `platform` when its capability ships there (ADR 0015).");
+  lines.push("  func applies(to attribute: RegistryDateBoardAttribute, on platform: String) -> Bool {");
+  lines.push("    attributes.contains(attribute) && RegistryCapabilities.isAvailable(featureId, on: platform)");
   lines.push("  }");
   lines.push("}");
   lines.push("");
@@ -1547,7 +1631,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const k of TASK_PAGE_BLOCK_KINDS) lines.push(`  case ${k}`);
   lines.push("}");
   lines.push("");
-  lines.push("/// Where a task page block shows: `inline` (the quick edit in the row) or `page` (the full task page).");
+  lines.push("/// Where a task page block shows: `inline` (the quick edit in the row), `page` (the full task page), or `review` (the page of a task waiting for the user to accept it).");
   lines.push("enum RegistryTaskPageDepth: String, Sendable, Hashable {");
   for (const d of TASK_PAGE_DEPTHS) lines.push(`  case ${d}`);
   lines.push("}");
@@ -1604,6 +1688,10 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let skipWhen: String?");
   lines.push("  let requires: String?");
   lines.push("  let completesGetStartedStep: String?");
+  lines.push("  /// The platforms this step shows on; empty means every platform.");
+  lines.push("  let platforms: [String]");
+  lines.push("  /// The step shows only where this capability ships (`RegistryCapabilities.isAvailable`).");
+  lines.push("  let featureId: String?");
   lines.push("  let points: [RegistryFirstRunPoint]");
   lines.push("  let choices: [RegistryFirstRunChoice]");
   lines.push("  let instructions: [String]");
@@ -1625,7 +1713,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     const points = (st.points ?? []).map((pt) => `RegistryFirstRunPoint(icon: ${swiftStr(pt.icon)}, title: ${L(pt.title, pt, "title")}, detail: ${L(pt.detail, pt, "detail")})`).join(", ");
     const choices = (st.choices ?? []).map((ch) => `RegistryFirstRunChoice(id: ${swiftStr(ch.id)}, icon: ${swiftStr(ch.icon)}, title: ${L(ch.title, ch, "title")}, detail: ${L(ch.detail, ch, "detail")}, action: ${swiftStr(ch.action)}, platforms: [${(ch.platforms ?? []).map(swiftStr).join(", ")}])`).join(", ");
     const instructions = (st.instructions ?? []).map((s) => L(s)).join(", ");
-    lines.push(`    RegistryFirstRunStep(id: ${swiftStr(st.id)}, kind: ${swiftStr(st.kind)}, icon: ${swiftStr(st.icon)}, title: ${L(st.title, st, "title")}, body: ${st.body === undefined ? '""' : L(st.body, st, "body")}, footnote: ${LOpt(st.footnote, st, "footnote")}, returningTitle: ${LOpt(st.returningTitle, st, "returningTitle")}, returningBody: ${LOpt(st.returningBody, st, "returningBody")}, skipWhen: ${swiftOptStr(st.skipWhen)}, requires: ${swiftOptStr(st.requires)}, completesGetStartedStep: ${swiftOptStr(st.completesGetStartedStep)}, points: [${points}], choices: [${choices}], instructions: [${instructions}], primary: ${frButton(st.primary)}, secondary: ${frButton(st.secondary)}, tertiary: ${frButton(st.tertiary)}, afterDone: ${frButton(st.afterDone)}),`);
+    lines.push(`    RegistryFirstRunStep(id: ${swiftStr(st.id)}, kind: ${swiftStr(st.kind)}, icon: ${swiftStr(st.icon)}, title: ${L(st.title, st, "title")}, body: ${st.body === undefined ? '""' : L(st.body, st, "body")}, footnote: ${LOpt(st.footnote, st, "footnote")}, returningTitle: ${LOpt(st.returningTitle, st, "returningTitle")}, returningBody: ${LOpt(st.returningBody, st, "returningBody")}, skipWhen: ${swiftOptStr(st.skipWhen)}, requires: ${swiftOptStr(st.requires)}, completesGetStartedStep: ${swiftOptStr(st.completesGetStartedStep)}, platforms: [${(st.platforms ?? []).map(swiftStr).join(", ")}], featureId: ${swiftOptStr(st.featureId)}, points: [${points}], choices: [${choices}], instructions: [${instructions}], primary: ${frButton(st.primary)}, secondary: ${frButton(st.secondary)}, tertiary: ${frButton(st.tertiary)}, afterDone: ${frButton(st.afterDone)}),`);
   }
   lines.push("  ]");
   lines.push("}");
@@ -2023,6 +2111,10 @@ function generateKotlinCore(bundle) {
     RegistryFirstRunStepIds: surfaces.firstRun.steps.map((s) => s.id),
     RegistryTaskAttributeIds: surfaces.taskAttributes.map((a) => a.id),
     RegistryTaskPageBlockIds: surfaces.taskPage.blocks.map((b) => b.id),
+    // Top-level surfaces looked up by id (taskRowMenu, taskSelection, ...).
+    RegistrySurfaceIds: Object.values(surfaces)
+      .filter((v) => v && typeof v === "object" && !Array.isArray(v) && typeof v.id === "string")
+      .map((v) => v.id),
   };
   const idCounts = new Map();
   (function countIds(v) {
@@ -2224,9 +2316,17 @@ const destIds = validateDestinations(dests, icons, caps);
 validateActions(actions, icons, caps, destIds);
 validateSurfaces(surfaces, icons, caps, plans);
 checkOpensAttribute({ actions, surfaces });
+checkTaskDateBoard({ surfaces, icons, caps, actions });
 validateFirstRun(surfaces, icons, caps, settings);
 validatePlans(plans, icons, caps);
 validateConformance();
+// Marketing content only: no generated bindings, no localized strings (ADR 0030).
+validateCast(
+  fs.readdirSync(path.join(REPO, "registry/cast")).filter((name) => name.endsWith(".json")).sort()
+    .map((file) => ({ file, person: readJSON(`registry/cast/${file}`) })),
+  { tokens, caps, inboxTitle: dests.destinations.find((item) => item.id === "inbox").title },
+  assert,
+);
 
 BY_KEY = L10N.collectStrings({ settings, destinations: dests, actions, surfaces, tokens, plans }, assert);
 

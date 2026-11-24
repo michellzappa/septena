@@ -372,6 +372,18 @@ final class AppearancePreferences {
     }
   }
 
+  /// AppKit twin of `magicPlusSwiftUIColor`.
+  var magicPlusNSColor: NSColor {
+    let f = brandFruit
+    let light = RGBTriple.fromHex(f.lightHex)
+    let dark = RGBTriple.fromHex(f.darkHex)
+    return NSColor(name: nil) { appearance in
+      let isDark = appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+      let c = isDark ? dark : light
+      return NSColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: 1)
+    }
+  }
+
   /// AppKit twin of `glyphSwiftUIColor(_:)`.
   func glyphNSColor(_ iconID: String) -> NSColor {
     guard isColorful, let hex = RegistryTokens.multicolorGlyphHex[iconID] else { return accentNSColor }

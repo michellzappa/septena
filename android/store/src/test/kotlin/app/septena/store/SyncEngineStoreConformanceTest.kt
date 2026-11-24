@@ -4,10 +4,13 @@ import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import app.septena.core.JsonValue
 import app.septena.core.SyncChange
 import app.septena.core.SyncOperation
+import app.septena.core.SyncOperationResult
 import app.septena.core.SyncPullPage
 import app.septena.core.SyncRecord
+import app.septena.core.SyncResultStatus
 import app.septena.core.SyncWireCodec
 import app.septena.core.booleanValue
+import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.stringValue
 import app.septena.store.db.SeptenaDatabase
 import java.io.File
@@ -148,6 +151,118 @@ class SyncEngineStoreConformanceTest {
             } finally {
                 driver.close()
             }
+        }
+    }
+
+    fun remoteAttachmentDeleteNotifiesListener() {
+        val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+        try {
+            SeptenaDatabase.Schema.create(driver)
+            val store = SqlDelightTaskStore(SeptenaDatabase(driver))
+            val deleted = mutableListOf<Pair<String, String>>()
+            store.onRemoteDelete = { entity, id -> deleted += entity to id }
+            val now = Instant.parse("2026-11-24T12:00:00Z")
+
+            runSuspending {
+                // Pull a live attachment and a live task: neither fires onRemoteDelete.
+                store.applyPullPage(
+                    SyncPullPage(
+                        changes = listOf(
+                            SyncChange(
+                                RegistryEntityNames.ATTACHMENT,
+                                mapOf(
+                                    "id" to JsonValue.StringValue("att-1"),
+                                    "rev" to JsonValue.IntegerValue(1),
+                                    "taskId" to JsonValue.StringValue("task-1"),
+                                    "filename" to JsonValue.StringValue("photo.jpg"),
+                                    "contentType" to JsonValue.StringValue("image/jpeg"),
+                                    "byteCount" to JsonValue.IntegerValue(128),
+                                    "position" to JsonValue.DecimalValue(0.0),
+                                    "createdAt" to JsonValue.StringValue("2026-11-24T11:00:00Z"),
+                                ),
+                            ),
+                            SyncChange(
+                                RegistryEntityNames.TASK,
+                                mapOf(
+                                    "id" to JsonValue.StringValue("task-1"),
+                                    "rev" to JsonValue.IntegerValue(1),
+                                    "title" to JsonValue.StringValue("Keep me"),
+                                    "status" to JsonValue.StringValue("open"),
+                                ),
+                            ),
+                        ),
+                        nextSince = 1,
+                        hasMore = false,
+                    ),
+                    now,
+                )
+                assertEquals(emptyList<Pair<String, String>>(), deleted, "live pull must not fire onRemoteDelete")
+
+                // Pull tombstones for both: attachment fires onRemoteDelete, task keeps its local row.
+                store.applyPullPage(
+                    SyncPullPage(
+                        changes = listOf(
+                            SyncChange(
+                                RegistryEntityNames.ATTACHMENT,
+                                mapOf(
+                                    "id" to JsonValue.StringValue("att-1"),
+                                    "rev" to JsonValue.IntegerValue(2),
+                                    "deletedAt" to JsonValue.StringValue("2026-11-24T12:00:00Z"),
+                                ),
+                            ),
+                            SyncChange(
+                                RegistryEntityNames.TASK,
+                                mapOf(
+                                    "id" to JsonValue.StringValue("task-1"),
+                                    "rev" to JsonValue.IntegerValue(2),
+                                    "deletedAt" to JsonValue.StringValue("2026-11-24T12:00:00Z"),
+                                ),
+                            ),
+                        ),
+                        nextSince = 2,
+                        hasMore = false,
+                    ),
+                    now,
+                )
+                assertEquals(
+                    listOf(RegistryEntityNames.ATTACHMENT to "att-1"),
+                    deleted,
+                    "attachment tombstone fires onRemoteDelete; task tombstone does not",
+                )
+                assertNull(store.record(RegistryEntityNames.ATTACHMENT, "att-1"), "attachment row removed")
+
+                // A DROPPED push result for an attachment also fires onRemoteDelete.
+                val att2Fields = mapOf(
+                    "taskId" to JsonValue.StringValue("task-2"),
+                    "filename" to JsonValue.StringValue("doc.pdf"),
+                    "contentType" to JsonValue.StringValue("application/pdf"),
+                    "byteCount" to JsonValue.IntegerValue(256),
+                    "position" to JsonValue.DecimalValue(0.0),
+                    "createdAt" to JsonValue.StringValue("2026-11-24T11:00:00Z"),
+                )
+                val att2Update = mapOf("filename" to JsonValue.StringValue("renamed.pdf"))
+                store.writeLocalAndEnqueue(
+                    SyncRecord(RegistryEntityNames.ATTACHMENT, "att-2", att2Fields + att2Update),
+                    SyncOperation.Upsert("op-att-2", RegistryEntityNames.ATTACHMENT, "att-2", att2Update),
+                )
+                store.applyPushResults(
+                    listOf(SyncOperationResult("op-att-2", SyncResultStatus.DROPPED, revision = 3)),
+                    now,
+                )
+                assertEquals(
+                    listOf(RegistryEntityNames.ATTACHMENT to "att-1", RegistryEntityNames.ATTACHMENT to "att-2"),
+                    deleted,
+                    "dropped attachment push fires onRemoteDelete",
+                )
+                assertNull(store.record(RegistryEntityNames.ATTACHMENT, "att-2"), "dropped attachment row removed")
+
+                // A reset pull must never invoke onRemoteDelete.
+                deleted.clear()
+                store.resetForFullPull()
+                assertEquals(emptyList<Pair<String, String>>(), deleted, "resetForFullPull must not fire onRemoteDelete")
+            }
+        } finally {
+            driver.close()
         }
     }
 }

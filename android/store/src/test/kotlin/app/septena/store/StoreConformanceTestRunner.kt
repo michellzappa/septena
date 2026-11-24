@@ -4,7 +4,9 @@ package app.septena.store
 object StoreConformanceTestRunner {
     @JvmStatic
     fun main(args: Array<String>) {
-        SyncEngineStoreConformanceTest().pulledRowVectors()
+        val tests = SyncEngineStoreConformanceTest()
+        tests.pulledRowVectors()
+        tests.remoteAttachmentDeleteNotifiesListener()
         println("Store conformance vectors passed")
     }
 }

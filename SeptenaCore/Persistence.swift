@@ -309,22 +309,12 @@ final class TaskEntity {
   /// count, Next, and the badge.
   var isFaded: Bool { status == .open && fadedAt != nil }
 
-  var isOnToday: Bool {
-    guard status == .open, !isHeading, fadedAt == nil else { return false }
-    if today { return true }
-    if let s = scheduled, s <= SeptenaDate.today { return true }
-    if let d = deadline, d <= SeptenaDate.today { return true }
-    return false
-  }
+  var isOnToday: Bool { listMembership()?.isOnToday ?? false }
 
   /// `docs/TASK_DATES_SPEC.md` R5: open, not on Today, and a When date or
   /// deadline after today. A task is never on Today and in Upcoming at once
   /// (decision Q3). Every Upcoming list and count reads this.
-  var isUpcoming: Bool {
-    guard status == .open, !isHeading, fadedAt == nil, !isOnToday else { return false }
-    let today = SeptenaDate.today
-    return (scheduled.map { $0 > today } ?? false) || (deadline.map { $0 > today } ?? false)
-  }
+  var isUpcoming: Bool { listMembership()?.matchesUpcoming ?? false }
 
   /// Filed nowhere: no area, no project. See `TaskInbox`.
   var isUnfiled: Bool { TaskInbox.isUnfiled(area: area, project: project) }
@@ -337,13 +327,9 @@ final class TaskEntity {
   }
 
   /// The triage band: Inbox members not yet ratified — the layer rendered
-  /// above Today (`docs/TRIAGE_BAND_SPEC.md`, `TaskInbox.isUnratified`).
+  /// above Today (`docs/TRIAGE_BAND_SPEC.md`; the core's rule, `TaskListRules`).
   /// Mirror of `SeptenaTask.isInTriageBand`.
-  var isInTriageBand: Bool {
-    isInInbox && TaskInbox.isUnratified(source: source, createdAt: createdAt,
-                                        acknowledgedAt: acknowledgedAt, today: today,
-                                        scheduled: scheduled, deadline: deadline)
-  }
+  var isInTriageBand: Bool { listMembership()?.inTriageBand ?? false }
 
   var recurrence: Recurrence? {
     get {
