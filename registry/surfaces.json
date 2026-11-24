@@ -317,7 +317,7 @@
     { "id": "deadline", "label": "Deadline", "icon": "action.deadline", "commitContract": "pickCommits", "surfaceTier": "popover", "featureId": "task.when-deadline" },
     { "id": "reminder", "label": "Remind", "icon": "action.reminder", "commitContract": "pickCommits", "surfaceTier": "popover", "featureId": "task.alerts" },
     { "id": "repeat", "label": "Repeat", "icon": "action.repeat", "commitContract": "closeCommits", "surfaceTier": "popover", "featureId": "task.repeat" },
-    { "id": "star", "label": "Star", "icon": "action.star", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "lists.starred" },
+    { "id": "star", "label": "Favorite", "icon": "action.star", "toggle": true, "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "lists.starred" },
     { "id": "list", "label": "List", "icon": "action.move", "commitContract": "pickCommits", "surfaceTier": "popover", "featureId": "places.projects" },
     { "id": "tags", "label": "Tags", "countLabel": { "one": "{count} tag", "other": "{count} tags" }, "icon": "action.tag", "commitContract": "pickCommits", "surfaceTier": "popover", "featureId": "task.tags", "editOnly": true },
     { "id": "checklist", "label": "Checklist", "icon": "action.checklist", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "task.checklists", "editOnly": true },

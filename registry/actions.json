@@ -95,9 +95,9 @@
       "featureId": "lists.today"
     },
     "task.toggleStar": {
-      "title": "Toggle Star",
-      "addTitle": "Star",
-      "removeTitle": "Remove Star",
+      "title": "Toggle Favorite",
+      "addTitle": "Favorite",
+      "removeTitle": "Unfavorite",
       "icon": "action.star",
       "role": "default",
       "shortcut": { "key": "s", "modifiers": ["primary", "alt"] },

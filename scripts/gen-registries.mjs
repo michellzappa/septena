@@ -123,6 +123,11 @@ function validateIcons(icons) {
     for (const family of ["sfSymbol", "material", "lucide"]) {
       assert(typeof map[family] === "string" && map[family].length > 0, `icons.json: ${id}.${family} must be non-empty string`);
     }
+    // The filled variant a control shows while it is on (DesignSpec: a toggle
+    // that is on shows its filled symbol).
+    if (map.sfSymbolOn !== undefined) {
+      assert(typeof map.sfSymbolOn === "string" && map.sfSymbolOn.length > 0, `icons.json: ${id}.sfSymbolOn must be non-empty string`);
+    }
   }
 }
 
@@ -209,10 +214,15 @@ function validateSettings(settings, entities, icons, caps) {
   }
 
   // mz (2026-11-22): AI is never drawn with sparkles, on any platform.
+  // One exception, chosen by mz on 2026-11-24: the "added by agent" mark is
+  // SF `text.bubble.badge.sparkles` (a text bubble with a small sparkles
+  // badge). Material and Lucide stay sparkle-free.
+  const SPARKLES_ALLOWED = new Set(["task.added_by_agent:sfSymbol"]);
   for (const [id, icon] of Object.entries(icons.icons)) {
     if (!/(^|[._])(ai|agent|agents|claude)([._]|$)/.test(id)) continue;
-    for (const v of [icon.sfSymbol, icon.material, icon.lucide]) {
-      assert(!/sparkle|auto_awesome/.test(v ?? ""), `icons.json: ${id} uses a sparkles glyph; AI icons never use sparkles`);
+    for (const family of ["sfSymbol", "material", "lucide"]) {
+      if (SPARKLES_ALLOWED.has(`${id}:${family}`)) continue;
+      assert(!/sparkle|auto_awesome/.test(icon[family] ?? ""), `icons.json: ${id} uses a sparkles glyph; AI icons never use sparkles`);
     }
   }
   assert(Array.isArray(settings.pages) && settings.pages.length > 0, "settings.json: missing pages");
@@ -490,6 +500,10 @@ function validateSurfaces(surfaces, icons, caps, plans) {
     assert(["field", "inline", "popover", "chip"].includes(attr.surfaceTier), `surfaces.json: attribute ${attr.id} unknown surfaceTier "${attr.surfaceTier}"`);
     assert(attr.icon in icons.icons, `surfaces.json: attribute ${attr.id} unknown icon "${attr.icon}"`);
     assert(attr.featureId in caps.capabilities, `surfaces.json: attribute ${attr.id} unknown featureId "${attr.featureId}"`);
+    // An on/off attribute shows a filled symbol while on, so its icon must declare one.
+    if (attr.toggle === true) {
+      assert(typeof icons.icons[attr.icon]?.sfSymbolOn === "string", `surfaces.json: toggle attribute ${attr.id} needs an icon with sfSymbolOn`);
+    }
   }
   // The task page (ADR 0029, docs/TASK_PAGE_SPEC.md): ordered blocks from a
   // closed set of kinds. Each platform writes one renderer per kind; the
@@ -739,6 +753,19 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("");
   lines.push("  static func sfSymbol(for id: String) -> String {");
   lines.push('    sfSymbols[id] ?? "circle"');
+  lines.push("  }");
+  lines.push("");
+  lines.push("  /// Filled variants (`icons.json` `sfSymbolOn`) a control shows while it is on.");
+  lines.push("  static let sfSymbolsOn: [String: String] = [");
+  for (const [id, map] of Object.entries(icons.icons)) {
+    if (map.sfSymbolOn !== undefined) lines.push(`    ${swiftStr(id)}: ${swiftStr(map.sfSymbolOn)},`);
+  }
+  lines.push("  ]");
+  lines.push("");
+  lines.push("  /// The symbol for `id` in a control's state: its filled variant while on,");
+  lines.push("  /// when the icon declares one. Every on/off control reads its icon here.");
+  lines.push("  static func sfSymbol(for id: String, on: Bool) -> String {");
+  lines.push("    on ? (sfSymbolsOn[id] ?? sfSymbol(for: id)) : sfSymbol(for: id)");
   lines.push("  }");
   lines.push("}");
   lines.push("");
@@ -1408,6 +1435,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  /// Pill text while the attribute's work runs (Discuss).");
   lines.push("  let workingLabel: String?");
   lines.push("  var isPill: Bool { surfaceTier == \"inline\" || surfaceTier == \"popover\" }");
+  lines.push("  /// The attribute's symbol in its state: the filled variant while set or on.");
+  lines.push("  func sfSymbol(on: Bool) -> String { RegistryIcons.sfSymbol(for: iconId, on: on) }");
   lines.push("  /// The attribute shows on `platform` when its capability ships (ADR 0015).");
   lines.push("  func applies(to platform: String) -> Bool { RegistryCapabilities.isAvailable(featureId, on: platform) }");
   lines.push("}");

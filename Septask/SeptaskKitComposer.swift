@@ -1181,7 +1181,8 @@ final class KitPillButton: NSButton {
         .foregroundColor: isOn ? SeptaskKitTheme.inkPrimary : SeptaskKitTheme.inkSecondary,
       ])
     contentTintColor = isOn ? SeptaskKitTheme.inkPrimary : SeptaskKitTheme.inkSecondary
-    if let attribute { image = symbolImage(attribute.sfSymbol, ink: contentTintColor ?? .labelColor) }
+    // A pill that is on draws its filled symbol (DesignSpec: on = filled).
+    if let attribute { image = symbolImage(attribute.sfSymbol(on: isOn), ink: contentTintColor ?? .labelColor) }
     isRestyling = false
     applyCapsule()
   }

@@ -5665,7 +5665,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
 
     starGlyph.translatesAutoresizingMaskIntoConstraints = false
     starGlyph.contentTintColor = SeptaskKitTheme.todayAccent
-    starGlyph.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)?
+    starGlyph.image = NSImage(systemSymbolName: RegistryIcons.sfSymbol(for: "action.star", on: true),
+                              accessibilityDescription: nil)?
       .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
     starGlyph.setContentHuggingPriority(.required, for: .horizontal)
     starGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)

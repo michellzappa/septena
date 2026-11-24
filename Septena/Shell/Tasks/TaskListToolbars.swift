@@ -246,7 +246,7 @@ struct StarFilterToolbarButton: View {
     Button {
       a11yAnimate(.snappy(duration: 0.18)) { isOn.toggle() }
     } label: {
-      Image(systemName: isOn ? "star.fill" : "star")
+      Image(systemName: RegistryIcons.sfSymbol(for: "action.star", on: isOn))
     }
     .tint(isOn ? Theme.todayAccent : .primary)
     .accessibilityLabel(Text(TaskFilter.starred.title))

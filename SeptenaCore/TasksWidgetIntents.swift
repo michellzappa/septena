@@ -43,7 +43,7 @@ public struct SeptaskWidgetListEntity: AppEntity, Identifiable, Hashable, Sendab
     todayDefault,
     SeptaskWidgetListEntity(id: TasksWidgetListSummary.upcomingID, title: "Upcoming", symbol: "calendar"),
     SeptaskWidgetListEntity(id: TasksWidgetListSummary.inboxID, title: "Inbox", symbol: "tray.fill"),
-    SeptaskWidgetListEntity(id: TasksWidgetListSummary.starredID, title: "Starred", symbol: "star"),
+    SeptaskWidgetListEntity(id: TasksWidgetListSummary.starredID, title: "Favorites", symbol: "star"),
   ]
 }
 
