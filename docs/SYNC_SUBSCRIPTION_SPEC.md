@@ -64,7 +64,7 @@ paid plan is named **Septena Plus** on every surface.
 | Watch app paired to the phone (syncs through the phone) | Server sync for 1 device (backup; moving to a new device is free, the old one stops syncing) | Server sync on all devices, including the watch through the server |
 | | Live sync of that device | Live sync on every device |
 | Import and export (plain JSON) | Change history: 30 days | Full change history, account restore *(pending a Cloudflare check)* |
-| Attachments on the device that added them | Recently Deleted: 30 days | Recently Deleted: 90 days *(planned; the app uses 30)* |
+| Attachments on the device that added them | Recently Deleted: 30 days | Recently Deleted: 30 days (90 when #446 ships) |
 | | Attachments stay on the device that added them (no R2) | Attachments synced, 10 GB |
 | | 1 connected agent | 3 connected agents |
 | | Join shared projects | Create shared projects and invite |
@@ -98,7 +98,7 @@ Rules:
 |---|---|---|---|
 | Change log (`changes`, who changed what) | 30 days | 365 days | Pruned per plan by the daily alarm. A device offline past the window gets a full resync (exists). |
 | Logbook (completed tasks) | All | All | No limit on any level (ADR 0036). |
-| Recently Deleted | 30 days | 90 days | User-facing restore window only. Plus matches the 90-day tombstone window (decided 2026-11-22). |
+| Recently Deleted | 30 days | 30 days; 90 when #446 ships | User-facing restore window only. 90 matches the tombstone window (decided 2026-11-22). |
 | Deleted rows for sync (tombstones) | 90 days | 90 days | Same on every level: it protects sync, not a feature. |
 | Conversation turns | Kept | Kept | Not limited. |
 

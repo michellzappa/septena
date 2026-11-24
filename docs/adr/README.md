@@ -40,7 +40,8 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0033](0033-no-github-integration-issue-links-are-references.md) | Drop the GitHub integration; issue links are references | accepted |
 | [0034](0034-companion-devices-get-a-limited-session.md) | Give companion devices a limited session and a small verb set | proposed |
 | [0035](0035-companion-voice-is-push-to-talk-and-confirmed.md) | Make companion voice push-to-talk, unstored and confirmed | proposed |
-| [0036](0036-plan-ladder-one-agent-then-three.md) | Four plan levels: an account adds the server, Plus adds more than one (amends 0010, 0023) | accepted |
+| [0036](0036-plan-ladder-one-agent-then-three.md) | Four plan levels: an account adds the server, Plus adds more than one (amends 0010, 0023) | accepted, presentation amended by 0037 |
+| [0037](0037-show-free-plus-and-planned-pro.md) | Show three plans: Free, Plus and a planned Pro (amends 0036) | accepted |
 
 ## Template
 
