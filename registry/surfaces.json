@@ -370,10 +370,40 @@
       { "id": "taskPage.attributes", "kind": "attributes", "depths": ["inline", "page"], "featureId": "lists.today" },
       { "id": "taskPage.checklist", "kind": "checklist", "attribute": "checklist", "depths": ["inline", "page"], "featureId": "task.checklists", "editOnly": true },
       { "id": "taskPage.attachments", "kind": "attachments", "attribute": "attachments", "depths": ["inline", "page"], "featureId": "task.attachments", "editOnly": true },
+      { "id": "taskPage.references", "kind": "references", "label": "References", "depths": ["page"], "featureId": "task.references", "editOnly": true },
       { "id": "taskPage.conversation", "kind": "conversation", "label": "Conversation", "depths": ["page"], "featureId": "ai.discuss", "editOnly": true },
       { "id": "taskPage.provenance", "kind": "provenance", "label": "Added by", "selfLabel": "You", "agentFallbackName": "Claude", "icon": "task.added_by_agent", "depths": ["page"], "featureId": "task.provenance", "editOnly": true },
       { "id": "taskPage.history", "kind": "history", "attribute": "history", "depths": ["page"], "featureId": "task.history", "editOnly": true }
     ]
+  },
+  "taskReferences": {
+    "id": "taskReferences",
+    "featureId": "task.references",
+    "open": { "format": "Open {name}" },
+    "createdFrom": { "format": "Created from {name}" },
+    "kinds": {
+      "email": { "label": "Email", "icon": "reference.email" },
+      "thread": { "label": "Email thread", "icon": "reference.thread" },
+      "event": { "label": "Calendar event", "icon": "reference.event" },
+      "issue": { "label": "GitHub issue", "icon": "reference.issue" },
+      "task": { "label": "Task", "icon": "reference.task" },
+      "door": { "label": "Starlings record", "icon": "reference.door" },
+      "url": { "label": "Web page", "icon": "reference.url" },
+      "file": { "label": "File", "icon": "reference.file" }
+    },
+    "otherKind": { "label": "Reference", "icon": "reference.other" },
+    "roles": {
+      "blocked_by": { "label": "Blocked by" },
+      "follow_up": { "label": "Follow-up to" }
+    },
+    "add": {
+      "placeholder": "Paste a link",
+      "confirmTitle": "Add",
+      "offers": { "title": "Links in this task" },
+      "invalid": { "message": "Septena can’t add this. Paste a web link or a mail link." },
+      "limitReached": { "format": "This task already has {count} references." },
+      "failed": { "message": "Couldn’t add the reference." }
+    }
   },
   "taskTagsPicker": {
     "id": "taskTagsPicker",

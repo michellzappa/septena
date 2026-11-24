@@ -546,7 +546,7 @@ function validateSurfaces(surfaces, icons, caps, plans) {
     assert(Array.isArray(b.depths) && b.depths.length > 0 && b.depths.every((d) => TASK_PAGE_DEPTHS.has(d)), `surfaces.json: taskPage block ${b.id} needs depths from ${[...TASK_PAGE_DEPTHS].join(", ")}`);
     assert(b.featureId in caps.capabilities, `surfaces.json: taskPage block ${b.id} unknown featureId "${b.featureId}"`);
     if (b.attribute !== undefined) assert(attrIds.has(b.attribute), `surfaces.json: taskPage block ${b.id} unknown attribute "${b.attribute}"`);
-    if (["checklist", "attachments", "conversation", "history"].includes(b.kind)) {
+    if (["checklist", "attachments", "references", "conversation", "history"].includes(b.kind)) {
       assert(typeof b.label === "string" || b.attribute !== undefined, `surfaces.json: taskPage block ${b.id} needs a label or an attribute`);
     }
     // Provenance (who added the task) is permanent metadata: the label, the
@@ -562,6 +562,24 @@ function validateSurfaces(surfaces, icons, caps, plans) {
   for (const kind of TASK_PAGE_BLOCK_KINDS) {
     assert(page.blocks.filter((b) => b.kind === kind).length === 1, `surfaces.json: taskPage needs exactly one "${kind}" block`);
   }
+}
+
+// References (docs/TASK_REFERENCES_SPEC.md §8): a label and an icon per key
+// kind, the fallback for a kind this build does not know, the labels of the
+// roles that show one, and the copy of Add Reference.
+function validateTaskReferences(surfaces, icons, caps, entities) {
+  const t = surfaces.taskReferences;
+  assert(t && t.featureId in caps.capabilities, "surfaces.json: taskReferences needs a known featureId");
+  for (const [kind, k] of [...Object.entries(t.kinds), ["otherKind", t.otherKind]]) {
+    assert(/^[a-z][a-z0-9_-]*$/i.test(kind), `surfaces.json: taskReferences kind "${kind}" is not a kind`);
+    assert(typeof k.label === "string" && k.label.length > 0, `surfaces.json: taskReferences ${kind} needs a label`);
+    assert(k.icon in icons.icons, `surfaces.json: taskReferences ${kind} unknown icon "${k.icon}"`);
+  }
+  for (const [role, r] of Object.entries(t.roles)) {
+    assert(entities.enums.taskRefRole.includes(role), `surfaces.json: taskReferences unknown role "${role}"`);
+    assert(typeof r.label === "string" && r.label.length > 0, `surfaces.json: taskReferences role ${role} needs a label`);
+  }
+  for (const [p, v] of stringsOf(t, "taskReferences")) assert(!/[–—]/.test(v), `surfaces.json: ${p} contains an em or en dash`);
 }
 
 // One picker per attribute (ADR 0029): every popover attribute is opened by
@@ -581,7 +599,7 @@ function checkOpensAttribute({ actions, surfaces }) {
     assert(openers.has(attr.id), `actions.json: popover attribute "${attr.id}" has no action with opensAttribute (ADR 0029: one picker per attribute)`);
   }
 }
-const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checklist", "attachments", "conversation", "provenance", "history"]);
+const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checklist", "attachments", "references", "conversation", "provenance", "history"]);
 const TASK_PAGE_DEPTHS = new Set(["inline", "page"]);
 
 // ---- plans.json (ADR 0010, ADR 0023) ----
@@ -1567,6 +1585,39 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  // 8a. References (surfaces.json `taskReferences`)
+  const refs = surfaces.taskReferences;
+  const refTmpl = (node) => L10N.swiftTemplate(BY_KEY, tmplKey(node.format, node, "format"));
+  const refKind = (id, k) => `RegistryTaskReferenceKind(id: ${swiftStr(id)}, label: ${L(k.label, k, "label")}, sfSymbol: ${swiftStr(icons.icons[k.icon].sfSymbol)})`;
+  lines.push("/// The label and the symbol of one reference kind (`surfaces.json` `taskReferences.kinds`).");
+  lines.push("struct RegistryTaskReferenceKind: Sendable, Hashable {");
+  lines.push("  let id: String");
+  lines.push("  let label: String");
+  lines.push("  let sfSymbol: String");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// Task references (`surfaces.json` `taskReferences`, docs/TASK_REFERENCES_SPEC.md §8).");
+  lines.push("enum RegistryTaskReferences {");
+  lines.push("  static let kinds: [RegistryTaskReferenceKind] = [");
+  for (const [id, k] of Object.entries(refs.kinds)) lines.push(`    ${refKind(id, k)},`);
+  lines.push("  ]");
+  lines.push("  /// A kind this build does not know.");
+  lines.push(`  static let otherKind: RegistryTaskReferenceKind = ${refKind("", refs.otherKind)}`);
+  lines.push("  static func kind(_ id: String) -> RegistryTaskReferenceKind { kinds.first { $0.id == id } ?? otherKind }");
+  lines.push("  /// The label of a role that shows one, by role.");
+  lines.push(`  static let roleLabels: [String: String] = [${Object.entries(refs.roles).map(([id, r]) => `${swiftStr(id)}: ${L(r.label, r, "label")}`).join(", ")}]`);
+  for (const [name, node] of [["open", refs.open], ["createdFrom", refs.createdFrom], ["limitReached", refs.add.limitReached]]) {
+    const t = refTmpl(node);
+    lines.push(`  static func ${name}(${t.params}) -> String { ${t.body} }`);
+  }
+  for (const [name, node, field] of [
+    ["addPlaceholder", refs.add, "placeholder"], ["addConfirmTitle", refs.add, "confirmTitle"],
+    ["offersTitle", refs.add.offers, "title"], ["invalidMessage", refs.add.invalid, "message"],
+    ["failedMessage", refs.add.failed, "message"],
+  ]) lines.push(`  static let ${name}: String = ${L(node[field], node, field)}`);
+  lines.push("}");
+  lines.push("");
+
   // 8b. First run (surfaces.json `firstRun`)
   const fr = surfaces.firstRun;
   const frButton = (b) => (b === undefined ? "nil" : `RegistryFirstRunButton(title: ${L(b.title, b, "title")}, action: ${swiftStr(b.action)})`);
@@ -2223,6 +2274,7 @@ validateSettings(settings, entities, icons, caps);
 const destIds = validateDestinations(dests, icons, caps);
 validateActions(actions, icons, caps, destIds);
 validateSurfaces(surfaces, icons, caps, plans);
+validateTaskReferences(surfaces, icons, caps, entities);
 checkOpensAttribute({ actions, surfaces });
 validateFirstRun(surfaces, icons, caps, settings);
 validatePlans(plans, icons, caps);
