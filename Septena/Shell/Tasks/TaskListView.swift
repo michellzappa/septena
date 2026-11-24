@@ -1380,7 +1380,12 @@ struct TaskListView: View {
   /// editor at once and left an empty gap for the rows below to slide into,
   /// which read as a jump. The editor→row swap itself still has no transition
   /// (`foldingEditId`), so the title does not cross-fade or move.
-  private func collapseEdit(animated: Bool = true) {
+  private func collapseEdit() { collapseEdit(animated: true) }
+
+  /// `collapseEdit` with the fold's animation chosen. The zero-argument
+  /// overload above stays, so `collapseEdit` still works as a `() -> Void`
+  /// reference (`onDismiss: collapseEdit`).
+  private func collapseEdit(animated: Bool) {
     let closingId = expandedEditId
     if let closingId { clearQuickAddCaptureSlot(for: closingId) }
     if animated, let closingId {
