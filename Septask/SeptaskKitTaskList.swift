@@ -2980,8 +2980,12 @@ final class SeptaskKitTaskListController: NSViewController {
       repeatTitle: kind == .when
         ? TaskRepeatLabel.title(Set(selection.map(\.recurrence)).count == 1 ? selection.first?.recurrence : nil)
         : nil,
-      // The Repeat editor hangs off the same control as this picker.
-      onRepeat: kind == .when ? { [weak self] in self?.presentRecurrencePanel(anchor: anchor) } : nil
+      // The Repeat editor hangs off the same control as this picker. In the
+      // inspector, where When folds open under its row, Repeat folds open
+      // under the Repeat row instead (the iOS task page does the same).
+      onRepeat: kind == .when ? { [weak self] in
+        self?.presentRecurrencePanel(anchor: anchor?.inlineSibling(attribute: "repeat") ?? anchor)
+      } : nil
     ) { [weak self] date, today in
       guard let self else { return }
       // Read the rows again from the store: a time-slot change in the same
