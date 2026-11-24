@@ -1,6 +1,7 @@
 # Repo split: Septena Life moves to `septena-life`
 
-Status: proposal (2026-11-20). Issue #84. Moving code waits for mz's go.
+Status: done 2026-11-21, superseded by ADR 0017 — historical. Docs it names that
+are no longer here are under the tag `septena-life-archive`.
 
 Rests on: ADR 0007 (Septena is the task app), ADR 0002 (own backend),
 `docs/SEPTASK_BACKEND.md` §11 (this plan replaces §11), `docs/SEPTASK.md`,

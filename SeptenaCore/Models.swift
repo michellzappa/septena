@@ -1189,49 +1189,6 @@ enum TaskFilter: Equatable, Hashable {
 // ignored — the server stays authoritative; we don't round-trip writes
 // for sections we haven't built UIs for yet.
 
-struct AppTargets: Codable, Hashable {
-  let proteinMinG: Double?
-  let proteinMaxG: Double?
-  let fatMinG: Double?
-  let fatMaxG: Double?
-  let carbsMinG: Double?
-  let carbsMaxG: Double?
-  let kcalMin: Double?
-  let kcalMax: Double?
-  let z2WeeklyMin: Int?
-  let sleepTargetH: Double?
-  let fastingMinH: Double?
-  let fastingMaxH: Double?
-  let weightMinKg: Double?
-  let weightMaxKg: Double?
-  let fatMinPct: Double?
-  let fatMaxPct: Double?
-
-  enum CodingKeys: String, CodingKey {
-    case proteinMinG  = "protein_min_g"
-    case proteinMaxG  = "protein_max_g"
-    case fatMinG      = "fat_min_g"
-    case fatMaxG      = "fat_max_g"
-    case carbsMinG    = "carbs_min_g"
-    case carbsMaxG    = "carbs_max_g"
-    case kcalMin      = "kcal_min"
-    case kcalMax      = "kcal_max"
-    case z2WeeklyMin  = "z2_weekly_min"
-    case sleepTargetH = "sleep_target_h"
-    case fastingMinH  = "fasting_min_h"
-    case fastingMaxH  = "fasting_max_h"
-    case weightMinKg  = "weight_min_kg"
-    case weightMaxKg  = "weight_max_kg"
-    case fatMinPct    = "fat_min_pct"
-    case fatMaxPct    = "fat_max_pct"
-  }
-}
-
-struct AppUnits: Codable, Hashable {
-  let weight: String        // "kg" | "lb"
-  let distance: String      // "km" | "mi"
-}
-
 struct AppTimeSettings: Codable, Hashable {
   let homeTimezone: String
   let travelMode: String?
@@ -1244,86 +1201,13 @@ struct AppTimeSettings: Codable, Hashable {
   }
 }
 
-struct MacroColors: Codable, Hashable {
-  let protein: String?
-  let fat: String?
-  let carbs: String?
-  let fiber: String?
-  let kcal: String?
-  let fasting: String?
-}
-
-/// Per-macro tile preference. The id matches `MacroCatalog.Macro.id`.
-/// `colorHex` overrides the catalog's default tint; `visible` toggles whether
-/// the tile renders. Array position in `NutritionSettings.macroTiles` is the
-/// authoritative display order.
-struct MacroTilePref: Codable, Hashable, Identifiable {
-  var id: String
-  var colorHex: String?
-  var visible: Bool
-
-  enum CodingKeys: String, CodingKey {
-    case id
-    case colorHex = "color_hex"
-    case visible
-  }
-}
-
-struct NutritionSettings: Codable, Hashable {
-  var macroColors: MacroColors?
-  /// Authoritative tile list. Nil for legacy payloads → consumers should
-  /// fall back to `MacroCatalog.defaultTilePrefs()`.
-  var macroTiles: [MacroTilePref]?
-  /// Whether the user tracks fasting (the Nutrition tile's live timer + the
-  /// wrist macro-complication morph). Synced so every device agrees — the
-  /// device-local `@AppStorage` mirror (`SettingsKey.nutritionTrackFasting`)
-  /// used by display surfaces stays in lockstep. Nil for legacy payloads →
-  /// consumers fall back to the local mirror (or `false`).
-  var trackFasting: Bool?
-
-  enum CodingKeys: String, CodingKey {
-    case macroColors  = "macro_colors"
-    case macroTiles   = "macro_tiles"
-    case trackFasting = "track_fasting"
-  }
-}
-
 struct AppSettings: Codable {
-  /// INVARIANT — `sectionOrder` is ORDERING ONLY, never membership. Whether a
-  /// section is active is `SectionEntity.isEnabled` (see
-  /// `SeptenaServices.enabledSectionKeys()`); this array only ranks the active
-  /// ones for display. A key absent from here is NOT hidden — rank it last and
-  /// move on; an unknown key is ignored. Filtering membership through this
-  /// array (`order.filter { enabled… }`) silently drops sections enabled after
-  /// the order was last saved — the exact bug that hid `symptoms`/`medications`
-  /// from MCP. Resolve order+membership via `SettingsMirror.loadSections`
-  /// (ordered, complete) rather than re-deriving from this field.
-  var sectionOrder: [String]?
-  var targets: AppTargets?
-  var units: AppUnits?
   var time: AppTimeSettings?
-  var theme: String?        // "system" | "light" | "dark"
-  var eink: Bool?
-  var nutrition: NutritionSettings?
-  var hkSync: HKSyncSettings?
-  /// Personalizes the dashboard welcome greeting. Synced so the user's name
+  /// The user's name, for the greeting. Synced so the user's name
   /// follows them across their own devices; also mirrored into the
   /// `welcomeName` @AppStorage key that `WelcomeHeader` reads locally.
   /// Defaulted so the existing memberwise-init call sites stay source-stable.
   var welcomeName: String? = nil
-  /// Cosmetic supporter state ("Support Septena" purchase), synced so the
-  /// badge/foil follow the account into Septask — StoreKit entitlements are
-  /// per-app, so the sibling can't read the purchase itself. Gates nothing,
-  /// by product rule. Authoritative writer: the app hosting StoreKit
-  /// (Septena); tasks-only shells adopt inbound values only.
-  var supporter: Bool? = nil
-
-  /// User-configured boundary hours for the morning/afternoon/evening day
-  /// buckets (Settings ▸ Time of Day). Synced across devices; mirrored into
-  /// the shared App Group suite that `DayBucket` reads. Nil → historical
-  /// defaults (12 / 17). Defaulted so memberwise-init call sites stay stable.
-  var morningCutoffHour: Int? = nil
-  var afternoonCutoffHour: Int? = nil
 
   /// The day the "N rolled into today" banner was last dismissed, as an ISO
   /// `yyyy-MM-dd` string. Synced because the banner reports one fact about the
@@ -1382,11 +1266,6 @@ struct AppSettings: Codable {
   /// Defaulted so the existing memberwise-init call sites stay source-stable.
   var onboardedAt: Date? = nil
 
-  /// Next suggestion IDs dismissed by the user, keyed by ISO date string.
-  /// Synced so a skip on one device propagates to others via union merge.
-  /// Only today's key is live; past dates are pruned on write and ignored on read.
-  var nextSkips: [String: [String]]? = nil
-
   /// Graded analytics privacy level (`TelemetryClient.TelemetryLevel` raw value:
   /// "none" | "minimal" | "balanced" | "full"). Synced so the user's privacy
   /// choice follows them across their own devices; also mirrored into the
@@ -1407,35 +1286,16 @@ struct AppSettings: Codable {
   var calendarHiddenTitles: [String]? = nil
 
   enum CodingKeys: String, CodingKey {
-    case sectionOrder = "section_order"
-    case targets, units, time, theme, eink, nutrition
-    case hkSync = "hk_sync"
+    case time
     case welcomeName = "welcome_name"
-    case supporter
-    case morningCutoffHour = "morning_cutoff_hour"
-    case afternoonCutoffHour = "afternoon_cutoff_hour"
     case rolledInDismissedOn = "rolled_in_dismissed_on"
     case agentsPaused = "agents_paused"
     case getStartedDismissed = "get_started_dismissed"
     case getStartedSteps = "get_started_steps"
     case upsellsSeen = "upsells_seen"
     case onboardedAt = "onboarded_at"
-    case nextSkips = "next_skips"
     case telemetryLevel = "telemetry_level"
     case calendarHiddenTitles = "calendar_hidden_titles"
-  }
-}
-
-/// Per-section HealthKit write toggles. All default to `true` so existing
-/// users get full sync on upgrade without extra friction; they can opt out
-/// per-type in Settings → Integrations → Apple Health.
-struct HKSyncSettings: Codable {
-  var mood: Bool
-  var nutrition: Bool
-
-  init(mood: Bool = true, nutrition: Bool = true) {
-    self.mood = mood
-    self.nutrition = nutrition
   }
 }
 

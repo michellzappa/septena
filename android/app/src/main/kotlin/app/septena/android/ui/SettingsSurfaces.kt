@@ -50,7 +50,7 @@ internal class SettingsSurfaceEnv(
 
 /** The custom surfaces this file renders; the others stay in SettingsScreen or their own files. */
 internal val SETTINGS_SURFACES = setOf(
-    "about_header", "send_feedback", "privacy_explainer", "ai_explainer", "septena_life_link",
+    "about_header", "send_feedback", "privacy_explainer", "ai_explainer",
     "mcp_skills", "sync_diagnostics", "smart_lists_editor", "plus_offer", "calendar_detail",
     "reset_first_run", DELETE_ACCOUNT,
     "sign_in_approval", "claude_connector",
@@ -75,12 +75,6 @@ internal fun SettingsCustomSurface(
         }
         "privacy_explainer" -> detail?.let { Text(it, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
         "ai_explainer" -> ExpandableRow(label) { AiExplainer(appName(context), languageTag) }
-        "septena_life_link" -> {
-            detail?.let { SectionFooter(it) }
-            ActionRow(label) {
-                if (!openUrl(context, SEPTENA_LIFE_URL)) openUrl(context, SEPTENA_SITE_URL)
-            }
-        }
         // `reset_get_started` is omitted on Android until Android renders the Get Started notice.
         // This device only: the synced `onboardedAt` stays, so other devices are not asked again (as on iOS).
         "reset_first_run" -> ActionRow(label) { env.graph.firstRun.showAgain() }
@@ -258,5 +252,3 @@ private const val SYNC_DIAGNOSTICS = "sync_diagnostics"
 private const val MAX_ISSUES = 20
 private const val FEEDBACK_EMAIL = "mz@envisioning.com"
 private const val FEEDBACK_URL = "mailto:mz@envisioning.com?subject=Septena%20feedback"
-private const val SEPTENA_LIFE_URL = "septena://"
-private const val SEPTENA_SITE_URL = "https://www.septena.app"

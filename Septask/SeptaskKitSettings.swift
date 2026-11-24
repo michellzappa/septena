@@ -26,7 +26,6 @@ enum SeptaskKitSettingsWindow {
     let theme = SeptaskMacRuntime.theme
     let settings = SeptaskMacRuntime.settings
     settings.reloadFromMirror(context: LocalStore.shared.container.mainContext)
-    theme.paintFromCache()
 
     let root = SeptaskKitSettingsRoot(
       navigation: navigation,

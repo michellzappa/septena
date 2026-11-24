@@ -299,7 +299,6 @@ enum TaskNotices {
   private static let stepsKey = "septena.notices.getStarted.steps.v1"
 
   private static func getStarted(context: ModelContext) -> TaskNotice? {
-    #if SEPTASK
     let syncedDismissed = SettingsMirror.getStartedDismissed(context: context)
     let localDismissed = hasSeen(.getStarted)
     if syncedDismissed || localDismissed {
@@ -359,9 +358,6 @@ enum TaskNotices {
       return nil
     }
     return notice(.getStarted, steps: steps)
-    #else
-    return nil
-    #endif
   }
 
   /// Weekly sweep prompt (`docs/TASK_FADE_SPEC.md` §5): once a week on Sunday

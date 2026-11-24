@@ -25,7 +25,8 @@ struct SharedTaskCapture: Codable, Identifiable, Sendable {
   }
 }
 
-enum SharedTaskCaptureDestination: String, Sendable { case septena, septask }
+/// The raw value is a folder name in the app group, so it stays `septask`.
+enum SharedTaskCaptureDestination: String, Sendable { case septask }
 
 enum SharedTaskCaptureQueue {
   private static let appGroup = "group.com.septena.cloud"
@@ -88,11 +89,7 @@ enum SharedTaskCaptureImporter {
     #if os(macOS)
     return
     #else
-    #if SEPTASK
     let destination = SharedTaskCaptureDestination.septask
-    #else
-    let destination = SharedTaskCaptureDestination.septena
-    #endif
     for (claimedURL, capture) in SharedTaskCaptureQueue.claimAll(for: destination) {
       let title = capture.title.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !title.isEmpty else { SharedTaskCaptureQueue.finish(claimedURL); continue }

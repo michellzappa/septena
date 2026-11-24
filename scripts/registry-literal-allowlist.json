@@ -56,12 +56,6 @@
       "issue": "#218"
     },
     {
-      "file": "Septena/Shell/Tasks/TasksQuickAddMenu.swift",
-      "literal": "Today",
-      "reason": "Relative date or quick pick; the registry has no datePickers block yet.",
-      "issue": "#218"
-    },
-    {
       "file": "Septask/SeptaskApp.swift",
       "literal": "Septena",
       "reason": "App name in a window title.",
@@ -296,12 +290,6 @@
       "issue": "#260"
     },
     {
-      "file": "Septena/Shell/UI/SeptenaPage.swift",
-      "literal": "Today",
-      "reason": "Septena Life tab label.",
-      "issue": "#260"
-    },
-    {
       "file": "Septena/Shell/UI/TextSizeScale.swift",
       "literal": "Large",
       "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
@@ -339,12 +327,6 @@
     },
     {
       "file": "Septena/Shell/Sidebar/SidebarView.swift",
-      "literal": "Tasks",
-      "reason": "Heading word that the places screen and import flow now hold in surfaces.json (#238); the Swift shells do not read it yet.",
-      "issue": "#260"
-    },
-    {
-      "file": "Septena/Shell/UI/SeptenaPage.swift",
       "literal": "Tasks",
       "reason": "Heading word that the places screen and import flow now hold in surfaces.json (#238); the Swift shells do not read it yet.",
       "issue": "#260"
