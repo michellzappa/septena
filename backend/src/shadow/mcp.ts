@@ -47,7 +47,7 @@ import {
 } from "../tools/taskShared.js";
 import { MCP_CLIENT_PREFIX, MCP_READ_SCOPE, MCP_WRITE_SCOPE, hasScope, verifyMcpAccess, type McpGrant } from "./tokens.js";
 import { getClient } from "../storage.js";
-import { type StoreRpc, type WriteToolName, WRITE_TOOL_NAMES, rpcStoreFor, runWriteTool, zWriteArgs } from "./writes.js";
+import { type StoreRpc, type WriteToolName, WRITE_TOOL_NAMES, mcpActorFor, rpcStoreFor, runWriteTool, zWriteArgs } from "./writes.js";
 import { AGENT_TOOLS, type AgentToolName, agentStage, runAgentTool, zAgentArgs } from "./agent.js";
 import { NOTES_READ_TOOLS, NOTES_TOOLS, type NotesToolName, notesForTask, runNotesTool, zNotesArgs } from "./notes.js";
 import { PROMPTS, getPrompt } from "./prompts.js";
@@ -255,7 +255,7 @@ async function callTool(
     // names ("Added by Claude Code"). One KV read per write call.
     const agentName = (await getClient(env, grant.clientId, MCP_CLIENT_PREFIX))?.name;
     const result = await runWriteTool(
-      { store, timeZone, agentName },
+      { store, timeZone, agentName, actor: mcpActorFor(agentName) },
       name as WriteToolName,
       args.data as Record<string, unknown>,
     );
