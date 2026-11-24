@@ -87,4 +87,10 @@ describe("tasks REST surface (desk orb)", () => {
     const out = clientTask({ id: "t1", title: "Done thing", completedAt: "2026-11-24T09:15:00" } as never, new Map());
     assert.equal(out.completedAt, "2026-11-24T09:15:00");
   });
+
+  it("carries the agent's review note for the review view", async () => {
+    const { clientTask } = await import("../src/api/tasksRest.ts");
+    const out = clientTask({ id: "t1", title: "Draft", reviewNote: "Drafted the reply; check the tone." } as never, new Map());
+    assert.equal(out.reviewNote, "Drafted the reply; check the tone.");
+  });
 });
