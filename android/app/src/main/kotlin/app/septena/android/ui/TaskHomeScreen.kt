@@ -84,6 +84,7 @@ import app.septena.ui.SeptenaIconKind
 import app.septena.ui.StarGlyph
 import app.septena.ui.TaskCardMetrics
 import app.septena.ui.TaskHomeContent
+import app.septena.ui.TaskMenuActionIcon
 import app.septena.ui.TaskRowMenuAction
 import app.septena.ui.TaskSelection
 import app.septena.ui.insertionPosition
@@ -518,9 +519,15 @@ private fun SectionTitleDropdownHeader(
             }
         }
 
+        val isDark = LocalSeptenaDarkTheme.current
         DropdownMenu(
             expanded = menuExpanded,
             onDismissRequest = { menuExpanded = false },
+            shape = RoundedCornerShape(14.dp),
+            containerColor = if (isDark) MaterialTheme.colorScheme.surfaceContainerHigh else Color(0xF7FFFFFF),
+            tonalElevation = 0.dp,
+            shadowElevation = 10.dp,
+            modifier = Modifier.width(248.dp),
         ) {
             // Top smart lists (identical to iOS `TaskNavMenu` `.top`).
             state.topSmartLists.forEach { item ->
@@ -1114,9 +1121,28 @@ private fun taskRowMenuGroups(
                 unselectedTitle = if (id == RegistryActionIds.TASK_TOGGLE_STAR) {
                     RegistryCatalog.actionAddTitle(id, languageTag)
                 } else null,
+                icon = actionMenuIcon(id),
             )
         }.takeIf { it.isNotEmpty() }
     }
+}
+
+private fun actionMenuIcon(actionId: String): TaskMenuActionIcon = when (actionId) {
+    RegistryActionIds.TASK_WHEN -> TaskMenuActionIcon.When
+    RegistryActionIds.TASK_MOVE -> TaskMenuActionIcon.Move
+    RegistryActionIds.TASK_TAGS -> TaskMenuActionIcon.Tags
+    RegistryActionIds.TASK_DEADLINE -> TaskMenuActionIcon.Deadline
+    RegistryActionIds.TASK_TOGGLE_STAR -> TaskMenuActionIcon.Star
+    RegistryActionIds.TASK_OPEN -> TaskMenuActionIcon.Open
+    RegistryActionIds.TASK_DUPLICATE -> TaskMenuActionIcon.Duplicate
+    RegistryActionIds.TASK_SHARE -> TaskMenuActionIcon.Share
+    RegistryActionIds.TASK_SELECT -> TaskMenuActionIcon.Select
+    RegistryActionIds.TASK_DELETE -> TaskMenuActionIcon.Delete
+    RegistryActionIds.TASK_RESTORE -> TaskMenuActionIcon.Restore
+    RegistryActionIds.TASK_ACCEPT_REVIEW,
+    RegistryActionIds.TASK_KEEP_FADED -> TaskMenuActionIcon.Check
+    RegistryActionIds.TASK_LET_GO_FADED -> TaskMenuActionIcon.Cancel
+    else -> TaskMenuActionIcon.None
 }
 
 private enum class SelectionPicker { When, List }

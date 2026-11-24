@@ -107,12 +107,31 @@ fun Modifier.selectableTaskRow(
 /** The selection wash on a selected row: the accent at low strength, ink stays normal. */
 const val SELECTION_WASH_ALPHA = 0.14f
 
+/** Icon kind for task row context-menu items (matches iOS `UIContextMenu` trailing symbols). */
+enum class TaskMenuActionIcon {
+    None,
+    When,
+    Move,
+    Tags,
+    Deadline,
+    Star,
+    Open,
+    Duplicate,
+    Share,
+    Select,
+    Delete,
+    Restore,
+    Check,
+    Cancel,
+}
+
 data class TaskRowMenuAction(
     val id: String,
     val title: String,
     val isDestructive: Boolean = false,
     val selectedTitle: String? = null,
     val unselectedTitle: String? = null,
+    val icon: TaskMenuActionIcon = TaskMenuActionIcon.None,
 )
 
 /** Portable task-list surface. Platform hosts provide registry copy and bind actions to their mutators. */

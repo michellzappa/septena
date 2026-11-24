@@ -634,36 +634,15 @@ fun TaskCardRow(
             }
 
             if (rowMenuGroups.isNotEmpty() && !selecting) {
-                DropdownMenu(
+                SeptenaContextMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
-                    modifier = Modifier.semantics { contentDescription = rowMenuAccessibilityLabel },
-                ) {
-                    rowMenuGroups.forEachIndexed { index, group ->
-                        if (index > 0) HorizontalDivider()
-                        group.forEach { action ->
-                            val label = if (action.selectedTitle != null || action.unselectedTitle != null) {
-                                if (task.isStarred) action.selectedTitle ?: action.title
-                                else action.unselectedTitle ?: action.title
-                            } else {
-                                action.title
-                            }
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = label,
-                                        color = if (action.isDestructive) MaterialTheme.colorScheme.error
-                                        else MaterialTheme.colorScheme.onSurface,
-                                    )
-                                },
-                                onClick = {
-                                    menuExpanded = false
-                                    onTaskAction(task.id, action.id)
-                                },
-                            )
-                        }
-                    }
-                }
+                    isDark = isDark,
+                    groups = rowMenuGroups,
+                    isTaskStarred = task.isStarred,
+                    accessibilityLabel = rowMenuAccessibilityLabel,
+                    onAction = { actionId -> onTaskAction(task.id, actionId) },
+                )
             }
         }
     }
@@ -723,6 +702,211 @@ private fun TagOutlineChip(text: String, tint: Color) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+/**
+ * iOS-style floating context menu (`UIContextMenu`): wider (`248.dp`), compact
+ * `38.dp` rows, `14.dp` rounded glass-ish container, recessed `6.dp` section
+ * separators, hairline inner dividers, and trailing icons on every action.
+ */
+@Composable
+fun SeptenaContextMenu(
+    expanded: Boolean,
+    onDismissRequest: () -> Unit,
+    isDark: Boolean,
+    groups: List<List<TaskRowMenuAction>>,
+    isTaskStarred: Boolean,
+    accessibilityLabel: String,
+    onAction: (String) -> Unit,
+) {
+    val menuBg = if (isDark) {
+        MaterialTheme.colorScheme.surfaceContainerHigh
+    } else {
+        Color(0xF7FFFFFF)
+    }
+    val separatorBand = if (isDark) {
+        Color.Black.copy(alpha = 0.28f)
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+    }
+    val rowDivider = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (isDark) 0.32f else 0.42f)
+    val destructiveRed = if (isDark) Color(0xFFFF453A) else Color(0xFFFF3B30)
+
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismissRequest,
+        shape = RoundedCornerShape(14.dp),
+        containerColor = menuBg,
+        tonalElevation = 0.dp,
+        shadowElevation = 10.dp,
+        modifier = Modifier
+            .width(248.dp)
+            .semantics { contentDescription = accessibilityLabel },
+    ) {
+        groups.forEachIndexed { groupIndex, group ->
+            if (groupIndex > 0) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .background(separatorBand),
+                )
+            }
+            group.forEachIndexed { itemIndex, action ->
+                if (itemIndex > 0) {
+                    HorizontalDivider(thickness = 0.5.dp, color = rowDivider)
+                }
+                val label = if (action.selectedTitle != null || action.unselectedTitle != null) {
+                    if (isTaskStarred) action.selectedTitle ?: action.title
+                    else action.unselectedTitle ?: action.title
+                } else {
+                    action.title
+                }
+                val ink = if (action.isDestructive) destructiveRed else MaterialTheme.colorScheme.onSurface
+                val iconTint = if (action.isDestructive) destructiveRed else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onDismissRequest()
+                            onAction(action.id)
+                        }
+                        .padding(horizontal = 16.dp, vertical = 9.dp),
+                ) {
+                    Text(
+                        text = label,
+                        fontSize = 15.5.sp,
+                        lineHeight = 20.sp,
+                        color = ink,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (action.icon != TaskMenuActionIcon.None) {
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.size(20.dp),
+                        ) {
+                            TaskMenuActionGlyph(
+                                icon = action.icon,
+                                tint = iconTint,
+                                isStarFilled = isTaskStarred,
+                                size = 17.dp,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskMenuActionGlyph(
+    icon: TaskMenuActionIcon,
+    tint: Color,
+    isStarFilled: Boolean,
+    size: Dp,
+) {
+    when (icon) {
+        TaskMenuActionIcon.None -> Unit
+        TaskMenuActionIcon.When -> CalendarSmallGlyph(tint = tint, size = size)
+        TaskMenuActionIcon.Move -> SeptenaGlyph(kind = SeptenaIconKind.Area, tint = tint, size = size)
+        TaskMenuActionIcon.Deadline -> DeadlineFlagGlyph(tint = tint, size = size)
+        TaskMenuActionIcon.Star -> StarGlyph(filled = isStarFilled, tint = tint, size = size)
+        TaskMenuActionIcon.Select -> ChecklistSmallGlyph(tint = tint, size = size)
+        TaskMenuActionIcon.Delete -> SeptenaGlyph(kind = SeptenaIconKind.RecentlyDeleted, tint = tint, size = size)
+        TaskMenuActionIcon.Restore -> RepeatSmallGlyph(tint = tint, size = size)
+        TaskMenuActionIcon.Check -> CheckmarkGlyph(tint = tint, size = size)
+        TaskMenuActionIcon.Tags -> Canvas(modifier = Modifier.size(size)) {
+            val w = this.size.width
+            val h = this.size.height
+            val stroke = (w * 0.095f).coerceAtLeast(1.3.dp.toPx())
+            val tag = Path().apply {
+                moveTo(w * 0.14f, h * 0.14f)
+                lineTo(w * 0.52f, h * 0.14f)
+                lineTo(w * 0.88f, h * 0.50f)
+                lineTo(w * 0.50f, h * 0.88f)
+                lineTo(w * 0.14f, h * 0.52f)
+                close()
+            }
+            drawPath(tag, tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            drawCircle(tint, radius = w * 0.075f, center = Offset(w * 0.34f, h * 0.34f))
+        }
+        TaskMenuActionIcon.Open -> Canvas(modifier = Modifier.size(size)) {
+            val w = this.size.width
+            val h = this.size.height
+            val stroke = (w * 0.095f).coerceAtLeast(1.3.dp.toPx())
+            drawRoundRect(
+                color = tint,
+                topLeft = Offset(w * 0.14f, h * 0.24f),
+                size = Size(w * 0.62f, h * 0.62f),
+                cornerRadius = CornerRadius(w * 0.14f, w * 0.14f),
+                style = Stroke(width = stroke),
+            )
+            drawLine(tint, Offset(w * 0.46f, h * 0.54f), Offset(w * 0.86f, h * 0.14f), strokeWidth = stroke, cap = StrokeCap.Round)
+            val arrow = Path().apply {
+                moveTo(w * 0.62f, h * 0.14f)
+                lineTo(w * 0.86f, h * 0.14f)
+                lineTo(w * 0.86f, h * 0.38f)
+            }
+            drawPath(arrow, tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+        TaskMenuActionIcon.Duplicate -> Canvas(modifier = Modifier.size(size)) {
+            val w = this.size.width
+            val h = this.size.height
+            val stroke = (w * 0.095f).coerceAtLeast(1.3.dp.toPx())
+            val r = CornerRadius(w * 0.12f, w * 0.12f)
+            drawRoundRect(
+                color = tint,
+                topLeft = Offset(w * 0.32f, h * 0.32f),
+                size = Size(w * 0.56f, h * 0.56f),
+                cornerRadius = r,
+                style = Stroke(width = stroke),
+            )
+            val back = Path().apply {
+                moveTo(w * 0.32f, h * 0.68f)
+                lineTo(w * 0.18f, h * 0.68f)
+                quadraticTo(w * 0.12f, h * 0.68f, w * 0.12f, h * 0.62f)
+                lineTo(w * 0.12f, h * 0.18f)
+                quadraticTo(w * 0.12f, h * 0.12f, w * 0.18f, h * 0.12f)
+                lineTo(w * 0.62f, h * 0.12f)
+                quadraticTo(w * 0.68f, h * 0.12f, w * 0.68f, h * 0.18f)
+                lineTo(w * 0.68f, h * 0.32f)
+            }
+            drawPath(back, tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+        TaskMenuActionIcon.Share -> Canvas(modifier = Modifier.size(size)) {
+            val w = this.size.width
+            val h = this.size.height
+            val stroke = (w * 0.095f).coerceAtLeast(1.3.dp.toPx())
+            drawLine(tint, Offset(w * 0.50f, h * 0.60f), Offset(w * 0.50f, h * 0.14f), strokeWidth = stroke, cap = StrokeCap.Round)
+            val arrow = Path().apply {
+                moveTo(w * 0.32f, h * 0.32f)
+                lineTo(w * 0.50f, h * 0.14f)
+                lineTo(w * 0.68f, h * 0.32f)
+            }
+            drawPath(arrow, tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            val box = Path().apply {
+                moveTo(w * 0.30f, h * 0.42f)
+                lineTo(w * 0.18f, h * 0.42f)
+                lineTo(w * 0.18f, h * 0.86f)
+                lineTo(w * 0.82f, h * 0.86f)
+                lineTo(w * 0.82f, h * 0.42f)
+                lineTo(w * 0.70f, h * 0.42f)
+            }
+            drawPath(box, tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+        TaskMenuActionIcon.Cancel -> Canvas(modifier = Modifier.size(size)) {
+            val w = this.size.width
+            val h = this.size.height
+            val stroke = (w * 0.10f).coerceAtLeast(1.4.dp.toPx())
+            drawLine(tint, Offset(w * 0.24f, h * 0.24f), Offset(w * 0.76f, h * 0.76f), strokeWidth = stroke, cap = StrokeCap.Round)
+            drawLine(tint, Offset(w * 0.76f, h * 0.24f), Offset(w * 0.24f, h * 0.76f), strokeWidth = stroke, cap = StrokeCap.Round)
+        }
     }
 }
 
