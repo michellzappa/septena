@@ -207,3 +207,29 @@ export function normalizeTaskDates(task: CoreTask, today: string): Record<string
 export function nextOccurrenceDates(task: CoreTask, nextScheduled: string, now: string): Record<string, unknown> {
   return callCore("nextOccurrenceDates", { task, nextScheduled, now });
 }
+
+/// A task's conversation as the core reads it (`TaskConversation`).
+export interface CoreConversation {
+  confirmedIntent?: string | null;
+  thread: Array<{ seq: number; role: string; options?: string[] | null; confidence?: number | null }>;
+  artifactExists?: boolean;
+  handoffExists?: boolean;
+  endState?: string | null;
+  endStateNote?: string | null;
+  assignee?: string | null;
+  stoppedAt?: string | null;
+  claimUntil?: string | null;
+}
+
+export interface CoreProjection {
+  stage: string;
+  badge: string | null;
+  nextAction: string;
+  pendingReasoning: boolean;
+}
+
+/// The stage, badge, next action and pending-reasoning flag of a
+/// conversation (`convo.rs`, vectors `convo-derived.json`).
+export function deriveConversation(conversation: CoreConversation, now: string): CoreProjection {
+  return callCore("deriveConversation", { conversation, now });
+}
