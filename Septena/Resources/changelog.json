@@ -1495,11 +1495,6 @@
           "section": null
         },
         {
-          "title": "feat(septask): app icon — white discs on dark gray, Septena geometry",
-          "detail": null,
-          "section": null
-        },
-        {
           "title": "feat(septask): same-device sibling nudge via Darwin notifications (P4)",
           "detail": null,
           "section": null
@@ -2410,11 +2405,6 @@
           "section": null
         },
         {
-          "title": "add maker identity, seven-disc \"open\" flourish, and disc-tile about row",
-          "detail": null,
-          "section": null
-        },
-        {
           "title": "add cron-maintained \"Unreleased\" changelog entry with live build number",
           "detail": null,
           "section": null
@@ -2500,11 +2490,6 @@
           "section": null
         },
         {
-          "title": "drop the seven-disc end flourish from the watch Next list",
-          "detail": null,
-          "section": null
-        },
-        {
           "title": "reorganize settings into seven intent-grouped hubs and surface Readwise in connected apps",
           "detail": null,
           "section": null
@@ -2521,11 +2506,6 @@
         },
         {
           "title": "stop watch Next list crashing on rapid taps via snapshotted rows and benign-cancel handling",
-          "detail": null,
-          "section": null
-        },
-        {
-          "title": "draw the watch discs mark from real circles so it renders inside a list row",
           "detail": null,
           "section": null
         },
@@ -2764,11 +2744,6 @@
           "title": "Move suggestions on demand",
           "detail": "Ask for tidy-up suggestions outside the inbox, when you want them.",
           "section": "tasks"
-        },
-        {
-          "title": "Full-color discs on the watch",
-          "detail": "The watch corner complication wears Septena's discs mark.",
-          "section": null
         }
       ]
     },

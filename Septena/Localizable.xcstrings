@@ -7297,22 +7297,6 @@
         }
       }
     },
-    "Light mode uses a %@ background with white discs. Dark mode uses transparent artwork so the system background shows through behind %@ discs." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Light mode uses a %1$@ background with white discs. Dark mode uses transparent artwork so the system background shows through behind %2$@ discs."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O modo claro usa um fundo %1$@ com discos brancos. O modo escuro usa arte transparente, então o fundo do sistema aparece atrás de discos %2$@."
-          }
-        }
-      }
-    },
     "Lime" : {
       "localizations" : {
         "pt-BR" : {
@@ -11578,9 +11562,6 @@
       "comment" : "Generated from registry settings.copy.claude_connector.setupPrompt.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
-    "Seven-disc open" : {
-
-    },
     "Severity" : {
 
     },
@@ -13234,12 +13215,6 @@
           }
         }
       }
-    },
-    "The seven discs unfurl in foil — the Septena+ thank-you" : {
-
-    },
-    "The seven discs unfurl in the rainbow — everyday, in-app" : {
-
     },
     "The task app stays free" : {
       "comment" : "Generated from registry plans.promises.core_free.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

@@ -312,8 +312,8 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
 - Septask runs `RuntimeProfile.tasksOnly` (task/area/project mutators only,
   no provider stores) but still mirrors the WHOLE zone locally — CKSyncEngine
   fetches per-zone; non-task records are applied and invisible.
-- The Septask icon is generated, not drawn — regeneration recipe and the
-  raw-pixel-coordinate trap are in `docs/SEPTASK.md` ("Icon Notes").
+- The Septask icon is generated, not drawn: recipe in `docs/SEPTASK.md`
+  ("Icon Notes").
 
 ## Known traps (from prior sessions)
 

@@ -893,7 +893,7 @@ private struct SeptaskAboutPane: View {
     switch item.surface {
     case "about_header":
       VStack(spacing: 6) {
-        SeptenaDiscTile(size: 72)
+        SeptenaIconTile(size: 72)
           .padding(.bottom, 6)
         Text(AppDisplayName.current)
           .font(.title2.weight(.semibold))

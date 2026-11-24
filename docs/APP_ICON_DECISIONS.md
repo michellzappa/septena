@@ -4,7 +4,7 @@ Locked on 2026-11-21 and shipped to `main` in `michellzappa/septena`.
 
 ## 1. Locked Brand Mark — The Septena Upright Compass
 
-Replaces the legacy 7-dotted disc emblem across all app surfaces.
+The only Septena mark, on every app surface.
 
 - **Form:** All-round circular dial inside the Apple squircle housing (rejected: 7-sided heptagon, 7-ray rose, engraved outer bezel, Pomodoro pie segments).
 - **Upright North pointer:** Points straight up (`-90°`) in the active exotic-fruit accent.
@@ -32,12 +32,11 @@ Replaces the legacy 7-dotted disc emblem across all app surfaces.
   - **macOS:** Live CoreGraphics Retina `NSImage` rendering into `NSApp.applicationIconImage` + `dockTile` (reacts to Light/Dark appearance switches) and persists on `/Applications/Septask.app` via `NSWorkspace.shared.setIcon(_:forFile:)`.
 - **Single generator source of truth:** `tools/logo-builder/dial-svg.mjs` → `scripts/generate-app-icons.mjs` (outputs all 23 iOS `.appiconset`s, macOS `Septask/AppIcon.icns`, and watchOS `AppIcon-1024.png`).
 
-## 3. Legacy 7-Dot Replacement Across All Surfaces
+## 3. Where the mark is drawn
 
 - **iOS Launch Screen:** Blank, system background only (`LaunchBackground`). The glyph launch screen was removed on 2026-11-23.
-- **Settings & About (`SeptenaDiscTile`):** Live `SeptenaCompassIconView` mirroring the user's active icon finish & color.
-- **macOS & watchOS:** Replaced `Septask/AppIcon.icns`, removed obsolete `Septask/AppIcon.icon` (`discs.svg`), and updated `SeptaskWatch/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`.
-- **Celebration burst (`SeptenaOpenView`):** Radiates upright North pointer + 6 oriented machined ticks along the 7 bearings.
+- **Settings & About (`SeptenaIconTile`):** Live `SeptenaCompassIconView` mirroring the user's active icon finish & color.
+- **macOS & watchOS:** `Septask/AppIcon.icns` and `SeptaskWatch/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`.
 
 ## 4. Related UX & Performance Decisions Locked in the Same Session
 
@@ -48,7 +47,7 @@ Replaces the legacy 7-dotted disc emblem across all app surfaces.
 ## Shipped Commits on `main`
 
 - `f1a45c08` — 31-icon Septena Compass system and iOS Appearance icon picker
-- `04e8dfea` — Replace legacy 7-dot mark across launch screen, About, macOS, watchOS, and bursts
+- `04e8dfea` — Compass mark across launch screen, About, macOS, watchOS, and bursts
 - `453f0959` — Registry-backed App Icon switcher parity on macOS
 - `8ce6e37b` — Restore brand-free Get Started checklist copy
 - `84722060` — Optimize iOS task list scroll performance and shrink alternate AppIcon `Assets.car` 4×

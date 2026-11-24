@@ -72,8 +72,8 @@ thesis: lead with it, not with "AI".
 ### Block I — the name (canonical)
 
 > **Septena** — Latin for a *group of seven*. Seven because the week is the unit a
-> life actually turns on, and the app is built around it (the seven-disc
-> mark); the word itself has seven letters. (Marketing owns the tagline
+> life actually turns on, and the app is built around it;
+> the word itself has seven letters. (Marketing owns the tagline
 > side — see `marketing.md` §4 "the week.")
 
 ### Banned claims (untrue or off-voice)
