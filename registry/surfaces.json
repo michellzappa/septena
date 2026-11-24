@@ -197,11 +197,28 @@
         "message": "Move only this task, or update the repeating schedule to the new date?",
         "options": [{ "id": "exception", "title": "Only This Task" }, { "id": "updateRule", "title": "Update Schedule" }],
         "featureId": "task.repeat"
+      },
+      {
+        "id": "disconnectAgent",
+        "kind": "destructive",
+        "title": "Disconnect {name}?",
+        "message": "{name} can no longer read or change your tasks. To use it again, connect it again.",
+        "confirmTitle": "Disconnect",
+        "featureId": "agents.connector"
+      },
+      {
+        "id": "agentReplaces",
+        "kind": "fork",
+        "title": "Replaces",
+        "message": "If this agent takes the place of one you connected before, pick it. That agent stops working.",
+        "options": [{ "id": "none", "title": "Nothing, a new agent" }, { "id": "agent", "title": "An agent below" }],
+        "featureId": "agents.connector"
       }
     ],
     "countPhrases": [
       { "id": "tasks", "label": { "one": "1 task", "other": "{count} tasks" } },
-      { "id": "projects", "label": { "one": "1 project", "other": "{count} projects" } }
+      { "id": "projects", "label": { "one": "1 project", "other": "{count} projects" } },
+      { "id": "agents", "label": { "one": "1 agent", "other": "{count} agents" } }
     ],
     "text": [
       { "id": "newSection", "title": "New Section", "placeholder": "Section name", "confirmTitle": "Add", "featureId": "places.sections" },
@@ -210,6 +227,8 @@
       { "id": "renameArea", "title": "Rename Area", "placeholder": "Area name", "confirmTitle": "Rename", "featureId": "places.areas" },
       { "id": "newProject", "title": "New Project", "placeholder": "Project name", "confirmTitle": "Create", "featureId": "places.projects" },
       { "id": "renameProject", "title": "Rename Project", "placeholder": "Project name", "confirmTitle": "Rename", "featureId": "places.projects" },
+      { "id": "renameAgent", "title": "Rename Agent", "placeholder": "Agent name", "confirmTitle": "Rename", "featureId": "agents.connector" },
+      { "id": "nameAgent", "title": "Name this agent", "placeholder": "Agent name", "confirmTitle": "Save", "featureId": "agents.connector" },
       { "id": "conversationOther", "title": "Other…", "placeholder": "Type your answer", "confirmTitle": "Send", "featureId": "ai.discuss" },
       { "id": "conversationReply", "title": "Reply…", "placeholder": "Reply to thread", "confirmTitle": "Send", "featureId": "ai.discuss" }
     ],

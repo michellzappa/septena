@@ -249,13 +249,24 @@ actor TaskBackendClient {
 
   /// Approves a sign-in code. `kind` is the kind the user confirmed; the
   /// server approves nothing if the code is of another kind. Sends the device
-  /// time zone, which decides what "today" means for the connector. Returns
-  /// the client name.
+  /// time zone, which decides what "today" means for the connector. For a
+  /// connector code, `agentName` names the new agent and `replaces` is the
+  /// agent (connection id) it takes the place of. Returns the client name.
   @discardableResult
-  func approvePairing(code: String, kind: BackendPairingRequest.Kind? = nil) async throws -> String {
+  func approvePairing(
+    code: String,
+    kind: BackendPairingRequest.Kind? = nil,
+    agentName: String? = nil,
+    replaces: String? = nil
+  ) async throws -> String {
     struct Approval: Decodable { let client: String }
     var fields = ["code": code, "timeZone": TimeZone.current.identifier]
     if let kind { fields["kind"] = kind.rawValue }
+    if kind == .connector {
+      let name = agentName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+      if !name.isEmpty { fields["name"] = String(name.prefix(Self.agentNameMax)) }
+      if let replaces { fields["replaces"] = replaces }
+    }
     let body = try JSONEncoder().encode(fields)
     let (data, status) = try await authed(path: "/v1/pair/approve", method: "POST", body: body)
     guard status == 200 else { throw Self.httpError(status, data) }
@@ -288,7 +299,10 @@ actor TaskBackendClient {
     return status
   }
 
-  // MARK: - Devices & Access
+  // MARK: - Devices and agents
+
+  /// Longest agent name the server takes (backend `AGENT_NAME_MAX`).
+  static let agentNameMax = 40
 
   /// Every place the account is signed in (`GET /v1/access`).
   func access() async throws -> BackendAccess {
@@ -311,6 +325,21 @@ actor TaskBackendClient {
       throw TaskBackendError.badResponse("connection id")
     }
     let (data, status) = try await authed(path: "/v1/access/connections/\(connectionID)", method: "DELETE", body: nil)
+    guard status == 204 else { throw Self.httpError(status, data) }
+  }
+
+  /// Renames one agent (`PATCH /v1/access/connections/:id`). nil or blank
+  /// goes back to the name the app registered with.
+  func renameAgent(connectionID: String, name: String?) async throws {
+    guard connectionID.range(of: "^[A-Za-z0-9_-]{8,64}$", options: .regularExpression) != nil else {
+      throw TaskBackendError.badResponse("connection id")
+    }
+    let clean = (name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    // `name: null` must be sent, not left out: the server requires the key.
+    let body = clean.isEmpty
+      ? Data(#"{"name":null}"#.utf8)
+      : try JSONEncoder().encode(["name": String(clean.prefix(Self.agentNameMax))])
+    let (data, status) = try await authed(path: "/v1/access/connections/\(connectionID)", method: "PATCH", body: body)
     guard status == 204 else { throw Self.httpError(status, data) }
   }
 

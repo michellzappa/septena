@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// Settings ▸ Account ▸ Devices & Access (`registry/settings.json`
-/// `devices_access`, docs/SEPTASK_BACKEND.md §10). Every place the account is
-/// signed in: app installs (sessions) and connected apps (MCP connections such
-/// as Claude or ChatGPT). Another device can be signed out and a connected app
-/// disconnected from here. The Apple Watch row lives here too (iOS only).
+/// Settings ▸ Account ▸ Devices (`registry/settings.json` `devices_access`,
+/// docs/SEPTASK_BACKEND.md §10). Every app install signed in to the account.
+/// Another device can be signed out from here. The Apple Watch row lives here
+/// too (iOS only). Agents (MCP connections) are a separate list:
+/// `SeptaskAgentsSections`, Settings ▸ AI & Agents ▸ Agents.
 struct SeptaskDevicesAccessPane: View {
   private var sync: TaskSyncEngine { .shared }
 
@@ -12,11 +12,9 @@ struct SeptaskDevicesAccessPane: View {
   @State private var loading = false
   @State private var error: String?
   @State private var pendingDevice: BackendAccess.Device?
-  @State private var pendingConnection: BackendAccess.Connection?
 
   private static let page = RegistrySettings.PageID.devicesAccess
   private static let devicesSection = RegistrySettings.section("devices", page: page)
-  private static let connectionsSection = RegistrySettings.section("connections", page: page)
 
   var body: some View {
     Form {
@@ -28,7 +26,6 @@ struct SeptaskDevicesAccessPane: View {
         }
       } else {
         devicesList
-        connectionsList
         if let error {
           Section {
             Text(error).font(.caption).foregroundStyle(.red)
@@ -60,17 +57,6 @@ struct SeptaskDevicesAccessPane: View {
     } message: { _ in
       Text("That device stops syncing within the hour. Its tasks stay on it until you sign in there again.")
     }
-    .confirmationDialog(
-      pendingConnection.map { String(localized: "Disconnect \($0.clientName)?") } ?? "",
-      isPresented: Binding(get: { pendingConnection != nil }, set: { if !$0 { pendingConnection = nil } }),
-      titleVisibility: .visible,
-      presenting: pendingConnection
-    ) { connection in
-      Button("Disconnect", role: .destructive) { Task { await disconnect(connection) } }
-      Button(RegistryPrompts.cancelTitle, role: .cancel) {}
-    } message: { connection in
-      Text("\(connection.clientName) can no longer read or change your tasks. Connect it again from Connect Claude.")
-    }
   }
 
   // MARK: Sections
@@ -92,26 +78,6 @@ struct SeptaskDevicesAccessPane: View {
       Text(Self.devicesSection?.header ?? "")
     } footer: {
       if let footer = Self.devicesSection?.footer { Text(footer) }
-    }
-  }
-
-  @ViewBuilder
-  private var connectionsList: some View {
-    Section {
-      if let connections = access?.connections {
-        if connections.isEmpty {
-          Text("No connected apps").foregroundStyle(.secondary)
-        }
-        ForEach(connections) { connection in
-          connectionRow(connection)
-        }
-      } else if loading {
-        ProgressView()
-      }
-    } header: {
-      Text(Self.connectionsSection?.header ?? "")
-    } footer: {
-      if let footer = Self.connectionsSection?.footer { Text(footer) }
     }
   }
 
@@ -142,27 +108,6 @@ struct SeptaskDevicesAccessPane: View {
     }
   }
 
-  private func connectionRow(_ connection: BackendAccess.Connection) -> some View {
-    LabeledContent {
-      Button("Disconnect", role: .destructive) { pendingConnection = connection }
-        .buttonStyle(.borderless)
-    } label: {
-      Label {
-        VStack(alignment: .leading, spacing: 2) {
-          Text(connection.clientName)
-          Text(String(localized: "Last used \(Self.date(connection.lastUsed).formatted(.relative(presentation: .named)))"))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-      } icon: {
-        Image(systemName: "link")
-      }
-    }
-    .contextMenu {
-      Button("Disconnect", role: .destructive) { pendingConnection = connection }
-    }
-  }
-
   // MARK: Actions
 
   private func load() async {
@@ -185,16 +130,6 @@ struct SeptaskDevicesAccessPane: View {
     pendingDevice = nil
     do {
       try await TaskBackendClient.shared.signOutDevice(sid: device.sid)
-    } catch {
-      self.error = error.localizedDescription
-    }
-    await load()
-  }
-
-  private func disconnect(_ connection: BackendAccess.Connection) async {
-    pendingConnection = nil
-    do {
-      try await TaskBackendClient.shared.disconnect(connectionID: connection.id)
     } catch {
       self.error = error.localizedDescription
     }

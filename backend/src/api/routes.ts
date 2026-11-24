@@ -11,6 +11,7 @@ import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from 
 import { issueSession, refreshSession, revokeSession, storeFor, verifyAccessToken } from "./session.js";
 import {
   approvePairing,
+  zAgentName,
   inspectPairing,
   pollDevicePairing,
   startDevicePairing,
@@ -397,12 +398,15 @@ const zFamilyId = z.string().regex(/^[A-Za-z0-9_-]{8,64}$/);
 api.get("/access", async (c) => {
   const userId = c.get("userId");
   let cap: number | null = null;
+  let agentLimit: number | null = null;
   try {
-    cap = (await planFor(c.env, userId)).limits.devices;
+    const limits = (await planFor(c.env, userId)).limits;
+    cap = limits.devices;
+    agentLimit = limits.connectedAgents;
   } catch {
     // The list still shows; "syncing" then reads true for every device.
   }
-  const summary = await storeFor(c.env, userId).accessSummary(c.get("sid"), cap);
+  const summary = await storeFor(c.env, userId).accessSummary(c.get("sid"), cap, Date.now(), agentLimit);
   return c.json(summary, 200, { "Cache-Control": "no-store" });
 });
 
@@ -427,6 +431,20 @@ api.delete("/access/connections/:id", async (c) => {
   const had = await disconnectFamily(c.env, userId, id.data);
   if (!had) return c.json({ error: "not_found" }, 404);
   logEvent("access_connection_revoked", { userId, by: c.get("actor") });
+  return c.body(null, 204);
+});
+
+/// Renames an agent. `name: null` goes back to the client's registered name.
+const zRenameConnectionBody = z.object({ name: zAgentName.nullable() }).strict();
+
+api.patch("/access/connections/:id", async (c) => {
+  const id = zFamilyId.safeParse(c.req.param("id"));
+  const body = zRenameConnectionBody.safeParse(await c.req.json().catch(() => null));
+  if (!id.success || !body.success) return c.json({ error: "invalid_request" }, 400);
+  const userId = c.get("userId");
+  const had = await storeFor(c.env, userId).renameConnection(id.data, body.data.name);
+  if (!had) return c.json({ error: "not_found" }, 404);
+  logEvent("access_connection_renamed", { userId, by: c.get("actor") });
   return c.body(null, 204);
 });
 

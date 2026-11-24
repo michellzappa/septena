@@ -107,14 +107,8 @@
   "AI Preferences": {
     "text": "AI Preferences",
     "paths": [
-      "settings.rootGroups.ai_agents_root.items.2.label",
+      "settings.rootGroups.ai_agents_root.items.3.label",
       "settings.pages.ai_preferences.title"
-    ]
-  },
-  "AI apps and agents that reach your tasks through the Septena connector.": {
-    "text": "AI apps and agents that reach your tasks through the Septena connector.",
-    "paths": [
-      "settings.pages.devices_access.sections.connections.footer"
     ]
   },
   "AI on this device": {
@@ -201,6 +195,13 @@
       "destinations.destinations.agent.title"
     ]
   },
+  "Agent name": {
+    "text": "Agent name",
+    "paths": [
+      "surfaces.prompts.text.renameAgent.placeholder",
+      "surfaces.prompts.text.nameAgent.placeholder"
+    ]
+  },
   "Agent runs": {
     "text": "Agent runs",
     "paths": [
@@ -219,6 +220,13 @@
       "settings.pages.claude_pairing.sections.agent_tools.header"
     ]
   },
+  "Agents": {
+    "text": "Agents",
+    "paths": [
+      "settings.rootGroups.ai_agents_root.items.1.label",
+      "settings.pages.agents.title"
+    ]
+  },
   "All": {
     "text": "All",
     "paths": [
@@ -230,6 +238,12 @@
     "text": "All your devices",
     "paths": [
       "plans.outcomes.everywhere.rows.devices.cells.plus"
+    ]
+  },
+  "An agent below": {
+    "text": "An agent below",
+    "paths": [
+      "surfaces.prompts.items.agentReplaces.options.agent.title"
     ]
   },
   "Anonymous usage data": {
@@ -503,10 +517,10 @@
       "surfaces.notices.items.getStarted.steps.connectAI.title"
     ]
   },
-  "Connected apps": {
-    "text": "Connected apps",
+  "Connected agents": {
+    "text": "Connected agents",
     "paths": [
-      "settings.pages.devices_access.sections.connections.header"
+      "settings.pages.agents.sections.agents.header"
     ]
   },
   "Connections": {
@@ -729,21 +743,31 @@
   "Devices": {
     "text": "Devices",
     "paths": [
-      "settings.pages.devices_access.sections.devices.header",
-      "plans.outcomes.everywhere.rows.devices.label"
-    ]
-  },
-  "Devices & Access": {
-    "text": "Devices & Access",
-    "paths": [
       "settings.pages.devices_access.title",
-      "settings.pages.account.sections.devices_access.items.0.label"
+      "settings.pages.devices_access.sections.devices.header",
+      "settings.pages.account.sections.devices_access.items.0.label",
+      "plans.outcomes.everywhere.rows.devices.label"
     ]
   },
   "Diagnostics": {
     "text": "Diagnostics",
     "paths": [
       "settings.pages.advanced.sections.diagnostics.header"
+    ]
+  },
+  "Disconnect": {
+    "text": "Disconnect",
+    "paths": [
+      "surfaces.prompts.items.disconnectAgent.confirmTitle"
+    ]
+  },
+  "Disconnect {name}?": {
+    "text": "Disconnect {name}?",
+    "placeholders": [
+      "name"
+    ],
+    "paths": [
+      "surfaces.prompts.items.disconnectAgent.title"
     ]
   },
   "Discuss": {
@@ -775,6 +799,12 @@
     "text": "Duplicate Tasks",
     "paths": [
       "actions.actions.task.duplicate.pluralTitle"
+    ]
+  },
+  "Each agent you connected to your tasks, with the name you gave it. An agent counts while it was used in the last 30 days. Your phones, tablets and computers are under Account, Devices.": {
+    "text": "Each agent you connected to your tasks, with the name you gave it. An agent counts while it was used in the last 30 days. Your phones, tablets and computers are under Account, Devices.",
+    "paths": [
+      "settings.pages.agents.sections.agents.footer"
     ]
   },
   "Each app you signed in to. A device you sign out stops syncing within the hour.": {
@@ -1037,6 +1067,12 @@
     "text": "How AI helps with your tasks",
     "paths": [
       "settings.pages.ai_preferences.sections.explainer.items.0.label"
+    ]
+  },
+  "If this agent takes the place of one you connected before, pick it. That agent stops working.": {
+    "text": "If this agent takes the place of one you connected before, pick it. That agent stops working.",
+    "paths": [
+      "surfaces.prompts.items.agentReplaces.message"
     ]
   },
   "If you skip this, your tasks stay on this device until you sign in.": {
@@ -1406,6 +1442,12 @@
       "actions.actions.task.move.title"
     ]
   },
+  "Name this agent": {
+    "text": "Name this agent",
+    "paths": [
+      "surfaces.prompts.text.nameAgent.title"
+    ]
+  },
   "New Area": {
     "text": "New Area",
     "paths": [
@@ -1613,6 +1655,12 @@
       "destinations.destinations.upcoming.emptyState.title"
     ]
   },
+  "Nothing, a new agent": {
+    "text": "Nothing, a new agent",
+    "paths": [
+      "surfaces.prompts.items.agentReplaces.options.none.title"
+    ]
+  },
   "OK": {
     "text": "OK",
     "paths": [
@@ -1746,7 +1794,7 @@
   "Pause all agents": {
     "text": "Pause all agents",
     "paths": [
-      "settings.rootGroups.ai_agents_root.items.1.label",
+      "settings.rootGroups.ai_agents_root.items.2.label",
       "actions.actions.app.pauseAgents.title"
     ]
   },
@@ -1954,7 +2002,14 @@
       "actions.actions.section.rename.title",
       "surfaces.prompts.text.renameSection.confirmTitle",
       "surfaces.prompts.text.renameArea.confirmTitle",
-      "surfaces.prompts.text.renameProject.confirmTitle"
+      "surfaces.prompts.text.renameProject.confirmTitle",
+      "surfaces.prompts.text.renameAgent.confirmTitle"
+    ]
+  },
+  "Rename Agent": {
+    "text": "Rename Agent",
+    "paths": [
+      "surfaces.prompts.text.renameAgent.title"
     ]
   },
   "Rename Area": {
@@ -1991,6 +2046,12 @@
     "text": "Repeat…",
     "paths": [
       "actions.actions.task.repeat.title"
+    ]
+  },
+  "Replaces": {
+    "text": "Replaces",
+    "paths": [
+      "surfaces.prompts.items.agentReplaces.title"
     ]
   },
   "Reply to thread": {
@@ -2085,7 +2146,8 @@
     "text": "Save",
     "paths": [
       "actions.actions.task.detail.save.title",
-      "actions.actions.settings.save.title"
+      "actions.actions.settings.save.title",
+      "surfaces.prompts.text.nameAgent.confirmTitle"
     ]
   },
   "Save Notes": {
@@ -2917,7 +2979,7 @@
   "While paused, no agent can start or work on a task.": {
     "text": "While paused, no agent can start or work on a task.",
     "paths": [
-      "settings.rootGroups.ai_agents_root.items.1.detail"
+      "settings.rootGroups.ai_agents_root.items.2.detail"
     ]
   },
   "Within a monthly run budget": {
@@ -3138,6 +3200,18 @@
       "tokens.fruitAccents.yuzu.name"
     ]
   },
+  "{count} agents": {
+    "forms": {
+      "one": "1 agent",
+      "other": "{count} agents"
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.prompts.countPhrases.agents.label"
+    ]
+  },
   "{count} files": {
     "forms": {
       "one": "{count} file",
@@ -3220,6 +3294,15 @@
     ],
     "paths": [
       "surfaces.notices.items.rolledIn.title"
+    ]
+  },
+  "{name} can no longer read or change your tasks. To use it again, connect it again.": {
+    "text": "{name} can no longer read or change your tasks. To use it again, connect it again.",
+    "placeholders": [
+      "name"
+    ],
+    "paths": [
+      "surfaces.prompts.items.disconnectAgent.message"
     ]
   },
   "“{title}” deleted": {

@@ -25,7 +25,12 @@ export type ChangeDiff = Record<string, [unknown, unknown]>;
 /// `GET /v1/access`: every place the account is signed in.
 export interface AccessSummary {
   devices: { sid: string; client: string | null; firstSeen: number; lastSeen: number; current: boolean; syncing: boolean }[];
-  connections: { id: string; clientName: string; scope: string; createdAt: number; lastUsed: number }[];
+  /// The agents: one row per connected app (an MCP token family). `name` is
+  /// the name the user gave it, else the name the client registered with.
+  connections: { id: string; name: string; clientName: string; scope: string; createdAt: number; lastUsed: number }[];
+  /// The agent count (every row in `connections`) and the plan's limit on it
+  /// (`connectedAgents`, null = no cap). The limit is log-only: nothing blocks.
+  agents: { count: number; limit: number | null };
 }
 
 export interface ChangeEntry {
@@ -353,6 +358,10 @@ export class TaskStore extends DurableObject<Env> {
     // refresh-token rotation, so it names the device for the sync slot.
     const sessionCols = this.sql.exec<{ name: string }>("PRAGMA table_info(sessions)").toArray().map((r) => r.name);
     if (!sessionCols.includes("sid")) this.sql.exec("ALTER TABLE sessions ADD COLUMN sid TEXT");
+    // The name the user gave an agent (pairing or Settings rename). Null =
+    // the client's registered name.
+    const connectionCols = this.sql.exec<{ name: string }>("PRAGMA table_info(connections)").toArray().map((r) => r.name);
+    if (!connectionCols.includes("label")) this.sql.exec("ALTER TABLE connections ADD COLUMN label TEXT");
   }
 
   // ---- rev counter ----
@@ -1209,10 +1218,12 @@ export class TaskStore extends DurableObject<Env> {
 
   /// Notes an MCP token family (a connected app such as Claude). Called on
   /// every issue and refresh rotation, so `lastUsed` moves about hourly.
-  recordConnection(familyId: string, clientId: string, clientName: string, scope: string, now = Date.now()): void {
+  /// `label` is the name the user gave the agent at pairing; a refresh passes
+  /// none and keeps the stored one.
+  recordConnection(familyId: string, clientId: string, clientName: string, scope: string, now = Date.now(), label: string | null = null): void {
     this.sql.exec(
-      "INSERT INTO connections (familyId, clientId, clientName, scope, createdAt, lastUsed) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(familyId) DO UPDATE SET lastUsed = excluded.lastUsed, scope = excluded.scope, clientName = excluded.clientName",
-      familyId, clientId, clientName, scope, now, now,
+      "INSERT INTO connections (familyId, clientId, clientName, scope, createdAt, lastUsed, label) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(familyId) DO UPDATE SET lastUsed = excluded.lastUsed, scope = excluded.scope, clientName = excluded.clientName, label = COALESCE(excluded.label, connections.label)",
+      familyId, clientId, clientName, scope, now, now, label,
     );
   }
 
@@ -1223,20 +1234,52 @@ export class TaskStore extends DurableObject<Env> {
     return had;
   }
 
-  /// Every place this account is signed in: app sessions and MCP connections.
-  /// A connection unused for its refresh lifetime has expired and is left out.
-  accessSummary(currentSid: string | null, cap: number | null, now = Date.now()): AccessSummary {
+  /// Renames an agent. Null or blank goes back to the client's registered
+  /// name. False when the row is not in this store.
+  renameConnection(familyId: string, label: string | null): boolean {
+    const clean = label?.trim() || null;
+    const had = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM connections WHERE familyId = ?", familyId).one().n > 0;
+    if (had) this.sql.exec("UPDATE connections SET label = ? WHERE familyId = ?", clean, familyId);
+    return had;
+  }
+
+  /// The agent's display name: the user's name for it, else the client's.
+  connectionName(familyId: string): string | null {
+    const row = this.sql.exec<{ name: string | null }>(
+      "SELECT COALESCE(label, clientName) AS name FROM connections WHERE familyId = ?", familyId,
+    ).toArray()[0];
+    return row?.name ?? null;
+  }
+
+  /// The other token families of one registered client. A client that pairs
+  /// again is the same agent, so the new family replaces these.
+  otherFamiliesOfClient(clientId: string, keepFamilyId: string): string[] {
+    return this.sql.exec<{ familyId: string }>(
+      "SELECT familyId FROM connections WHERE clientId = ? AND familyId != ?", clientId, keepFamilyId,
+    ).toArray().map((r) => r.familyId);
+  }
+
+  /// The agent count: connections used within their refresh lifetime.
+  connectedAgentCount(now = Date.now()): number {
+    return this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM connections WHERE lastUsed > ?", now - CONNECTION_TTL_MS).one().n;
+  }
+
+  /// Every place this account is signed in: app sessions (devices) and MCP
+  /// connections (agents). A connection unused for its refresh lifetime has
+  /// expired and is left out.
+  accessSummary(currentSid: string | null, cap: number | null, now = Date.now(), agentLimit: number | null = null): AccessSummary {
     const devices = this.deviceSummary(cap);
     const firstSeen = new Map(this.sql.exec<{ sid: string; firstSeen: number }>("SELECT sid, firstSeen FROM devices").toArray().map((r) => [r.sid, r.firstSeen]));
-    const connections = this.sql.exec<{ familyId: string; clientName: string; scope: string; createdAt: number; lastUsed: number }>(
-      "SELECT familyId, clientName, scope, createdAt, lastUsed FROM connections WHERE lastUsed > ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS,
+    const connections = this.sql.exec<{ familyId: string; name: string; clientName: string; scope: string; createdAt: number; lastUsed: number }>(
+      "SELECT familyId, COALESCE(label, clientName) AS name, clientName, scope, createdAt, lastUsed FROM connections WHERE lastUsed > ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS,
     ).toArray();
     return {
       devices: devices.map((d) => ({
         sid: d.sid, client: d.client, firstSeen: firstSeen.get(d.sid) ?? d.lastSeen, lastSeen: d.lastSeen,
         current: d.sid === currentSid, syncing: d.syncing,
       })),
-      connections: connections.map((r) => ({ id: r.familyId, clientName: r.clientName, scope: r.scope, createdAt: r.createdAt, lastUsed: r.lastUsed })),
+      connections: connections.map((r) => ({ id: r.familyId, name: r.name, clientName: r.clientName, scope: r.scope, createdAt: r.createdAt, lastUsed: r.lastUsed })),
+      agents: { count: connections.length, limit: agentLimit },
     };
   }
 

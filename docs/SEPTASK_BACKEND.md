@@ -380,6 +380,17 @@ tasks through CloudKit.
   `DELETE /v1/access/connections/:id` revokes the token family. A connection
   appears on its first token issue or refresh after deploy, and drops out
   after 30 days without a refresh.
+- **Agents (2026-11-24).** One agent is one MCP connection (one token
+  family). The apps show devices and agents as separate lists: Settings ▸
+  Account ▸ Devices, and Settings ▸ AI & Agents ▸ Agents. Each agent has a
+  name: the user gives it when they approve the code (`name` on
+  `POST /v1/pair/approve`), and can change it with
+  `PATCH /v1/access/connections/:id {name}` (`null` goes back to the client's
+  registered name). Writes and task history use that name. When an agent
+  pairs, the client's older families stop working, and so does the agent
+  named in `replaces` on the approval, so one agent stays one row.
+  `GET /v1/access` returns `agents: {count, limit}`; the plan limit
+  `connectedAgents` only logs (`agent_limit_over`), it never blocks.
 - Attachment limits: **25 MB per file, 2 GB per user.** The Worker checks
   both before it mints an upload URL, and the app checks the file size before
   upload so the user sees the error at once.
