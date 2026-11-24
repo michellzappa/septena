@@ -181,10 +181,6 @@
       "reason": "Reminder fields: reminders are not on Android yet.",
       "issue": "#174"
     },
-    "RegistryDestinationIds.REVIEW": {
-      "reason": "Review is planned on Android.",
-      "issue": "#174"
-    },
     "RegistryDestinationIds.AGENT": {
       "reason": "The Agent list is planned on Android.",
       "issue": "#242"
