@@ -1,5 +1,5 @@
 import { DOMAIN_RULES, VIEW_ALIASES } from "../generated/registries.js";
-import { taskViewMembership, type CoreMembership, type CoreTask } from "../core/index.js";
+import { deriveConversation, taskViewMembership, type CoreConversation, type CoreMembership, type CoreTask } from "../core/index.js";
 
 // Pure task logic shared by the live CloudKit tools (listTasks.ts,
 // writeTasks.ts) and the read-only task-backend preview (src/shadow/). No
@@ -276,13 +276,23 @@ export function isTerminalConvo(c: TaskConvo): boolean {
   return c.endState !== undefined && c.endState !== "open";
 }
 
-/// Marked for Claude, or the last provider turn was low-confidence — and not
-/// yet terminal. Mirrors the in-app `pendingReasoning`.
+/// The conversation as the core reads it.
+export function coreConversation(c: TaskConvo): CoreConversation {
+  return {
+    confirmedIntent: c.confirmedIntent ?? null,
+    thread: c.thread.map((t) => ({ seq: t.seq, role: t.role, options: t.options ?? null, confidence: t.confidence ?? null })),
+    artifactExists: !!c.artifact,
+    handoffExists: !!c.handoff,
+    endState: c.endState ?? null,
+    endStateNote: c.endStateNote ?? null,
+    assignee: c.assignee ?? null,
+  };
+}
+
+/// Marked for Claude, or the last provider turn was low-confidence, and not
+/// terminal: the core's `pendingReasoning` (`convo.rs`).
 export function awaitsReasoning(c: TaskConvo): boolean {
-  if (isTerminalConvo(c)) return false;
-  const lastProvider = [...c.thread].reverse().find((t) => t.role === "provider");
-  const lowConf = lastProvider?.confidence !== undefined && lastProvider.confidence < 0.5;
-  return c.assignee === "claude" || lowConf;
+  return deriveConversation(coreConversation(c), new Date().toISOString()).pendingReasoning;
 }
 
 /// The compact conversation block `tasks_get` returns.
