@@ -12,6 +12,7 @@ import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from 
 import { issueSession, refreshSession, revokeSession, storeFor, verifyAccessToken } from "./session.js";
 import {
   approvePairing,
+  denyPairing,
   zAgentName,
   inspectPairing,
   pollDevicePairing,
@@ -19,6 +20,7 @@ import {
   zDevicePollBody,
   zDeviceStartBody,
   zPairApproveBody,
+  zPairDenyBody,
   zPairInspectBody,
 } from "../shadow/oauth.js";
 import { disconnectFamily } from "../shadow/tokens.js";
@@ -145,16 +147,20 @@ api.post("/auth/signout", async (c) => {
 api.post("/auth/device/start", async (c) => {
   const body = await parse(c, zDeviceStartBody);
   if (body instanceof Response) return body;
-  const res = await startDevicePairing(c.env, body);
-  return res ? c.json(res, 200, { "Cache-Control": "no-store" }) : c.json({ error: "pairing_unavailable" }, 503);
+  const res = await startDevicePairing(c.env, body, c.req.header("CF-Connecting-IP"));
+  return res.ok
+    ? c.json(res.data, 200, { "Cache-Control": "no-store" })
+    : c.json({ error: res.error }, res.status, { "Cache-Control": "no-store" });
 });
 
 api.post("/auth/device/poll", async (c) => {
   const body = await parse(c, zDevicePollBody);
   if (body instanceof Response) return body;
-  const res = await pollDevicePairing(c.env, body);
+  const res = await pollDevicePairing(c.env, body, c.req.header("CF-Connecting-IP"));
   if (res.status === "pending") return c.json({ status: "pending" }, 202, { "Cache-Control": "no-store" });
-  if (res.status === "gone") return c.json({ error: "expired_or_unknown" }, 410);
+  if (res.status === "denied") return c.json({ error: "denied" }, 410, { "Cache-Control": "no-store" });
+  if (res.status === "rate_limited") return c.json({ error: "too_many_attempts" }, 429, { "Cache-Control": "no-store" });
+  if (res.status === "gone") return c.json({ error: "expired_or_unknown" }, 410, { "Cache-Control": "no-store" });
   return c.json(await issueSession(c.env, res.userId), 200, { "Cache-Control": "no-store" });
 });
 
@@ -405,7 +411,18 @@ api.post("/pair/approve", async (c) => {
   const body = await parse(c, zPairApproveBody);
   if (body instanceof Response) return body;
   const res = await approvePairing(c.env, c.get("userId"), body);
-  return res.ok ? c.json({ ok: true, client: res.client, kind: res.kind }) : c.json({ error: res.error }, res.status);
+  return res.ok
+    ? c.json({ ok: true, client: res.client, kind: res.kind }, 200, { "Cache-Control": "no-store" })
+    : c.json({ error: res.error }, res.status, { "Cache-Control": "no-store" });
+});
+
+api.post("/pair/deny", async (c) => {
+  const body = await parse(c, zPairDenyBody);
+  if (body instanceof Response) return body;
+  const res = await denyPairing(c.env, c.get("userId"), body);
+  return res.ok
+    ? c.json({ ok: true, client: res.client, kind: res.kind }, 200, { "Cache-Control": "no-store" })
+    : c.json({ error: res.error }, res.status, { "Cache-Control": "no-store" });
 });
 
 // ---- Devices & Access (Settings > Account > Devices & Access) ----

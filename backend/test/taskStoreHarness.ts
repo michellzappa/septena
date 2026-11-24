@@ -219,3 +219,42 @@ export async function createTestAccountStore(existing?: DatabaseSync) {
   const store = new AccountStore(ctx as never, {} as never);
   return { store, db };
 }
+
+/// Creates a real `PairingStore` instance backed by an in-memory KV map so
+/// tests exercise the actual Durable Object methods and alarm/expiry cleanup.
+export async function createTestPairingStore() {
+  installWorkerTestHooks();
+  const { PairingStore } = await import("../src/shadow/PairingStore.ts");
+  const data = new Map<string, unknown>();
+  let alarm: number | null = null;
+
+  const ctx = {
+    storage: {
+      async get<T>(key: string): Promise<T | undefined> {
+        return data.get(key) as T | undefined;
+      },
+      async put(key: string, value: unknown): Promise<void> {
+        data.set(key, value);
+      },
+      async deleteAll(): Promise<void> {
+        data.clear();
+      },
+      async getAlarm(): Promise<number | null> {
+        return alarm;
+      },
+      async setAlarm(ts: number): Promise<void> {
+        alarm = ts;
+      },
+      async deleteAlarm(): Promise<void> {
+        alarm = null;
+      },
+    },
+  };
+
+  const store = new PairingStore(ctx as never, {} as never);
+  return {
+    store,
+    data,
+    getAlarm: () => alarm,
+  };
+}
