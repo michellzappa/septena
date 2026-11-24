@@ -55,7 +55,7 @@ fn decompose(c: u32, out: &mut Vec<(u32, u8)>) {
         let s = c - S_BASE;
         out.push((L_BASE + s / (V_COUNT * T_COUNT), 0));
         out.push((V_BASE + s % (V_COUNT * T_COUNT) / T_COUNT, 0));
-        if s % T_COUNT > 0 {
+        if !s.is_multiple_of(T_COUNT) {
             out.push((T_BASE + s % T_COUNT, 0));
         }
         return;
