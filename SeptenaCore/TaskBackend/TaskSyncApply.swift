@@ -583,6 +583,13 @@ extension TaskSyncEngine {
     take("sourceClient") { t.sourceClient = $0.stringValue }
     take("acknowledgedAt") { t.acknowledgedAt = Self.parseStamp($0.stringValue) }
     take("createdAt") { t.createdAt = Self.parseStamp($0.stringValue) ?? .distantPast }
+    // Fade (docs/TASK_FADE_SPEC.md §3). A pulled touch wins like any field,
+    // so the newest device's fade clock holds everywhere.
+    take("touchedAt") { t.touchedAt = Self.parseStamp($0.stringValue) }
+    take("deferCount") { t.deferCount = max(0, Self.int($0) ?? 0) }
+    take("fadedAt") { t.fadedAt = Self.parseStamp($0.stringValue) }
+    take("dropReason") { t.dropReason = $0.stringValue }
+    take("effort") { t.effort = $0.stringValue }
     return applied
   }
 

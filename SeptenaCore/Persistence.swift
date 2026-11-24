@@ -106,15 +106,15 @@ final class TaskEntity {
   /// `todayPosition` / `setTodayPosition:` selector.
   var todayPosition: Double?
   /// Task fade fields (docs/TASK_FADE_SPEC.md §3, ADR 0006). All have defaults,
-  /// so the migration is lightweight. Local only for now: the task backend
-  /// gets the matching columns at the cutover (docs/SEPTASK_BACKEND.md §5.2),
-  /// and there is no CloudKit field. Names checked: NSManagedObject has none
-  /// of these selectors.
+  /// so the migration is lightweight. They sync through the task backend
+  /// (docs/SEPTASK_BACKEND.md §5.2, #117); there is no CloudKit field. Names
+  /// checked: NSManagedObject has none of these selectors.
   ///
   /// Last user gesture on the task. nil on legacy rows: read as `createdAt`
   /// (`fadeClock`). Written only by `TasksBackend.touch`, which the user
-  /// gesture sites reach through `TaskMutator.touch` — never by a sync apply,
-  /// recurrence spawn, purge, agent write or the fade pass.
+  /// gesture sites reach through `TaskMutator.touch` — never by a recurrence
+  /// spawn, purge, agent write or the fade pass. A sync apply copies another
+  /// device's stamp; it never makes a new one.
   var touchedAt: Date?
   /// Times the user pushed the task to a later day. Resets to 0 on any other
   /// user gesture (`TasksBackend.touch`).

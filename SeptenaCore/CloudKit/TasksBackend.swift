@@ -1470,24 +1470,29 @@ final class CloudKitTasksBackend {
   /// The ONE place `touchedAt` / `deferCount` are written for user gestures.
   /// A user gesture stamps `touchedAt` (and clears `fadedAt`, keeping any
   /// faded task the user edits); a defer also adds 1 to `deferCount`, and any
-  /// other gesture resets it to 0. Local save only (the task backend has no
-  /// fade columns until the cutover), followed by a repaint notice so row
-  /// opacity snaps back to full strength and kept tasks return to their list.
+  /// other gesture resets it to 0. The fields sync like any other (#117),
+  /// followed by a repaint notice so row opacity snaps back to full strength
+  /// and kept tasks return to their list.
   func touch(ids: [String], deferredIDs: Set<String> = []) {
-    var changed = false
+    var changed: [String] = []
     let now = DayClock.appNow
     for id in ids {
       guard let entity = fetch(id: id), entity.deletedAt == nil else { continue }
       entity.touchedAt = now
       entity.deferCount = deferredIDs.contains(id) ? entity.deferCount + 1 : 0
       if entity.fadedAt != nil { entity.fadedAt = nil }
-      changed = true
+      entity.pendingSync = true
+      changed.append(id)
     }
-    if changed {
-      if StoreHealth.save(context, op: "touch") {
-        NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-      }
-    }
+    pushFadeChanges(changed, op: "touch")
+  }
+
+  /// One save for a batch of fade-field writes, then one engine change per
+  /// row so the fields reach the task backend (#117) and a repaint notice.
+  private func pushFadeChanges(_ ids: [String], op: String) {
+    guard !ids.isEmpty, StoreHealth.save(context, op: op) else { return }
+    for id in ids { engine.noteTaskChange(id: id) }
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
   }
 
   /// Daily idempotent fade pass (`docs/TASK_FADE_SPEC.md` §4). Stamps
@@ -1504,7 +1509,7 @@ final class CloudKitTasksBackend {
       }
     )
     let candidates = (try? context.fetch(descriptor)) ?? []
-    var faded = 0
+    var fadedIDs: [String] = []
     for entity in candidates {
       let convo = entity.conversation
       let isAgentTurn = deriveConvo(convo).badge == .working
@@ -1527,14 +1532,13 @@ final class CloudKitTasksBackend {
         today: today
       ) else { continue }
       entity.fadedAt = now
-      faded += 1
+      entity.pendingSync = true
+      fadedIDs.append(entity.id)
     }
-    guard faded > 0 else { return 0 }
-    if StoreHealth.save(context, op: "fadePass") {
-      SeptenaLog.info("[Fade] faded \(faded) untouched task(s) on \(today)")
-      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-    }
-    return faded
+    guard !fadedIDs.isEmpty else { return 0 }
+    pushFadeChanges(fadedIDs, op: "fadePass")
+    SeptenaLog.info("[Fade] faded \(fadedIDs.count) untouched task(s) on \(today)")
+    return fadedIDs.count
   }
 
   /// Keep faded task(s) out of the Faded pile (§4): clears `fadedAt`, stamps
@@ -1562,7 +1566,7 @@ final class CloudKitTasksBackend {
   /// Undo target for `TaskUndo.recordKeepFaded` and `TaskUndo.recordSweepDrop`:
   /// restores exact pre-action fade & status fields without re-stamping `touchedAt`.
   func restoreFaded(_ snapshots: [TaskUndo.FadedSnapshot]) {
-    var localOnlyChanged = false
+    var fadeOnly: [String] = []
     for snap in snapshots {
       guard let entity = fetch(id: snap.id), entity.deletedAt == nil else { continue }
       let statusChanged = entity.statusRaw != snap.statusRaw || entity.completedAt != snap.completedAt
@@ -1576,12 +1580,11 @@ final class CloudKitTasksBackend {
         entity.pendingSync = true
         commitAndPush(entity, op: "restoreFaded")
       } else {
-        localOnlyChanged = true
+        entity.pendingSync = true
+        fadeOnly.append(entity.id)
       }
     }
-    if localOnlyChanged, StoreHealth.save(context, op: "restoreFaded") {
-      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-    }
+    pushFadeChanges(fadeOnly, op: "restoreFaded")
   }
 
   // MARK: Headings (project section dividers — docs/ORDERING_AND_HEADINGS_PLAN.md)
