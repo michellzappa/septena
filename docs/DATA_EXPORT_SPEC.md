@@ -28,17 +28,17 @@ Turn Septena's existing local JSON export (`Septask/SeptaskDataTransfer.swift`) 
 ## 3. Format contracts
 
 ### 3.1 Canonical JSON (`septena_export_version: 1`)
-- Keep `septena_export_version: 1` backward-compatible by adding optional keys and new tables (`checklist_item`, `tag`, `task_tag`, `task_convo`, `change_log` when exported from server) — older readers ignore unknown keys/tables.
+- Keep `septena_export_version: 1` backward-compatible by adding optional keys and new tables (`checklist_item`, `task_ref`, `tag`, `task_tag`, `task_convo`, `change_log` when exported from server) — older readers ignore unknown keys/tables.
 - Every task column defined in `registry/entities.json` MUST be serialized in `TaskJSONTransfer.taskDict` and restored in `upsertTask` (enforced by a unit test comparing exported keys against `registry/entities.json`).
 - Round-trip invariant: exporting a local store to JSON and importing into a fresh store via `TaskJSONTransfer.apply` (and later `#99`) produces an identical task dataset with zero lost fields.
 
 ### 3.2 Markdown (`septena-tasks-YYYY-MM-DD.md`)
 - Ordered cleanly: **Inbox**, then **Areas** (with their **Projects** and **Sections**), then **Standalone Projects**, then **Logbook (Completed)**.
-- Task line: `- [ ] Title` (or `- [x] Title`), followed by subtle inline metadata (`(when: 2026-11-22, deadline: 2026-11-30, repeat: Weekdays, ★)`), indented notes block, and indented `- [ ]` / `- [x]` checklist items (`#76`).
+- Task line: `- [ ] Title` (or `- [x] Title`), followed by subtle inline metadata (`(when: 2026-11-22, deadline: 2026-11-30, repeat: Weekdays, ★)`), indented notes block, and indented `- [ ]` / `- [x]` checklist items (`#76`), then one indented line per reference: its title, then its URL if there is one (`#387`).
 - Deterministic ordering by `position` so diffs are clean if a user commits exports to git or drops them in Obsidian.
 
 ### 3.3 CSV (`septena-tasks-YYYY-MM-DD.csv`)
-- Columns: `id,title,status,area,project,section,today,scheduled,deadline,reminder_at,recurrence,starred,tags,checklist,notes,created,completed_at`.
+- Columns: `id,title,status,area,project,section,today,scheduled,deadline,reminder_at,recurrence,starred,tags,checklist,notes,created,completed_at,references`. `references` holds the reference keys, separated by a space (`#387`).
 - Strictly RFC 4180 escaped (quotes, embedded newlines, commas), UTF-8 with optional BOM (`\uFEFF`) so Excel/Numbers open Unicode cleanly.
 
 ## 4. UX & Settings placement
