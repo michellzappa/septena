@@ -33,8 +33,9 @@ permissions:
 
 concurrency:
   # github.workflow is the caller's name in a call, so a release never cancels a main push.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.workflow == 'core' }}
+  # Every commit on main gets its own finished run (F4, #345).
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || (github.ref == 'refs/heads/main' && github.sha) || github.ref }}
+  cancel-in-progress: ${{ github.workflow == 'core' && github.ref != 'refs/heads/main' }}
 
 env:
   CARGO_TERM_COLOR: always
