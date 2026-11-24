@@ -11,7 +11,10 @@ core's WASM (`backend/src/core/`, installed by `scripts/core-pin.sh`).
 Measured 2026-11-24: bundle 571 → 1001 KiB (136 → 270 KiB gzip); CPU about
 6.5 µs per task per list request against about 0.3 µs in TypeScript, so a
 1,000-task list costs about 7 ms more. That fits Workers Paid. A batch call
-in the core would cut the JSON cost if lists grow. C1 and C2 open.
+in the core would cut the JSON cost if lists grow. C1 in progress (#247):
+Android calls the core for list membership, fade, recurrence, reminders and
+the conversation projection through the UniFFI Kotlin bindings and JNA; the
+Kotlin rule copies are gone. The sync engine (#173) is next. C2 open.
 
 **Rests on:** ADR 0025 (shared Rust core), ADR 0015 (shared registries),
 ADR 0013 (Windows on the Android code), ADR 0002 (own backend).

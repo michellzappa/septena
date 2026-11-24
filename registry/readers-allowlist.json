@@ -201,8 +201,20 @@
       "reason": "Fade is not on Android yet.",
       "issue": "#247"
     },
+    "RegistryRules.CUE_DECAY_DAYS": {
+      "reason": "The shared core holds the agent-cue window (views.rs); Android calls it.",
+      "issue": "#247"
+    },
+    "RegistryRules.FADE_GRACE_DAYS": {
+      "reason": "The shared core holds the fade rule (fade.rs); Android calls it.",
+      "issue": "#247"
+    },
     "RegistryRules.FADE_SWEEP_WEEKDAY": {
       "reason": "Fade rules move to the shared core.",
+      "issue": "#247"
+    },
+    "RegistryRules.FADE_WINDOW_DAYS": {
+      "reason": "The shared core holds the fade rule (fade.rs); Android calls it.",
       "issue": "#247"
     },
     "RegistryRules.RECENTLY_DELETED_DAYS": {

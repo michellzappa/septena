@@ -3,11 +3,11 @@ package app.septena.core
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
-import app.septena.core.generated.RegistryRules
 import app.septena.core.generated.RegistryDestinationIds
-import java.time.Duration
+import app.septena.sharedcore.taskViewMembership
 import java.time.Instant
 import java.time.LocalDate
+import app.septena.sharedcore.TaskSnapshot as CoreTaskSnapshot
 
 /** Platform-neutral task values used by list membership and the adaptive UI. */
 data class TaskSnapshot(
@@ -72,7 +72,10 @@ data class TaskViewMembership(
     val matchesView: Map<String, Boolean>,
 )
 
-/** Shared list membership rules; today and now are supplied by DayClock. */
+/**
+ * List membership, from the shared core (`views.rs`, ADR 0025 C1 #247): the
+ * rule the Apple apps and the backend run. today and now come from DayClock.
+ */
 object TaskViewRules {
     private val recurrenceUnits = setOf(
         RegistryEntityEnums.RecurrenceUnit.DAY,
@@ -82,47 +85,20 @@ object TaskViewRules {
     )
 
     fun membership(task: TaskSnapshot, today: LocalDate, now: Instant): TaskViewMembership {
-        val open = task.status == RegistryEntityEnums.TaskStatus.OPEN
-        val deleted = task.deletedAt != null
-        val faded = TaskFadeRules.isFaded(task.fadedAt)
-        val activeTask = open && !task.isHeading && !deleted && !faded
-        val unfiled = task.area == null && task.project == null
-        val isOnToday = activeTask && (
-            task.today ||
-                day(task.scheduled)?.let { !it.isAfter(today) } == true ||
-                day(task.deadline)?.let { !it.isAfter(today) } == true
-            )
-        val isInbox = activeTask && unfiled
-        val freshAgentProposal = isFreshAgentProposal(task, now)
-        val inTriageBand = isInbox && if (task.source == RegistryEntityEnums.TaskSource.MCP) {
-            freshAgentProposal && if (task.today || task.scheduled != null || task.deadline != null) {
-                task.acknowledgedAt == null
-            } else {
-                true
-            }
-        } else {
-            task.scheduled == null && task.deadline == null && !task.today
-        }
-        val inTodayInbox = inTriageBand || (isInbox && isOnToday)
-        val hasAgentCue = task.source == RegistryEntityEnums.TaskSource.MCP && task.acknowledgedAt == null && freshAgentProposal
-        val daysOnToday = carriedDays(task, today, open, isOnToday, hasAgentCue)
-        val scheduled = day(task.scheduled)
-        val deadline = day(task.deadline)
-        val matches = linkedMapOf(
-            RegistryDestinationIds.TODAY to (activeTask && (isOnToday || inTriageBand)),
-            RegistryDestinationIds.INBOX to inTodayInbox,
-            RegistryDestinationIds.UPCOMING to (activeTask && !task.today &&
-                (scheduled?.isAfter(today) == true || deadline?.isAfter(today) == true)),
-            RegistryDestinationIds.ANYTIME to (activeTask && !task.today && task.scheduled == null && task.deadline == null),
-        )
+        val m = taskViewMembership(task.toCore(), today.toString(), now.toString())
         return TaskViewMembership(
-            isUnfiled = unfiled,
-            isInboxMember = isInbox,
-            inTriageBand = inTriageBand,
-            isOnToday = isOnToday,
-            inTodayInbox = inTodayInbox,
-            daysOnToday = daysOnToday,
-            matchesView = matches,
+            isUnfiled = m.isUnfiled,
+            isInboxMember = m.isInboxMember,
+            inTriageBand = m.inTriageBand,
+            isOnToday = m.isOnToday,
+            inTodayInbox = m.inTodayInbox,
+            daysOnToday = m.daysOnToday.toInt(),
+            matchesView = linkedMapOf(
+                RegistryDestinationIds.TODAY to m.matchesToday,
+                RegistryDestinationIds.INBOX to m.matchesInbox,
+                RegistryDestinationIds.UPCOMING to m.matchesUpcoming,
+                RegistryDestinationIds.ANYTIME to m.matchesAnytime,
+            ),
         )
     }
 
@@ -159,32 +135,34 @@ object TaskViewRules {
             else -> false
         }
     }
-
-    private fun isFreshAgentProposal(task: TaskSnapshot, now: Instant): Boolean {
-        if (task.source != RegistryEntityEnums.TaskSource.MCP) return false
-        val createdAt = instant(task.createdAt) ?: return false
-        return Duration.between(createdAt, now) < Duration.ofDays(RegistryRules.CUE_DECAY_DAYS)
-    }
-
-    private fun carriedDays(
-        task: TaskSnapshot,
-        today: LocalDate,
-        open: Boolean,
-        isOnToday: Boolean,
-        hasAgentCue: Boolean,
-    ): Int {
-        if (!open || !isOnToday || hasAgentCue) return 0
-        val landed = buildList {
-            if (task.today) day(task.todaySetOn)?.let(::add)
-            day(task.scheduled)?.takeIf { !it.isAfter(today) }?.let(::add)
-            day(task.deadline)?.takeIf { !it.isAfter(today) }?.let(::add)
-        }.minOrNull() ?: return 0
-        val created = day(task.created)
-        val floor = created?.takeIf { it.isAfter(landed) } ?: landed
-        return maxOf(0, (today.toEpochDay() - floor.toEpochDay()).toInt())
-    }
-
-    private fun day(raw: String?): LocalDate? = raw?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() }
-
-    private fun instant(raw: String?): Instant? = raw?.let { runCatching { Instant.parse(it) }.getOrNull() }
 }
+
+/** The task as the shared core reads it. */
+internal fun TaskSnapshot.toCore(): CoreTaskSnapshot = CoreTaskSnapshot(
+    id = id,
+    title = title,
+    status = status,
+    kind = kind,
+    area = area,
+    project = project,
+    created = created,
+    createdAt = createdAt,
+    scheduled = scheduled,
+    deadline = deadline,
+    today = today,
+    todaySetOn = todaySetOn,
+    source = source,
+    acknowledgedAt = acknowledgedAt,
+    starred = starred,
+    recurrenceUnit = recurrenceUnit,
+    deletedAt = deletedAt,
+    fadedAt = fadedAt,
+    startTime = null,
+    durationMinutes = null,
+    timeZone = null,
+    reminderAt = null,
+    reminderSnoozedUntil = null,
+    reminderDismissedAt = null,
+    recurrenceAfterCompletion = null,
+    recurrenceAnchorDate = null,
+)

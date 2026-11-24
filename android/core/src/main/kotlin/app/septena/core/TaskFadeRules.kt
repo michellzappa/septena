@@ -1,42 +1,23 @@
 package app.septena.core
 
 import app.septena.core.generated.RegistryRules
-import java.time.Duration
+import app.septena.sharedcore.FadeInput
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
+import app.septena.sharedcore.fadeFill as coreFadeFill
+import app.septena.sharedcore.rowOpacity as coreRowOpacity
+import app.septena.sharedcore.shouldFade as coreShouldFade
 
-/** Pure fade calculation shared with registry/conformance/task-fade.json. */
+/**
+ * Task fade, from the shared core (`fade.rs`, ADR 0025 C1 #247), verified by
+ * registry/conformance/task-fade.json. Never re-implement a rule here.
+ */
 object TaskFadeRules {
-    private val window = Duration.ofDays(RegistryRules.FADE_WINDOW_DAYS)
-    private val grace = Duration.ofDays(RegistryRules.FADE_GRACE_DAYS)
     val minOpacity: Double = RegistryRules.FADE_MIN_OPACITY
 
     fun isFaded(fadedAt: String?): Boolean = fadedAt != null
 
-    fun rowOpacity(fill: Double?): Double {
-        if (fill == null || !fill.isFinite() || fill <= 0.0) return 1.0
-        return 1.0 - minOf(1.0, fill) * (1.0 - minOpacity)
-    }
-
-    fun isEligible(
-        isOpen: Boolean,
-        isHeading: Boolean,
-        isDeleted: Boolean,
-        isFaded: Boolean,
-        deadline: String?,
-        scheduled: String?,
-        hasRecurrence: Boolean,
-        isAgentTurn: Boolean,
-        isAssignedToClaude: Boolean,
-        isAwaitingHuman: Boolean = false,
-        today: String,
-    ): Boolean {
-        if (!isOpen || isHeading || isDeleted || isFaded) return false
-        if (!deadline.isNullOrEmpty()) return false
-        if (!scheduled.isNullOrEmpty() && scheduled.take(10) >= today) return false
-        return !hasRecurrence && !isAgentTurn && !isAssignedToClaude && !isAwaitingHuman
-    }
+    fun rowOpacity(fill: Double?): Double = coreRowOpacity(fill)
 
     fun shouldFade(
         isOpen: Boolean,
@@ -55,15 +36,12 @@ object TaskFadeRules {
         today: String,
         isAwaitingHuman: Boolean = false,
         zone: ZoneId = ZoneId.systemDefault(),
-    ): Boolean {
-        if (!isEligible(
-                isOpen, isHeading, isDeleted, isFaded, deadline, scheduled, hasRecurrence,
-                isAgentTurn, isAssignedToClaude, isAwaitingHuman, today,
-            )
-        ) return false
-        val clock = clockDate(touchedAt, createdAt, created, zone) ?: return false
-        return Duration.between(clock, now) >= window
-    }
+    ): Boolean = coreShouldFade(
+        input(
+            isOpen, isHeading, isDeleted, isFaded, deadline, scheduled, hasRecurrence, isAgentTurn,
+            isAssignedToClaude, isAwaitingHuman, false, touchedAt, createdAt, created, now, today, zone,
+        ),
+    )
 
     fun fadeFill(
         isOpen: Boolean,
@@ -83,23 +61,49 @@ object TaskFadeRules {
         today: String,
         isAwaitingHuman: Boolean = false,
         zone: ZoneId = ZoneId.systemDefault(),
-    ): Double? {
-        if (showsAgentCue || !isEligible(
-                isOpen, isHeading, isDeleted, isFaded, deadline, scheduled, hasRecurrence,
-                isAgentTurn, isAssignedToClaude, isAwaitingHuman, today,
-            )
-        ) return null
-        val clock = clockDate(touchedAt, createdAt, created, zone) ?: return null
-        val elapsed = Duration.between(clock, now)
-        if (elapsed < grace) return null
-        return minOf(1.0, elapsed.toMillis().toDouble() / window.toMillis().toDouble())
-    }
+    ): Double? = coreFadeFill(
+        input(
+            isOpen, isHeading, isDeleted, isFaded, deadline, scheduled, hasRecurrence, isAgentTurn,
+            isAssignedToClaude, isAwaitingHuman, showsAgentCue, touchedAt, createdAt, created, now, today, zone,
+        ),
+    )
 
-    private fun clockDate(
+    private fun input(
+        isOpen: Boolean,
+        isHeading: Boolean,
+        isDeleted: Boolean,
+        isFaded: Boolean,
+        deadline: String?,
+        scheduled: String?,
+        hasRecurrence: Boolean,
+        isAgentTurn: Boolean,
+        isAssignedToClaude: Boolean,
+        isAwaitingHuman: Boolean,
+        showsAgentCue: Boolean,
         touchedAt: Instant?,
         createdAt: Instant?,
         created: String?,
+        now: Instant,
+        today: String,
         zone: ZoneId,
-    ): Instant? = touchedAt ?: createdAt ?: created
-        ?.let { runCatching { LocalDate.parse(it.take(10)).atStartOfDay(zone).toInstant() }.getOrNull() }
+    ) = FadeInput(
+        isOpen = isOpen,
+        isHeading = isHeading,
+        isDeleted = isDeleted,
+        isFaded = isFaded,
+        deadline = deadline,
+        scheduled = scheduled,
+        hasRecurrence = hasRecurrence,
+        isAgentTurn = isAgentTurn,
+        isAssignedToClaude = isAssignedToClaude,
+        isAwaitingHuman = isAwaitingHuman,
+        showsAgentCue = showsAgentCue,
+        touchedAt = touchedAt?.toString(),
+        createdAt = createdAt?.toString(),
+        created = created,
+        now = now.toString(),
+        today = today,
+        // A date-only `created` is midnight on the device's clock.
+        utcOffsetSeconds = zone.rules.getOffset(now).totalSeconds,
+    )
 }

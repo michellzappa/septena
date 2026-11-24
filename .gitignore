@@ -26,3 +26,6 @@ android/.gradle/
 android/.kotlin/
 android/local.properties
 android/**/build/
+
+# Shared core native libraries, fetched by :app:fetchCoreJniLibs from core/release/release.json.
+android/app/src/main/jniLibs/
