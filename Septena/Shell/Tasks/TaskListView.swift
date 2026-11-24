@@ -2570,34 +2570,24 @@ struct TaskListView: View {
   }
 
   /// Review stage rows (`needs_verify`, #87): each row carries Accept and Send
-  /// back right in the list, and expands into the full composer on tap.
+  /// back right in the list. A tap opens the task page (pushed on iPhone, the
+  /// inspector on wide screens). It never expands inline: the review row's
+  /// layout is not a task row, so the inline editor broke it.
   @ViewBuilder
   private var reviewRows: some View {
     let rows = visibleItems
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
       let position = TaskCardPosition(index: idx, count: rows.count)
-      if expandedEditId == task.id {
-        taskRow(task, quickMenu: false)
-          .taskCardChrome(position, isSelected: false, isEditing: true)
-          .zIndex(1)
-      } else {
-        ReviewTaskRow(
-          task: task,
-          isSelected: selection.contains(task.id),
-          onOpen: {
-            #if os(iOS)
-            if closeActiveEditIfNeeded() { return }
-            #endif
-            beginEdit(task)
-          },
-          onAccept: { acceptReview(task) },
-          onSendBack: { note in sendBackReview(task, note: note) }
-        )
-        .asListRow()
-        .taskCardChrome(position, isSelected: selection.contains(task.id))
-        .taskCardContextMenu(position) { taskContextMenu(for: task) }
-        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
-      }
+      ReviewTaskRow(
+        task: task,
+        isSelected: selection.contains(task.id),
+        onOpen: { openPage(task) },
+        onAccept: { acceptReview(task) },
+        onSendBack: { note in sendBackReview(task, note: note) }
+      )
+      .asListRow()
+      .taskCardChrome(position, isSelected: selection.contains(task.id))
+      .taskCardContextMenu(position) { taskContextMenu(for: task) }
     }
   }
 

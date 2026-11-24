@@ -3570,6 +3570,12 @@ final class SeptaskKitTaskListController: NSViewController {
       beginEditingRow(row)
       return
     }
+    // A Review row opens the task page (the inspector), same as iPhone. It
+    // never expands inline: the review cell is not a task row.
+    if filter == .review {
+      onOpenInspector?()
+      return
+    }
     beginComposing(id: task.id)
   }
 
