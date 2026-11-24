@@ -322,7 +322,11 @@ private fun QuickAddRow(
     title: String,
     onAdd: () -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = Modifier.padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         OutlinedTextField(
             value = draft,
             onValueChange = onDraftChange,
