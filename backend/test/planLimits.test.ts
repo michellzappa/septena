@@ -31,8 +31,10 @@ describe("plan table", () => {
     assert.deepEqual(ent.PLAN_TABLE.free, PLAN_LIMITS.account);
     assert.deepEqual(ent.PLAN_TABLE.plus, PLAN_LIMITS.plus);
     assert.equal(ent.PLAN_TABLE.free.devices, 1);
-    assert.equal(ent.PLAN_TABLE.free.connectorWritesPerDay, 25);
-    assert.equal(ent.PLAN_TABLE.free.agentRunsPerMonth, 10);
+    assert.equal(ent.PLAN_TABLE.free.connectorWritesPerDay, 500);
+    assert.equal(ent.PLAN_TABLE.free.connectedAgents, 1);
+    assert.equal(ent.PLAN_TABLE.free.liveSync, true);
+    assert.equal(ent.PLAN_TABLE.plus.connectedAgents, 3);
     assert.equal(ent.PLAN_TABLE.plus.devices, null);
   });
 
@@ -67,7 +69,7 @@ describe("plan table", () => {
   });
 
   it("quotes the registry's upsell words", () => {
-    assert.match(ent.upsellLine("connector_cap"), /25/);
+    assert.match(ent.upsellLine("connector_cap"), /500/);
   });
 });
 

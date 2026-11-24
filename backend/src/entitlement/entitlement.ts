@@ -104,18 +104,14 @@ export interface PlanLimits {
   /// Change history the reads show (`/v1/changes`, tasks_history,
   /// tasks_activity). null = everything the store keeps.
   changeLogDays: number | null;
-  /// Logbook window. Read by the apps; the server has no Logbook read.
-  logbookDays: number | null;
   /// Recently Deleted window. Read by the apps; the server has no Recently
   /// Deleted read.
   recentlyDeletedDays: number | null;
   /// Server attachment storage (R2). 0 = attachments stay on the device.
   attachmentsGB: number | null;
-  /// Connector write calls per UTC day; null = no cap.
+  /// Connector write calls per UTC day; null = no cap. An abuse cap, not a
+  /// plan feature (ADR 0036): it is not on the pricing page.
   connectorWritesPerDay: number | null;
-  /// New agent claims per UTC month; null = no cap (the per-task run budget
-  /// of ADR 0008 still applies).
-  agentRunsPerMonth: number | null;
   /// Connected agents (MCP connections used in the last 30 days); null = no
   /// cap. Log-only: a pairing past the limit logs `agent_limit_over` and
   /// still works.
