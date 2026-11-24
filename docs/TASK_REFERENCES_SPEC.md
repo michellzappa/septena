@@ -1,6 +1,7 @@
 # Task references — spec
 
-**Status:** accepted 2026-11-24, not started. mz accepted the defaults of #296.
+**Status:** building (R0, 2026-11-24). mz accepted the defaults of #296.
+**First release = R0 + R1:** add a link or an email to a task, see it, open it. R2 to R4 come later and do not block it.
 Defaults that this doc adds are marked *(new)* in §13.
 **Decisions:** [ADR 0031](adr/0031-references-are-keyed-pointers.md),
 [ADR 0002](adr/0002-own-backend-replaces-icloud.md),
@@ -86,7 +87,7 @@ platforms get their types from the registry generator.
 | `taskId` | id, required | Immutable after insert. |
 | `key` | text, max 1,000, required | Normalised. Immutable after insert. |
 | `kind` | text, max 32, server-owned | Derived from `key`. |
-| `role` | enum `taskRefRole`, default `about` | `about`, `from`, `blocked_by`, `follow_up`, `tracked` (`GITHUB_SPEC.md` §2). |
+| `role` | enum `taskRefRole`, default `about` | `about`, `from`, `blocked_by`, `follow_up`. |
 | `snapshot` | json, max 2,048 bytes | §4.1. |
 | `position` | real, null | Order inside the task. |
 | `createdBy` | text, server-owned | The actor of the insert (`app:…`, `mcp:…`, `capture:<feed>`). |
@@ -230,13 +231,29 @@ An agent can read a referenced item and propose completion with
 `tasks_set_endstate(needs_verify)`. A reference never completes a task. The
 `human_accepts` rule stays.
 
-### 6.6 The GitHub issue chip
+### 6.6 GitHub issue links become references
 
-The apps and MCP already derive `issue` from conversation text
-(`TaskConvo.linkedIssue`, `issueLink`). A reference of kind `issue` comes
-first in that order. The conversation text stays the fallback, so no old row
-changes. Nothing is migrated here. Role `tracked` makes the task follow the
-issue, and its backfill is part of `GITHUB_SPEC.md` G0 (ADR 0032).
+Today the apps and MCP read an issue link out of conversation text, with two
+parsers (`ConvoIssueLink` in Swift, `issueLink` in TypeScript). ADR 0033 folds
+them into references. Septena never contacts GitHub.
+
+- **Backfill, once per account (R0):** every task whose conversation text gives
+  an issue link today gets one `about` reference of kind `issue`. Same search
+  order as `TaskConvo.linkedIssue`. A task that already has the key is skipped.
+  It runs again without effect.
+- **New writes (R0):** when an agent writes a GitHub issue or pull request URL
+  into an artifact, a handoff, an end-state note or a turn, the store adds the
+  `issue` reference, up to the limit. The core parses it. A user's own removal
+  wins: the store does not add a key again that a user removed from the task.
+- **MCP `issue` (R0):** the field stays on task rows and reads the newest
+  `issue` reference, where the newest is the last one added. The TypeScript
+  text parser goes. Pull requests give `kind: "pr"` when `snapshot.url` says so.
+- **Apps (R1):** the References block and the conversation's "Open" link read
+  references. The row chip and `ConvoIssueLink` go. Old app builds keep their
+  own parser, and the text stays, so nothing changes for them.
+- **No live state.** A private, closed, renamed or deleted issue looks the
+  same. The row shows `owner/repo#n` when there is no title.
+- Agents that know the title write it into `snapshot.title`.
 
 ## 7. MCP and REST
 
@@ -272,9 +289,16 @@ thin clients (`backend/src/api/tasksRest.ts`) gets the same fields.
   row.
 - **Task row:** one quiet icon when the task has a `from` reference, and the
   "New reply" mark. No chips in v1.
-- **Add:** paste a URL or a `message://` link into "Add Reference". On the
-  Mac, drag a mail from Apple Mail, or a link from a browser, onto a task row
-  or the page.
+- **Add:** paste a URL or a `message://` link into "Add Reference". The panel
+  first offers the links that are already in the task's title and notes, one
+  tap each. Septena never turns a link in the notes into a reference on its
+  own, and adding one leaves the notes as they are. On the Mac (R4), drag a
+  mail from Apple Mail, or a link from a browser, onto a task row or the page.
+- **Row title:** `snapshot.title`. Without one: `owner/repo#n` for an issue,
+  host and path for a URL, the kind's label for the rest. The client never
+  fetches a title from the network.
+- **Wrong input:** text that does not parse shows one line under the field and
+  adds nothing. A key that the task has already only highlights its row.
 - **Watch and widgets:** nothing in v1.
 - Undo: add and remove register on `TaskUndo` at the gesture.
 - New capability `task.references` in `registry/capabilities.json`, per
@@ -304,8 +328,8 @@ thin clients (`backend/src/api/tasksRest.ts`) gets the same fields.
 
 | Phase | What | Depends on | Exit check |
 |---|---|---|---|
-| R0 (#386) | Core key grammar and vectors; registry entity, limits and enum; store, index, opt-in pull, permissions; MCP and REST fields, `tasks_find_by_ref`; the issue-chip order; JSON export. | None | An agent creates a task with an `email` reference, and `tasks_find_by_ref` on the raw `message://` link returns it. |
-| R1 (#387) | Apple apps: sync, the References block on Mac, iPhone and iPad, resolvers, paste to add, undo, Markdown and CSV export. | R0 (#386) | A tap on an `email` reference opens the mail in Apple Mail on Mac and iPhone. |
+| R0 (#386) | Core key grammar and vectors; registry entity, limits and enum; store, index, opt-in pull, permissions; MCP and REST fields, `tasks_find_by_ref`; issue links become references (§6.6); JSON export. | None | An agent creates a task with an `email` reference, and `tasks_find_by_ref` on the raw `message://` link returns it. |
+| R1 (#387) | Apple apps: sync, the References block on Mac, iPhone and iPad, resolvers, paste to add, undo, Markdown and CSV export; the row chip and the Swift parser go (§6.6). | R0 (#386) | A tap on an `email` reference opens the mail in Apple Mail on Mac and iPhone. |
 | R2 (#388) | Forwarding address writes references; duplicate check in the store and in `tasks_create`; privacy line. | R0, #134 (EM0) | The same mail forwarded twice as an attachment creates one task. The `.eml` fixtures give the results of §6.1. |
 | R3 (#389) | `replyAt`, the Inbox-band rule in the core, the "New reply" mark, `tasks_ref_seen`. The Gmail feed writes references when it ships (#15). | R1, R2 | A reply on a referenced thread marks the active task and shows it in the Inbox band. Opening the task clears it. |
 | R4 (#390) | Back-links: the task page list and the iOS Share extension. Drag a mail onto a task on the Mac. Android and web blocks and resolvers. | R1; web waits for #21 | Sharing a URL that already has a task shows that task. |
@@ -338,3 +362,4 @@ doc was written. They stand until mz overrules them.
 | Inline forward with no usable headers? *(new)* | Create the task without a reference. Never use the forward's own id. |
 | What does a repeating task copy? *(new)* | `about` references only. |
 | Does `tasks_create` by an agent stop on a duplicate? *(new)* | Yes, it returns the existing task. `allow_duplicate: true` overrides. |
+| Old issue links? | Decided by mz, 2026-11-24: backfill them and delete the parsers (ADR 0033). |

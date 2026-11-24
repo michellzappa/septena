@@ -1,7 +1,7 @@
 # Linked projects — spec
 
-**Status:** accepted, not started. Written and accepted 2026-11-19. Open questions keep their defaults until mz overrules them.
-**GitHub is out of this spec** since 2026-11-24 (ADR 0032): issues are followed, not mirrored. See [GITHUB_SPEC.md](GITHUB_SPEC.md). Read every GitHub rule below as historical. The spec still holds for Starlings and Linear, where the first provider now also builds the shared parts of L0 and L1.
+**Status:** not started; rewrite for Starlings only before any work (#12).
+**GitHub is out of this spec** since 2026-11-24 (ADR 0033): Septena does not connect to GitHub, and an issue link is a reference ([TASK_REFERENCES_SPEC.md](TASK_REFERENCES_SPEC.md) §6.6). Read every GitHub rule below as historical. **Linear is not planned** (mz, 2026-11-24). The spec still holds for Starlings, which now also builds the shared parts of L0 and L1.
 **Decisions:** [ADR 0002](adr/0002-own-backend-replaces-icloud.md),
 [ADR 0003](adr/0003-external-links-run-server-side.md).
 **Depends on:** the task backend (`docs/SEPTASK_BACKEND.md`). This spec
@@ -246,7 +246,7 @@ provider cannot do.
 |---|---|---|
 | GitHub Issues | source | First. Proves the model. |
 | Starlings tasks | source | Second. Our own product, so its API can adapt. Proves several connections + dedupe. |
-| Linear | source | Third. Clean GraphQL and webhooks; strong for selling to developers. |
+| Linear | not planned | Was third. Clean GraphQL and webhooks; strong for selling to developers. |
 | Gmail (starred / label) | capture | First capture feed. |
 | Granola action items | capture | Action items go to the project of the meeting. |
 | GitLab | source | Close to GitHub; on demand. |
@@ -300,17 +300,17 @@ link pauses until another member reconnects it.
 
 | Phase | What | Exit check |
 |---|---|---|
-| ~~L0~~ | GitHub: replaced by `GITHUB_SPEC.md` G0 and G1. The tables move to L2. Was: `connections` + `links` tables, GitHub App auth, inbound poll, read-only links. | One repo's open issues show as tasks on every device; closing on GitHub completes them in Septask. |
+| ~~L0~~ | GitHub: dropped (ADR 0033). The tables move to L2. Was: `connections` + `links` tables, GitHub App auth, inbound poll, read-only links. | One repo's open issues show as tasks on every device; closing on GitHub completes them in Septask. |
 | ~~L1~~ | GitHub: dropped. Write-back moves to L2. Was: Outbound for complete / reopen / title. Echo suppression. | Completing in Septask closes the issue; no loop in `changes`. |
 | L2 | Starlings provider, several workspaces, dedupe by `extKey`. | A repo linked both directly and through a Starlings project shows each issue once. |
 | L3 | Notes ↔ body, deadline ↔ due date, "Send to GitHub/Starlings" for local tasks. | Edits round-trip without loss on a real project. |
 
 | L4 | Moves across lists (§6.5), including cross-provider with confirm. | A task moved GitHub → Starlings keeps its id, Today slot and conversation. |
 | L5 | Capture feeds: Gmail first. | A starred mail creates one Inbox task, once. |
-| L6 | Linear. | Same exit check as L0–L1, on a Linear team. |
+| ~~L6~~ | Linear: not planned. Was: | Same exit check as L0–L1, on a Linear team. |
 
-The task factory (`docs/TASK_FACTORY_SPEC.md`) uses `GITHUB_SPEC.md` G0: the
-project's `githubRepo` is where the agent works.
+The task factory (`docs/TASK_FACTORY_SPEC.md`) uses the project's
+`githubRepo`: it is where the agent works.
 
 ## 11. Open questions for mz
 

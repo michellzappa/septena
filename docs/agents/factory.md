@@ -114,8 +114,12 @@ Set up 2026-11-19 so planned work keeps moving without mz.
      open a build ticket in the right milestone and attach it; if a product call
      is needed, append one short question turn (`tasks_thread_append` with 2–4
      short options).
+   - **Linked issue closed:** an open task with a linked issue and
+     `endState == "decomposed"`, whose issue is now closed → set
+     `endState = "needs_verify"` with how it closed and what to check. Do not
+     claim it. This is not part of the 5.
    - **Never close the task (`tasks_complete`).** Leave it open so mz sees the
-     `#N` chip in the app and closes it themselves.
+     linked issue and closes it themselves.
 
 ## 3. Pick the work
 

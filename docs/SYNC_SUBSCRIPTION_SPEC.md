@@ -68,7 +68,9 @@ paid plan is named **Septena Plus** on every surface.
 | | Claude connector: read, plus a few writes a day | Claude connector without daily caps |
 | | Agents: a few runs a month | Agents within the run budget (ADR 0008) |
 | | Join shared projects | Create shared projects and invite |
-| | 1 linked project | Linked projects without a cap |
+
+GitHub is in no plan (ADR 0033). `linkedProjects` stays in the plan
+table unused and is not a promise.
 
 Exact numbers ("a few", allowances) are set in the plan table (§6) and can
 change without a new ADR. Moving a free thing to paid still needs one. The
