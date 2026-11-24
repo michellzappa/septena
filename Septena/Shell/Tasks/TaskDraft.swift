@@ -114,7 +114,8 @@ struct TaskDraft: Equatable {
       mutator.setStarred(id: task.id, starred: true)
     }
     if let startTime {
-      mutator.setTimeSlot(id: task.id, startTime: startTime, durationMinutes: durationMinutes)
+      mutator.apply(.setTimeSlot(startTime: startTime, durationMinutes: durationMinutes,
+                                 timeZone: nil), to: task.id)
     }
     return task
   }

@@ -1644,7 +1644,234 @@ public func FfiConverterTypeTaskConversation_lower(_ value: TaskConversation) ->
 
 
 /**
- * The task fields that list membership reads.
+ * Every task field a date action can write.
+ */
+public struct TaskDateFields {
+    public var scheduled: String?
+    public var deadline: String?
+    public var today: Bool
+    public var todaySetOn: String?
+    public var startTime: String?
+    public var durationMinutes: Int32?
+    public var timeZone: String?
+    public var reminderAt: String?
+    public var reminderSnoozedUntil: String?
+    public var reminderDismissedAt: String?
+    public var recurrenceAnchorDate: String?
+    public var acknowledgedAt: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(scheduled: String?, deadline: String?, today: Bool, todaySetOn: String?, startTime: String?, durationMinutes: Int32?, timeZone: String?, reminderAt: String?, reminderSnoozedUntil: String?, reminderDismissedAt: String?, recurrenceAnchorDate: String?, acknowledgedAt: String?) {
+        self.scheduled = scheduled
+        self.deadline = deadline
+        self.today = today
+        self.todaySetOn = todaySetOn
+        self.startTime = startTime
+        self.durationMinutes = durationMinutes
+        self.timeZone = timeZone
+        self.reminderAt = reminderAt
+        self.reminderSnoozedUntil = reminderSnoozedUntil
+        self.reminderDismissedAt = reminderDismissedAt
+        self.recurrenceAnchorDate = recurrenceAnchorDate
+        self.acknowledgedAt = acknowledgedAt
+    }
+}
+
+#if compiler(>=6)
+extension TaskDateFields: Sendable {}
+#endif
+
+
+extension TaskDateFields: Equatable, Hashable {
+    public static func ==(lhs: TaskDateFields, rhs: TaskDateFields) -> Bool {
+        if lhs.scheduled != rhs.scheduled {
+            return false
+        }
+        if lhs.deadline != rhs.deadline {
+            return false
+        }
+        if lhs.today != rhs.today {
+            return false
+        }
+        if lhs.todaySetOn != rhs.todaySetOn {
+            return false
+        }
+        if lhs.startTime != rhs.startTime {
+            return false
+        }
+        if lhs.durationMinutes != rhs.durationMinutes {
+            return false
+        }
+        if lhs.timeZone != rhs.timeZone {
+            return false
+        }
+        if lhs.reminderAt != rhs.reminderAt {
+            return false
+        }
+        if lhs.reminderSnoozedUntil != rhs.reminderSnoozedUntil {
+            return false
+        }
+        if lhs.reminderDismissedAt != rhs.reminderDismissedAt {
+            return false
+        }
+        if lhs.recurrenceAnchorDate != rhs.recurrenceAnchorDate {
+            return false
+        }
+        if lhs.acknowledgedAt != rhs.acknowledgedAt {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(scheduled)
+        hasher.combine(deadline)
+        hasher.combine(today)
+        hasher.combine(todaySetOn)
+        hasher.combine(startTime)
+        hasher.combine(durationMinutes)
+        hasher.combine(timeZone)
+        hasher.combine(reminderAt)
+        hasher.combine(reminderSnoozedUntil)
+        hasher.combine(reminderDismissedAt)
+        hasher.combine(recurrenceAnchorDate)
+        hasher.combine(acknowledgedAt)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTaskDateFields: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TaskDateFields {
+        return
+            try TaskDateFields(
+                scheduled: FfiConverterOptionString.read(from: &buf), 
+                deadline: FfiConverterOptionString.read(from: &buf), 
+                today: FfiConverterBool.read(from: &buf), 
+                todaySetOn: FfiConverterOptionString.read(from: &buf), 
+                startTime: FfiConverterOptionString.read(from: &buf), 
+                durationMinutes: FfiConverterOptionInt32.read(from: &buf), 
+                timeZone: FfiConverterOptionString.read(from: &buf), 
+                reminderAt: FfiConverterOptionString.read(from: &buf), 
+                reminderSnoozedUntil: FfiConverterOptionString.read(from: &buf), 
+                reminderDismissedAt: FfiConverterOptionString.read(from: &buf), 
+                recurrenceAnchorDate: FfiConverterOptionString.read(from: &buf), 
+                acknowledgedAt: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TaskDateFields, into buf: inout [UInt8]) {
+        FfiConverterOptionString.write(value.scheduled, into: &buf)
+        FfiConverterOptionString.write(value.deadline, into: &buf)
+        FfiConverterBool.write(value.today, into: &buf)
+        FfiConverterOptionString.write(value.todaySetOn, into: &buf)
+        FfiConverterOptionString.write(value.startTime, into: &buf)
+        FfiConverterOptionInt32.write(value.durationMinutes, into: &buf)
+        FfiConverterOptionString.write(value.timeZone, into: &buf)
+        FfiConverterOptionString.write(value.reminderAt, into: &buf)
+        FfiConverterOptionString.write(value.reminderSnoozedUntil, into: &buf)
+        FfiConverterOptionString.write(value.reminderDismissedAt, into: &buf)
+        FfiConverterOptionString.write(value.recurrenceAnchorDate, into: &buf)
+        FfiConverterOptionString.write(value.acknowledgedAt, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTaskDateFields_lift(_ buf: RustBuffer) throws -> TaskDateFields {
+    return try FfiConverterTypeTaskDateFields.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTaskDateFields_lower(_ value: TaskDateFields) -> RustBuffer {
+    return FfiConverterTypeTaskDateFields.lower(value)
+}
+
+
+/**
+ * The fields after an action, and the camelCase names of the ones that
+ * changed. The host writes only the changed fields.
+ */
+public struct TaskDatePatch {
+    public var fields: TaskDateFields
+    public var changed: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(fields: TaskDateFields, changed: [String]) {
+        self.fields = fields
+        self.changed = changed
+    }
+}
+
+#if compiler(>=6)
+extension TaskDatePatch: Sendable {}
+#endif
+
+
+extension TaskDatePatch: Equatable, Hashable {
+    public static func ==(lhs: TaskDatePatch, rhs: TaskDatePatch) -> Bool {
+        if lhs.fields != rhs.fields {
+            return false
+        }
+        if lhs.changed != rhs.changed {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(fields)
+        hasher.combine(changed)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTaskDatePatch: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TaskDatePatch {
+        return
+            try TaskDatePatch(
+                fields: FfiConverterTypeTaskDateFields.read(from: &buf), 
+                changed: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TaskDatePatch, into buf: inout [UInt8]) {
+        FfiConverterTypeTaskDateFields.write(value.fields, into: &buf)
+        FfiConverterSequenceString.write(value.changed, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTaskDatePatch_lift(_ buf: RustBuffer) throws -> TaskDatePatch {
+    return try FfiConverterTypeTaskDatePatch.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTaskDatePatch_lower(_ value: TaskDatePatch) -> RustBuffer {
+    return FfiConverterTypeTaskDatePatch.lower(value)
+}
+
+
+/**
+ * The task fields that list membership and the date actions read.
  */
 public struct TaskSnapshot {
     public var id: String
@@ -1665,10 +1892,36 @@ public struct TaskSnapshot {
     public var recurrenceUnit: String?
     public var deletedAt: String?
     public var fadedAt: String?
+    /**
+     * `HH:MM` on the task's day.
+     */
+    public var startTime: String?
+    public var durationMinutes: Int32?
+    public var timeZone: String?
+    public var reminderAt: String?
+    public var reminderSnoozedUntil: String?
+    public var reminderDismissedAt: String?
+    /**
+     * False for a fixed repeat. Read only when `recurrence_unit` is set.
+     */
+    public var recurrenceAfterCompletion: Bool?
+    /**
+     * The logical slot of a fixed repeat.
+     */
+    public var recurrenceAnchorDate: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: String, title: String, status: String, kind: String?, area: String?, project: String?, created: String?, createdAt: String?, scheduled: String?, deadline: String?, today: Bool, todaySetOn: String?, source: String?, acknowledgedAt: String?, starred: Bool, recurrenceUnit: String?, deletedAt: String?, fadedAt: String?) {
+    public init(id: String, title: String, status: String, kind: String?, area: String?, project: String?, created: String?, createdAt: String?, scheduled: String?, deadline: String?, today: Bool, todaySetOn: String?, source: String?, acknowledgedAt: String?, starred: Bool, recurrenceUnit: String?, deletedAt: String?, fadedAt: String?, 
+        /**
+         * `HH:MM` on the task's day.
+         */startTime: String?, durationMinutes: Int32?, timeZone: String?, reminderAt: String?, reminderSnoozedUntil: String?, reminderDismissedAt: String?, 
+        /**
+         * False for a fixed repeat. Read only when `recurrence_unit` is set.
+         */recurrenceAfterCompletion: Bool?, 
+        /**
+         * The logical slot of a fixed repeat.
+         */recurrenceAnchorDate: String?) {
         self.id = id
         self.title = title
         self.status = status
@@ -1687,6 +1940,14 @@ public struct TaskSnapshot {
         self.recurrenceUnit = recurrenceUnit
         self.deletedAt = deletedAt
         self.fadedAt = fadedAt
+        self.startTime = startTime
+        self.durationMinutes = durationMinutes
+        self.timeZone = timeZone
+        self.reminderAt = reminderAt
+        self.reminderSnoozedUntil = reminderSnoozedUntil
+        self.reminderDismissedAt = reminderDismissedAt
+        self.recurrenceAfterCompletion = recurrenceAfterCompletion
+        self.recurrenceAnchorDate = recurrenceAnchorDate
     }
 }
 
@@ -1751,6 +2012,30 @@ extension TaskSnapshot: Equatable, Hashable {
         if lhs.fadedAt != rhs.fadedAt {
             return false
         }
+        if lhs.startTime != rhs.startTime {
+            return false
+        }
+        if lhs.durationMinutes != rhs.durationMinutes {
+            return false
+        }
+        if lhs.timeZone != rhs.timeZone {
+            return false
+        }
+        if lhs.reminderAt != rhs.reminderAt {
+            return false
+        }
+        if lhs.reminderSnoozedUntil != rhs.reminderSnoozedUntil {
+            return false
+        }
+        if lhs.reminderDismissedAt != rhs.reminderDismissedAt {
+            return false
+        }
+        if lhs.recurrenceAfterCompletion != rhs.recurrenceAfterCompletion {
+            return false
+        }
+        if lhs.recurrenceAnchorDate != rhs.recurrenceAnchorDate {
+            return false
+        }
         return true
     }
 
@@ -1773,6 +2058,14 @@ extension TaskSnapshot: Equatable, Hashable {
         hasher.combine(recurrenceUnit)
         hasher.combine(deletedAt)
         hasher.combine(fadedAt)
+        hasher.combine(startTime)
+        hasher.combine(durationMinutes)
+        hasher.combine(timeZone)
+        hasher.combine(reminderAt)
+        hasher.combine(reminderSnoozedUntil)
+        hasher.combine(reminderDismissedAt)
+        hasher.combine(recurrenceAfterCompletion)
+        hasher.combine(recurrenceAnchorDate)
     }
 }
 
@@ -1802,7 +2095,15 @@ public struct FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer {
                 starred: FfiConverterBool.read(from: &buf), 
                 recurrenceUnit: FfiConverterOptionString.read(from: &buf), 
                 deletedAt: FfiConverterOptionString.read(from: &buf), 
-                fadedAt: FfiConverterOptionString.read(from: &buf)
+                fadedAt: FfiConverterOptionString.read(from: &buf), 
+                startTime: FfiConverterOptionString.read(from: &buf), 
+                durationMinutes: FfiConverterOptionInt32.read(from: &buf), 
+                timeZone: FfiConverterOptionString.read(from: &buf), 
+                reminderAt: FfiConverterOptionString.read(from: &buf), 
+                reminderSnoozedUntil: FfiConverterOptionString.read(from: &buf), 
+                reminderDismissedAt: FfiConverterOptionString.read(from: &buf), 
+                recurrenceAfterCompletion: FfiConverterOptionBool.read(from: &buf), 
+                recurrenceAnchorDate: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -1825,6 +2126,14 @@ public struct FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.recurrenceUnit, into: &buf)
         FfiConverterOptionString.write(value.deletedAt, into: &buf)
         FfiConverterOptionString.write(value.fadedAt, into: &buf)
+        FfiConverterOptionString.write(value.startTime, into: &buf)
+        FfiConverterOptionInt32.write(value.durationMinutes, into: &buf)
+        FfiConverterOptionString.write(value.timeZone, into: &buf)
+        FfiConverterOptionString.write(value.reminderAt, into: &buf)
+        FfiConverterOptionString.write(value.reminderSnoozedUntil, into: &buf)
+        FfiConverterOptionString.write(value.reminderDismissedAt, into: &buf)
+        FfiConverterOptionBool.write(value.recurrenceAfterCompletion, into: &buf)
+        FfiConverterOptionString.write(value.recurrenceAnchorDate, into: &buf)
     }
 }
 
@@ -1858,13 +2167,43 @@ public struct TaskViewMembership {
     public var matchesInbox: Bool
     public var matchesUpcoming: Bool
     public var matchesAnytime: Bool
+    /**
+     * R3: `overdue` (deadline before today) or `dueToday`. None for a task
+     * that is not active or has no arrived deadline.
+     */
+    public var dueState: String?
+    /**
+     * R4: the deadline renders red. A When date never does.
+     */
+    public var deadlineRed: Bool
+    /**
+     * R5: the Upcoming day, the earlier future date. None outside Upcoming.
+     */
+    public var upcomingDay: String?
+    /**
+     * R8: the task landed on Today this morning by its own date.
+     */
+    public var arrivedOnOwn: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(isUnfiled: Bool, isInboxMember: Bool, inTriageBand: Bool, isOnToday: Bool, 
         /**
          * The Inbox band on Today (the vectors call it `inInbox`).
-         */inTodayInbox: Bool, daysOnToday: Int64, matchesToday: Bool, matchesInbox: Bool, matchesUpcoming: Bool, matchesAnytime: Bool) {
+         */inTodayInbox: Bool, daysOnToday: Int64, matchesToday: Bool, matchesInbox: Bool, matchesUpcoming: Bool, matchesAnytime: Bool, 
+        /**
+         * R3: `overdue` (deadline before today) or `dueToday`. None for a task
+         * that is not active or has no arrived deadline.
+         */dueState: String?, 
+        /**
+         * R4: the deadline renders red. A When date never does.
+         */deadlineRed: Bool, 
+        /**
+         * R5: the Upcoming day, the earlier future date. None outside Upcoming.
+         */upcomingDay: String?, 
+        /**
+         * R8: the task landed on Today this morning by its own date.
+         */arrivedOnOwn: Bool) {
         self.isUnfiled = isUnfiled
         self.isInboxMember = isInboxMember
         self.inTriageBand = inTriageBand
@@ -1875,6 +2214,10 @@ public struct TaskViewMembership {
         self.matchesInbox = matchesInbox
         self.matchesUpcoming = matchesUpcoming
         self.matchesAnytime = matchesAnytime
+        self.dueState = dueState
+        self.deadlineRed = deadlineRed
+        self.upcomingDay = upcomingDay
+        self.arrivedOnOwn = arrivedOnOwn
     }
 }
 
@@ -1915,6 +2258,18 @@ extension TaskViewMembership: Equatable, Hashable {
         if lhs.matchesAnytime != rhs.matchesAnytime {
             return false
         }
+        if lhs.dueState != rhs.dueState {
+            return false
+        }
+        if lhs.deadlineRed != rhs.deadlineRed {
+            return false
+        }
+        if lhs.upcomingDay != rhs.upcomingDay {
+            return false
+        }
+        if lhs.arrivedOnOwn != rhs.arrivedOnOwn {
+            return false
+        }
         return true
     }
 
@@ -1929,6 +2284,10 @@ extension TaskViewMembership: Equatable, Hashable {
         hasher.combine(matchesInbox)
         hasher.combine(matchesUpcoming)
         hasher.combine(matchesAnytime)
+        hasher.combine(dueState)
+        hasher.combine(deadlineRed)
+        hasher.combine(upcomingDay)
+        hasher.combine(arrivedOnOwn)
     }
 }
 
@@ -1950,7 +2309,11 @@ public struct FfiConverterTypeTaskViewMembership: FfiConverterRustBuffer {
                 matchesToday: FfiConverterBool.read(from: &buf), 
                 matchesInbox: FfiConverterBool.read(from: &buf), 
                 matchesUpcoming: FfiConverterBool.read(from: &buf), 
-                matchesAnytime: FfiConverterBool.read(from: &buf)
+                matchesAnytime: FfiConverterBool.read(from: &buf), 
+                dueState: FfiConverterOptionString.read(from: &buf), 
+                deadlineRed: FfiConverterBool.read(from: &buf), 
+                upcomingDay: FfiConverterOptionString.read(from: &buf), 
+                arrivedOnOwn: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -1965,6 +2328,10 @@ public struct FfiConverterTypeTaskViewMembership: FfiConverterRustBuffer {
         FfiConverterBool.write(value.matchesInbox, into: &buf)
         FfiConverterBool.write(value.matchesUpcoming, into: &buf)
         FfiConverterBool.write(value.matchesAnytime, into: &buf)
+        FfiConverterOptionString.write(value.dueState, into: &buf)
+        FfiConverterBool.write(value.deadlineRed, into: &buf)
+        FfiConverterOptionString.write(value.upcomingDay, into: &buf)
+        FfiConverterBool.write(value.arrivedOnOwn, into: &buf)
     }
 }
 
@@ -2060,6 +2427,175 @@ extension CoreError: Foundation.LocalizedError {
         String(reflecting: self)
     }
 }
+
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * A date action of spec §4. The comment on each variant names its spec ID.
+ */
+
+public enum DateAction {
+    
+    /**
+     * A1. Put the task on Today. Replaces its When date (I1).
+     */
+    case putOnToday(mode: RescheduleMode
+    )
+    /**
+     * A2. Plan the task for `day`. A day on or before today is A1.
+     */
+    case scheduleFor(day: String, mode: RescheduleMode
+    )
+    /**
+     * A3. Take the task off Today. An arrived When date or deadline goes too
+     * (decision Q2).
+     */
+    case removeFromToday
+    /**
+     * A4. A3 when the task is on Today (R2), else A1.
+     */
+    case toggleToday(mode: RescheduleMode
+    )
+    /**
+     * A5. Clear the When date. The deadline stays (I5).
+     */
+    case clearWhenDate
+    /**
+     * A6. Clear When: When date, deadline, pin and time slot all go.
+     */
+    case clearWhen
+    /**
+     * A7 (a day) and A8 (none). Set or clear the deadline.
+     */
+    case setDeadline(day: String?
+    )
+    /**
+     * A9. Set or clear the time slot. A time with no day pins the task.
+     */
+    case setTimeSlot(startTime: String?, durationMinutes: Int32?, timeZone: String?
+    )
+    /**
+     * A11. File the task from the triage band: A1, unless the task has a
+     * future When date, which it keeps.
+     */
+    case fileFromTriage
+}
+
+
+#if compiler(>=6)
+extension DateAction: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDateAction: FfiConverterRustBuffer {
+    typealias SwiftType = DateAction
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DateAction {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .putOnToday(mode: try FfiConverterTypeRescheduleMode.read(from: &buf)
+        )
+        
+        case 2: return .scheduleFor(day: try FfiConverterString.read(from: &buf), mode: try FfiConverterTypeRescheduleMode.read(from: &buf)
+        )
+        
+        case 3: return .removeFromToday
+        
+        case 4: return .toggleToday(mode: try FfiConverterTypeRescheduleMode.read(from: &buf)
+        )
+        
+        case 5: return .clearWhenDate
+        
+        case 6: return .clearWhen
+        
+        case 7: return .setDeadline(day: try FfiConverterOptionString.read(from: &buf)
+        )
+        
+        case 8: return .setTimeSlot(startTime: try FfiConverterOptionString.read(from: &buf), durationMinutes: try FfiConverterOptionInt32.read(from: &buf), timeZone: try FfiConverterOptionString.read(from: &buf)
+        )
+        
+        case 9: return .fileFromTriage
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: DateAction, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .putOnToday(mode):
+            writeInt(&buf, Int32(1))
+            FfiConverterTypeRescheduleMode.write(mode, into: &buf)
+            
+        
+        case let .scheduleFor(day,mode):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(day, into: &buf)
+            FfiConverterTypeRescheduleMode.write(mode, into: &buf)
+            
+        
+        case .removeFromToday:
+            writeInt(&buf, Int32(3))
+        
+        
+        case let .toggleToday(mode):
+            writeInt(&buf, Int32(4))
+            FfiConverterTypeRescheduleMode.write(mode, into: &buf)
+            
+        
+        case .clearWhenDate:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .clearWhen:
+            writeInt(&buf, Int32(6))
+        
+        
+        case let .setDeadline(day):
+            writeInt(&buf, Int32(7))
+            FfiConverterOptionString.write(day, into: &buf)
+            
+        
+        case let .setTimeSlot(startTime,durationMinutes,timeZone):
+            writeInt(&buf, Int32(8))
+            FfiConverterOptionString.write(startTime, into: &buf)
+            FfiConverterOptionInt32.write(durationMinutes, into: &buf)
+            FfiConverterOptionString.write(timeZone, into: &buf)
+            
+        
+        case .fileFromTriage:
+            writeInt(&buf, Int32(9))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDateAction_lift(_ buf: RustBuffer) throws -> DateAction {
+    return try FfiConverterTypeDateAction.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDateAction_lower(_ value: DateAction) -> RustBuffer {
+    return FfiConverterTypeDateAction.lower(value)
+}
+
+
+extension DateAction: Equatable, Hashable {}
+
+
 
 
 
@@ -2500,6 +3036,86 @@ extension PushPlan: Equatable, Hashable {}
 
 
 
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * The answer to "this occurrence or the whole series" for a fixed repeat.
+ * Other tasks ignore it.
+ */
+
+public enum RescheduleMode {
+    
+    /**
+     * Move this occurrence only. The series keeps its slot.
+     */
+    case makeException
+    /**
+     * Move the series. The host rebases the other open copies.
+     */
+    case updateRule
+}
+
+
+#if compiler(>=6)
+extension RescheduleMode: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRescheduleMode: FfiConverterRustBuffer {
+    typealias SwiftType = RescheduleMode
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RescheduleMode {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .makeException
+        
+        case 2: return .updateRule
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RescheduleMode, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .makeException:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .updateRule:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRescheduleMode_lift(_ buf: RustBuffer) throws -> RescheduleMode {
+    return try FfiConverterTypeRescheduleMode.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRescheduleMode_lower(_ value: RescheduleMode) -> RustBuffer {
+    return FfiConverterTypeRescheduleMode.lower(value)
+}
+
+
+extension RescheduleMode: Equatable, Hashable {}
+
+
+
+
+
+
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
@@ -2567,6 +3183,30 @@ fileprivate struct FfiConverterOptionDouble: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterDouble.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionBool: FfiConverterRustBuffer {
+    typealias SwiftType = Bool?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterBool.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterBool.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -2743,6 +3383,22 @@ fileprivate struct FfiConverterSequenceTypeConversationTurn: FfiConverterRustBuf
     }
 }
 /**
+ * Applies one date action to one task. A heading or a deleted task has no
+ * dates to change: the patch is empty. Every action also clears the agent
+ * cue of an agent row. `today` is `YYYY-MM-DD` and `now` an ISO-8601
+ * instant, both from the host's day clock.
+ */
+public func applyDateAction(task: TaskSnapshot, action: DateAction, today: String, now: String)throws  -> TaskDatePatch  {
+    return try  FfiConverterTypeTaskDatePatch_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+    uniffi_septena_core_fn_func_apply_date_action(
+        FfiConverterTypeTaskSnapshot_lower(task),
+        FfiConverterTypeDateAction_lower(action),
+        FfiConverterString.lower(today),
+        FfiConverterString.lower(now),$0
+    )
+})
+}
+/**
  * Checks one pull page against the stored cursor. A reset is allowed once
  * per sync (`resets_so_far` counts the earlier ones).
  */
@@ -2815,6 +3471,20 @@ public func invokeJson(function: String, inputJson: String)throws  -> String  {
 })
 }
 /**
+ * A10: the date fields of the next occurrence of a repeating task, due on
+ * `next_scheduled`. No deadline, no pin, the same time slot, the reminder
+ * shifted to the new day. An agent row arrives acknowledged.
+ */
+public func nextOccurrenceDates(task: TaskSnapshot, nextScheduled: String, now: String)throws  -> TaskDateFields  {
+    return try  FfiConverterTypeTaskDateFields_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+    uniffi_septena_core_fn_func_next_occurrence_dates(
+        FfiConverterTypeTaskSnapshot_lower(task),
+        FfiConverterString.lower(nextScheduled),
+        FfiConverterString.lower(now),$0
+    )
+})
+}
+/**
  * The next scheduled date (`YYYY-MM-DD`) after a completion, or none when the
  * rule cannot produce one. A fixed schedule catches up strictly past
  * `completed_on`; `logical_scheduled` is the occurrence's date before an
@@ -2827,6 +3497,19 @@ public func nextScheduledDate(completedOn: String, scheduled: String?, logicalSc
         FfiConverterOptionString.lower(scheduled),
         FfiConverterOptionString.lower(logicalScheduled),
         FfiConverterTypeRecurrenceRule_lower(rule),$0
+    )
+})
+}
+/**
+ * A12 and restore: the task's fields brought to invariants I1–I7. A pin
+ * with a future When date loses the pin; a pin with an arrived When date
+ * loses the date. An empty or invalid day becomes none.
+ */
+public func normalizeTaskDates(task: TaskSnapshot, today: String)throws  -> TaskDatePatch  {
+    return try  FfiConverterTypeTaskDatePatch_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+    uniffi_septena_core_fn_func_normalize_task_dates(
+        FfiConverterTypeTaskSnapshot_lower(task),
+        FfiConverterString.lower(today),$0
     )
 })
 }
@@ -2977,6 +3660,9 @@ private let initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
+    if (uniffi_septena_core_checksum_func_apply_date_action() != 8400) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_septena_core_checksum_func_check_pull_page() != 24761) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -2995,7 +3681,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_septena_core_checksum_func_invoke_json() != 29059) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_septena_core_checksum_func_next_occurrence_dates() != 7516) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_septena_core_checksum_func_next_scheduled_date() != 10335) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_septena_core_checksum_func_normalize_task_dates() != 27973) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_septena_core_checksum_func_occurrence_id() != 31912) {

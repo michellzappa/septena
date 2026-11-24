@@ -24,6 +24,8 @@ Use this repo-local skill when creating Septena marketing images that show the t
 
 ## Multi-device composition
 
+For repeatable, pixel-accurate 3D renders of Mac, iPad, iPhone, and Apple Watch using real PNG screenshots (rather than image generation), use the Blender Cycles studio pipeline documented in `docs/3d-studio/SKILL.md` (`tools/3d-studio/render.py`).
+
 When the user asks for the Mac, iPhone, and Watch composition based on the supplied dark App Store panel:
 
 - Keep the large white headline above the devices, the dark charcoal topographic background, and the overlapping hierarchy: Mac wide in back, iPhone in the lower-right foreground, Watch in the lower-left foreground. Include only the requested devices; do not add iPad by default.

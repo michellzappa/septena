@@ -9,10 +9,10 @@ import Foundation
 // `schedule` / `moveToToday` / `setDeadline` / `removeFromToday` themselves;
 // that chaining is how the platforms drifted apart (spec §7).
 //
-// Phase D3 (#290) moves the decisions below into the Rust core
-// (`septena-core`, ADR 0027). Until then this file is the one Swift copy.
-//
-// Undo stays with the caller: record one `TaskUndo` snapshot before the
+// The shared core decides the fields (`task_dates.rs`, D3 #290, ADR 0027);
+// `TasksBackend+DateActions.swift` writes its patch in one save. This file
+// only maps the Swift action to the core's and keeps the selection rule of
+// A4. Undo stays with the caller: record one `TaskUndo` snapshot before the
 // action and one entry after it (AGENTS.md, "Undo is ONE shared stack").
 
 /// A date action from `docs/TASK_DATES_SPEC.md` §4. The comment on each case
@@ -38,13 +38,18 @@ enum TaskDateAction: Equatable {
 
 extension TaskMutator {
 
-  /// Apply one date action to one task, then clear its agent cue (every
-  /// date action is engagement). `mode` answers the fixed-repeat question
-  /// for A1 / A2; callers that show the prompt pass the user's answer.
+  /// Apply one date action to one task. The core also clears the agent cue
+  /// (every date action is engagement). `mode` answers the fixed-repeat
+  /// question for A1 / A2; callers that show the prompt pass the user's
+  /// answer.
+  /// Returns nothing: shells call it from `() -> Void` closures.
   func apply(_ action: TaskDateAction, to id: String,
              mode: RecurrenceRescheduleMode = .makeException) {
-    perform(action, on: id, mode: mode)
-    acknowledge(id: id)
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] apply(date action) called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.applyDateAction(id: id, action: action, mode: mode)
   }
 
   /// A4. Toggle Today for a selection. If every task is on Today (by pin OR
@@ -69,76 +74,5 @@ extension TaskMutator {
       }
     }
     return joining
-  }
-
-  // MARK: - The rules (spec §4)
-
-  private func perform(_ action: TaskDateAction, on id: String,
-                       mode: RecurrenceRescheduleMode) {
-    let today = SeptenaDate.today
-    switch action {
-    case .putOnToday:
-      // Move a dated row's occurrence to today first, so a fixed repeat
-      // records its slot and a reminder on the old When day follows it, then
-      // drop the date: a pinned row has no When date (I1).
-      if taskEntity(id: id)?.scheduled != nil {
-        reschedule(id: id, date: SeptenaDate.parse(today), mode: mode)
-        schedule(id: id, date: nil)
-      }
-      moveToToday(id: id, today: true)
-
-    case .scheduleFor(let day):
-      guard let iso = SeptenaDate.format(day) else { return }
-      if iso <= today {
-        perform(.putOnToday, on: id, mode: mode)
-        return
-      }
-      // The deadline stays (decision Q1): a deadline that has arrived keeps
-      // the row on Today, red, until the user deals with it.
-      reschedule(id: id, date: day, mode: mode)
-      moveToToday(id: id, today: false)
-
-    case .removeFromToday:
-      removeFromToday(id: id)
-      clearTimeSlotIfNoDay(id)
-
-    case .clearWhenDate:
-      schedule(id: id, date: nil)
-      moveToToday(id: id, today: false)
-      clearTimeSlotIfSet(id)
-
-    case .clearWhen:
-      // The deadline goes before the unpin: `setDeadline` pins a row that
-      // only its old deadline held on Today, and the unpin after it removes
-      // that pin, so Clear When always ends in Anytime.
-      schedule(id: id, date: nil)
-      setDeadline(id: id, date: nil)
-      moveToToday(id: id, today: false)
-      clearTimeSlotIfSet(id)
-
-    case .setDeadline(let date):
-      // `setDeadline` keeps a row on Today that only its old deadline held
-      // there (spec §4, the keep-on-Today rule).
-      setDeadline(id: id, date: date)
-
-    case .setTimeSlot(let start, let duration, let zone):
-      setTimeSlot(id: id, startTime: start, durationMinutes: duration, timeZone: zone)
-      guard let start, !start.isEmpty,
-            let task = taskEntity(id: id),
-            task.scheduled == nil, !task.today else { return }
-      moveToToday(id: id, today: true)
-    }
-  }
-
-  /// Invariant I6: a time slot needs a day. After a row leaves Today with no
-  /// When date left, its time slot goes too.
-  private func clearTimeSlotIfNoDay(_ id: String) {
-    guard let task = taskEntity(id: id), task.scheduled == nil, !task.today else { return }
-    clearTimeSlotIfSet(id)
-  }
-
-  private func clearTimeSlotIfSet(_ id: String) {
-    guard taskEntity(id: id)?.startTime != nil else { return }
-    setTimeSlot(id: id, startTime: nil, durationMinutes: nil)
   }
 }
