@@ -1756,7 +1756,7 @@ struct TaskListView: View {
       .accessibilityLabel("Move selected tasks")
 
       Button { toggleSelected() } label: {
-        Label("Complete", systemImage: "checkmark.circle")
+        Label(RegistryActions.title("task.toggleComplete", .short), systemImage: "checkmark.circle")
           .labelStyle(.iconOnly)
           .frame(width: 40, height: 38)
           .contentShape(Rectangle())
@@ -1787,7 +1787,7 @@ struct TaskListView: View {
         Button {
           selectAllOrClearVisibleTasks()
         } label: {
-          Label(allSelectableVisibleSelected ? "Deselect All" : "Select All",
+          Label(RegistryActions.title("task.selectAll", allSelectableVisibleSelected ? .active : .base),
                 systemImage: allSelectableVisibleSelected ? "checklist.unchecked" : "checklist")
         }
         Divider()
@@ -1828,7 +1828,7 @@ struct TaskListView: View {
       Button(RegistrySurfaces.taskAttribute("when").label) { openWhenForSelected() }
       Button("Copy") { copyTasks(orderedActionIDs()) }
       Button(RegistryActions.title("task.move", .short)) { openMoveForSelected() }
-      Button("Complete") { toggleSelected() }
+      Button(RegistryActions.title("task.toggleComplete", .short)) { toggleSelected() }
       Button("Delete", role: .destructive) { deleteSelected() }
     }
     .padding(.horizontal, Theme.hPadding)

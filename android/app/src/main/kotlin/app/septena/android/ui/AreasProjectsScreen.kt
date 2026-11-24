@@ -1,7 +1,10 @@
 package app.septena.android.ui
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -40,7 +43,10 @@ import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryPlacesScreenIds
 import app.septena.core.generated.RegistryPromptIds
 import app.septena.core.generated.RegistryTaskAttributeIds
+import app.septena.ui.SELECTION_WASH_ALPHA
 import app.septena.ui.TaskRowActionsMenu
+import app.septena.ui.TaskSelection
+import app.septena.ui.selectableTaskRow
 import app.septena.ui.TaskRowMenuAction
 
 /** Detail content for an area or project. The shell owns navigation and routes callbacks to these details. */
@@ -54,6 +60,7 @@ fun AreasProjectsScreen(
     rowMenuGroups: List<List<TaskRowMenuAction>> = emptyList(),
     rowMenuAccessibilityLabel: String = "",
     onTaskAction: (String, String) -> Unit = { _, _ -> },
+    selection: TaskSelection = TaskSelection(),
 ) {
     val factory = remember(graph) { AreasProjectsViewModel.Factory(graph) }
     val viewModel: AreasProjectsViewModel = viewModel(key = destination.key, factory = factory)
@@ -155,7 +162,7 @@ fun AreasProjectsScreen(
                         }
                     } else {
                         items(state.areaTasks, key = { "task:${it.id}" }) { task ->
-                            PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, onOpenTask, onTaskAction)
+                            PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, selection, onOpenTask, onTaskAction)
                         }
                     }
                 }
@@ -190,7 +197,7 @@ fun AreasProjectsScreen(
                     }
                     if (state.unsectionedTasks.isNotEmpty()) {
                         items(state.unsectionedTasks, key = { "task:${it.id}" }) { task ->
-                            PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, onOpenTask, onTaskAction)
+                            PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, selection, onOpenTask, onTaskAction)
                         }
                     }
                     if (state.sections.isEmpty()) {
@@ -211,6 +218,7 @@ fun AreasProjectsScreen(
                                 onOpenTask = onOpenTask,
                                 rowMenuGroups = rowMenuGroups,
                                 rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                                selection = selection,
                                 onTaskAction = onTaskAction,
                                 onRename = { dialog = PlacesDialog.RenameSection(section.id, section.title) },
                                 onDelete = { dialog = PlacesDialog.DeleteSection(section.id) },
@@ -298,22 +306,34 @@ private fun QuickAddRow(
 }
 
 @Composable
-@OptIn(ExperimentalFoundationApi::class)
 private fun PlaceTaskItem(
     task: PlaceTaskRow,
     rowMenuGroups: List<List<TaskRowMenuAction>>,
     rowMenuAccessibilityLabel: String,
+    selection: TaskSelection,
     onOpenTask: (String) -> Unit,
     onTaskAction: (String, String) -> Unit,
 ) {
     var menuExpanded by remember(task.id) { mutableStateOf(false) }
+    val selected = task.id in selection.selectedIds
     ListItem(
         headlineContent = { Text(task.title) },
-        modifier = Modifier.fillMaxWidth().combinedClickable(
-            onClick = { onOpenTask(task.id) },
-            onLongClick = { menuExpanded = true },
-        ),
-        trailingContent = if (rowMenuGroups.isNotEmpty()) {
+        colors = if (selected) {
+            ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = SELECTION_WASH_ALPHA))
+        } else {
+            ListItemDefaults.colors()
+        },
+        leadingContent = if (selection.isActive) {
+            {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = { selection.onToggle(task.id) },
+                    modifier = Modifier.semantics { contentDescription = selection.toggleLabel },
+                )
+            }
+        } else null,
+        modifier = Modifier.fillMaxWidth().selectableTaskRow(task.id, selection, onOpenTask, onMenu = { menuExpanded = true }),
+        trailingContent = if (rowMenuGroups.isNotEmpty() && !selection.isActive) {
             {
                 TaskRowActionsMenu(
                     groups = rowMenuGroups.map { group ->
@@ -344,6 +364,7 @@ private fun PlaceSectionBlock(
     onOpenTask: (String) -> Unit,
     rowMenuGroups: List<List<TaskRowMenuAction>>,
     rowMenuAccessibilityLabel: String,
+    selection: TaskSelection,
     onTaskAction: (String, String) -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
@@ -362,7 +383,7 @@ private fun PlaceSectionBlock(
             Text(surfaceText(RegistryPlacesScreenIds.EMPTY_SECTION_TASKS, "title", languageTag), modifier = Modifier.padding(start = 12.dp))
         } else {
             section.tasks.forEach { task ->
-                PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, onOpenTask, onTaskAction)
+                PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, selection, onOpenTask, onTaskAction)
             }
         }
         QuickAddRow(

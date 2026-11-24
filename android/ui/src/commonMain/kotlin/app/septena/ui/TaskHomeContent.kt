@@ -18,13 +18,12 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +54,37 @@ data class TaskListItem(
     val groupTitle: String? = null,
 )
 
+/**
+ * Multi-select state a host hands to a task list. A long-press starts the
+ * selection with that row; while any row is selected, a tap adds or removes a
+ * row instead of opening it. The host owns the ids and the action bar.
+ */
+data class TaskSelection(
+    val selectedIds: Set<String> = emptySet(),
+    /** False where the registry offers no Select (Recently Deleted): long-press opens the row menu there. */
+    val enabled: Boolean = false,
+    /** Accessibility label of the selection checkbox (registry copy). */
+    val toggleLabel: String = "",
+    val onToggle: (String) -> Unit = {},
+) {
+    val isActive: Boolean get() = selectedIds.isNotEmpty()
+}
+
+/** Tap opens the task, or toggles it while a selection is active; long-press selects it. */
+@OptIn(ExperimentalFoundationApi::class)
+fun Modifier.selectableTaskRow(
+    taskId: String,
+    selection: TaskSelection,
+    onOpen: (String) -> Unit,
+    onMenu: () -> Unit,
+): Modifier = combinedClickable(
+    onClick = { if (selection.isActive) selection.onToggle(taskId) else onOpen(taskId) },
+    onLongClick = { if (selection.enabled) selection.onToggle(taskId) else onMenu() },
+)
+
+/** The selection wash on a selected row: the accent at low strength, ink stays normal. */
+const val SELECTION_WASH_ALPHA = 0.14f
+
 data class TaskRowMenuAction(
     val id: String,
     val title: String,
@@ -66,8 +96,6 @@ data class TaskRowMenuAction(
 /** Portable task-list surface. Platform hosts provide registry copy and bind actions to their mutators. */
 @Composable
 fun TaskHomeContent(
-    quickAddTitle: String,
-    quickAddSubmitTitle: String,
     completeTitle: String,
     emptyTitle: String,
     emptyDescription: String,
@@ -79,15 +107,12 @@ fun TaskHomeContent(
     inboxTasks: List<TaskListItem>,
     tasks: List<TaskListItem>,
     canQuickAdd: Boolean,
-    isDraftOpen: Boolean,
     canComplete: Boolean,
-    draftTitle: String,
     errorMessage: String?,
     rowMenuGroups: List<List<TaskRowMenuAction>>,
     rowMenuAccessibilityLabel: String,
     modifier: Modifier = Modifier,
-    onDraftTitleChange: (String) -> Unit,
-    onQuickAdd: () -> Unit,
+    selection: TaskSelection = TaskSelection(),
     onComplete: (String) -> Unit,
     onOpenTask: (String) -> Unit,
     onTaskAction: (String, String) -> Unit,
@@ -102,7 +127,7 @@ fun TaskHomeContent(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            if (isToday && (inboxTasks.isNotEmpty() || (canQuickAdd && isDraftOpen))) {
+            if (isToday && inboxTasks.isNotEmpty()) {
                 item(key = "inbox-band-title") {
                     Text(
                         text = inboxBandTitle,
@@ -125,18 +150,9 @@ fun TaskHomeContent(
                     onOpenTask = onOpenTask,
                     rowMenuGroups = rowMenuGroups,
                     rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    selection = selection,
                     onTaskAction = onTaskAction,
                 )
-            }
-            if (isToday && canQuickAdd && isDraftOpen) {
-                item(key = "inbox-capture") {
-                    QuickAddRow(quickAddTitle, quickAddSubmitTitle, draftTitle, onDraftTitleChange, onQuickAdd)
-                }
-            }
-            if (!isToday && canQuickAdd && isDraftOpen) {
-                item(key = "list-capture") {
-                    QuickAddRow(quickAddTitle, quickAddSubmitTitle, draftTitle, onDraftTitleChange, onQuickAdd)
-                }
             }
             if (hasLoaded && !canQuickAdd && tasks.isEmpty() && inboxTasks.isEmpty() && emptyTitle.isNotBlank()) {
                 item(key = "empty-state") {
@@ -173,6 +189,7 @@ fun TaskHomeContent(
                 onOpenTask = onOpenTask,
                 rowMenuGroups = rowMenuGroups,
                 rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                selection = selection,
                 onTaskAction = onTaskAction,
             )
         }
@@ -191,6 +208,7 @@ private fun LazyListScope.taskRows(
     onOpenTask: (String) -> Unit,
     rowMenuGroups: List<List<TaskRowMenuAction>>,
     rowMenuAccessibilityLabel: String,
+    selection: TaskSelection,
     onTaskAction: (String, String) -> Unit,
 ) {
     itemsIndexed(tasks, key = { _, task -> "$keyPrefix:${task.id}" }) { index, task ->
@@ -214,6 +232,7 @@ private fun LazyListScope.taskRows(
             onOpenTask = onOpenTask,
             rowMenuGroups = rowMenuGroups,
             rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+            selection = selection,
             onTaskAction = onTaskAction,
         )
         if (index < tasks.lastIndex) {
@@ -221,31 +240,6 @@ private fun LazyListScope.taskRows(
                 modifier = Modifier.padding(start = 72.dp, end = 16.dp),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
             )
-        }
-    }
-}
-
-@Composable
-private fun QuickAddRow(
-    quickAddTitle: String,
-    submitTitle: String,
-    draftTitle: String,
-    onDraftTitleChange: (String) -> Unit,
-    onQuickAdd: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        OutlinedTextField(
-            value = draftTitle,
-            onValueChange = onDraftTitleChange,
-            modifier = Modifier.weight(1f),
-            singleLine = true,
-            label = { Text(quickAddTitle) },
-        )
-        TextButton(enabled = draftTitle.isNotBlank(), onClick = onQuickAdd) {
-            Text(submitTitle)
         }
     }
 }
@@ -263,14 +257,24 @@ private fun TaskRow(
     onOpenTask: (String) -> Unit,
     rowMenuGroups: List<List<TaskRowMenuAction>>,
     rowMenuAccessibilityLabel: String,
+    selection: TaskSelection,
     onTaskAction: (String, String) -> Unit,
 ) {
     val showToday = showTodayIndicator && task.isOnToday && !task.isCompleted
     var menuExpanded by remember(task.id) { mutableStateOf(false) }
+    val selecting = selection.isActive
+    val selected = task.id in selection.selectedIds
     ListItem(
-        modifier = Modifier.fillMaxWidth().alpha(task.opacity).combinedClickable(
-            onClick = { onOpenTask(task.id) },
-            onLongClick = { menuExpanded = true },
+        colors = if (selected) {
+            ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = SELECTION_WASH_ALPHA))
+        } else {
+            ListItemDefaults.colors()
+        },
+        modifier = Modifier.fillMaxWidth().alpha(task.opacity).selectableTaskRow(
+            taskId = task.id,
+            selection = selection,
+            onOpen = onOpenTask,
+            onMenu = { menuExpanded = true },
         ),
         headlineContent = {
             Text(
@@ -294,7 +298,7 @@ private fun TaskRow(
         } else {
             null
         },
-        trailingContent = if (showToday || task.agentName != null || rowMenuGroups.isNotEmpty()) {
+        trailingContent = if (showToday || task.agentName != null || (rowMenuGroups.isNotEmpty() && !selecting)) {
             {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -317,7 +321,7 @@ private fun TaskRow(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    if (rowMenuGroups.isNotEmpty()) {
+                    if (rowMenuGroups.isNotEmpty() && !selecting) {
                         TaskRowActionsMenu(
                             groups = rowMenuGroups.map { group ->
                                 group.map { action ->
@@ -338,7 +342,15 @@ private fun TaskRow(
         } else {
             null
         },
-        leadingContent = if (canComplete || task.isCompleted) {
+        leadingContent = if (selecting) {
+            {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = { selection.onToggle(task.id) },
+                    modifier = Modifier.semantics { contentDescription = selection.toggleLabel },
+                )
+            }
+        } else if (canComplete || task.isCompleted) {
             {
                 Checkbox(
                     checked = task.isCompleted,

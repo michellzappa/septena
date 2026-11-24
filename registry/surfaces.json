@@ -404,6 +404,10 @@
     "id": "taskRowMenu",
     "accessibilityLabel": "Task actions"
   },
+  "taskSelection": {
+    "id": "taskSelection",
+    "format": "{count} selected"
+  },
   "taskDetail": {
     "id": "taskDetail",
     "title": "Task Details",
