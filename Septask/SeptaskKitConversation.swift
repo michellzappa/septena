@@ -326,8 +326,8 @@ final class KitConversationView: NSView {
     label.font = SeptaskKitTheme.chip
     label.textColor = SeptaskKitTheme.inkSecondary
     let title = stopped
-      ? String(localized: "Resume", comment: "SeptaskKit: let agents work this task again")
-      : String(localized: "Stop", comment: "SeptaskKit: stop agent work on this task")
+      ? RegistryActions.title("task.conversation.stop", .active)
+      : RegistryActions.title("task.conversation.stop")
     let button = NSButton(title: title, target: self, action: #selector(toggleStopped))
     button.bezelStyle = .rounded
     button.controlSize = .small

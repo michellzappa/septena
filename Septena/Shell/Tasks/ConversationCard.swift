@@ -150,14 +150,14 @@ struct ConversationCard: View {
         Label("Agent work stopped", systemImage: "stop.circle")
           .font(.caption).foregroundStyle(.secondary)
         Spacer(minLength: 0)
-        Button("Resume") { setStopped(false) }
+        Button(RegistryActions.title("task.conversation.stop", .active)) { setStopped(false) }
           .font(.caption).buttonStyle(.borderless)
       } else {
         Label(convo.isClaimed(at: DayClock.appNow) ? "Claude is working…" : "Waiting for Claude",
               systemImage: "ellipsis.bubble")
           .font(.caption).foregroundStyle(.secondary)
         Spacer(minLength: 0)
-        Button("Stop", role: .destructive) { setStopped(true) }
+        Button(RegistryActions.title("task.conversation.stop"), role: .destructive) { setStopped(true) }
           .font(.caption).buttonStyle(.borderless)
       }
     }

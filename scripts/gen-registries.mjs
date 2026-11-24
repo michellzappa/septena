@@ -1592,6 +1592,12 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const k of ["askKicker", "reviewKicker", "reviewFallback", "acceptedLabel"]) {
     lines.push(`  static let agentPrompt${k[0].toUpperCase()}${k.slice(1)}: String = ${L(convoBlock[k], convoBlock, k)}`);
   }
+  const qf = surfaces.quickFind;
+  lines.push("  /// Quick Find copy (`surfaces.json` `quickFind`).");
+  lines.push(`  static let quickFindPlaceholder: String = ${L(qf.placeholder, qf, "placeholder")}`);
+  lines.push(`  static let quickFindEmptyTitle: String = ${L(qf.emptyState.title, qf.emptyState, "title")}`);
+  lines.push(`  static let quickFindEmptyDetail: String = ${L(qf.emptyState.detail, qf.emptyState, "detail")}`);
+  lines.push(`  static let quickFindCompletedLabel: String = ${L(qf.completed.label, qf.completed, "label")}`);
   lines.push("  /// The block of `kind`. Each kind appears exactly once (the generator checks it).");
   lines.push("  static func taskPageBlock(_ kind: RegistryTaskPageBlockKind) -> RegistryTaskPageBlock {");
   lines.push("    guard let b = taskPageBlocks.first(where: { $0.kind == kind }) else { preconditionFailure(\"no task page block \\(kind)\") }");

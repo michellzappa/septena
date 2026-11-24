@@ -376,7 +376,7 @@ struct SeptenaToastCapsule: View {
         .lineLimit(1)
       if let undo = toast.undo {
         Spacer(minLength: 0)
-        Button("Undo") {
+        Button(RegistryActions.title("app.undo")) {
           undo()
           store.dismiss()
         }
