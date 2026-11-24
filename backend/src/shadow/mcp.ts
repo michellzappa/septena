@@ -70,6 +70,9 @@ const INSTRUCTIONS =
   "tasks and their conversations. It is the same data the user's Septena app shows, " +
   "and changes reach the app within seconds.\n\n" +
   "Before you create a task, call tasks_search to check that it does not exist yet.\n\n" +
+  "Septena sets no limit on parallel calls. Some agent hosts refuse calls beyond their own limit (for example " +
+  "\"too many calls already running\"): create many tasks one after another or in small groups, and call " +
+  "tasks_search before you retry a refused create, so it does not land twice.\n\n" +
   "Working a task as an agent: find work with tasks_pending_reasoning (or tasks_agent_events with a cursor), " +
   "tasks_claim it with your agent name before you write, renew the claim while you work, write each step as a " +
   "conversation turn, and tasks_release with one line on what you did. Ask the user with a provider turn that has " +

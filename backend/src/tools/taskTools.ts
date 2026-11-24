@@ -138,7 +138,7 @@ export const TASK_TOOLS: Tool[] = [
   {
     name: "tasks_create",
     title: "Create task",
-    description: "Create a new Septena task. Call tasks_search first so you do not create a duplicate. Returns the new id and its placement. Set `origin` to declare provenance: `user_request` when the user explicitly asked (lands committed, placed where specified) or `agent_suggestion` when you surfaced it yourself (lands as a PROPOSAL in the user's inbox to review). Omit → Septena files it as a proposal (secure by default).",
+    description: "Create a new Septena task. Call tasks_search first so you do not create a duplicate. Returns the new id and its placement. Set `origin` to declare provenance: `user_request` when the user explicitly asked (lands committed, placed where specified) or `agent_suggestion` when you surfaced it yourself (lands as a PROPOSAL in the user's inbox to review). Omit → Septena files it as a proposal (secure by default). Septena sets no limit on parallel calls, but some hosts do: for many tasks, create them in sequence or small groups and tasks_search before you retry a refused create.",
     inputSchema: createTaskJsonSchema,
     annotations: { title: "Create task", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   },
