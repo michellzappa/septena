@@ -25,7 +25,8 @@ describe("Checklists (1-level subtasks, CL0 #153)", () => {
       readChecklistItems: async (taskId: string) => store.readChecklistItems(taskId),
       readChecklistItem: async (id: string) => store.readChecklistItem(id),
       readChecklistCounts: async () => store.readChecklistCounts(),
-      readConvoLinks: async () => store.readConvoLinks(),
+      readTaskLinks: async () => store.readTaskLinks(),
+      readTaskRefs: async (id: string) => store.readTaskRefs(id),
       readOrderTop: async () => store.readOrderTop(),
       push: async (ops: Parameters<typeof store.push>[0], actor: string) => store.push(ops, actor),
     };
@@ -76,7 +77,8 @@ describe("Checklists (1-level subtasks, CL0 #153)", () => {
       readChecklistItems: async (taskId: string) => store.readChecklistItems(taskId),
       readChecklistItem: async (id: string) => store.readChecklistItem(id),
       readChecklistCounts: async () => store.readChecklistCounts(),
-      readConvoLinks: async () => store.readConvoLinks(),
+      readTaskLinks: async () => store.readTaskLinks(),
+      readTaskRefs: async (id: string) => store.readTaskRefs(id),
       readOrderTop: async () => store.readOrderTop(),
       push: async (ops: Parameters<typeof store.push>[0], actor: string) => store.push(ops, actor),
     };

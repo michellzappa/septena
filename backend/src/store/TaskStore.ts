@@ -4,20 +4,25 @@ import {
   ENTITIES,
   ENTITY_NAMES,
   MAX_CHECKLIST_ITEMS_PER_TASK,
+  MAX_REFS_PER_TASK,
   MAX_TAGS_PER_TASK,
   MAX_USER_ATTACHMENT_BYTES,
   addMissingColumnsSQL,
   createTableSQL,
   decodeRow,
   encodeValue,
+  snapshotFits,
   type EntityName,
   type EntitySpec,
+  type RefSnapshot,
 } from "./columns.js";
+import { CoreInputError, findIssueRefs, parseRef, taskRefId, type CoreRef } from "../core/index.js";
 import type { Op, OpResult, PullResult, PushResult, Turn } from "./ops.js";
 import type { EntitlementRow } from "../entitlement/entitlement.js";
 import type { IcalTask } from "../ical.js";
 import { DOMAIN_RULES, ENTITY_LIMITS, TURN_FIELDS } from "../generated/registries.js";
 import { MCP_REFRESH_TTL_S } from "../shadow/tokens.js";
+import { logEvent } from "../util.js";
 
 /// Task fields only the app writes (docs/TASK_FADE_SPEC.md §3): the fade
 /// clock and its outcome. An agent cannot keep a task alive by touching it.
@@ -185,17 +190,27 @@ function decodeTurnRow(raw: Record<string, unknown>): Record<string, unknown> {
   return row;
 }
 
-/// An open task with a conversation, as the agent queue reads it.
-/// `readConvoLinks`: the conversation text that can name a GitHub issue.
-export type ConvoLinkRow = {
+/// One task's references and end state, as a list row shows them.
+export type TaskLinkRow = {
   id: string;
   endState: string | null;
-  endStateNote: string | null;
-  artifact: { title?: string; body?: string; refs?: string[] } | null;
-  handoffPayload: string | null;
-  turnText: string | null;
+  refCount: number;
+  /// The newest `issue` reference: the last one added.
+  issue: { key: string; snapshot: RefSnapshot | null } | null;
 };
 
+/// A task that points at a key (`findByRef`).
+export type RefHit = {
+  id: string;
+  title: string;
+  status: string;
+  area: string | null;
+  project: string | null;
+  faded: boolean;
+  role: string;
+};
+
+/// An open task with a conversation, as the agent queue reads it.
 export type ConvoCandidate = {
   id: string; title: string | null; confirmedIntent: string | null;
   assignee: string | null; endState: string | null;
@@ -234,6 +249,55 @@ export class TaskStore extends DurableObject<Env> {
     if (!changeCols.has("diff")) this.sql.exec("ALTER TABLE changes ADD COLUMN diff TEXT");
     if (!changeCols.has("reason")) this.sql.exec("ALTER TABLE changes ADD COLUMN reason TEXT");
     if (this.meta("notesV1") === 0) this.ctx.storage.transactionSync(() => this.migrateNotesV1());
+    if (this.meta("issueRefsV1") === 0) {
+      // A store must open even when this fails. The next start tries again.
+      try {
+        this.ctx.storage.transactionSync(() => {
+          this.backfillIssueRefs();
+          this.setMeta("issueRefsV1", 1);
+        });
+      } catch (e) {
+        logEvent("issue_refs_backfill_failed", { error: e instanceof CoreInputError ? e.message : "unexpected" });
+      }
+    }
+  }
+
+  /// One time (docs/TASK_REFERENCES_SPEC.md §6.6, ADR 0033): every task whose
+  /// conversation text names a GitHub issue or pull request gets one `about`
+  /// reference to it. The search order is the app's `TaskConvo.linkedIssue`:
+  /// artifact refs, body and title, the handoff payload, the end-state note,
+  /// then the newest provider turn (note, then question). It runs again
+  /// without effect. Returns how many references it added.
+  backfillIssueRefs(): number {
+    const now = new Date().toISOString();
+    const tasks = this.sql.exec<{ id: string; artifact: string | null; handoff: string | null; endStateNote: string | null }>(`
+      SELECT t.id AS id, c.artifact AS artifact, c.handoff AS handoff, c.endStateNote AS endStateNote
+      FROM tasks t LEFT JOIN convos c ON c.id = t.id AND c.deletedAt IS NULL
+      WHERE t.deletedAt IS NULL
+        AND (c.artifact LIKE '%github.com%' OR c.handoff LIKE '%github.com%' OR c.endStateNote LIKE '%github.com%'
+             OR EXISTS (SELECT 1 FROM turns WHERE taskId = t.id AND role = 'provider'
+                          AND (note LIKE '%github.com%' OR question LIKE '%github.com%')))
+      ORDER BY t.rev
+    `).toArray();
+    let added = 0;
+    for (const t of tasks) {
+      const artifact = t.artifact ? (JSON.parse(t.artifact) as { title?: string; body?: string; refs?: string[] }) : null;
+      const handoff = t.handoff ? (JSON.parse(t.handoff) as { payload?: string }) : null;
+      const texts: (string | null | undefined)[] = [
+        ...(artifact?.refs ?? []), artifact?.body, artifact?.title, handoff?.payload, t.endStateNote,
+      ];
+      const turns = this.sql.exec<{ note: string | null; question: string | null }>(
+        "SELECT note, question FROM turns WHERE taskId = ? AND role = 'provider' ORDER BY seq DESC", t.id,
+      ).toArray();
+      for (const turn of turns) texts.push(turn.note, turn.question);
+      for (const text of texts) {
+        const [ref] = text ? findIssueRefs(text) : [];
+        if (!ref) continue;
+        if (this.addIssueRef(t.id, ref, "system:migration", now)) added++;
+        break;
+      }
+    }
+    return added;
   }
 
   /// One time (ADR 0012): give every existing note a first revision, then
@@ -335,6 +399,10 @@ export class TaskStore extends DurableObject<Env> {
         id TEXT PRIMARY KEY, source TEXT NOT NULL, productId TEXT, expiresAt INTEGER,
         originalTransactionId TEXT, status TEXT NOT NULL, environment TEXT, note TEXT,
         signedAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS task_ref_removals (
+        taskId TEXT NOT NULL, key TEXT NOT NULL, at TEXT NOT NULL,
+        PRIMARY KEY (taskId, key)
       );
       CREATE TABLE IF NOT EXISTS ical_feed (
         id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -486,12 +554,6 @@ export class TaskStore extends DurableObject<Env> {
     }
     if (op.op === "appendTurn") return this.appendTurn(op.clientOpId, op.taskId, op.turn, actor, now);
 
-    // A key must be in normal form, and the core that normalises it is not
-    // pinned yet (core/release/README.md).
-    if (op.op === "upsert" && op.entity === "taskRef") {
-      return { clientOpId: op.clientOpId, status: "rejected", reason: "not_supported:taskRef" };
-    }
-
     const spec: EntitySpec = ENTITIES[op.entity];
     const row = this.sql.exec(`SELECT * FROM ${spec.table} WHERE id = ?`, op.id).toArray()[0];
 
@@ -512,6 +574,11 @@ export class TaskStore extends DurableObject<Env> {
         this.tombstoneConvo(op.id, now);
         purgedAttachmentIds.push(...this.tombstoneAttachments(op.id, now));
         this.tombstoneChecklistItems(op.id, now);
+        this.tombstoneTaskRefs(op.id, now);
+      }
+      if (op.entity === "taskRef" && !isAgentActor(actor)) {
+        // A user's own removal wins over every automatic add (§6.6).
+        this.sql.exec("INSERT OR REPLACE INTO task_ref_removals (taskId, key, at) VALUES (?, ?, ?)", gone.taskId, gone.key, now);
       }
       return { clientOpId: op.clientOpId, status: "applied", rev };
     }
@@ -527,7 +594,10 @@ export class TaskStore extends DurableObject<Env> {
       }
     }
 
+    if (op.entity === "taskRef" && row && !row.deletedAt) this.dropSameRefIdentity(op, row as Record<string, unknown>);
     const names = Object.keys(op.fields);
+    // Columns only the store writes, set when the row is inserted.
+    let owned: Record<string, unknown> = {};
     if (row?.deletedAt) {
       const rev = this.nextRev();
       this.log(rev, op.entity, op.id, "dropped", names, op.clientOpId, actor, now, this.diffFor(null, op.fields));
@@ -552,6 +622,21 @@ export class TaskStore extends DurableObject<Env> {
         ).one().n;
         if (count >= MAX_CHECKLIST_ITEMS_PER_TASK) {
           return { clientOpId: op.clientOpId, status: "rejected", reason: "checklist_limit_exceeded" };
+        }
+      }
+      if (op.entity === "taskRef") {
+        const taskId = op.fields.taskId as string;
+        const ref = this.parseKey(op.fields.key as string);
+        if (!ref) return { clientOpId: op.clientOpId, status: "rejected", reason: "invalid_key" };
+        if (!this.liveTask(taskId)) return { clientOpId: op.clientOpId, status: "rejected", reason: "unknown_task" };
+        if (this.hasLiveRef(taskId, ref.key)) return { clientOpId: op.clientOpId, status: "rejected", reason: "duplicate_ref" };
+        if (this.liveRefCount(taskId) >= MAX_REFS_PER_TASK) {
+          return { clientOpId: op.clientOpId, status: "rejected", reason: "ref_limit_exceeded" };
+        }
+        op.fields.key = ref.key;
+        owned = { kind: ref.kind, createdBy: actor, ...(op.fields.createdAt ? {} : { createdAt: now }) };
+        if (!isAgentActor(actor)) {
+          this.sql.exec("DELETE FROM task_ref_removals WHERE taskId = ? AND key = ?", taskId, ref.key);
         }
       }
     } else {
@@ -590,8 +675,9 @@ export class TaskStore extends DurableObject<Env> {
     const rev = this.nextRev();
     const cols = Object.entries(spec.columns);
     if (!row) {
-      const insertCols = cols.filter(([n, c]) => op.fields[n] !== undefined || c.dflt !== undefined);
-      const values = insertCols.map(([n, c]) => (op.fields[n] !== undefined ? encodeValue(c, op.fields[n]) : c.dflt ?? null));
+      const inserted: Record<string, unknown> = { ...op.fields, ...owned };
+      const insertCols = cols.filter(([n, c]) => inserted[n] !== undefined || c.dflt !== undefined);
+      const values = insertCols.map(([n, c]) => (inserted[n] !== undefined ? encodeValue(c, inserted[n]) : c.dflt ?? null));
       const colList = insertCols.map(([n]) => `"${n}"`).concat(["id", "rev", "updatedAt"]).join(", ");
       const marks = insertCols.map(() => "?").concat(["?", "?", "?"]).join(", ");
       this.sql.exec(`INSERT INTO ${spec.table} (${colList}) VALUES (${marks})`, ...values, op.id, rev, now);
@@ -608,6 +694,16 @@ export class TaskStore extends DurableObject<Env> {
       if (field in op.fields && next !== ((before?.[field] as string | null | undefined) ?? null)) {
         this.recordNoteRevision(noteContainer, op.id, next, actor, now, (row?.noteRev as number | null) ?? 0, this.reason);
       }
+    }
+    if (isAgentActor(actor) && op.entity === "convo") {
+      const { artifact, handoff, endStateNote } = op.fields as {
+        artifact?: { title?: string; body?: string; refs?: string[] } | null;
+        handoff?: { instruction?: string; payload?: string } | null;
+        endStateNote?: string | null;
+      };
+      this.addWrittenIssueRefs(op.id, [
+        ...(artifact?.refs ?? []), artifact?.body, artifact?.title, handoff?.payload, handoff?.instruction, endStateNote,
+      ], actor, now);
     }
     if (isAgentActor(actor) && op.entity === "convo" && op.fields.endState === "needs_verify") {
       // Handing off to Review puts the ball in the human's court, so the claim ends.
@@ -632,8 +728,10 @@ export class TaskStore extends DurableObject<Env> {
       : (op.entity === "task" || op.entity === "convo") ? op.id
       : op.entity === "attachment" && op.op === "upsert" ? (op.fields.taskId as string | undefined) ?? null
       : op.entity === "checklistItem" ? this.checklistItemTaskId(op)
+      : op.entity === "taskRef" ? this.taskRefTaskId(op)
       : null;
     if (taskId && this.convoStopped(taskId)) return "stopped";
+    if (op.op !== "appendTurn" && op.entity === "taskRef" && this.readSetting("agentsPaused") === true) return "paused";
     if (op.op === "upsert" && op.entity === "task" && op.fields.status === "done" && this.convoRequiresHumanAccept(op.id)) {
       return "human_accepts";
     }
@@ -705,6 +803,114 @@ export class TaskStore extends DurableObject<Env> {
     return null;
   }
 
+  // ---- task references (docs/TASK_REFERENCES_SPEC.md, ADR 0031) ----
+
+  /// A permanently deleted task takes its references with it.
+  private tombstoneTaskRefs(taskId: string, now: string): void {
+    const ids = this.sql.exec<{ id: string }>(
+      "SELECT id FROM task_refs WHERE taskId = ? AND deletedAt IS NULL", taskId,
+    ).toArray().map((r) => r.id);
+    for (const id of ids) {
+      const rev = this.nextRev();
+      this.sql.exec("UPDATE task_refs SET deletedAt = ?, rev = ?, updatedAt = ? WHERE id = ?", now, rev, now, id);
+    }
+  }
+
+  /// The task of a reference op. The stored row decides, never the push.
+  private taskRefTaskId(op: Extract<Op, { op: "upsert" | "delete" }>): string | null {
+    const row = this.sql.exec<{ taskId: string }>("SELECT taskId FROM task_refs WHERE id = ?", op.id).toArray()[0];
+    if (row) return row.taskId;
+    return op.op === "upsert" && typeof op.fields.taskId === "string" ? op.fields.taskId : null;
+  }
+
+  /// The core's parse of a key, or null when it is not valid.
+  private parseKey(key: string): CoreRef | null {
+    try {
+      return parseRef(key);
+    } catch (e) {
+      if (e instanceof CoreInputError) return null;
+      throw e;
+    }
+  }
+
+  private hasLiveRef(taskId: string, key: string): boolean {
+    return this.sql.exec("SELECT 1 FROM task_refs WHERE taskId = ? AND key = ? AND deletedAt IS NULL", taskId, key).toArray().length > 0;
+  }
+
+  private liveRefCount(taskId: string): number {
+    return this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM task_refs WHERE taskId = ? AND deletedAt IS NULL", taskId).one().n;
+  }
+
+  /// Two offline devices that add one reference mint one id (§4), so the
+  /// second insert arrives as an update of the same task and key. Its
+  /// identity fields say nothing new; the rest is an ordinary update.
+  private dropSameRefIdentity(op: Extract<Op, { op: "upsert" }>, row: Record<string, unknown>): void {
+    const { taskId, key } = op.fields;
+    if (taskId !== row.taskId || typeof key !== "string" || this.parseKey(key)?.key !== row.key) return;
+    const { taskId: _t, key: _k, createdAt: _c, ...rest } = op.fields;
+    op.fields = rest;
+  }
+
+  /// The id of the next reference of this task to this key. Purged
+  /// tombstones lower the count, so an id in use moves on to the next one.
+  newRefId(taskId: string, key: string): string {
+    let n = this.sql.exec<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM task_refs WHERE taskId = ? AND key = ? AND deletedAt IS NOT NULL", taskId, key,
+    ).one().n;
+    for (;;) {
+      const id = taskRefId(taskId, key, n++);
+      if (this.sql.exec("SELECT 1 FROM task_refs WHERE id = ?", id).toArray().length === 0) return id;
+    }
+  }
+
+  /// Adds the `issue` references an agent wrote as URLs into a conversation
+  /// (§6.6), up to the limit. The first link in the text is added last, so it
+  /// is the task's newest issue, as the text parser had it.
+  private addWrittenIssueRefs(taskId: string, texts: (string | null | undefined)[], actor: string, now: string): void {
+    const refs = new Map<string, CoreRef>();
+    for (const text of texts) {
+      if (!text) continue;
+      for (const ref of findIssueRefs(text)) if (!refs.has(ref.key)) refs.set(ref.key, ref);
+    }
+    if (refs.size === 0 || this.readSetting("agentsPaused") === true || !this.liveTask(taskId)) return;
+    const room = Math.max(0, MAX_REFS_PER_TASK - this.liveRefCount(taskId));
+    const fresh = [...refs.values()].filter((r) => this.mayAddIssueRef(taskId, r.key)).slice(0, room);
+    for (const ref of fresh.reverse()) this.addIssueRef(taskId, ref, actor, now);
+  }
+
+  /// False when the task has the key, or a user removed it.
+  private mayAddIssueRef(taskId: string, key: string): boolean {
+    return !this.hasLiveRef(taskId, key)
+      && this.sql.exec("SELECT 1 FROM task_ref_removals WHERE taskId = ? AND key = ?", taskId, key).toArray().length === 0;
+  }
+
+  /// One `about` reference to an issue, as its own rev. False when the task
+  /// may not get it.
+  private addIssueRef(taskId: string, ref: CoreRef, actor: string, now: string): boolean {
+    if (!this.mayAddIssueRef(taskId, ref.key) || this.liveRefCount(taskId) >= MAX_REFS_PER_TASK) return false;
+    const snapshot: RefSnapshot = {
+      ...(ref.url ? { url: ref.url } : {}),
+      ...(ref.rawId !== ref.id ? { rawId: ref.rawId } : {}),
+    };
+    const top = this.sql.exec<{ m: number | null }>(
+      "SELECT MAX(position) AS m FROM task_refs WHERE taskId = ? AND deletedAt IS NULL", taskId,
+    ).one().m ?? 0;
+    const fields: Record<string, unknown> = {
+      taskId, key: ref.key, kind: ref.kind, role: "about",
+      snapshot: Object.keys(snapshot).length > 0 && snapshotFits(snapshot) ? snapshot : null,
+      position: top + 1024, createdBy: actor, createdAt: now,
+    };
+    const id = this.newRefId(taskId, ref.key);
+    const rev = this.nextRev();
+    const names = Object.keys(fields);
+    this.sql.exec(
+      `INSERT INTO task_refs (${names.map((n) => `"${n}"`).join(", ")}, id, rev, updatedAt) VALUES (${names.map(() => "?").join(", ")}, ?, ?, ?)`,
+      ...names.map((n) => encodeValue(ENTITIES.taskRef.columns[n as keyof typeof ENTITIES.taskRef.columns], fields[n])), id, rev, now,
+    );
+    this.log(rev, "taskRef", id, "upsert", names, null, actor, now, this.diffFor(null, fields));
+    return true;
+  }
+
   /// Returns a rejection reason, or null when the new attachment fits.
   private checkQuota(id: string, byteCount: number): string | null {
     const used = this.sql.exec<{ total: number | null }>(
@@ -733,6 +939,7 @@ export class TaskStore extends DurableObject<Env> {
       taskId, seq, ...values, rev, now,
     );
     this.log(rev, "turn", `${taskId}:${seq}`, "append", null, clientOpId, actor, now);
+    if (isAgentActor(actor)) this.addWrittenIssueRefs(taskId, [turn.note, turn.question], actor, now);
     if (!isAgentActor(actor) && turn.role === "user") {
       // The human spoke: the run budget starts over.
       this.writeConvoServerFields(taskId, { runsSinceUser: 0 }, "budget", actor, now, true);
@@ -1047,31 +1254,51 @@ export class TaskStore extends DurableObject<Env> {
     `).toArray();
   }
 
-  /// Per task, the conversation fields that can carry a GitHub link, plus the
-  /// end state: what `issueLink` (tools/taskShared.ts) reads to put `issue`
-  /// and `endState` on a list row. `turnText` is the newest provider turn
-  /// whose note or question names a github.com URL (note first).
-  readConvoLinks(): ConvoLinkRow[] {
-    return this.sql.exec(`
-      SELECT c.id AS id, c.endState AS endState, c.endStateNote AS endStateNote,
-             c.artifact AS artifact, c.handoff AS handoff,
-             (SELECT COALESCE(note, '') || ' ' || COALESCE(question, '') FROM turns
-                WHERE taskId = c.id AND role = 'provider'
-                  AND (note LIKE '%github.com/%' OR question LIKE '%github.com/%')
-                ORDER BY seq DESC LIMIT 1) AS turnText
-      FROM convos c
-      WHERE c.deletedAt IS NULL
-        AND (c.artifact IS NOT NULL OR c.handoff IS NOT NULL OR c.endState IS NOT NULL
-             OR EXISTS (SELECT 1 FROM turns WHERE taskId = c.id AND role = 'provider'
-                          AND (note LIKE '%github.com/%' OR question LIKE '%github.com/%')))
-    `).toArray().map((r) => ({
-      id: r.id as string,
-      endState: (r.endState as string | null) ?? null,
-      endStateNote: (r.endStateNote as string | null) ?? null,
-      artifact: r.artifact ? (JSON.parse(r.artifact as string) as ConvoLinkRow["artifact"]) : null,
-      handoffPayload: r.handoff ? ((JSON.parse(r.handoff as string) as { payload?: string }).payload ?? null) : null,
-      turnText: (r.turnText as string | null) ?? null,
+  /// Per task, what its list row says about references and its conversation:
+  /// the reference count, the newest `issue` reference and the end state.
+  /// Rows that would say nothing are left out.
+  readTaskLinks(): TaskLinkRow[] {
+    const out = new Map<string, TaskLinkRow>();
+    const row = (id: string): TaskLinkRow => {
+      let r = out.get(id);
+      if (!r) out.set(id, r = { id, endState: null, refCount: 0, issue: null });
+      return r;
+    };
+    for (const c of this.sql.exec<{ id: string; endState: string }>(
+      "SELECT id, endState FROM convos WHERE deletedAt IS NULL AND endState IS NOT NULL AND endState != 'open'",
+    )) row(c.id).endState = c.endState;
+    for (const c of this.sql.exec<{ taskId: string; n: number }>(
+      "SELECT taskId, COUNT(*) AS n FROM task_refs WHERE deletedAt IS NULL GROUP BY taskId",
+    )) row(c.taskId).refCount = c.n;
+    // rowid is the insert order. A later row replaces an earlier one.
+    for (const r of this.sql.exec<{ taskId: string; key: string; snapshot: string | null }>(
+      "SELECT taskId, key, snapshot FROM task_refs WHERE deletedAt IS NULL AND kind = 'issue' ORDER BY rowid",
+    )) row(r.taskId).issue = { key: r.key, snapshot: r.snapshot ? (JSON.parse(r.snapshot) as RefSnapshot) : null };
+    return [...out.values()];
+  }
+
+  /// A task's references, in order.
+  readTaskRefs(taskId: string): Row[] {
+    return this.sql.exec(
+      "SELECT * FROM task_refs WHERE taskId = ? AND deletedAt IS NULL ORDER BY position IS NULL, position, rowid", taskId,
+    ).toArray().map((r) => decodeRow(ENTITIES.taskRef, r) as Row);
+  }
+
+  /// The tasks that point at a key, active first, then the newest write
+  /// first. `key` is in normal form.
+  findByRef(key: string, limit: number): { tasks: RefHit[]; total: number } {
+    const from = `FROM task_refs r JOIN tasks t ON t.id = r.taskId
+      WHERE r.key = ? AND r.deletedAt IS NULL AND t.deletedAt IS NULL AND (t.kind IS NULL OR t.kind != 'heading')`;
+    const total = this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n ${from}`, key).one().n;
+    const tasks = this.sql.exec<Record<string, string | null>>(
+      `SELECT t.id, t.title, t.status, t.area, t.project, t.fadedAt, r.role ${from}
+       ORDER BY (t.status = 'open' AND t.fadedAt IS NULL) DESC, t.rev DESC LIMIT ?`,
+      key, Math.min(Math.max(limit, 1), 200),
+    ).toArray().map((r) => ({
+      id: r.id as string, title: r.title ?? "", status: r.status ?? "open", area: r.area, project: r.project,
+      faded: r.fadedAt !== null, role: r.role ?? "about",
     }));
+    return { tasks, total };
   }
 
   /// The lowest order key across live tasks, or null when there is none:
@@ -1688,6 +1915,7 @@ export class TaskStore extends DurableObject<Env> {
         this.sql.exec(`DELETE FROM ${table} WHERE deletedAt IS NOT NULL AND deletedAt < ?`, tombstoneCutoff);
       }
       this.sql.exec("DELETE FROM turns WHERE taskId NOT IN (SELECT id FROM tasks)");
+      this.sql.exec("DELETE FROM task_ref_removals WHERE taskId NOT IN (SELECT id FROM tasks)");
       // Notes history lives as long as its container, then goes with it.
       for (const c of Object.keys(NOTE_FIELD) as NoteContainer[]) {
         this.sql.exec(`DELETE FROM note_revisions WHERE container = ? AND id NOT IN (SELECT id FROM ${ENTITIES[c].table})`, c);

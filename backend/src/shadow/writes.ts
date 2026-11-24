@@ -3,9 +3,9 @@ import type { Env } from "../env.js";
 import { randomId } from "../util.js";
 import { localServerTimestamp, todayYMD } from "../tz.js";
 import { checklistOccurrenceID, nextScheduledDate, occurrenceID } from "../recurrence.js";
-import { applyDateAction, nextOccurrenceDates, normalizeTaskDates, taskViewMembership, type CoreDateAction, type CoreTask } from "../core/index.js";
+import { applyDateAction, nextOccurrenceDates, normalizeTaskDates, taskRefId, taskViewMembership, type CoreDateAction, type CoreTask } from "../core/index.js";
 import { storeFor } from "../api/session.js";
-import { MAX_TAGS_PER_TASK, TAG_NAME_MAX, zId } from "../store/columns.js";
+import { MAX_REFS_PER_TASK, MAX_TAGS_PER_TASK, TAG_NAME_MAX, zId } from "../store/columns.js";
 import { zPushBody, type Op, type OpResult } from "../store/ops.js";
 import { AGENT_WRITE_RULES, type Row, type TaskStore } from "../store/TaskStore.js";
 import {
@@ -23,6 +23,7 @@ import {
   updateNeedsStoredSchedule,
 } from "../tools/writeTasks.js";
 import { type ConvoTurn, appendNotes, notesRev, replaceNotesSection } from "../tools/taskShared.js";
+import { type ResolvedRef, parseRefArg, resolveRefs, snapshotFor, zRefKeys, zRefs } from "./refs.js";
 import { SURFACES_CATALOG } from "../generated/registries.js";
 
 // Task WRITE tools for the connector on api.septena.app (src/shadow/mcp.ts),
@@ -58,7 +59,8 @@ const ORDER_GAP = 1024;
 /// The DO's methods as plain async calls. Typed from TaskStore's own
 /// declarations: the generated RPC stub type recurses too deep on JSON rows.
 type StoreMethod =
-  | "readTasks" | "readReviewTasks" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates" | "readConvoLinks"
+  | "readTasks" | "readReviewTasks" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates" | "readTaskLinks"
+  | "readTaskRefs" | "findByRef" | "newRefId"
   | "readChecklistItems" | "readChecklistItem" | "readChecklistCounts"
   | "readTags" | "readTagByName"
   | "readOrderTop" | "readSetting" | "push" | "claim" | "release" | "agentEvents" | "history" | "head"
@@ -116,6 +118,7 @@ export const zWriteArgs = {
     reminderMode: z.enum(["floating", "fixed"]).nullable().optional(),
     checklist: z.array(z.string().min(1).max(2000)).max(200).optional(),
     tags: z.array(z.string().trim().min(1).max(TAG_NAME_MAX)).max(MAX_TAGS_PER_TASK).optional(),
+    refs: zRefs.optional(),
     origin: z.enum(["user_request", "agent_suggestion"]).optional(),
   }),
   tasks_complete: z.object({ id: zId }),
@@ -146,6 +149,8 @@ export const zWriteArgs = {
     reminder_mode: z.enum(["floating", "fixed"]).nullable().optional(),
     reminderMode: z.enum(["floating", "fixed"]).nullable().optional(),
     tags: z.array(z.string().trim().min(1).max(TAG_NAME_MAX)).max(MAX_TAGS_PER_TASK).nullable().optional(),
+    refs: zRefs.optional(),
+    refs_remove: zRefKeys.optional(),
   }),
   tasks_defer: z.object({ id: zId, until: zDay }),
   tasks_move_to_today: z.object({ id: zId }),
@@ -333,6 +338,9 @@ function requireApplied(r: OpResult | undefined, id: string): void {
   if (r?.status === "rejected" && r.reason === "stopped") {
     throw new Error(`Task ${id} was not changed: the user stopped agent work on it. Only the user can resume it in Septena.`);
   }
+  if (r?.status === "rejected" && r.reason === "paused") {
+    throw new Error(`Task ${id} was not changed (paused): ${AGENT_WRITE_RULES.paused}`);
+  }
   if (r?.status === "rejected" && r.reason === "human_accepts") {
     throw new Error(`Task ${id} was not completed (human_accepts): ${r.rule ?? AGENT_WRITE_RULES.human_accepts}`);
   }
@@ -387,6 +395,30 @@ async function resolveTagNames(
     }
   }
   return { tagIds, tagNames, tagOps };
+}
+
+/// The insert of one reference.
+function refInsert(taskId: string, id: string, r: ResolvedRef, position: number, now: string): NewOp {
+  const snapshot = snapshotFor(r);
+  return {
+    op: "upsert", entity: "taskRef", id,
+    fields: { taskId, key: r.ref.key, role: r.role ?? "about", ...(snapshot ? { snapshot } : {}), position, createdAt: now },
+  };
+}
+
+/// The reference part of a write's result: what is on the task now, and what
+/// the store refused (an agent's reference while agents are paused). Nothing
+/// is dropped without a word.
+function refResult(refs: ResolvedRef[], results: (OpResult | undefined)[]) {
+  const ok = refs.filter((_, i) => applied(results[i]) || results[i]?.status === "noop");
+  const refused = refs.flatMap((r, i) => {
+    const res = results[i];
+    return res?.status === "rejected" ? [{ key: r.ref.key, reason: res.reason, ...(res.rule ? { rule: res.rule } : {}) }] : [];
+  });
+  return {
+    ...(ok.length > 0 ? { refs: ok.map((r) => ({ key: r.ref.key, kind: r.ref.kind, role: r.role ?? "about" })) } : {}),
+    ...(refused.length > 0 ? { refs_refused: refused } : {}),
+  };
 }
 
 /// Whether an open row with these date fields is on Today: the core's rule
@@ -493,8 +525,9 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
   const { store } = ctx;
   await assertKnownContainer(store, "area", input.area);
   await assertKnownContainer(store, "project", input.project);
-  // Validate the rule BEFORE creating anything.
+  // Validate the rule and the references BEFORE creating anything.
   const plan = planCreate(input);
+  const refs = resolveRefs(input.refs ?? []);
 
   let id = newTaskId();
   for (let i = 0; i < 3 && (await store.readTask(id)); i++) id = newTaskId();
@@ -569,6 +602,9 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     }
   }
 
+  const refOpIdx = ops.length;
+  refs.forEach((ref, i) => ops.push(refInsert(id, taskRefId(id, ref.ref.key, 0), ref, (i + 1) * ORDER_GAP, now)));
+
   const results = await push(store, ctx.actor, ops);
   const r = results[taskOpIdx];
   if (!applied(r)) throw new Error(`Task was not created: ${r?.status === "rejected" ? r.reason : r?.status ?? "no result"}`);
@@ -579,6 +615,7 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     ...plan.echo,
     ...(resolvedTagNames.length > 0 ? { tags: resolvedTagNames } : {}),
     ...(createdChecklist.length > 0 ? { checklist: createdChecklist } : {}),
+    ...refResult(refs, results.slice(refOpIdx)),
   };
 }
 
@@ -593,7 +630,13 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
   const storedScheduled = updateNeedsStoredSchedule(input) ? (str(old.scheduled) ?? null) : undefined;
   const { fields: p, updated } = planUpdate(input, storedScheduled);
   const hasTagChange = input.tags !== undefined;
-  if (updated.length === 0 && !hasTagChange) return { id: input.id, updated: [] };
+  const refOps = await planRefs(store, input);
+  if (updated.length === 0 && !hasTagChange) {
+    if (refOps.ops.length === 0) return { id: input.id, updated: refOps.updated };
+    const results = await push(store, ctx.actor, refOps.ops);
+    for (const r of results) requireApplied(r, input.id);
+    return { id: input.id, updated: refOps.updated };
+  }
 
   const today = todayYMD(ctx.timeZone);
   const clear = (v: string | null) => (v === "" ? null : v);
@@ -651,10 +694,56 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
   }
   const taskOpIdx = ops.length;
   ops.push({ op: "upsert", entity: "task", id: input.id, fields });
+  ops.push(...refOps.ops);
 
   const results = await push(store, ctx.actor, ops);
   requireApplied(results[taskOpIdx], input.id);
-  return { id: input.id, updated, ...(p.notes !== undefined ? { notesRev: notesRev(clear(p.notes)) } : {}) };
+  // The task changed. A refused reference (agents are paused) is named, so
+  // the caller does not retry the fields that landed.
+  const refused = results.slice(taskOpIdx + 1).flatMap((r) =>
+    r.status === "rejected" ? [{ reason: r.reason, ...(r.rule ? { rule: r.rule } : {}) }] : []);
+  if (refused.length === 0) updated.push(...refOps.updated);
+  return { id: input.id, updated, ...(refused.length > 0 ? { refs_refused: refused } : {}), ...(p.notes !== undefined ? { notesRev: notesRev(clear(p.notes)) } : {}) };
+}
+
+/// The ops of `refs` (add or update by key) and `refs_remove`. Removals go
+/// first, so a full task can replace a reference in one call.
+async function planRefs(store: StoreRpc, input: UpdateTaskInput): Promise<{ ops: NewOp[]; updated: string[] }> {
+  const ops: NewOp[] = [];
+  const updated: string[] = [];
+  if (!input.refs?.length && !input.refs_remove?.length) return { ops, updated };
+  const refs = resolveRefs(input.refs ?? []);
+  const remove = new Set((input.refs_remove ?? []).map((k, i) => parseRefArg(k, `refs_remove[${i}]`).key));
+  if (refs.some((r) => remove.has(r.ref.key))) throw new Error("The same key is in refs and refs_remove.");
+  const live = new Map((await store.readTaskRefs(input.id)).map((r) => [r.key as string, r]));
+  for (const key of remove) {
+    const row = live.get(key);
+    if (!row) continue;
+    ops.push({ op: "delete", entity: "taskRef", id: row.id as string });
+    live.delete(key);
+  }
+  if (ops.length > 0) updated.push("refs_remove");
+  const removed = ops.length;
+  const fresh = refs.filter((r) => !live.has(r.ref.key));
+  if (live.size + fresh.length > MAX_REFS_PER_TASK) {
+    throw new Error(`A task has at most ${MAX_REFS_PER_TASK} references. Nothing was written.`);
+  }
+  for (const r of refs) {
+    const row = live.get(r.ref.key);
+    if (!row) continue;
+    const fields: Record<string, unknown> = {};
+    if (r.role !== undefined && r.role !== row.role) fields.role = r.role;
+    if (r.snapshot !== undefined) fields.snapshot = snapshotFor(r);
+    if (Object.keys(fields).length > 0) ops.push({ op: "upsert", entity: "taskRef", id: row.id as string, fields });
+  }
+  const now = new Date().toISOString();
+  let position = Math.max(0, ...[...live.values()].map((r) => num(r.position) ?? 0));
+  for (const r of fresh) {
+    position += ORDER_GAP;
+    ops.push(refInsert(input.id, await store.newRefId(input.id, r.ref.key), r, position, now));
+  }
+  if (ops.length > removed) updated.push("refs");
+  return { ops, updated };
 }
 
 /// Turns notes_append / notes_section into a plain `notes` write against the
@@ -768,6 +857,24 @@ async function completeTask(ctx: WriteContext, id: string) {
               checked: false,
               checkedAt: null,
               position: num(item.position) ?? (i + 1) * ORDER_GAP,
+              createdAt: now,
+            },
+          });
+        }
+
+        // The occurrence is about the same things (spec §4.2). The other roles
+        // belong to the completed row.
+        for (const ref of await store.readTaskRefs(id)) {
+          if (ref.role !== "about") continue;
+          const key = ref.key as string;
+          ops.push({
+            op: "upsert",
+            entity: "taskRef",
+            id: taskRefId(occId, key, 0),
+            fields: {
+              taskId: occId, key, role: "about",
+              ...(ref.snapshot ? { snapshot: ref.snapshot } : {}),
+              ...(num(ref.position) !== undefined ? { position: num(ref.position) } : {}),
               createdAt: now,
             },
           });

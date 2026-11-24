@@ -1,4 +1,5 @@
 import type { ConvoTurn, TaskConvo } from "./taskShared.js";
+import type { RefInput } from "../shadow/refs.js";
 import { isValidReminderAt, type ReminderMode } from "../reminders.js";
 
 // Pure task-write logic (planning, ids, recurrence and conversation helpers)
@@ -85,6 +86,41 @@ export const recurrenceJsonSchema = {
   },
 } as const;
 
+/** Task references (docs/TASK_REFERENCES_SPEC.md §7). */
+const refsJsonSchema = {
+  type: "array",
+  maxItems: 20,
+  items: {
+    type: "object",
+    required: ["key"],
+    properties: {
+      key: {
+        type: "string",
+        minLength: 1,
+        description:
+          "What the task points at: a key (email:<Message-ID>, thread:<root Message-ID>, event:<iCal UID>, issue:<owner>/<repo>#<n>, task:<task id>, url:<web URL>), a web URL, or a message:// link. Septena stores it in normal form.",
+      },
+      role: {
+        type: "string",
+        enum: ["about", "from", "blocked_by", "follow_up"],
+        description: "about (default) = the task is about it. from = the task was made from it. blocked_by and follow_up are labels.",
+      },
+      snapshot: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          subtitle: { type: "string", description: "Sender, repository, organiser or host." },
+          date: { type: "string" },
+          url: { type: "string", description: "http or https web address." },
+          rawId: { type: "string", description: "The id before normalisation." },
+          account: { type: "string", description: "The mail account address." },
+        },
+        description: "What the app shows for it. Set the title when you know it: Septena never fetches one. No message text.",
+      },
+    },
+  },
+} as const;
+
 export const createTaskJsonSchema = {
   type: "object",
   required: ["title"],
@@ -120,6 +156,10 @@ export const createTaskJsonSchema = {
       items: { type: "string", minLength: 1, maxLength: 64 },
       maxItems: 20,
       description: "Optional flat tag names (resolved case-insensitively to existing tags; missing tags are created).",
+    },
+    refs: {
+      ...refsJsonSchema,
+      description: "Optional references: the email, issue, event, page or task this task is about or was made from. Use role 'from' for the item you made it from.",
     },
     origin: {
       type: "string",
@@ -183,6 +223,13 @@ export const updateTaskJsonSchema = {
       maxItems: 20,
       description: "Replace the task's tags by name (case-insensitive; creates missing tags). Pass [] or null to clear.",
     },
+    refs: { ...refsJsonSchema, description: "Add these references, or update role and snapshot of those the task has (matched by key). The others stay." },
+    refs_remove: {
+      type: "array",
+      maxItems: 20,
+      items: { type: "string", minLength: 1 },
+      description: "Remove these references, by key, URL or message:// link.",
+    },
   },
 } as const;
 
@@ -222,6 +269,7 @@ export interface CreateTaskInput {
   reminderMode?: ReminderMode | null;
   checklist?: string[];
   tags?: string[];
+  refs?: RefInput[];
   /**
    * Provenance (docs/TASK_ROW_LANGUAGE_SPEC.md §3.4). `user_request` commits the
    * task (placed where specified); `agent_suggestion` (or omitted — the gateway's
@@ -258,6 +306,8 @@ export interface UpdateTaskInput {
   reminder_mode?: ReminderMode | null;
   reminderMode?: ReminderMode | null;
   tags?: string[] | null;
+  refs?: RefInput[];
+  refs_remove?: string[];
 }
 
 /** Wire form of a repeat rule. `afterCompletion` is accepted as an alias for

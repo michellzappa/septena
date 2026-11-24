@@ -63,14 +63,15 @@ export interface TaskOut {
   inbox?: true;
   daysOnToday?: number;
   reviewNote?: string;
-  // Derived by `withConvoLink` from the task's conversation (absent = none):
-  // `issue` = the GitHub issue or PR the app shows as a chip on the row;
-  // `endState` = the conversation's end state, when it is not `open`.
+  // Added by `withTaskLinks` (absent = none): `refCount` = how many references
+  // the task has; `issue` = its newest `issue` reference; `endState` = the
+  // conversation's end state, when it is not `open`.
+  refCount?: number;
   issue?: IssueLink;
   endState?: string;
 }
 
-/// A GitHub issue or pull request. Mirrors SeptenaCore `ConvoIssueLink`.
+/// A GitHub issue or pull request.
 export interface IssueLink {
   url: string;
   repo: string;   // owner/name
@@ -78,44 +79,31 @@ export interface IssueLink {
   kind: "issue" | "pr";
 }
 
-/// The conversation text that can name a link, in the app's search order.
-export interface ConvoLinkSource {
-  endState?: string | null;
-  endStateNote?: string | null;
-  artifact?: { title?: string; body?: string; refs?: string[] } | null;
-  handoffPayload?: string | null;
-  turnText?: string | null;
+/// The `issue` field of an `issue` reference (TASK_REFERENCES_SPEC.md §6.6).
+/// `key` is in normal form: `issue:<owner>/<repo>#<n>`. The snapshot keeps
+/// the spelling of the name, and only its URL says whether it is a pull
+/// request, because GitHub gives both one number series.
+export function issueLink(key: string, snapshot: { url?: string; rawId?: string } | null): IssueLink {
+  const id = key.slice(key.indexOf(":") + 1);
+  const hash = id.lastIndexOf("#");
+  const number = Number(id.slice(hash + 1));
+  const name = id.slice(0, hash);
+  const raw = snapshot?.rawId?.split("#")[0];
+  const repo = raw !== undefined && raw.toLowerCase() === name ? raw : name;
+  const pr = /\/pull\/\d+/.test(snapshot?.url ?? "");
+  return { url: `https://github.com/${repo}/${pr ? "pull" : "issues"}/${number}`, repo, number, kind: pr ? "pr" : "issue" };
 }
 
-const ISSUE_URL = /https?:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/(issues|pull)\/([0-9]+)/;
-
-/// The first GitHub issue or PR URL in `text`. Mirrors `ConvoIssueLink.parse`.
-export function parseIssueLink(text: string | null | undefined): IssueLink | undefined {
-  if (!text || !text.includes("github.com/")) return undefined;
-  const m = ISSUE_URL.exec(text);
-  if (!m) return undefined;
-  return { url: m[0], repo: `${m[1]}/${m[2]}`, number: Number(m[4]), kind: m[3] === "pull" ? "pr" : "issue" };
-}
-
-/// Mirrors SeptenaCore `TaskConvo.linkedIssue`: artifact refs, body and
-/// title, then the handoff payload, the end-state note, and the newest
-/// provider turn (note, then question).
-export function issueLink(c: ConvoLinkSource): IssueLink | undefined {
-  for (const ref of c.artifact?.refs ?? []) {
-    const link = parseIssueLink(ref);
-    if (link) return link;
-  }
-  return parseIssueLink(c.artifact?.body) ?? parseIssueLink(c.artifact?.title)
-    ?? parseIssueLink(c.handoffPayload) ?? parseIssueLink(c.endStateNote) ?? parseIssueLink(c.turnText);
-}
-
-/// Adds `issue` and a non-open `endState` to an output row.
-export function withConvoLink(t: TaskOut, c: ConvoLinkSource | undefined): TaskOut {
-  if (!c) return t;
+/// Adds `refCount`, `issue` and a non-open `endState` to an output row.
+export function withTaskLinks(
+  t: TaskOut,
+  l: { endState: string | null; refCount: number; issue: { key: string; snapshot: { url?: string; rawId?: string } | null } | null } | undefined,
+): TaskOut {
+  if (!l) return t;
   const out = { ...t };
-  const link = issueLink(c);
-  if (link) out.issue = link;
-  if (c.endState && c.endState !== "open") out.endState = c.endState;
+  if (l.refCount > 0) out.refCount = l.refCount;
+  if (l.issue) out.issue = issueLink(l.issue.key, l.issue.snapshot);
+  if (l.endState && l.endState !== "open") out.endState = l.endState;
   return out;
 }
 
