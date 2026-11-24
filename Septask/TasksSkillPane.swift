@@ -44,10 +44,10 @@ struct TasksSkillPane: View {
             a11yAnimate { copied = false }
           }
         } label: {
-          Label(copied ? "Copied" : "Copy Skill", systemImage: copied ? "checkmark" : "doc.on.doc")
+          Label(copied ? "Copied" : RegistrySettings.copy("mcp_skills", "copySkill"), systemImage: copied ? "checkmark" : "doc.on.doc")
         }
       } footer: {
-        Text("Paste into a model's context to teach it the task tools without connecting MCP.")
+        Text(RegistrySettings.copy("mcp_skills", "copyFooter"))
       }
     }
     .formStyle(.grouped)

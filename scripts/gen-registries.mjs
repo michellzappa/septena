@@ -314,6 +314,25 @@ function validateSettings(settings, entities, icons, caps) {
     if (def.ui === false) continue;
     assert(seenSettingKeys.has(key), `settings.json: UI setting "${key}" is never referenced in rootGroups or pages`);
   }
+
+  // `copy`: the words a custom surface or a status line spells out, keyed by
+  // the surface id (or statusKey) and then by a copy id (#260, #370).
+  const statusKeys = new Set(
+    [...settings.rootGroups.flatMap((g) => g.items), ...settings.pages.flatMap((pg) => pg.sections.flatMap((s) => s.items))]
+      .map((i) => i.statusKey).filter(Boolean),
+  );
+  for (const [owner, entries] of Object.entries(settings.copy ?? {})) {
+    assert(seenSurfaces.has(owner) || statusKeys.has(owner), `settings.json: copy "${owner}" names no surface or statusKey`);
+    assert(Array.isArray(entries) && entries.length > 0, `settings.json: copy "${owner}" must be a non-empty array`);
+    const ids = new Set();
+    for (const e of entries) {
+      assert(typeof e.id === "string" && /^[a-zA-Z][a-zA-Z0-9]*$/.test(e.id), `settings.json: copy "${owner}" has an invalid id "${e.id}"`);
+      assert(!ids.has(e.id), `settings.json: copy "${owner}" duplicate id "${e.id}"`);
+      ids.add(e.id);
+      assert(typeof e.label === "string" && e.label.trim().length > 0, `settings.json: copy ${owner}.${e.id} needs a label`);
+      assert(!/[–—]/.test(e.label), `settings.json: copy ${owner}.${e.id} contains an em or en dash`);
+    }
+  }
 }
 
 function validateDestinations(dests, icons, caps) {
@@ -1038,6 +1057,18 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  /// Label of a setting item; the key when the registry has none.");
   lines.push("  static func label(key: String) -> String { itemByKey[key]?.label ?? key }");
   for (const fn of settingsTemplates) lines.push(fn);
+  // Plain surface copy (`copy` in settings.json). Templates (`{name}`) are
+  // read by the runtime-JSON clients; Swift spells those with interpolation.
+  lines.push("  /// Plain copy of a settings surface (`copy` in settings.json); the copy id when the registry has none.");
+  lines.push("  static func copy(_ surface: String, _ id: String) -> String { copyTable[surface + \".\" + id] ?? id }");
+  lines.push("  private static let copyTable: [String: String] = [");
+  for (const [owner, entries] of Object.entries(settings.copy ?? {})) {
+    for (const e of entries) {
+      if (L10N.placeholdersOf(e.label).length > 0) continue;
+      lines.push(`    ${swiftStr(`${owner}.${e.id}`)}: ${L(e.label, e, "label")},`);
+    }
+  }
+  lines.push("  ]");
   lines.push("}");
   lines.push("");
 
@@ -2055,6 +2086,7 @@ function generateKotlinCore(bundle) {
     destinations: bundle.dests,
     actions: bundle.actions,
     surfaces: bundle.surfaces,
+    plans: bundle.plans,
     conformance: bundle.conformance,
     localizations: bundle.translations,
   })) {
