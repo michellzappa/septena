@@ -39,6 +39,12 @@ import UniformTypeIdentifiers
 @MainActor
 final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
+  /// Top-left origin matching `NSTableRowView`. `NSTableCellView` defaults to
+  /// non-flipped (bottom-left), which moves `topAnchor` by the entire height
+  /// delta while `noteHeightOfRows` animates the row open/closed and causes
+  /// the title and checkbox to visibly jump vertically during the transition.
+  override var isFlipped: Bool { true }
+
   /// Which pill was activated — the controller owns every mutation, this view
   /// only says what was asked for.
   enum Action {
@@ -116,6 +122,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
   private var leadingConstraint: NSLayoutConstraint!
   private var trailingConstraint: NSLayoutConstraint!
+  private var checkboxCenterYConstraint: NSLayoutConstraint!
+  private var columnTopConstraint: NSLayoutConstraint!
   private var titleHeightConstraint: NSLayoutConstraint!
   private var notesHeightConstraint: NSLayoutConstraint!
   private var checklistHeightConstraint: NSLayoutConstraint!
@@ -165,14 +173,55 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private static let bottomPadding: CGFloat = 10
   private static let interRowGap: CGFloat = 8
 
-  /// One line of title. The first line sits centered in the closed-row band
-  /// exactly where `SeptaskKitTaskCell`'s label draws, so opening the row
-  /// doesn't nudge the glyphs; every further wrapped line adds to the row
-  /// below it. This is the one knob if the open/closed title ever drifts.
+  /// One line of title. The first line's baseline aligns to `SeptaskKitTaskCell`'s
+  /// centered label to 0pt across every `SeptenaTypeScale` step so opening the
+  /// row never nudges the glyphs; every further wrapped line adds to the row
+  /// below it.
   static var titleLineHeight: CGFloat {
     ceil(NSLayoutManager().defaultLineHeight(for: SeptaskKitTheme.taskTitle))
   }
-  private static var titleTop: CGFloat { (SeptaskKitTheme.rowHeight - titleLineHeight) / 2 }
+
+  private struct TitleTopCacheKey: Equatable {
+    let fontSize: CGFloat
+    let rowHeight: CGFloat
+  }
+  private static var cachedTitleTop: (key: TitleTopCacheKey, value: CGFloat)?
+
+  /// Exact vertical offset from the cell's top to `titleScroll`'s top so the
+  /// first line's baseline matches `SeptaskKitTaskCell`'s vertically centered
+  /// `NSTextField` label at every text-size factor (including non-integer scale
+  /// steps where `NSTextFieldCell` and `NSLayoutManager.defaultLineHeight`
+  /// otherwise diverge by 0.5pt).
+  private static var titleTop: CGFloat {
+    let font = SeptaskKitTheme.taskTitle
+    let rowHeight = SeptaskKitTheme.rowHeight
+    let key = TitleTopCacheKey(fontSize: font.pointSize, rowHeight: rowHeight)
+    if let cached = cachedTitleTop, cached.key == key {
+      return cached.value
+    }
+    let probe = NSTextField(labelWithString: "Ag")
+    probe.font = font
+    probe.isBordered = false
+    probe.isBezeled = false
+    let labelHeight = probe.intrinsicContentSize.height
+    let labelBaselineFromTop = (rowHeight - labelHeight) / 2
+      + (labelHeight - probe.baselineOffsetFromBottom)
+
+    let storage = NSTextStorage(string: "Ag", attributes: [.font: font])
+    let container = NSTextContainer(size: CGSize(width: 200, height: CGFloat.greatestFiniteMagnitude))
+    container.lineFragmentPadding = 0
+    let manager = NSLayoutManager()
+    manager.addTextContainer(container)
+    storage.addLayoutManager(manager)
+    manager.ensureLayout(for: container)
+    let lineRect = manager.lineFragmentRect(forGlyphAt: 0, effectiveRange: nil)
+    let tvBaselineFromBottom = manager.typesetter.baselineOffset(in: manager, glyphIndex: 0)
+    let tvBaselineFromLineTop = lineRect.maxY - tvBaselineFromBottom
+
+    let value = labelBaselineFromTop - tvBaselineFromLineTop
+    cachedTitleTop = (key, value)
+    return value
+  }
 
   /// Row height for a one-line title with no notes — the controller's answer
   /// until the live cell has measured itself (`expandedHeight`).
@@ -326,9 +375,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     addSubview(column)
 
     leadingConstraint = checkbox.leadingAnchor.constraint(
-      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
+      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + SeptaskKitLayout.rowLeadingPad)
     trailingConstraint = column.trailingAnchor.constraint(
       equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    checkboxCenterYConstraint = checkbox.centerYAnchor.constraint(
+      equalTo: topAnchor, constant: SeptaskKitTheme.rowHeight / 2)
+    columnTopConstraint = column.topAnchor.constraint(
+      equalTo: topAnchor, constant: Self.titleTop)
     titleHeightConstraint = titleScroll.heightAnchor.constraint(
       equalToConstant: Self.titleLineHeight)
     notesHeightConstraint = notesScroll.heightAnchor.constraint(
@@ -338,14 +391,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     NSLayoutConstraint.activate([
       leadingConstraint,
       // Match `SeptaskKitTaskCell`: checkbox on the vertical center of a
-      // standard-height row, the title's FIRST line centered on it. Extra
-      // lines and the rest of the column add space BELOW this band.
-      checkbox.centerYAnchor.constraint(equalTo: topAnchor,
-                                        constant: SeptaskKitTheme.rowHeight / 2),
+      // standard-height row, the title's FIRST line baseline-locked to it.
+      // Extra lines and the rest of the column add space BELOW this band.
+      checkboxCenterYConstraint,
       checkbox.widthAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
       checkbox.heightAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
       column.leadingAnchor.constraint(equalTo: checkbox.trailingAnchor, constant: 7),
-      column.topAnchor.constraint(equalTo: topAnchor, constant: Self.titleTop),
+      columnTopConstraint,
       trailingConstraint,
 
       titleScroll.widthAnchor.constraint(equalTo: column.widthAnchor),
@@ -408,7 +460,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
   override func layout() {
     let inset = SeptaskKitLayout.inset(for: bounds.width)
-    leadingConstraint.constant = inset + 6
+    leadingConstraint.constant = inset + SeptaskKitLayout.rowLeadingPad
     trailingConstraint.constant = -(inset + 8)
     super.layout()
     // Width can change on window resize — re-wrap and grow/shrink both fields.
@@ -427,7 +479,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private var textColumnWidth: CGFloat? {
     guard bounds.width > 60 else { return nil }
     let inset = SeptaskKitLayout.inset(for: bounds.width)
-    return bounds.width - (inset + 6 + KitCheckboxView.tapSize + 7) - (inset + 8)
+    return bounds.width - (inset + SeptaskKitLayout.rowLeadingPad + KitCheckboxView.tapSize + 7) - (inset + 8)
   }
 
   // MARK: - Populate
@@ -440,14 +492,26 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     configuredTaskID = task.id
     committedTitle = task.title
     committedNotes = Self.normalizedNotes(task.notes)
+    // Refresh text-scale-dependent geometry on every reuse so a pooled cell
+    // stays baseline-locked to `SeptaskKitTaskCell` after Text Size changes.
+    checkboxCenterYConstraint.constant = SeptaskKitTheme.rowHeight / 2
+    columnTopConstraint.constant = Self.titleTop
+    column.setCustomSpacing(Self.titleTop + Self.interRowGap, after: titleScroll)
+    measuredTitleHeight = Self.titleLineHeight
+    titleHeightConstraint.constant = Self.titleLineHeight
+    titleView.font = SeptaskKitTheme.taskTitle
+    titleView.textContainerInset = .zero
+    titleView.textContainer?.lineFragmentPadding = 0
     titleView.textStorage?.setAttributedString(
       NSAttributedString(string: task.title, attributes: Self.titleAttributes))
     titleView.typingAttributes = Self.titleAttributes
+    titleScroll.contentView.scroll(to: .zero)
     let notes = task.notes ?? ""
     let fontSize = SeptaskKitTheme.notesFontSize
     notesView.textStorage?.setAttributedString(
       MarkdownNotesStyle.attributed(notes, fontSize: fontSize))
     notesView.typingAttributes = MarkdownNotesStyle.baseAttributes(fontSize: fontSize)
+    notesScroll.contentView.scroll(to: .zero)
     // An open row ALWAYS shows its notes field, empty or not: the open row is
     // the task's whole document, and a field that appears only once it has
     // content hides the fact that notes exist at all. The empty field's
@@ -625,11 +689,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     // inherits a near-zero frame and you can only see the glyph you just
     // typed. Same guard, same reason as `SeptaskKitTaskCell.beginEditing`.
     layoutSubtreeIfNeeded()
+    titleScroll.contentView.scroll(to: .zero)
     window?.makeFirstResponder(titleView)
     // Caret at the end (Things), not AppKit's select-all block — a selected
     // title reads as a second surface, and one stray keystroke replaces it.
     let end = (titleView.string as NSString).length
     titleView.setSelectedRange(NSRange(location: end, length: 0))
+    titleScroll.contentView.scroll(to: .zero)
   }
 
   /// Title → notes while notes are on screen, straight to the rail otherwise;
@@ -744,7 +810,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     guard let manager = view.layoutManager, let container = view.textContainer else { return 0 }
     manager.ensureLayout(for: container)
     let used = manager.usedRect(for: container)
-    return ceil(used.height + view.textContainerInset.height * 2)
+    let height = ceil(used.height + view.textContainerInset.height * 2)
+    let minHeight = view === titleView ? Self.titleLineHeight : Self.notesMinHeight
+    let clamped = max(minHeight, height)
+    if abs(view.frame.size.height - clamped) > 0.5 || view.frame.origin != .zero {
+      view.frame = NSRect(x: 0, y: 0, width: width, height: clamped)
+    }
+    return height
   }
 
   // MARK: - Commit

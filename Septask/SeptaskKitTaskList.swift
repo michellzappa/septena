@@ -3689,9 +3689,17 @@ final class SeptaskKitTaskListController: NSViewController {
     // `heightOfRow` — `wireComposer` ran inside `viewFor:`, before the table
     // gave the cell its frame, so a title that wraps was still an unknown.
     // Without this the row opens one line tall and jumps on the next pass.
+    // Also flush the cell's initial layout with animations disabled BEFORE
+    // `animateComposerHeight` starts: otherwise its first Auto Layout pass
+    // runs inside the implicit-animation context and visibly shifts the title.
     if let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false)
         as? KitComposerCell {
       composerRowHeight = cell.expandedHeight
+      NSAnimationContext.runAnimationGroup { ctx in
+        ctx.duration = 0
+        ctx.allowsImplicitAnimation = false
+        cell.layoutSubtreeIfNeeded()
+      }
     }
     refreshCardGeometry()
     tableView.scrollRowToVisible(row)
@@ -6139,7 +6147,10 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     title.isEditable = true
     // Truncation while the field editor is attached makes AppKit fight the
     // insertion-point scroll — the caret jumps to the far right as you type
-    // or arrow through a long title. Clip for the duration of the edit.
+    // or arrow through a long title. Clip and scroll horizontally for the
+    // duration of the edit so a long title never reflows vertically.
+    title.usesSingleLineMode = true
+    title.cell?.isScrollable = true
     title.lineBreakMode = .byClipping
     title.cell?.truncatesLastVisibleLine = false
     // Keep the configure-time font (taskTitle / heading) on the plain string
@@ -6154,17 +6165,22 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     window?.makeFirstResponder(title)
     // Field editor inherits the text field's frame (now full-width via the
     // trailing pin) and defaults to an opaque white fill — clear it so rename
-    // reads as in-row text, same as the composer title. Also re-assert font:
-    // the shared field editor can carry a stale face from a prior edit.
+    // reads as in-row text, same as the composer title. Also re-assert font
+    // and container geometry: the window's shared field editor can carry a
+    // stale face or textContainerInset from another control in the window,
+    // which visibly shifted the title vertically on first responder.
     if let editor = title.currentEditor() as? NSTextView {
       editor.drawsBackground = false
       editor.backgroundColor = .clear
       editor.insertionPointColor = .labelColor
+      editor.textContainerInset = .zero
+      editor.textContainer?.lineFragmentPadding = 2
       editor.font = font
       editor.typingAttributes = [
         .font: font,
         .foregroundColor: NSColor.labelColor,
       ]
+      editor.enclosingScrollView?.contentView.scroll(to: .zero)
       editor.selectAll(nil)
     }
   }
@@ -6179,6 +6195,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     guard editing else { return }
     editing = false
     title.isEditable = false
+    title.usesSingleLineMode = false
+    title.cell?.isScrollable = false
     title.lineBreakMode = .byTruncatingTail
     title.cell?.truncatesLastVisibleLine = true
     onRename?(taskId, title.stringValue)
@@ -6195,6 +6213,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     editing = false
     _ = title.abortEditing()
     title.isEditable = false
+    title.usesSingleLineMode = false
+    title.cell?.isScrollable = false
     title.lineBreakMode = .byTruncatingTail
     title.cell?.truncatesLastVisibleLine = true
     return text
