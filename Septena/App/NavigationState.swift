@@ -173,6 +173,12 @@ final class NavigationState {
   /// to hide the floating Magic Plus orb while the bottom selection bar is up.
   var isTaskMultiSelectActive = false
 
+  /// True while the on-screen iOS task list has a task open: the inline
+  /// editor in a row, the new-task draft, or the pushed task page. Used by
+  /// `SeptaskRootView` to fade the Magic Plus orb out, which otherwise shows
+  /// through the open task.
+  var isTaskEditorOpen = false
+
   /// One-shot trigger from a Home Screen Quick Action (long-press app
   /// icon). ContentView dispatches the route change + `shouldStartCreating`
   /// flip, then resets this to nil. nil means "no pending shortcut".

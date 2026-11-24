@@ -1049,8 +1049,16 @@ struct TaskListView: View {
       if isTouchSelecting {
         nav.isTaskMultiSelectActive = false
       }
+      // Pushing the task page takes the list off screen, and the page is
+      // an open task: the orb stays hidden. Any other exit clears it.
+      if pageTaskId == nil {
+        nav.isTaskEditorOpen = false
+      }
       #endif
     }
+    #if os(iOS)
+    .onChange(of: isTaskEditorOpen) { _, _ in syncTaskEditorChrome() }
+    #endif
     #if os(iOS)
     .toolbar {
       if isTouchSelecting {
@@ -1229,6 +1237,7 @@ struct TaskListView: View {
     refreshTodayNotices()
     flushDeferredReloadIfNeeded()
     syncMultiSelectChrome()
+    syncTaskEditorChrome()
     consumeStartCreatingRequest()
     consumePendingTaskReveal()
   }
@@ -4366,6 +4375,22 @@ struct TaskListView: View {
       selection = Set(all)
       syncMultiSelectChrome()
     }
+  }
+
+  /// A task is open in this list: a row's inline editor, the new-task
+  /// draft, or the task page.
+  private var isTaskEditorOpen: Bool {
+    expandedEditId != nil || pageTaskId != nil || creating
+  }
+
+  /// Publishes `isTaskEditorOpen` so the root fades the Magic Plus orb.
+  /// The pushed page keeps it while the list is off screen.
+  private func syncTaskEditorChrome() {
+    #if os(iOS)
+    if isOnScreen || pageTaskId != nil {
+      nav.isTaskEditorOpen = isTaskEditorOpen
+    }
+    #endif
   }
 
   private func syncMultiSelectChrome() {
