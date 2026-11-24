@@ -1,5 +1,6 @@
 package app.septena.android.ui
 
+import app.septena.core.WireTimestamp
 import app.septena.ui.TaskListItem
 import app.septena.core.TaskViewRules
 import app.septena.core.SyncRecord
@@ -157,6 +158,33 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 ),
             )
             true
+        }
+    }
+
+    /** Closes the project as done or cancelled (iPhone `ProjectsMutator.setStatus`). */
+    fun closeProject(status: String, onClosed: () -> Unit) {
+        val selected = destination.value as? AreasProjectsDestination.Project ?: return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.registryEntityMutator.update(
+                        RegistryEntityNames.PROJECT,
+                        selected.id,
+                        mapOf(
+                            RegistryEntityFields.Project.STATUS to JsonValue.StringValue(status),
+                            RegistryEntityFields.Project.COMPLETED_AT to
+                                JsonValue.StringValue(WireTimestamp.format(graph.clock.now())),
+                        ),
+                    ) != null
+                }
+            }.onSuccess { changed ->
+                errorMessage.value = null
+                if (changed) {
+                    graph.sync.noteLocalChange()
+                    graph.sync.requestSync()
+                    onClosed()
+                }
+            }.onFailure { errorMessage.value = it.message }
         }
     }
 

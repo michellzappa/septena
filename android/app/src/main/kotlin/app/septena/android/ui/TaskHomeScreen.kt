@@ -1,5 +1,8 @@
 package app.septena.android.ui
 
+import app.septena.ui.LocalTaskListStyle
+import app.septena.core.generated.RegistryPromptIds
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.ui.text.font.FontWeight
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -120,6 +123,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                 }
                 localContext.startActivity(Intent.createChooser(intent, shareTitle))
             }
+            actionId == RegistryActionIds.TASK_TOGGLE_COMPLETE -> homeViewModel.complete(id)
             actionId == RegistryActionIds.TASK_DELETE -> homeViewModel.delete(id)
             actionId == RegistryActionIds.TASK_RESTORE -> homeViewModel.restore(id)
             actionId == RegistryActionIds.TASK_ACCEPT_REVIEW -> homeViewModel.acceptReview(id)
@@ -567,6 +571,12 @@ private fun TaskHomeScaffold(
 ) {
     var quickAddOpen by rememberSaveable { mutableStateOf(false) }
     var overflowOpen by remember { mutableStateOf(false) }
+    var newPlacePrompt by rememberSaveable { mutableStateOf<String?>(null) }
+    var starredOnly by rememberSaveable(state.location.toString()) { mutableStateOf(false) }
+    val hasStarred = (state.inboxTasks + state.tasks).any { it.isStarred && !it.isCompleted }
+    val showsStarFilter = hasStarred && state.location is TaskHomeLocation.SmartList &&
+        (state.location as TaskHomeLocation.SmartList).destinationId != RegistryDestinationIds.STARRED
+    val filterStarred = starredOnly && showsStarFilter
     var selectionPicker by remember { mutableStateOf<SelectionPicker?>(null) }
     var allOnToday by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -590,6 +600,18 @@ private fun TaskHomeScaffold(
     LaunchedEffect(state.selectedIds) { allOnToday = homeViewModel.allOnToday(state.selectedIds) }
     BackHandler(enabled = selecting) { homeViewModel.clearSelection() }
 
+    newPlacePrompt?.let { promptId ->
+        TextEntryDialog(
+            promptId = promptId,
+            languageTag = languageTag,
+            onDismiss = { newPlacePrompt = null },
+            onConfirm = { title ->
+                newPlacePrompt = null
+                if (promptId == RegistryPromptIds.NEW_AREA) homeViewModel.createArea(title)
+                else homeViewModel.createProject(title)
+            },
+        )
+    }
     if (quickAddOpen) {
         QuickAddSheet(
             today = graph.clock.today(graph.clock.now()),
@@ -717,6 +739,21 @@ private fun TaskHomeScaffold(
                         {}
                     },
                     actions = {
+                        // iPhone shows the star filter only while an open task is starred.
+                        if (showsStarFilter) {
+                            IconButton(onClick = { starredOnly = !starredOnly }) {
+                                RegistryIcon(
+                                    RegistryIconIds.ACTION_STAR,
+                                    contentDescription = RegistryCatalog.destinationTitle(
+                                        RegistryDestinationIds.STARRED,
+                                        languageTag,
+                                    ),
+                                    on = filterStarred,
+                                    tint = if (filterStarred) LocalTaskListStyle.current.starTint
+                                    else LocalContentColor.current,
+                                )
+                            }
+                        }
                         IconButton(onClick = onQuickFind) {
                             RegistryIcon(
                                 RegistryCatalog.actionIcon(RegistryActionIds.APP_QUICK_FIND),
@@ -733,9 +770,27 @@ private fun TaskHomeScaffold(
                         // until the agents page owns it, as on iPhone.
                         Box {
                             IconButton(onClick = { overflowOpen = true }) {
-                                RegistryIcon(RegistryIconIds.ACTION_MORE, contentDescription = pauseAgentsTitle)
+                                RegistryIcon(RegistryIconIds.ACTION_MORE, contentDescription = title)
                             }
                             DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
+                                listOf(
+                                    RegistryActionIds.SIDEBAR_NEW_AREA to RegistryPromptIds.NEW_AREA,
+                                    RegistryActionIds.SIDEBAR_NEW_PROJECT to RegistryPromptIds.NEW_PROJECT,
+                                ).forEach { (actionId, promptId) ->
+                                    DropdownMenuItem(
+                                        leadingIcon = {
+                                            RegistryIcon(RegistryCatalog.actionIcon(actionId), contentDescription = null)
+                                        },
+                                        text = {
+                                            Text(RegistryCatalog.actionTitle(actionId, languageTag = languageTag).orEmpty())
+                                        },
+                                        onClick = {
+                                            overflowOpen = false
+                                            newPlacePrompt = promptId
+                                        },
+                                    )
+                                }
+                                HorizontalDivider()
                                 DropdownMenuItem(
                                     leadingIcon = {
                                         RegistryIcon(
@@ -783,6 +838,7 @@ private fun TaskHomeScaffold(
                     onTaskAction = onTaskAction,
                     selection = selection,
                     onComplete = onComplete,
+                    onClosed = { onSelectHomeLocation(TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY)) },
                 )
                 is TaskHomeLocation.SmartList -> TaskHomeContent(
                     completeTitle = completeTitle,
@@ -794,8 +850,8 @@ private fun TaskHomeScaffold(
                     todayTint = MaterialTheme.colorScheme.secondary,
                     hasLoaded = state.hasLoaded,
                     isToday = location.destinationId == RegistryDestinationIds.TODAY,
-                    inboxTasks = state.inboxTasks,
-                    tasks = state.tasks,
+                    inboxTasks = if (filterStarred) state.inboxTasks.filter { it.isStarred } else state.inboxTasks,
+                    tasks = if (filterStarred) state.tasks.filter { it.isStarred } else state.tasks,
                     canQuickAdd = state.canQuickAdd,
                     canComplete = state.canComplete,
                     errorMessage = state.errorMessage,
@@ -821,7 +877,9 @@ private fun taskRowMenuGroups(
     val supportedActions = if (menuId == "task.recentlyDeleted") {
         setOf(RegistryActionIds.TASK_RESTORE)
     } else {
-        setOf(
+        setOfNotNull(
+            // Android has no write that reopens a done task, so Logbook offers none.
+            RegistryActionIds.TASK_TOGGLE_COMPLETE.takeIf { destinationId != RegistryDestinationIds.LOGBOOK },
             RegistryActionIds.TASK_ACCEPT_REVIEW,
             RegistryActionIds.TASK_KEEP_FADED,
             RegistryActionIds.TASK_LET_GO_FADED,

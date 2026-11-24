@@ -160,6 +160,55 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
+    /** Creates an area after the last one, then opens it. */
+    fun createArea(title: String) = createPlace(title) { trimmed ->
+        val record = graph.registryEntityMutator.create(
+            EntityNames.AREA,
+            mapOf(
+                RegistryEntityFields.Area.TITLE to JsonValue.StringValue(trimmed),
+                RegistryEntityFields.Area.POSITION to
+                    JsonValue.IntegerValue(nextPosition(EntityNames.AREA, RegistryEntityFields.Area.POSITION)),
+            ),
+        )
+        TaskHomeLocation.Area(record.id, trimmed)
+    }
+
+    /** Creates a project outside any area, after the last one, then opens it. */
+    fun createProject(title: String) = createPlace(title) { trimmed ->
+        val record = graph.registryEntityMutator.create(
+            EntityNames.PROJECT,
+            mapOf(
+                RegistryEntityFields.Project.TITLE to JsonValue.StringValue(trimmed),
+                RegistryEntityFields.Project.STATUS to JsonValue.StringValue(RegistryEntityEnums.ProjectStatus.ACTIVE),
+                RegistryEntityFields.Project.CREATED to
+                    JsonValue.StringValue(graph.clock.today(graph.clock.now()).toString()),
+                RegistryEntityFields.Project.POSITION to
+                    JsonValue.IntegerValue(nextPosition(EntityNames.PROJECT, RegistryEntityFields.Project.POSITION)),
+            ),
+        )
+        TaskHomeLocation.Project(record.id, trimmed)
+    }
+
+    private fun createPlace(title: String, create: suspend (String) -> TaskHomeLocation) {
+        val trimmed = title.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { create(trimmed) } }
+                .onSuccess { location ->
+                    errorMessage.value = null
+                    noteLocalChangeAndSync()
+                    select(location)
+                }
+                .onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    private suspend fun nextPosition(entity: String, field: String): Long =
+        graph.taskStore.records(entity)
+            .filter { it.deletedAt == null }
+            .mapNotNull { it.fields[field].numberValue() }
+            .maxOrNull()?.toLong()?.plus(1) ?: 0L
+
     /** True while a Quick Add write runs, so a second tap on Add cannot create a second task. */
     private var quickAddRunning = false
 
@@ -420,8 +469,11 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     )
                 }
             }
-        val projectRecords = graph.taskStore.records(EntityNames.PROJECT)
-            .filter { it.deletedAt == null }
+        val liveProjects = graph.taskStore.records(EntityNames.PROJECT).filter { it.deletedAt == null }
+        val activeProjectIds = liveProjects
+            .filter { it.fields[RegistryEntityFields.Project.STATUS].stringValue() == RegistryEntityEnums.ProjectStatus.ACTIVE }
+            .mapTo(mutableSetOf()) { it.id }
+        val projectRecords = liveProjects
             .mapNotNull { record ->
                 record.fields[RegistryEntityFields.Project.TITLE].stringValue()?.let { title ->
                     TaskHomeNavigationItem(TaskHomeLocation.Project(record.id, title), title)
@@ -572,7 +624,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             location = resolvedLocation,
             smartLists = smartListItems,
             areas = areaRecords,
-            projects = projectRecords,
+            // A done or cancelled project leaves the lists, as on iPhone.
+            projects = projectRecords.filter { (it.location as? TaskHomeLocation.Project)?.id in activeProjectIds },
             inboxTasks = inbox.sortedTaskItems(),
             tasks = orderedTasks,
             canQuickAdd = canQuickAdd,

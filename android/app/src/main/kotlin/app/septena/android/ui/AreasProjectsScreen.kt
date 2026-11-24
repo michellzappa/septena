@@ -1,5 +1,10 @@
 package app.septena.android.ui
 
+import app.septena.ui.TaskRowActionsMenu
+import app.septena.core.generated.RegistryPlatformIds
+import app.septena.core.generated.RegistryEntityEnums
+import app.septena.core.RegistryActionResolver
+import app.septena.core.RegistryActionContext
 import app.septena.ui.TaskRow
 import app.septena.ui.TaskListItem
 import app.septena.ui.TaskGroupHeader
@@ -68,6 +73,8 @@ fun AreasProjectsScreen(
     onTaskAction: (String, String) -> Unit = { _, _ -> },
     selection: TaskSelection = TaskSelection(),
     onComplete: (String) -> Unit = {},
+    /** The project on this page was marked done or cancelled. */
+    onClosed: () -> Unit = {},
 ) {
     val factory = remember(graph) { AreasProjectsViewModel.Factory(graph) }
     val viewModel: AreasProjectsViewModel = viewModel(key = destination.key, factory = factory)
@@ -121,8 +128,22 @@ fun AreasProjectsScreen(
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.weight(1f),
                         )
-                        TextButton(onClick = { dialog = PlacesDialog.RenamePlace(state.title) }) {
-                            Text(actionTitle(destination.renameAction(), languageTag))
+                        PlaceMenu(
+                            menuId = destination.menuId(),
+                            actionIds = PLACE_ACTIONS,
+                            languageTag = languageTag,
+                            label = state.title,
+                        ) { actionId ->
+                            when (actionId) {
+                                RegistryActionIds.AREA_NEW_PROJECT -> dialog = PlacesDialog.CreateProject
+                                RegistryActionIds.AREA_RENAME, RegistryActionIds.PROJECT_RENAME ->
+                                    dialog = PlacesDialog.RenamePlace(state.title)
+                                RegistryActionIds.AREA_CHANGE_EMOJI -> emojiPickerOpen = true
+                                RegistryActionIds.PROJECT_MARK_DONE ->
+                                    viewModel.closeProject(RegistryEntityEnums.ProjectStatus.DONE, onClosed)
+                                RegistryActionIds.PROJECT_CANCEL ->
+                                    viewModel.closeProject(RegistryEntityEnums.ProjectStatus.CANCELLED, onClosed)
+                            }
                         }
                     }
                 }
@@ -385,6 +406,63 @@ private fun PlaceTaskItem(task: TaskListItem, rows: PlaceRowContext, first: Bool
     }
 }
 
+/**
+ * A registry context menu on a place, with the actions Android has a handler
+ * for. Deleting an area or project is not here yet: it also moves every task
+ * to Recently Deleted with an undo, and Android has no such write.
+ */
+@Composable
+private fun PlaceMenu(
+    menuId: String,
+    actionIds: Set<String>,
+    languageTag: String,
+    label: String,
+    onAction: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val groups = remember(menuId, languageTag) {
+        val available = RegistryActionResolver.availableActionIds(
+            RegistryActionContext(RegistryPlatformIds.ANDROID, destinationId = null, selectedCount = 1),
+        ).toSet()
+        RegistryCatalog.menuActionGroups(menuId).mapNotNull { group ->
+            group.actionIds.filter { it in actionIds && it in available }.map { id ->
+                TaskRowMenuAction(
+                    id = id,
+                    title = RegistryCatalog.actionTitle(id, languageTag = languageTag).orEmpty(),
+                    isDestructive = RegistryCatalog.actionRole(id) == "destructive",
+                    icon = RegistryCatalog.actionIcon(id),
+                )
+            }.takeIf { it.isNotEmpty() }
+        }
+    }
+    TaskRowActionsMenu(
+        groups = groups,
+        accessibilityLabel = label,
+        icon = RegistryIconIds.ACTION_MORE,
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        onAction = onAction,
+    )
+}
+
+private const val SECTION_MENU = "project.heading"
+
+private val SECTION_ACTIONS = setOf(RegistryActionIds.SECTION_RENAME, RegistryActionIds.SECTION_DELETE)
+
+private val PLACE_ACTIONS = setOf(
+    RegistryActionIds.AREA_NEW_PROJECT,
+    RegistryActionIds.AREA_RENAME,
+    RegistryActionIds.AREA_CHANGE_EMOJI,
+    RegistryActionIds.PROJECT_RENAME,
+    RegistryActionIds.PROJECT_MARK_DONE,
+    RegistryActionIds.PROJECT_CANCEL,
+)
+
+private fun AreasProjectsDestination.menuId(): String = when (this) {
+    is AreasProjectsDestination.Area -> "sidebar.area"
+    is AreasProjectsDestination.Project -> "sidebar.project"
+}
+
 @Composable
 private fun PlaceSectionBlock(
     section: PlaceSectionRow,
@@ -399,11 +477,16 @@ private fun PlaceSectionBlock(
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TaskGroupHeader(section.title, Modifier.weight(1f).padding(top = 18.dp, bottom = 6.dp))
-            TextButton(onClick = onRename) {
-                Text(actionTitle(RegistryActionIds.SECTION_RENAME, languageTag))
-            }
-            TextButton(onClick = onDelete) {
-                Text(actionTitle(RegistryActionIds.SECTION_DELETE, languageTag))
+            PlaceMenu(
+                menuId = SECTION_MENU,
+                actionIds = SECTION_ACTIONS,
+                languageTag = languageTag,
+                label = section.title,
+            ) { actionId ->
+                when (actionId) {
+                    RegistryActionIds.SECTION_RENAME -> onRename()
+                    RegistryActionIds.SECTION_DELETE -> onDelete()
+                }
             }
         }
         if (section.tasks.isEmpty()) {
@@ -425,7 +508,7 @@ private fun PlaceSectionBlock(
 }
 
 @Composable
-private fun TextEntryDialog(
+internal fun TextEntryDialog(
     promptId: String,
     languageTag: String,
     initialValue: String = "",
@@ -528,11 +611,6 @@ private fun actionTitle(id: String, languageTag: String): String =
 
 private fun String?.registryLocalized(languageTag: String): String =
     this?.let { RegistryCatalog.localizedString(it, languageTag) ?: it }.orEmpty()
-
-private fun AreasProjectsDestination.renameAction(): String = when (this) {
-    is AreasProjectsDestination.Area -> RegistryActionIds.AREA_RENAME
-    is AreasProjectsDestination.Project -> RegistryActionIds.PROJECT_RENAME
-}
 
 private fun AreasProjectsDestination.renamePrompt(): String = when (this) {
     is AreasProjectsDestination.Area -> RegistryPromptIds.RENAME_AREA
