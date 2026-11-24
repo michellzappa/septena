@@ -28,7 +28,8 @@ A device approved as a companion gets a session with a `companion` scope. The
 backend enforces the scope on the route, before the handler, and refuses every
 route that is not on the list.
 
-1. **Read:** Today, Review, Completed, Upcoming, and open questions. A
+1. **Read:** Today, Review, Completed, Upcoming, recently added, and
+   open questions. A
    companion response carries no task notes.
 2. **Write:** complete a task, accept or send back a review, answer an open
    question, defer a task, create a task.

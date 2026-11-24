@@ -77,10 +77,23 @@ seconds *(default)*. That is 32 KB per second, so at most 640 KB. Response:
 the account, checks the size before it reads the body, and logs duration and
 result, never text or audio.
 
+### 6. Added feed (#430)
+
+A companion shows a task at the moment it is created, by the user on another
+device or by an agent. Today alone cannot tell "created" from "moved to
+Today", and it misses tasks that go straight to a project or a later day.
+
+`GET /v1/tasks?view=added`: open tasks created in the last 24 hours, newest
+first, at most 50 plus `total`. Each row is a `clientTask` with two more fields,
+`createdAt` (ms) and `addedBy`: `agent` when `source` is `mcp`, else `you`. The
+store already has both columns. A spawned repeat occurrence is not in the
+list: nobody added it. Nor is an import.
+
 ## Phases
 
 | Phase | What | Needs |
 |---|---|---|
+| CD0 (#430) | Added feed | nothing |
 | CD1 (#424) | Needs-you feed, `accept` / `send_back` / `answer` | #423 |
 | CD2 (#358) | Companion scope, device list | ADR 0034 accepted |
 | CD3 (#425) | Live nudge | CD2 |
@@ -95,6 +108,7 @@ Collected for mz in #427.
 | Question | Default |
 |---|---|
 | Does a companion take a sync device slot? | No, like the watch |
+| Does the added feed skip imports and repeats? | Yes |
 | Can a companion create tasks? | Yes, so voice has somewhere to write |
 | Where is speech turned into text? | Workers AI, when ADR 0009 is accepted |
 | Is voice on when a companion signs in? | Off, turned on in the app |
