@@ -45,7 +45,7 @@ enum TaskA11y {
 
   static func checkboxValue(isDone: Bool) -> String {
     isDone
-      ? String(localized: "Completed", comment: "A11y: checkbox value when done")
+      ? String(localized: "Completed", comment: "A11y: checkbox value when done") // septena-lint:allow registry-owned-literal — VoiceOver checkbox state paired with "Incomplete", not QuickFind/history copy
       : String(localized: "Incomplete", comment: "A11y: checkbox value when open")
   }
 

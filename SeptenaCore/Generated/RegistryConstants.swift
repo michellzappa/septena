@@ -1650,6 +1650,11 @@ enum RegistrySurfaces {
   static let agentPromptReviewKicker: String = RegistryL10n.t("Review requested")
   static let agentPromptReviewFallback: String = RegistryL10n.t("Ready for review")
   static let agentPromptAcceptedLabel: String = RegistryL10n.t("Accepted")
+  /// Quick Find copy (`surfaces.json` `quickFind`).
+  static let quickFindPlaceholder: String = RegistryL10n.t("Search tasks, projects, areas…")
+  static let quickFindEmptyTitle: String = RegistryL10n.t("Search Tasks")
+  static let quickFindEmptyDetail: String = RegistryL10n.t("Find any task, project, or area.")
+  static let quickFindCompletedLabel: String = RegistryL10n.t("Completed")
   /// The block of `kind`. Each kind appears exactly once (the generator checks it).
   static func taskPageBlock(_ kind: RegistryTaskPageBlockKind) -> RegistryTaskPageBlock {
     guard let b = taskPageBlocks.first(where: { $0.kind == kind }) else { preconditionFailure("no task page block \(kind)") }
