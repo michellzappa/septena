@@ -476,7 +476,22 @@
       "historyReminderSet": "Reminder set",
       "historyReminderRemoved": "Reminder removed",
       "historyFavorited": "Favorited",
-      "historyUnfavorited": "Unfavorited"
+      "historyUnfavorited": "Unfavorited",
+      "reminderNone": "No reminder",
+      "reminderInOneHour": "In 1 hour",
+      "reminderTonight": "Tonight 18:00",
+      "reminderTomorrow": "Tomorrow 09:00",
+      "reminderRemindAt": "Remind at",
+      "reminderSet": "Set Reminder",
+      "reminderFixedTimeZone": "Fixed time zone",
+      "reminderClear": "Clear Reminder",
+      "reminderNotificationsOff": "Notifications are off. Open Settings",
+      "reminderExactAlarmsOff": "Reminders can arrive late. Allow alarms in Settings",
+      "reminderNotificationTitle": "Task Reminder",
+      "reminderChannel": "Reminders",
+      "reminderComplete": "Complete",
+      "reminderSnooze15m": "Snooze 15 min",
+      "reminderSnooze1h": "Snooze 1 hour"
     },
     "repeatUnits": [
       { "value": "day", "title": "Day" },

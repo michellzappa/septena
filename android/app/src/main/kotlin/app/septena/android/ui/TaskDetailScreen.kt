@@ -224,6 +224,17 @@ fun TaskDetailScreen(
         else -> labels.noDate
     }
     val deadline = taskFields[RegistryEntityFields.Task.DEADLINE].stringValue()
+    val reminderAt = taskFields[RegistryEntityFields.Task.REMINDER_AT].stringValue()
+    val reminderMode = taskFields[RegistryEntityFields.Task.REMINDER_MODE].stringValue()
+    val reminderValue = reminderAt?.let {
+        formatReminder(
+            reminderAt = it,
+            reminderMode = reminderMode,
+            snoozedUntil = taskFields[RegistryEntityFields.Task.REMINDER_SNOOZED_UNTIL].stringValue(),
+            today = graph.clock.today(graph.clock.now()),
+            languageTag = languageTag,
+        )
+    } ?: labels.control(RegistryTaskDetail.Controls.REMINDER_NONE)
     val repeatUnit = taskFields[RegistryEntityFields.Task.RECURRENCE_UNIT].stringValue()
     val repeatInterval = taskFields[RegistryEntityFields.Task.RECURRENCE_INTERVAL].longValue() ?: 1L
     val repeatAfterCompletion = repeatUnit == null ||
@@ -319,6 +330,11 @@ fun TaskDetailScreen(
         write { check(graph.taskMutator.setDeadline(taskId, day) != null) }
     }
 
+    // The write bumps dataVersion, and the graph arms the alarm from the store.
+    fun setReminder(reminderAt: String?, mode: String?) {
+        write { check(graph.taskMutator.setReminder(taskId, reminderAt, mode) != null) }
+    }
+
     fun setTag(tagId: String, selected: Boolean) {
         write {
             val currentTask = graph.taskStore.record(RegistryEntityNames.TASK, taskId)
@@ -371,8 +387,8 @@ fun TaskDetailScreen(
      * On the page a picker is embedded, never modal (docs/TASK_PAGE_SPEC.md §3):
      * the picker folds open in the attribute's row, and a second tap on the row
      * folds it closed, which is Cancel. A commit writes through the attribute's
-     * setter and folds the row. One row is open at a time. Reminder and star
-     * have no Android editor yet.
+     * setter and folds the row. One row is open at a time. Star
+     * has no Android editor yet.
      */
     fun openAttribute(attributeId: String) {
         if (openPicker == attributeId) {
@@ -620,7 +636,7 @@ fun TaskDetailScreen(
                             HorizontalDivider()
                             // The attributes block holds no list of its own: it renders the
                             // registry task attributes in their order. Notes, checklist and
-                            // attachments have their own blocks. Reminder and star
+                            // attachments have their own blocks. Star and
                             // paste have no editor on Android yet. Each picker folds open in
                             // its own row through [openAttribute], never in a dialog.
                             attributes.forEach { attribute ->
@@ -657,6 +673,23 @@ fun TaskDetailScreen(
                                             enabled = canEdit,
                                             onSelect = { day -> openPicker = null; setDeadline(day) },
                                             onClear = { openPicker = null; setDeadline(null) },
+                                        )
+                                    }
+                                    RegistryTaskAttributeIds.REMINDER -> AttributeFoldRow(
+                                        label = attribute.label,
+                                        value = reminderValue,
+                                        expanded = openPicker == RegistryTaskAttributeIds.REMINDER,
+                                        enabled = canEdit,
+                                        onToggle = { openAttribute(RegistryTaskAttributeIds.REMINDER) },
+                                    ) {
+                                        TaskReminderPicker(
+                                            graph = graph,
+                                            reminderAt = reminderAt,
+                                            reminderMode = reminderMode,
+                                            enabled = canEdit,
+                                            control = labels::control,
+                                            onSet = { at, mode -> openPicker = null; setReminder(at, mode) },
+                                            onClear = { openPicker = null; setReminder(null, null) },
                                         )
                                     }
                                     RegistryTaskAttributeIds.LIST -> AttributeFoldRow(

@@ -157,10 +157,6 @@
       "reason": "Privacy settings are not on Android yet.",
       "issue": "#244"
     },
-    "RegistryEntityEnums.ReminderMode.*": {
-      "reason": "Reminders are not on Android yet.",
-      "issue": "#174"
-    },
     "RegistryEntityEnums.ConvoAssignee.*": {
       "reason": "Task conversations are not on Android yet.",
       "issue": "#242"
@@ -194,7 +190,7 @@
       "issue": "#174"
     },
     "RegistryEntityFields.Task.*": {
-      "reason": "Reminder fields: reminders are not on Android yet.",
+      "reason": "deferCount, dropReason and effort: Android does not read or write them yet.",
       "issue": "#174"
     },
     "RegistryRules.CUE_DECAY_DAYS": {
