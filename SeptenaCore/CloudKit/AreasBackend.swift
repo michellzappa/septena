@@ -36,6 +36,9 @@ protocol AreasBackend: AnyObject {
   func create(title: String, context: String?) async throws -> Area
   func rename(id: String, to title: String) async throws
   func setContext(id: String, context: String?) async throws
+  func acceptNotesProposal(id: String) async throws
+  func rejectNotesProposal(id: String) async throws
+  func restoreNotesState(id: String, context: String?, proposal: NotesProposal?) async throws
   func setEmoji(id: String, emoji: String?) async throws
   func delete(id: String) async throws
   /// Renumber areas to match `orderedIDs` (synced sidebar order). See
@@ -81,6 +84,15 @@ final class AreasMutator: AreasBackend {
   }
   func setContext(id: String, context ctx: String?) async throws {
     try await requireBackend().setContext(id: id, context: ctx)
+  }
+  func acceptNotesProposal(id: String) async throws {
+    try await requireBackend().acceptNotesProposal(id: id)
+  }
+  func rejectNotesProposal(id: String) async throws {
+    try await requireBackend().rejectNotesProposal(id: id)
+  }
+  func restoreNotesState(id: String, context ctx: String?, proposal: NotesProposal?) async throws {
+    try await requireBackend().restoreNotesState(id: id, context: ctx, proposal: proposal)
   }
   func setEmoji(id: String, emoji: String?) async throws {
     try await requireBackend().setEmoji(id: id, emoji: emoji)
@@ -312,6 +324,27 @@ final class CloudKitAreasBackend: AreasBackend {
     guard let entity = fetch(id: id) else { return }
     entity.context = (ctx?.isEmpty == true) ? nil : ctx
     commitAndPush(entity, op: "setContext")
+  }
+
+  func acceptNotesProposal(id: String) async throws {
+    guard let entity = fetch(id: id), let proposal = entity.notesProposal else { return }
+    let merged = ContainerNotes.replacingBrief(in: entity.context, with: proposal.body)
+    entity.context = merged.isEmpty ? nil : merged
+    entity.notesProposal = nil
+    commitAndPush(entity, op: "acceptNotesProposal")
+  }
+
+  func rejectNotesProposal(id: String) async throws {
+    guard let entity = fetch(id: id), entity.notesProposal != nil else { return }
+    entity.notesProposal = nil
+    commitAndPush(entity, op: "rejectNotesProposal")
+  }
+
+  func restoreNotesState(id: String, context ctx: String?, proposal: NotesProposal?) async throws {
+    guard let entity = fetch(id: id) else { return }
+    entity.context = (ctx?.isEmpty == true) ? nil : ctx
+    entity.notesProposal = proposal
+    commitAndPush(entity, op: "restoreNotesState")
   }
 
   func setEmoji(id: String, emoji: String?) async throws {

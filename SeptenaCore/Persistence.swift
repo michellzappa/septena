@@ -404,6 +404,10 @@ final class ProjectEntity {
   var completedAt: String?
   var notes: String?
   var context: String?
+  /// Server-maintained notes revision counter (ADR 0012). Pulled only, never pushed.
+  var noteRev: Int = 0
+  /// Encoded `NotesProposal` JSON when an agent has suggested a new brief.
+  var notesProposalJSON: String?
   var githubRepo: String?
   /// Sidebar sort order (synced). `0` = unset (falls back to legacy device
   /// order / title); a reorder renumbers the whole group 1…N. Rides the
@@ -426,6 +430,8 @@ final class ProjectEntity {
        completedAt: String? = nil,
        notes: String? = nil,
        context: String? = nil,
+       noteRev: Int = 0,
+       notesProposalJSON: String? = nil,
        githubRepo: String? = nil,
        position: Int = 0,
        lastSyncedAt: Date = .distantPast,
@@ -440,6 +446,8 @@ final class ProjectEntity {
     self.completedAt = completedAt
     self.notes = notes
     self.context = context
+    self.noteRev = noteRev
+    self.notesProposalJSON = notesProposalJSON
     self.githubRepo = githubRepo
     self.position = position
     self.lastSyncedAt = lastSyncedAt
@@ -452,6 +460,22 @@ final class ProjectEntity {
     get { ProjectStatus(rawValue: statusRaw) ?? .active }
     set { statusRaw = newValue.rawValue }
   }
+
+  var notesProposal: NotesProposal? {
+    get {
+      guard let json = notesProposalJSON, let data = json.data(using: .utf8) else { return nil }
+      return try? JSONDecoder().decode(NotesProposal.self, from: data)
+    }
+    set {
+      guard let newValue,
+            let data = try? JSONEncoder().encode(newValue),
+            let json = String(data: data, encoding: .utf8) else {
+        notesProposalJSON = nil
+        return
+      }
+      notesProposalJSON = json
+    }
+  }
 }
 
 @Model
@@ -459,6 +483,10 @@ final class AreaEntity {
   @Attribute(.unique) var id: String
   var title: String
   var context: String?
+  /// Server-maintained notes revision counter (ADR 0012). Pulled only, never pushed.
+  var noteRev: Int = 0
+  /// Encoded `NotesProposal` JSON when an agent has suggested a new brief.
+  var notesProposalJSON: String?
   /// Optional user-assigned glyph. When set, it replaces the area's filler
   /// dot wherever the area appears (sidebar, headers, pickers) — a Tier-3
   /// emoji in design-system terms. Nil ⇒ fall back to the dot.
@@ -473,18 +501,37 @@ final class AreaEntity {
   /// CKRecord system-fields blob. See `TaskEntity.cloudKitSystemFields`.
   var cloudKitSystemFields: Data?
 
-  init(id: String, title: String, context: String? = nil, emoji: String? = nil,
+  init(id: String, title: String, context: String? = nil, noteRev: Int = 0,
+       notesProposalJSON: String? = nil, emoji: String? = nil,
        position: Int = 0,
        lastSyncedAt: Date = .distantPast, updatedAt: String? = nil,
        cloudKitSystemFields: Data? = nil) {
     self.id = id
     self.title = title
     self.context = context
+    self.noteRev = noteRev
+    self.notesProposalJSON = notesProposalJSON
     self.emoji = emoji
     self.position = position
     self.lastSyncedAt = lastSyncedAt
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
+  }
+
+  var notesProposal: NotesProposal? {
+    get {
+      guard let json = notesProposalJSON, let data = json.data(using: .utf8) else { return nil }
+      return try? JSONDecoder().decode(NotesProposal.self, from: data)
+    }
+    set {
+      guard let newValue,
+            let data = try? JSONEncoder().encode(newValue),
+            let json = String(data: data, encoding: .utf8) else {
+        notesProposalJSON = nil
+        return
+      }
+      notesProposalJSON = json
+    }
   }
 }
 
@@ -752,6 +799,8 @@ extension Project {
               completedAt: e.completedAt,
               notes: e.notes,
               context: e.context,
+              noteRev: e.noteRev,
+              notesProposal: e.notesProposal,
               githubRepo: e.githubRepo,
               position: e.position,
               updatedAt: e.updatedAt,
@@ -761,7 +810,8 @@ extension Project {
 
 extension Area {
   init(_ e: AreaEntity) {
-    self.init(id: e.id, title: e.title, context: e.context, emoji: e.emoji,
+    self.init(id: e.id, title: e.title, context: e.context, noteRev: e.noteRev,
+              notesProposal: e.notesProposal, emoji: e.emoji,
               position: e.position,
               updatedAt: e.updatedAt)
   }

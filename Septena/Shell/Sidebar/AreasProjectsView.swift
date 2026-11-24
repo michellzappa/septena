@@ -22,9 +22,11 @@ import SwiftData
 func notesField(_ text: Binding<String>,
                 placeholder: String,
                 selection: Binding<TextSelection?> = .constant(nil),
-                focused: FocusState<Bool>.Binding) -> some View {
+                focused: FocusState<Bool>.Binding,
+                onShowHistory: (() -> Void)? = nil) -> some View {
   ContainerNotesField(text: text, placeholder: placeholder,
-                      selection: selection, focused: focused)
+                      selection: selection, focused: focused,
+                      onShowHistory: onShowHistory)
 }
 
 struct ContainerNotesField: View {
@@ -32,6 +34,7 @@ struct ContainerNotesField: View {
   let placeholder: String
   @Binding var selection: TextSelection?
   var focused: FocusState<Bool>.Binding
+  var onShowHistory: (() -> Void)? = nil
 
   /// Lines the blurred preview shows before the "Show more" toggle.
   static let previewLines = 3
@@ -111,6 +114,13 @@ struct ContainerNotesField: View {
           .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+      }
+    }
+    .contextMenu {
+      if let onShowHistory {
+        Button(action: onShowHistory) {
+          Label(ContainerNotesCopy.historyMenuTitle, systemImage: "clock.arrow.circlepath")
+        }
       }
     }
   }
@@ -259,6 +269,8 @@ struct AreaDetailView: View {
   @State private var draftName: String
   @State private var draftNotes: String
   @State private var originalNotes: String
+  @State private var notesProposal: NotesProposal?
+  @State private var showingNotesHistory = false
   @State private var draftEmoji: String
   @State private var originalEmoji: String
   @State private var showingEmojiEditor = false
@@ -276,6 +288,7 @@ struct AreaDetailView: View {
     _draftName = State(initialValue: area.title)
     _draftNotes = State(initialValue: area.context ?? "")
     _originalNotes = State(initialValue: area.context ?? "")
+    _notesProposal = State(initialValue: area.notesProposal)
     _draftEmoji = State(initialValue: area.emoji ?? "")
     _originalEmoji = State(initialValue: area.emoji ?? "")
     // Seed area + project lists from cache before first render so the
@@ -342,7 +355,16 @@ struct AreaDetailView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
           }
-          notesField($draftNotes, placeholder: ContainerNotes.areaPlaceholder, focused: $notesFocused)
+          if let proposal = notesProposal {
+            NotesProposalCard(
+              proposal: proposal,
+              currentNotes: draftNotes,
+              onAccept: acceptProposal,
+              onReject: rejectProposal
+            )
+          }
+          notesField($draftNotes, placeholder: ContainerNotes.areaPlaceholder, focused: $notesFocused,
+                     onShowHistory: TaskHistory.isAvailable ? { showingNotesHistory = true } : nil)
         }
         // Park the whole header on the task cards' content column so the area
         // glyph, notes, and the project rings / task checkboxes below all line
@@ -387,11 +409,39 @@ struct AreaDetailView: View {
     .septenaInlineTitle()
     #if os(iOS)
     .toolbar {
+      if TaskHistory.isAvailable {
+        ToolbarItem(placement: usesPushNavigation ? .primaryAction : .topBarTrailing) {
+          Button { showingNotesHistory = true } label: {
+            Label(ContainerNotesCopy.historyMenuTitle, systemImage: "clock.arrow.circlepath")
+          }
+        }
+      }
       if !usesPushNavigation {
         ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }
       }
     }
+    #else
+    .toolbar {
+      if TaskHistory.isAvailable {
+        ToolbarItem(placement: .primaryAction) {
+          Button { showingNotesHistory = true } label: {
+            Label(ContainerNotesCopy.historyMenuTitle, systemImage: "clock.arrow.circlepath")
+          }
+        }
+      }
+    }
     #endif
+    .sheet(isPresented: $showingNotesHistory) {
+      NotesHistorySheet(
+        container: .area,
+        containerID: area.id,
+        containerTitle: draftName,
+        currentNotes: draftNotes,
+        onRestore: restoreNotes
+      )
+      .presentationDetents([.medium, .large])
+      .septenaSheetChrome()
+    }
     .alert(RegistryPrompts.errorTitle, isPresented: Binding(
       get: { errorMessage != nil },
       set: { if !$0 { errorMessage = nil } }
@@ -407,6 +457,7 @@ struct AreaDetailView: View {
       if draftName == old.title {
         draftName = fresh.title
       }
+      notesProposal = fresh.notesProposal
     }
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
       Task { await load() }
@@ -518,11 +569,14 @@ struct AreaDetailView: View {
     // refreshed, so coming back to this screen would otherwise show pre-save
     // notes even though the server has the new value. Guard on focus so we
     // never clobber a draft the user is actively typing.
-    if !notesFocused, let fresh = areas.first(where: { $0.id == area.id }) {
-      let serverNotes = fresh.context ?? ""
-      if serverNotes != draftNotes {
-        draftNotes = serverNotes
-        originalNotes = serverNotes
+    if let fresh = areas.first(where: { $0.id == area.id }) {
+      notesProposal = fresh.notesProposal
+      if !notesFocused {
+        let serverNotes = fresh.context ?? ""
+        if serverNotes != draftNotes {
+          draftNotes = serverNotes
+          originalNotes = serverNotes
+        }
       }
     }
 
@@ -557,6 +611,63 @@ struct AreaDetailView: View {
     }
   }
 
+  private func acceptProposal() {
+    guard let proposal = notesProposal else { return }
+    let before = draftNotes.isEmpty ? nil : draftNotes
+    let merged = ContainerNotes.replacingBrief(in: before, with: proposal.body)
+    Haptics.commit()
+    notesFocused = false
+    draftNotes = merged
+    originalNotes = merged
+    notesProposal = nil
+    TaskUndo.recordAreaProposalDecision(
+      id: area.id,
+      accepted: true,
+      beforeNotes: before,
+      afterNotes: merged.isEmpty ? nil : merged,
+      proposal: proposal,
+      areas: areasMutator
+    )
+    Task {
+      do { try await areasMutator.acceptNotesProposal(id: area.id) }
+      catch { errorMessage = error.localizedDescription }
+    }
+  }
+
+  private func rejectProposal() {
+    guard let proposal = notesProposal else { return }
+    let current = draftNotes.isEmpty ? nil : draftNotes
+    Haptics.commit()
+    notesProposal = nil
+    TaskUndo.recordAreaProposalDecision(
+      id: area.id,
+      accepted: false,
+      beforeNotes: current,
+      afterNotes: current,
+      proposal: proposal,
+      areas: areasMutator
+    )
+    Task {
+      do { try await areasMutator.rejectNotesProposal(id: area.id) }
+      catch { errorMessage = error.localizedDescription }
+    }
+  }
+
+  private func restoreNotes(_ restored: String) {
+    let before = draftNotes.isEmpty ? nil : draftNotes
+    let after = restored.isEmpty ? nil : restored
+    guard (before ?? "") != (after ?? "") else { return }
+    Haptics.commit()
+    notesFocused = false
+    draftNotes = restored
+    originalNotes = restored
+    TaskUndo.recordAreaNotesRestore(id: area.id, before: before, after: after, areas: areasMutator)
+    Task {
+      do { try await areasMutator.setContext(id: area.id, context: after) }
+      catch { errorMessage = error.localizedDescription }
+    }
+  }
+
   private func commitEmoji(_ value: String) {
     guard value != originalEmoji else { return }
     originalEmoji = value
@@ -586,6 +697,8 @@ struct ProjectDetailView: View {
   @State private var draftNotes: String
   @State private var originalName: String
   @State private var originalNotes: String
+  @State private var notesProposal: NotesProposal?
+  @State private var showingNotesHistory = false
   @State private var status: ProjectStatus
   @State private var errorMessage: String?
   @State private var showingDeleteConfirm = false
@@ -608,6 +721,7 @@ struct ProjectDetailView: View {
     _draftNotes = State(initialValue: project.notes ?? "")
     _originalName = State(initialValue: project.title)
     _originalNotes = State(initialValue: project.notes ?? "")
+    _notesProposal = State(initialValue: project.notesProposal)
     _status = State(initialValue: project.status)
     // Seed the progress ring synchronously from the local cache so the very
     // first render already shows the right fraction — otherwise it paints an
@@ -652,8 +766,17 @@ struct ProjectDetailView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
           }
+          if let proposal = notesProposal {
+            NotesProposalCard(
+              proposal: proposal,
+              currentNotes: draftNotes,
+              onAccept: acceptProposal,
+              onReject: rejectProposal
+            )
+          }
           notesField($draftNotes, placeholder: ContainerNotes.projectPlaceholder,
-                     selection: $notesSelection, focused: $notesFocused)
+                     selection: $notesSelection, focused: $notesFocused,
+                     onShowHistory: TaskHistory.isAvailable ? { showingNotesHistory = true } : nil)
         }
         // Match the area page: park the header on the task cards' content
         // column so the progress ring sits over the checkboxes below.
@@ -686,6 +809,17 @@ struct ProjectDetailView: View {
       AreaPickerSheet(areas: areas, currentAreaId: project.area) { newAreaId in
         moveToArea(newAreaId)
       }
+      .presentationDetents([.medium, .large])
+      .septenaSheetChrome()
+    }
+    .sheet(isPresented: $showingNotesHistory) {
+      NotesHistorySheet(
+        container: .project,
+        containerID: project.id,
+        containerTitle: draftName,
+        currentNotes: draftNotes,
+        onRestore: restoreNotes
+      )
       .presentationDetents([.medium, .large])
       .septenaSheetChrome()
     }
@@ -722,6 +856,7 @@ struct ProjectDetailView: View {
         draftNotes = notes
         originalNotes = notes
       }
+      notesProposal = fresh.notesProposal
       status = fresh.status
     }
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
@@ -760,6 +895,13 @@ struct ProjectDetailView: View {
 
   private var projectOverflowMenu: some View {
     OverflowMenu {
+      if TaskHistory.isAvailable {
+        Button {
+          showingNotesHistory = true
+        } label: {
+          Label(ContainerNotesCopy.historyMenuTitle, systemImage: "clock.arrow.circlepath")
+        }
+      }
       Button {
         nav.shouldCreateHeading = true
       } label: {
@@ -801,7 +943,9 @@ struct ProjectDetailView: View {
   private func rehydrateNotes() async {
     let fresh: Project? = LocalCache.projects(in: modelContext)
       .first(where: { $0.id == project.id })
-    guard !notesFocused, let fresh else { return }
+    guard let fresh else { return }
+    notesProposal = fresh.notesProposal
+    guard !notesFocused else { return }
     let serverNotes = fresh.notes ?? ""
     if serverNotes != draftNotes {
       draftNotes = serverNotes
@@ -862,6 +1006,63 @@ struct ProjectDetailView: View {
     originalNotes = draftNotes
     Task {
       do { try await projectsMutator.setNotes(id: project.id, notes: draftNotes) }
+      catch { errorMessage = error.localizedDescription }
+    }
+  }
+
+  private func acceptProposal() {
+    guard let proposal = notesProposal else { return }
+    let before = draftNotes.isEmpty ? nil : draftNotes
+    let merged = ContainerNotes.replacingBrief(in: before, with: proposal.body)
+    Haptics.commit()
+    notesFocused = false
+    draftNotes = merged
+    originalNotes = merged
+    notesProposal = nil
+    TaskUndo.recordProjectProposalDecision(
+      id: project.id,
+      accepted: true,
+      beforeNotes: before,
+      afterNotes: merged.isEmpty ? nil : merged,
+      proposal: proposal,
+      projects: projectsMutator
+    )
+    Task {
+      do { try await projectsMutator.acceptNotesProposal(id: project.id) }
+      catch { errorMessage = error.localizedDescription }
+    }
+  }
+
+  private func rejectProposal() {
+    guard let proposal = notesProposal else { return }
+    let current = draftNotes.isEmpty ? nil : draftNotes
+    Haptics.commit()
+    notesProposal = nil
+    TaskUndo.recordProjectProposalDecision(
+      id: project.id,
+      accepted: false,
+      beforeNotes: current,
+      afterNotes: current,
+      proposal: proposal,
+      projects: projectsMutator
+    )
+    Task {
+      do { try await projectsMutator.rejectNotesProposal(id: project.id) }
+      catch { errorMessage = error.localizedDescription }
+    }
+  }
+
+  private func restoreNotes(_ restored: String) {
+    let before = draftNotes.isEmpty ? nil : draftNotes
+    let after = restored.isEmpty ? nil : restored
+    guard (before ?? "") != (after ?? "") else { return }
+    Haptics.commit()
+    notesFocused = false
+    draftNotes = restored
+    originalNotes = restored
+    TaskUndo.recordProjectNotesRestore(id: project.id, before: before, after: after, projects: projectsMutator)
+    Task {
+      do { try await projectsMutator.setNotes(id: project.id, notes: after) }
       catch { errorMessage = error.localizedDescription }
     }
   }

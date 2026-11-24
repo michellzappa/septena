@@ -241,3 +241,25 @@ struct BackendAccess: Decodable, Sendable, Equatable {
   /// The agent count: the server's, else the list length.
   var agentCount: Int { agents?.count ?? connections.count }
 }
+
+// MARK: - Project & area notes history (GET /v1/notes/history, #123)
+
+struct BackendNoteRevision: Decodable, Identifiable, Hashable, Sendable {
+  let rev: Int
+  let actor: String
+  let at: String
+  let reason: String?
+  let body: String?
+
+  var id: Int { rev }
+  var date: Date? { TaskHistory.parseStamp(at) }
+  var who: String { TaskHistory.who(actor) }
+  var byAgent: Bool { actor.hasPrefix("mcp:") }
+}
+
+struct BackendNoteHistoryResponse: Decodable, Sendable {
+  let container: String
+  let id: String
+  let noteRev: Int
+  let revisions: [BackendNoteRevision]
+}
