@@ -8,7 +8,7 @@ import { taskViewMembership, type CoreMembership, type CoreTask } from "../core/
 // disagree on what "Today" or "pending reasoning" means.
 
 export type TaskView =
-  | "today" | "inbox" | "review" | "anytime" | "upcoming" | "completed";
+  | "today" | "inbox" | "review" | "anytime" | "upcoming" | "completed" | "faded";
 
 export interface TaskOut {
   id: string;
@@ -235,6 +235,9 @@ export function matchesView(t: TaskOut, view: TaskView, today: string, nowMs: nu
     case "upcoming":
     case "anytime":
       return membership(t, today, nowMs).matchesView[view];
+    case "faded":
+      // The app's Faded pile: open tasks the fade pass took out of their list.
+      return t.status === "open" && t.kind !== "heading" && !!t.fadedAt;
     default:
       return t.status === "open" && t.kind !== "heading";
   }

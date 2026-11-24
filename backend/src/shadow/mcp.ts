@@ -137,7 +137,7 @@ const zLimit = (max: number) => z.number().int().min(1).max(max);
 const zArgs = {
   tasks_list: z.object({
     // "triage" and "someday" are retired names, kept as aliases (normalizeView).
-    view: z.enum(["today", "inbox", "review", "anytime", "upcoming", "completed", "triage", "someday"]).optional(),
+    view: z.enum(["today", "inbox", "review", "anytime", "upcoming", "completed", "faded", "triage", "someday"]).optional(),
     limit: zLimit(500).optional(),
     tag: z.union([z.string().min(1), z.array(z.string().min(1))]).optional(),
   }),
