@@ -498,7 +498,7 @@ private fun approvalCopy(id: String, languageTag: String, client: String = ""): 
 private fun connectorCopy(id: String, languageTag: String): String = settingsCopy(CLAUDE_CONNECTOR, id, languageTag)
 
 private const val SIGN_IN_APPROVAL = "sign_in_approval"
-private const val CLAUDE_CONNECTOR = "claude_connector"
+internal const val CLAUDE_CONNECTOR = "claude_connector"
 private const val CONNECTOR_URL = "https://api.septena.app/mcp"
 private const val MAX_CODE_INPUT = 32
 private const val MAX_AGENT_NAME = 40

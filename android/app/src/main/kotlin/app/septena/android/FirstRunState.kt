@@ -40,6 +40,9 @@ class FirstRunState(
      */
     suspend fun resolve(graph: AndroidAppGraph) {
         if (_phase.value != Phase.Unresolved) return
+        // A deleted account's rows must not count as this account's content. A wipe that fails again stays
+        // pending and blocks the next sign-in.
+        runCatching { graph.finishPendingWipe() }
         if (needsFirstRun() && graph.credentials.signedIn.value) runCatching { graph.sync.syncAndWait() }
         grandfatherIfEstablished(graph)
         _phase.value = if (needsFirstRun()) Phase.Show else Phase.Hidden

@@ -66,14 +66,20 @@ class AndroidAppGraph(application: Application) {
     val syncedSettingsMutator = SyncedSettingsMutator(taskStore, ids)
 
     val auth = SeptenaAuthClient(clientVersion)
-    val credentials = AppCredentials(SessionStore(application), auth)
+    val credentials = AppCredentials(SessionStore(application), auth, beforeAdopt = ::finishPendingWipe)
     private val transport = UrlConnectionSyncTransport(credentials, clientVersion)
     val access = SeptenaAccessClient(credentials, clientVersion)
     val taskBackend = SeptenaTaskBackendClient(credentials, clientVersion)
     val attachments = TaskAttachmentStore(application, taskStore, registryEntityMutator, clock, taskBackend)
+    val accountWipe = AccountWipe(application, taskStore, attachments, taskUndoHistory)
     val sync = SyncController(TaskSyncEngine(taskStore, transport, clock), appScope, afterSync = ::afterSync)
     val appearance = AppearanceStore(deviceSettings, syncedSettings, syncedSettingsMutator, sync, clock, appScope)
     val firstRun = FirstRunState(application, taskStore, syncedSettings, syncedSettingsMutator, clock)
+
+    /** Finishes the wipe of a deleted account that failed earlier (`AccountWipe`); nothing to do otherwise. */
+    suspend fun finishPendingWipe() {
+        if (accountWipe.finishIfPending()) sync.noteLocalChange()
+    }
 
     /** The app day the fade pass last ran in this process. */
     @Volatile private var lastFadePassDay: String? = null
