@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
@@ -30,7 +32,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
@@ -50,13 +51,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -277,7 +283,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         sidebarActionTitle = sidebarActionTitle,
                         quickAddTitle = quickAddTitle,
                         quickFindTitle = quickFindTitle,
-                        pauseAgentsTitle = pauseAgentsTitle,
+                        settingsTitle = settingsTitle,
                         completeTitle = completeTitle,
                         emptyTitle = emptyTitle,
                         emptyDescription = emptyDescription,
@@ -292,7 +298,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         onOpenTask = { openTaskWithAttribute(it, null) },
                         onTaskAction = onTaskAction,
                         onQuickFind = { quickFindOpen = true },
-                        onToggleAgentsPaused = { homeViewModel.setAgentsPaused(!state.agentsPaused) },
+                        onOpenSettings = { settingsOpen = true },
                         onSelectHomeLocation = selectHomeLocation,
                         snackbarVisible = undoSnackbarHostState.currentSnackbarData != null,
                     )
@@ -343,7 +349,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         sidebarActionTitle = sidebarActionTitle,
                         quickAddTitle = quickAddTitle,
                         quickFindTitle = quickFindTitle,
-                        pauseAgentsTitle = pauseAgentsTitle,
+                        settingsTitle = settingsTitle,
                         completeTitle = completeTitle,
                         emptyTitle = emptyTitle,
                         emptyDescription = emptyDescription,
@@ -359,7 +365,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         onOpenTask = { openTaskWithAttribute(it, null) },
                         onTaskAction = onTaskAction,
                         onQuickFind = { quickFindOpen = true },
-                        onToggleAgentsPaused = { homeViewModel.setAgentsPaused(!state.agentsPaused) },
+                        onOpenSettings = { settingsOpen = true },
                         onSelectHomeLocation = selectHomeLocation,
                         snackbarVisible = undoSnackbarHostState.currentSnackbarData != null,
                     )
@@ -404,27 +410,39 @@ private fun TaskHomeNavigation(
             )
         }
 
-        if (areasTitle.isNotEmpty() || projectsTitle.isNotEmpty()) {
+        val areaIds = state.areas.mapNotNull { (it.location as? TaskHomeLocation.Area)?.id }.toSet()
+        val projectsByArea = state.projects.groupBy { it.parentAreaId }
+        val standaloneProjects = state.projects.filter { it.parentAreaId == null || it.parentAreaId !in areaIds }
+
+        if (areasTitle.isNotEmpty() || standaloneProjects.isNotEmpty()) {
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         }
-        if (areasTitle.isNotEmpty()) {
+        if (areasTitle.isNotEmpty() && state.areas.isNotEmpty()) {
             DrawerGroupTitle(areasTitle)
             state.areas.forEach { item ->
+                val area = item.location as TaskHomeLocation.Area
                 AreaNavigationDrawerItem(
                     item = item,
                     selected = state.location == item.location,
                     languageTag = languageTag,
                     onSelect = { onSelect(item.location) },
-                    onSetEmoji = { emoji ->
-                        val area = item.location as TaskHomeLocation.Area
-                        onSetAreaEmoji(area.id, emoji)
-                    },
+                    onSetEmoji = { emoji -> onSetAreaEmoji(area.id, emoji) },
                 )
+                projectsByArea[area.id].orEmpty().forEach { projectItem ->
+                    NavigationDrawerItem(
+                        label = { Text(projectItem.title.orEmpty()) },
+                        selected = state.location == projectItem.location,
+                        onClick = { onSelect(projectItem.location) },
+                        modifier = Modifier
+                            .padding(NavigationDrawerItemDefaults.ItemPadding)
+                            .padding(start = 20.dp),
+                    )
+                }
             }
         }
-        if (projectsTitle.isNotEmpty()) {
+        if (projectsTitle.isNotEmpty() && standaloneProjects.isNotEmpty()) {
             DrawerGroupTitle(projectsTitle)
-            state.projects.forEach { item ->
+            standaloneProjects.forEach { item ->
                 NavigationDrawerItem(
                     label = { Text(item.title.orEmpty()) },
                     selected = state.location == item.location,
@@ -536,7 +554,7 @@ private fun TaskHomeScaffold(
     sidebarActionTitle: String,
     quickAddTitle: String,
     quickFindTitle: String,
-    pauseAgentsTitle: String,
+    settingsTitle: String,
     completeTitle: String,
     emptyTitle: String,
     emptyDescription: String,
@@ -552,7 +570,7 @@ private fun TaskHomeScaffold(
     onOpenTask: (String) -> Unit,
     onTaskAction: (String, String) -> Unit,
     onQuickFind: () -> Unit,
-    onToggleAgentsPaused: () -> Unit,
+    onOpenSettings: () -> Unit,
     onSelectHomeLocation: (TaskHomeLocation) -> Unit,
     snackbarVisible: Boolean = false,
 ) {
@@ -679,19 +697,28 @@ private fun TaskHomeScaffold(
                         title = { Text(title) },
                         navigationIcon = if (showNavigationAction) {
                             {
-                                TextButton(onClick = onOpenNavigation) {
-                                    Text(sidebarActionTitle)
+                                IconButton(
+                                    onClick = onOpenNavigation,
+                                    modifier = Modifier.semantics { contentDescription = sidebarActionTitle },
+                                ) {
+                                    SidebarMenuGlyph(tint = MaterialTheme.colorScheme.onSurface)
                                 }
                             }
                         } else {
                             {}
                         },
                         actions = {
-                            TextButton(onClick = onToggleAgentsPaused) {
-                                Text(pauseAgentsTitle)
+                            IconButton(
+                                onClick = onQuickFind,
+                                modifier = Modifier.semantics { contentDescription = quickFindTitle },
+                            ) {
+                                SearchGlyph(tint = MaterialTheme.colorScheme.onSurface)
                             }
-                            TextButton(onClick = onQuickFind) {
-                                Text(quickFindTitle)
+                            IconButton(
+                                onClick = onOpenSettings,
+                                modifier = Modifier.semantics { contentDescription = settingsTitle },
+                            ) {
+                                SettingsGearGlyph(tint = MaterialTheme.colorScheme.onSurface)
                             }
                         },
                     )
@@ -808,6 +835,63 @@ private fun defaultQuickAddDraft(location: TaskHomeLocation): QuickAddDraft = wh
         RegistryDestinationIds.TODAY -> QuickAddDraft(today = true)
         RegistryDestinationIds.STARRED -> QuickAddDraft(starred = true)
         else -> QuickAddDraft()
+    }
+}
+
+@Composable
+private fun SidebarMenuGlyph(tint: Color) {
+    Canvas(modifier = Modifier.size(22.dp)) {
+        val stroke = 2.dp.toPx()
+        val left = 2.dp.toPx()
+        val right = size.width - 2.dp.toPx()
+        val ys = listOf(size.height * 0.25f, size.height * 0.50f, size.height * 0.75f)
+        ys.forEach { y ->
+            drawLine(tint, Offset(left, y), Offset(right, y), strokeWidth = stroke, cap = StrokeCap.Round)
+        }
+    }
+}
+
+@Composable
+private fun SearchGlyph(tint: Color) {
+    Canvas(modifier = Modifier.size(22.dp)) {
+        val stroke = 2.dp.toPx()
+        val radius = size.minDimension * 0.30f
+        val center = Offset(size.width * 0.43f, size.height * 0.43f)
+        drawCircle(tint, radius = radius, center = center, style = Stroke(width = stroke))
+        val offset = radius * 0.72f
+        drawLine(
+            tint,
+            Offset(center.x + offset, center.y + offset),
+            Offset(size.width * 0.86f, size.height * 0.86f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round,
+        )
+    }
+}
+
+@Composable
+private fun SettingsGearGlyph(tint: Color) {
+    Canvas(modifier = Modifier.size(22.dp)) {
+        val stroke = 1.9.dp.toPx()
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val innerR = size.minDimension * 0.17f
+        val midR = size.minDimension * 0.31f
+        val outerR = size.minDimension * 0.44f
+        drawCircle(tint, radius = innerR, center = Offset(cx, cy), style = Stroke(width = stroke))
+        drawCircle(tint, radius = midR, center = Offset(cx, cy), style = Stroke(width = stroke))
+        for (i in 0 until 8) {
+            val angle = i * (Math.PI / 4.0)
+            val cosA = cos(angle).toFloat()
+            val sinA = sin(angle).toFloat()
+            drawLine(
+                tint,
+                Offset(cx + cosA * midR, cy + sinA * midR),
+                Offset(cx + cosA * outerR, cy + sinA * outerR),
+                strokeWidth = stroke * 1.15f,
+                cap = StrokeCap.Round,
+            )
+        }
     }
 }
 

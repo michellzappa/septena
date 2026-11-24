@@ -127,15 +127,14 @@ class AppearanceStore(
             var pushed = false
             lock.withLock {
                 withContext(Dispatchers.IO) {
-                    runCatching {
-                        // Synced store first: a sync that lands between the two
-                        // writes then brings back the new value, not the old one.
-                        if (key in SYNCED_KEYS && readState().syncTheme) {
-                            syncedSettingsMutator.set(key, value)
-                            pushed = true
-                        }
-                        writeLocal(key, value)
+                    // Synced store first: a sync that lands between the two
+                    // writes then brings back the new value, not the old one.
+                    // Keep the local write in its own guard so a sync failure
+                    // never drops the user's choice on this device.
+                    if (key in SYNCED_KEYS && readState().syncTheme) {
+                        pushed = runCatching { syncedSettingsMutator.set(key, value) }.isSuccess
                     }
+                    runCatching { writeLocal(key, value) }
                 }
                 _state.value = readState()
             }
@@ -152,8 +151,11 @@ class AppearanceStore(
             withContext(Dispatchers.IO) {
                 if (!readState().syncTheme) return@withContext
                 for (key in SYNCED_KEYS) {
-                    val synced = runCatching { syncedSettings.value(key) }.getOrNull() ?: continue
-                    if (synced === JsonValue.Null || !isValid(key, synced)) continue
+                    // Read the raw persisted value, not the default fallback: a missing
+                    // or null server row must never overwrite the local choice back to
+                    // `none` / `colorful` (matches Apple `AppearancePreferences.adoptSynced`).
+                    val synced = runCatching { syncedSettings.rawValue(key) }.getOrNull() ?: continue
+                    if (!isValid(key, synced)) continue
                     if (readLocal(key) != synced) writeLocal(key, synced)
                 }
             }

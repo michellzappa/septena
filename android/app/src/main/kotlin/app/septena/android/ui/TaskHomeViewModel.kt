@@ -46,6 +46,8 @@ data class TaskHomeNavigationItem(
     val location: TaskHomeLocation,
     val title: String? = null,
     val emoji: String? = null,
+    /** Owning area id for a project item, so the sidebar nests projects under their areas. */
+    val parentAreaId: String? = null,
 )
 
 data class TaskHomeUiState(
@@ -101,7 +103,11 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private val errorMessage = MutableStateFlow<String?>(null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val loaded: StateFlow<LoadedTaskHome> = combine(location, graph.sync.dataVersion) { selected, _ ->
+    private val loaded: StateFlow<LoadedTaskHome> = combine(
+        location,
+        graph.sync.dataVersion,
+        graph.deviceSettings.changes,
+    ) { selected, _, _ ->
         selected
     }.mapLatest { selected ->
         withContext(Dispatchers.IO) { load(selected) }
@@ -425,20 +431,44 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             .filter { it.deletedAt == null }
             .mapNotNull { record ->
                 record.fields[RegistryEntityFields.Area.TITLE].stringValue()?.let { title ->
-                    TaskHomeNavigationItem(
-                        TaskHomeLocation.Area(record.id, title),
-                        title,
-                        record.fields[RegistryEntityFields.Area.EMOJI].stringValue()?.takeIf(String::isNotBlank),
+                    val position = record.fields[RegistryEntityFields.Area.POSITION].numberValue()
+                    Triple(
+                        position,
+                        title.lowercase(),
+                        TaskHomeNavigationItem(
+                            location = TaskHomeLocation.Area(record.id, title),
+                            title = title,
+                            emoji = record.fields[RegistryEntityFields.Area.EMOJI].stringValue()?.takeIf(String::isNotBlank),
+                        ),
                     )
                 }
             }
+            .sortedWith(compareBy<Triple<Double?, String, TaskHomeNavigationItem>>({ it.first ?: Double.MAX_VALUE }, { it.second }))
+            .map { it.third }
         val projectRecords = graph.taskStore.records(EntityNames.PROJECT)
             .filter { it.deletedAt == null }
+            .filter {
+                val status = it.fields[RegistryEntityFields.Project.STATUS].stringValue()
+                status == null || status == RegistryEntityEnums.ProjectStatus.ACTIVE
+            }
             .mapNotNull { record ->
                 record.fields[RegistryEntityFields.Project.TITLE].stringValue()?.let { title ->
-                    TaskHomeNavigationItem(TaskHomeLocation.Project(record.id, title), title)
+                    val position = record.fields[RegistryEntityFields.Project.POSITION].numberValue()
+                    val parentAreaId = record.fields[RegistryEntityFields.Project.AREA].stringValue()
+                        ?.takeIf(String::isNotBlank)
+                    Triple(
+                        position,
+                        title.lowercase(),
+                        TaskHomeNavigationItem(
+                            location = TaskHomeLocation.Project(record.id, title),
+                            title = title,
+                            parentAreaId = parentAreaId,
+                        ),
+                    )
                 }
             }
+            .sortedWith(compareBy<Triple<Double?, String, TaskHomeNavigationItem>>({ it.first ?: Double.MAX_VALUE }, { it.second }))
+            .map { it.third }
 
         val agentsPaused = graph.syncedSettings.value(RegistrySettingKeys.AGENTS_PAUSED).booleanValue() ?: false
 
@@ -523,6 +553,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                             RegistryDestinationIds.RECENTLY_DELETED -> record.deletedAt
                             else -> null
                         },
+                        areaId = snapshot.area,
+                        projectId = snapshot.project,
                     )
                     if (resolvedLocation.destinationId == RegistryDestinationIds.TODAY && membership.inTodayInbox) {
                         inbox += positioned
@@ -572,11 +604,23 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         ) && destinationId != RegistryDestinationIds.LOGBOOK &&
             destinationId != RegistryDestinationIds.RECENTLY_DELETED
         val stageOrder = agentGroups.values.toList()
-        val orderedTasks = visible.sortedTaskItems(destinationId).let { items ->
-            if (destinationId == RegistryDestinationIds.AGENT) {
-                items.sortedBy { stageOrder.indexOf(it.groupTitle).let { i -> if (i < 0) Int.MAX_VALUE else i } }
-            } else {
-                items
+        val groupByList = (destinationId == RegistryDestinationIds.TODAY &&
+            graph.deviceSettings.bool(RegistrySettingKeys.TODAY_GROUP_BY_LIST)) ||
+            destinationId == RegistryDestinationIds.ANYTIME
+        val orderedTasks = if (groupByList) {
+            groupByAreaAndProject(
+                tasks = visible,
+                areas = areaRecords,
+                projects = projectRecords,
+                destinationId = destinationId,
+            )
+        } else {
+            visible.sortedTaskItems(destinationId).let { items ->
+                if (destinationId == RegistryDestinationIds.AGENT) {
+                    items.sortedBy { stageOrder.indexOf(it.groupTitle).let { i -> if (i < 0) Int.MAX_VALUE else i } }
+                } else {
+                    items
+                }
             }
         }
         return LoadedTaskHome(
@@ -693,10 +737,75 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         )
             .map(PositionedTask::item)
 
+    /**
+     * Groups open tasks by area and project in sidebar order, matching Apple
+     * `TaskListView.groupedOpenItems`: unfiled tasks first (outside Today),
+     * then each area's direct tasks followed by its projects, then top-level
+     * projects without an area.
+     */
+    private fun groupByAreaAndProject(
+        tasks: List<PositionedTask>,
+        areas: List<TaskHomeNavigationItem>,
+        projects: List<TaskHomeNavigationItem>,
+        destinationId: String?,
+    ): List<TaskListItem> {
+        val sorted = tasks.sortedWith(
+            compareBy<PositionedTask>({ it.position ?: Double.MAX_VALUE }, { it.item.title.lowercase() }),
+        )
+        val byProject = sorted.filter { it.projectId != null }.groupBy { it.projectId!! }
+        val byArea = sorted.filter { it.projectId == null && it.areaId != null }.groupBy { it.areaId!! }
+        val emitted = mutableSetOf<String>()
+        val result = mutableListOf<TaskListItem>()
+
+        // Unfiled tasks (headerless) on Anytime; on Today loose tasks live in the Inbox band above.
+        if (destinationId != RegistryDestinationIds.TODAY) {
+            sorted.filter { it.projectId == null && it.areaId == null }.forEach { entry ->
+                emitted += entry.item.id
+                result += entry.item.copy(groupTitle = null)
+            }
+        }
+
+        val areaIds = areas.mapNotNull { (it.location as? TaskHomeLocation.Area)?.id }.toSet()
+        for (areaItem in areas) {
+            val area = areaItem.location as? TaskHomeLocation.Area ?: continue
+            val areaHeader = listOfNotNull(areaItem.emoji, area.title).joinToString(" ")
+            byArea[area.id].orEmpty().forEach { entry ->
+                emitted += entry.item.id
+                result += entry.item.copy(groupTitle = areaHeader, subtitle = null)
+            }
+            for (projectItem in projects) {
+                if (projectItem.parentAreaId != area.id) continue
+                val project = projectItem.location as? TaskHomeLocation.Project ?: continue
+                byProject[project.id].orEmpty().forEach { entry ->
+                    emitted += entry.item.id
+                    result += entry.item.copy(groupTitle = project.title, subtitle = null)
+                }
+            }
+        }
+
+        // Top-level projects (no area, or whose area is no longer active).
+        for (projectItem in projects) {
+            if (projectItem.parentAreaId != null && projectItem.parentAreaId in areaIds) continue
+            val project = projectItem.location as? TaskHomeLocation.Project ?: continue
+            byProject[project.id].orEmpty().forEach { entry ->
+                emitted += entry.item.id
+                result += entry.item.copy(groupTitle = project.title, subtitle = null)
+            }
+        }
+
+        // Fallback: keep any remaining task visible even if its area/project is archived.
+        sorted.filter { it.item.id !in emitted }.forEach { entry ->
+            result += entry.item
+        }
+        return result
+    }
+
     private data class PositionedTask(
         val item: TaskListItem,
         val position: Double?,
         val archiveDate: String? = null,
+        val areaId: String? = null,
+        val projectId: String? = null,
     )
 
     private companion object {
