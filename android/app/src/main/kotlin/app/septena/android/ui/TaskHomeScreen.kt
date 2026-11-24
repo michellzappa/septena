@@ -433,7 +433,8 @@ private fun TaskHomeNavigation(
             .verticalScroll(rememberScrollState())
             .padding(vertical = 12.dp),
     ) {
-        state.smartLists.forEach { item ->
+        // Top smart lists (identical to iOS `sidebarRoutes(in: .top)`).
+        state.topSmartLists.forEach { item ->
             val location = item.location as TaskHomeLocation.SmartList
             val title = RegistryCatalog.destinationTitle(location.destinationId, languageTag).orEmpty()
             val iconKind = destinationIconKind(location.destinationId)
@@ -455,8 +456,23 @@ private fun TaskHomeNavigation(
         val projectsByArea = state.projects.groupBy { it.parentAreaId }
         val standaloneProjects = state.projects.filter { it.parentAreaId == null || it.parentAreaId !in areaIds }
 
-        if (areasTitle.isNotEmpty() || standaloneProjects.isNotEmpty()) {
+        if (state.areas.isNotEmpty() || standaloneProjects.isNotEmpty()) {
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+        }
+        if (projectsTitle.isNotEmpty() && standaloneProjects.isNotEmpty()) {
+            standaloneProjects.forEach { item ->
+                NavigationDrawerItem(
+                    icon = {
+                        Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
+                            SeptenaGlyph(kind = SeptenaIconKind.Project, tint = mutedIcon, size = 16.dp)
+                        }
+                    },
+                    label = { Text(item.title.orEmpty()) },
+                    selected = state.location == item.location,
+                    onClick = { onSelect(item.location) },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                )
+            }
         }
         if (areasTitle.isNotEmpty() && state.areas.isNotEmpty()) {
             DrawerGroupTitle(areasTitle)
@@ -486,16 +502,21 @@ private fun TaskHomeNavigation(
                 }
             }
         }
-        if (projectsTitle.isNotEmpty() && standaloneProjects.isNotEmpty()) {
-            DrawerGroupTitle(projectsTitle)
-            standaloneProjects.forEach { item ->
+        // Bottom smart lists (identical to iOS `sidebarRoutes(in: .bottom)`: Logbook, Faded, Deleted, etc.).
+        if (state.bottomSmartLists.isNotEmpty()) {
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            state.bottomSmartLists.forEach { item ->
+                val location = item.location as TaskHomeLocation.SmartList
+                val title = RegistryCatalog.destinationTitle(location.destinationId, languageTag).orEmpty()
+                val iconKind = destinationIconKind(location.destinationId)
+                val iconTint = if (iconKind == SeptenaIconKind.Today || iconKind == SeptenaIconKind.Starred) todayTint else mutedIcon
                 NavigationDrawerItem(
                     icon = {
                         Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
-                            SeptenaGlyph(kind = SeptenaIconKind.Project, tint = mutedIcon, size = 16.dp)
+                            SeptenaGlyph(kind = iconKind, tint = iconTint, size = 19.dp)
                         }
                     },
-                    label = { Text(item.title.orEmpty()) },
+                    label = { Text(title) },
                     selected = state.location == item.location,
                     onClick = { onSelect(item.location) },
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
@@ -703,7 +724,8 @@ private fun SectionTitleDropdownHeader(
             expanded = menuExpanded,
             onDismissRequest = { menuExpanded = false },
         ) {
-            state.smartLists.forEach { item ->
+            // Top smart lists (identical to iOS `TaskNavMenu` `.top`).
+            state.topSmartLists.forEach { item ->
                 val loc = item.location as TaskHomeLocation.SmartList
                 val itemTitle = RegistryCatalog.destinationTitle(loc.destinationId, languageTag).orEmpty()
                 val kind = destinationIconKind(loc.destinationId)
@@ -813,6 +835,38 @@ private fun SectionTitleDropdownHeader(
                         onClick = {
                             menuExpanded = false
                             onSelectLocation(projItem.location)
+                        },
+                    )
+                }
+            }
+
+            // Bottom smart lists (identical to iOS `TaskNavMenu` `.bottom`: Logbook, Faded, Deleted, etc.).
+            if (state.bottomSmartLists.isNotEmpty()) {
+                HorizontalDivider()
+                state.bottomSmartLists.forEach { item ->
+                    val loc = item.location as TaskHomeLocation.SmartList
+                    val itemTitle = RegistryCatalog.destinationTitle(loc.destinationId, languageTag).orEmpty()
+                    val kind = destinationIconKind(loc.destinationId)
+                    val tint = if (kind == SeptenaIconKind.Today || kind == SeptenaIconKind.Starred) todayTint else mutedIcon
+                    val isCurrent = state.location == loc
+                    DropdownMenuItem(
+                        leadingIcon = {
+                            Box(modifier = Modifier.width(22.dp), contentAlignment = Alignment.Center) {
+                                SeptenaGlyph(kind = kind, tint = tint, size = 18.dp)
+                            }
+                        },
+                        text = {
+                            Text(
+                                text = itemTitle,
+                                fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                            )
+                        },
+                        trailingIcon = if (isCurrent) {
+                            { CheckmarkGlyph(tint = MaterialTheme.colorScheme.primary, size = 16.dp) }
+                        } else null,
+                        onClick = {
+                            menuExpanded = false
+                            onSelectLocation(loc)
                         },
                     )
                 }

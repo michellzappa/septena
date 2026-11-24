@@ -88,7 +88,11 @@ data class TaskSelection(
     val isActive: Boolean get() = selectedIds.isNotEmpty()
 }
 
-/** Tap opens the task, or toggles it while a selection is active; long-press selects it. */
+/**
+ * Tap opens the task (or toggles selection while multi-select is active).
+ * Long-press opens the task's context menu, matching iOS (`Select` inside the
+ * menu enters multi-select mode).
+ */
 @OptIn(ExperimentalFoundationApi::class)
 fun Modifier.selectableTaskRow(
     taskId: String,
@@ -97,7 +101,7 @@ fun Modifier.selectableTaskRow(
     onMenu: () -> Unit,
 ): Modifier = combinedClickable(
     onClick = { if (selection.isActive) selection.onToggle(taskId) else onOpen(taskId) },
-    onLongClick = { if (selection.enabled) selection.onToggle(taskId) else onMenu() },
+    onLongClick = { if (selection.isActive) selection.onToggle(taskId) else onMenu() },
 )
 
 /** The selection wash on a selected row: the accent at low strength, ink stays normal. */

@@ -8,6 +8,7 @@ import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
 import app.septena.core.SmartListResolver
+import app.septena.core.SmartListSection
 import app.septena.core.SyncRecord
 import app.septena.core.TaskConversation
 import app.septena.core.TaskFadeRules
@@ -55,7 +56,10 @@ data class TaskHomeNavigationItem(
 data class TaskHomeUiState(
     val hasLoaded: Boolean = false,
     val location: TaskHomeLocation = TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY),
-    val smartLists: List<TaskHomeNavigationItem> = emptyList(),
+    /** Smart lists pinned to the top sidebar/nav zone (above Areas & Projects), identical to iOS. */
+    val topSmartLists: List<TaskHomeNavigationItem> = emptyList(),
+    /** Smart lists pinned to the bottom sidebar/nav zone (below Areas & Projects), identical to iOS. */
+    val bottomSmartLists: List<TaskHomeNavigationItem> = emptyList(),
     val areas: List<TaskHomeNavigationItem> = emptyList(),
     val projects: List<TaskHomeNavigationItem> = emptyList(),
     val inboxTasks: List<TaskListItem> = emptyList(),
@@ -88,7 +92,8 @@ data class QuickAddDraft(
 private data class LoadedTaskHome(
     val hasLoaded: Boolean,
     val location: TaskHomeLocation,
-    val smartLists: List<TaskHomeNavigationItem>,
+    val topSmartLists: List<TaskHomeNavigationItem>,
+    val bottomSmartLists: List<TaskHomeNavigationItem>,
     val areas: List<TaskHomeNavigationItem>,
     val projects: List<TaskHomeNavigationItem>,
     val inboxTasks: List<TaskListItem>,
@@ -127,7 +132,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         TaskHomeUiState(
             hasLoaded = home.hasLoaded,
             location = home.location,
-            smartLists = home.smartLists,
+            topSmartLists = home.topSmartLists,
+            bottomSmartLists = home.bottomSmartLists,
             areas = home.areas,
             projects = home.projects,
             inboxTasks = if (applyStar) home.inboxTasks.filter(TaskListItem::isStarred) else home.inboxTasks,
@@ -427,7 +433,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private fun loadInitial() = LoadedTaskHome(
         hasLoaded = false,
         location = TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY),
-        smartLists = emptyList(),
+        topSmartLists = emptyList(),
+        bottomSmartLists = emptyList(),
         areas = emptyList(),
         projects = emptyList(),
         inboxTasks = emptyList(),
@@ -484,20 +491,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
         val agentsPaused = graph.syncedSettings.value(RegistrySettingKeys.AGENTS_PAUSED).booleanValue() ?: false
 
-        val nonEmptyDestinations = buildSet {
-            if (taskRecords.any { it.deletedAt != null }) add(RegistryDestinationIds.RECENTLY_DELETED)
-        }
-        val smartListItems = SmartListResolver.visibleFromSynced(
-            graph.syncedSettings,
-            nonEmptyIds = nonEmptyDestinations,
-        ).map { descriptor ->
-            descriptor.id to TaskHomeNavigationItem(
-                location = TaskHomeLocation.SmartList(descriptor.id),
-            )
-        }.filter { (id, _) -> id in SHELL_DESTINATIONS }
-            .sortedBy { (id, _) -> if (id == RegistryDestinationIds.TODAY) 0 else 1 }
-            .map { it.second }
-
         val areaTitles = areaRecords.mapNotNull { item ->
             val area = item.location as? TaskHomeLocation.Area ?: return@mapNotNull null
             area.id to area.title
@@ -518,6 +511,39 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         val conversations = graph.taskStore.records(EntityNames.CONVO)
             .filter { it.deletedAt == null }
             .associate { it.id to runCatching { TaskConversation.from(it, graph.taskStore.turns(it.id)) }.getOrNull() }
+
+        // Compute non-empty `whenNonEmpty` smart lists identically to iOS `TaskDestinations.nonEmptySmartListIDs`.
+        val nonEmptyDestinations = buildSet {
+            for ((_, snapshot) in allSnapshots) {
+                if (snapshot.isHeading) continue
+                if (snapshot.deletedAt != null) {
+                    add(RegistryDestinationIds.RECENTLY_DELETED)
+                    continue
+                }
+                val conversation = conversations[snapshot.id]
+                if (snapshot.status == RegistryEntityEnums.TaskStatus.OPEN) {
+                    if (conversation?.needsHumanReview == true) add(RegistryDestinationIds.REVIEW)
+                    if (TaskFadeRules.isFaded(snapshot.fadedAt)) {
+                        add(RegistryDestinationIds.FADED)
+                    } else if (snapshot.starred) {
+                        add(RegistryDestinationIds.STARRED)
+                    }
+                }
+                if (conversation?.agentStage(now) != null) add(RegistryDestinationIds.AGENT)
+            }
+        }
+        val topSmartListItems = SmartListResolver.visibleFromSynced(
+            graph.syncedSettings,
+            nonEmptyIds = nonEmptyDestinations,
+            section = SmartListSection.TOP,
+        ).filter { it.id in SHELL_DESTINATIONS }
+            .map { TaskHomeNavigationItem(location = TaskHomeLocation.SmartList(it.id)) }
+        val bottomSmartListItems = SmartListResolver.visibleFromSynced(
+            graph.syncedSettings,
+            nonEmptyIds = nonEmptyDestinations,
+            section = SmartListSection.BOTTOM,
+        ).filter { it.id in SHELL_DESTINATIONS }
+            .map { TaskHomeNavigationItem(location = TaskHomeLocation.SmartList(it.id)) }
         val agentGroups = agentGroupTitles()
         val showAging = graph.deviceSettings.bool(RegistrySettingKeys.TASKS_SHOW_AGING)
         val resolvedLocation = when (selected) {
@@ -682,7 +708,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         return LoadedTaskHome(
             hasLoaded = true,
             location = resolvedLocation,
-            smartLists = smartListItems,
+            topSmartLists = topSmartListItems,
+            bottomSmartLists = bottomSmartListItems,
             areas = areaRecords,
             projects = projectRecords,
             inboxTasks = inbox.sortedTaskItems(),

@@ -397,116 +397,125 @@ fun TaskCardRow(
         hasActiveTexture = hasActiveTexture,
         modifier = dropModifier,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .alpha(task.opacity)
-                .selectableTaskRow(
-                    taskId = task.id,
-                    selection = selection,
-                    onOpen = onOpenTask,
-                    onMenu = { menuExpanded = true },
-                )
-                .padding(
-                    start = TaskCardMetrics.ContentInset,
-                    end = 8.dp,
-                    top = 9.dp,
-                    bottom = 9.dp,
-                ),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (hasLeadingSlot) {
-                    if (selecting) {
-                        SeptenaTaskCheckbox(
-                            checked = selected,
-                            enabled = true,
-                            accessibilityLabel = selection.toggleLabel,
-                            isDark = isDark,
-                            isSelectionCircle = true,
-                            onToggle = { selection.onToggle(task.id) },
-                        )
-                    } else {
-                        SeptenaTaskCheckbox(
-                            checked = task.isCompleted,
-                            enabled = canComplete && !task.isCompleted,
-                            accessibilityLabel = completeTitle,
-                            isDark = isDark,
-                            onToggle = { if (!task.isCompleted) onComplete(task.id) },
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
-                }
-
-                Text(
-                    text = task.title,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontSize = 16.sp,
-                        lineHeight = 21.sp,
-                        textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+        Box {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .alpha(task.opacity)
+                    .selectableTaskRow(
+                        taskId = task.id,
+                        selection = selection,
+                        onOpen = onOpenTask,
+                        onMenu = { if (rowMenuGroups.isNotEmpty()) menuExpanded = true },
+                    )
+                    .padding(
+                        horizontal = TaskCardMetrics.ContentInset,
+                        vertical = 10.dp,
                     ),
-                    color = if (task.isCompleted) {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-
-                // Trailing metadata cluster (exact iOS order).
+            ) {
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(start = 8.dp),
                 ) {
-                    if (showTodayPill) {
-                        StatusGlassPill(
-                            label = todayTitle,
-                            iconKind = SeptenaIconKind.Today,
-                            iconTint = todayTint,
-                            isDark = isDark,
-                        )
-                    } else if (showFadedPill && fadedTitle.isNotEmpty()) {
-                        StatusGlassPill(
-                            label = fadedTitle,
-                            iconKind = SeptenaIconKind.Faded,
-                            iconTint = mutedInk,
-                            isDark = isDark,
-                        )
+                    if (hasLeadingSlot) {
+                        if (selecting) {
+                            SeptenaTaskCheckbox(
+                                checked = selected,
+                                enabled = true,
+                                accessibilityLabel = selection.toggleLabel,
+                                isDark = isDark,
+                                isSelectionCircle = true,
+                                onToggle = { selection.onToggle(task.id) },
+                            )
+                        } else {
+                            SeptenaTaskCheckbox(
+                                checked = task.isCompleted,
+                                enabled = canComplete && !task.isCompleted,
+                                accessibilityLabel = completeTitle,
+                                isDark = isDark,
+                                onToggle = { if (!task.isCompleted) onComplete(task.id) },
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
                     }
 
-                    // Deadline / Scheduled / Completed date.
-                    when {
-                        task.deadlineText != null -> {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                            ) {
-                                if (task.deadlineShowsFlag) {
-                                    DeadlineFlagGlyph(tint = mutedInk, size = 11.dp)
-                                }
-                                Text(
-                                    text = task.deadlineText,
-                                    fontSize = 12.sp,
-                                    lineHeight = 14.sp,
-                                    fontWeight = if (task.deadlineIsRed) FontWeight.SemiBold else FontWeight.Normal,
-                                    color = if (task.deadlineIsRed) overdueRed else mutedInk,
-                                    maxLines = 1,
-                                )
-                            }
+                    Text(
+                        text = task.title,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontSize = 16.sp,
+                            lineHeight = 21.sp,
+                            textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                        ),
+                        color = if (task.isCompleted) {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+
+                    // Trailing metadata cluster (exact iOS order; row menu lives on long-press).
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(start = 8.dp),
+                    ) {
+                        if (showTodayPill) {
+                            StatusGlassPill(
+                                label = todayTitle,
+                                iconKind = SeptenaIconKind.Today,
+                                iconTint = todayTint,
+                                isDark = isDark,
+                            )
+                        } else if (showFadedPill && fadedTitle.isNotEmpty()) {
+                            StatusGlassPill(
+                                label = fadedTitle,
+                                iconKind = SeptenaIconKind.Faded,
+                                iconTint = mutedInk,
+                                isDark = isDark,
+                            )
                         }
-                        task.scheduledText != null -> {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                            ) {
-                                CalendarSmallGlyph(tint = mutedInk, size = 11.dp)
+
+                        // Deadline / Scheduled / Completed date.
+                        when {
+                            task.deadlineText != null -> {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                ) {
+                                    if (task.deadlineShowsFlag) {
+                                        DeadlineFlagGlyph(tint = mutedInk, size = 11.dp)
+                                    }
+                                    Text(
+                                        text = task.deadlineText,
+                                        fontSize = 12.sp,
+                                        lineHeight = 14.sp,
+                                        fontWeight = if (task.deadlineIsRed) FontWeight.SemiBold else FontWeight.Normal,
+                                        color = if (task.deadlineIsRed) overdueRed else mutedInk,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                            task.scheduledText != null -> {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                ) {
+                                    CalendarSmallGlyph(tint = mutedInk, size = 11.dp)
+                                    Text(
+                                        text = task.scheduledText,
+                                        fontSize = 12.sp,
+                                        lineHeight = 14.sp,
+                                        color = mutedInk,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                            task.completedDateText != null -> {
                                 Text(
-                                    text = task.scheduledText,
+                                    text = task.completedDateText,
                                     fontSize = 12.sp,
                                     lineHeight = 14.sp,
                                     color = mutedInk,
@@ -514,139 +523,145 @@ fun TaskCardRow(
                                 )
                             }
                         }
-                        task.completedDateText != null -> {
+
+                        // Checklist summary (`done/total`).
+                        if (task.checklistTotal > 0) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                ChecklistSmallGlyph(tint = mutedInk, size = 11.dp)
+                                Text(
+                                    text = "${task.checklistDone}/${task.checklistTotal}",
+                                    fontSize = 11.5.sp,
+                                    lineHeight = 13.sp,
+                                    color = mutedInk,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+
+                        // Timed reminder badge (bell + time; red when past due).
+                        task.reminderText?.let { reminder ->
+                            val bellTint = if (task.reminderIsPastDue) overdueRed else mutedInk
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                BellSmallGlyph(tint = bellTint, size = 11.dp)
+                                Text(
+                                    text = reminder,
+                                    fontSize = 11.5.sp,
+                                    lineHeight = 13.sp,
+                                    fontWeight = if (task.reminderIsPastDue) FontWeight.Medium else FontWeight.Normal,
+                                    color = bellTint,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+
+                        // Repeat glyph.
+                        if (task.isRepeating) {
+                            RepeatSmallGlyph(tint = mutedInk, size = 12.dp)
+                        }
+
+                        // Starred indicator (gold star).
+                        if (task.isStarred) {
+                            StarGlyph(filled = true, tint = todayTint, size = 12.dp)
+                        }
+
+                        // Notes glyph (suppressed when agent-authored, matching iOS).
+                        if (task.hasNotes && task.agentName == null) {
+                            NotesSmallGlyph(tint = mutedInk, size = 11.dp)
+                        }
+
+                        // Attachment indicator.
+                        if (task.hasAttachments) {
+                            AttachmentSmallGlyph(tint = mutedInk, size = 11.dp)
+                        }
+
+                        // Agent provenance: dialogue bubble with sparkles (iOS `text.bubble.badge.sparkles`).
+                        task.agentName?.let { name ->
+                            AgentSparkleBubbleGlyph(
+                                tint = mutedInk,
+                                size = 14.dp,
+                                modifier = Modifier.semantics { contentDescription = name },
+                            )
+                        }
+                    }
+                }
+
+                if (showSubtitleLine) {
+                    val startPad = if (hasLeadingSlot) {
+                        TaskCardMetrics.LeadingColumnWidth + TaskCardMetrics.IconTextGap
+                    } else {
+                        0.dp
+                    }
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = startPad, top = 3.dp),
+                    ) {
+                        task.subtitle?.let { sub ->
                             Text(
-                                text = task.completedDateText,
-                                fontSize = 12.sp,
+                                text = sub,
+                                fontSize = 12.5.sp,
+                                lineHeight = 16.sp,
+                                color = mutedInk,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.align(Alignment.CenterVertically),
+                            )
+                        }
+                        val visibleTags = task.tagNames.take(2)
+                        val overflowCount = (task.tagNames.size - visibleTags.size).coerceAtLeast(0)
+                        visibleTags.forEach { tag ->
+                            TagOutlineChip(text = tag, tint = mutedInk)
+                        }
+                        if (overflowCount > 0) {
+                            Text(
+                                text = "+$overflowCount",
+                                fontSize = 11.sp,
                                 lineHeight = 14.sp,
                                 color = mutedInk,
-                                maxLines = 1,
+                                modifier = Modifier.align(Alignment.CenterVertically),
                             )
                         }
-                    }
-
-                    // Checklist summary (`done/total`).
-                    if (task.checklistTotal > 0) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        ) {
-                            ChecklistSmallGlyph(tint = mutedInk, size = 11.dp)
-                            Text(
-                                text = "${task.checklistDone}/${task.checklistTotal}",
-                                fontSize = 11.5.sp,
-                                lineHeight = 13.sp,
-                                color = mutedInk,
-                                maxLines = 1,
-                            )
-                        }
-                    }
-
-                    // Timed reminder badge (bell + time; red when past due).
-                    task.reminderText?.let { reminder ->
-                        val bellTint = if (task.reminderIsPastDue) overdueRed else mutedInk
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        ) {
-                            BellSmallGlyph(tint = bellTint, size = 11.dp)
-                            Text(
-                                text = reminder,
-                                fontSize = 11.5.sp,
-                                lineHeight = 13.sp,
-                                fontWeight = if (task.reminderIsPastDue) FontWeight.Medium else FontWeight.Normal,
-                                color = bellTint,
-                                maxLines = 1,
-                            )
-                        }
-                    }
-
-                    // Repeat glyph.
-                    if (task.isRepeating) {
-                        RepeatSmallGlyph(tint = mutedInk, size = 12.dp)
-                    }
-
-                    // Starred indicator (gold star).
-                    if (task.isStarred) {
-                        StarGlyph(filled = true, tint = todayTint, size = 12.dp)
-                    }
-
-                    // Notes glyph (suppressed when agent-authored, matching iOS).
-                    if (task.hasNotes && task.agentName == null) {
-                        NotesSmallGlyph(tint = mutedInk, size = 11.dp)
-                    }
-
-                    // Attachment indicator.
-                    if (task.hasAttachments) {
-                        AttachmentSmallGlyph(tint = mutedInk, size = 11.dp)
-                    }
-
-                    // Agent provenance: dialogue bubble with sparkles (iOS `text.bubble.badge.sparkles`).
-                    task.agentName?.let { name ->
-                        AgentSparkleBubbleGlyph(
-                            tint = mutedInk,
-                            size = 14.dp,
-                            modifier = Modifier.semantics { contentDescription = name },
-                        )
-                    }
-
-                    // Compact subtle row menu trigger.
-                    if (rowMenuGroups.isNotEmpty() && !selecting) {
-                        CompactRowMenuTrigger(
-                            groups = rowMenuGroups.map { group ->
-                                group.map { action ->
-                                    if (action.selectedTitle != null || action.unselectedTitle != null) action.copy(
-                                        title = if (task.isStarred) action.selectedTitle ?: action.title
-                                        else action.unselectedTitle ?: action.title,
-                                    ) else action
-                                }
-                            },
-                            accessibilityLabel = rowMenuAccessibilityLabel,
-                            expanded = menuExpanded,
-                            onExpandedChange = { menuExpanded = it },
-                            onAction = { id -> onTaskAction(task.id, id) },
-                        )
                     }
                 }
             }
 
-            if (showSubtitleLine) {
-                val startPad = if (hasLeadingSlot) {
-                    TaskCardMetrics.LeadingColumnWidth + TaskCardMetrics.IconTextGap
-                } else {
-                    0.dp
-                }
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = startPad, top = 3.dp, end = 24.dp),
+            if (rowMenuGroups.isNotEmpty() && !selecting) {
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                    modifier = Modifier.semantics { contentDescription = rowMenuAccessibilityLabel },
                 ) {
-                    task.subtitle?.let { sub ->
-                        Text(
-                            text = sub,
-                            fontSize = 12.5.sp,
-                            lineHeight = 16.sp,
-                            color = mutedInk,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.align(Alignment.CenterVertically),
-                        )
-                    }
-                    val visibleTags = task.tagNames.take(2)
-                    val overflowCount = (task.tagNames.size - visibleTags.size).coerceAtLeast(0)
-                    visibleTags.forEach { tag ->
-                        TagOutlineChip(text = tag, tint = mutedInk)
-                    }
-                    if (overflowCount > 0) {
-                        Text(
-                            text = "+$overflowCount",
-                            fontSize = 11.sp,
-                            lineHeight = 14.sp,
-                            color = mutedInk,
-                            modifier = Modifier.align(Alignment.CenterVertically),
-                        )
+                    rowMenuGroups.forEachIndexed { index, group ->
+                        if (index > 0) HorizontalDivider()
+                        group.forEach { action ->
+                            val label = if (action.selectedTitle != null || action.unselectedTitle != null) {
+                                if (task.isStarred) action.selectedTitle ?: action.title
+                                else action.unselectedTitle ?: action.title
+                            } else {
+                                action.title
+                            }
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = label,
+                                        color = if (action.isDestructive) MaterialTheme.colorScheme.error
+                                        else MaterialTheme.colorScheme.onSurface,
+                                    )
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    onTaskAction(task.id, action.id)
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -708,51 +723,6 @@ private fun TagOutlineChip(text: String, tint: Color) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-    }
-}
-
-@Composable
-private fun CompactRowMenuTrigger(
-    groups: List<List<TaskRowMenuAction>>,
-    accessibilityLabel: String,
-    expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    onAction: (String) -> Unit,
-) {
-    Box {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(width = 24.dp, height = 28.dp)
-                .clip(CircleShape)
-                .semantics { contentDescription = accessibilityLabel }
-                .clickable { onExpandedChange(true) },
-        ) {
-            MoreDotsGlyph(
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.48f),
-                size = 15.dp,
-            )
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { onExpandedChange(false) }) {
-            groups.forEachIndexed { index, group ->
-                if (index > 0) HorizontalDivider()
-                group.forEach { action ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = action.title,
-                                color = if (action.isDestructive) MaterialTheme.colorScheme.error
-                                else MaterialTheme.colorScheme.onSurface,
-                            )
-                        },
-                        onClick = {
-                            onExpandedChange(false)
-                            onAction(action.id)
-                        },
-                    )
-                }
-            }
-        }
     }
 }
 
