@@ -1,5 +1,7 @@
 package app.septena.android.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -38,6 +40,8 @@ import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryPlacesScreenIds
 import app.septena.core.generated.RegistryPromptIds
 import app.septena.core.generated.RegistryTaskAttributeIds
+import app.septena.ui.TaskRowActionsMenu
+import app.septena.ui.TaskRowMenuAction
 
 /** Detail content for an area or project. The shell owns navigation and routes callbacks to these details. */
 @Composable
@@ -47,6 +51,9 @@ fun AreasProjectsScreen(
     modifier: Modifier = Modifier,
     onOpenProject: (String) -> Unit = {},
     onOpenTask: (String) -> Unit = {},
+    rowMenuGroups: List<List<TaskRowMenuAction>> = emptyList(),
+    rowMenuAccessibilityLabel: String = "",
+    onTaskAction: (String, String) -> Unit = { _, _ -> },
 ) {
     val factory = remember(graph) { AreasProjectsViewModel.Factory(graph) }
     val viewModel: AreasProjectsViewModel = viewModel(key = destination.key, factory = factory)
@@ -148,7 +155,7 @@ fun AreasProjectsScreen(
                         }
                     } else {
                         items(state.areaTasks, key = { "task:${it.id}" }) { task ->
-                            PlaceTaskItem(task = task, onOpenTask = onOpenTask)
+                            PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, onOpenTask, onTaskAction)
                         }
                     }
                 }
@@ -183,7 +190,7 @@ fun AreasProjectsScreen(
                     }
                     if (state.unsectionedTasks.isNotEmpty()) {
                         items(state.unsectionedTasks, key = { "task:${it.id}" }) { task ->
-                            PlaceTaskItem(task = task, onOpenTask = onOpenTask)
+                            PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, onOpenTask, onTaskAction)
                         }
                     }
                     if (state.sections.isEmpty()) {
@@ -202,6 +209,9 @@ fun AreasProjectsScreen(
                                     sectionTaskDrafts = sectionTaskDrafts + (section.id to "")
                                 },
                                 onOpenTask = onOpenTask,
+                                rowMenuGroups = rowMenuGroups,
+                                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                                onTaskAction = onTaskAction,
                                 onRename = { dialog = PlacesDialog.RenameSection(section.id, section.title) },
                                 onDelete = { dialog = PlacesDialog.DeleteSection(section.id) },
                             )
@@ -288,10 +298,39 @@ private fun QuickAddRow(
 }
 
 @Composable
-private fun PlaceTaskItem(task: PlaceTaskRow, onOpenTask: (String) -> Unit) {
+@OptIn(ExperimentalFoundationApi::class)
+private fun PlaceTaskItem(
+    task: PlaceTaskRow,
+    rowMenuGroups: List<List<TaskRowMenuAction>>,
+    rowMenuAccessibilityLabel: String,
+    onOpenTask: (String) -> Unit,
+    onTaskAction: (String, String) -> Unit,
+) {
+    var menuExpanded by remember(task.id) { mutableStateOf(false) }
     ListItem(
         headlineContent = { Text(task.title) },
-        modifier = Modifier.fillMaxWidth().clickable { onOpenTask(task.id) },
+        modifier = Modifier.fillMaxWidth().combinedClickable(
+            onClick = { onOpenTask(task.id) },
+            onLongClick = { menuExpanded = true },
+        ),
+        trailingContent = if (rowMenuGroups.isNotEmpty()) {
+            {
+                TaskRowActionsMenu(
+                    groups = rowMenuGroups.map { group ->
+                        group.map { action ->
+                            if (action.selectedTitle != null || action.unselectedTitle != null) action.copy(
+                                title = if (task.isStarred) action.selectedTitle ?: action.title
+                                else action.unselectedTitle ?: action.title,
+                            ) else action
+                        }
+                    },
+                    accessibilityLabel = rowMenuAccessibilityLabel,
+                    expanded = menuExpanded,
+                    onExpandedChange = { menuExpanded = it },
+                    onAction = { onTaskAction(task.id, it) },
+                )
+            }
+        } else null,
     )
 }
 
@@ -303,6 +342,9 @@ private fun PlaceSectionBlock(
     onTaskDraftChange: (String) -> Unit,
     onAddTask: () -> Unit,
     onOpenTask: (String) -> Unit,
+    rowMenuGroups: List<List<TaskRowMenuAction>>,
+    rowMenuAccessibilityLabel: String,
+    onTaskAction: (String, String) -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -319,7 +361,9 @@ private fun PlaceSectionBlock(
         if (section.tasks.isEmpty()) {
             Text(surfaceText(RegistryPlacesScreenIds.EMPTY_SECTION_TASKS, "title", languageTag), modifier = Modifier.padding(start = 12.dp))
         } else {
-            section.tasks.forEach { task -> PlaceTaskItem(task, onOpenTask) }
+            section.tasks.forEach { task ->
+                PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, onOpenTask, onTaskAction)
+            }
         }
         QuickAddRow(
             draft = taskDraft,

@@ -203,6 +203,53 @@ class TaskMutator(
         )
     }
 
+    /** Clones a task's editable fields into a fresh, open task and recurrence series. */
+    suspend fun duplicate(id: String): TaskRecord? {
+        val source = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (source.deletedAt != null) return null
+
+        val copy = create(
+            title = source.title,
+            area = source.fields[RegistryEntityFields.Task.AREA].stringValue(),
+            project = source.fields[RegistryEntityFields.Task.PROJECT].stringValue(),
+            scheduled = source.fields[RegistryEntityFields.Task.SCHEDULED].stringValue(),
+            deadline = source.fields[RegistryEntityFields.Task.DEADLINE].stringValue(),
+            today = source.fields[RegistryEntityFields.Task.TODAY].booleanValue() == true,
+            notes = source.fields[RegistryEntityFields.Task.NOTES].stringValue(),
+            heading = source.fields[RegistryEntityFields.Task.HEADING].stringValue(),
+        )
+        val extra = linkedMapOf<String, JsonValue>()
+        source.fields[RegistryEntityFields.Task.STARRED]
+            ?.let { extra[RegistryEntityFields.Task.STARRED] = it }
+        source.fields[RegistryEntityFields.Task.TAGS]
+            ?.let { extra[RegistryEntityFields.Task.TAGS] = it }
+        for (field in listOf(
+            RegistryEntityFields.Task.START_TIME,
+            RegistryEntityFields.Task.DURATION_MINUTES,
+            RegistryEntityFields.Task.TIME_ZONE,
+        )) {
+            source.fields[field]?.let { extra[field] = it }
+        }
+
+        val recurrenceUnit = source.fields[RegistryEntityFields.Task.RECURRENCE_UNIT].stringValue()
+        if (recurrenceUnit != null) {
+            for (field in listOf(
+                RegistryEntityFields.Task.RECURRENCE_UNIT,
+                RegistryEntityFields.Task.RECURRENCE_INTERVAL,
+                RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION,
+                RegistryEntityFields.Task.RECURRENCE_PAUSED,
+                RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE,
+                RegistryEntityFields.Task.RECURRENCE_WEEKDAYS,
+                RegistryEntityFields.Task.RECURRENCE_MONTH_DAY,
+                RegistryEntityFields.Task.RECURRENCE_ORDINAL_WEEKDAY,
+            )) {
+                source.fields[field]?.let { extra[field] = it }
+            }
+            extra[RegistryEntityFields.Task.RECURRENCE_SERIES_ID] = JsonValue.StringValue(copy.id)
+        }
+        return if (extra.isEmpty()) copy else updateFields(copy.id, extra) ?: copy
+    }
+
     suspend fun complete(id: String): TaskRecord? {
         val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
         if (existing.deletedAt != null || existing.status != TaskStatus.OPEN) return null

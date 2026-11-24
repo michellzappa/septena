@@ -1,5 +1,6 @@
 package app.septena.android.ui
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -58,7 +60,9 @@ import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryCapabilityIds
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryPlatformIds
+import app.septena.core.stringValue
 import app.septena.ui.TaskHomeContent
+import app.septena.ui.TaskRowMenuAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -67,6 +71,7 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 fun TaskHomeScreen(graph: AndroidAppGraph) {
     var openedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    var openedTaskAttribute by rememberSaveable { mutableStateOf<String?>(null) }
     var quickFindOpen by rememberSaveable { mutableStateOf(false) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     var inlineDraftOpen by rememberSaveable { mutableStateOf(false) }
@@ -80,6 +85,41 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
     val undoSnackbarHostState = remember { SnackbarHostState() }
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val wideLayout = LocalConfiguration.current.screenWidthDp >= 600
+    val localContext = LocalContext.current
+    val rowMenuId = if ((state.location as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.RECENTLY_DELETED) {
+        "task.recentlyDeleted"
+    } else {
+        "task.row"
+    }
+    val rowMenuGroups = remember(rowMenuId, languageTag, state.location) {
+        taskRowMenuGroups(rowMenuId, (state.location as? TaskHomeLocation.SmartList)?.destinationId, languageTag)
+    }
+    val rowMenuAccessibilityLabel = remember(languageTag) {
+        registrySurfaceText("taskRowMenu", "accessibilityLabel", languageTag)
+    }
+    val shareTitle = RegistryCatalog.actionTitle(RegistryActionIds.TASK_SHARE, languageTag = languageTag).orEmpty()
+    val openTaskWithAttribute: (String, String?) -> Unit = { id, attribute ->
+        openedTaskId = id
+        openedTaskAttribute = attribute
+    }
+    val onTaskAction: (String, String) -> Unit = { id, actionId ->
+        when {
+            actionId == RegistryActionIds.TASK_OPEN -> openTaskWithAttribute(id, null)
+            RegistryCatalog.actionOpensAttribute(actionId) != null ->
+                openTaskWithAttribute(id, RegistryCatalog.actionOpensAttribute(actionId))
+            actionId == RegistryActionIds.TASK_TOGGLE_STAR -> homeViewModel.toggleStar(id)
+            actionId == RegistryActionIds.TASK_DUPLICATE -> homeViewModel.duplicate(id)
+            actionId == RegistryActionIds.TASK_SHARE -> homeViewModel.shareText(id) { shareText ->
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, shareText)
+                }
+                localContext.startActivity(Intent.createChooser(intent, shareTitle))
+            }
+            actionId == RegistryActionIds.TASK_DELETE -> homeViewModel.delete(id)
+            actionId == RegistryActionIds.TASK_RESTORE -> homeViewModel.restore(id)
+        }
+    }
     val undoTitle = RegistryCatalog.actionTitle(
         RegistryActionIds.APP_UNDO,
         languageTag = languageTag,
@@ -172,6 +212,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                 }
                 selectHomeLocation(destination)
                 openedTaskId = target.taskId
+                openedTaskAttribute = null
             }
             is QuickFindTarget.Area -> {
                 val destination = state.areas.firstOrNull {
@@ -211,7 +252,12 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                 } else if (quickFindOpen) {
                     QuickFindScreen(graph, onBack = { quickFindOpen = false }, onSelect = openQuickFindTarget)
                 } else if (openedTaskId != null) {
-                    TaskDetailScreen(graph, openedTaskId!!, onBack = { openedTaskId = null })
+                    TaskDetailScreen(
+                        graph,
+                        openedTaskId!!,
+                        onBack = { openedTaskId = null; openedTaskAttribute = null },
+                        initialAttribute = openedTaskAttribute,
+                    )
                 } else {
                     TaskHomeScaffold(
                         graph = graph,
@@ -233,7 +279,10 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         onDraftTitleChange = homeViewModel::updateDraft,
                         onQuickAdd = homeViewModel::quickAdd,
                         onComplete = homeViewModel::complete,
-                        onOpenTask = { openedTaskId = it },
+                        rowMenuGroups = rowMenuGroups,
+                        rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                        onOpenTask = { openTaskWithAttribute(it, null) },
+                        onTaskAction = onTaskAction,
                         onQuickFind = { quickFindOpen = true },
                         onToggleAgentsPaused = { homeViewModel.setAgentsPaused(!state.agentsPaused) },
                         onSelectHomeLocation = selectHomeLocation,
@@ -271,7 +320,12 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                 } else if (quickFindOpen) {
                     QuickFindScreen(graph, onBack = { quickFindOpen = false }, onSelect = openQuickFindTarget)
                 } else if (openedTaskId != null) {
-                    TaskDetailScreen(graph, openedTaskId!!, onBack = { openedTaskId = null })
+                    TaskDetailScreen(
+                        graph,
+                        openedTaskId!!,
+                        onBack = { openedTaskId = null; openedTaskAttribute = null },
+                        initialAttribute = openedTaskAttribute,
+                    )
                 } else {
                     TaskHomeScaffold(
                         graph = graph,
@@ -294,7 +348,10 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         onDraftTitleChange = homeViewModel::updateDraft,
                         onQuickAdd = homeViewModel::quickAdd,
                         onComplete = homeViewModel::complete,
-                        onOpenTask = { openedTaskId = it },
+                        rowMenuGroups = rowMenuGroups,
+                        rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                        onOpenTask = { openTaskWithAttribute(it, null) },
+                        onTaskAction = onTaskAction,
                         onQuickFind = { quickFindOpen = true },
                         onToggleAgentsPaused = { homeViewModel.setAgentsPaused(!state.agentsPaused) },
                         onSelectHomeLocation = selectHomeLocation,
@@ -485,8 +542,11 @@ private fun TaskHomeScaffold(
     onOpenNavigation: () -> Unit = {},
     onDraftTitleChange: (String) -> Unit,
     onQuickAdd: () -> Unit,
+    rowMenuGroups: List<List<TaskRowMenuAction>>,
+    rowMenuAccessibilityLabel: String,
     onComplete: (String) -> Unit,
     onOpenTask: (String) -> Unit,
+    onTaskAction: (String, String) -> Unit,
     onQuickFind: () -> Unit,
     onToggleAgentsPaused: () -> Unit,
     onSelectHomeLocation: (TaskHomeLocation) -> Unit,
@@ -536,6 +596,9 @@ private fun TaskHomeScaffold(
                 graph = graph,
                 destination = AreasProjectsDestination.Area(location.id),
                 modifier = Modifier.padding(contentPadding),
+                rowMenuGroups = rowMenuGroups,
+                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                onTaskAction = onTaskAction,
                 onOpenProject = { projectId ->
                     val project = state.projects.firstOrNull {
                         (it.location as? TaskHomeLocation.Project)?.id == projectId
@@ -549,6 +612,9 @@ private fun TaskHomeScaffold(
                 destination = AreasProjectsDestination.Project(location.id),
                 modifier = Modifier.padding(contentPadding),
                 onOpenTask = onOpenTask,
+                rowMenuGroups = rowMenuGroups,
+                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                onTaskAction = onTaskAction,
             )
             is TaskHomeLocation.SmartList -> TaskHomeContent(
                 quickAddTitle = quickAddTitle,
@@ -568,14 +634,67 @@ private fun TaskHomeScaffold(
                 canComplete = state.canComplete,
                 draftTitle = state.draftTitle,
                 errorMessage = state.errorMessage,
+                rowMenuGroups = rowMenuGroups,
+                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                 modifier = Modifier.padding(contentPadding),
                 onDraftTitleChange = onDraftTitleChange,
                 onQuickAdd = onQuickAdd,
                 onComplete = onComplete,
                 onOpenTask = onOpenTask,
+                onTaskAction = onTaskAction,
             )
         }
     }
+}
+
+private fun taskRowMenuGroups(
+    menuId: String,
+    destinationId: String?,
+    languageTag: String,
+): List<List<TaskRowMenuAction>> {
+    val supportedActions = if (menuId == "task.recentlyDeleted") {
+        setOf(RegistryActionIds.TASK_RESTORE)
+    } else {
+        setOf(
+            RegistryActionIds.TASK_OPEN,
+            RegistryActionIds.TASK_WHEN,
+            RegistryActionIds.TASK_MOVE,
+            RegistryActionIds.TASK_TAGS,
+            RegistryActionIds.TASK_DEADLINE,
+            RegistryActionIds.TASK_TOGGLE_STAR,
+            RegistryActionIds.TASK_DUPLICATE,
+            RegistryActionIds.TASK_SHARE,
+            RegistryActionIds.TASK_DELETE,
+        )
+    }
+    val context = RegistryActionContext(
+        platform = RegistryPlatformIds.ANDROID,
+        destinationId = destinationId,
+        selectedCount = 1,
+    )
+    val available = RegistryActionResolver.availableActionIds(context).toSet()
+    return RegistryCatalog.menuActionGroups(menuId).mapNotNull { group ->
+        group.actionIds.mapNotNull { id ->
+            if (id !in supportedActions || id !in available) return@mapNotNull null
+            val title = RegistryCatalog.actionTitle(id, languageTag = languageTag).orEmpty()
+            TaskRowMenuAction(
+                id = id,
+                title = title,
+                isDestructive = RegistryCatalog.actionRole(id) == "destructive",
+                selectedTitle = if (id == RegistryActionIds.TASK_TOGGLE_STAR) {
+                    RegistryCatalog.actionTitle(id, field = "removeTitle", languageTag = languageTag)
+                } else null,
+                unselectedTitle = if (id == RegistryActionIds.TASK_TOGGLE_STAR) {
+                    RegistryCatalog.actionAddTitle(id, languageTag)
+                } else null,
+            )
+        }.takeIf { it.isNotEmpty() }
+    }
+}
+
+private fun registrySurfaceText(surfaceId: String, field: String, languageTag: String): String {
+    val key = RegistryCatalog.surface(surfaceId)?.fields?.get(field).stringValue().orEmpty()
+    return RegistryCatalog.localizedString(key, languageTag) ?: key
 }
 
 private class TaskHomeViewModelFactory(

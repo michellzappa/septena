@@ -1,6 +1,7 @@
 package app.septena.ui
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,13 +16,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,6 +47,15 @@ data class TaskListItem(
     val subtitle: String? = null,
     val isCompleted: Boolean = false,
     val isOnToday: Boolean = false,
+    val isStarred: Boolean = false,
+)
+
+data class TaskRowMenuAction(
+    val id: String,
+    val title: String,
+    val isDestructive: Boolean = false,
+    val selectedTitle: String? = null,
+    val unselectedTitle: String? = null,
 )
 
 /** Portable task-list surface. Platform hosts provide registry copy and bind actions to their mutators. */
@@ -61,11 +78,14 @@ fun TaskHomeContent(
     canComplete: Boolean,
     draftTitle: String,
     errorMessage: String?,
+    rowMenuGroups: List<List<TaskRowMenuAction>>,
+    rowMenuAccessibilityLabel: String,
     modifier: Modifier = Modifier,
     onDraftTitleChange: (String) -> Unit,
     onQuickAdd: () -> Unit,
     onComplete: (String) -> Unit,
     onOpenTask: (String) -> Unit,
+    onTaskAction: (String, String) -> Unit,
 ) {
     Column(
         modifier = modifier.fillMaxSize().padding(vertical = 8.dp),
@@ -98,6 +118,9 @@ fun TaskHomeContent(
                     showTodayIndicator = false,
                     onComplete = onComplete,
                     onOpenTask = onOpenTask,
+                    rowMenuGroups = rowMenuGroups,
+                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    onTaskAction = onTaskAction,
                 )
             }
             if (isToday && canQuickAdd && isDraftOpen) {
@@ -143,6 +166,9 @@ fun TaskHomeContent(
                 showTodayIndicator = !isToday,
                 onComplete = onComplete,
                 onOpenTask = onOpenTask,
+                rowMenuGroups = rowMenuGroups,
+                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                onTaskAction = onTaskAction,
             )
         }
     }
@@ -158,6 +184,9 @@ private fun LazyListScope.taskRows(
     showTodayIndicator: Boolean,
     onComplete: (String) -> Unit,
     onOpenTask: (String) -> Unit,
+    rowMenuGroups: List<List<TaskRowMenuAction>>,
+    rowMenuAccessibilityLabel: String,
+    onTaskAction: (String, String) -> Unit,
 ) {
     itemsIndexed(tasks, key = { _, task -> "$keyPrefix:${task.id}" }) { index, task ->
         TaskRow(
@@ -169,6 +198,9 @@ private fun LazyListScope.taskRows(
             showTodayIndicator = showTodayIndicator,
             onComplete = onComplete,
             onOpenTask = onOpenTask,
+            rowMenuGroups = rowMenuGroups,
+            rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+            onTaskAction = onTaskAction,
         )
         if (index < tasks.lastIndex) {
             HorizontalDivider(
@@ -205,6 +237,7 @@ private fun QuickAddRow(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun TaskRow(
     task: TaskListItem,
     completeTitle: String,
@@ -214,10 +247,17 @@ private fun TaskRow(
     showTodayIndicator: Boolean,
     onComplete: (String) -> Unit,
     onOpenTask: (String) -> Unit,
+    rowMenuGroups: List<List<TaskRowMenuAction>>,
+    rowMenuAccessibilityLabel: String,
+    onTaskAction: (String, String) -> Unit,
 ) {
     val showToday = showTodayIndicator && task.isOnToday && !task.isCompleted
+    var menuExpanded by remember(task.id) { mutableStateOf(false) }
     ListItem(
-        modifier = Modifier.fillMaxWidth().clickable { onOpenTask(task.id) },
+        modifier = Modifier.fillMaxWidth().combinedClickable(
+            onClick = { onOpenTask(task.id) },
+            onLongClick = { menuExpanded = true },
+        ),
         headlineContent = {
             Text(
                 text = task.title,
@@ -240,7 +280,7 @@ private fun TaskRow(
         } else {
             null
         },
-        trailingContent = if (showToday || task.agentName != null) {
+        trailingContent = if (showToday || task.agentName != null || rowMenuGroups.isNotEmpty()) {
             {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -261,6 +301,22 @@ private fun TaskRow(
                             name,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (rowMenuGroups.isNotEmpty()) {
+                        TaskRowActionsMenu(
+                            groups = rowMenuGroups.map { group ->
+                                group.map { action ->
+                                    if (action.selectedTitle != null || action.unselectedTitle != null) action.copy(
+                                        title = if (task.isStarred) action.selectedTitle ?: action.title
+                                        else action.unselectedTitle ?: action.title,
+                                    ) else action
+                                }
+                            },
+                            accessibilityLabel = rowMenuAccessibilityLabel,
+                            expanded = menuExpanded,
+                            onExpandedChange = { menuExpanded = it },
+                            onAction = { id -> onTaskAction(task.id, id) },
                         )
                     }
                 }
@@ -285,4 +341,42 @@ private fun TaskRow(
             null
         },
     )
+}
+
+@Composable
+fun TaskRowActionsMenu(
+    groups: List<List<TaskRowMenuAction>>,
+    accessibilityLabel: String,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onAction: (String) -> Unit,
+) {
+    Column {
+        IconButton(
+            onClick = { onExpandedChange(true) },
+            modifier = Modifier.semantics { contentDescription = accessibilityLabel },
+        ) {
+            Text("⋮", style = MaterialTheme.typography.titleLarge)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { onExpandedChange(false) }) {
+            groups.forEachIndexed { index, group ->
+                if (index > 0) HorizontalDivider()
+                group.forEach { action ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = action.title,
+                                color = if (action.isDestructive) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurface,
+                            )
+                        },
+                        onClick = {
+                            onExpandedChange(false)
+                            onAction(action.id)
+                        },
+                    )
+                }
+            }
+        }
+    }
 }

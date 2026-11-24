@@ -96,11 +96,14 @@ private data class ChecklistLine(
     val position: Double,
 )
 
+private data class TagLine(val id: String, val name: String)
+
 private data class TaskDetailData(
     val task: SyncRecord,
     val areas: List<DetailListItem>,
     val projects: List<DetailListItem>,
     val checklist: List<ChecklistLine>,
+    val tags: List<TagLine>,
 )
 
 private data class RepeatUnitOption(val value: String, val title: String)
@@ -120,6 +123,7 @@ fun TaskDetailScreen(
     taskId: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    initialAttribute: String? = null,
 ) {
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val labels = remember(languageTag) { TaskDetailLabels.fromRegistry(languageTag) }
@@ -140,7 +144,8 @@ fun TaskDetailScreen(
     var saving by remember(taskId) { mutableStateOf(false) }
     var saveFailed by remember(taskId) { mutableStateOf(false) }
     // The attribute whose picker is folded open in its row on the page. One at a time.
-    var openPicker by remember(taskId) { mutableStateOf<String?>(null) }
+    var openPicker by remember(taskId, initialAttribute) { mutableStateOf(initialAttribute) }
+    var tagFilterDraft by remember(taskId) { mutableStateOf("") }
 
     LaunchedEffect(graph, taskId, dataVersion) {
         val loaded = withContext(Dispatchers.IO) { loadTaskDetail(graph, taskId) }
@@ -296,9 +301,7 @@ fun TaskDetailScreen(
         }
     }
 
-    // One editor per attribute (ADR 0029). Each attribute writes through one
-    // function, and each picker opens through one function, so that the page and
-    // a future row menu (#300) use the same editor.
+    // One editor per attribute (ADR 0029). The page and row menu use the same editors.
 
     fun setWhen(day: String?) {
         write { check(graph.taskMutator.setWhen(taskId, day) != null) }
@@ -308,13 +311,60 @@ fun TaskDetailScreen(
         write { check(graph.taskMutator.setDeadline(taskId, day) != null) }
     }
 
+    fun setTag(tagId: String, selected: Boolean) {
+        write {
+            val currentTask = graph.taskStore.record(RegistryEntityNames.TASK, taskId)
+                ?: error("Task is unavailable")
+            val selectedIds = (currentTask.fields[RegistryEntityFields.Task.TAGS] as? JsonValue.ArrayValue)
+                ?.values?.mapNotNull { it.stringValue() }.orEmpty()
+            val nextIds = if (selected) (selectedIds + tagId).distinct() else selectedIds - tagId
+            check(graph.taskMutator.setTags(taskId, nextIds) != null)
+        }
+    }
+
+    fun createAndAssignTag() {
+        val name = tagFilterDraft.trim().take(RegistryEntityLimits.TAG_NAME_MAX.toInt())
+        if (name.isEmpty()) return
+        scope.launch {
+            saving = true
+            saveFailed = false
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val existingTag = graph.taskStore.records(RegistryEntityNames.TAG)
+                        .firstOrNull { record ->
+                            record.deletedAt == null &&
+                                record.fields[RegistryEntityFields.Tag.NAME].stringValue()
+                                    ?.equals(name, ignoreCase = true) == true
+                        }
+                    val tag = existingTag ?: graph.registryEntityMutator.create(
+                        RegistryEntityNames.TAG,
+                        mapOf(RegistryEntityFields.Tag.NAME to JsonValue.StringValue(name)),
+                    )
+                    graph.captureTaskEdit(taskId) {
+                        val currentTask = graph.taskStore.record(RegistryEntityNames.TASK, taskId)
+                            ?: error("Task is unavailable")
+                        val currentIds = (currentTask.fields[RegistryEntityFields.Task.TAGS] as? JsonValue.ArrayValue)
+                            ?.values?.mapNotNull { it.stringValue() }.orEmpty()
+                        check(graph.taskMutator.setTags(taskId, (currentIds + tag.id).distinct()) != null)
+                    }
+                    tag.id
+                }
+            }.onSuccess {
+                tagFilterDraft = ""
+                graph.sync.noteLocalChange()
+                graph.sync.requestSync()
+            }.onFailure { saveFailed = true }
+            saving = false
+        }
+    }
+
     /**
      * Opens the picker for a task attribute (actions.json `opensAttribute`).
      * On the page a picker is embedded, never modal (docs/TASK_PAGE_SPEC.md §3):
      * the picker folds open in the attribute's row, and a second tap on the row
      * folds it closed, which is Cancel. A commit writes through the attribute's
-     * setter and folds the row. One row is open at a time. Reminder, star and
-     * tags have no Android editor yet.
+     * setter and folds the row. One row is open at a time. Reminder and star
+     * have no Android editor yet.
      */
     fun openAttribute(attributeId: String) {
         if (openPicker == attributeId) {
@@ -549,7 +599,7 @@ fun TaskDetailScreen(
                             HorizontalDivider()
                             // The attributes block holds no list of its own: it renders the
                             // registry task attributes in their order. Notes, checklist and
-                            // attachments have their own blocks. Reminder, star, tags and
+                            // attachments have their own blocks. Reminder and star
                             // paste have no editor on Android yet. Each picker folds open in
                             // its own row through [openAttribute], never in a dialog.
                             attributes.forEach { attribute ->
@@ -628,6 +678,67 @@ fun TaskDetailScreen(
                                                 enabled = canEdit,
                                                 onClick = { openPicker = null; moveToProject(project.id) },
                                             )
+                                        }
+                                    }
+                                    RegistryTaskAttributeIds.TAGS -> {
+                                        val selectedIds = (taskFields[RegistryEntityFields.Task.TAGS] as? JsonValue.ArrayValue)
+                                            ?.values?.mapNotNull { it.stringValue() }.orEmpty()
+                                        val selectedNames = data?.tags.orEmpty()
+                                            .filter { it.id in selectedIds }
+                                            .map(TagLine::name)
+                                        val tagLabels = taskTagPickerLabels(languageTag)
+                                        AttributeFoldRow(
+                                            label = attribute.label,
+                                            value = selectedNames.joinToString().ifEmpty { tagLabels.emptyTitle },
+                                            expanded = openPicker == RegistryTaskAttributeIds.TAGS,
+                                            enabled = canEdit,
+                                            onToggle = { openAttribute(RegistryTaskAttributeIds.TAGS) },
+                                        ) {
+                                            OutlinedTextField(
+                                                value = tagFilterDraft,
+                                                onValueChange = {
+                                                    tagFilterDraft = it.take(RegistryEntityLimits.TAG_NAME_MAX.toInt())
+                                                },
+                                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                                                singleLine = true,
+                                                label = { Text(tagLabels.filterPlaceholder) },
+                                                enabled = canEdit,
+                                            )
+                                            val filteredTags = data?.tags.orEmpty().filter { tag ->
+                                                tag.name.contains(tagFilterDraft.trim(), ignoreCase = true)
+                                            }
+                                            if (filteredTags.isNotEmpty()) {
+                                                Column {
+                                                    filteredTags.forEach { tag ->
+                                                        FilterChip(
+                                                            selected = tag.id in selectedIds,
+                                                            onClick = { setTag(tag.id, tag.id !in selectedIds) },
+                                                            label = { Text(tag.name) },
+                                                            enabled = canEdit && !saving,
+                                                            modifier = Modifier.padding(horizontal = 12.dp),
+                                                        )
+                                                    }
+                                                }
+                                            } else if (data?.tags.isNullOrEmpty()) {
+                                                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                                    Text(tagLabels.emptyTitle, style = MaterialTheme.typography.bodyMedium)
+                                                    Text(
+                                                        tagLabels.emptyDetail,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                }
+                                            }
+                                            val duplicateTag = data?.tags.orEmpty().any {
+                                                it.name.equals(tagFilterDraft.trim(), ignoreCase = true)
+                                            }
+                                            if (tagFilterDraft.isNotBlank() && !duplicateTag) {
+                                                TextButton(
+                                                    onClick = ::createAndAssignTag,
+                                                    enabled = canEdit && !saving,
+                                                    modifier = Modifier.align(Alignment.End),
+                                                ) { Text(tagLabels.addTitle) }
+                                            }
                                         }
                                     }
                                     RegistryTaskAttributeIds.REPEAT -> AttributeFoldRow(
@@ -1167,6 +1278,27 @@ private fun ChecklistRow(
     }
 }
 
+private data class TaskTagPickerLabels(
+    val filterPlaceholder: String,
+    val addTitle: String,
+    val emptyTitle: String,
+    val emptyDetail: String,
+)
+
+private fun taskTagPickerLabels(languageTag: String): TaskTagPickerLabels {
+    val surface = RegistryCatalog.surface("taskTagsPicker")
+    fun label(field: String): String {
+        val key = surface?.fields?.get(field).stringValue().orEmpty()
+        return RegistryCatalog.localizedString(key, languageTag) ?: key
+    }
+    return TaskTagPickerLabels(
+        filterPlaceholder = label("filterPlaceholder"),
+        addTitle = label("addTitle"),
+        emptyTitle = label("emptyTitle"),
+        emptyDetail = label("emptyDetail"),
+    )
+}
+
 private data class TaskDetailLabels(
     val title: String,
     val back: String,
@@ -1288,7 +1420,13 @@ private suspend fun loadTaskDetail(graph: AndroidAppGraph, taskId: String): Task
         .sortedBy { it.title.lowercase() }
         .sortedBy(ChecklistLine::position)
         .toList()
-    return TaskDetailData(task, areas, projects, checklist)
+    val tags = graph.taskStore.records(RegistryEntityNames.TAG)
+        .filter { it.deletedAt == null }
+        .mapNotNull { row ->
+            row.fields[RegistryEntityFields.Tag.NAME].stringValue()?.let { name -> TagLine(row.id, name) }
+        }
+        .sortedBy { it.name.lowercase() }
+    return TaskDetailData(task, areas, projects, checklist, tags)
 }
 
 /** When the task was added: the creation instant in the device zone, else its creation day. */

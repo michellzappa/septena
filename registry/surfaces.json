@@ -358,6 +358,17 @@
       { "id": "taskPage.history", "kind": "history", "attribute": "history", "depths": ["page"], "featureId": "task.history", "editOnly": true }
     ]
   },
+  "taskTagsPicker": {
+    "id": "taskTagsPicker",
+    "filterPlaceholder": "Filter or create tag…",
+    "addTitle": "Add",
+    "emptyTitle": "No tags yet",
+    "emptyDetail": "Type a name above and press Return to create your first tag."
+  },
+  "taskRowMenu": {
+    "id": "taskRowMenu",
+    "accessibilityLabel": "Task actions"
+  },
   "taskDetail": {
     "id": "taskDetail",
     "title": "Task Details",

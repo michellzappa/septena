@@ -13,6 +13,7 @@ import app.septena.core.TaskFadeRules
 import app.septena.core.TaskProvenance
 import app.septena.core.TaskSnapshot
 import app.septena.core.TaskViewRules
+import app.septena.core.asSyncRecord
 import app.septena.core.booleanValue
 import app.septena.core.stringValue
 import app.septena.core.generated.RegistryActionIds
@@ -166,6 +167,70 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     noteLocalChangeAndSync()
                 }
                 .onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    fun toggleStar(id: String) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val record = graph.taskStore.record(EntityNames.TASK, id) ?: error("Task is unavailable")
+                    val starred = record.fields[RegistryEntityFields.Task.STARRED].booleanValue() == true
+                    graph.captureTaskEdit(id) {
+                        check(graph.taskMutator.setStarred(id, !starred) != null)
+                    }
+                }
+            }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
+                .onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    fun delete(id: String) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.captureTaskEdit(id) { check(graph.taskMutator.delete(id) != null) }
+                }
+            }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
+                .onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    fun restore(id: String) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.captureTaskEdit(id) { check(graph.taskMutator.restore(id) != null) }
+                }
+            }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
+                .onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    fun duplicate(id: String) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val copy = graph.taskMutator.duplicate(id) ?: error("Task is unavailable")
+                    graph.taskUndoHistory.recordCreated(copy.asSyncRecord())
+                }
+            }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
+                .onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    fun shareText(id: String, onReady: (String) -> Unit) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val task = graph.taskStore.record(EntityNames.TASK, id) ?: error("Task is unavailable")
+                    val title = task.fields[RegistryEntityFields.Task.TITLE].stringValue().orEmpty()
+                    val notes = task.fields[RegistryEntityFields.Task.NOTES].stringValue()
+                        ?.trim()
+                        .orEmpty()
+                    if (notes.isEmpty()) title else "$title\n\n$notes"
+                }
+            }.onSuccess(onReady).onFailure { errorMessage.value = it.message }
         }
     }
 
@@ -370,6 +435,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             subtitle = subtitle,
             isCompleted = snapshot.status == RegistryEntityEnums.TaskStatus.DONE,
             isOnToday = isOnToday,
+            isStarred = snapshot.starred,
         )
     }
 

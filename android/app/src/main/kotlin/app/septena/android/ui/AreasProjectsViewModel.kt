@@ -37,7 +37,7 @@ sealed interface AreasProjectsDestination {
 }
 
 data class PlaceProjectRow(val id: String, val title: String)
-data class PlaceTaskRow(val id: String, val title: String)
+data class PlaceTaskRow(val id: String, val title: String, val isStarred: Boolean = false)
 data class PlaceSectionRow(val id: String, val title: String, val tasks: List<PlaceTaskRow>)
 
 data class AreasProjectsUiState(
@@ -318,7 +318,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     .toList()
                 val tasks = taskRows.asSequence()
                     .filter { (_, task) -> task.area == selected.id && task.project == null && !task.isHeading }
-                    .map { (record, task) -> PositionedPlaceTask(PlaceTaskRow(record.id, task.title), record.fields[RegistryEntityFields.Task.POSITION].numberValue()) }
+                    .map { (record, task) -> PositionedPlaceTask(PlaceTaskRow(record.id, task.title, task.starred), record.fields[RegistryEntityFields.Task.POSITION].numberValue()) }
                     .sortedWith(PLACE_TASK_ORDER)
                     .map { it.task }
                     .toList()
@@ -338,7 +338,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     .map { (record, task) ->
                         ProjectTask(
                             recordId = record.id,
-                            row = PlaceTaskRow(record.id, task.title),
+                            row = PlaceTaskRow(record.id, task.title, task.starred),
                             headingId = record.fields[RegistryEntityFields.Task.HEADING].stringValue(),
                             isHeading = task.isHeading,
                             position = record.fields[RegistryEntityFields.Task.POSITION].numberValue(),

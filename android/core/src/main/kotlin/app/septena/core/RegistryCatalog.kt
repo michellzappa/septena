@@ -50,6 +50,9 @@ data class TaskAttribute(
     val editOnly: Boolean,
 )
 
+/** One contiguous action group from a generated context menu. */
+data class RegistryMenuActionGroup(val actionIds: List<String>)
+
 /** Runtime view over the complete generated registries. No Android-only copy of product contracts. */
 object RegistryCatalog {
     private val documents: Map<String, JsonValue.ObjectValue> by lazy {
@@ -98,10 +101,38 @@ object RegistryCatalog {
 
     /** Action IDs in a registry context menu, preserving its declared order. */
     fun menuActionIds(id: String): List<String> =
-        document("actions").objectAt("contextMenus")?.arrayAt(id).orEmpty().mapNotNull { raw ->
-            val entry = raw as? JsonValue.ObjectValue ?: return@mapNotNull null
-            if (entry.stringAt("kind") == "action") entry.stringAt("id") else null
+        menuActionGroups(id).flatMap(RegistryMenuActionGroup::actionIds)
+
+    /** Generated menu groups in declared order; nested submenu actions retain their position. */
+    fun menuActionGroups(id: String): List<RegistryMenuActionGroup> {
+        val nodes = document("actions").objectAt("contextMenus")?.arrayAt(id).orEmpty()
+        val groups = mutableListOf<RegistryMenuActionGroup>()
+        var current = mutableListOf<String>()
+
+        fun appendNested(node: JsonValue) {
+            val entry = node as? JsonValue.ObjectValue ?: return
+            when (entry.stringAt("kind")) {
+                "action" -> entry.stringAt("id")?.let(current::add)
+                "submenu" -> entry.arrayAt("items").orEmpty().forEach(::appendNested)
+            }
         }
+
+        nodes.forEach { raw ->
+            val entry = raw as? JsonValue.ObjectValue ?: return@forEach
+            when (entry.stringAt("kind")) {
+                "divider" -> if (current.isNotEmpty()) {
+                    groups += RegistryMenuActionGroup(current.toList())
+                    current = mutableListOf()
+                }
+                "action" -> entry.stringAt("id")?.let(current::add)
+                "submenu" -> entry.arrayAt("items").orEmpty().forEach(::appendNested)
+            }
+        }
+        if (current.isNotEmpty()) groups += RegistryMenuActionGroup(current.toList())
+        return groups
+    }
+
+    fun actionRole(id: String): String? = action(id)?.stringAt("role")
 
     fun setting(key: String): JsonValue.ObjectValue? =
         document("settings").objectAt("keys")?.get(key) as? JsonValue.ObjectValue
