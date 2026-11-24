@@ -175,8 +175,10 @@ leave it alone. (Never rewrite shared history.)
 
 **A request goes to closure** (global `~/.claude/CLAUDE.md`, "A new request:
 take it to closure", 2026-11-24): a `wt/<name>` branch in a worktree off fresh
-`origin/main`, push, PR, green CI, merge, deploy the backend when it changed
-(`cd backend && pnpm run deploy`), report. That short-lived PR branch is
+`origin/main`, push, PR, green CI, merge, deploy, report. Deployment
+is continuous (mz, 2026-11-24): CI deploys the Worker from `main`
+(`backend.yml`), and the site is deployed after every push to its `main`. Do
+not ask first; check the Deploy job. Store releases stay mz's. That short-lived PR branch is
 sanctioned; the rules below forbid long-lived forks.
 
 **Default to committing on `main`. Do NOT create branches unless the user
