@@ -29,10 +29,10 @@ export const listTasksJsonSchema = {
   properties: {
     view: {
       type: "string",
-      enum: ["today", "inbox", "review", "anytime", "upcoming", "completed"],
+      enum: ["today", "inbox", "review", "anytime", "upcoming", "completed", "faded"],
       default: "today",
       description:
-        "Which task list to read. 'today' = the whole Today page as the app shows it: the Inbox section first, then every task on Today. 'inbox' = only the Inbox section: tasks the user has not filed yet (no area or project) and your proposals they have not accepted. 'review' = open tasks awaiting the user's verification (`endState = needs_verify`). 'anytime' is the single home for open, dateless tasks. Rows carry `inbox: true` when they sit in the Inbox, and `daysOnToday: N` when they have carried over on Today undone for N days (the app darkens their checkbox; 7+ is long overdue for a decision).",
+        "Which task list to read. 'today' = the whole Today page as the app shows it: the Inbox section first, then every task on Today. 'inbox' = only the Inbox section: tasks the user has not filed yet (no area or project) and your proposals they have not accepted. 'review' = open tasks awaiting the user's verification (`endState = needs_verify`). 'anytime' is the single home for open, dateless tasks. 'faded' = the Faded pile: open tasks nobody touched for the fade window, which no other list shows (an agent edit does not bring one back: the user keeps or drops it in the app). Rows carry `inbox: true` when they sit in the Inbox, and `daysOnToday: N` when they have carried over on Today undone for N days (the app darkens their checkbox; 7+ is long overdue for a decision).",
     },
     limit: {
       type: "integer",
@@ -88,7 +88,7 @@ export const TASK_TOOLS: Tool[] = [
     name: "tasks_list",
     title: "List tasks",
     description:
-      "New here? Call tasks_orientation first. List Septena tasks for a given view (today, inbox, review, upcoming, anytime, completed). 'today' is the whole Today page the user sees: the Inbox section first, then the filed tasks on Today. 'inbox' is that Inbox section alone: unfiled tasks (no area or project) plus your proposals the user has not accepted. 'review' lists open tasks waiting for the user to check and accept (`needs_verify`). The user sees ONE Inbox; never describe it as two piles. Each row carries `inbox: true` when it sits in the Inbox, and `daysOnToday: N` when it has carried over on Today undone for N days (the app darkens its checkbox; flag rows at 7+ as stuck). A row carries `issue` ({url, repo, number, kind}) when its conversation links a GitHub issue or PR (the chip the app shows), and `endState` when the conversation has ended (for example `decomposed`: already tracked elsewhere). Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
+      "New here? Call tasks_orientation first. List Septena tasks for a given view (today, inbox, review, upcoming, anytime, completed, faded). 'today' is the whole Today page the user sees: the Inbox section first, then the filed tasks on Today. 'inbox' is that Inbox section alone: unfiled tasks (no area or project) plus your proposals the user has not accepted. 'review' lists open tasks waiting for the user to check and accept (`needs_verify`). The user sees ONE Inbox; never describe it as two piles. Each row carries `inbox: true` when it sits in the Inbox, and `daysOnToday: N` when it has carried over on Today undone for N days (the app darkens its checkbox; flag rows at 7+ as stuck). A row carries `issue` ({url, repo, number, kind}) when its conversation links a GitHub issue or PR (the chip the app shows), and `endState` when the conversation has ended (for example `decomposed`: already tracked elsewhere). Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
     inputSchema: listTasksJsonSchema,
     annotations: { title: "List tasks", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
