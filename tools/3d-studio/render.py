@@ -33,12 +33,14 @@ def parse_args():
     else:
         argv = []
     p = argparse.ArgumentParser(description="Render Septena 3D marketing scene")
-    p.add_argument("--mac", default=os.path.join(SCREENS_DIR, "demo_mac.png"))
+    p.add_argument("--platform", choices=["apple", "android"], default="apple", help="Device ecosystem: apple (Mac/iPad/iPhone/Watch) or android (Windows laptop + Pixel/Galaxy)")
+    p.add_argument("--mac", default=None, help="Laptop screen PNG (defaults to demo_mac.png or demo_windows.png)")
     p.add_argument("--ipad", default=os.path.join(SCREENS_DIR, "demo_ipad.png"))
-    p.add_argument("--no-ipad", action="store_true", help="Omit the iPad Mini from the scene")
-    p.add_argument("--ios", default=os.path.join(SCREENS_DIR, "demo_ios.png"))
+    p.add_argument("--no-ipad", action="store_true", help="Omit the iPad Mini from the Apple scene")
+    p.add_argument("--ios", default=None, help="Phone screen PNG (defaults to demo_ios.png or demo_android.png)")
     p.add_argument("--watch", default=os.path.join(SCREENS_DIR, "demo_watch.png"))
     p.add_argument("--phone", choices=["pro", "air"], default="pro")
+    p.add_argument("--android-phone", choices=["galaxy", "pixel"], default="galaxy", help="Android phone model when --platform android")
     p.add_argument("--mac-finish", choices=["silver", "space-black"], default="silver")
     p.add_argument("--preset", choices=["hero-vertical", "ortho-vertical", "iso-vertical", "hero-wide", "square", "closeup-phone"], default="hero-vertical")
     p.add_argument("--keep-notch", action="store_true", help="Keep the MacBook camera notch (removed by default)")
@@ -725,43 +727,62 @@ def build_iphone(ios_screen_path, phone_type="pro", keep_notch=False, preset="he
     return root, objs
 
 
-def relax_watch_soft_strap(watch_obj):
-    """Flatten the rigid circular sport-band loop into a soft relaxed strap so the Watch lies low on the desk."""
-    strap_mats = {
-        i for i, m in enumerate(watch_obj.data.materials)
-        if m and (m.name.startswith("Rubber") or m.name == "Metal" or m.name.startswith("Metal."))
-    }
+def squish_watch_onto_table(root, watch_obj, objs, case_clearance=0.0035):
+    """
+    Seat the Apple Watch low onto the desk (`Z = 0`) as if resting on a soft silicone strap:
+    1. Position the watch case itself so its lowest vertex sits just `case_clearance` (~3.5mm) above Z=0.
+    2. In world space, squish the flexible Rubber strap vertices behind/beneath the case smoothly flat
+       against the table surface (`Z >= 0`) so the band drapes naturally with tight floor contact and
+       zero floating gap.
+    """
+    bpy.context.view_layer.update()
     case_mats = {
         i for i, m in enumerate(watch_obj.data.materials)
         if m and (m.name.startswith("Black metal") or m.name.startswith("Screen"))
     }
+    strap_mats = {
+        i for i, m in enumerate(watch_obj.data.materials)
+        if m and (m.name.startswith("Rubber") or m.name == "Metal" or m.name.startswith("Metal."))
+    }
+
+    # 1. Measure lowest world Z of the rigid watch case and lower root so case rests just above the desk
+    mw = watch_obj.matrix_world
     bm = bmesh.new()
     bm.from_mesh(watch_obj.data)
     case_verts = {v for f in bm.faces if f.material_index in case_mats for v in f.verts}
     strap_verts = {v for f in bm.faces if f.material_index in strap_mats for v in f.verts} - case_verts
 
-    # Case back sits around y = -0.022; compress strap depth behind case & tuck bottom stilt loop gently up
-    y_back = -0.022
-    z_case_bot = 0.0165
-    pin_mats = {i for i, m in enumerate(watch_obj.data.materials) if m and (m.name == "Metal" or m.name.startswith("Metal."))}
-    pin_verts = {v for f in bm.faces if f.material_index in pin_mats for v in f.verts}
+    case_min_z = min((mw @ v.co).z for v in case_verts)
+    root.location.z += (case_clearance - case_min_z)
+    bpy.context.view_layer.update()
+
+    # 2. Squish strap vertices in world space so the band flattens gently onto Z=0 behind/under the watch
+    mw = watch_obj.matrix_world
+    mw_inv = mw.inverted()
+    case_center_y = sum((mw @ v.co).y for v in case_verts) / max(len(case_verts), 1)
+
     for v in strap_verts:
-        if v.co.y > y_back:
-            dy = v.co.y - y_back
-            # Smoothly compress rear strap loop to ~42% depth (relaxed silicone drape)
-            v.co.y = y_back + dy * 0.42
-        if v.co.z < z_case_bot:
-            # Tuck the rigid bottom band loop close under the watch body so the watch sits low on the floor
-            dz = z_case_bot - v.co.z
-            v.co.z = z_case_bot - dz * 0.28
-        if v in pin_verts:
-            # Keep underside clasp pin tucked inside the relaxed strap so it never pokes under the watch
-            v.co.z += 0.010
-            v.co.y -= 0.004
+        w = mw @ v.co
+        # Compress strap thickness behind the watch body toward the desk
+        if w.y > case_center_y + 0.004:
+            dy = w.y - (case_center_y + 0.004)
+            w.y = (case_center_y + 0.004) + dy * 0.55
+            # Softly droop the rear strap loop down toward the desk
+            blend = min(dy / 0.025, 1.0)
+            w.z = w.z * (1.0 - 0.55 * blend)
+        # Flatten any strap portion pressing into the table cleanly onto Z = 0..2.5mm
+        if w.z < 0.0025:
+            # Smooth soft floor pancake instead of hard knife-edge crease
+            depth = 0.0025 - w.z
+            w.z = max(0.0, 0.0025 - depth * 0.12)
+            # Subtle lateral/rear spread as silicone squishes against the desk
+            w.y += depth * 0.35
+        v.co = mw_inv @ w
 
     bm.to_mesh(watch_obj.data)
     bm.free()
     watch_obj.data.update()
+    drop_to_floor(root, objs, 0.0)
 
 
 def build_watch(watch_screen_path, preset="hero-vertical"):
@@ -770,7 +791,6 @@ def build_watch(watch_screen_path, preset="hero-vertical"):
 
     watch_mesh = next((o for o in objs if o.name.startswith("A smartwatch")), None)
     if watch_mesh:
-        relax_watch_soft_strap(watch_mesh)
         for m in watch_mesh.data.materials:
             if not m:
                 continue
@@ -785,8 +805,7 @@ def build_watch(watch_screen_path, preset="hero-vertical"):
                 reproject_planar_uv(watch_mesh, m.name, u_axis='x', v_axis='z', flip_u=False, flip_v=False)
                 make_emissive_screen_material(m, watch_screen_path, cam_strength=1.75, bounce_strength=3.5, glass_gloss=0.02)
 
-    # Remove detached rear clasp pin (Cylinder.003) since the relaxed strap compresses forward,
-    # and shade the Digital Crown (wheel.001) in dark warm titanium
+    # Remove detached rear clasp pin (Cylinder.003) and shade Digital Crown (wheel.001)
     kept_objs = []
     for o in objs:
         if o.type == 'MESH' and o.name.startswith("Cylinder"):
@@ -800,14 +819,17 @@ def build_watch(watch_screen_path, preset="hero-vertical"):
     objs = kept_objs
 
     if preset == "iso-vertical":
-        # Laid low on the desk resting naturally on its relaxed soft strap between iPad Mini and iPhone
-        root.rotation_euler = (math.radians(-46.0), 0.0, math.radians(-18.0))
+        # Laid low on the desk resting solidly on its squished soft strap between iPad Mini and iPhone
+        root.rotation_euler = (math.radians(-42.0), 0.0, math.radians(-18.0))
         root.location = (-0.002, -0.228, 0.0)
     else:
-        # Tilt face upward toward camera (-34 deg) resting firmly on desk, yaw slightly left (-12 deg) showing crown
         root.rotation_euler = (math.radians(-34.0), 0.0, math.radians(-12.0))
         root.location = (-0.068, -0.255, 0.0)
-    drop_to_floor(root, objs, 0.0)
+
+    if watch_mesh:
+        squish_watch_onto_table(root, watch_mesh, objs, case_clearance=0.003)
+    else:
+        drop_to_floor(root, objs, 0.0)
     return root, objs
 
 
@@ -932,10 +954,136 @@ def setup_camera(scene, preset, scale):
     return cobj
 
 
+def build_windows_laptop(laptop_screen_path, finish="silver"):
+    """Build the 14-inch aluminum Windows laptop with satin-matte PBR aluminum & crisp emissive screen."""
+    col, objs = append_all_objects(os.path.join(MODELS_DIR, "windows_laptop_14.blend"), "WindowsLaptop")
+    root = create_root_empty("WindowsLaptopRoot", objs, col)
+
+    # Preserve original 4K keyboard/trackpad PBR texture maps while clamping metallic roughness >= 0.40
+    # so the aluminum chassis reads as velvety bead-blasted anodized aluminum rather than shiny chrome.
+    for mat in bpy.data.materials:
+        if mat.name.startswith("Laptop14_mat") and mat.node_tree:
+            nt = mat.node_tree
+            bsdf = next((n for n in nt.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+            if bsdf:
+                if finish == "space-black" and bsdf.inputs['Base Color'].is_linked:
+                    src = bsdf.inputs['Base Color'].links[0].from_socket
+                    hsv = nt.nodes.new('ShaderNodeHueSaturation')
+                    hsv.inputs['Value'].default_value = 0.22
+                    nt.links.new(src, hsv.inputs['Color'])
+                    nt.links.new(hsv.outputs['Color'], bsdf.inputs['Base Color'])
+                if bsdf.inputs['Roughness'].is_linked:
+                    src = bsdf.inputs['Roughness'].links[0].from_socket
+                    mx = nt.nodes.new('ShaderNodeMath')
+                    mx.operation = 'MAXIMUM'
+                    mx.inputs[1].default_value = 0.42
+                    nt.links.new(src, mx.inputs[0])
+                    nt.links.new(mx.outputs['Value'], bsdf.inputs['Roughness'])
+                else:
+                    bsdf.inputs['Roughness'].default_value = 0.42
+
+    scr_obj = next((o for o in objs if o.type == 'MESH' and "screen" in o.name.lower()), None)
+    if scr_obj:
+        scr_mat = next((m for m in scr_obj.data.materials if m and "screen" in m.name.lower()), None)
+        if scr_mat:
+            reproject_planar_uv(scr_obj, scr_mat.name, u_axis='x', v_axis='z', flip_u=False, flip_v=False)
+            make_emissive_screen_material(
+                scr_mat, laptop_screen_path,
+                cam_strength=1.52, bounce_strength=8.5, glass_gloss=0.015,
+                corner_radius=0.018, aspect=1.488,
+            )
+
+    root.location = (0.0, 0.03, 0.0)
+    drop_to_floor(root, objs, 0.0)
+    return root, objs
+
+
+def make_transparent_material(mat):
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new('ShaderNodeOutputMaterial')
+    tr = nt.nodes.new('ShaderNodeBsdfTransparent')
+    nt.links.new(tr.outputs['BSDF'], out.inputs['Surface'])
+
+
+def build_android_phone(android_screen_path, model="pixel", keep_notch=False, preset="iso-vertical"):
+    """Build Google Pixel 9 Pro or Samsung Galaxy S25 Ultra with crisp emissive screen & titanium rails."""
+    if model == "galaxy":
+        blend_fn = "galaxy_s25_ultra.blend"
+        screen_obj_name = "Screen"
+        cam_obj_prefix = "Front-facing camera"
+        aspect = 0.473
+        corner_r = 0.014
+    else:
+        blend_fn = "pixel_9_pro.blend"
+        screen_obj_name = "Screen Emission"
+        cam_obj_prefix = "Front camera"
+        aspect = 0.464
+        corner_r = 0.056
+
+    col, objs = append_all_objects(os.path.join(MODELS_DIR, blend_fn), "AndroidPhone")
+    root = create_root_empty("AndroidPhoneRoot", objs, col)
+
+    # Remove front punch-hole camera object for a clean uninterrupted top edge unless --keep-notch
+    kept = []
+    for o in objs:
+        if not keep_notch and o.type == 'MESH' and o.name.startswith(cam_obj_prefix):
+            bpy.data.objects.remove(o, do_unlink=True)
+            continue
+        kept.append(o)
+    objs = kept
+
+    scr_obj = next((o for o in objs if o.type == 'MESH' and o.name.startswith(screen_obj_name)), None)
+    if scr_obj and scr_obj.data.materials:
+        scr_mat = scr_obj.data.materials[0]
+        reproject_planar_uv(scr_obj, scr_mat.name, u_axis='x', v_axis='y', flip_u=False, flip_v=False)
+        make_emissive_screen_material(
+            scr_mat, android_screen_path,
+            cam_strength=1.48, bounce_strength=4.5, glass_gloss=0.018,
+            corner_radius=corner_r, aspect=aspect,
+        )
+
+    # Make overlay touch glass transparent (screen material already supplies subtle Fresnel glass sheen),
+    # polish bezel glossy jet black, and refine titanium rails.
+    for o in objs:
+        if o.type != 'MESH' or o == scr_obj:
+            continue
+        for m in o.data.materials:
+            if not m:
+                continue
+            low = m.name.lower()
+            if "glass" in low and ("touch" in o.name.lower() or m.name.startswith("Glass")):
+                make_transparent_material(m)
+            elif "screen black" in low or low == "jet black" or low == "black":
+                set_simple_pbr(m, (0.005, 0.005, 0.006), metallic=0.0, roughness=0.05, coat=0.7)
+            elif "titanium" in low:
+                # Warm satin natural titanium rail matching our studio palette
+                set_simple_pbr(m, (0.68, 0.60, 0.54), metallic=0.95, roughness=0.22, coat=0.2, bump_scale=1200.0, bump_strength=0.004)
+
+    # Both Pixel 9 Pro and Galaxy S25 Ultra lie face-up (+Z normal, +Y top, +X right) in source .blend:
+    # rot_x = +76 deg stands upright facing -Y leaned back 14 deg; rot_z = -22 deg faces toward iso camera.
+    if preset == "iso-vertical":
+        root.rotation_euler = (math.radians(76.0), 0.0, math.radians(-22.0))
+        root.location = (0.082, -0.120, 0.0)
+    else:
+        root.rotation_euler = (math.radians(79.0), 0.0, math.radians(-14.0))
+        root.location = (0.056, -0.245, 0.0)
+    drop_to_floor(root, objs, 0.0)
+    return root, objs
+
+
 def main():
     args = parse_args()
     os.makedirs(RENDERS_DIR, exist_ok=True)
-    out_path = args.out or os.path.join(RENDERS_DIR, f"{args.preset}_{args.phone}.png")
+    if args.platform == "android":
+        mac_screen = args.mac or os.path.join(SCREENS_DIR, "demo_windows.png")
+        phone_screen = args.ios or os.path.join(SCREENS_DIR, "demo_android.png")
+        default_name = f"{args.preset}_android_{args.android_phone}.png"
+    else:
+        mac_screen = args.mac or os.path.join(SCREENS_DIR, "demo_mac.png")
+        phone_screen = args.ios or os.path.join(SCREENS_DIR, "demo_ios.png")
+        default_name = f"{args.preset}_{args.phone}.png"
+    out_path = args.out or os.path.join(RENDERS_DIR, default_name)
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
 
     clear_scene()
@@ -943,11 +1091,15 @@ def main():
     setup_cycles(scene, args.samples)
     build_desk(scene)
     build_topo_backdrop(scene, preset=args.preset)
-    build_macbook(args.mac, keep_notch=args.keep_notch, finish=args.mac_finish)
-    if not args.no_ipad:
-        build_ipad(args.ipad, preset=args.preset, finish=args.mac_finish)
-    build_iphone(args.ios, args.phone, keep_notch=args.keep_notch, preset=args.preset)
-    build_watch(args.watch, preset=args.preset)
+    if args.platform == "android":
+        build_windows_laptop(mac_screen, finish=args.mac_finish)
+        build_android_phone(phone_screen, model=args.android_phone, keep_notch=args.keep_notch, preset=args.preset)
+    else:
+        build_macbook(mac_screen, keep_notch=args.keep_notch, finish=args.mac_finish)
+        if not args.no_ipad:
+            build_ipad(args.ipad, preset=args.preset, finish=args.mac_finish)
+        build_iphone(phone_screen, args.phone, keep_notch=args.keep_notch, preset=args.preset)
+        build_watch(args.watch, preset=args.preset)
     setup_lighting_and_world(scene)
     setup_camera(scene, args.preset, args.scale)
 

@@ -19,6 +19,10 @@ import type { IcalTask } from "../ical.js";
 import { DOMAIN_RULES, ENTITY_LIMITS, TURN_FIELDS } from "../generated/registries.js";
 import { MCP_REFRESH_TTL_S } from "../shadow/tokens.js";
 
+/// Task fields only the app writes (docs/TASK_FADE_SPEC.md §3): the fade
+/// clock and its outcome. An agent cannot keep a task alive by touching it.
+const APP_ONLY_TASK_FIELDS = ["touchedAt", "deferCount", "fadedAt", "dropReason", "effort"] as const;
+
 /// Per changed field: [before, after]. `null` means absent / cleared.
 export type ChangeDiff = Record<string, [unknown, unknown]>;
 
@@ -612,6 +616,10 @@ export class TaskStore extends DurableObject<Env> {
     if (op.op === "upsert" && op.entity === "convo" && "stoppedAt" in op.fields) return "human_only:stoppedAt";
     if (op.op === "upsert" && op.entity === "setting" && op.id === "agentsPaused") return "human_only:agentsPaused";
     if (op.op === "upsert" && op.entity === "project" && "context" in op.fields) return "retired:context";
+    if (op.op === "upsert" && op.entity === "task") {
+      const appOnly = APP_ONLY_TASK_FIELDS.find((f) => f in op.fields);
+      if (appOnly) return `app_only:${appOnly}`;
+    }
     const taskId = op.op === "appendTurn" ? op.taskId
       : (op.entity === "task" || op.entity === "convo") ? op.id
       : op.entity === "attachment" && op.op === "upsert" ? (op.fields.taskId as string | undefined) ?? null

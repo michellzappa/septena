@@ -36,10 +36,12 @@ blender -b --python tools/3d-studio/render.py -- \
 
 | Flag | Values | Description |
 | :--- | :--- | :--- |
-| `--mac` | PNG/JPG path | MacBook Pro 14" display texture (`3024×1964` / ~3:2 aspect) |
+| `--platform` | `apple` (default), `android` | Switch between Apple ecosystem (Mac/iPad/iPhone/Watch) and Windows 14" + Android phone |
+| `--android-phone` | `pixel` (default), `galaxy` | Android phone model when `--platform android` (Google Pixel 9 Pro or Samsung Galaxy S25 Ultra) |
+| `--mac` | PNG/JPG path | Laptop display texture (MacBook Pro 14" or Windows 14" ultrabook) |
 | `--ipad` | PNG/JPG path | iPad Mini landscape display texture (`2266×1488`) |
-| `--no-ipad` | flag | Omit the iPad Mini for a 3-device layout |
-| `--ios` | PNG/JPG path | iPhone display texture (standard iPhone screenshot) |
+| `--no-ipad` | flag | Omit the iPad Mini for a 3-device Apple layout |
+| `--ios` | PNG/JPG path | Phone display texture (iPhone or Android screenshot) |
 | `--watch` | PNG/JPG path | Apple Watch OLED display texture (`410×502`) |
 | `--phone` | `pro` (default), `air` | Switches between iPhone 17 Pro Max and iPhone 17 Air |
 | `--mac-finish` | `silver` (default), `space-black` | Bead-blasted satin-matte anodized aluminum finish |

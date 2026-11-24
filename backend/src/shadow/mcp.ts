@@ -353,6 +353,12 @@ async function callTool(
         completedAt: t.completedAt, source: t.source, notes: t.notes, notesRev: notesRev(t.notes),
         ...(checklist.length > 0 ? { checklist } : {}),
         inbox: t.inbox, daysOnToday: t.daysOnToday,
+        // Fade fields, read-only (the app is the only writer).
+        ...(str(r.task.touchedAt) ? { touchedAt: str(r.task.touchedAt) } : {}),
+        ...((num(r.task.deferCount) ?? 0) > 0 ? { deferCount: num(r.task.deferCount) } : {}),
+        ...(str(r.task.fadedAt) ? { fadedAt: str(r.task.fadedAt) } : {}),
+        ...(str(r.task.dropReason) ? { dropReason: str(r.task.dropReason) } : {}),
+        ...(str(r.task.effort) ? { effort: str(r.task.effort) } : {}),
         convo: convoSummary(convoOut(r.convo, r.turns)),
         agent: agentState(r.convo),
         ...(a.include_notes === true ? await notesForTask(store, r.task) : {}),

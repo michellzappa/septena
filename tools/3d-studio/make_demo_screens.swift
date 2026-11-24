@@ -522,4 +522,284 @@ let ipadImg = makeContext(width: ipW, height: ipH) { ctx in
 }
 savePNG(ipadImg, to: "\(outDir)/demo_ipad.png")
 
+// ---------------------------------------------------------------------------
+// 5. WINDOWS 14" LAPTOP SCREEN (3024 x 2016) — Warm Persimmon Bloom + Win11 Septena
+// ---------------------------------------------------------------------------
+let winW = 3024, winH = 2016
+let winImg = makeContext(width: winW, height: winH) { ctx in
+    let W = CGFloat(winW), H = CGFloat(winH)
+    let cs = CGColorSpaceCreateDeviceRGB()
+
+    // Rich warm Persimmon-amber Windows 11 Bloom-inspired backdrop
+    let bgGrad = CGGradient(
+        colorsSpace: cs,
+        colors: [color(0xB82D04).cgColor, color(0xE05212).cgColor, color(0xFF8C1A).cgColor, color(0x8F1E02).cgColor] as CFArray,
+        locations: [0.0, 0.38, 0.72, 1.0]
+    )!
+    ctx.drawLinearGradient(bgGrad, start: CGPoint(x: 0, y: 0), end: CGPoint(x: W, y: H), options: [])
+
+    // Layered ribbon petals (warm Persimmon / amber Windows Bloom motif)
+    func drawPetal(cx: CGFloat, cy: CGFloat, rx: CGFloat, ry: CGFloat, rot: CGFloat, c1: UInt32, c2: UInt32, alpha: CGFloat) {
+        ctx.saveGState()
+        ctx.translateBy(x: cx, y: cy)
+        ctx.rotate(by: rot)
+        let oval = CGPath(ellipseIn: CGRect(x: -rx, y: -ry, width: rx * 2, height: ry * 2), transform: nil)
+        ctx.addPath(oval)
+        ctx.clip()
+        let g = CGGradient(colorsSpace: cs, colors: [color(c1, alpha: alpha).cgColor, color(c2, alpha: alpha).cgColor] as CFArray, locations: [0, 1])!
+        ctx.drawLinearGradient(g, start: CGPoint(x: -rx, y: -ry), end: CGPoint(x: rx, y: ry), options: [])
+        ctx.restoreGState()
+    }
+    drawPetal(cx: W * 0.25, cy: H * 0.30, rx: 1100, ry: 520, rot: -0.35, c1: 0xFFA229, c2: 0xC93604, alpha: 0.75)
+    drawPetal(cx: W * 0.78, cy: H * 0.55, rx: 1050, ry: 560, rot: 0.42, c1: 0xFF7B14, c2: 0x8F1C02, alpha: 0.80)
+    drawPetal(cx: W * 0.48, cy: H * 0.82, rx: 1200, ry: 480, rot: -0.18, c1: 0xFFB83D, c2: 0xB82A03, alpha: 0.70)
+
+    // Floating Windows 11 Septena desktop window
+    let winRect = CGRect(x: 280, y: 170, width: W - 560, height: H - 410)
+    ctx.saveGState()
+    ctx.setShadow(offset: CGSize(width: 0, height: 28), blur: 70, color: NSColor(white: 0, alpha: 0.40).cgColor)
+    drawRoundedRect(winRect, radius: 24, fill: color(0xFAFAFA))
+    ctx.restoreGState()
+
+    ctx.saveGState()
+    NSBezierPath(roundedRect: winRect, xRadius: 24, yRadius: 24).addClip()
+
+    let sidebarW: CGFloat = 530
+    let detailW: CGFloat = 760
+    let centerX = winRect.minX + sidebarW
+    let detailX = winRect.maxX - detailW
+
+    color(0xF3F2F0).setFill()
+    NSRect(x: winRect.minX, y: winRect.minY, width: sidebarW, height: winRect.height).fill()
+    color(0xF8F7F5).setFill()
+    NSRect(x: detailX, y: winRect.minY, width: detailW, height: winRect.height).fill()
+    color(0xE6E4E1).setFill()
+    NSRect(x: centerX, y: winRect.minY, width: 2, height: winRect.height).fill()
+    NSRect(x: detailX, y: winRect.minY, width: 2, height: winRect.height).fill()
+
+    let accent = color(0xE05212)
+    let softOrange = color(0xFCD6BF)
+    let ink = color(0x111113)
+    let muted = color(0x52525B)
+
+    // Windows 11 top-left app title + top-right window controls (minimize, maximize, close)
+    drawSunIcon(cx: winRect.minX + 54, cy: winRect.minY + 50, r: 14, color: accent)
+    drawText("Septena", at: CGPoint(x: winRect.minX + 82, y: winRect.minY + 32), size: 28, weight: .semibold, color: ink)
+
+    // Minimize
+    color(0x52525B).setFill()
+    NSRect(x: winRect.maxX - 184, y: winRect.minY + 50, width: 22, height: 3).fill()
+    // Maximize
+    drawRoundedRect(CGRect(x: winRect.maxX - 126, y: winRect.minY + 38, width: 20, height: 20), radius: 3, fill: nil, stroke: color(0x52525B), lineWidth: 2.5)
+    // Close X
+    let xPath = NSBezierPath()
+    xPath.move(to: CGPoint(x: winRect.maxX - 68, y: winRect.minY + 38))
+    xPath.line(to: CGPoint(x: winRect.maxX - 48, y: winRect.minY + 58))
+    xPath.move(to: CGPoint(x: winRect.maxX - 48, y: winRect.minY + 38))
+    xPath.line(to: CGPoint(x: winRect.maxX - 68, y: winRect.minY + 58))
+    color(0x52525B).setStroke(); xPath.lineWidth = 2.8; xPath.stroke()
+
+    // Sidebar items
+    let sbX = winRect.minX + 36
+    drawRoundedRect(CGRect(x: sbX - 8, y: winRect.minY + 124, width: sidebarW - 56, height: 74), radius: 14, fill: softOrange)
+    drawSunIcon(cx: sbX + 26, cy: winRect.minY + 161, r: 16, color: accent)
+    drawText("Today", at: CGPoint(x: sbX + 58, y: winRect.minY + 141), size: 32, weight: .semibold, color: accent)
+    drawRoundedRect(CGRect(x: winRect.minX + sidebarW - 88, y: winRect.minY + 143, width: 42, height: 36), radius: 18, fill: color(0xF6B38E))
+    drawText("6", at: CGPoint(x: winRect.minX + sidebarW - 75, y: winRect.minY + 145), size: 25, weight: .semibold, color: color(0x7C2D12))
+
+    drawText("Inbox", at: CGPoint(x: sbX + 58, y: winRect.minY + 230), size: 31, weight: .medium, color: ink)
+    drawTextRight("2", rightX: winRect.minX + sidebarW - 56, y: winRect.minY + 232, size: 28, weight: .regular, color: muted)
+    drawText("Upcoming", at: CGPoint(x: sbX + 58, y: winRect.minY + 305), size: 31, weight: .medium, color: ink)
+    drawText("Lists", at: CGPoint(x: sbX + 12, y: winRect.minY + 412), size: 26, weight: .semibold, color: muted)
+    drawText("Admin", at: CGPoint(x: sbX + 58, y: winRect.minY + 474), size: 31, weight: .medium, color: ink)
+    drawText("Website", at: CGPoint(x: sbX + 58, y: winRect.minY + 548), size: 31, weight: .medium, color: ink)
+    drawText("+  New List", at: CGPoint(x: sbX + 18, y: winRect.minY + 626), size: 29, weight: .medium, color: muted)
+
+    // Center pane: Today
+    let cx = centerX + 76
+    let cw = detailX - centerX - 152
+    drawSunIcon(cx: cx + 22, cy: winRect.minY + 150, r: 22, color: accent)
+    drawText("Today", at: CGPoint(x: cx + 62, y: winRect.minY + 114), size: 58, weight: .bold, color: ink)
+
+    drawText("Inbox", at: CGPoint(x: cx + 42, y: winRect.minY + 230), size: 31, weight: .semibold, color: ink)
+    drawText("2", at: CGPoint(x: cx + 140, y: winRect.minY + 232), size: 29, weight: .regular, color: muted)
+    color(0xECEAE6).setFill()
+    NSRect(x: cx, y: winRect.minY + 280, width: cw, height: 2).fill()
+
+    drawCheckbox(cx + 4, winRect.minY + 306, size: 34, stroke: color(0x71717A), radius: 8, lineWidth: 3.5)
+    drawText("Check the download links", at: CGPoint(x: cx + 58, y: winRect.minY + 304), size: 31, weight: .medium, color: ink)
+    drawCheckbox(cx + 4, winRect.minY + 378, size: 34, stroke: color(0x71717A), radius: 8, lineWidth: 3.5)
+    drawText("Review the product outline", at: CGPoint(x: cx + 58, y: winRect.minY + 376), size: 31, weight: .medium, color: ink)
+
+    let cardY = winRect.minY + 468
+    let cardH: CGFloat = 382
+    drawRoundedRect(CGRect(x: cx - 22, y: cardY, width: cw + 44, height: cardH), radius: 22, fill: color(0xFDE5D7), stroke: color(0xF0B28C), lineWidth: 2.5)
+    drawSparkle(cx: cx + 20, cy: cardY + 48, r: 16, col: accent)
+    drawText("Discuss", at: CGPoint(x: cx + 52, y: cardY + 28), size: 32, weight: .bold, color: accent)
+    drawCheckbox(cx + 4, cardY + 98, size: 34, stroke: color(0x27272A), radius: 8, lineWidth: 3.5)
+    drawText("Send the launch update", at: CGPoint(x: cx + 58, y: cardY + 95), size: 34, weight: .bold, color: ink)
+
+    drawRoundedRect(CGRect(x: cx + 2, y: cardY + 162, width: cw - 4, height: 186), radius: 18, fill: color(0xF9D2BA))
+    drawText("What should the update focus on?", at: CGPoint(x: cx + 28, y: cardY + 190), size: 30, weight: .semibold, color: ink)
+    let pills = ["What's new", "Launch timing", "Next steps"]
+    var px = cx + 28
+    for p in pills {
+        let pw = CGFloat(p.count) * 16 + 54
+        drawRoundedRect(CGRect(x: px, y: cardY + 264, width: pw, height: 56), radius: 28, fill: color(0xFFFFFF))
+        drawText(p, at: CGPoint(x: px + 26, y: cardY + 276), size: 25, weight: .medium, color: ink)
+        px += pw + 18
+    }
+
+    let agY = cardY + cardH + 46
+    drawSparkle(cx: cx + 20, cy: agY + 20, r: 16, col: accent)
+    drawText("Draft the launch brief", at: CGPoint(x: cx + 56, y: agY), size: 32, weight: .medium, color: ink)
+    drawRoundedRect(CGRect(x: cx + cw - 156, y: agY - 4, width: 156, height: 48), radius: 24, fill: softOrange)
+    drawText("Your turn", at: CGPoint(x: cx + cw - 134, y: agY + 5), size: 24, weight: .semibold, color: accent)
+
+    let adY = agY + 92
+    drawText("Admin", at: CGPoint(x: cx + 44, y: adY), size: 33, weight: .bold, color: ink)
+    for (i, t) in ["Review the project outline", "Confirm the launch checklist", "Share the final draft"].enumerated() {
+        let ry = adY + 68 + CGFloat(i) * 72
+        drawCheckbox(cx + 4, ry, size: 34, stroke: color(0x71717A), radius: 8, lineWidth: 3.5)
+        drawText(t, at: CGPoint(x: cx + 58, y: ry - 2), size: 31, weight: .medium, color: ink)
+    }
+
+    // Right inspector pane
+    let dx = detailX + 56
+    let dw = detailW - 112
+    drawSparkle(cx: dx + 16, cy: winRect.minY + 132, r: 15, col: accent)
+    drawText("Discuss", at: CGPoint(x: dx + 44, y: winRect.minY + 114), size: 30, weight: .semibold, color: accent)
+    drawText("Send the launch update", at: CGPoint(x: dx, y: winRect.minY + 190), size: 42, weight: .bold, color: ink)
+    drawText("What should the update focus on?", at: CGPoint(x: dx, y: winRect.minY + 266), size: 29, weight: .regular, color: color(0x3F3F46))
+    var dpx = dx
+    for p in pills {
+        let pw = CGFloat(p.count) * 14 + 44
+        drawRoundedRect(CGRect(x: dpx, y: winRect.minY + 340, width: pw, height: 52), radius: 26, fill: color(0xEFECE8))
+        drawText(p, at: CGPoint(x: dpx + 20, y: winRect.minY + 352), size: 23, weight: .medium, color: ink)
+        dpx += pw + 14
+    }
+    drawText("Notes", at: CGPoint(x: dx, y: winRect.minY + 462), size: 28, weight: .semibold, color: muted)
+    drawRoundedRect(CGRect(x: dx, y: winRect.minY + 514, width: dw, height: 112), radius: 14, fill: color(0xF1EFEC))
+    drawText("Add a note...", at: CGPoint(x: dx + 26, y: winRect.minY + 548), size: 28, weight: .regular, color: color(0xA1A1AA))
+    ctx.restoreGState()
+
+    // Subtle frosted Windows 11 centered taskbar along the bottom edge
+    let tbH: CGFloat = 92
+    color(0x141416, alpha: 0.72).setFill()
+    NSRect(x: 0, y: H - tbH, width: W, height: tbH).fill()
+    // Centered Start 4-square icon + active Septena app icon pill
+    let midX = W / 2
+    let ty = H - tbH + 24
+    color(0x60A5FA).setFill()
+    for r in 0..<2 {
+        for c in 0..<2 {
+            drawRoundedRect(CGRect(x: midX - 140 + CGFloat(c)*22, y: ty + CGFloat(r)*22, width: 19, height: 19), radius: 3, fill: color(0x7DD3FC))
+        }
+    }
+    drawRoundedRect(CGRect(x: midX - 66, y: ty - 6, width: 140, height: 54), radius: 12, fill: color(0xFFFFFF, alpha: 0.14))
+    drawRoundedRect(CGRect(x: midX - 42, y: ty + 3, width: 38, height: 38), radius: 10, fill: accent)
+    drawRoundedRect(CGRect(x: midX - 28, y: H - 14, width: 24, height: 5), radius: 2.5, fill: accent)
+    drawRoundedRect(CGRect(x: midX + 18, y: ty + 4, width: 36, height: 36), radius: 10, fill: color(0xE4E4E7, alpha: 0.65))
+    drawRoundedRect(CGRect(x: midX + 94, y: ty + 4, width: 36, height: 36), radius: 10, fill: color(0xE4E4E7, alpha: 0.45))
+    drawTextRight("9:41 AM", rightX: W - 44, y: H - tbH + 28, size: 26, weight: .medium, color: color(0xF4F4F5))
+}
+savePNG(winImg, to: "\(outDir)/demo_windows.png")
+
+// ---------------------------------------------------------------------------
+// 6. ANDROID PHONE SCREEN (1290 x 2796) — Material 3 Septena Today + Squircle FAB
+// ---------------------------------------------------------------------------
+let andImg = makeContext(width: iosW, height: iosH) { ctx in
+    let W = CGFloat(iosW), H = CGFloat(iosH)
+    let ink = color(0x111113)
+    let accent = color(0xE05212)
+    let softOrange = color(0xFCD6BF)
+
+    color(0xF5F4F1).setFill()
+    NSRect(x: 0, y: 0, width: W, height: H).fill()
+
+    // Android status bar (clean uninterrupted top edge)
+    drawText("9:41", at: CGPoint(x: 84, y: 64), size: 44, weight: .semibold, color: ink)
+    for i in 0..<4 {
+        let bh = CGFloat(14 + i * 7)
+        drawRoundedRect(CGRect(x: W - 240 + CGFloat(i)*14, y: 100 - bh, width: 9, height: bh), radius: 2, fill: ink)
+    }
+    drawRoundedRect(CGRect(x: W - 150, y: 68, width: 34, height: 36), radius: 6, fill: ink)
+    drawRoundedRect(CGRect(x: W - 140, y: 62, width: 14, height: 6), radius: 2, fill: ink)
+
+    // Material 3 top bar
+    drawSunIcon(cx: 108, cy: 274, r: 34, color: accent)
+    drawText("Today", at: CGPoint(x: 164, y: 222), size: 92, weight: .bold, color: ink)
+    // Search + overflow menu on right
+    let sc = NSBezierPath(ovalIn: CGRect(x: W - 220, y: 256, width: 38, height: 38))
+    ink.setStroke(); sc.lineWidth = 5; sc.stroke()
+    for i in 0..<3 {
+        NSBezierPath(ovalIn: CGRect(x: W - 110, y: 254 + CGFloat(i)*16, width: 9, height: 9)).fill()
+    }
+
+    let pad: CGFloat = 68
+    drawText("Inbox  2", at: CGPoint(x: pad + 18, y: 410), size: 46, weight: .semibold, color: ink)
+    drawRoundedRect(CGRect(x: pad, y: 486, width: W - pad*2, height: 244), radius: 36, fill: color(0xFFFFFF), stroke: color(0xE4E2DD), lineWidth: 2)
+    drawCheckbox(pad + 36, 530, size: 48, stroke: color(0x71717A), radius: 12, lineWidth: 4.5)
+    drawText("Check the download links", at: CGPoint(x: pad + 114, y: 528), size: 44, weight: .medium, color: ink)
+    color(0xE8E5DF).setFill()
+    NSRect(x: pad + 36, y: 608, width: W - pad*2 - 72, height: 2).fill()
+    drawCheckbox(pad + 36, 646, size: 48, stroke: color(0x71717A), radius: 12, lineWidth: 4.5)
+    drawText("Review the product outline", at: CGPoint(x: pad + 114, y: 644), size: 44, weight: .medium, color: ink)
+
+    // Discuss highlighted card
+    let cy: CGFloat = 796
+    let ch: CGFloat = 650
+    drawRoundedRect(CGRect(x: pad - 6, y: cy, width: W - pad*2 + 12, height: ch), radius: 44, fill: color(0xFDE5D7), stroke: color(0xEDA880), lineWidth: 3.5)
+    drawSparkle(cx: pad + 52, cy: cy + 78, r: 24, col: accent)
+    drawText("Discuss", at: CGPoint(x: pad + 98, y: cy + 48), size: 48, weight: .bold, color: accent)
+    drawCheckbox(pad + 32, cy + 158, size: 50, stroke: color(0x18181B), radius: 12, lineWidth: 5)
+    drawText("Send the launch update", at: CGPoint(x: pad + 112, y: cy + 152), size: 52, weight: .bold, color: ink)
+
+    drawRoundedRect(CGRect(x: pad + 26, y: cy + 258, width: W - pad*2 - 52, height: 344), radius: 32, fill: color(0xF9D2BA))
+    drawText("What should the update focus on?", at: CGPoint(x: pad + 62, y: cy + 306), size: 46, weight: .semibold, color: ink)
+    var px = pad + 54
+    for p in ["What's new", "Launch timing", "Next steps"] {
+        let pw = CGFloat(p.count) * 23 + 74
+        drawRoundedRect(CGRect(x: px, y: cy + 444, width: pw, height: 96), radius: 48, fill: color(0xFFFFFF))
+        drawText(p, at: CGPoint(x: px + 34, y: cy + 468), size: 37, weight: .medium, color: ink)
+        px += pw + 22
+    }
+
+    // Agent row
+    let ay: CGFloat = cy + ch + 78
+    drawSparkle(cx: pad + 44, cy: ay + 30, r: 24, col: accent)
+    drawText("Draft the launch brief", at: CGPoint(x: pad + 98, y: ay), size: 46, weight: .medium, color: ink)
+    drawRoundedRect(CGRect(x: W - pad - 246, y: ay - 10, width: 246, height: 76), radius: 38, fill: softOrange)
+    drawText("Your turn", at: CGPoint(x: W - pad - 210, y: ay + 6), size: 36, weight: .semibold, color: accent)
+
+    // Admin section
+    let ady: CGFloat = ay + 152
+    drawText("Admin", at: CGPoint(x: pad + 18, y: ady), size: 50, weight: .bold, color: ink)
+    drawRoundedRect(CGRect(x: pad, y: ady + 84, width: W - pad*2, height: 360), radius: 36, fill: color(0xFFFFFF), stroke: color(0xE4E2DD), lineWidth: 2)
+    for (i, t) in ["Review the project outline", "Confirm the launch checklist", "Share the final draft"].enumerated() {
+        let ry = ady + 126 + CGFloat(i) * 114
+        if i > 0 {
+            color(0xE8E5DF).setFill()
+            NSRect(x: pad + 36, y: ry - 26, width: W - pad*2 - 72, height: 2).fill()
+        }
+        drawCheckbox(pad + 36, ry, size: 48, stroke: color(0x71717A), radius: 12, lineWidth: 4.5)
+        drawText(t, at: CGPoint(x: pad + 114, y: ry - 2), size: 44, weight: .medium, color: ink)
+    }
+
+    // Material 3 Squircle Persimmon + FAB (Android capture FAB)
+    let fabSize: CGFloat = 196
+    let fabRect = CGRect(x: W - pad - fabSize, y: H - 300, width: fabSize, height: fabSize)
+    ctx.saveGState()
+    ctx.setShadow(offset: CGSize(width: 0, height: 18), blur: 36, color: color(0xE05212, alpha: 0.45).cgColor)
+    drawRoundedRect(fabRect, radius: 54, fill: color(0xE05212))
+    ctx.restoreGState()
+    color(0xFFFFFF).setFill()
+    NSRect(x: fabRect.midX - 42, y: fabRect.midY - 6, width: 84, height: 12).fill()
+    NSRect(x: fabRect.midX - 6, y: fabRect.midY - 42, width: 12, height: 84).fill()
+
+    // Android gesture navigation bar
+    drawRoundedRect(CGRect(x: W/2 - 170, y: H - 50, width: 340, height: 12), radius: 6, fill: color(0x18181B, alpha: 0.72))
+}
+savePNG(andImg, to: "\(outDir)/demo_android.png")
+
 print("Generated demo screens in \(outDir)")
