@@ -4,6 +4,52 @@ import SwiftUI
 // (recurrence), and Move (area/project). Self-contained sheet UI; split out of
 // TaskComponents.swift, which was carrying them alongside the row primitives.
 
+// MARK: - Embedded presentation
+
+/// A task picker drawn inside the task page's attribute card instead of a
+/// sheet. It is the same picker view (ADR 0029: one picker per attribute);
+/// only its frame changes. Embedded, a picker has no navigation bar, no
+/// Cancel (the row collapses it) and no inner vertical scroll (the page
+/// scrolls), and "close" collapses the card instead of dismissing a sheet.
+struct TaskPickerEmbedding {
+  let close: () -> Void
+}
+
+extension EnvironmentValues {
+  /// Set by the task page on the picker it embeds. Nil means the picker is a sheet.
+  @Entry var taskPickerEmbedding: TaskPickerEmbedding? = nil
+}
+
+/// A vertical scroll in a sheet, plain content when embedded in the page.
+private struct TaskPickerScroll<Content: View>: View {
+  let embedded: Bool
+  @ViewBuilder let content: Content
+
+  var body: some View {
+    if embedded { content } else { ScrollView { content } }
+  }
+}
+
+/// The search field an embedded picker draws itself: `.searchable` needs the
+/// navigation bar that only the sheet has.
+struct TaskPickerFilterField: View {
+  let placeholder: LocalizedStringKey
+  let systemImage: String
+  @Binding var text: String
+
+  var body: some View {
+    HStack(spacing: 8) {
+      Image(systemName: systemImage)
+        .foregroundStyle(Theme.inkSecondary)
+      TextField(placeholder, text: $text)
+        .textFieldStyle(.plain)
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 9)
+    .background(Theme.mutedSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+  }
+}
+
 // MARK: - Date picker sheet
 
 /// Shared picker for both "When" (scheduled) and "Deadline" (due) — the modal
@@ -36,6 +82,7 @@ struct DatePickerSheet: View {
   let onTimeSlotChange: ((String?, Int?) -> Void)?
   let onPick: (Date?) -> Void
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.taskPickerEmbedding) private var embedding
 
   @State private var startTime: String?
   @State private var durationMinutes: Int?
@@ -83,42 +130,54 @@ struct DatePickerSheet: View {
   }
 
   var body: some View {
-    NavigationStack {
-      VStack(spacing: 0) {
-        TaskDateBoard(
-          selected: initialDate.map { cal.startOfDay(for: $0) },
-          todayActive: initialToday
-            || (initialDate.map { cal.isDate($0, inSameDayAs: anchorDay) } ?? false),
-          clearLabel: clearLabel,
-          repeatLabel: onRepeat == nil ? nil : repeatLabel,
-          onRepeat: onRepeat.map { open in { open(); dismiss() } },
-          onToday: { commit(anchorDay) },
-          onPick: { commit($0) },
-          onClear: { commit(nil) })
-        .padding(.horizontal, Theme.hPadding)
-        .padding(.top, 6)
-
-        if onTimeSlotChange != nil {
-          Divider()
-            .padding(.horizontal, Theme.hPadding)
-            .padding(.vertical, 8)
-          timeControls
-            .padding(.horizontal, Theme.hPadding)
-        }
-
-        Spacer(minLength: 0)
+    if embedding != nil {
+      content
+    } else {
+      NavigationStack {
+        content
+          .padding(.bottom, 12)
+          .navigationTitle(title)
+          .septenaInlineTitle()
+          .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+              Button("Cancel") { dismiss() }
+            }
+          }
       }
-      .padding(.bottom, 12)
-      .navigationTitle(title)
-      .septenaInlineTitle()
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-      }
+      .macSheetFrame(width: 420, height: Self.fittedHeight(showsRepeat: onRepeat != nil,
+                                                           showsTime: onTimeSlotChange != nil) + 60)
     }
-    .macSheetFrame(width: 420, height: Self.fittedHeight(showsRepeat: onRepeat != nil,
-                                                         showsTime: onTimeSlotChange != nil) + 60)
+  }
+
+  private var content: some View {
+    VStack(spacing: 0) {
+      TaskDateBoard(
+        selected: initialDate.map { cal.startOfDay(for: $0) },
+        todayActive: initialToday
+          || (initialDate.map { cal.isDate($0, inSameDayAs: anchorDay) } ?? false),
+        clearLabel: clearLabel,
+        repeatLabel: onRepeat == nil ? nil : repeatLabel,
+        onRepeat: onRepeat.map { open in { close(); open() } },
+        onToday: { commit(anchorDay) },
+        onPick: { commit($0) },
+        onClear: { commit(nil) })
+      .padding(.horizontal, Theme.hPadding)
+      .padding(.top, 6)
+
+      if onTimeSlotChange != nil {
+        Divider()
+          .padding(.horizontal, Theme.hPadding)
+          .padding(.vertical, 8)
+        timeControls
+          .padding(.horizontal, Theme.hPadding)
+      }
+
+      if embedding == nil { Spacer(minLength: 0) }
+    }
+  }
+
+  private func close() {
+    if let embedding { embedding.close() } else { dismiss() }
   }
 
   /// Start time and duration, the same controls as the AppKit date popover.
@@ -197,7 +256,7 @@ struct DatePickerSheet: View {
 
   private func commit(_ day: Date?) {
     onPick(day.map { cal.startOfDay(for: $0) })
-    dismiss()
+    close()
   }
 }
 
@@ -227,6 +286,7 @@ struct ReminderPickerSheet: View {
   let initial: TaskReminder?
   let onPick: (TaskReminder?) -> Void
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.taskPickerEmbedding) private var embedding
 
   @State private var pickedDate: Date
   @State private var mode: TaskReminderMode
@@ -249,12 +309,35 @@ struct ReminderPickerSheet: View {
       Task { await TaskReminderScheduler.shared.requestAuthorizationIfNeeded() }
     }
     onPick(reminder)
-    dismiss()
+    close()
+  }
+
+  private func close() {
+    if let embedding { embedding.close() } else { dismiss() }
   }
 
   var body: some View {
-    NavigationStack {
-      ScrollView {
+    // A VStack, never a Group: `.task` on a Group attaches per child (AGENTS.md).
+    VStack(spacing: 0) {
+      if embedding != nil {
+        content
+      } else {
+        NavigationStack {
+          content
+            .navigationTitle("Reminder")
+            .septenaInlineTitle()
+        }
+        .macSheetFrame(width: 440, height: 340)
+      }
+    }
+    .task {
+      notificationsDenied = await TaskReminderScheduler.shared.authorizationStatus() == .denied
+    }
+  }
+
+  private var content: some View {
+    VStack(spacing: 0) {
+      TaskPickerScroll(embedded: embedding != nil) {
         VStack(alignment: .leading, spacing: 14) {
           if notificationsDenied {
             Button {
@@ -340,8 +423,11 @@ struct ReminderPickerSheet: View {
 
         Spacer(minLength: 0)
 
-        Button("Cancel") { dismiss() }
-          .buttonStyle(.bordered)
+        // Embedded, collapsing the row is Cancel.
+        if embedding == nil {
+          Button("Cancel") { dismiss() }
+            .buttonStyle(.bordered)
+        }
 
         Button("Save") {
           save(TaskReminder.make(date: pickedDate, mode: mode))
@@ -351,12 +437,6 @@ struct ReminderPickerSheet: View {
       }
       .padding(.horizontal, Theme.hPadding)
       .padding(.vertical, 14)
-      .navigationTitle("Reminder")
-      .septenaInlineTitle()
-    }
-    .macSheetFrame(width: 440, height: 340)
-    .task {
-      notificationsDenied = await TaskReminderScheduler.shared.authorizationStatus() == .denied
     }
   }
 }
@@ -379,6 +459,11 @@ struct RecurrencePickerSheet: View {
   let onPick: (Recurrence?) -> Void
   let onPauseChanged: ((Bool) -> Void)?
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.taskPickerEmbedding) private var embedding
+
+  private func close() {
+    if let embedding { embedding.close() } else { dismiss() }
+  }
 
   private enum MonthlyMode: Int, CaseIterable {
     case anchor = 0
@@ -495,8 +580,21 @@ struct RecurrencePickerSheet: View {
   }
 
   var body: some View {
-    NavigationStack {
-      ScrollView {
+    if embedding != nil {
+      content
+    } else {
+      NavigationStack {
+        content
+          .navigationTitle("Repeat")
+          .septenaInlineTitle()
+      }
+      .macSheetFrame(width: 520, height: 400)
+    }
+  }
+
+  private var content: some View {
+    VStack(spacing: 0) {
+      TaskPickerScroll(embedded: embedding != nil) {
         VStack(spacing: 0) {
           HStack(spacing: 10) {
             ZStack {
@@ -720,7 +818,7 @@ struct RecurrencePickerSheet: View {
           Button {
             Haptics.commit()
             onPick(nil)
-            dismiss()
+            close()
           } label: {
             Text("Don't Repeat")
           }
@@ -730,22 +828,22 @@ struct RecurrencePickerSheet: View {
 
         Spacer(minLength: 0)
 
-        Button("Cancel") { dismiss() }
-          .buttonStyle(.bordered)
+        // Embedded, collapsing the row is Cancel.
+        if embedding == nil {
+          Button("Cancel") { dismiss() }
+            .buttonStyle(.bordered)
+        }
 
         Button("OK") {
           onPick(candidateRecurrence)
-          dismiss()
+          close()
         }
         .buttonStyle(.borderedProminent)
         .tint(theme.accent)
       }
       .padding(.horizontal, Theme.hPadding)
       .padding(.vertical, 14)
-      .navigationTitle("Repeat")
-      .septenaInlineTitle()
     }
-    .macSheetFrame(width: 520, height: 400)
   }
 
   private func cadenceDescription() -> String {
@@ -768,21 +866,53 @@ struct MovePickerSheet: View {
   var bulkCount: Int = 1
   let onPick: (_ areaId: String?, _ projectId: String?) -> Void
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.taskPickerEmbedding) private var embedding
   @Environment(\.modelContext) private var modelContext
   @State private var query = ""
   // Real done/(done+open) ratio per project id, so the pie glyph matches the
   // sidebar instead of a placeholder. Loaded once on appear.
   @State private var progressByProject: [String: Double] = [:]
 
+  private func close() {
+    if let embedding { embedding.close() } else { dismiss() }
+  }
+
   var body: some View {
-    NavigationStack {
-      ScrollView {
+    if embedding != nil {
+      // The page scrolls; the search field sits on top of the rows.
+      VStack(alignment: .leading, spacing: 4) {
+        TaskPickerFilterField(placeholder: "Search", systemImage: "magnifyingglass", text: $query)
+          .padding(.horizontal, Theme.hPadding)
+        rows
+      }
+      .task { loadProgress() }
+    } else {
+      NavigationStack {
+        ScrollView { rows }
+          .background(Theme.paperBackground)
+          .task { loadProgress() }
+          .septenaAlwaysVisibleSearch(text: $query)
+          .navigationTitle(bulkCount > 1 ? "Move \(bulkCount) Tasks" : "Move")
+          .septenaInlineTitle()
+          .toolbar {
+            // Picking a row is the commit; the only other choice is to leave
+            // without moving, so the toolbar offers Cancel, not a no-op Done.
+            ToolbarItem(placement: .cancellationAction) {
+              Button("Cancel") { dismiss() }
+            }
+          }
+      }
+      .macSheetFrame(width: 460, height: 520)
+    }
+  }
+
+  private var rows: some View {
         LazyVStack(alignment: .leading, spacing: 4) {
           // Inbox first — drop both area and project.
           if !hidesInboxTarget && matches(TaskFilter.triage.title) {
             row(.inbox, title: TaskFilter.triage.title,
                 selected: showCurrentSelection && currentAreaId == nil && currentProjectId == nil) {
-              onPick(nil, nil); dismiss()
+              onPick(nil, nil); close()
             }
           }
 
@@ -790,7 +920,7 @@ struct MovePickerSheet: View {
           ForEach(filteredTopProjects) { p in
             row(.project, title: p.title, projectId: p.id,
                 selected: showCurrentSelection && p.id == currentProjectId) {
-              onPick(nil, p.id); dismiss()
+              onPick(nil, p.id); close()
             }
           }
 
@@ -799,32 +929,17 @@ struct MovePickerSheet: View {
           ForEach(filteredAreas) { area in
             row(.area, title: area.title, emoji: area.emoji,
                 selected: showCurrentSelection && currentProjectId == nil && area.id == currentAreaId) {
-              onPick(area.id, nil); dismiss()
+              onPick(area.id, nil); close()
             }
             ForEach(projectsIn(area.id)) { p in
               row(.project, title: p.title, projectId: p.id,
                   selected: showCurrentSelection && p.id == currentProjectId, indent: true) {
-                onPick(area.id, p.id); dismiss()
+                onPick(area.id, p.id); close()
               }
             }
           }
         }
         .padding(.vertical, 8)
-      }
-      .background(Theme.paperBackground)
-      .task { loadProgress() }
-      .septenaAlwaysVisibleSearch(text: $query)
-      .navigationTitle(bulkCount > 1 ? "Move \(bulkCount) Tasks" : "Move")
-      .septenaInlineTitle()
-      .toolbar {
-        // Picking a row is the commit; the only other choice is to leave
-        // without moving, so the toolbar offers Cancel, not a no-op Done.
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-      }
-    }
-    .macSheetFrame(width: 460, height: 520)
   }
 
   // MARK: - Filtering
@@ -975,6 +1090,7 @@ struct TagPickerSheet: View {
   let onDone: (() -> Void)?
 
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.taskPickerEmbedding) private var embedding
   @Environment(\.modelContext) private var modelContext
 
   @State private var allTags: [TaskTag] = []
@@ -1014,8 +1130,55 @@ struct TagPickerSheet: View {
   private enum AssignmentState { case none, some, all }
 
   var body: some View {
-    NavigationStack {
+    if embedding != nil {
+      // Each tap applies at once, so there is no Done; Manage sits under the list.
       VStack(alignment: .leading, spacing: 12) {
+        content
+        Button("Manage…") { showingManageTags = true }
+          .buttonStyle(.plain)
+          .font(.septenaLabel)
+          .foregroundStyle(Theme.inkSecondary)
+          .padding(.horizontal, Theme.hPadding)
+          .contentShape(Rectangle())
+      }
+      .sheet(isPresented: $showingManageTags, onDismiss: reload) {
+        ManageTagsSheet()
+      }
+      .onAppear { reload() }
+      .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in reload() }
+    } else {
+      NavigationStack {
+        VStack(alignment: .leading, spacing: 12) {
+          content
+          Spacer(minLength: 0)
+        }
+        .padding(.top, 12)
+        .navigationTitle(Text("Tags"))
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+          ToolbarItem(placement: .cancellationAction) {
+            Button("Manage…") { showingManageTags = true }
+          }
+          ToolbarItem(placement: .confirmationAction) {
+            Button("Done") {
+              onDone?()
+              dismiss()
+            }
+          }
+        }
+        .sheet(isPresented: $showingManageTags, onDismiss: reload) {
+          ManageTagsSheet()
+        }
+        .onAppear { reload() }
+        .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in reload() }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var content: some View {
         HStack(spacing: 8) {
           Image(systemName: "tag")
             .foregroundStyle(Theme.inkSecondary)
@@ -1050,7 +1213,7 @@ struct TagPickerSheet: View {
           .padding(.vertical, 28)
           .padding(.horizontal, Theme.hPadding)
         } else {
-          ScrollView {
+          TaskPickerScroll(embedded: embedding != nil) {
             VStack(spacing: 2) {
               ForEach(filteredTags) { tag in
                 let state = assignmentState(for: tag.id)
@@ -1084,31 +1247,6 @@ struct TagPickerSheet: View {
             }
           }
         }
-
-        Spacer(minLength: 0)
-      }
-      .padding(.top, 12)
-      .navigationTitle(Text("Tags"))
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Manage…") { showingManageTags = true }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Done") {
-            onDone?()
-            dismiss()
-          }
-        }
-      }
-      .sheet(isPresented: $showingManageTags, onDismiss: reload) {
-        ManageTagsSheet()
-      }
-      .onAppear { reload() }
-      .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in reload() }
-    }
   }
 
   private func reload() {

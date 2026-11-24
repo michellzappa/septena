@@ -238,6 +238,22 @@ export function agentSourceClient(name: string | undefined): string {
   return clean || AGENT_FALLBACK_NAME;
 }
 
+/// The change log actor for an MCP write by the connection named `name`:
+/// `mcp:<name>`, so history says which agent changed what. No name = the
+/// legacy `MCP_ACTOR`.
+export function mcpActorFor(name: string | undefined): string {
+  const clean = (name ?? "").replace(/[\u0000-\u001f\u007f@]/g, "").trim().slice(0, 64);
+  return clean ? `mcp:${clean}` : MCP_ACTOR;
+}
+
+/// The agent's display name in an `mcp:` actor: `mcp:Claude Code` and the
+/// agent loop's `mcp:<agent>@<client>` give the name; the legacy
+/// `mcp:claude` gives the registry fallback name.
+export function agentNameFromActor(actor: string): string {
+  const name = actor.replace(/^mcp:/, "").split("@")[0].trim();
+  return !name || name === "claude" ? AGENT_FALLBACK_NAME : name;
+}
+
 /// Runs one validated write tool. Throws a plain Error (the tool error the
 /// live connector would give) on a missing task, an unknown container or a
 /// bad repeat rule.

@@ -408,6 +408,8 @@ struct TaskComposerCard: View {
         showsChecklist: kinds.contains(.checklist),
         showsAttachments: kinds.contains(.attachments),
         showsHistory: kinds.contains(.history),
+        // On the page the conversation runs inside the Discuss card.
+        showsConversation: pageDepth == .page && kinds.contains(.conversation),
         // Paste leads the rail when it shows, as on the Mac composer: the
         // registry lists it first (`taskAttributes` `paste`, tier `chip`).
         leading: showsPasteChip ? AnyView(pasteChip) : nil,
@@ -427,6 +429,8 @@ struct TaskComposerCard: View {
         TaskHistoryPanel(taskID: task.id)
       })
     case .conversation:
+      // The page's attribute column holds it, inside the Discuss card.
+      if pageDepth == .page && kinds.contains(.attributes) { return AnyView(EmptyView()) }
       guard let task = editingTask else { return AnyView(EmptyView()) }
       return AnyView(ConversationSection(task: task, accent: accent))
     case .provenance:
