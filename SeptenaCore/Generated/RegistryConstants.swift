@@ -160,6 +160,9 @@ enum RegistryIcons {
     "action.clear_schedule": "calendar.badge.minus",
     "action.move": "folder",
     "action.more": "ellipsis",
+    "action.back": "chevron.backward",
+    "action.disclosure": "chevron.forward",
+    "action.settings": "gearshape",
     "action.repeat": "arrow.clockwise",
     "action.repeat_pause": "pause.circle",
     "action.repeat_resume": "play.circle",
@@ -1072,7 +1075,7 @@ enum RegistryActions {
     "task.conversation.send": "checkmark.circle",
     "task.conversation.reply": "info.circle",
     "app.toggleSidebar": "sidebar.leading",
-    "app.settings": "checklist",
+    "app.settings": "gearshape",
     "app.undo": "arrow.uturn.backward",
     "account.signOut": "xmark.circle",
     "settings.save": "checkmark.circle",
@@ -1332,7 +1335,7 @@ enum RegistryActions {
 
   static let menuBar: [RegistryMenu] = [
     RegistryMenu(id: "app", title: RegistryL10n.t("Septena"), system: "app", items: [
-      RegistryMenuItem(kind: "action", id: "app.settings", title: RegistryL10n.t("Settings…"), sfSymbol: "checklist", items: []),
+      RegistryMenuItem(kind: "action", id: "app.settings", title: RegistryL10n.t("Settings…"), sfSymbol: "gearshape", items: []),
     ]),
     RegistryMenu(id: "file", title: RegistryL10n.t("File"), system: "file", items: [
       RegistryMenuItem(kind: "action", id: "app.newTask", title: RegistryL10n.t("New Task"), sfSymbol: "plus", items: []),

@@ -64,6 +64,8 @@ data class TaskAttribute(
     val label: String,
     val featureId: String,
     val editOnly: Boolean,
+    /** Icon ID (icons.json) the attribute row shows. */
+    val icon: String? = null,
 )
 
 /** One contiguous action group from a generated context menu. */
@@ -151,6 +153,11 @@ object RegistryCatalog {
 
     fun actionRole(id: String): String? = action(id)?.stringAt("role")
 
+    /** The icon ID (icons.json) of an action or a destination. */
+    fun actionIcon(id: String): String? = action(id)?.stringAt("icon")
+
+    fun destinationIcon(id: String): String? = destination(id)?.stringAt("icon")
+
     fun setting(key: String): JsonValue.ObjectValue? =
         document("settings").objectAt("keys")?.get(key) as? JsonValue.ObjectValue
 
@@ -207,6 +214,7 @@ object RegistryCatalog {
                 label = localizedString(label, languageTag) ?: label,
                 featureId = fields.stringAt("featureId").orEmpty(),
                 editOnly = (fields.fields["editOnly"] as? JsonValue.BooleanValue)?.value == true,
+                icon = fields.stringAt("icon"),
             )
         }
 

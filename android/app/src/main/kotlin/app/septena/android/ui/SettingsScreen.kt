@@ -1,5 +1,8 @@
 package app.septena.android.ui
 
+import app.septena.ui.RegistryIcon
+import app.septena.core.generated.RegistryIconIds
+import androidx.compose.material3.IconButton
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
@@ -65,6 +68,8 @@ private data class RegistrySettingRow(
     val visibility: String = "always",
     val platforms: Set<String> = emptySet(),
     val ownsKeys: List<String> = emptyList(),
+    /** Icon ID (icons.json), as iPhone shows it before the label. */
+    val icon: String? = null,
 )
 
 private data class RegistrySettingsSection(
@@ -79,6 +84,7 @@ private data class RegistrySettingsPage(
     val title: String,
     val platforms: Set<String>,
     val sections: List<RegistrySettingsSection>,
+    val icon: String? = null,
 )
 
 @Composable
@@ -194,7 +200,9 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
             TopAppBar(
                 title = { Text(currentTitle) },
                 navigationIcon = {
-                    TextButton(onClick = ::closeOrPop, enabled = !signingOut) { Text(backTitle) }
+                    IconButton(onClick = ::closeOrPop, enabled = !signingOut) {
+                        RegistryIcon(RegistryIconIds.ACTION_BACK, contentDescription = backTitle)
+                    }
                 },
             )
         },
@@ -336,8 +344,10 @@ private fun SettingsRegistryRow(
                 AI_MODE_STATUS_KEY -> optionTitle(definitions[RegistrySettingKeys.AI_MODE], values[RegistrySettingKeys.AI_MODE], languageTag)
                 else -> null
             }
+            val icon = item.icon ?: page?.icon
             ListItem(
                 headlineContent = { Text(title) },
+                leadingContent = icon?.let { { RegistryIcon(it, contentDescription = null) } },
                 modifier = Modifier.fillMaxWidth().clickable { onPage(target) },
                 trailingContent = {
                     Row(
@@ -345,7 +355,11 @@ private fun SettingsRegistryRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         status?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                        Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        RegistryIcon(
+                            RegistryIconIds.ACTION_DISCLOSURE,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 },
             )
@@ -401,15 +415,10 @@ private fun SettingsRegistryRow(
                         onValueChange = { onValueChange(key, it) },
                     )
                 }
+                // A surface Android does not build yet draws nothing: a bare label
+                // would look like a row that does nothing when tapped.
                 else -> if (item.surface != null && item.surface in SETTINGS_SURFACES) {
                     SettingsCustomSurface(item.surface, item.label, item.detail, surfaceEnv, languageTag)
-                } else {
-                    if (item.label != null || item.detail != null) {
-                        ListItem(
-                            headlineContent = { item.label?.let { Text(it) } },
-                            supportingContent = item.detail?.let { detail -> ({ Text(detail) }) },
-                        )
-                    }
                 }
             }
         }
@@ -605,6 +614,7 @@ private fun registrySettingsPages(languageTag: String): List<RegistrySettingsPag
             title = page.string("title")?.localized(languageTag) ?: return@mapNotNull null,
             platforms = page.array("platforms").mapNotNull(JsonValue?::stringValue).toSet(),
             sections = sections,
+            icon = page.string("icon"),
         ).takeIf { it.platforms.isEmpty() || RegistryPlatformIds.ANDROID in it.platforms }
     }
 
@@ -621,6 +631,7 @@ private fun JsonValue?.asSettingsItem(languageTag: String): RegistrySettingRow? 
         visibility = item.string("visibility") ?: "always",
         platforms = item.array("platforms").mapNotNull(JsonValue?::stringValue).toSet(),
         ownsKeys = item.array("ownsKeys").mapNotNull(JsonValue?::stringValue),
+        icon = item.string("icon"),
     )
 }
 

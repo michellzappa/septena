@@ -91,6 +91,8 @@ data class TaskRowMenuAction(
     val isDestructive: Boolean = false,
     val selectedTitle: String? = null,
     val unselectedTitle: String? = null,
+    /** Icon ID (icons.json) shown before the title. */
+    val icon: String? = null,
 )
 
 /** Portable task-list surface. Platform hosts provide registry copy and bind actions to their mutators. */
@@ -113,6 +115,8 @@ fun TaskHomeContent(
     rowMenuAccessibilityLabel: String,
     modifier: Modifier = Modifier,
     selection: TaskSelection = TaskSelection(),
+    /** Icon ID (icons.json) of the row menu button. */
+    rowMenuIcon: String? = null,
     onComplete: (String) -> Unit,
     onOpenTask: (String) -> Unit,
     onTaskAction: (String, String) -> Unit,
@@ -151,6 +155,7 @@ fun TaskHomeContent(
                     rowMenuGroups = rowMenuGroups,
                     rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                     selection = selection,
+                    rowMenuIcon = rowMenuIcon,
                     onTaskAction = onTaskAction,
                 )
             }
@@ -190,6 +195,7 @@ fun TaskHomeContent(
                 rowMenuGroups = rowMenuGroups,
                 rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                 selection = selection,
+                rowMenuIcon = rowMenuIcon,
                 onTaskAction = onTaskAction,
             )
         }
@@ -209,6 +215,7 @@ private fun LazyListScope.taskRows(
     rowMenuGroups: List<List<TaskRowMenuAction>>,
     rowMenuAccessibilityLabel: String,
     selection: TaskSelection,
+    rowMenuIcon: String?,
     onTaskAction: (String, String) -> Unit,
 ) {
     itemsIndexed(tasks, key = { _, task -> "$keyPrefix:${task.id}" }) { index, task ->
@@ -233,6 +240,7 @@ private fun LazyListScope.taskRows(
             rowMenuGroups = rowMenuGroups,
             rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
             selection = selection,
+            rowMenuIcon = rowMenuIcon,
             onTaskAction = onTaskAction,
         )
         if (index < tasks.lastIndex) {
@@ -258,6 +266,7 @@ private fun TaskRow(
     rowMenuGroups: List<List<TaskRowMenuAction>>,
     rowMenuAccessibilityLabel: String,
     selection: TaskSelection,
+    rowMenuIcon: String?,
     onTaskAction: (String, String) -> Unit,
 ) {
     val showToday = showTodayIndicator && task.isOnToday && !task.isCompleted
@@ -333,6 +342,7 @@ private fun TaskRow(
                                 }
                             },
                             accessibilityLabel = rowMenuAccessibilityLabel,
+                            icon = rowMenuIcon,
                             expanded = menuExpanded,
                             onExpandedChange = { menuExpanded = it },
                             onAction = { id -> onTaskAction(task.id, id) },
@@ -377,19 +387,27 @@ fun TaskRowActionsMenu(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     onAction: (String) -> Unit,
+    icon: String? = null,
 ) {
     Column {
-        IconButton(
-            onClick = { onExpandedChange(true) },
-            modifier = Modifier.semantics { contentDescription = accessibilityLabel },
-        ) {
-            Text("⋮", style = MaterialTheme.typography.titleLarge)
+        IconButton(onClick = { onExpandedChange(true) }) {
+            RegistryIcon(icon, contentDescription = accessibilityLabel)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { onExpandedChange(false) }) {
             groups.forEachIndexed { index, group ->
                 if (index > 0) HorizontalDivider()
                 group.forEach { action ->
                     DropdownMenuItem(
+                        leadingIcon = action.icon?.let { id ->
+                            {
+                                RegistryIcon(
+                                    id,
+                                    contentDescription = null,
+                                    tint = if (action.isDestructive) MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        },
                         text = {
                             Text(
                                 text = action.title,

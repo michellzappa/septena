@@ -442,7 +442,7 @@
     },
     "app.settings": {
       "title": "Settings…",
-      "icon": "settings.tasks",
+      "icon": "action.settings",
       "role": "default",
       "shortcut": { "key": ",", "modifiers": ["primary"] },
       "availability": { "selection": "none" },

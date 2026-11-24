@@ -1,5 +1,7 @@
 package app.septena.android.ui
 
+import app.septena.ui.RegistryIcon
+import app.septena.core.generated.RegistryIconIds
 import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -134,7 +136,13 @@ private fun ExpandableRow(label: String?, content: @Composable () -> Unit) {
     var open by rememberSaveable(title) { mutableStateOf(false) }
     ListItem(
         headlineContent = { Text(title) },
-        trailingContent = { Text(if (open) "⌃" else "⌄", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+        trailingContent = {
+            RegistryIcon(
+                if (open) RegistryIconIds.ACTION_MOVE_UP else RegistryIconIds.ACTION_MOVE_DOWN,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
         modifier = Modifier.fillMaxWidth().clickable { open = !open },
     )
     if (open) content()

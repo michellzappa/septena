@@ -12,6 +12,10 @@ jna = "5.17.0"
 junit = "4.13.2"
 # Google Play services code scanner (sign-in QR, #353): no camera permission, no bundled model.
 play-services-code-scanner = "16.1.0"
+# Material Icons for the registry glyphs (registry/icons.json `material`). The
+# last published set; Compose no longer ships it in the BOM. The app reads
+# names generated into android/ui (RegistryIcons.kt).
+material-icons = "1.7.3"
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
@@ -32,6 +36,7 @@ activity-compose = { module = "androidx.activity:activity-compose", version.ref 
 lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
+material-icons-extended = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "material-icons" }
 junit = { module = "junit:junit", version.ref = "junit" }
 play-services-code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version.ref = "play-services-code-scanner" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }

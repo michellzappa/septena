@@ -21,6 +21,8 @@ kotlin {
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(compose.ui)
+            // `api`: the app module draws the same registry glyphs.
+            api(libs.material.icons.extended)
         }
     }
 }

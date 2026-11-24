@@ -1,5 +1,8 @@
 package app.septena.android.ui
 
+import app.septena.ui.RegistryIcon
+import app.septena.core.generated.RegistryIconIds
+import androidx.compose.material3.IconButton
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -60,8 +63,8 @@ fun QuickFindScreen(
             TopAppBar(
                 title = { Text(copy.title) },
                 navigationIcon = {
-                    androidx.compose.material3.TextButton(onClick = onBack) {
-                        Text(copy.backTitle)
+                    IconButton(onClick = onBack) {
+                        RegistryIcon(RegistryIconIds.ACTION_BACK, contentDescription = copy.backTitle)
                     }
                 },
             )

@@ -1,5 +1,7 @@
 package app.septena.android.ui
 
+import app.septena.ui.RegistryIcon
+import app.septena.core.generated.RegistryIconIds
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -133,7 +135,13 @@ internal fun AccountProfileCard(
     ListItem(
         headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
         supportingContent = { Text(detail) },
-        trailingContent = { Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+        trailingContent = {
+            RegistryIcon(
+                RegistryIconIds.ACTION_DISCLOSURE,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     )
 }

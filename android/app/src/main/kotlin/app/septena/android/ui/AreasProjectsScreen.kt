@@ -41,6 +41,7 @@ import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.stringValue
 import app.septena.core.generated.RegistryActionIds
+import app.septena.core.generated.RegistryIconIds
 import app.septena.core.generated.RegistryPlacesScreenIds
 import app.septena.core.generated.RegistryPromptIds
 import app.septena.core.generated.RegistryTaskAttributeIds
@@ -347,6 +348,7 @@ private fun PlaceTaskItem(
                         }
                     },
                     accessibilityLabel = rowMenuAccessibilityLabel,
+                    icon = RegistryIconIds.ACTION_MORE,
                     expanded = menuExpanded,
                     onExpandedChange = { menuExpanded = it },
                     onAction = { onTaskAction(task.id, it) },

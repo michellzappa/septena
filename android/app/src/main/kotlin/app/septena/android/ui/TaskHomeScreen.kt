@@ -27,7 +27,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
@@ -50,9 +49,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -65,8 +61,10 @@ import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryCapabilityIds
 import app.septena.core.generated.RegistryDestinationIds
+import app.septena.core.generated.RegistryIconIds
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistrySurfaceIds
+import app.septena.ui.RegistryIcon
 import app.septena.ui.TaskHomeContent
 import app.septena.ui.TaskRowMenuAction
 import app.septena.ui.TaskSelection
@@ -234,6 +232,11 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
         }
     }
 
+    // The back gesture leaves an area or project page for Today, not the app.
+    BackHandler(enabled = state.location !is TaskHomeLocation.SmartList) {
+        selectHomeLocation(TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY))
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         if (wideLayout) {
             PermanentNavigationDrawer(
@@ -288,6 +291,8 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         onQuickFind = { quickFindOpen = true },
                         onToggleAgentsPaused = { homeViewModel.setAgentsPaused(!state.agentsPaused) },
                         onSelectHomeLocation = selectHomeLocation,
+                        settingsTitle = settingsTitle,
+                        onOpenSettings = { settingsOpen = true },
                     )
                 }
             }
@@ -354,6 +359,8 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         onQuickFind = { quickFindOpen = true },
                         onToggleAgentsPaused = { homeViewModel.setAgentsPaused(!state.agentsPaused) },
                         onSelectHomeLocation = selectHomeLocation,
+                        settingsTitle = settingsTitle,
+                        onOpenSettings = { settingsOpen = true },
                     )
                 }
             }
@@ -389,6 +396,9 @@ private fun TaskHomeNavigation(
             val location = item.location as TaskHomeLocation.SmartList
             val title = RegistryCatalog.destinationTitle(location.destinationId, languageTag).orEmpty()
             NavigationDrawerItem(
+                icon = {
+                    RegistryIcon(RegistryCatalog.destinationIcon(location.destinationId), contentDescription = null)
+                },
                 label = { Text(title) },
                 selected = state.location == item.location,
                 onClick = { onSelect(item.location) },
@@ -418,6 +428,7 @@ private fun TaskHomeNavigation(
             DrawerGroupTitle(projectsTitle)
             state.projects.forEach { item ->
                 NavigationDrawerItem(
+                    icon = { RegistryIcon(RegistryIconIds.PLACE_PROJECT, contentDescription = null) },
                     label = { Text(item.title.orEmpty()) },
                     selected = state.location == item.location,
                     onClick = { onSelect(item.location) },
@@ -427,6 +438,9 @@ private fun TaskHomeNavigation(
         }
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         NavigationDrawerItem(
+            icon = {
+                RegistryIcon(RegistryCatalog.actionIcon(RegistryActionIds.APP_SETTINGS), contentDescription = null)
+            },
             label = { Text(settingsTitle) },
             selected = false,
             onClick = onOpenSettings,
@@ -482,14 +496,14 @@ private fun AreaNavigationDrawerItem(
         )
         if (changeEmojiAvailable) {
             Box {
-                IconButton(
-                    onClick = { menuExpanded = true },
-                    modifier = Modifier.semantics { contentDescription = changeEmojiTitle },
-                ) {
-                    Text("⋮", style = MaterialTheme.typography.titleLarge)
+                IconButton(onClick = { menuExpanded = true }) {
+                    RegistryIcon(RegistryIconIds.ACTION_MORE, contentDescription = changeEmojiTitle)
                 }
                 DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                     DropdownMenuItem(
+                        leadingIcon = {
+                            RegistryIcon(RegistryCatalog.actionIcon(RegistryActionIds.AREA_CHANGE_EMOJI), contentDescription = null)
+                        },
                         text = { Text(changeEmojiTitle) },
                         onClick = {
                             menuExpanded = false
@@ -546,8 +560,11 @@ private fun TaskHomeScaffold(
     onQuickFind: () -> Unit,
     onToggleAgentsPaused: () -> Unit,
     onSelectHomeLocation: (TaskHomeLocation) -> Unit,
+    settingsTitle: String,
+    onOpenSettings: () -> Unit,
 ) {
     var quickAddOpen by rememberSaveable { mutableStateOf(false) }
+    var overflowOpen by remember { mutableStateOf(false) }
     var selectionPicker by remember { mutableStateOf<SelectionPicker?>(null) }
     var allOnToday by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -651,14 +668,10 @@ private fun TaskHomeScaffold(
             },
             floatingActionButton = if (!selecting && state.canQuickAdd && state.location is TaskHomeLocation.SmartList) {
                 {
-                    FloatingActionButton(
-                        onClick = { quickAddOpen = true },
-                        modifier = Modifier.semantics { contentDescription = quickAddTitle },
-                    ) {
-                        Text(
-                            text = "+",
-                            style = MaterialTheme.typography.headlineSmall,
-                            textAlign = TextAlign.Center,
+                    FloatingActionButton(onClick = { quickAddOpen = true }) {
+                        RegistryIcon(
+                            RegistryCatalog.actionIcon(RegistryActionIds.APP_QUICK_ADD),
+                            contentDescription = quickAddTitle,
                         )
                     }
                 }
@@ -674,19 +687,50 @@ private fun TaskHomeScaffold(
                     title = { Text(title) },
                     navigationIcon = if (showNavigationAction) {
                         {
-                            TextButton(onClick = onOpenNavigation) {
-                                Text(sidebarActionTitle)
+                            IconButton(onClick = onOpenNavigation) {
+                                RegistryIcon(
+                                    RegistryCatalog.actionIcon(RegistryActionIds.APP_TOGGLE_SIDEBAR),
+                                    contentDescription = sidebarActionTitle,
+                                )
                             }
                         }
                     } else {
                         {}
                     },
                     actions = {
-                        TextButton(onClick = onToggleAgentsPaused) {
-                            Text(pauseAgentsTitle)
+                        IconButton(onClick = onQuickFind) {
+                            RegistryIcon(
+                                RegistryCatalog.actionIcon(RegistryActionIds.APP_QUICK_FIND),
+                                contentDescription = quickFindTitle,
+                            )
                         }
-                        TextButton(onClick = onQuickFind) {
-                            Text(quickFindTitle)
+                        IconButton(onClick = onOpenSettings) {
+                            RegistryIcon(
+                                RegistryCatalog.actionIcon(RegistryActionIds.APP_SETTINGS),
+                                contentDescription = settingsTitle,
+                            )
+                        }
+                        // Pause all agents is an Android action; it keeps a place here
+                        // until the agents page owns it, as on iPhone.
+                        Box {
+                            IconButton(onClick = { overflowOpen = true }) {
+                                RegistryIcon(RegistryIconIds.ACTION_MORE, contentDescription = pauseAgentsTitle)
+                            }
+                            DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
+                                DropdownMenuItem(
+                                    leadingIcon = {
+                                        RegistryIcon(
+                                            RegistryCatalog.actionIcon(RegistryActionIds.APP_PAUSE_AGENTS),
+                                            contentDescription = null,
+                                        )
+                                    },
+                                    text = { Text(pauseAgentsTitle) },
+                                    onClick = {
+                                        overflowOpen = false
+                                        onToggleAgentsPaused()
+                                    },
+                                )
+                            }
                         }
                     },
                 )
@@ -735,6 +779,7 @@ private fun TaskHomeScaffold(
                     errorMessage = state.errorMessage,
                     rowMenuGroups = rowMenuGroups,
                     rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    rowMenuIcon = RegistryIconIds.ACTION_MORE,
                     modifier = Modifier.padding(contentPadding),
                     selection = selection,
                     onComplete = onComplete,
@@ -790,6 +835,7 @@ private fun taskRowMenuGroups(
                 unselectedTitle = if (id == RegistryActionIds.TASK_TOGGLE_STAR) {
                     RegistryCatalog.actionAddTitle(id, languageTag)
                 } else null,
+                icon = RegistryCatalog.actionIcon(id),
             )
         }.takeIf { it.isNotEmpty() }
     }

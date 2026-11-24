@@ -116,7 +116,10 @@ internal fun CalendarFeedSection(graph: AndroidAppGraph, signedIn: Boolean, lang
                     TextButton(onClick = { copyToClipboard(context, copy("feedToggle"), webcal) }, enabled = !busy) {
                         Text(copy("copyUrl"))
                     }
-                    TextButton(onClick = { openUrl(context, webcal) }) { Text(copy("openInCalendar")) }
+                    // Android has no webcal:// handler; Google Calendar subscribes from its web URL.
+                    TextButton(onClick = {
+                        if (!openUrl(context, webcal)) openUrl(context, GOOGLE_CALENDAR_SUBSCRIBE + Uri.encode(webcal))
+                    }) { Text(copy("openInCalendar")) }
                     TextButton(onClick = { confirmRotate = true }, enabled = !busy) {
                         Text(copy("rotate"), color = MaterialTheme.colorScheme.error)
                     }
@@ -166,5 +169,6 @@ internal fun openUrl(context: Context, url: String): Boolean = try {
 }
 
 private const val CALENDAR = "calendar_detail"
+private const val GOOGLE_CALENDAR_SUBSCRIBE = "https://calendar.google.com/calendar/render?cid="
 private const val SCOPE_ALL = "all"
 private const val SCOPE_TIMED = "timed"

@@ -1,5 +1,8 @@
 package app.septena.android.ui
 
+import app.septena.ui.RegistryIcon
+import app.septena.core.generated.RegistryIconIds
+import androidx.compose.material3.IconButton
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -543,8 +546,8 @@ fun TaskDetailScreen(
             TopAppBar(
                 title = { Text(labels.title) },
                 navigationIcon = {
-                    TextButton(onClick = ::handleBack, enabled = !saving) {
-                        Text(labels.back)
+                    IconButton(onClick = ::handleBack, enabled = !saving) {
+                        RegistryIcon(RegistryIconIds.ACTION_BACK, contentDescription = labels.back)
                     }
                 },
                 actions = {
