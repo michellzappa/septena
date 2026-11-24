@@ -24,6 +24,7 @@ on a listed issue without the label). Feature IDs: Starlings Docs
 | Task factory | `docs/TASK_FACTORY_SPEC.md`, ADR 0005, ADR 0008 | `track:factory` |
 | Project sharing | `docs/PROJECT_SHARING_SPEC.md`, ADR 0004 | `track:sharing` |
 | Switcher essentials, moving in & other clients (web, Android) | Starlings `/strategy/product-roadmap`, `docs/ANDROID_CLIENT_SPEC.md`, ADR 0016 sign-in | `track:clients` |
+| Companion devices (watch, desk orb) | `docs/COMPANION_DEVICES_SPEC.md`, ADR 0034, ADR 0035 | `track:clients` |
 | Task fade | `docs/TASK_FADE_SPEC.md`, ADR 0006 | `track:fade` |
 | Project notes as agent context | `docs/PROJECT_NOTES_SPEC.md`, ADR 0012 | `track:factory` |
 | Launch — Septena name, free tier, paid sync, rate lock | `docs/SYNC_SUBSCRIPTION_SPEC.md`, ADR 0007, ADR 0010 | `track:launch` |
@@ -209,6 +210,8 @@ GitHub milestone: `"M5 Breadth"`.
   question, done-first week)
 - #88 Packaged agent installs (Claude Code, Gemini CLI, OpenClaw)
 - #89 Siri, Shortcuts and App Intents · #90 Public API with keys
+- Companion devices: #424 CD1 needs-you feed → #358 CD2 limited session →
+  #425 CD3 live nudge · #426 CD4 voice (after ADR 0009)
 - #65 Apple Watch · #51 Capture AI · #72–#74 Polish (drag to create, logbook by
   date, accessibility) · Public web links for projects (S4)
 
