@@ -6,7 +6,7 @@
 //! migration. An error reason never holds the input: hosts may log it, and a
 //! key is user content (§10).
 
-use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 
 use crate::date::Day;
 use crate::error::CoreError;
@@ -29,9 +29,8 @@ const GITHUB_PATH: &str = "github.com/";
 const STARLINGS_SUFFIX: &str = ".starlings.work";
 
 /// One parsed reference.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
-#[serde(rename_all = "camelCase")]
 pub struct ParsedRef {
     /// `<kind>:<id>` in normal form. The lookup key.
     pub key: String,
@@ -45,50 +44,73 @@ pub struct ParsedRef {
     pub url: Option<String>,
 }
 
+impl ParsedRef {
+    pub fn to_json(&self) -> Value {
+        json!({ "key": self.key, "kind": self.kind, "id": self.id, "rawId": self.raw_id, "url": self.url })
+    }
+}
+
 /// The headers of one message, as written in the message.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct MessageHeaders {
-    #[serde(default)]
     pub message_id: Option<String>,
-    #[serde(default)]
     pub in_reply_to: Option<String>,
-    #[serde(default)]
     pub references: Option<String>,
 }
 
-/// How a message reached Septena.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
-#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
-#[serde(rename_all = "camelCase")]
-pub enum MailArrival {
-    /// Sent to the account's forwarding address.
-    Forwarded,
-    /// Read in the mailbox by a feed or by an agent with mail access.
-    Mailbox,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
-#[serde(rename_all = "camelCase")]
+/// One message that reached Septena. Only the server captures mail, so this
+/// part has no Swift and Kotlin bindings: `invoke_json` is its entry point.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EmailRefInput {
-    pub arrival: MailArrival,
+    /// True for a message sent to the account's forwarding address. False for
+    /// one read in the mailbox, by a feed or by an agent with mail access.
+    pub forwarded: bool,
     /// The `From` address is the account owner.
     pub from_is_owner: bool,
     pub message: MessageHeaders,
     /// The headers of the `message/rfc822` part, when the message has one.
-    #[serde(default)]
     pub attached: Option<MessageHeaders>,
 }
 
+impl EmailRefInput {
+    /// Reads the JSON shape of the vectors.
+    pub(crate) fn from_json(input: &Value) -> Option<EmailRefInput> {
+        let headers = |value: &Value| -> Option<MessageHeaders> {
+            value.as_object()?;
+            let text = |name: &str| value[name].as_str().map(str::to_string);
+            Some(MessageHeaders {
+                message_id: text("messageId"),
+                in_reply_to: text("inReplyTo"),
+                references: text("references"),
+            })
+        };
+        Some(EmailRefInput {
+            forwarded: match input["arrival"].as_str()? {
+                "forwarded" => true,
+                "mailbox" => false,
+                _ => return None,
+            },
+            from_is_owner: input["fromIsOwner"].as_bool()?,
+            message: headers(&input["message"])?,
+            attached: headers(&input["attached"]),
+        })
+    }
+}
+
 /// The references of one captured message (§6.1). None means "no key".
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EmailRefKeys {
     pub email: Option<ParsedRef>,
     pub thread: Option<ParsedRef>,
+}
+
+impl EmailRefKeys {
+    pub fn to_json(&self) -> Value {
+        json!({
+            "email": self.email.as_ref().map(ParsedRef::to_json),
+            "thread": self.thread.as_ref().map(ParsedRef::to_json),
+        })
+    }
 }
 
 /// Parses a key, a web URL or a `message://` link.
@@ -139,9 +161,8 @@ pub fn find_issue_refs(text: String) -> Vec<ParsedRef> {
 
 /// The keys of a captured message. A forwarded mail is a new message with its
 /// own Message-ID, and that id is never the key of the original.
-#[cfg_attr(feature = "ffi", uniffi::export)]
-pub fn email_ref_keys(input: EmailRefInput) -> EmailRefKeys {
-    if input.arrival == MailArrival::Forwarded {
+pub fn email_ref_keys(input: &EmailRefInput) -> EmailRefKeys {
+    if input.forwarded {
         if let Some(attached) = &input.attached {
             return message_keys(attached);
         }
@@ -236,7 +257,7 @@ fn message_id_ref(kind: &str, text: &str) -> Result<ParsedRef, CoreError> {
         .filter(|c| !c.is_whitespace() && *c != '<' && *c != '>')
         .collect();
     let id = match raw.rsplit_once('@') {
-        Some((local, domain)) => format!("{local}@{}", domain.to_lowercase()),
+        Some((local, domain)) => format!("{local}@{}", domain.to_ascii_lowercase()),
         None => raw.clone(),
     };
     build(kind, id, &raw, None)
@@ -579,9 +600,10 @@ fn split_port(authority: &str) -> Option<(String, Option<u16>)> {
     } else {
         Some(port.parse().ok()?)
     };
-    Some((host.to_lowercase(), port))
+    Some((host.to_ascii_lowercase(), port))
 }
 
+/// A host outside ASCII stays as written: a browser writes it in ASCII.
 fn valid_host(host: &str) -> bool {
     match host.strip_prefix('[') {
         Some(inner) => inner
@@ -591,7 +613,7 @@ fn valid_host(host: &str) -> bool {
             !host.is_empty()
                 && host
                     .chars()
-                    .all(|c| c.is_alphanumeric() || c == '-' || c == '.' || c == '_')
+                    .all(|c| !c.is_ascii() || c.is_ascii_alphanumeric() || c == '-' || c == '.' || c == '_')
         }
     }
 }

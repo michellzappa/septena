@@ -40,14 +40,30 @@ def table(doc, name, kind, rows):
     return out + [line, "];", ""]
 
 
+
+def split(rows):
+    """Rows of u16 and rows that need u32, to keep the tables small."""
+    small = [r for r in rows if r[0] <= 0xFFFF and r[1] <= 0xFFFF]
+    assert all(v <= 0xFFFF for r in small for v in r)
+    return small, [r for r in rows if r not in small]
+
+
+(compose, compose_wide), (decompose, decompose_wide), (classes, classes_wide) = map(split, (compose, decompose, classes))
+COMPOSED = "`(composed, first, second)`, sorted by the first column."
+DECOMPOSED = "`(character, first, second or 0)`: decomposed, never composed again. Sorted."
+CLASSED = "`(first, last, canonical combining class)`, sorted. Other characters have class 0."
+
 lines = [
     "// GENERATED FILE — DO NOT EDIT BY HAND.",
     f"// Regenerate: python3 scripts/gen-nfc-table.py (Unicode {u.unidata_version}).",
     "",
-    *table("`(composed, first, second)`, sorted by the first column.", "COMPOSE", "(u32, u32, u32)", compose),
-    *table("`(character, first, second or 0)`: decomposed, never composed again. Sorted.", "DECOMPOSE", "(u32, u32, u32)", decompose),
-    *table("`(first, last, canonical combining class)`, sorted. Other characters have class 0.", "CLASSES", "(u32, u32, u8)", classes),
+    *table(COMPOSED, "COMPOSE", "(u16, u16, u16)", compose),
+    *table(COMPOSED, "COMPOSE_WIDE", "(u32, u32, u32)", compose_wide),
+    *table(DECOMPOSED, "DECOMPOSE", "(u16, u16, u16)", decompose),
+    *table(DECOMPOSED, "DECOMPOSE_WIDE", "(u32, u32, u32)", decompose_wide),
+    *table(CLASSED, "CLASSES", "(u16, u16, u8)", classes),
+    *table(CLASSED, "CLASSES_WIDE", "(u32, u32, u8)", classes_wide),
 ]
 target = pathlib.Path(__file__).resolve().parent.parent / "core/crates/septena-core/src/nfc_table.rs"
 target.write_text("\n".join(lines).rstrip() + "\n")
-print(f"{len(compose)} compositions, {len(decompose)} decompositions, {len(classes)} class ranges")
+print(f"{len(compose) + len(compose_wide)} compositions, {len(decompose) + len(decompose_wide)} decompositions")

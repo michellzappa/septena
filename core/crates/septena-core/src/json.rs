@@ -2,13 +2,13 @@
 //! the web client and the Worker). Input and output are JSON objects with the
 //! same camelCase keys as the conformance vectors.
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::error::CoreError;
 use crate::task_dates::patch_json;
 use crate::{
-    ConversationProjection, DateAction, EmailRefInput, FadeInput, OrdinalWeekday, PullPageHeader, PushOutcome,
+    ConversationProjection, DateAction, EmailRefInput, FadeInput, OrdinalWeekday, ParsedRef, PullPageHeader, PushOutcome,
     RecurrenceRule, ReminderArmInput, TaskConversation, TaskSnapshot, TaskViewMembership, apply_date_action,
     check_pull_page, checklist_occurrence_id, conversation_state, derive_conversation, email_ref_keys, fade_fill,
     find_issue_refs, next_occurrence_dates, next_scheduled_date, normalize_ref_key, normalize_task_dates,
@@ -171,29 +171,32 @@ pub(crate) fn invoke_value(function: &str, input: Value) -> Result<Value, CoreEr
             let args: RejectionArgs = decode(input).map_err(|e| parse(&e))?;
             Ok(json!(server_rejection_reason(args.status, args.body)))
         }
-        "parseRef" => {
-            let args: ParseRefArgs = decode(input).map_err(|e| parse(&e))?;
-            to_json(parse_ref(args.input)?)
-        }
-        "normalizeRefKey" => {
-            let args: RefKeyArgs = decode(input).map_err(|e| parse(&e))?;
-            Ok(json!(normalize_ref_key(args.key)?))
-        }
+        "parseRef" => Ok(parse_ref(text_arg(&input, "input").ok_or_else(|| parse("input"))?)?.to_json()),
+        "normalizeRefKey" => Ok(json!(normalize_ref_key(
+            text_arg(&input, "key").ok_or_else(|| parse("key"))?
+        )?)),
         "findIssueRefs" => {
-            let args: FindIssueRefsArgs = decode(input).map_err(|e| parse(&e))?;
-            to_json(find_issue_refs(args.text))
+            let refs = find_issue_refs(text_arg(&input, "text").ok_or_else(|| parse("text"))?);
+            Ok(Value::Array(refs.iter().map(ParsedRef::to_json).collect()))
         }
-        "emailRefKeys" => to_json(email_ref_keys(decode::<EmailRefInput>(input).map_err(|e| parse(&e))?)),
+        "emailRefKeys" => {
+            let args = EmailRefInput::from_json(&input).ok_or_else(|| parse("message"))?;
+            Ok(email_ref_keys(&args).to_json())
+        }
         "taskRefId" => {
-            let args: TaskRefIdArgs = decode(input).map_err(|e| parse(&e))?;
-            Ok(json!(task_ref_id(args.task_id, args.key, args.deleted_count)))
+            let deleted = input["deletedCount"].as_u64().and_then(|n| u32::try_from(n).ok());
+            Ok(json!(task_ref_id(
+                text_arg(&input, "taskId").ok_or_else(|| parse("taskId"))?,
+                text_arg(&input, "key").ok_or_else(|| parse("key"))?,
+                deleted.ok_or_else(|| parse("deletedCount"))?,
+            )))
         }
         other => Err(CoreError::invalid(format!("Unknown core function: {other}"))),
     }
 }
 
-fn to_json<T: Serialize>(value: T) -> Result<Value, CoreError> {
-    serde_json::to_value(value).map_err(|e| CoreError::invalid(e.to_string()))
+fn text_arg(input: &Value, name: &str) -> Option<String> {
+    input[name].as_str().map(str::to_string)
 }
 
 fn decode<T: for<'de> Deserialize<'de>>(input: Value) -> Result<T, String> {
@@ -377,27 +380,4 @@ pub(crate) struct PushArgs {
 pub(crate) struct RejectionArgs {
     pub status: u16,
     pub body: String,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct ParseRefArgs {
-    pub input: String,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct RefKeyArgs {
-    pub key: String,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct FindIssueRefsArgs {
-    pub text: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct TaskRefIdArgs {
-    pub task_id: String,
-    pub key: String,
-    pub deleted_count: u32,
 }
