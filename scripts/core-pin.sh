@@ -18,8 +18,10 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 wasm_name="septena-core-wasm-web-$version.tgz"
+kotlin_name="septena-core-kotlin-$version.zip"
 gh release download "$tag" --repo michellzappa/septena --dir "$tmp" \
-  --pattern release.json --pattern "SeptenaSharedCore-$version.swift" --pattern "$wasm_name"
+  --pattern release.json --pattern "SeptenaSharedCore-$version.swift" --pattern "$wasm_name" \
+  --pattern "$kotlin_name"
 
 zip_name="SeptenaSharedCoreFFI-$version.xcframework.zip"
 url="$(jq -r --arg n "$zip_name" '.assets[] | select(.name == $n) | .url' "$tmp/release.json")"
@@ -68,4 +70,16 @@ mkdir -p "$wasm_dir"
 tar -xzf "$tmp/$wasm_name" -C "$wasm_dir"
 printf '%s\n' "$version" > "$wasm_dir/VERSION"
 
-echo "pinned $tag in core/release/ (XCFramework $sum) and backend/src/core/wasm/"
+# Android and the JVM (C1, #247): the UniFFI Kotlin bindings are source and
+# are committed; the native libraries come from release.json at build time
+# (android/app/build.gradle.kts, task fetchCoreJniLibs).
+kotlin_sum="$(jq -r --arg n "$kotlin_name" '.assets[] | select(.name == $n) | .sha256' "$tmp/release.json")"
+got_sum="$(shasum -a 256 "$tmp/$kotlin_name" | cut -d' ' -f1)"
+[ "$kotlin_sum" = "$got_sum" ] || { echo "core-pin: $kotlin_name checksum mismatch" >&2; exit 1; }
+mkdir -p "$tmp/kotlin"
+unzip -q -o "$tmp/$kotlin_name" -d "$tmp/kotlin"
+kotlin_dir="$root/android/core/src/main/kotlin/app/septena/sharedcore"
+mkdir -p "$kotlin_dir"
+cp "$tmp/kotlin/app/septena/sharedcore/septena_core.kt" "$kotlin_dir/septena_core.kt"
+
+echo "pinned $tag in core/release/ (XCFramework $sum), backend/src/core/wasm/ and android/core (Kotlin bindings)"

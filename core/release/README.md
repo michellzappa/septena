@@ -34,4 +34,11 @@ Apps link a **released** shared core, never a local Rust build (ADR 0025).
   zip by URL and checksum, so Xcode downloads the prebuilt core. C4 (#250)
   adds it to `project.yml`.
 
-Commit the result. Never edit `swift/` by hand.
+- `backend/src/core/wasm/`: the WASM package the Worker loads (C3).
+- `android/core/src/main/kotlin/app/septena/sharedcore/septena_core.kt`: the
+  Kotlin bindings (C1). The Android natives are not committed:
+  `:app:fetchCoreJniLibs` downloads them from the URL in `release.json` and
+  checks the SHA-256 before every build.
+
+Commit the result. Never edit `swift/`, the WASM package or the Kotlin
+bindings by hand.

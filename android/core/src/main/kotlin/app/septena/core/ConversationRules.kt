@@ -1,7 +1,10 @@
 package app.septena.core
 
-import app.septena.core.generated.RegistryEntityEnums
+import app.septena.sharedcore.conversationState
+import app.septena.sharedcore.deriveConversation
 import java.time.Instant
+import app.septena.sharedcore.ConversationTurn as CoreConversationTurn
+import app.septena.sharedcore.TaskConversation as CoreTaskConversation
 
 data class ConversationTurn(
     val sequence: Long,
@@ -21,24 +24,29 @@ data class TaskConversation(
     val stoppedAt: String? = null,
     val claimUntil: String? = null,
 ) {
-    val isTerminal: Boolean get() = endState != null && endState != RegistryEntityEnums.ConvoEndState.OPEN
-    val needsHumanReview: Boolean get() = endState == RegistryEntityEnums.ConvoEndState.NEEDS_VERIFY
-    val hasOpenProviderQuestion: Boolean
-        get() = thread.lastOrNull()?.let {
-            it.role == RegistryEntityEnums.ConvoTurnRole.PROVIDER && !it.options.isNullOrEmpty()
-        } == true
-    val awaitsHuman: Boolean get() = needsHumanReview || hasOpenProviderQuestion
-    val hasStarted: Boolean
-        get() = thread.isNotEmpty() || confirmedIntent != null || isTerminal || artifactExists || handoffExists
+    /** The core's predicates (`convo.rs`). A live claim needs a clock; these do not. */
+    private fun state(now: Instant = Instant.now()) = conversationState(toCore(), now.toString())
 
-    fun isPendingReasoning(): Boolean {
-        if (isTerminal || stoppedAt != null) return false
-        if (assignee == RegistryEntityEnums.ConvoAssignee.CLAUDE) return true
-        val lastProviderConfidence = thread.lastOrNull {
-            it.role == RegistryEntityEnums.ConvoTurnRole.PROVIDER
-        }?.confidence
-        return lastProviderConfidence != null && lastProviderConfidence < 0.5
-    }
+    val isTerminal: Boolean get() = state().isTerminal
+    val needsHumanReview: Boolean get() = state().needsHumanReview
+    val hasOpenProviderQuestion: Boolean get() = state().hasOpenProviderQuestion
+    val awaitsHuman: Boolean get() = state().awaitsHuman
+    val hasStarted: Boolean get() = state().hasStarted
+
+    fun isPendingReasoning(now: Instant = Instant.now()): Boolean =
+        deriveConversation(toCore(), now.toString()).pendingReasoning
+
+    internal fun toCore() = CoreTaskConversation(
+        confirmedIntent = confirmedIntent,
+        thread = thread.map { CoreConversationTurn(it.sequence, it.role, it.options, it.confidence) },
+        artifactExists = artifactExists,
+        handoffExists = handoffExists,
+        endState = endState,
+        endStateNote = endStateNote,
+        assignee = assignee,
+        stoppedAt = stoppedAt,
+        claimUntil = claimUntil,
+    )
 
     companion object {
         fun from(record: SyncRecord, turns: List<SyncTurn>): TaskConversation {
@@ -78,34 +86,10 @@ data class ConversationProjection(
     val pendingReasoning: Boolean,
 )
 
-/** Pure conversation projection shared by task rows, queues and conformance fixtures. */
+/** The conversation projection, from the shared core (`convo.rs`, ADR 0025 C1 #247). */
 object ConversationRules {
     fun derive(conversation: TaskConversation, now: Instant): ConversationProjection {
-        val pending = conversation.isPendingReasoning()
-        if (conversation.needsHumanReview) {
-            return ConversationProjection(
-                stage = "awaitingHuman",
-                badge = "needsYou",
-                nextAction = conversation.endStateNote ?: "Needs review",
-                pendingReasoning = false,
-            )
-        }
-        if (conversation.isTerminal) {
-            val badge = if (conversation.endState == RegistryEntityEnums.ConvoEndState.WONT_DO) "wontDo" else "done"
-            return ConversationProjection("terminal", badge, conversation.endStateNote ?: "Resolved", false)
-        }
-        if (!conversation.hasStarted) {
-            return ConversationProjection("open", null, "No conversation yet", pending)
-        }
-        if (conversation.stoppedAt != null) {
-            return ConversationProjection("inProgress", null, "Stopped", false)
-        }
-        if (conversation.hasOpenProviderQuestion) {
-            return ConversationProjection("awaitingHuman", "needsYou", "Tap to answer", pending)
-        }
-        val stage = if (conversation.confirmedIntent == null) "clarifying" else "inProgress"
-        val claimed = conversation.claimUntil
-            ?.let { runCatching { Instant.parse(it) }.getOrNull()?.isAfter(now) == true } == true
-        return ConversationProjection(stage, "working", if (claimed) "Claude is working" else "Claude's move", pending)
+        val p = deriveConversation(conversation.toCore(), now.toString())
+        return ConversationProjection(p.stage, p.badge, p.nextAction, p.pendingReasoning)
     }
 }
