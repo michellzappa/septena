@@ -53,6 +53,7 @@ where a date-only value needs one.
 | `recurrence` | `next_scheduled_date`, `occurrence_id` | `recurrence.json` |
 | `reminders` | `shift_reminder_for_recurrence`, `shift_reminder_on_reschedule`, `should_arm_reminder` | `reminders.json` |
 | `convo` | `derive_conversation`, `conversation_state` | `convo-derived.json` |
+| `refs` | `parse_ref`, `normalize_ref_key`, `find_issue_refs`, `email_ref_keys`, `task_ref_id` (`TASK_REFERENCES_SPEC.md` §3) | `refs.json` |
 | `sync` | `check_pull_page`, `plan_pull_row`, `plan_push_response`, `server_rejection_reason` | `sync-engine.json` |
 | `conformance` | `run_conformance(fixture, json)` runs one vector file inside the core | all |
 

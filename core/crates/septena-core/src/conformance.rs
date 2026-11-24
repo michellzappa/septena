@@ -22,6 +22,7 @@ pub struct ConformanceReport {
 pub const CONFORMANCE_FIXTURES: &[&str] = &[
     "convo-derived",
     "recurrence",
+    "refs",
     "reminders",
     "sync-engine",
     "task-dates",
@@ -95,6 +96,24 @@ pub fn run_conformance(fixture: String, json: String) -> Result<ConformanceRepor
                     "sourceItemID": case["sourceItemID"],
                 });
                 run.check("checklistOccurrenceID", case, "checklistOccurrenceId", input, false);
+            }
+        }
+        "refs" => {
+            for case in cases(&doc, "parseRef") {
+                run.check("parseRef", case, "parseRef", json!({ "input": case["input"] }), false);
+            }
+            for case in cases(&doc, "normalizeRefKey") {
+                let input = json!({ "key": case["input"] });
+                run.check("normalizeRefKey", case, "normalizeRefKey", input, false);
+            }
+            for case in cases(&doc, "findIssueRefs") {
+                let input = json!({ "text": case["input"] });
+                run.check("findIssueRefs", case, "findIssueRefs", input, false);
+            }
+            for section in ["emailRefKeys", "taskRefId"] {
+                for case in cases(&doc, section) {
+                    run.check(section, case, section, case["input"].clone(), false);
+                }
             }
         }
         "reminders" => {

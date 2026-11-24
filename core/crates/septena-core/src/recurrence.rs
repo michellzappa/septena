@@ -147,7 +147,7 @@ pub fn checklist_occurrence_id(new_task_id: String, index: u32, source_item_id: 
     )
 }
 
-fn fnv1a64(input: &str) -> String {
+pub(crate) fn fnv1a64(input: &str) -> String {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     for byte in input.bytes() {
         hash ^= u64::from(byte);
