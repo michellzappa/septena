@@ -91,6 +91,12 @@
       "plans.cards.plus.points.1"
     ]
   },
+  "ABCD-EFGH": {
+    "text": "ABCD-EFGH",
+    "paths": [
+      "settings.copy.sign_in_approval.codePlaceholder.label"
+    ]
+  },
   "AI & Agents": {
     "text": "AI & Agents",
     "paths": [
@@ -361,6 +367,24 @@
       "plans.outcomes.everywhere.rows.watch.label"
     ]
   },
+  "Approve": {
+    "text": "Approve",
+    "paths": [
+      "settings.copy.sign_in_approval.approve.label"
+    ]
+  },
+  "Approve a sign-in": {
+    "text": "Approve a sign-in",
+    "paths": [
+      "settings.copy.sign_in_approval.title.label"
+    ]
+  },
+  "Approving…": {
+    "text": "Approving…",
+    "paths": [
+      "settings.copy.sign_in_approval.approving.label"
+    ]
+  },
   "Archive and utility lists shown below your areas and projects. Drag to reorder within a section, or use the arrow button to move a list above or below. Changes sync across all your devices.": {
     "text": "Archive and utility lists shown below your areas and projects. Drag to reorder within a section, or use the arrow button to move a list above or below. Changes sync across all your devices.",
     "paths": [
@@ -534,6 +558,12 @@
       "settings.pages.about.sections.actions.items.0.label"
     ]
   },
+  "Checking the code…": {
+    "text": "Checking the code…",
+    "paths": [
+      "settings.copy.sign_in_approval.checking.label"
+    ]
+  },
   "Checklist": {
     "text": "Checklist",
     "paths": [
@@ -550,6 +580,12 @@
     "text": "Claude connector",
     "paths": [
       "plans.outcomes.agents.rows.connector.label"
+    ]
+  },
+  "Claude is connected. Go back to your browser to finish.": {
+    "text": "Claude is connected. Go back to your browser to finish.",
+    "paths": [
+      "settings.copy.sign_in_approval.doneConnector.label"
     ]
   },
   "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.": {
@@ -613,6 +649,12 @@
       "destinations.genericEmptyState.pointerDetail"
     ]
   },
+  "Code from the browser page": {
+    "text": "Code from the browser page",
+    "paths": [
+      "settings.copy.claude_connector.codePlaceholder.label"
+    ]
+  },
   "Colorful": {
     "text": "Colorful",
     "paths": [
@@ -658,6 +700,15 @@
       "surfaces.notices.items.getStarted.steps.connectAI.title"
     ]
   },
+  "Connect {client} to your tasks?": {
+    "text": "Connect {client} to your tasks?",
+    "placeholders": [
+      "client"
+    ],
+    "paths": [
+      "settings.copy.sign_in_approval.confirmConnector.label"
+    ]
+  },
   "Connected agents": {
     "text": "Connected agents",
     "paths": [
@@ -671,9 +722,16 @@
       "settings.rootGroups.connections_data_root.header"
     ]
   },
+  "Connector URL": {
+    "text": "Connector URL",
+    "paths": [
+      "settings.copy.claude_connector.connectorUrl.label"
+    ]
+  },
   "Continue": {
     "text": "Continue",
     "paths": [
+      "settings.copy.sign_in_approval.continue.label",
       "surfaces.firstRun.steps.welcome.primary.title",
       "surfaces.firstRun.steps.connectClaude.afterDone.title"
     ]
@@ -684,9 +742,16 @@
       "surfaces.taskPage.blocks.taskPage.conversation.label"
     ]
   },
+  "Copied": {
+    "text": "Copied",
+    "paths": [
+      "settings.copy.claude_connector.copied.label"
+    ]
+  },
   "Copy": {
     "text": "Copy",
     "paths": [
+      "settings.copy.claude_connector.copy.label",
       "actions.actions.task.copy.title"
     ]
   },
@@ -941,6 +1006,12 @@
       "surfaces.taskAttributes.discuss.label"
     ]
   },
+  "Discuss never leaves this device. Septena has no on-device model here, so Discuss is off.": {
+    "text": "Discuss never leaves this device. Septena has no on-device model here, so Discuss is off.",
+    "paths": [
+      "settings.copy.aiMode.onDeviceOnlyNoModel.label"
+    ]
+  },
   "Dismiss": {
     "text": "Dismiss",
     "paths": [
@@ -953,10 +1024,17 @@
       "settings.copy.ai_explainer.workDetail.label"
     ]
   },
+  "Don't approve": {
+    "text": "Don't approve",
+    "paths": [
+      "settings.copy.sign_in_approval.dontApprove.label"
+    ]
+  },
   "Done": {
     "text": "Done",
     "paths": [
       "settings.copy.ai_explainer.turnDone.label",
+      "settings.copy.sign_in_approval.done.label",
       "destinations.destinations.agent.groups.done.title",
       "plans.paywall.done"
     ]
@@ -1007,6 +1085,12 @@
     "text": "Elevation",
     "paths": [
       "tokens.textures.ridges.tag"
+    ]
+  },
+  "Enter the code from the other device. If you're connecting Claude, the code is in your browser.": {
+    "text": "Enter the code from the other device. If you're connecting Claude, the code is in your browser.",
+    "paths": [
+      "settings.copy.sign_in_approval.enterFooter.label"
     ]
   },
   "Error": {
@@ -1122,6 +1206,12 @@
     "text": "Find any task, project, or area.",
     "paths": [
       "surfaces.quickFind.emptyState.detail"
+    ]
+  },
+  "First prompt": {
+    "text": "First prompt",
+    "paths": [
+      "settings.copy.claude_connector.firstPrompt.label"
     ]
   },
   "Free": {
@@ -2012,6 +2102,12 @@
       "surfaces.prompts.items.rescheduleFixedRepeat.options.exception.title"
     ]
   },
+  "Only approve a code you started yourself. Septena never asks for a code by email, text or phone call.": {
+    "text": "Only approve a code you started yourself. Septena never asks for a code by email, text or phone call.",
+    "paths": [
+      "settings.copy.sign_in_approval.safetyFooter.label"
+    ]
+  },
   "Open": {
     "text": "Open",
     "paths": [
@@ -2090,6 +2186,12 @@
     "text": "Paste the first prompt. Claude sets up your areas and projects with you.",
     "paths": [
       "surfaces.firstRun.steps.connectClaude.instructions.2"
+    ]
+  },
+  "Paste the setup prompt into Claude, or add the connector URL to Claude as a custom connector. When your browser shows a code, enter it here. Once connected, paste the first prompt to set up your areas, projects and tasks. Only enter a code from a browser window you opened yourself.": {
+    "text": "Paste the setup prompt into Claude, or add the connector URL to Claude as a custom connector. When your browser shows a code, enter it here. Once connected, paste the first prompt to set up your areas, projects and tasks. Only enter a code from a browser window you opened yourself.",
+    "paths": [
+      "settings.copy.claude_connector.footer.label"
     ]
   },
   "Pause Repeat": {
@@ -2207,6 +2309,15 @@
     "text": "Point the camera at the QR code on the other screen.",
     "paths": [
       "surfaces.prompts.items.scanSignInCode.message"
+    ]
+  },
+  "Prefer your connected Claude for reasoning (your account, your data). {app} still never runs AI on your tasks.": {
+    "text": "Prefer your connected Claude for reasoning (your account, your data). {app} still never runs AI on your tasks.",
+    "placeholders": [
+      "app"
+    ],
+    "paths": [
+      "settings.copy.aiMode.useMyClaude.label"
     ]
   },
   "Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.": {
@@ -2666,6 +2777,12 @@
       "plans.paywall.syncThisDeviceFailed"
     ]
   },
+  "Septena has no on-device model here, so Discuss hands the task to your own Claude. Recommended.": {
+    "text": "Septena has no on-device model here, so Discuss hands the task to your own Claude. Recommended.",
+    "paths": [
+      "settings.copy.aiMode.autoNoModel.label"
+    ]
+  },
   "Septena keeps deleted tasks here for 30 days, then deletes them for good.": {
     "text": "Septena keeps deleted tasks here for 30 days, then deletes them for good.",
     "paths": [
@@ -2700,6 +2817,12 @@
     "text": "Settings…",
     "paths": [
       "actions.actions.app.settings.title"
+    ]
+  },
+  "Setup prompt": {
+    "text": "Setup prompt",
+    "paths": [
+      "settings.copy.claude_connector.setupPrompt.label"
     ]
   },
   "Shared projects": {
@@ -2792,10 +2915,31 @@
       "plans.cards.free.footnote"
     ]
   },
+  "Sign in on {client}?": {
+    "text": "Sign in on {client}?",
+    "placeholders": [
+      "client"
+    ],
+    "paths": [
+      "settings.copy.sign_in_approval.confirmDevice.label"
+    ]
+  },
+  "Sign in so Claude can connect to your tasks through your private Septena account.": {
+    "text": "Sign in so Claude can connect to your tasks through your private Septena account.",
+    "paths": [
+      "settings.copy.claude_connector.signInBody.label"
+    ]
+  },
   "Sign in to Septena sync to create a private calendar feed URL for Apple Calendar, Google Calendar, or Outlook.": {
     "text": "Sign in to Septena sync to create a private calendar feed URL for Apple Calendar, Google Calendar, or Outlook.",
     "paths": [
       "settings.copy.calendar_detail.feedSignIn.label"
+    ]
+  },
+  "Sign in to connect Claude": {
+    "text": "Sign in to connect Claude",
+    "paths": [
+      "settings.copy.claude_connector.signInHeader.label"
     ]
   },
   "Sign in to sync": {
@@ -3087,6 +3231,18 @@
       "actions.menuBar.view.items.textSize.title"
     ]
   },
+  "That code is wrong or has expired.": {
+    "text": "That code is wrong or has expired.",
+    "paths": [
+      "settings.copy.sign_in_approval.invalidCode.label"
+    ]
+  },
+  "That code was already used.": {
+    "text": "That code was already used.",
+    "paths": [
+      "settings.copy.sign_in_approval.codeUsed.label"
+    ]
+  },
   "That device stops syncing within the hour. Its tasks stay on it until you sign in there again.": {
     "text": "That device stops syncing within the hour. Its tasks stay on it until you sign in there again.",
     "paths": [
@@ -3222,6 +3378,12 @@
       "settings.pages.appearance.sections.appearance.items.2.label"
     ]
   },
+  "To sign in on a new phone, tablet or computer, tap Get a sign-in code on it. Then scan or enter that code here.": {
+    "text": "To sign in on a new phone, tablet or computer, tap Get a sign-in code on it. Then scan or enter that code here.",
+    "paths": [
+      "settings.copy.sign_in_approval.footer.label"
+    ]
+  },
   "Today": {
     "text": "Today",
     "paths": [
@@ -3265,6 +3427,12 @@
       "surfaces.taskDateBoard.rows.dateBoard.tomorrow.label"
     ]
   },
+  "Too many wrong codes. Try again in 10 minutes.": {
+    "text": "Too many wrong codes. Try again in 10 minutes.",
+    "paths": [
+      "settings.copy.sign_in_approval.tooManyAttempts.label"
+    ]
+  },
   "Topography": {
     "text": "Topography",
     "paths": [
@@ -3275,6 +3443,12 @@
     "text": "Try Plus free for 14 days",
     "paths": [
       "plans.paywall.startTrial"
+    ]
+  },
+  "Try another code": {
+    "text": "Try another code",
+    "paths": [
+      "settings.copy.sign_in_approval.tryAnother.label"
     ]
   },
   "Tuesday": {
@@ -3724,6 +3898,33 @@
     ],
     "paths": [
       "settings.copy.ai_explainer.privateBody.label"
+    ]
+  },
+  "{client} can read and change your tasks. You can pause it in AI & Agents.": {
+    "text": "{client} can read and change your tasks. You can pause it in AI & Agents.",
+    "placeholders": [
+      "client"
+    ],
+    "paths": [
+      "settings.copy.sign_in_approval.detailConnector.label"
+    ]
+  },
+  "{client} gets full access to your Septena account, including tasks, lists, conversations and settings. It stays signed in until you sign it out.": {
+    "text": "{client} gets full access to your Septena account, including tasks, lists, conversations and settings. It stays signed in until you sign it out.",
+    "placeholders": [
+      "client"
+    ],
+    "paths": [
+      "settings.copy.sign_in_approval.detailDevice.label"
+    ]
+  },
+  "{client} is signed in.": {
+    "text": "{client} is signed in.",
+    "placeholders": [
+      "client"
+    ],
+    "paths": [
+      "settings.copy.sign_in_approval.doneDevice.label"
     ]
   },
   "{count} agents": {

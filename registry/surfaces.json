@@ -475,7 +475,15 @@
       "historyReminderSet": "Reminder set",
       "historyReminderRemoved": "Reminder removed",
       "historyFavorited": "Favorited",
-      "historyUnfavorited": "Unfavorited"
+      "historyUnfavorited": "Unfavorited",
+      "conversationWaiting": "Waiting for Claude",
+      "conversationWorking": "Claude is working…",
+      "conversationStopped": "Agent work stopped",
+      "conversationResolved": "Resolved",
+      "conversationWontDo": "Won't do",
+      "conversationDoneWhen": "Done when: {acceptance}",
+      "conversationConnectFirst": "Connect Claude in Settings first, then tap Discuss.",
+      "conversationCheckFailed": "Could not reach your account. Check your connection and try again."
     },
     "repeatUnits": [
       { "value": "day", "title": "Day" },

@@ -26,6 +26,11 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+        <!-- Asks Google Play services to fetch the code scanner UI at install,
+             so the first Scan Code (sign-in approval, #353) opens at once. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
         <!-- Opens a task attachment in another app with a read grant (TaskAttachmentsSection). -->
         <provider
             android:name="androidx.core.content.FileProvider"

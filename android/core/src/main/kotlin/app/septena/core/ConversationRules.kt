@@ -33,6 +33,9 @@ data class TaskConversation(
     val awaitsHuman: Boolean get() = state().awaitsHuman
     val hasStarted: Boolean get() = state().hasStarted
 
+    /** An agent holds a live claim on the task (it is working now). */
+    fun isClaimed(now: Instant = Instant.now()): Boolean = state(now).isClaimed
+
     /** The Agent list stage (queued, working, yourTurn, review, done), or null when not agent work. */
     fun agentStage(now: Instant = Instant.now()): String? = state(now).agentStage
 
@@ -80,7 +83,8 @@ data class TaskConversation(
                 endStateNote = fields["endStateNote"].stringValue(),
                 assignee = fields["assignee"].stringValue(),
                 stoppedAt = fields["stoppedAt"].stringValue(),
-                claimUntil = fields["claimUntil"].stringValue(),
+                // The core reads a claim only when it has a claimant (`convo.rs`, `is_claimed`).
+                claimUntil = fields["claimUntil"].stringValue().takeIf { fields["claimedBy"].stringValue() != null },
             )
         }
     }

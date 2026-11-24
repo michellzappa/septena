@@ -271,9 +271,9 @@ fun TaskDetailScreen(
         .joinToString(" · ")
         .ifEmpty { labels.noArea }
     // On the page the conversation runs with the attributes, as on iOS, where it
-    // sits inside the Discuss card. Android has no Discuss row (it cannot start
-    // a discussion), so the conversation shows directly under the attribute rows,
-    // headed with the Discuss label. Without an attributes block it keeps its own block.
+    // sits inside the Discuss card. On Android the conversation section shows
+    // directly under the attribute rows: the Discuss button before a thread
+    // exists, then the thread headed with the Discuss label. Without an attributes block it keeps its own block.
     val conversationBlock = pageBlocks.firstOrNull { it.kind == TaskPageBlockKinds.CONVERSATION }
     val conversationInAttributes = conversationBlock != null &&
         pageBlocks.any { it.kind == TaskPageBlockKinds.ATTRIBUTES }

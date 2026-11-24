@@ -540,6 +540,24 @@
       "literal": "Projects",
       "reason": "Heading word that the places screen and import flow now hold in surfaces.json (#238); the Swift shells do not read it yet.",
       "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Settings/ConnectedAppsDetails.swift",
+      "literal": "Copied",
+      "reason": "Copy-button feedback word that settings.json copy claude_connector now owns (#353); this pane does not read it yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskFirstRun.swift",
+      "literal": "Copied",
+      "reason": "Copy-button feedback word that settings.json copy claude_connector now owns (#353); the first run does not read it yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/TasksSkillPane.swift",
+      "literal": "Copied",
+      "reason": "Copy-button feedback word that settings.json copy claude_connector now owns (#353); this pane does not read it yet.",
+      "issue": "#260"
     }
   ]
 }

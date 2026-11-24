@@ -65,9 +65,61 @@ data class IcalFeed(
     val webcalUrl: String?,
 )
 
+/** What a sign-in code asks for (`POST /v1/pair/inspect`), shown before the user approves it. */
+data class PairingRequest(
+    /** `device` (a new device signs in) or `connector` (Claude gets task access). */
+    val kind: String,
+    /** The requester's own name: "Android SM-A175F", or "Claude". */
+    val client: String,
+) {
+    val isConnector: Boolean get() = kind == KIND_CONNECTOR
+
+    companion object {
+        const val KIND_CONNECTOR = "connector"
+        const val KIND_DEVICE = "device"
+    }
+}
+
 class AccessHttpException(val statusCode: Int, val responseBody: String) : IOException(
     "Septena access returned HTTP $statusCode",
-)
+) {
+    /** The server's `error` code (`invalid_code`, `code_used`, `too_many_attempts`, ...), when the body has one. */
+    val errorCode: String?
+        get() = runCatching {
+            ((JsonValue.parse(responseBody) as? JsonValue.ObjectValue)?.fields?.get("error")).stringValue()
+        }.getOrNull()
+}
+
+/**
+ * A sign-in code as people type or scan it (ADR 0016). Same rules as the backend's
+ * `normalizePairCode` and Apple's `SeptaskSignInCodeScanner.code(from:)`.
+ */
+object PairCode {
+    /** Uppercases and drops spaces and dashes. Null unless the result is 8 characters. */
+    fun normalized(input: String): String? {
+        val code = input.uppercase().filter { !it.isWhitespace() && it != '-' }
+        return code.takeIf { it.length == CODE_LENGTH }
+    }
+
+    /**
+     * The code in a scanned QR: `https://api.septena.app/pair/<CODE>` (only that host
+     * and path) or a bare code. Anything else is null. A scan only fills in the code.
+     */
+    fun fromScan(payload: String, baseUrl: String = JsonHttp.DEFAULT_BASE_URL): String? {
+        val text = payload.trim()
+        val uri = runCatching { java.net.URI(text) }.getOrNull()
+        if (uri?.scheme != null) {
+            val host = runCatching { java.net.URI(baseUrl).host }.getOrNull()
+            if (uri.scheme != "https" || host == null || !uri.host.equals(host, ignoreCase = true)) return null
+            val parts = uri.path.orEmpty().split('/').filter(String::isNotEmpty)
+            if (parts.size != 2 || parts[0] != "pair") return null
+            return normalized(parts[1])
+        }
+        return normalized(text)
+    }
+
+    private const val CODE_LENGTH = 8
+}
 
 /**
  * Devices and agents that can reach the account (docs/SEPTASK_BACKEND.md §10).
@@ -128,6 +180,37 @@ class SeptenaAccessClient(
         val trimmed = name?.trim()?.take(MAX_AGENT_NAME)?.takeIf(String::isNotEmpty)
         val body = JsonValue.ObjectValue(mapOf("name" to JsonValue.stringOrNull(trimmed))).canonicalJson()
         request("/v1/access/connections/${connectionId.pathSegment()}", "PATCH", body)
+    }
+
+    /** What a sign-in code asks for. Throws [AccessHttpException] with `invalid_code` and the like. */
+    suspend fun inspectPairing(code: String): PairingRequest {
+        val body = JsonValue.ObjectValue(mapOf("code" to JsonValue.StringValue(code))).canonicalJson()
+        val json = JsonValue.parse(request("/v1/pair/inspect", "POST", body)) as? JsonValue.ObjectValue
+            ?: error("Expected a JSON object")
+        return PairingRequest(
+            kind = json.fields["kind"].stringValue() ?: error("A sign-in request without a kind"),
+            client = json.fields["client"].stringValue().orEmpty(),
+        )
+    }
+
+    /**
+     * Approves a sign-in code for the [kind] the user confirmed; the server approves
+     * nothing if the code is of another kind. Sends the device time zone, which decides
+     * what "today" means for the connector. For a connector code, [agentName] names the
+     * new agent and [replaces] is the agent (connection id) it takes the place of.
+     */
+    suspend fun approvePairing(code: String, kind: String, agentName: String? = null, replaces: String? = null) {
+        val fields = buildMap<String, JsonValue> {
+            put("code", JsonValue.StringValue(code))
+            put("timeZone", JsonValue.StringValue(java.util.TimeZone.getDefault().id.take(MAX_TIME_ZONE)))
+            put("kind", JsonValue.StringValue(kind))
+            if (kind == PairingRequest.KIND_CONNECTOR) {
+                agentName?.trim()?.take(MAX_AGENT_NAME)?.takeIf(String::isNotEmpty)
+                    ?.let { put("name", JsonValue.StringValue(it)) }
+                replaces?.let { put("replaces", JsonValue.StringValue(it)) }
+            }
+        }
+        request("/v1/pair/approve", "POST", JsonValue.ObjectValue(fields).canonicalJson())
     }
 
     suspend fun entitlement(): AccountEntitlement {
@@ -206,5 +289,6 @@ class SeptenaAccessClient(
 
     private companion object {
         const val MAX_AGENT_NAME = 40
+        const val MAX_TIME_ZONE = 64
     }
 }
