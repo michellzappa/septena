@@ -158,26 +158,26 @@ function incoming(inc, { w, pad, tint, margin }) {
   const ui = String(theme.fonts.ui).replace(/"/g, "'");
   const deep = `color-mix(in oklab, ${tint} 72%, #000)`;
   if (inc.style === "icons") {
-    const S = 168; // tile size
+    // Each symbol once, none overlapping (mz, 2026-11-24). A tile sits at a
+    // screen height y, out px from the phone edge (its centre; negative is
+    // over the screen), size px, over or under the phone.
     const glyph = (node, size) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${node.map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).filter(([a]) => a !== "key").map(([a, v]) => `${a}="${esc(String(v))}"`).join(" ")}/>`).join("")}</svg>`;
-    return inc.rows.map((r, i) => {
-      if (!r.node) throw new Error(`incoming icons: row "${r.label}" has no icon`);
+    const tiles = inc.rows.map((r, i) => {
+      if (!r.node) throw new Error(`incoming icons: "${r.label}" has no icon`);
       const [, y, , h] = r.frame;
-      const top = pad + (y + h / 2) * k;
+      const size = r.size ?? 160;
       const left = r.side ? r.side === "left" : i % 2 === 0;
-      const over = r.over ?? i % 2 === 1;
-      const tilt = (left ? -1 : 1) * (6 + (i % 3) * 3);
-      // A tile under the phone tucks 40% behind its edge. A tile over the
-      // phone sits across the edge, already arriving. The trail tiles sit
-      // further out, smaller and fainter.
-      const first = over ? -0.2 : -0.38;
-      const steps = [{ out: first, scale: 1, alpha: 1 }, { out: 0.8, scale: 0.74, alpha: 0.5 }, { out: 1.55, scale: 0.52, alpha: 0.22 }];
-      return steps.map((st, j) => {
-        const size = Math.round(S * st.scale);
-        const off = Math.round(S * st.out + size / 2); // the tile centre, outside the phone edge
-        const x = left ? `left:${-off - size / 2}px` : `right:${-off - size / 2}px`;
-        return `<div style="position:absolute; z-index:${over && j === 0 ? 4 : 0}; ${x}; top:${top}px; width:${size}px; height:${size}px; transform:translateY(-50%) rotate(${tilt}deg); opacity:${st.alpha}; display:flex; align-items:center; justify-content:center; background:${deep}; border-radius:${Math.round(size * 0.27)}px; box-shadow:0 0 0 ${Math.max(2, Math.round(4 * st.scale))}px rgb(255 255 255 / .9), 0 ${Math.round(24 * st.scale)}px ${Math.round(50 * st.scale)}px rgb(0 0 0 / .3);">${st.alpha > 0.3 ? glyph(r.node, Math.round(size * 0.52)) : ""}</div>`;
-      }).join("");
+      const cx = left ? -(r.out ?? 0) : w + (r.out ?? 0); // centre, in the phone's coordinates
+      return { r, i, size, left, cx, cy: pad + (y + h / 2) * k, over: r.over ?? i % 2 === 1 };
+    });
+    for (const a of tiles) for (const b of tiles) {
+      if (a.i >= b.i) continue;
+      const gap = 24 + (a.size + b.size) / 2; // the tiles are tilted: keep their boxes plus a margin apart
+      if (Math.abs(a.cx - b.cx) < gap && Math.abs(a.cy - b.cy) < gap) throw new Error(`incoming icons: ${a.r.label} and ${b.r.label} overlap`);
+    }
+    return tiles.map(({ r, i, size, left, cx, cy, over }) => {
+      const tilt = r.tilt ?? (left ? -1 : 1) * (5 + (i % 3) * 4);
+      return `<div style="position:absolute; z-index:${over ? 4 : 0}; left:${Math.round(cx - size / 2)}px; top:${Math.round(cy - size / 2)}px; width:${size}px; height:${size}px; transform:rotate(${tilt}deg); display:flex; align-items:center; justify-content:center; background:${deep}; border-radius:${Math.round(size * 0.27)}px; box-shadow:0 0 0 ${Math.max(3, Math.round(size / 42))}px rgb(255 255 255 / .9), 0 ${Math.round(size / 7)}px ${Math.round(size / 3.3)}px rgb(0 0 0 / .3);">${glyph(r.node, Math.round(size * 0.52))}</div>`;
     }).join("");
   }
   const inverted = inc.style === "inverted";

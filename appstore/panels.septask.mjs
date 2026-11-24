@@ -84,19 +84,27 @@ const VISUAL = {
   "move-in":      {
     fruit: "tamarillo", texture: "topography",
     // Symbols for the tasks arriving from your other app (mz, 2026-11-24):
-    // one per row at its height, plus free ones above and below. Some slide
-    // in under the phone, some over it, each with a fading trail.
+    // each symbol once, no two overlapping, some over the phone and some
+    // under it. render.mjs and incoming() check both rules.
     shot: {
       incomingStyle: "icons",
       incoming: [
-        { icon: "bell", y: 140, side: "left", over: true },
-        { icon: "repeat", y: 175, side: "right", over: false },
-        { id: "task-reply", icon: "mail", side: "left", over: false },
-        { id: "task-dentist", icon: "calendar", side: "right", over: true },
-        { id: "task-receipts", icon: "receipt", side: "left", over: true },
-        { id: "task-brief", icon: "file-text", side: "right", over: false },
-        { id: "task-photos", icon: "image", side: "left", over: false },
-        { icon: "tag", y: 560, side: "right", over: false },
+        // Left: an inner column across the phone edge, an outer column of smaller tiles.
+        { icon: "bell", y: 140, side: "left", out: 25, size: 150, over: true },
+        { icon: "mail", y: 235, side: "left", out: 30, size: 150, over: false },
+        { icon: "receipt", y: 350, side: "left", out: 25, size: 150, over: true },
+        { icon: "image", y: 465, side: "left", out: 30, size: 150, over: false },
+        { icon: "plane", y: 178, side: "left", out: 176, size: 92 },
+        { icon: "gift", y: 293, side: "left", out: 176, size: 92 },
+        { icon: "dumbbell", y: 408, side: "left", out: 176, size: 92 },
+        // Right: the same, offset by half a step.
+        { icon: "repeat", y: 175, side: "right", out: 30, size: 150, over: false },
+        { icon: "calendar", y: 290, side: "right", out: 25, size: 150, over: true },
+        { icon: "file-text", y: 405, side: "right", out: 30, size: 150, over: false },
+        { icon: "tag", y: 520, side: "right", out: 25, size: 150, over: true },
+        { icon: "shopping-cart", y: 232, side: "right", out: 176, size: 92 },
+        { icon: "book-open", y: 347, side: "right", out: 176, size: 92 },
+        { icon: "phone", y: 462, side: "right", out: 176, size: 92 },
       ],
     },
     card: { kind: "section", page: "import_export", section: "move_in", top: 2160 },
