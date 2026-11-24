@@ -47,8 +47,34 @@ android {
         applicationId = "app.septena.android"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
+        // CI passes the commit count, so each APK updates the one before it.
+        versionCode = (findProperty("septenaBuildNumber") as String?)?.toInt() ?: 1
         versionName = "0.1.0"
+    }
+
+    // The fixed tester key (scripts/android-tester-keystore.sh). android.yml
+    // passes the keystore path with -PseptenaTesterStoreFile and the password
+    // as ORG_GRADLE_PROJECT_septenaTesterStorePassword, so it never shows on a
+    // command line. Android updates an app only from an APK with the same key;
+    // the runner's own debug key changes on every run. Local builds without
+    // the key keep the machine's debug key.
+    val testerStoreFile = findProperty("septenaTesterStoreFile") as String?
+    signingConfigs {
+        if (testerStoreFile != null) {
+            create("tester") {
+                storeFile = file(testerStoreFile)
+                storeType = "pkcs12"
+                storePassword = findProperty("septenaTesterStorePassword") as String?
+                keyAlias = "septena-tester"
+                keyPassword = findProperty("septenaTesterStorePassword") as String?
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig = signingConfigs.findByName("tester") ?: signingConfigs.getByName("debug")
+        }
     }
 
     buildFeatures {
