@@ -3,8 +3,8 @@ import type { Env } from "../env.js";
 import { randomId } from "../util.js";
 import { localServerTimestamp, todayYMD } from "../tz.js";
 import { checklistOccurrenceID, nextScheduledDate, occurrenceID } from "../recurrence.js";
-import { shiftReminderForRecurrence, shiftReminderOnReschedule } from "../reminders.js";
-import { taskViewMembership } from "../core/index.js";
+import { shiftReminderForRecurrence } from "../reminders.js";
+import { applyDateAction, normalizeTaskDates, taskViewMembership, type CoreDateAction, type CoreTask } from "../core/index.js";
 import { storeFor } from "../api/session.js";
 import { MAX_TAGS_PER_TASK, TAG_NAME_MAX, zId } from "../store/columns.js";
 import { zPushBody, type Op, type OpResult } from "../store/ops.js";
@@ -399,6 +399,72 @@ function onToday(t: { today?: unknown; scheduled?: unknown; deadline?: unknown }
   ).isOnToday;
 }
 
+/// A stored or planned row as the core reads it.
+function coreRow(r: Record<string, unknown>): CoreTask {
+  const n = (v: unknown) => (typeof v === "number" ? v : null);
+  return {
+    id: str(r.id), title: str(r.title), status: str(r.status) ?? "open", kind: str(r.kind) ?? null,
+    area: str(r.area) ?? null, project: str(r.project) ?? null,
+    created: str(r.created) ?? null, createdAt: str(r.createdAt) ?? null,
+    scheduled: str(r.scheduled) ?? null, deadline: str(r.deadline) ?? null,
+    today: r.today === true, todaySetOn: str(r.todaySetOn) ?? null,
+    source: str(r.source) ?? null, acknowledgedAt: str(r.acknowledgedAt) ?? null,
+    starred: r.starred === true,
+    recurrenceUnit: str(r.recurrenceUnit) ?? null,
+    recurrenceAfterCompletion: typeof r.recurrenceAfterCompletion === "boolean" ? r.recurrenceAfterCompletion : null,
+    recurrenceAnchorDate: str(r.recurrenceAnchorDate) ?? null,
+    deletedAt: str(r.deletedAt) ?? null, fadedAt: str(r.fadedAt) ?? null,
+    startTime: str(r.startTime) ?? null, durationMinutes: n(r.durationMinutes), timeZone: str(r.timeZone) ?? null,
+    reminderAt: str(r.reminderAt) ?? null, reminderSnoozedUntil: str(r.reminderSnoozedUntil) ?? null,
+    reminderDismissedAt: str(r.reminderDismissedAt) ?? null,
+  };
+}
+
+/// The date part of an update, as spec §4 actions the core decides (D4,
+/// #291): When (Today pin or day), then deadline, then time slot, each on
+/// the fields the one before it left. Returns the changed columns. The
+/// agent cue is only cleared for a human surface (`human`): an agent that
+/// re-dates its own proposal has not ratified it.
+function planDateEdits(
+  old: Record<string, unknown>,
+  p: { today?: boolean; scheduled?: string | null; deadline?: string | null;
+       startTime?: string | null; durationMinutes?: number | null; timeZone?: string | null },
+  today: string, now: string, human: boolean,
+): Record<string, unknown> {
+  const actions: CoreDateAction[] = [];
+  const day = (v: string | null | undefined) => (v === "" || v === undefined ? null : v);
+  const when = day(p.scheduled);
+  if (p.today === true) {
+    actions.push({ type: "putOnToday" });
+    if (when) actions.push({ type: "scheduleFor", day: when });
+  } else if (p.today === false) {
+    // A day with the unpin is a move to that day (the deadline stays, Q1);
+    // an unpin alone is Remove from Today (A3, arrived dates go too, Q2).
+    if (p.scheduled === undefined) actions.push({ type: "removeFromToday" });
+    else actions.push(when ? { type: "scheduleFor", day: when } : { type: "clearWhenDate" });
+  } else if (p.scheduled !== undefined) {
+    actions.push(when ? { type: "scheduleFor", day: when } : { type: "clearWhenDate" });
+  }
+  if (p.deadline !== undefined) actions.push({ type: "setDeadline", day: day(p.deadline) });
+  if (p.startTime !== undefined || p.durationMinutes !== undefined || p.timeZone !== undefined) {
+    actions.push({
+      type: "setTimeSlot",
+      startTime: p.startTime !== undefined ? p.startTime : str(old.startTime) ?? null,
+      durationMinutes: p.durationMinutes !== undefined ? p.durationMinutes : (typeof old.durationMinutes === "number" ? old.durationMinutes : null),
+      timeZone: p.timeZone !== undefined ? p.timeZone : str(old.timeZone) ?? null,
+    });
+  }
+  const row: Record<string, unknown> = { ...old };
+  const changed: Record<string, unknown> = {};
+  for (const action of actions) {
+    const patch = applyDateAction(coreRow(row), action, today, now);
+    Object.assign(row, patch);
+    Object.assign(changed, patch);
+  }
+  if (!human) delete changed.acknowledgedAt;
+  return changed;
+}
+
 function recurrenceColumns(rule: RecurrenceRuleInput | null): Record<string, unknown> {
   if (!rule) {
     return {
@@ -471,6 +537,9 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     fields.reminderAt = plan.reminder.reminderAt;
     fields.reminderMode = plan.reminder.reminderMode;
   }
+  // The date invariants (I1–I7): a pin with a future When date keeps the
+  // date, a pin with an arrived one keeps the pin.
+  Object.assign(fields, normalizeTaskDates(coreRow(fields), today));
   if (onToday(fields, today)) fields.todayPosition = position;
 
   const ops: NewOp[] = [];
@@ -531,37 +600,15 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
   const clear = (v: string | null) => (v === "" ? null : v);
   const fields: Record<string, unknown> = {};
   if (p.title !== undefined) fields.title = p.title;
-  if (p.today !== undefined) {
-    fields.today = p.today;
-    fields.todaySetOn = p.today ? today : null;
-  }
   if (p.starred !== undefined) fields.starred = p.starred;
-  if (p.scheduled !== undefined) {
-    const nextSched = clear(p.scheduled);
-    fields.scheduled = nextSched;
-    if (p.reminderAt === undefined) {
-      const shifted = shiftReminderOnReschedule({
-        reminderAt: str(old.reminderAt),
-        oldScheduled: str(old.scheduled),
-        newScheduled: nextSched,
-      });
-      if (shifted !== str(old.reminderAt)) {
-        fields.reminderAt = shifted;
-        fields.reminderSnoozedUntil = null;
-        fields.reminderDismissedAt = null;
-      }
-    }
-  }
+  // Every date field goes through the core's actions (spec §4).
+  Object.assign(fields, planDateEdits(old, p, today, new Date().toISOString(), !!ctx.source));
   if (p.reminderAt !== undefined) {
     fields.reminderAt = p.reminderAt;
     fields.reminderMode = p.reminderMode ?? null;
     fields.reminderSnoozedUntil = null;
     fields.reminderDismissedAt = null;
   }
-  if (p.deadline !== undefined) fields.deadline = clear(p.deadline);
-  if (p.startTime !== undefined) fields.startTime = p.startTime;
-  if (p.durationMinutes !== undefined) fields.durationMinutes = p.durationMinutes;
-  if (p.timeZone !== undefined) fields.timeZone = p.timeZone;
   if (p.area !== undefined) fields.area = clear(p.area);
   if (p.project !== undefined) fields.project = clear(p.project);
   if (p.heading !== undefined) fields.heading = null;

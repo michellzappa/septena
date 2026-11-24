@@ -172,3 +172,28 @@ export interface CoreFadeInput {
 export function fadeFill(input: CoreFadeInput): number | null {
   return callCore("fadeFill", input);
 }
+
+/// A date action of `docs/TASK_DATES_SPEC.md` §4, in the core's JSON shape.
+export type CoreDateAction =
+  | { type: "putOnToday"; mode?: "makeException" | "updateRule" }
+  | { type: "scheduleFor"; day: string; mode?: "makeException" | "updateRule" }
+  | { type: "removeFromToday" }
+  | { type: "toggleToday"; mode?: "makeException" | "updateRule" }
+  | { type: "clearWhenDate" }
+  | { type: "clearWhen" }
+  | { type: "setDeadline"; day: string | null }
+  | { type: "setTimeSlot"; startTime: string | null; durationMinutes: number | null; timeZone: string | null }
+  | { type: "fileFromTriage" };
+
+/// The date fields one action changes, by column name. Empty when the
+/// action changes nothing (a heading, a deleted row, or no difference).
+export function applyDateAction(
+  task: CoreTask, action: CoreDateAction, today: string, now: string,
+): Record<string, unknown> {
+  return callCore("applyDateAction", { task, action, today, now });
+}
+
+/// The fields a row needs to meet the date invariants (I1–I7).
+export function normalizeTaskDates(task: CoreTask, today: string): Record<string, unknown> {
+  return callCore("normalizeTaskDates", { task, today });
+}
