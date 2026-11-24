@@ -680,7 +680,6 @@ struct RegistryDestination: Sendable, Hashable, Identifiable {
   let visibility: String
   let canHide: Bool
   let canMoveSection: Bool
-  let shortcutKeycaps: [String]?
   let emptyTitle: String
   let emptyDetail: String
   let featureId: String
@@ -704,21 +703,37 @@ enum RegistryDestinations {
   ]
 
   static let all: [RegistryDestination] = [
-    RegistryDestination(id: "inbox", navigationKey: "triage", serverView: "triage", title: RegistryL10n.t("Inbox"), iconId: "list.inbox", sfSymbol: "tray.full", sidebarSection: "top", visibility: "todayBand", canHide: false, canMoveSection: false, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("Inbox is empty"), emptyDetail: RegistryL10n.t("New tasks wait at the top of Today until you schedule or file them."), featureId: "lists.inbox"),
-    RegistryDestination(id: "today", navigationKey: "today", serverView: "today", title: RegistryL10n.t("Today"), iconId: "list.today", sfSymbol: "sun.max.fill", sidebarSection: "top", visibility: "always", canHide: false, canMoveSection: false, shortcutKeycaps: ["⌘", "1"], emptyTitle: RegistryL10n.t("Nothing on Today"), emptyDetail: RegistryL10n.t("Add a task or move one here when you want to work on it today."), featureId: "lists.today"),
-    RegistryDestination(id: "review", navigationKey: "review", serverView: "all", title: RegistryL10n.t("Review"), iconId: "list.review", sfSymbol: "eye", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("Nothing to review"), emptyDetail: RegistryL10n.t("Work an agent finished appears here so you can check and accept it."), featureId: "lists.review"),
-    RegistryDestination(id: "agent", navigationKey: "agent", serverView: "all", title: RegistryL10n.t("Agent"), iconId: "list.agent", sfSymbol: "person.2.badge.gearshape", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No agent work"), emptyDetail: RegistryL10n.t("Tasks you assign to Claude appear here, grouped by where the work stands."), featureId: "lists.agent"),
-    RegistryDestination(id: "upcoming", navigationKey: "upcoming", serverView: "upcoming", title: RegistryL10n.t("Upcoming"), iconId: "list.upcoming", sfSymbol: "calendar", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: true, shortcutKeycaps: ["⌘", "2"], emptyTitle: RegistryL10n.t("Nothing upcoming"), emptyDetail: RegistryL10n.t("Tasks with a future When or Deadline date appear here."), featureId: "lists.upcoming"),
-    RegistryDestination(id: "repeating", navigationKey: "repeating", serverView: "all", title: RegistryL10n.t("Repeating"), iconId: "list.repeating", sfSymbol: "arrow.clockwise", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No repeating tasks"), emptyDetail: RegistryL10n.t("Give any task a Repeat rule and it will show up here."), featureId: "lists.repeating"),
-    RegistryDestination(id: "anytime", navigationKey: "unscheduled", serverView: "unscheduled", title: RegistryL10n.t("Anytime"), iconId: "list.anytime", sfSymbol: "rectangle.stack.fill", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: true, shortcutKeycaps: ["⌘", "3"], emptyTitle: RegistryL10n.t("Nothing in Anytime"), emptyDetail: RegistryL10n.t("Open tasks without a date live here."), featureId: "lists.anytime"),
-    RegistryDestination(id: "logbook", navigationKey: "logbook", serverView: "logbook", title: RegistryL10n.t("Logbook"), iconId: "list.logbook", sfSymbol: "checkmark", sidebarSection: "bottom", visibility: "always", canHide: true, canMoveSection: true, shortcutKeycaps: ["⌘", "4"], emptyTitle: RegistryL10n.t("Logbook is empty"), emptyDetail: RegistryL10n.t("Tasks you complete or let go end up here."), featureId: "lists.logbook"),
-    RegistryDestination(id: "starred", navigationKey: "starred", serverView: "all", title: RegistryL10n.t("Favorites"), iconId: "list.starred", sfSymbol: "star.fill", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Favorites"), emptyDetail: RegistryL10n.t("Favorite important tasks to keep them one tap away."), featureId: "lists.starred"),
-    RegistryDestination(id: "faded", navigationKey: "faded", serverView: "all", title: RegistryL10n.t("Faded"), iconId: "list.faded", sfSymbol: "circle.dashed", sidebarSection: "bottom", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Faded Tasks"), emptyDetail: RegistryL10n.t("Undated tasks without activity for 14 days appear here until you keep them or let them go."), featureId: "lists.faded"),
-    RegistryDestination(id: "recentlyDeleted", navigationKey: "recentlyDeleted", serverView: "all", title: RegistryL10n.t("Deleted"), iconId: "list.recently_deleted", sfSymbol: "trash", sidebarSection: "bottom", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Deleted Tasks"), emptyDetail: RegistryL10n.t("Septena keeps deleted tasks here for 30 days, then deletes them for good."), featureId: "lists.recently-deleted"),
+    RegistryDestination(id: "inbox", navigationKey: "triage", serverView: "triage", title: RegistryL10n.t("Inbox"), iconId: "list.inbox", sfSymbol: "tray.full", sidebarSection: "top", visibility: "todayBand", canHide: false, canMoveSection: false, emptyTitle: RegistryL10n.t("Inbox is empty"), emptyDetail: RegistryL10n.t("New tasks wait at the top of Today until you schedule or file them."), featureId: "lists.inbox"),
+    RegistryDestination(id: "today", navigationKey: "today", serverView: "today", title: RegistryL10n.t("Today"), iconId: "list.today", sfSymbol: "sun.max.fill", sidebarSection: "top", visibility: "always", canHide: false, canMoveSection: false, emptyTitle: RegistryL10n.t("Nothing on Today"), emptyDetail: RegistryL10n.t("Add a task or move one here when you want to work on it today."), featureId: "lists.today"),
+    RegistryDestination(id: "review", navigationKey: "review", serverView: "all", title: RegistryL10n.t("Review"), iconId: "list.review", sfSymbol: "eye", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("Nothing to review"), emptyDetail: RegistryL10n.t("Work an agent finished appears here so you can check and accept it."), featureId: "lists.review"),
+    RegistryDestination(id: "agent", navigationKey: "agent", serverView: "all", title: RegistryL10n.t("Agent"), iconId: "list.agent", sfSymbol: "person.2.badge.gearshape", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("No agent work"), emptyDetail: RegistryL10n.t("Tasks you assign to Claude appear here, grouped by where the work stands."), featureId: "lists.agent"),
+    RegistryDestination(id: "upcoming", navigationKey: "upcoming", serverView: "upcoming", title: RegistryL10n.t("Upcoming"), iconId: "list.upcoming", sfSymbol: "calendar", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("Nothing upcoming"), emptyDetail: RegistryL10n.t("Tasks with a future When or Deadline date appear here."), featureId: "lists.upcoming"),
+    RegistryDestination(id: "repeating", navigationKey: "repeating", serverView: "all", title: RegistryL10n.t("Repeating"), iconId: "list.repeating", sfSymbol: "arrow.clockwise", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("No repeating tasks"), emptyDetail: RegistryL10n.t("Give any task a Repeat rule and it will show up here."), featureId: "lists.repeating"),
+    RegistryDestination(id: "anytime", navigationKey: "unscheduled", serverView: "unscheduled", title: RegistryL10n.t("Anytime"), iconId: "list.anytime", sfSymbol: "rectangle.stack.fill", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("Nothing in Anytime"), emptyDetail: RegistryL10n.t("Open tasks without a date live here."), featureId: "lists.anytime"),
+    RegistryDestination(id: "logbook", navigationKey: "logbook", serverView: "logbook", title: RegistryL10n.t("Logbook"), iconId: "list.logbook", sfSymbol: "checkmark", sidebarSection: "bottom", visibility: "always", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("Logbook is empty"), emptyDetail: RegistryL10n.t("Tasks you complete or let go end up here."), featureId: "lists.logbook"),
+    RegistryDestination(id: "starred", navigationKey: "starred", serverView: "all", title: RegistryL10n.t("Favorites"), iconId: "list.starred", sfSymbol: "star.fill", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("No Favorites"), emptyDetail: RegistryL10n.t("Favorite important tasks to keep them one tap away."), featureId: "lists.starred"),
+    RegistryDestination(id: "faded", navigationKey: "faded", serverView: "all", title: RegistryL10n.t("Faded"), iconId: "list.faded", sfSymbol: "circle.dashed", sidebarSection: "bottom", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("No Faded Tasks"), emptyDetail: RegistryL10n.t("Undated tasks without activity for 14 days appear here until you keep them or let them go."), featureId: "lists.faded"),
+    RegistryDestination(id: "recentlyDeleted", navigationKey: "recentlyDeleted", serverView: "all", title: RegistryL10n.t("Deleted"), iconId: "list.recently_deleted", sfSymbol: "trash", sidebarSection: "bottom", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("No Deleted Tasks"), emptyDetail: RegistryL10n.t("Septena keeps deleted tasks here for 30 days, then deletes them for good."), featureId: "lists.recently-deleted"),
   ]
 
   static let byId: [String: RegistryDestination] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
   static let byNavigationKey: [String: RegistryDestination] = Dictionary(uniqueKeysWithValues: all.map { ($0.navigationKey, $0) })
+
+  /// Digit shortcuts in order (`digitShortcuts` in destinations.json): the first
+  /// enabled list in the sidebar takes the first one.
+  static let digitShortcuts: [RegistryShortcut] = [
+    RegistryShortcut(key: "1", modifiers: ["primary"], keycaps: ["⌘", "1"], excludePlatforms: []),
+    RegistryShortcut(key: "2", modifiers: ["primary"], keycaps: ["⌘", "2"], excludePlatforms: []),
+    RegistryShortcut(key: "3", modifiers: ["primary"], keycaps: ["⌘", "3"], excludePlatforms: []),
+    RegistryShortcut(key: "4", modifiers: ["primary"], keycaps: ["⌘", "4"], excludePlatforms: []),
+    RegistryShortcut(key: "5", modifiers: ["primary"], keycaps: ["⌘", "5"], excludePlatforms: []),
+    RegistryShortcut(key: "6", modifiers: ["primary"], keycaps: ["⌘", "6"], excludePlatforms: []),
+    RegistryShortcut(key: "7", modifiers: ["primary"], keycaps: ["⌘", "7"], excludePlatforms: []),
+    RegistryShortcut(key: "8", modifiers: ["primary"], keycaps: ["⌘", "8"], excludePlatforms: []),
+    RegistryShortcut(key: "9", modifiers: ["primary"], keycaps: ["⌘", "9"], excludePlatforms: []),
+  ]
+  /// Only lists with this `visibility` take a digit.
+  static let digitShortcutVisibility: String = "always"
 
   /// Ordered row groups per destination id (`groups` in destinations.json).
   static let groups: [String: [RegistryDestinationGroup]] = [
@@ -1206,16 +1221,10 @@ enum RegistryActions {
       RegistryMenuItem(kind: "submenu", id: "textSize", title: RegistryL10n.t("Text Size"), sfSymbol: "textformat.size", items: [RegistryMenuItem(kind: "slot", id: "textSizeSteps", title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "divider", id: "divider.1", title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "action", id: "app.textSizeIncrease", title: RegistryL10n.t("Increase Text Size"), sfSymbol: "textformat.size", items: []), RegistryMenuItem(kind: "action", id: "app.textSizeDecrease", title: RegistryL10n.t("Decrease Text Size"), sfSymbol: "textformat.size", items: []), RegistryMenuItem(kind: "action", id: "app.textSizeReset", title: RegistryL10n.t("Reset Text Size"), sfSymbol: "textformat.size", items: [])]),
     ]),
     RegistryMenu(id: "go", title: RegistryL10n.t("Go"), system: nil, items: [
-      RegistryMenuItem(kind: "destination", id: "today", title: RegistryL10n.t("Today"), sfSymbol: "sun.max.fill", items: []),
-      RegistryMenuItem(kind: "destination", id: "review", title: RegistryL10n.t("Review"), sfSymbol: "eye", items: []),
-      RegistryMenuItem(kind: "destination", id: "agent", title: RegistryL10n.t("Agent"), sfSymbol: "person.2.badge.gearshape", items: []),
-      RegistryMenuItem(kind: "destination", id: "upcoming", title: RegistryL10n.t("Upcoming"), sfSymbol: "calendar", items: []),
-      RegistryMenuItem(kind: "destination", id: "repeating", title: RegistryL10n.t("Repeating"), sfSymbol: "arrow.clockwise", items: []),
-      RegistryMenuItem(kind: "destination", id: "anytime", title: RegistryL10n.t("Anytime"), sfSymbol: "rectangle.stack.fill", items: []),
-      RegistryMenuItem(kind: "destination", id: "logbook", title: RegistryL10n.t("Logbook"), sfSymbol: "checkmark", items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.7", title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "slot", id: "smartLists", title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.1", title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "app.quickFind", title: RegistryL10n.t("Quick Find…"), sfSymbol: "magnifyingglass", items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.9", title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.3", title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "app.septenaWindow", title: RegistryL10n.t("Septena Window"), sfSymbol: "macwindow", items: []),
       RegistryMenuItem(kind: "action", id: "app.classicWindow", title: RegistryL10n.t("Classic Window"), sfSymbol: "macwindow", items: []),
       RegistryMenuItem(kind: "action", id: "app.quickEntry", title: RegistryL10n.t("Quick Entry"), sfSymbol: "plus", items: []),

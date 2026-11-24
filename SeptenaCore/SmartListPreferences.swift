@@ -160,6 +160,23 @@ final class SmartListPreferences {
     visibleDestinations(nonEmptyIDs: nonEmptyIDs).filter { section(for: $0.id) == targetSection }
   }
 
+  /// Every list the user has enabled, in sidebar order (top zone, then
+  /// bottom), whether or not a `whenNonEmpty` list has rows now.
+  var enabledDestinations: [RegistryDestination] {
+    (orderedDestinations(in: .top) + orderedDestinations(in: .bottom))
+      .filter { !isHidden($0.id) }
+  }
+
+  /// Digit shortcut per destination ID (⌘1, ⌘2, …): counts the enabled lists
+  /// down the sidebar. `whenNonEmpty` lists take no digit. They come and go
+  /// with their rows, and would renumber the lists below them.
+  var digitShortcuts: [String: RegistryShortcut] {
+    let numbered = enabledDestinations
+      .filter { $0.visibility == RegistryDestinations.digitShortcutVisibility }
+    return Dictionary(uniqueKeysWithValues:
+      zip(numbered.map(\.id), RegistryDestinations.digitShortcuts))
+  }
+
   /// True when visibility, placement, or order differs from the canonical
   /// registry defaults.
   var isCustomized: Bool {
