@@ -8,9 +8,9 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 52 | 53 | 53 | 0 | 41 | 0 | 1 |
+| ships | 52 | 53 | 53 | 0 | 42 | 0 | 1 |
 | partial | 1 | 1 | 1 | 0 | 3 | 0 | 3 |
-| planned | 0 | 0 | 0 | 50 | 8 | 53 | 1 |
+| planned | 0 | 0 | 0 | 50 | 7 | 53 | 1 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 52 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
@@ -61,7 +61,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `agents.stop-pause` | Stop one task, pause all agents | ships | ships | ships | planned | ships | planned | - |
 | `sync.backend` | Sync through api.septena.app | ships | ships | ships | planned | ships | planned | planned |
 | `account.delete` | Delete account | ships | ships | ships | planned | ships | planned | - |
-| `task.times` | Start time and duration on a task | ships | ships | ships | planned | planned | planned | - |
+| `task.times` | Start time and duration on a task | ships | ships | ships | planned | ships | planned | - |
 | `calendar.feed` | Private read-only calendar feed (.ics) | ships | ships | ships | planned | planned | planned | - |
 | `widgets.tasks` | Today and Upcoming widgets | ships | ships | ships | - | planned | planned | - |
 | `watch.app` | Apple Watch app | - | - | - | - | - | - | ships |

@@ -59,6 +59,8 @@ data class TaskListItem(
     val scheduledText: String? = null,
     /** Completed/archived date for Logbook / Recently Deleted rows. */
     val completedDateText: String? = null,
+    /** Scheduled start time / range (e.g. `"14:00"` or `"14:00–15:00"`, feature `task.times`). */
+    val timeSlotText: String? = null,
     /** Checklist progress summary (`done/total`). Zero chrome when [checklistTotal] == 0. */
     val checklistDone: Int = 0,
     val checklistTotal: Int = 0,

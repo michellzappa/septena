@@ -31,6 +31,9 @@ data class TaskSnapshot(
     val deletedAt: String? = null,
     val fadedAt: String? = null,
     val touchedAt: String? = null,
+    val startTime: String? = null,
+    val durationMinutes: Int? = null,
+    val timeZone: String? = null,
 ) {
     val isHeading: Boolean get() = kind == RegistryEntityEnums.TaskKind.HEADING
 
@@ -59,6 +62,13 @@ data class TaskSnapshot(
                 deletedAt = record.deletedAt,
                 fadedAt = f[RegistryEntityFields.Task.FADED_AT].stringValue(),
                 touchedAt = f[RegistryEntityFields.Task.TOUCHED_AT].stringValue(),
+                startTime = f[RegistryEntityFields.Task.START_TIME].stringValue(),
+                durationMinutes = when (val raw = f[RegistryEntityFields.Task.DURATION_MINUTES]) {
+                    is JsonValue.IntegerValue -> raw.value.toInt()
+                    is JsonValue.DecimalValue -> raw.value.toInt()
+                    else -> null
+                },
+                timeZone = f[RegistryEntityFields.Task.TIME_ZONE].stringValue(),
             )
         }
     }
@@ -210,9 +220,9 @@ internal fun TaskSnapshot.toCore(): CoreTaskSnapshot = CoreTaskSnapshot(
     recurrenceUnit = recurrenceUnit,
     deletedAt = deletedAt,
     fadedAt = fadedAt,
-    startTime = null,
-    durationMinutes = null,
-    timeZone = null,
+    startTime = startTime,
+    durationMinutes = durationMinutes,
+    timeZone = timeZone,
     reminderAt = null,
     reminderSnoozedUntil = null,
     reminderDismissedAt = null,
