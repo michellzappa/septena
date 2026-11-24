@@ -320,6 +320,11 @@ struct TaskListView: View {
   // `.inline` presentation, so the form is literally the same component the
   // create-drawer uses. Folding the row autosaves (see `collapseEdit`).
   @State private var expandedEditId: String?
+  /// The row whose inline editor is folding shut right now (`collapseEdit`).
+  /// While it is set, the editor and the closed row swap with NO transition,
+  /// so only the card's frame animates: the card shrinks in step with the
+  /// rows below sliding up, instead of the editor vanishing and leaving a gap.
+  @State private var foldingEditId: String?
   /// Inline-create placeholders (`deferPush` drafts) — purged on fold when the
   /// title never got a non-empty commit.
   @State private var draftEditIds: Set<String> = []
@@ -1335,7 +1340,9 @@ struct TaskListView: View {
     // Opening a row while another is open folds (and so saves) the other and
     // opens this one in the SAME tap. This used to stop after the fold, which
     // (with select-first on iPad) made switching rows cost three taps.
-    if let open = expandedEditId, open != task.id { collapseEdit() }
+    // The fold is instant here: an animated fold and an instant open in the
+    // same tap would fight over the list's layout.
+    if let open = expandedEditId, open != task.id { collapseEdit(animated: false) }
     if composerIsOpen { closeComposer() }
     // Open INSTANTLY — no animated transaction. An animated open cross-faded the
     // closed `Text` row and the editor `TextField` row (both carry
@@ -1356,13 +1363,26 @@ struct TaskListView: View {
   /// click on empty paper, which would otherwise have cleared the selection a
   /// beat before this runs). The one exception: if the user closed by selecting
   /// a DIFFERENT row, we respect that new selection instead of yanking it back.
-  private func collapseEdit() {
+  ///
+  /// The fold animates the card's height, on the same curve the rows below
+  /// use to slide back (`Theme.Motion.inlineEdit`). The open is instant, but
+  /// there the tall editor sits on top (`zIndex`) and covers the rows sliding
+  /// down beneath it. A fold has nothing to cover: an instant fold removed the
+  /// editor at once and left an empty gap for the rows below to slide into,
+  /// which read as a jump. The editor→row swap itself still has no transition
+  /// (`foldingEditId`), so the title does not cross-fade or move.
+  private func collapseEdit(animated: Bool = true) {
     let closingId = expandedEditId
     if let closingId { clearQuickAddCaptureSlot(for: closingId) }
-    // Close INSTANTLY too — a matching, un-animated fold so the editor→closed
-    // swap doesn't cross-fade (the "flash" on blur) or animate the baseline
-    // delta (the drop). See `beginEdit`.
-    expandedEditId = nil
+    if animated, let closingId {
+      foldingEditId = closingId
+      a11yAnimate(Theme.Motion.inlineEdit) { expandedEditId = nil }
+      DispatchQueue.main.asyncAfter(deadline: .now() + Theme.Motion.inlineEditDuration + 0.1) {
+        if foldingEditId == closingId { foldingEditId = nil }
+      }
+    } else {
+      expandedEditId = nil
+    }
     if usesSelectionModel {
       if let closingId, selection.isEmpty || selection == [closingId] {
         selection = [closingId]
@@ -3849,7 +3869,7 @@ struct TaskListView: View {
     // separate rounded box. Vertical inset lives in `TaskComposerCard` (same
     // `rowVInset` as closed rows).
     .id(task.id)
-    .transition(.opacity)
+    .transition(foldingEditId == task.id ? .identity : .opacity)
     // `TaskComposerCard` owns Escape: it saves and folds the row, the same as
     // tapping away. The selection remains on the closed row afterwards.
     .septenaOnRightClick {
@@ -4010,8 +4030,10 @@ struct TaskListView: View {
     )
     // Fade on insert/removal. The fade only plays inside an animated
     // transaction; every settle-driven removal runs through `motion.run`, so
-    // Reduce Motion still gets an instant (un-animated) drop.
-    .transition(.opacity)
+    // Reduce Motion still gets an instant (un-animated) drop. A row coming
+    // back from its folding editor does not fade: a fade there cross-fades
+    // with the editor (the "flash"); see `foldingEditId`.
+    .transition(foldingEditId == task.id ? .identity : .opacity)
     // Open + selection gestures live on `selectableScrollRow` (applied via
     // `asTaskRow`): tap → open (touch), single-click → select / double-click →
     // open (Mac). `activateRow` routes "open" to `beginEdit` (the Things-style
