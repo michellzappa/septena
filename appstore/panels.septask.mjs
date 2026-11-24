@@ -52,7 +52,7 @@ const VISUAL = {
   // The render at the panel's full width, from the top; under it, on the
   // dark fill, the four devices by symbol and name (mz, 2026-11-24).
   devices:        {
-    photo: { src: "art/photo-devices.png", fit: "width", offsetY: 90, bottomFade: 460, shade: 0.55, fade: 700 },
+    photo: { src: "art/photo-devices.png", rendered: true, fit: "width", offsetY: 90, bottomFade: 460, shade: 0.55, fade: 700 },
     background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" },
     badges: [
       { icon: "smartphone", label: "iPhone" }, { icon: "tablet", label: "iPad" },

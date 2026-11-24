@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
 """
-Photorealistic Screen Replacement for `appstore/art/photo-today.png`
-(Runs via Blender's bundled Python + NumPy in ~2s — zero extra packages needed.)
+Photo composite: put a real app screenshot on the device in a photo.
+Technique and steps: docs/photo-composite/SKILL.md.
 
-Maps any real iPhone screenshot onto the exact sub-pixel projective screen quad of
-`photo-today.png` using:
-  - 4x4 linear-light supersampling (crisp, moire-free SF Pro UI text)
-  - Apple continuous-curvature squircle corner mask (exact 0.155w inner bezel match)
-  - Matched photographic OLED black-floor, white-point, subtle ambient falloff,
-    whisper-soft glass sheen, and fine sensor micro-grain
+The photo `X.png` needs a sidecar `X.screen.json` with the screen corners
+(TL, TR, BR, BL, normalized, origin top-left), the corner radius as a fraction
+of the screen width, and the SHA-256 of the photo. The script stops when the
+sidecar is missing or the photo is not the measured one, so a changed photo
+never gets a screenshot in the wrong place.
 
-Usage:
-  blender -b --python tools/3d-studio/replace_photo_screen.py -- \
-    --ios tools/3d-studio/screens/demo_ios.png \
-    --out tools/3d-studio/renders/photo_today_replaced.png
+Runs in Blender's bundled Python + NumPy (no extra packages): a projective
+warp with 4x4 linear-light supersampling, a continuous-curvature corner mask,
+and light matching (black floor, white point, falloff, sheen, grain).
+
+Composite:
+  blender -b --python-exit-code 1 --python tools/3d-studio/replace_photo_screen.py -- \
+    --photo appstore/art/photo-today.png --ios SCREEN.png --out OUT.png
+
+New photo (paint its own screen black, then pin the new hash in the sidecar):
+  blender -b --python-exit-code 1 --python tools/3d-studio/replace_photo_screen.py -- \
+    --photo X.png --blackout
 """
 import argparse
+import hashlib
+import json
 import os
 import sys
 import bpy
@@ -27,18 +35,6 @@ DEFAULT_PHOTO = os.path.join(REPO_ROOT, "appstore", "art", "photo-today.png")
 DEFAULT_IOS = os.path.join(SCRIPT_DIR, "screens", "demo_ios.png")
 DEFAULT_OUT = os.path.join(SCRIPT_DIR, "renders", "photo_today_replaced.png")
 
-# Sub-pixel measured screen quad of `appstore/art/photo-today.png` (941 x 1672),
-# in normalized [0..1] image coords (origin = top-left) so it scales cleanly if photo is resized.
-# Measured edge fit residuals: L=0.18px, R=0.04px, T=0.05px, B=0.05px.
-PHOTO_TODAY_QUAD_NORM = np.array([
-    [420.24 / 941.0,  463.26 / 1672.0],  # TL
-    [669.85 / 941.0,  448.10 / 1672.0],  # TR
-    [637.38 / 941.0, 1098.06 / 1672.0],  # BR
-    [388.61 / 941.0, 1087.80 / 1672.0],  # BL
-], dtype=np.float64)
-
-# Inner bezel rounded corner radius as fraction of screen width (measured ~0.155)
-CORNER_RADIUS_U = 0.156
 SQUIRCLE_POWER = 2.65
 
 
@@ -50,7 +46,8 @@ def parse_args():
         argv = []
     p = argparse.ArgumentParser(description="Replace iPhone screen in photo-today.png with a real screenshot")
     p.add_argument("--photo", default=DEFAULT_PHOTO, help="Base photograph path")
-    p.add_argument("--ios", default=DEFAULT_IOS, help="Real iPhone screenshot PNG/JPG")
+    p.add_argument("--ios", default=DEFAULT_IOS, help="Real app screenshot PNG/JPG")
+    p.add_argument("--blackout", action="store_true", help="Paint the photo's own screen black in place and pin its hash in the sidecar")
     p.add_argument("--out", default=DEFAULT_OUT, help="Output composited PNG path")
     p.add_argument("--inset-px", type=float, default=-0.5, help="Expand/contract screen mask in pixels (negative = slightly wider into bezel)")
     p.add_argument("--feather-px", type=float, default=1.25, help="Anti-aliased edge blend width in pixels")
@@ -60,6 +57,26 @@ def parse_args():
     p.add_argument("--grain", type=float, default=0.005, help="Matching photographic luma grain sigma")
     p.add_argument("--ssaa", type=int, default=4, help="Supersampling grid per axis (4 = 16 samples/px)")
     return p.parse_args(argv)
+
+
+def sha256(path):
+    with open(path, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
+def load_screen(photo_path, check_hash=True):
+    """Read and check the photo's sidecar. Exits when it cannot be trusted."""
+    side = os.path.splitext(photo_path)[0] + ".screen.json"
+    if not os.path.exists(side):
+        sys.exit(f"replace_photo_screen: {side} is missing. Measure the photo first (docs/photo-composite/SKILL.md).")
+    with open(side) as f:
+        meta = json.load(f)
+    corners = np.asarray(meta["corners"], dtype=np.float64)
+    if corners.shape != (4, 2) or corners.min() < 0.0 or corners.max() > 1.0:
+        sys.exit(f"replace_photo_screen: {side} needs 4 corners in 0..1")
+    if check_hash and meta.get("sha256") != sha256(photo_path):
+        sys.exit(f"replace_photo_screen: {photo_path} is not the photo {side} was measured on. Measure it again.")
+    return side, meta, corners, float(meta["cornerRadius"])
 
 
 def srgb_to_linear(c):
@@ -147,9 +164,37 @@ def save_image_topdown_srgb(arr_srgb, out_path):
     bpy.data.images.remove(out_img)
 
 
+def blackout(photo_path, photo, side, meta, corners, corner_radius):
+    """Remove the photo's own screen: paint it black, 1 px past the edge, so no
+    generated UI is left to show. Then pin the new file's hash."""
+    ph, pw, _ = photo.shape
+    quad_px = corners * np.array([[pw, ph]], dtype=np.float64)
+    H = compute_homography(quad_px, np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]))
+    gx, gy = np.meshgrid(np.arange(pw) + 0.5, np.arange(ph) + 0.5)
+    d = H[2, 0] * gx + H[2, 1] * gy + H[2, 2]
+    u = (H[0, 0] * gx + H[0, 1] * gy + H[0, 2]) / d
+    v = (H[1, 0] * gx + H[1, 1] * gy + H[1, 2]) / d
+    w = 0.5 * (np.linalg.norm(quad_px[1] - quad_px[0]) + np.linalg.norm(quad_px[2] - quad_px[3]))
+    h = 0.5 * (np.linalg.norm(quad_px[3] - quad_px[0]) + np.linalg.norm(quad_px[2] - quad_px[1]))
+    sdf_px = squircle_sdf(u, v, h / w, corner_radius, power=SQUIRCLE_POWER) * w
+    # Solid black to 1 px outside the edge, then a 1 px soft step into the bezel.
+    keep = np.clip(sdf_px - 1.0, 0.0, 1.0)
+    out = photo[:, :, :3] * np.where(d > 0, keep, 1.0)[..., None]
+    save_image_topdown_srgb(out, photo_path)
+    meta["sha256"] = sha256(photo_path)
+    with open(side, "w") as f:
+        json.dump(meta, f, indent=2)
+        f.write("\n")
+    print(f"Screen painted black in {photo_path}; hash pinned in {side}")
+
+
 def main():
     args = parse_args()
+    side, meta, corners, corner_radius = load_screen(args.photo, check_hash=not args.blackout)
     photo = load_image_topdown_srgb(args.photo)
+    if args.blackout:
+        blackout(args.photo, photo, side, meta, corners, corner_radius)
+        return
     screen = load_image_topdown_srgb(args.ios)
 
     ph, pw, _ = photo.shape
@@ -158,7 +203,7 @@ def main():
     print(f"Base photo: {pw}x{ph} | Screenshot: {sw}x{sh} (aspect={screen_aspect:.4f})")
 
     # Exact quad corners in base photo pixel coordinates
-    quad_px = PHOTO_TODAY_QUAD_NORM * np.array([[pw, ph]], dtype=np.float64)
+    quad_px = corners * np.array([[pw, ph]], dtype=np.float64)
     uv_corners = np.array([
         [0.0, 0.0],  # TL
         [1.0, 0.0],  # TR
@@ -213,7 +258,7 @@ def main():
     vc = (H[1, 0] * gx + H[1, 1] * gy + H[1, 2]) / denom_c
 
     # Continuous-curvature rounded screen mask with crisp optical anti-aliasing into the black bezel
-    sdf_px = squircle_sdf(uc, vc, screen_aspect, CORNER_RADIUS_U, power=SQUIRCLE_POWER) * mean_scr_w
+    sdf_px = squircle_sdf(uc, vc, screen_aspect, corner_radius, power=SQUIRCLE_POWER) * mean_scr_w
     # Smoothstep across [-feather, 0] shifted by inset_px
     edge = sdf_px - args.inset_px
     feather = max(0.5, args.feather_px)
@@ -232,7 +277,7 @@ def main():
     bezel_ao = 1.0 - 0.035 * np.exp(np.clip(sdf_px / 6.0, -10.0, 0.0))
     warped_srgb *= (illum * bezel_ao)[..., None]
 
-    # 3. Very subtle warm-cream color balance matching photo-today.png's original OLED tint
+    # 3. Very subtle warm-cream color balance matching a photographed OLED
     warped_srgb *= np.array([1.000, 0.994, 0.986], dtype=np.float64)[None, None, :]
 
     # 4. Subtle diagonal glossy glass reflection band (upper-right window sheen)

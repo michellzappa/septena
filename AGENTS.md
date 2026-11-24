@@ -540,7 +540,8 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   binary, never a review submission (docs/APPSTORE-SEPTASK.md "Uploading").
   Mac is a separate ASC app (own deliver run). See `docs/APPSTORE.md`.
   For generated Photo Studio lifestyle images and device variants, use
-  `docs/photo-studio/SKILL.md`.
+  `docs/photo-studio/SKILL.md`. A device screen in a photo is always a composed
+  PNG, never a generated screen: `docs/photo-composite/SKILL.md`.
 
 ## Conventions
 
