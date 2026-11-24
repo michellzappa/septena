@@ -157,6 +157,12 @@ function resolveCard(device, panel) {
     const [status, ...buttons] = el(c.element);
     return { ...base, title: el(c.taskElement ?? "task-detail")[0], subtitle: status, actions: c.actions === false ? [] : buttons.map((label) => ({ label, kind: label === "Stop" ? "destructive" : "tinted" })), toggle: c.toggleSetting ? settingLabel(c.toggleSetting) : null };
   }
+  if (c.kind === "page") {
+    // The task page's Discuss card, both moments: the question with the
+    // answer you tapped, and the agent at work with Stop.
+    const [status, stop, question, answer] = el("conversation");
+    return { ...base, title: el("task-page")[0], subtitle: el("discuss")[0], question, chips: [], answer, status, actions: [{ label: stop, kind: "destructive" }] };
+  }
   if (c.kind === "review") {
     const lines = el(c.element);
     const actions = lines.slice(-2);

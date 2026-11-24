@@ -48,21 +48,13 @@ const VISUAL = {
   // (mz, 2026-11-24, tools/3d-studio iso_vertical_4dev). Its dark top holds the title.
   // The focus keeps the iPhone whole at the right edge; the Mac runs off the left.
   devices:        { photo: { src: "art/photo-devices.png", zoom: 1, focus: "92% 100%", shade: 0.55, fade: 700 }, background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" } },
-  // Slide 3: Discuss. The conversation in an iOS-style card over the phone's
-  // empty lower half, with the agent's face; a ring marks it on the screen.
-  thinking:       {
+  // Slides 3 and 4 in one (mz, 2026-11-24): the task page (ADR 0029). The
+  // Discuss card holds both moments: the question you answered with a tap,
+  // and the agent at work with Stop.
+  asks:           {
     fruit: "yuzu", texture: "fieldMatrix",
-    shot: { ring: { element: "conversation" } },
-    card: { kind: "discussion", element: "conversation", top: 2060 },
-  },
-  // Slide 4: your agent works, and you hold the brakes. The working screen,
-  // and a card with the agent's status, Stop, and the Pause all agents switch.
-  "agent-work":   {
-    fruit: "acai", texture: "ridges",
-    // The agent's side: you hand it the task, it says what it is doing. The
-    // phone shows the task working, with the agent's status ringed.
-    shot: { appearance: "light", ring: { element: "agent-status" } },
-    chat: { top: 2080, you: "Can you take the launch brief?", agent: "On it. I’m drafting it from the task’s notes and will ask if I need you." },
+    shot: { ring: { element: "discuss" } },
+    card: { kind: "page", top: 2110 },
   },
   // Slide 5: agent work waits in Review until you accept it.
   "agent-result": {

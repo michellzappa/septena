@@ -290,6 +290,19 @@ function card(c) {
   const question = c.question ? `<div style="font:700 62px/1.18 ${ui}; color:#141518; margin-top:40px;">${esc(c.question)}</div>` : "";
   const chips = c.chips?.length ? `<div style="display:flex; flex-wrap:wrap; gap:20px; margin-top:40px;">${c.chips.map((x) => button(x, /…$/.test(x) ? "muted" : "tinted")).join("")}</div>` : "";
   const artifact = c.artifact ? `<div style="display:inline-flex; align-items:center; gap:14px; margin-top:30px; padding:18px 28px; border-radius:22px; background:#F2F2F7; font:500 38px/1 ${ui}; color:#3A3A3C;">${esc(c.artifact)}</div>` : "";
+  // The answer you tapped: a filled chip with a check. Then the agent's
+  // status and its buttons on one line, under a rule.
+  const answer = c.answer ? `<div style="display:flex; margin-top:36px;"><span style="display:inline-flex; align-items:center; gap:16px; padding:24px 40px; border-radius:999px; font:600 42px/1 ${ui}; background:${tint}; color:#fff;"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>${esc(c.answer)}</span></div>` : "";
+  if (c.status) {
+    const statusRow = `<div style="display:flex; align-items:center; justify-content:space-between; gap:30px; margin-top:40px; padding-top:34px; border-top:2px solid #E5E5EA;">
+      <span style="display:flex; align-items:center; gap:18px; font:500 44px/1.2 ${ui}; color:${tint};"><span style="width:22px; height:22px; border-radius:50%; background:${tint}; box-shadow:0 0 0 8px color-mix(in oklab, ${tint} 20%, transparent);"></span>${esc(c.status)}</span>
+      ${c.actions.map((x) => button(x.label, x.kind)).join("")}
+    </div>`;
+    return `
+  <div data-linked style="position:absolute; z-index:5; left:${c.left ?? 90}px; right:${c.right ?? 90}px; top:${c.top}px; padding:52px 56px; background:#fff; border-radius:56px; ${linkedEdge(c.tint)}">
+    ${head}${question}${answer}${statusRow}
+  </div>`;
+  }
   const actions = c.actions?.length ? `<div style="display:flex; flex-wrap:wrap; gap:20px; margin-top:40px;">${c.actions.map((x) => button(x.label, x.kind)).join("")}</div>` : "";
   const toggle = c.toggle ? `
     <div style="display:flex; align-items:center; justify-content:space-between; gap:30px; margin-top:40px; padding-top:34px; border-top:2px solid #E5E5EA;">
