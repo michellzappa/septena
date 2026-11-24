@@ -113,7 +113,12 @@
         "source": { "kind": "text", "max": 64, "nullable": true },
         "sourceClient": { "kind": "text", "max": 64, "nullable": true },
         "acknowledgedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
-        "createdAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true }
+        "createdAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "touchedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "deferCount": { "kind": "int", "min": 0, "default": 0 },
+        "fadedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "dropReason": { "kind": "text", "max": 16, "nullable": true },
+        "effort": { "kind": "text", "max": 16, "nullable": true }
       }
     },
     "area": {

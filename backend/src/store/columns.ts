@@ -171,6 +171,18 @@ export const ENTITIES = {
       sourceClient: text(64),
       acknowledgedAt: stamp(),
       createdAt: stamp(),
+      // Fade (docs/TASK_FADE_SPEC.md §3). The app is the only writer: an
+      // agent write that sets one is refused (`TaskStore.agentRefusal`).
+      // `touchedAt`: the last human engagement; the fade clock runs from it.
+      touchedAt: stamp(),
+      // How many times the human moved the When date later.
+      deferCount: { kind: "int", zod: z.number().int().min(0).nullable(), dflt: 0 },
+      // When the task faded out of its list.
+      fadedAt: stamp(),
+      // Why a cancelled task was dropped: "faded" (the sweep) or "user".
+      dropReason: text(16),
+      // The capture-cleanup size estimate (spec §9).
+      effort: text(16),
     },
     requiredOnInsert: ["title", "status"],
   },
