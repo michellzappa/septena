@@ -154,7 +154,7 @@ struct SeptaskDeleteAccountSection: View {
         Button(role: .destructive) {
           confirming = true
         } label: {
-          Label("Delete account", systemImage: "trash")
+          Label(RegistrySettings.copy("delete_account", "button"), systemImage: "trash")
         }
         // On the button, not the Section: a Section's modifiers fan out to
         // its rows.
@@ -162,7 +162,7 @@ struct SeptaskDeleteAccountSection: View {
           SeptaskDeleteAccountSheet()
         }
       } footer: {
-        Text("Deletes your account and all your tasks on the Septena server.")
+        Text(RegistrySettings.copy("delete_account", "footer"))
       }
     }
   }
@@ -175,17 +175,17 @@ private struct SeptaskDeleteAccountSheet: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
-      Text("Delete your account?")
+      Text(RegistrySettings.copy("delete_account", "title"))
         .font(.title2.weight(.semibold))
-      Text("This deletes the following from the Septena server:")
+      Text(RegistrySettings.copy("delete_account", "intro"))
       VStack(alignment: .leading, spacing: 6) {
-        Label("Your tasks, areas and projects", systemImage: "checklist")
-        Label("Your attachments", systemImage: "paperclip")
-        Label("Your task conversations", systemImage: "bubble.left.and.text.bubble.right")
-        Label("Your synced settings", systemImage: "gearshape")
+        Label(RegistrySettings.copy("delete_account", "tasks"), systemImage: "checklist")
+        Label(RegistrySettings.copy("delete_account", "attachments"), systemImage: "paperclip")
+        Label(RegistrySettings.copy("delete_account", "conversations"), systemImage: "bubble.left.and.text.bubble.right")
+        Label(RegistrySettings.copy("delete_account", "settings"), systemImage: "gearshape")
       }
       .padding(.leading, 4)
-      Text("It also removes your tasks from this device and signs you out. You can’t undo this.")
+      Text(RegistrySettings.copy("delete_account", "consequence"))
       if let error {
         Text(error).font(.callout).foregroundStyle(.red)
       }
@@ -198,7 +198,7 @@ private struct SeptaskDeleteAccountSheet: View {
         Button("Cancel") { dismiss() }
           .keyboardShortcut(.defaultAction)
           .disabled(working)
-        Button("Delete account", role: .destructive) { delete() }
+        Button(RegistrySettings.copy("delete_account", "button"), role: .destructive) { delete() }
           .disabled(working)
       }
     }
@@ -222,8 +222,7 @@ private struct SeptaskDeleteAccountSheet: View {
         TaskNotices.resetGetStarted()
       } catch {
         let detail = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        self.error = String(localized: "Couldn't delete your account. Nothing was deleted. \(detail)",
-                            comment: "Delete account sheet: the server call failed")
+        self.error = "\(RegistrySettings.copy("delete_account", "failed")) \(detail)"
         working = false
       }
     }

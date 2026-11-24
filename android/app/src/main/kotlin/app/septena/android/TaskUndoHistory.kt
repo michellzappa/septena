@@ -64,6 +64,14 @@ class TaskUndoHistory {
         record(Entry(taskId = task.id, operation = UndoOperation.DeleteCreated))
     }
 
+    /** Drops every entry: the tasks they restore are gone (account deletion). */
+    suspend fun clear() {
+        mutex.withLock {
+            entries.clear()
+            mutableState.value = mutableState.value.copy(canUndo = false)
+        }
+    }
+
     private suspend fun record(entry: Entry) {
         mutex.withLock {
             entries += entry

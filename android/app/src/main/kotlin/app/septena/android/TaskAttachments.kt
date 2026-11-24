@@ -163,6 +163,14 @@ class TaskAttachmentStore(
         return landed
     }
 
+    /** Deletes every attachment file on this device (account deletion). */
+    fun wipeLocalFiles() {
+        uploaded.clear()
+        refused.clear()
+        root.deleteRecursively()
+        incoming.deleteRecursively()
+    }
+
     private fun localFile(record: SyncRecord): File {
         // One directory per attachment id, so two files with one name never collide.
         val safe = filename(record).replace(UNSAFE_CHARACTERS, "_").trimStart('.').ifEmpty { record.id }

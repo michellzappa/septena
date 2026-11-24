@@ -350,6 +350,18 @@
     }
   },
   "copy": {
+    "delete_account": [
+      { "id": "button", "label": "Delete account" },
+      { "id": "footer", "label": "Deletes your account and all your tasks on the Septena server." },
+      { "id": "title", "label": "Delete your account?" },
+      { "id": "intro", "label": "This deletes the following from the Septena server:" },
+      { "id": "tasks", "label": "Your tasks, areas and projects" },
+      { "id": "attachments", "label": "Your attachments" },
+      { "id": "conversations", "label": "Your task conversations" },
+      { "id": "settings", "label": "Your synced settings" },
+      { "id": "consequence", "label": "It also removes your tasks from this device and signs you out. You can’t undo this." },
+      { "id": "failed", "label": "Couldn’t delete your account. Nothing was deleted." }
+    ],
     "account_profile_card": [
       { "id": "yourProfile", "label": "Your Profile" },
       { "id": "signInToSync", "label": "On this device · Sign in to sync" }
