@@ -33,9 +33,13 @@ struct TaskMarkdownNotesEditor: View {
   /// The smallest height of the field. The task page passes a taller value so
   /// the notes read as a text area and the whole box takes a tap.
   var minHeight: CGFloat = 28
-  @State private var contentHeight: CGFloat = 28
-
-  private let maxHeight: CGFloat = 360
+  /// The tallest the field grows before capping and scrolling inside. Inline
+  /// cards pass a compact cap so long notes don't take over the card; the task
+  /// page passes a taller cap.
+  var maxHeight: CGFloat = 360
+  /// True when the note overflows `maxHeight` and isn't scrolled to the bottom,
+  /// driving a soft bottom fade so truncation is visible without slicing a line.
+  @State private var showBottomFade = false
 
   #if os(iOS)
   @ScaledMetric(relativeTo: .body) private var scaledBodySize: CGFloat = 17
@@ -49,10 +53,6 @@ struct TaskMarkdownNotesEditor: View {
     #endif
   }
 
-  private var visibleHeight: CGFloat {
-    min(max(contentHeight, minHeight), maxHeight)
-  }
-
   var body: some View {
     ZStack(alignment: .topLeading) {
       PlatformMarkdownNotesTextView(
@@ -64,12 +64,25 @@ struct TaskMarkdownNotesEditor: View {
             else if focus == .notes { focus = nil }
           }
         ),
-        contentHeight: $contentHeight,
+        showBottomFade: $showBottomFade,
         fontSize: bodyFontSize,
+        minHeight: minHeight,
         maxHeight: maxHeight,
         onDone: onDone
       )
-      .frame(height: visibleHeight)
+      .frame(maxWidth: .infinity, alignment: .topLeading)
+      .clipped()
+      .mask {
+        VStack(spacing: 0) {
+          Color.black
+          LinearGradient(
+            colors: [.black, .black.opacity(showBottomFade ? 0 : 1)],
+            startPoint: .top,
+            endPoint: .bottom
+          )
+          .frame(height: 24)
+        }
+      }
 
       if text.isEmpty {
         Text(verbatim: RegistrySurfaces.taskAttribute("notes").label)
@@ -83,25 +96,86 @@ struct TaskMarkdownNotesEditor: View {
 }
 
 #if os(iOS)
+private final class NotesTextView: UITextView {
+  var minVisibleHeight: CGFloat = 28
+  var maxVisibleHeight: CGFloat = 360
+  var onScrollMetricsChange: ((_ isOverflowing: Bool, _ isAtBottom: Bool) -> Void)?
+  private var lastMeasuredHeight: CGFloat = 28
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    syncScrollState()
+  }
+
+  func measuredHeight(forWidth width: CGFloat) -> CGFloat {
+    guard width > 0 else { return minVisibleHeight }
+    let fitted = sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+    return max(minVisibleHeight, ceil(fitted.height))
+  }
+
+  func syncScrollState() {
+    guard bounds.width > 0 else { return }
+    let measured = measuredHeight(forWidth: bounds.width)
+    lastMeasuredHeight = measured
+    let overflows = measured > maxVisibleHeight + 0.5
+    if isScrollEnabled != overflows {
+      let previousOffset = contentOffset
+      isScrollEnabled = overflows
+      if !overflows {
+        contentOffset = .zero
+      } else if isFirstResponder {
+        contentOffset = previousOffset
+        scrollRangeToVisible(selectedRange)
+      } else {
+        contentOffset = .zero
+      }
+    }
+    reportScrollPosition(isOverflowing: overflows)
+  }
+
+  func reportScrollPosition(isOverflowing: Bool? = nil) {
+    let overflows = isOverflowing ?? isScrollEnabled
+    let atBottom: Bool
+    if !overflows {
+      atBottom = true
+    } else {
+      let effectiveContentHeight = max(contentSize.height, lastMeasuredHeight)
+      let maxOffsetY = max(0, effectiveContentHeight - bounds.height)
+      atBottom = contentOffset.y >= maxOffsetY - 4
+    }
+    onScrollMetricsChange?(overflows, atBottom)
+  }
+}
+
 private struct PlatformMarkdownNotesTextView: UIViewRepresentable {
   @Binding var text: String
   @Binding var isFocused: Bool
-  @Binding var contentHeight: CGFloat
+  @Binding var showBottomFade: Bool
   let fontSize: CGFloat
+  let minHeight: CGFloat
   let maxHeight: CGFloat
   var onDone: (() -> Void)? = nil
 
-  func makeUIView(context: Context) -> UITextView {
-    let view = UITextView()
+  func makeUIView(context: Context) -> NotesTextView {
+    let view = NotesTextView()
     view.delegate = context.coordinator
     view.backgroundColor = .clear
     view.isOpaque = false
+    view.clipsToBounds = true
     view.isScrollEnabled = false
+    view.alwaysBounceVertical = false
     view.textContainerInset = .zero
     view.textContainer.lineFragmentPadding = 0
     view.adjustsFontForContentSizeCategory = false
     view.textDragInteraction?.isEnabled = false
     view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    view.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+    view.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    view.minVisibleHeight = minHeight
+    view.maxVisibleHeight = maxHeight
+    view.onScrollMetricsChange = { [weak coordinator = context.coordinator] overflows, atBottom in
+      coordinator?.handleScrollMetrics(isOverflowing: overflows, isAtBottom: atBottom)
+    }
     view.typingAttributes = MarkdownNotesStyle.baseAttributes(fontSize: fontSize)
     view.attributedText = MarkdownNotesStyle.attributed(text, fontSize: fontSize)
     if onDone != nil {
@@ -122,15 +196,20 @@ private struct PlatformMarkdownNotesTextView: UIViewRepresentable {
     return view
   }
 
-  func updateUIView(_ view: UITextView, context: Context) {
+  func updateUIView(_ view: NotesTextView, context: Context) {
     context.coordinator.parent = self
-    view.isScrollEnabled = contentHeight >= maxHeight - 1
+    let limitsChanged = view.minVisibleHeight != minHeight || view.maxVisibleHeight != maxHeight
+    view.minVisibleHeight = minHeight
+    view.maxVisibleHeight = maxHeight
     view.typingAttributes = MarkdownNotesStyle.baseAttributes(fontSize: fontSize)
 
     if view.text != text {
       context.coordinator.replaceText(in: view, with: text)
     } else if context.coordinator.lastFontSize != fontSize {
       context.coordinator.applyStyle(to: view)
+      view.invalidateIntrinsicContentSize()
+    } else if limitsChanged {
+      view.invalidateIntrinsicContentSize()
     }
 
     // Act on a CHANGE of the requested focus only. Nothing in SwiftUI is
@@ -148,7 +227,16 @@ private struct PlatformMarkdownNotesTextView: UIViewRepresentable {
       coordinator.lastRequestedFocus = isFocused
     }
 
-    context.coordinator.updateHeight(for: view)
+    view.syncScrollState()
+  }
+
+  func sizeThatFits(_ proposal: ProposedViewSize,
+                    uiView: NotesTextView,
+                    context: Context) -> CGSize? {
+    let width = proposal.width ?? uiView.bounds.width
+    guard width > 0 else { return nil }
+    let measured = uiView.measuredHeight(forWidth: width)
+    return CGSize(width: width, height: min(measured, maxHeight))
   }
 
   func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
@@ -160,10 +248,27 @@ private struct PlatformMarkdownNotesTextView: UIViewRepresentable {
     var lastRequestedFocus = false
     /// True while UIKit has the text view editing (a tap, not a request).
     var isEditing = false
+    private var lastShowBottomFade = false
     private var applying = false
 
     init(parent: PlatformMarkdownNotesTextView) {
       self.parent = parent
+    }
+
+    func handleScrollMetrics(isOverflowing: Bool, isAtBottom: Bool) {
+      let nextFade = isOverflowing && !isAtBottom
+      guard nextFade != lastShowBottomFade else { return }
+      lastShowBottomFade = nextFade
+      DispatchQueue.main.async {
+        if self.parent.showBottomFade != nextFade {
+          self.parent.showBottomFade = nextFade
+        }
+      }
+    }
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+      guard let notesView = scrollView as? NotesTextView else { return }
+      notesView.reportScrollPosition()
     }
 
     func textViewDidBeginEditing(_ textView: UITextView) {
@@ -182,10 +287,11 @@ private struct PlatformMarkdownNotesTextView: UIViewRepresentable {
       guard !applying else { return }
       parent.text = textView.text
       applyStyle(to: textView)
-      updateHeight(for: textView)
+      textView.invalidateIntrinsicContentSize()
+      (textView as? NotesTextView)?.syncScrollState()
     }
 
-    func replaceText(in textView: UITextView, with text: String) {
+    func replaceText(in textView: NotesTextView, with text: String) {
       applying = true
       let selected = textView.selectedRange
       textView.attributedText = MarkdownNotesStyle.attributed(text, fontSize: parent.fontSize)
@@ -193,7 +299,8 @@ private struct PlatformMarkdownNotesTextView: UIViewRepresentable {
       textView.typingAttributes = MarkdownNotesStyle.baseAttributes(fontSize: parent.fontSize)
       lastFontSize = parent.fontSize
       applying = false
-      updateHeight(for: textView)
+      textView.invalidateIntrinsicContentSize()
+      textView.syncScrollState()
     }
 
     func applyStyle(to textView: UITextView) {
@@ -209,19 +316,6 @@ private struct PlatformMarkdownNotesTextView: UIViewRepresentable {
       applying = false
     }
 
-    func updateHeight(for textView: UITextView) {
-      guard textView.bounds.width > 0 else { return }
-      let size = textView.sizeThatFits(
-        CGSize(width: textView.bounds.width, height: .greatestFiniteMagnitude)
-      )
-      let next = max(28, ceil(size.height))
-      DispatchQueue.main.async {
-        if abs(self.parent.contentHeight - next) > 0.5 {
-          self.parent.contentHeight = next
-        }
-      }
-    }
-
     private func clamped(_ range: NSRange, length: Int) -> NSRange {
       NSRange(location: min(range.location, length),
               length: min(range.length, max(0, length - min(range.location, length))))
@@ -232,8 +326,9 @@ private struct PlatformMarkdownNotesTextView: UIViewRepresentable {
 private struct PlatformMarkdownNotesTextView: NSViewRepresentable {
   @Binding var text: String
   @Binding var isFocused: Bool
-  @Binding var contentHeight: CGFloat
+  @Binding var showBottomFade: Bool
   let fontSize: CGFloat
+  let minHeight: CGFloat
   let maxHeight: CGFloat
   var onDone: (() -> Void)? = nil
 
@@ -244,6 +339,7 @@ private struct PlatformMarkdownNotesTextView: NSViewRepresentable {
     scrollView.hasVerticalScroller = false
     scrollView.hasHorizontalScroller = false
     scrollView.autohidesScrollers = true
+    scrollView.contentView.postsBoundsChangedNotifications = true
 
     let textView = NSTextView()
     textView.delegate = context.coordinator
@@ -263,6 +359,7 @@ private struct PlatformMarkdownNotesTextView: NSViewRepresentable {
 
     scrollView.documentView = textView
     context.coordinator.textView = textView
+    context.coordinator.observeScroll(of: scrollView)
     return scrollView
   }
 
@@ -270,7 +367,6 @@ private struct PlatformMarkdownNotesTextView: NSViewRepresentable {
     context.coordinator.parent = self
     guard let textView = context.coordinator.textView else { return }
 
-    scrollView.hasVerticalScroller = contentHeight >= maxHeight - 1
     textView.typingAttributes = MarkdownNotesStyle.baseAttributes(fontSize: fontSize)
     textView.textContainer?.containerSize = CGSize(width: max(scrollView.bounds.width, 1),
                                                    height: .greatestFiniteMagnitude)
@@ -279,6 +375,7 @@ private struct PlatformMarkdownNotesTextView: NSViewRepresentable {
       context.coordinator.replaceText(in: textView, with: text)
     } else if context.coordinator.lastFontSize != fontSize {
       context.coordinator.applyStyle(to: textView)
+      scrollView.invalidateIntrinsicContentSize()
     }
 
     if isFocused, textView.window?.firstResponder !== textView {
@@ -291,7 +388,17 @@ private struct PlatformMarkdownNotesTextView: NSViewRepresentable {
       textView.window?.makeFirstResponder(nil)
     }
 
-    context.coordinator.updateHeight(for: scrollView)
+    context.coordinator.syncLayout(for: scrollView)
+  }
+
+  func sizeThatFits(_ proposal: ProposedViewSize,
+                    nsView scrollView: NSScrollView,
+                    context: Context) -> CGSize? {
+    guard let textView = context.coordinator.textView else { return nil }
+    let width = proposal.width ?? scrollView.bounds.width
+    guard width > 0 else { return nil }
+    let measured = context.coordinator.measuredHeight(for: textView, width: width)
+    return CGSize(width: width, height: min(measured, maxHeight))
   }
 
   func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
@@ -299,11 +406,38 @@ private struct PlatformMarkdownNotesTextView: NSViewRepresentable {
   final class Coordinator: NSObject, NSTextViewDelegate {
     var parent: PlatformMarkdownNotesTextView
     weak var textView: NSTextView?
+    weak var scrollView: NSScrollView?
     var lastFontSize: CGFloat = 0
+    private var lastLayoutWidth: CGFloat = 0
+    private var lastMeasuredHeight: CGFloat = 28
+    private var lastShowBottomFade = false
     private var applying = false
 
     init(parent: PlatformMarkdownNotesTextView) {
       self.parent = parent
+    }
+
+    deinit {
+      NotificationCenter.default.removeObserver(self)
+    }
+
+    func observeScroll(of scrollView: NSScrollView) {
+      self.scrollView = scrollView
+      NotificationCenter.default.addObserver(
+        self,
+        selector: #selector(clipViewBoundsDidChange(_:)),
+        name: NSView.boundsDidChangeNotification,
+        object: scrollView.contentView
+      )
+    }
+
+    @objc private func clipViewBoundsDidChange(_ notification: Notification) {
+      guard let scrollView else { return }
+      if abs(scrollView.bounds.width - lastLayoutWidth) > 0.5 {
+        syncLayout(for: scrollView)
+      } else {
+        reportScrollPosition(for: scrollView)
+      }
     }
 
     func textDidBeginEditing(_ notification: Notification) {
@@ -319,7 +453,8 @@ private struct PlatformMarkdownNotesTextView: NSViewRepresentable {
       parent.text = textView.string
       applyStyle(to: textView)
       if let scrollView = textView.enclosingScrollView {
-        updateHeight(for: scrollView)
+        scrollView.invalidateIntrinsicContentSize()
+        syncLayout(for: scrollView)
       }
     }
 
@@ -332,7 +467,8 @@ private struct PlatformMarkdownNotesTextView: NSViewRepresentable {
       lastFontSize = parent.fontSize
       applying = false
       if let scrollView = textView.enclosingScrollView {
-        updateHeight(for: scrollView)
+        scrollView.invalidateIntrinsicContentSize()
+        syncLayout(for: scrollView)
       }
     }
 
@@ -350,21 +486,46 @@ private struct PlatformMarkdownNotesTextView: NSViewRepresentable {
       applying = false
     }
 
-    func updateHeight(for scrollView: NSScrollView) {
-      guard let textView else { return }
-      let width = max(scrollView.bounds.width, 1)
-      textView.textContainer?.containerSize = CGSize(width: width,
+    func measuredHeight(for textView: NSTextView, width: CGFloat) -> CGFloat {
+      let safeWidth = max(width, 1)
+      textView.textContainer?.containerSize = CGSize(width: safeWidth,
                                                      height: .greatestFiniteMagnitude)
-      textView.frame.size.width = width
       if let manager = textView.layoutManager, let container = textView.textContainer {
         manager.ensureLayout(for: container)
         let used = manager.usedRect(for: container)
-        let next = max(28, ceil(used.height + textView.textContainerInset.height))
-        DispatchQueue.main.async {
-          if abs(self.parent.contentHeight - next) > 0.5 {
-            self.parent.contentHeight = next
-          }
-          textView.frame.size.height = next
+        return max(parent.minHeight, ceil(used.height + textView.textContainerInset.height))
+      }
+      return parent.minHeight
+    }
+
+    func syncLayout(for scrollView: NSScrollView) {
+      guard let textView, scrollView.bounds.width > 0 else { return }
+      let width = scrollView.bounds.width
+      lastLayoutWidth = width
+      let measured = measuredHeight(for: textView, width: width)
+      lastMeasuredHeight = measured
+      textView.frame.size = CGSize(width: width, height: measured)
+      let overflows = measured > parent.maxHeight + 0.5
+      scrollView.hasVerticalScroller = overflows
+      reportScrollPosition(for: scrollView, isOverflowing: overflows)
+    }
+
+    private func reportScrollPosition(for scrollView: NSScrollView, isOverflowing: Bool? = nil) {
+      let overflows = isOverflowing ?? scrollView.hasVerticalScroller
+      let atBottom: Bool
+      if !overflows {
+        atBottom = true
+      } else {
+        let visibleBottom = scrollView.contentView.bounds.maxY
+        let docHeight = max(scrollView.documentView?.frame.height ?? 0, lastMeasuredHeight)
+        atBottom = visibleBottom >= docHeight - 4
+      }
+      let nextFade = overflows && !atBottom
+      guard nextFade != lastShowBottomFade else { return }
+      lastShowBottomFade = nextFade
+      DispatchQueue.main.async {
+        if self.parent.showBottomFade != nextFade {
+          self.parent.showBottomFade = nextFade
         }
       }
     }

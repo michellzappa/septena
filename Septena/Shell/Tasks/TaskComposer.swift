@@ -660,8 +660,10 @@ struct TaskComposerCard: View {
       text: $draft.notes, focus: $focus,
       onDone: presentation == .inline ? { saveAndCloseFromKeyboard() } : nil,
       // The page shows notes as a visible text area: a taller box the whole
-      // of which takes a tap. The quick edit keeps the one-line field.
-      minHeight: pageDepth != .inline ? 120 : 28
+      // of which takes a tap. The quick edit keeps the one-line field and caps
+      // growth at ~5 lines so long notes don't take over the card.
+      minHeight: pageDepth != .inline ? 120 : 28,
+      maxHeight: pageDepth != .inline ? 360 : 120
     )
       .onKeyPress(keys: [.tab]) { press in
         moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
