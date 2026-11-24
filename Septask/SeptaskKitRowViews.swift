@@ -668,6 +668,32 @@ enum KitGlyph {
     return image
   }
 
+  /// Area emoji rendered into a square image so `NSButton` pills, inspector
+  /// rows, and `NSMenuItem`s can show an area's custom emoji in the same
+  /// leading icon slot as `areaDot` and `progress`.
+  static func emoji(_ text: String, size: CGFloat = 15) -> NSImage {
+    let key = "e:\(text):\(size)"
+    if let hit = cache[key] { return hit }
+    let image = draw(size: NSSize(width: size, height: size)) { rect in
+      let attr = NSAttributedString(string: text,
+                                    attributes: [.font: NSFont.systemFont(ofSize: size * 0.8)])
+      let glyphSize = attr.size()
+      attr.draw(at: NSPoint(x: rect.midX - glyphSize.width / 2,
+                            y: rect.midY - glyphSize.height / 2))
+    }
+    image.isTemplate = false
+    cache[key] = image
+    return image
+  }
+
+  /// Canonical area glyph: the area's custom emoji when set, else the muted dot.
+  static func area(emoji text: String?, diameter: CGFloat = 14) -> NSImage {
+    if let text, !text.isEmpty {
+      return emoji(text, size: diameter)
+    }
+    return areaDot(diameter: diameter)
+  }
+
   /// Draws lazily, at display time, in the drawing view's effective appearance
   /// — the AppKit-documented way to build a custom image from dynamic
   /// `NSColor`s. AppKit re-invokes the handler when the hosting view's

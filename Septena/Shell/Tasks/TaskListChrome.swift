@@ -1121,16 +1121,8 @@ struct QuickDropProjectTray: View {
 
   private func areaDropRow(_ area: Area) -> some View {
     HStack(spacing: 8) {
-      if let emoji = area.emoji, !emoji.isEmpty {
-        Text(emoji)
-          .scaledFont(size: 14)
-          .frame(width: 20, alignment: .center)
-      } else {
-        Image(systemName: "square.stack.3d.up")
-          .scaledFont(size: 13, weight: .medium)
-          .foregroundStyle(Theme.inkSecondary)
-          .frame(width: 20, alignment: .center)
-      }
+      AreaIcon(tint: Theme.inkSecondary, diameter: 16, emoji: area.emoji)
+        .frame(width: 20, alignment: .center)
       Text(area.title)
         .font(.septenaTaskTitle.weight(.semibold))
         .foregroundStyle(Theme.inkPrimary)

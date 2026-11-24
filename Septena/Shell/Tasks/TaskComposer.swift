@@ -741,10 +741,12 @@ struct TaskComposerCard: View {
     if !tokens.isEmpty || suggestion != nil {
       FlowLayout(spacing: 8) {
         ForEach(tokens) { token in
-          chip(icon: token.icon, leading: "plus", text: token.displayText) { apply(token) }
+          chip(icon: token.icon, customIcon: tokenCustomIcon(for: token),
+               leading: "plus", text: token.displayText) { apply(token) }
         }
         if let s = suggestion {
           chip(icon: s.kind == .project ? "number" : "folder",
+               customIcon: suggestionCustomIcon(for: s),
                leading: "lightbulb", text: s.title) { applySuggestedList() }
         }
       }
@@ -752,14 +754,44 @@ struct TaskComposerCard: View {
     }
   }
 
+  private func tokenCustomIcon(for token: DetectedToken) -> AnyView? {
+    switch token.kind {
+    case .area(let id, _):
+      let emoji = areas.first(where: { $0.id == id })?.emoji
+      return AnyView(AreaIcon(tint: accent, diameter: 14, emoji: emoji))
+    case .project(let id, _):
+      let progress = LocalCache.projectCompletionRatios(
+        in: LocalStore.shared.container.mainContext)[id] ?? 0
+      return AnyView(ProjectProgressIcon(progress: progress, tint: accent, diameter: 11, lineWidth: 1.8))
+    case .today, .date:
+      return nil
+    }
+  }
+
+  private func suggestionCustomIcon(for suggestion: SuggestionEngine.Suggestion) -> AnyView {
+    switch suggestion.kind {
+    case .area:
+      let emoji = areas.first(where: { $0.id == suggestion.id })?.emoji
+      return AnyView(AreaIcon(tint: accent, diameter: 14, emoji: emoji))
+    case .project:
+      let progress = LocalCache.projectCompletionRatios(
+        in: LocalStore.shared.container.mainContext)[suggestion.id] ?? 0
+      return AnyView(ProjectProgressIcon(progress: progress, tint: accent, diameter: 11, lineWidth: 1.8))
+    }
+  }
+
   /// A small glass action chip: a leading hint glyph (`plus` to add a parsed
   /// token, `lightbulb` for the smart suggestion), the field's icon, and a label.
-  private func chip(icon: String, leading: String, text: String,
+  private func chip(icon: String, customIcon: AnyView? = nil, leading: String, text: String,
                     _ action: @escaping () -> Void) -> some View {
     Button(action: action) {
       HStack(spacing: 5) {
         Image(systemName: leading).font(.system(size: 10, weight: .bold))
-        Image(systemName: icon).font(.system(size: 11, weight: .semibold))
+        if let customIcon {
+          customIcon
+        } else {
+          Image(systemName: icon).font(.system(size: 11, weight: .semibold))
+        }
         Text(text).font(.septenaLabel).lineLimit(1)
       }
       .foregroundStyle(accent)

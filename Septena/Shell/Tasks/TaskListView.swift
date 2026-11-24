@@ -3930,9 +3930,19 @@ struct TaskListView: View {
       Button {
         applySuggestion(task: task, suggestion: suggestion)
       } label: {
-        HStack(spacing: 3) {
-          Image(systemName: suggestion.kind == .project ? "number" : "folder")
-            .scaledFont(size: 10, weight: .semibold)
+        HStack(spacing: 4) {
+          switch suggestion.kind {
+          case .project:
+            ProjectProgressIcon(
+              progress: model.progressByProject[suggestion.id] ?? 0,
+              tint: Theme.inkSecondary,
+              diameter: 10,
+              lineWidth: 1.8
+            )
+          case .area:
+            let emoji = areas.first(where: { $0.id == suggestion.id })?.emoji
+            AreaIcon(tint: Theme.inkSecondary, diameter: 13, emoji: emoji)
+          }
           Text(suggestion.title)
             .scaledFont(size: 12, weight: .medium)
             .lineLimit(1)

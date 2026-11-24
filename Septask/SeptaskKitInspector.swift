@@ -686,7 +686,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       reminderButton.title = RegistryActions.alternateTitles["task.reminder"]?["addTitle"]
         ?? RegistrySurfaces.taskAttribute("reminder").label
     }
-    listButton.title = listDescription(for: next)
+    updateListButton(for: next)
 
     let repeatValue = next.recurrence.map { rule in
       let paused = next.recurrencePaused
@@ -762,19 +762,29 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     isEditingTitle || isEditingNotes || conversationView.isEditingReply
   }
 
-  private func listDescription(for task: SeptenaTask) -> String {
+  private func updateListButton(for task: SeptenaTask) {
     let snapshot = StructureCache.snapshot(in: context)
+    listButton.imagePosition = .imageLeading
     if let id = task.project,
        let project = snapshot.projects.first(where: { $0.id == id }) {
-      return String(localized: "In \(project.title)",
-                    comment: "SeptaskKit: inspector list affiliation")
+      let progress = LocalCache.projectCompletionRatios(in: context)[project.id] ?? 0
+      listButton.image = KitGlyph.progress(progress, tint: SeptaskKitTheme.inkSecondary, diameter: 12)
+      listButton.title = String(localized: "In \(project.title)",
+                                comment: "SeptaskKit: inspector list affiliation")
+      return
     }
     if let id = task.area,
        let area = snapshot.areas.first(where: { $0.id == id }) {
-      return String(localized: "In \(area.title)",
-                    comment: "SeptaskKit: inspector list affiliation")
+      listButton.image = KitGlyph.area(emoji: area.emoji, diameter: 14)
+      listButton.title = String(localized: "In \(area.title)",
+                                comment: "SeptaskKit: inspector list affiliation")
+      return
     }
-    return String(localized: "No list", comment: "SeptaskKit: inspector list affiliation")
+    listButton.image = KitGlyph.symbol(RegistrySurfaces.taskAttribute("list").sfSymbol,
+                                       color: SeptaskKitTheme.iconMuted,
+                                       cacheTag: "iconMuted",
+                                       size: 14)
+    listButton.title = String(localized: "No list", comment: "SeptaskKit: inspector list affiliation")
   }
 
   // MARK: - Commits

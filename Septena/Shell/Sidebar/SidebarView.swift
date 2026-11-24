@@ -1219,13 +1219,14 @@ struct SidebarRootView: View {
   private func projectAreaDestinations(_ project: Project) -> [RegistryMenuNode] {
     var nodes: [RegistryMenuNode] = [
       RegistryMenuEntry.slot(id: "area.none", title: String(localized: "No Area"),
-                             isOn: project.area == nil,
+                             sfSymbol: "tray", isOn: project.area == nil,
                              perform: project.area == nil ? nil : { moveProject(project, to: nil) }),
     ]
     if !areas.isEmpty { nodes.append(.divider(id: "areas.divider")) }
     for area in areas {
       nodes.append(RegistryMenuEntry.slot(
-        id: "area.\(area.id)", title: area.title, isOn: project.area == area.id,
+        id: "area.\(area.id)", title: area.title,
+        listIcon: .area(emoji: area.emoji), isOn: project.area == area.id,
         perform: project.area == area.id ? nil : { moveProject(project, to: area.id) }))
     }
     return nodes
@@ -1924,14 +1925,16 @@ struct NewProjectSheet: View {
           TextField(RegistryPrompts.textPrompt("newProject").placeholder, text: $title)
         }
         Section("Area") {
-          Picker("Area", selection: $selectedAreaId) {
-            Text("None").tag(nil as String?)
-            ForEach(areas) { area in
-              Text(area.title).tag(area.id as String?)
-            }
+          Button { selectedAreaId = nil } label: {
+            areaOptionRow(title: nil, emoji: nil, selected: selectedAreaId == nil)
           }
-          .pickerStyle(.inline)
-          .labelsHidden()
+          .buttonStyle(PlainHoverRowButtonStyle())
+          ForEach(areas) { area in
+            Button { selectedAreaId = area.id } label: {
+              areaOptionRow(title: area.title, emoji: area.emoji, selected: selectedAreaId == area.id)
+            }
+            .buttonStyle(PlainHoverRowButtonStyle())
+          }
         }
       }
       // Grouped style keeps the macOS sheet from collapsing to no height
@@ -1953,6 +1956,30 @@ struct NewProjectSheet: View {
         }
       }
     }
+  }
+
+  @ViewBuilder
+  private func areaOptionRow(title: String?, emoji: String?, selected: Bool) -> some View {
+    HStack(spacing: 12) {
+      if let title {
+        AreaIcon(diameter: 15, emoji: emoji)
+          .frame(width: 22)
+        Text(title).foregroundStyle(Theme.inkPrimary)
+      } else {
+        Image(systemName: "tray")
+          .scaledFont(size: 15)
+          .foregroundStyle(Theme.iconMuted)
+          .frame(width: 22)
+        Text("None").foregroundStyle(Theme.inkPrimary)
+      }
+      Spacer()
+      if selected {
+        Image(systemName: "checkmark")
+          .scaledFont(size: 13, weight: .semibold)
+          .foregroundStyle(Theme.inkSecondary)
+      }
+    }
+    .contentShape(Rectangle())
   }
 }
 
