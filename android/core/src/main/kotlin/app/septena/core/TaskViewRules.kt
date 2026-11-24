@@ -30,6 +30,7 @@ data class TaskSnapshot(
     val recurrenceUnit: String? = null,
     val deletedAt: String? = null,
     val fadedAt: String? = null,
+    val touchedAt: String? = null,
 ) {
     val isHeading: Boolean get() = kind == RegistryEntityEnums.TaskKind.HEADING
 
@@ -56,7 +57,8 @@ data class TaskSnapshot(
                 starred = f[RegistryEntityFields.Task.STARRED].booleanValue() ?: false,
                 recurrenceUnit = f[RegistryEntityFields.Task.RECURRENCE_UNIT].stringValue(),
                 deletedAt = record.deletedAt,
-                fadedAt = f["fadedAt"].stringValue(),
+                fadedAt = f[RegistryEntityFields.Task.FADED_AT].stringValue(),
+                touchedAt = f[RegistryEntityFields.Task.TOUCHED_AT].stringValue(),
             )
         }
     }
@@ -123,6 +125,16 @@ object TaskViewRules {
                 task.status == RegistryEntityEnums.TaskStatus.OPEN &&
                     !isHeading && !isDeleted && !TaskFadeRules.isFaded(task.fadedAt) &&
                     task.recurrenceUnit in recurrenceUnits
+
+            // Favorites: open starred tasks, as iOS.
+            RegistryDestinationIds.STARRED ->
+                task.status == RegistryEntityEnums.TaskStatus.OPEN &&
+                    !isHeading && !isDeleted && !TaskFadeRules.isFaded(task.fadedAt) && task.starred
+
+            // The Faded pile: open tasks the fade pass took out of their lists.
+            RegistryDestinationIds.FADED ->
+                task.status == RegistryEntityEnums.TaskStatus.OPEN &&
+                    !isHeading && !isDeleted && TaskFadeRules.isFaded(task.fadedAt)
 
             RegistryDestinationIds.LOGBOOK ->
                 !isHeading && !isDeleted &&
