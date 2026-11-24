@@ -23,7 +23,7 @@ const {
   matchesView,
   normalizeView,
 } = await import("../src/tools/taskShared.ts");
-const { taskViewMembership } = await import("../src/core/index.ts");
+const { applyDateAction, normalizeTaskDates, taskViewMembership } = await import("../src/core/index.ts");
 const {
   ACTIONS_CATALOG,
   CAPABILITIES,
@@ -182,6 +182,25 @@ describe("Conformance: task-views.json (core WASM in the Worker)", () => {
         assert.equal(matchesView(t, view as "today" | "inbox" | "upcoming" | "anytime", today, nowMs), want, `matchesView(${view})`);
       }
     });
+  }
+});
+
+describe("Conformance: task-dates.json (core WASM in the Worker, D4 #291)", () => {
+  const fixture = readJSON("conformance/task-dates.json");
+  const check = (name: string, expected: Record<string, unknown>, run: () => unknown) => {
+    it(name, () => {
+      if (typeof expected.error === "string") {
+        assert.throws(run);
+      } else {
+        assert.deepEqual(run(), expected);
+      }
+    });
+  };
+  for (const c of fixture.actions) {
+    check(`action: ${c.name}`, c.expected, () => applyDateAction(c.task, c.action, fixture.today, fixture.now));
+  }
+  for (const c of fixture.normalize) {
+    check(`normalize: ${c.name}`, c.expected, () => normalizeTaskDates(c.task, fixture.today));
   }
 });
 

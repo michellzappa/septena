@@ -278,17 +278,11 @@ tasksRest.post("/:id/:verb", async (c) => {
       if (body instanceof Response) return body;
       return run(c, ctx, "tasks_defer", { id: id.data, until: body.until });
     }
-    case "untoday": {
-      // The phone's "Remove from Today": drop the pin, and a scheduled date
-      // that already arrived (it would keep the row on Today). A due date
-      // stays; it is a commitment, not a placement.
-      const current = await ctx.store.readTask(id.data);
-      if (!current) return c.json({ error: "not_found" }, 404);
-      const scheduled = current.task.scheduled;
-      const args: Record<string, unknown> = { id: id.data, today: false };
-      if (typeof scheduled === "string" && scheduled <= today) args.scheduled = "";
-      return run(c, ctx, "tasks_update", args);
-    }
+    case "untoday":
+      // The phone's "Remove from Today" (spec §4 A3): the core drops the pin
+      // and any When date or deadline that has arrived, so the row cannot
+      // bounce straight back (decision Q2).
+      return run(c, ctx, "tasks_update", { id: id.data, today: false });
     case "cancel":
       return run(c, ctx, "tasks_update", { id: id.data, status: "cancelled" });
   }

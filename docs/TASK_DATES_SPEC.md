@@ -241,5 +241,17 @@ mz answered each question on 2026-11-23. Every answer was the proposed default.
 | D4 Backend | MCP tools, REST verbs and iCal call the core's actions and membership through WASM (or a TS port that passes the same fixtures, if C3 measures WASM as too heavy). Fixes W6–W8, R-a, R-h, and the T resolver of §6. | `backend/test/conformance.test.ts` runs `task-dates.json`. | D1, ADR 0025 C3 |
 | D5 Android | `TaskMutator.kt` calls the core's actions; `TaskViewRules` is deleted. Fixes W12, W13. | `RegistryConformanceTest` runs `task-dates.json`. | D1, ADR 0025 C1 |
 
+**D4 status (2026-11-24).** The backend's MCP `tasks_update`, `tasks_defer`
+and `tasks_move_to_today` and the REST verbs turn every date edit into §4
+actions that the core decides (`planDateEdits` in
+`backend/src/shadow/writes.ts`, core WASM). `tasks_create` normalises its
+fields (I1–I7). This fixes W6 (an unpin clears arrived dates), W7 (a future
+When unpins) and W8 (`todaySetOn` is stamped only on false → true). An agent
+date edit does not clear the agent cue; a human surface (REST, the watch)
+does. REST `untoday` is plain A3, so an arrived deadline goes too (Q2).
+`backend/test/conformance.test.ts` runs `task-dates.json` through the
+Worker's WASM. The recurrence spawn takes its date fields from
+`nextOccurrenceDates` (A10). Left: iCal reads use their own window rules.
+
 MCP tool changes in D4 land in both MCP servers and their skills in the same
 change (AGENTS.md, "Two MCP servers").
