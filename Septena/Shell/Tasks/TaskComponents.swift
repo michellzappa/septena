@@ -1141,6 +1141,9 @@ struct TaskDateBoard: View {
 
   @State private var calendarDate = Date()
   @State private var showingCalendar = false
+  /// On the task page the board is embedded in its card, so the month
+  /// calendar opens under the button instead of in a popover.
+  @Environment(\.taskPickerEmbedding) private var embedding
 
   private var cal: Calendar { Calendar.current }
   private var anchorDay: Date {
@@ -1164,6 +1167,12 @@ struct TaskDateBoard: View {
 
       calendarButton
         .padding(.vertical, 12)
+
+      if embedding != nil && showingCalendar {
+        calendar
+          .padding(.bottom, 8)
+          .transition(.opacity.combined(with: .move(edge: .top)))
+      }
 
       if let clearLabel {
         Hairline(leadingInset: 0)
@@ -1220,7 +1229,7 @@ struct TaskDateBoard: View {
     Button {
       Haptics.press()
       calendarDate = selected ?? anchorDay
-      showingCalendar = true
+      a11yAnimate(.snappy(duration: 0.22)) { showingCalendar.toggle() }
     } label: {
       HStack(spacing: 8) {
         Image(systemName: "calendar")
@@ -1240,7 +1249,18 @@ struct TaskDateBoard: View {
       .contentShape(Capsule())
     }
     .buttonStyle(.plain)
-    .popover(isPresented: $showingCalendar) {
+    .popover(isPresented: Binding(get: { embedding == nil && showingCalendar },
+                                  set: { showingCalendar = $0 })) {
+      calendar
+        .padding(8)
+        .frame(minWidth: 300, idealWidth: 320, minHeight: 360)
+        .presentationDetents([.medium])
+        .presentationCompactAdaptation(.sheet)
+    }
+  }
+
+  /// The month calendar: in the popover from a sheet, inline on the task page.
+  private var calendar: some View {
       VStack(spacing: 8) {
         DatePicker("", selection: $calendarDate, displayedComponents: [.date])
           .datePickerStyle(.graphical)
@@ -1261,11 +1281,6 @@ struct TaskDateBoard: View {
           .buttonStyle(.borderless)
           .tint(theme.accent)
       }
-      .padding(8)
-      .frame(minWidth: 300, idealWidth: 320, minHeight: 360)
-      .presentationDetents([.medium])
-      .presentationCompactAdaptation(.sheet)
-    }
   }
 
   private func commitCalendarDate() {
