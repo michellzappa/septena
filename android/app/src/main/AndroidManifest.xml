@@ -26,5 +26,15 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+        <!-- Opens a task attachment in another app with a read grant (TaskAttachmentsSection). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.attachments"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/attachment_paths" />
+        </provider>
     </application>
 </manifest>
