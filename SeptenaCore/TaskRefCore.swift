@@ -1,18 +1,9 @@
 import Foundation
+import SeptenaSharedCore
 
 // The one seam between the app and the core's reference functions
 // (docs/TASK_REFERENCES_SPEC.md §3, ADR 0031). The key grammar and the row id
 // live in the shared core and are never written again here.
-//
-// The functions ship in core-v0.5.0, which is not pinned yet. Until then
-// `isAvailable` is false, nothing in the app can add a reference, and pulled
-// references sync, export and undo as usual. After the pin, this file is the
-// only one to change:
-//
-//   isAvailable   true
-//   parse         try? SeptenaSharedCore.parseRef(input: input)
-//   mintID        SeptenaSharedCore.taskRefId(taskId: taskID, key: key,
-//                                             deletedCount: UInt32(clamping: deletedCount))
 
 enum TaskRefCore {
   /// The core's `ParsedRef`.
@@ -27,14 +18,19 @@ enum TaskRefCore {
     let url: String?
   }
 
-  static var isAvailable: Bool { false }
+  static var isAvailable: Bool { true }
 
   /// A key, a web URL or a `message://` link. Nil when it is none of them.
-  static func parse(_ input: String) -> Parsed? { nil }
+  static func parse(_ input: String) -> Parsed? {
+    guard let ref = try? parseRef(input: input) else { return nil }
+    return Parsed(key: ref.key, kind: ref.kind, id: ref.id, rawId: ref.rawId, url: ref.url)
+  }
 
   /// The row id. `deletedCount` is the number of deleted rows with the same
   /// task and key.
-  static func mintID(taskID: String, key: String, deletedCount: Int) -> String? { nil }
+  static func mintID(taskID: String, key: String, deletedCount: Int) -> String? {
+    taskRefId(taskId: taskID, key: key, deletedCount: UInt32(clamping: deletedCount))
+  }
 }
 
 /// What "Add Reference" did.
