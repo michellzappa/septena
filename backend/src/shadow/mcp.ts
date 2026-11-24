@@ -654,6 +654,7 @@ function taskOut(r: Row, tagMap?: Map<string, string>): TaskOut {
     acknowledgedAt: ms(r.acknowledgedAt),
     createdAt: ms(r.createdAt),
     kind: str(r.kind),
+    ...(str(r.fadedAt) ? { fadedAt: str(r.fadedAt) } : {}),
     recurrence: unit
       ? {
           unit,

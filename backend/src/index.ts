@@ -5,6 +5,12 @@ import * as oauth from "./shadow/oauth.js";
 import { previewMcpHandler } from "./shadow/mcp.js";
 import { ONBOARD_MARKDOWN } from "./shadow/prompts.js";
 import SKILL_MARKDOWN from "../skill.md";
+import coreWasm from "./core/wasm/septena_core_wasm_bg.wasm";
+import { initCore } from "./core/index.js";
+
+// The shared core (ADR 0025), compiled at bundle time, instantiated once per
+// isolate. The Durable Objects exported below share this isolate.
+initCore(coreWasm);
 
 export { TaskStore } from "./store/TaskStore.js";
 export { PairingStore } from "./shadow/PairingStore.js";

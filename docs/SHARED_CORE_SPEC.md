@@ -4,7 +4,14 @@
 PR #261; releases `core-v0.1.0`, `core-v0.2.0`). C4 in progress (#250): the
 Apple apps call the core for fade (#270) and the conversation projection,
 predicates and Agent stage (#275), and recurrence and timed reminders. The
-watch compiles no rule code (`TasksWatchWire.swift` only). C1–C3 open.
+watch compiles no rule code (`TasksWatchWire.swift` only). The date actions
+run on the core on Apple (D3 write half, #290). C3 in progress (#249): the
+Worker runs list membership, recurrence and the reminder rules through the
+core's WASM (`backend/src/core/`, installed by `scripts/core-pin.sh`).
+Measured 2026-11-24: bundle 571 → 1001 KiB (136 → 270 KiB gzip); CPU about
+6.5 µs per task per list request against about 0.3 µs in TypeScript, so a
+1,000-task list costs about 7 ms more. That fits Workers Paid. A batch call
+in the core would cut the JSON cost if lists grow. C1 and C2 open.
 
 **Rests on:** ADR 0025 (shared Rust core), ADR 0015 (shared registries),
 ADR 0013 (Windows on the Android code), ADR 0002 (own backend).

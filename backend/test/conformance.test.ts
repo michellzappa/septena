@@ -18,12 +18,12 @@ const {
   daysOnToday,
   inInbox,
   inTriageBand,
-  isInboxMember,
   isOnToday,
   isUnfiled,
   matchesView,
   normalizeView,
 } = await import("../src/tools/taskShared.ts");
+const { taskViewMembership } = await import("../src/core/index.ts");
 const {
   ACTIONS_CATALOG,
   CAPABILITIES,
@@ -154,22 +154,28 @@ describe("Conformance: reminders.json", () => {
   }
 });
 
-describe("Conformance: task-views.json", () => {
+describe("Conformance: task-views.json (core WASM in the Worker)", () => {
   const fixture = readJSON("conformance/task-views.json");
   const today: string = fixture.today;
   const nowMs = Date.parse(fixture.nowIso);
 
   for (const c of fixture.cases) {
     it(c.name, () => {
+      // The core itself, as the Worker loads it.
+      assert.deepEqual(taskViewMembership(c.task, today, fixture.nowIso), c.expected, "taskViewMembership");
+      // The Worker's row path. Readers drop deleted rows before it.
+      if (c.task.deletedAt) return;
       const t: TaskOut = {
         ...c.task,
         createdAt: c.task.createdAt ? Date.parse(c.task.createdAt) : undefined,
         acknowledgedAt: c.task.acknowledgedAt ? Date.parse(c.task.acknowledgedAt) : undefined,
+        ...(c.task.recurrenceUnit
+          ? { recurrence: { unit: c.task.recurrenceUnit, interval: 1, after_completion: c.task.recurrenceAfterCompletion !== false } }
+          : {}),
       };
       assert.equal(isUnfiled(t), c.expected.isUnfiled, "isUnfiled");
-      assert.equal(isInboxMember(t), c.expected.isInboxMember, "isInboxMember");
-      assert.equal(inTriageBand(t, nowMs), c.expected.inTriageBand, "inTriageBand");
-      assert.equal(isOnToday(t, today), c.expected.isOnToday, "isOnToday");
+      assert.equal(inTriageBand(t, today, nowMs), c.expected.inTriageBand, "inTriageBand");
+      assert.equal(isOnToday(t, today, nowMs), c.expected.isOnToday, "isOnToday");
       assert.equal(inInbox(t, today, nowMs), c.expected.inInbox, "inInbox");
       assert.equal(daysOnToday(t, today, nowMs), c.expected.daysOnToday, "daysOnToday");
       for (const [view, want] of Object.entries(c.expected.matchesView)) {

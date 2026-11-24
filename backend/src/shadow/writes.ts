@@ -4,6 +4,7 @@ import { randomId } from "../util.js";
 import { localServerTimestamp, todayYMD } from "../tz.js";
 import { checklistOccurrenceID, nextScheduledDate, occurrenceID } from "../recurrence.js";
 import { shiftReminderForRecurrence, shiftReminderOnReschedule } from "../reminders.js";
+import { taskViewMembership } from "../core/index.js";
 import { storeFor } from "../api/session.js";
 import { MAX_TAGS_PER_TASK, TAG_NAME_MAX, zId } from "../store/columns.js";
 import { zPushBody, type Op, type OpResult } from "../store/ops.js";
@@ -389,11 +390,13 @@ async function resolveTagNames(
   return { tagIds, tagNames, tagOps };
 }
 
-/// The app's `TaskEntity.isOnToday`: pinned, or scheduled / deadline arrived.
+/// Whether an open row with these date fields is on Today: the core's rule
+/// (pinned, or a When date or deadline that has arrived).
 function onToday(t: { today?: unknown; scheduled?: unknown; deadline?: unknown }, today: string): boolean {
-  const s = str(t.scheduled);
-  const d = str(t.deadline);
-  return t.today === true || (!!s && s <= today) || (!!d && d <= today);
+  return taskViewMembership(
+    { status: "open", today: t.today === true, scheduled: str(t.scheduled) ?? null, deadline: str(t.deadline) ?? null },
+    today, new Date().toISOString(),
+  ).isOnToday;
 }
 
 function recurrenceColumns(rule: RecurrenceRuleInput | null): Record<string, unknown> {

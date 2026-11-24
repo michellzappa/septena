@@ -17,8 +17,9 @@ release="$root/core/release"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+wasm_name="septena-core-wasm-web-$version.tgz"
 gh release download "$tag" --repo michellzappa/septena --dir "$tmp" \
-  --pattern release.json --pattern "SeptenaSharedCore-$version.swift"
+  --pattern release.json --pattern "SeptenaSharedCore-$version.swift" --pattern "$wasm_name"
 
 zip_name="SeptenaSharedCoreFFI-$version.xcframework.zip"
 url="$(jq -r --arg n "$zip_name" '.assets[] | select(.name == $n) | .url' "$tmp/release.json")"
@@ -56,4 +57,15 @@ let package = Package(
 )
 EOF
 
-echo "pinned $tag in core/release/ (XCFramework $sum)"
+# The Worker (backend/) runs the same release as WASM (C3, #249). The files
+# are committed, so a self-hosted deploy stays a plain `wrangler deploy`.
+wasm_sum="$(jq -r --arg n "$wasm_name" '.assets[] | select(.name == $n) | .sha256' "$tmp/release.json")"
+got_sum="$(shasum -a 256 "$tmp/$wasm_name" | cut -d' ' -f1)"
+[ "$wasm_sum" = "$got_sum" ] || { echo "core-pin: $wasm_name checksum mismatch" >&2; exit 1; }
+wasm_dir="$root/backend/src/core/wasm"
+rm -rf "$wasm_dir"
+mkdir -p "$wasm_dir"
+tar -xzf "$tmp/$wasm_name" -C "$wasm_dir"
+printf '%s\n' "$version" > "$wasm_dir/VERSION"
+
+echo "pinned $tag in core/release/ (XCFramework $sum) and backend/src/core/wasm/"
