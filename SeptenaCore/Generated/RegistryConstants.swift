@@ -1597,6 +1597,11 @@ enum RegistrySurfaces {
   static let provenanceSelfLabel: String = RegistryL10n.t("You")
   static let provenanceAgentFallbackName: String = "Claude"
   static let provenanceAgentSymbol: String = "text.bubble.badge.sparkles"
+  /// Agent prompt copy (`taskPage.conversation`, docs/AGENT_PROMPT_SPEC.md).
+  static let agentPromptAskKicker: String = RegistryL10n.t("Your agent asks")
+  static let agentPromptReviewKicker: String = RegistryL10n.t("Review requested")
+  static let agentPromptReviewFallback: String = RegistryL10n.t("Ready for review")
+  static let agentPromptAcceptedLabel: String = RegistryL10n.t("Accepted")
   /// The block of `kind`. Each kind appears exactly once (the generator checks it).
   static func taskPageBlock(_ kind: RegistryTaskPageBlockKind) -> RegistryTaskPageBlock {
     guard let b = taskPageBlocks.first(where: { $0.kind == kind }) else { preconditionFailure("no task page block \(kind)") }

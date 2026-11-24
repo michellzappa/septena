@@ -39,6 +39,7 @@ import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.generated.RegistryPromptIds
+import app.septena.core.generated.RegistryTaskPageBlockIds
 import app.septena.core.stringValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -117,11 +118,12 @@ internal fun TaskConversationSection(
     val sendBackTitle = RegistryCatalog.actionTitle(RegistryActionIds.TASK_SEND_BACK_REVIEW, languageTag = languageTag).orEmpty()
     fun localized(key: String) = RegistryCatalog.localizedString(key, languageTag) ?: key
     val cancelTitle = localized("Cancel")
-    // Kicker copy is not in the registry yet. It never names one agent: several can hand off.
-    val askKicker = localized("Your agent asks")
-    val reviewRequested = localized("Review requested")
+    // The kickers never name one agent: several can hand off.
+    val promptCopy = RegistryCatalog.surface(RegistryTaskPageBlockIds.TASK_PAGE_CONVERSATION)?.fields
+    val askKicker = registryText(promptCopy?.get("askKicker").stringValue(), languageTag)
+    val reviewRequested = registryText(promptCopy?.get("reviewKicker").stringValue(), languageTag)
     val reviewKicker = relativeAgo(conversation.endStateAt)?.let { "$reviewRequested · $it" } ?: reviewRequested
-    val readyForReview = localized("Ready for review")
+    val readyForReview = registryText(promptCopy?.get("reviewFallback").stringValue(), languageTag)
 
     fun appendTurn(fields: Map<String, JsonValue>, afterSuccess: () -> Unit = {}) {
         if (!canWrite || busy) return

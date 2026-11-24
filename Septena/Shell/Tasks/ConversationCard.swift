@@ -123,7 +123,7 @@ struct ConversationCard: View {
   @ViewBuilder private func questionBlock(_ q: ConvoTurn) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       AgentPromptCard(
-        kicker: String(localized: "Your agent asks", comment: "Agent prompt: kicker over an open question"),
+        kicker: RegistrySurfaces.agentPromptAskKicker,
         question: q.question ?? "",
         choices: (q.options ?? []).map { option in
           AgentPromptChoice(id: option, title: option) { choose(option, replyTo: q.seq, step: q.step) }
@@ -187,7 +187,7 @@ struct ConversationCard: View {
           .foregroundStyle(Color.green)
           .accessibilityHidden(true)
         VStack(alignment: .leading, spacing: 2) {
-          Text("Accepted").font(.septenaLabel)
+          Text(RegistrySurfaces.agentPromptAcceptedLabel).font(.septenaLabel)
           if let note = convo.endStateNote, !note.isEmpty {
             Text(note).font(.septenaMeta).foregroundStyle(.secondary)
               .fixedSize(horizontal: false, vertical: true)
@@ -201,7 +201,7 @@ struct ConversationCard: View {
     if let note = convo.endStateNote?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
       return note
     }
-    return String(localized: "Ready for review", comment: "Review stage: fallback check note")
+    return RegistrySurfaces.agentPromptReviewFallback
   }
 
   @ViewBuilder private var followUpBlock: some View {

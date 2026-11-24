@@ -151,7 +151,7 @@ final class AgentPromptRequests {
 extension TaskConvo {
   /// "Review requested · 2h ago" — the kicker of a Review prompt.
   func reviewKicker(now: Date) -> String {
-    let base = String(localized: "Review requested", comment: "Agent prompt: kicker over a review hand-off")
+    let base = RegistrySurfaces.agentPromptReviewKicker
     guard let at = endStateAt else { return base }
     return "\(base) · \(TaskHistory.relative(at, now: now))"
   }

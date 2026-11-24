@@ -220,8 +220,7 @@ final class KitConversationView: NSView {
       }
     }
     return promptBlock(
-      kicker: String(localized: "Your agent asks",
-                     comment: "SeptaskKit: agent prompt kicker for an open question"),
+      kicker: RegistrySurfaces.agentPromptAskKicker,
       question: question.question ?? "",
       choices: choices,
       freeText: .other)
@@ -351,8 +350,7 @@ final class KitConversationView: NSView {
       block.alignment = .leading
       block.spacing = 2
       block.addArrangedSubview(row(symbol: "checkmark.seal.fill", tint: .systemGreen,
-                                   text: String(localized: "Accepted",
-                                                comment: "SeptaskKit: conversation needs_verify accepted"),
+                                   text: RegistrySurfaces.agentPromptAcceptedLabel,
                                    font: SeptaskKitTheme.taskTitle,
                                    ink: SeptaskKitTheme.inkPrimary))
       if !note.isEmpty {
@@ -365,17 +363,9 @@ final class KitConversationView: NSView {
       return block
     }
 
-    let kicker: String
-    if let asked = convo.endStateAt,
-       case let ago = TaskHistory.relative(asked, now: DayClock.appNow), !ago.isEmpty {
-      kicker = String(localized: "Review requested · \(ago)",
-                      comment: "SeptaskKit: agent prompt kicker for a review, with how long ago")
-    } else {
-      kicker = String(localized: "Review requested",
-                      comment: "SeptaskKit: agent prompt kicker for a review")
-    }
+    let kicker = convo.reviewKicker(now: DayClock.appNow)
     let question = note.isEmpty
-      ? String(localized: "Ready for review", comment: "SeptaskKit: fallback review note")
+      ? RegistrySurfaces.agentPromptReviewFallback
       : note
     let accept = KitPromptChoiceButton(title: RegistryActions.title("task.acceptReview"),
                                        primary: true) { [weak self] in

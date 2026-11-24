@@ -549,6 +549,13 @@ function validateSurfaces(surfaces, icons, caps, plans) {
     if (["checklist", "attachments", "conversation", "history"].includes(b.kind)) {
       assert(typeof b.label === "string" || b.attribute !== undefined, `surfaces.json: taskPage block ${b.id} needs a label or an attribute`);
     }
+    // The agent prompt copy (docs/AGENT_PROMPT_SPEC.md): the kickers, the
+    // question when a hand-off has no note, and the line after Accept.
+    if (b.kind === "conversation") {
+      for (const k of ["askKicker", "reviewKicker", "reviewFallback", "acceptedLabel"]) {
+        assert(typeof b[k] === "string" && b[k].length > 0, `surfaces.json: taskPage block ${b.id} needs ${k}`);
+      }
+    }
     // Provenance (who added the task) is permanent metadata: the label, the
     // name a human author shows as, the name for an agent row that carries
     // no `sourceClient`, and the agent glyph the row and the page share.
@@ -1575,6 +1582,11 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`  static let provenanceSelfLabel: String = ${L(prov.selfLabel, prov, "selfLabel")}`);
   lines.push(`  static let provenanceAgentFallbackName: String = ${swiftStr(prov.agentFallbackName)}`);
   lines.push(`  static let provenanceAgentSymbol: String = ${swiftStr(icons.icons[prov.icon].sfSymbol)}`);
+  const convoBlock = surfaces.taskPage.blocks.find((b) => b.kind === "conversation");
+  lines.push("  /// Agent prompt copy (`taskPage.conversation`, docs/AGENT_PROMPT_SPEC.md).");
+  for (const k of ["askKicker", "reviewKicker", "reviewFallback", "acceptedLabel"]) {
+    lines.push(`  static let agentPrompt${k[0].toUpperCase()}${k.slice(1)}: String = ${L(convoBlock[k], convoBlock, k)}`);
+  }
   lines.push("  /// The block of `kind`. Each kind appears exactly once (the generator checks it).");
   lines.push("  static func taskPageBlock(_ kind: RegistryTaskPageBlockKind) -> RegistryTaskPageBlock {");
   lines.push("    guard let b = taskPageBlocks.first(where: { $0.kind == kind }) else { preconditionFailure(\"no task page block \\(kind)\") }");

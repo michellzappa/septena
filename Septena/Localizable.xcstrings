@@ -1513,6 +1513,10 @@
         }
       }
     },
+    "Accepted" : {
+      "comment" : "Generated from registry surfaces.taskPage.blocks.taskPage.conversation.acceptedLabel. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Account" : {
       "comment" : "Generated from registry settings.desktopTabs.account.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -10141,6 +10145,10 @@
       "comment" : "Generated from registry plans.outcomes.agents.rows.connector.cells.account. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Ready for review" : {
+      "comment" : "Generated from registry surfaces.taskPage.blocks.taskPage.conversation.reviewFallback. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "RECENT" : {
       "localizations" : {
         "pt-BR" : {
@@ -10591,6 +10599,10 @@
           }
         }
       }
+    },
+    "Review requested" : {
+      "comment" : "Generated from registry surfaces.taskPage.blocks.taskPage.conversation.reviewKicker. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Review your values" : {
       "localizations" : {
@@ -14510,6 +14522,10 @@
     },
     "Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are." : {
       "comment" : "Generated from registry plans.upsells.trial_end.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Your agent asks" : {
+      "comment" : "Generated from registry surfaces.taskPage.blocks.taskPage.conversation.askKicker. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Your agents do the work" : {

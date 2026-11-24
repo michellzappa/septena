@@ -157,7 +157,7 @@ final class KitReviewTaskCell: NSTableCellView {
        !note.isEmpty {
       return note
     }
-    return String(localized: "Ready for review", comment: "SeptaskKit: fallback review note")
+    return RegistrySurfaces.agentPromptReviewFallback
   }
 
   /// The meta line: the list, "asked {ago}" (only when the backend stamped

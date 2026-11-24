@@ -194,26 +194,6 @@
     },
     {
       "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "How AI helps with your tasks",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Other…",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Type your answer",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Send",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
       "literal": "Agent work stopped",
       "reasonId": "predates-rule"
     },
@@ -225,26 +205,6 @@
     {
       "file": "Septena/Shell/Tasks/ConversationCard.swift",
       "literal": "Stop",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Send back",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "What needs another pass?",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Reply to thread",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Reply…",
       "reasonId": "predates-rule"
     },
     {
@@ -365,21 +325,6 @@
     {
       "file": "Septena/Shell/Tasks/RemindersInboxSection.swift",
       "literal": "From Reminders",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ReviewTaskRow.swift",
-      "literal": "Send back",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ReviewTaskRow.swift",
-      "literal": "What needs another pass?",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ReviewTaskRow.swift",
-      "literal": "Send",
       "reasonId": "predates-rule"
     },
     {

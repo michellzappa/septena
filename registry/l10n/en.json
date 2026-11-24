@@ -155,6 +155,12 @@
       "actions.actions.task.acceptReview.title"
     ]
   },
+  "Accepted": {
+    "text": "Accepted",
+    "paths": [
+      "surfaces.taskPage.blocks.taskPage.conversation.acceptedLabel"
+    ]
+  },
   "Account": {
     "text": "Account",
     "paths": [
@@ -2308,6 +2314,12 @@
       "plans.outcomes.agents.rows.connector.cells.account"
     ]
   },
+  "Ready for review": {
+    "text": "Ready for review",
+    "paths": [
+      "surfaces.taskPage.blocks.taskPage.conversation.reviewFallback"
+    ]
+  },
   "Recently Deleted": {
     "text": "Recently Deleted",
     "paths": [
@@ -2467,6 +2479,12 @@
       "destinations.destinations.review.title",
       "destinations.destinations.agent.groups.review.title",
       "surfaces.notices.items.weeklySweep.primaryTitle"
+    ]
+  },
+  "Review requested": {
+    "text": "Review requested",
+    "paths": [
+      "surfaces.taskPage.blocks.taskPage.conversation.reviewKicker"
     ]
   },
   "Review…": {
@@ -3607,6 +3625,12 @@
     "text": "Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are.",
     "paths": [
       "plans.upsells.trial_end.detail"
+    ]
+  },
+  "Your agent asks": {
+    "text": "Your agent asks",
+    "paths": [
+      "surfaces.taskPage.blocks.taskPage.conversation.askKicker"
     ]
   },
   "Your agents do the work": {

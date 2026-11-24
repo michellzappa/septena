@@ -19,7 +19,7 @@ struct ReviewTaskRow: View {
        !note.isEmpty {
       return note
     }
-    return String(localized: "Ready for review", comment: "Review stage: fallback check note")
+    return RegistrySurfaces.agentPromptReviewFallback
   }
 
   private var metaLine: String {
