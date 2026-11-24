@@ -142,7 +142,10 @@ export const updateTaskJsonSchema = {
   properties: {
     id: { type: "string" },
     title: { type: "string" },
-    today: { type: "boolean" },
+    today: {
+      type: "boolean",
+      description: "true puts the task on Today (a When date goes). false takes it off Today: with `scheduled` it moves to that day and keeps its deadline; alone it also clears a When date or deadline that has already arrived, as the app's Remove from Today does.",
+    },
     starred: { type: "boolean", description: "Set or clear the Important / Star marker." },
     scheduled: { type: ["string", "null"], description: "YYYY-MM-DD, or null to clear" },
     start_time: { type: ["string", "null"], description: "Optional start time HH:MM (24-hour), or null to clear." },
