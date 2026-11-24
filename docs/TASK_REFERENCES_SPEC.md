@@ -81,8 +81,9 @@ Rules:
   case. The normalised key is for lookup. The resolver uses
   `snapshot.rawId` (§4).
 - The grammar lives once, in the core: `parse_ref(input)` (key, URL or
-  `message://` link → key + kind), `normalize_ref_key(key)`, and
-  `email_ref_keys(headers)` (§6.1). Vectors: `registry/conformance/refs.json`.
+  `message://` link → key + kind), `normalize_ref_key(key)`,
+  `find_issue_refs(text)` (§6.6), `email_ref_keys(headers)` (§6.1) and
+  `task_ref_id` (§4). Vectors: `registry/conformance/refs.json`.
 - Linked projects use the same functions for `extKey`.
 
 ## 4. Data model
@@ -111,9 +112,13 @@ platforms get their types from the registry generator.
   gets a new id, because a deleted row stays deleted in the store.
 - A purged task takes its references with it, as with checklist items. A task
   in Recently Deleted keeps them.
+- **A push that repeats an insert converges.** When the id exists with the
+  same task and key, the store reads the push as an update of role, snapshot
+  and position. Another id for the same task and key is refused as
+  `duplicate_ref`.
 - **Pull is opt-in.** Older clients decode pulled entities strictly, so the
   store sends `taskRef` rows only to a client that asks for them (as
-  `includeChecklists` does). The Worker deploys before the first app build
+  `includeChecklists` does; the query flag is `refs=1`). The Worker deploys before the first app build
   that pushes references.
 - References are on every plan. A snapshot is not an attachment.
 
@@ -253,6 +258,9 @@ them into references. Septena never contacts GitHub.
   into an artifact, a handoff, an end-state note or a turn, the store adds the
   `issue` reference, up to the limit. The core parses it. A user's own removal
   wins: the store does not add a key again that a user removed from the task.
+  It keeps that removal in `task_ref_removals` until the user adds the key
+  again or the task is purged. An agent's explicit `refs` write is not
+  affected.
 - **MCP `issue` (R0):** the field stays on task rows and reads the newest
   `issue` reference, where the newest is the last one added. The TypeScript
   text parser goes. Pull requests give `kind: "pr"` when `snapshot.url` says so.
@@ -314,7 +322,9 @@ thin clients (`backend/src/api/tasksRest.ts`) gets the same fields.
 
 ## 9. Export and import
 
-- JSON export gets the table `task_ref` (`DATA_EXPORT_SPEC.md` §3.1).
+- JSON export gets the table `task_ref` (`DATA_EXPORT_SPEC.md` §3.1). The
+  app's exporter reads the local store, so R0 sets the row shape and R1 writes
+  it.
 - Markdown export writes one indented line per reference: title, then the URL
   if there is one.
 - CSV export gets a `references` column with the keys, separated by a space.
@@ -336,8 +346,8 @@ thin clients (`backend/src/api/tasksRest.ts`) gets the same fields.
 
 | Phase | What | Depends on | Exit check |
 |---|---|---|---|
-| R0 (#386) | Core key grammar and vectors; registry entity, limits and enum; store, index, opt-in pull, permissions; MCP and REST fields, `tasks_find_by_ref`; issue links become references (§6.6); JSON export. | None | An agent creates a task with an `email` reference, and `tasks_find_by_ref` on the raw `message://` link returns it. |
-| R1 (#387) | Apple apps: sync, the References block on Mac, iPhone and iPad, resolvers, paste to add, undo, Markdown and CSV export; the row chip and the Swift parser go (§6.6). | R0 (#386) | A tap on an `email` reference opens the mail in Apple Mail on Mac and iPhone. |
+| R0 (#386) | Core key grammar and vectors; registry entity, limits and enum; store, index, opt-in pull, permissions; MCP and REST fields, `tasks_find_by_ref`; issue links become references (§6.6); the JSON export row shape. | None | An agent creates a task with an `email` reference, and `tasks_find_by_ref` on the raw `message://` link returns it. |
+| R1 (#387) | Apple apps: sync, the References block on Mac, iPhone and iPad, resolvers, paste to add, undo, JSON, Markdown and CSV export; the row chip and the Swift parser go (§6.6). | R0 (#386) | A tap on an `email` reference opens the mail in Apple Mail on Mac and iPhone. |
 | R2 (#388) | Forwarding address writes references; duplicate check in the store and in `tasks_create`; privacy line. | R0, #134 (EM0) | The same mail forwarded twice as an attachment creates one task. The `.eml` fixtures give the results of §6.1. |
 | R3 (#389) | `replyAt`, the Inbox-band rule in the core, the "New reply" mark, `tasks_ref_seen`. The Gmail feed writes references when it ships (#15). | R1, R2 | A reply on a referenced thread marks the active task and shows it in the Inbox band. Opening the task clears it. |
 | R4 (#390) | Back-links: the task page list and the iOS Share extension. Drag a mail onto a task on the Mac. Android and web blocks and resolvers. | R1; web waits for #21 | Sharing a URL that already has a task shows that task. |
