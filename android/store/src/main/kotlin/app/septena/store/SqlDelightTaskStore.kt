@@ -15,6 +15,9 @@ import app.septena.core.WireTimestamp
 import app.septena.core.stringValue
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.store.db.SeptenaDatabase
+import app.septena.sharedcore.CoreException
+import app.septena.sharedcore.PullRowPlan
+import app.septena.sharedcore.planPullRow
 import java.time.Instant
 
 /** SQLDelight-backed outbox, local rows and remote shadows. The injected driver keeps this module JVM reusable. */
@@ -193,92 +196,65 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
                 }
             }
 
+            // Each row's local write is the shared core's plan (planPullRow,
+            // sync-engine.json): merge around queued local edits, keep a task
+            // row on a remote delete, never let a server row undo a local
+            // delete. This loop only carries the plan out.
             for (change in page.changes) {
-                if (change.entity == "turn") {
-                    val taskId = change.row["taskId"].stringValue() ?: error("Pulled turn is missing taskId")
-                    val sequence = change.row["seq"].asLong() ?: error("Pulled turn is missing seq")
-                    queries.upsertTurn(taskId, sequence, encodeObject(change.row))
-                    continue
+                val rowJson = encodeObject(change.row)
+                val id = change.row["id"].stringValue()
+                val key = id?.let { change.entity to it }
+                val currentRow = id?.let { queries.selectRecord(change.entity, it).executeAsOneOrNull() }
+                // A malformed row is a store error (IllegalStateException), as
+                // before the core: the whole page rolls back.
+                val plan = try {
+                    planPullRow(
+                        entity = change.entity,
+                        rowJson = rowJson,
+                        currentFieldsJson = currentRow?.fieldsJson,
+                        pendingFields = key?.let { pendingFields[it]?.toList() }.orEmpty(),
+                        pendingDelete = key != null && key in pendingDeletes,
+                    )
+                } catch (e: CoreException.InvalidInput) {
+                    error(e.reason)
                 }
-
-                val id = change.row["id"].stringValue() ?: error("Pulled ${change.entity} row is missing id")
-                val key = change.entity to id
-                val currentRow = queries.selectRecord(change.entity, id).executeAsOneOrNull()
-                val current = currentRow?.let {
-                    SyncRecord(it.entity, it.id, parseObject(it.fieldsJson), it.revision, it.updatedAt, it.deletedAt)
-                }
-                val tombstone = change.row["deletedAt"].stringValue()
-                val serverFields = change.row.filterKeys { it !in ROW_METADATA_KEYS }
-                val pending = pendingFields[key].orEmpty()
-
-                if (change.entity == RegistryEntityNames.SETTING && tombstone != null) continue
-
-                if (tombstone != null) {
-                    rejectPendingForRemoteDelete(change.entity, id, at)
-                    if (change.entity == RegistryEntityNames.TASK && current != null) {
+                when (plan) {
+                    is PullRowPlan.Turn -> queries.upsertTurn(plan.taskId, plan.seq, canonical(plan.rowJson))
+                    PullRowPlan.Skip -> Unit
+                    is PullRowPlan.Tombstone -> {
+                        val rowId = requireNotNull(id)
+                        rejectPendingForRemoteDelete(change.entity, rowId, at)
+                        if (plan.keepLocalRow && currentRow != null) {
+                            queries.upsertRecord(
+                                entity = currentRow.entity,
+                                id = currentRow.id,
+                                fields_json = currentRow.fieldsJson,
+                                revision = plan.revision ?: currentRow.revision,
+                                updated_at = plan.updatedAt ?: currentRow.updatedAt,
+                                deleted_at = plan.deletedAt,
+                                remote_known = 1L,
+                            )
+                        } else {
+                            queries.deleteRecord(change.entity, rowId)
+                        }
+                        queries.upsertShadow(change.entity, rowId, canonical(plan.shadowJson), plan.revision, 1L, 1L)
+                    }
+                    is PullRowPlan.ShadowOnly ->
+                        queries.upsertShadow(change.entity, requireNotNull(id), canonical(plan.shadowJson), plan.revision, 0L, 1L)
+                    is PullRowPlan.Merge -> {
+                        val rowId = requireNotNull(id)
                         queries.upsertRecord(
-                            entity = current.entity,
-                            id = current.id,
-                            fields_json = encodeObject(current.fields),
-                            revision = change.row["rev"].asLong() ?: current.revision,
-                            updated_at = change.row["updatedAt"].stringValue() ?: current.updatedAt,
-                            deleted_at = tombstone,
+                            entity = change.entity,
+                            id = rowId,
+                            fields_json = canonical(plan.fieldsJson),
+                            revision = plan.revision ?: currentRow?.revision,
+                            updated_at = plan.updatedAt ?: currentRow?.updatedAt,
+                            deleted_at = null,
                             remote_known = 1L,
                         )
-                    } else {
-                        queries.deleteRecord(change.entity, id)
+                        queries.upsertShadow(change.entity, rowId, canonical(plan.shadowJson), plan.revision, 0L, 1L)
                     }
-                    queries.upsertShadow(
-                        entity = change.entity,
-                        id = id,
-                        fields_json = encodeObject(serverFields),
-                        revision = change.row["rev"].asLong(),
-                        gone = 1L,
-                        remote_known = 1L,
-                    )
-                    continue
                 }
-
-                // A server row does not cancel a local delete. Keep the local
-                // row as-is and record the remote snapshot for the undo path.
-                if (key in pendingDeletes) {
-                    queries.upsertShadow(
-                        entity = change.entity,
-                        id = id,
-                        fields_json = encodeObject(serverFields),
-                        revision = change.row["rev"].asLong(),
-                        gone = 0L,
-                        remote_known = 1L,
-                    )
-                    continue
-                }
-
-                val merged = current?.fields.orEmpty() + serverFields.filterKeys { it !in pending }
-                val updated = SyncRecord(
-                    entity = change.entity,
-                    id = id,
-                    fields = merged,
-                    revision = change.row["rev"].asLong() ?: current?.revision,
-                    updatedAt = change.row["updatedAt"].stringValue() ?: current?.updatedAt,
-                    deletedAt = null,
-                )
-                queries.upsertRecord(
-                    entity = updated.entity,
-                    id = updated.id,
-                    fields_json = encodeObject(updated.fields),
-                    revision = updated.revision,
-                    updated_at = updated.updatedAt,
-                    deleted_at = updated.deletedAt,
-                    remote_known = 1L,
-                )
-                queries.upsertShadow(
-                    entity = change.entity,
-                    id = id,
-                    fields_json = encodeObject(serverFields),
-                    revision = change.row["rev"].asLong(),
-                    gone = if (tombstone == null) 0L else 1L,
-                    remote_known = 1L,
-                )
             }
             queries.setSyncCursor(page.nextSince.toString())
         }
@@ -524,6 +500,9 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
     }
 
     private fun encodeObject(fields: Map<String, JsonValue>): String = JsonValue.ObjectValue(fields).canonicalJson()
+
+    /** The core's JSON in this store's canonical key order, so stored rows compare by text. */
+    private fun canonical(json: String): String = encodeObject(parseObject(json))
 
     private fun parseObject(json: String): Map<String, JsonValue> =
         (JsonValue.parse(json) as? JsonValue.ObjectValue)?.fields ?: error("Expected a JSON object")
