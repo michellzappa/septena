@@ -94,7 +94,8 @@ Textures render **exclusively as a faded top header wash** extending **all the w
   - SwiftUI `Canvas` / Metal `ShaderLibrary` (`colorEffect` / `layerEffect`) for GPU-native zero-CPU rendering at Retina resolution, static once rendered (no continuous frame loop, zero battery drain).
   - macOS AppKit shell (`SeptaskKit`): `CALayer` / `CAMetalLayer` or cached `CGImage` backing on the scroll view's document backdrop behind `KitCardCell` views, re-rendered only on resize, appearance change, or setting change.
 - **Web (`#21`):** Offscreen `<canvas>` (or CSS `paint()` / cached blob URL) rendered once per viewport/theme change using the exact same Mulberry32 + value-noise fBm parameters as the conformance fixture.
-- **Android / Windows (`#20`, `#136`):** Compose `DrawScope` / AGSL `RuntimeShader` (Android 13+, Canvas fallback below) using the shared registry parameters.
+- **Android (shipped, #371):** a Kotlin port of `HeaderWashEngine` (`android/app/.../ui/HeaderWashEngine.kt`) draws into a Compose `DrawScope` on a background thread. A still wash is a cached bitmap; Slow drift renders 15 frames a second into rotating bitmaps and pauses while the app is in the background, animations are off, or Battery Saver is on. The seed, the PRNG and the noise volume match the Swift code bit for bit (`HeaderWashNoiseTest`). The generator is not in the shared core yet (spec: #196).
+- **Windows (`#136`):** Compose `DrawScope` / Canvas using the shared registry parameters.
 - **Accessibility & battery invariants:**
   - `Reduce Motion`: forces `textureMotion` to `still` (zero animation); seed/style transitions skip cross-fading.
   - `Low Power Mode` & window inactivity: automatically pauses `slowDrift` (`TimelineView(.animation(minimumInterval: 1/20, paused: ...))` on Apple, `document.hidden` / window blur on Web & Desktop) so idle or battery-constrained sessions cost zero GPU frames.

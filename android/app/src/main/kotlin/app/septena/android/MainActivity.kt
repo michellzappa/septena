@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            SeptenaAndroidTheme {
+            SeptenaAndroidTheme(graph.appearance) {
                 Surface(modifier = Modifier.safeDrawingPadding()) {
                     val signedIn by graph.credentials.signedIn.collectAsStateWithLifecycle()
                     if (signedIn) TaskHomeScreen(graph) else SignInScreen(graph)

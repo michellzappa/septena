@@ -1,6 +1,7 @@
 package app.septena.android.ui
 
 import android.content.Intent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
@@ -42,6 +44,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -551,98 +554,108 @@ private fun TaskHomeScaffold(
     onToggleAgentsPaused: () -> Unit,
     onSelectHomeLocation: (TaskHomeLocation) -> Unit,
 ) {
-    Scaffold(
-        floatingActionButton = if (state.canQuickAdd && state.location is TaskHomeLocation.SmartList) {
-            {
-                FloatingActionButton(
-                    onClick = onOpenInlineDraft,
-                    modifier = Modifier.semantics { contentDescription = quickAddTitle },
-                ) {
-                    Text(
-                        text = "+",
-                        style = MaterialTheme.typography.headlineSmall,
-                        textAlign = TextAlign.Center,
-                    )
+    // The header texture sits behind the transparent app bar and the first
+    // rows, on the page background (iPhone `HeaderWashView`).
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        HeaderWashBackdrop()
+        Scaffold(
+            containerColor = Color.Transparent,
+            floatingActionButton = if (state.canQuickAdd && state.location is TaskHomeLocation.SmartList) {
+                {
+                    FloatingActionButton(
+                        onClick = onOpenInlineDraft,
+                        modifier = Modifier.semantics { contentDescription = quickAddTitle },
+                    ) {
+                        Text(
+                            text = "+",
+                            style = MaterialTheme.typography.headlineSmall,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
-            }
-        } else {
-            {}
-        },
-        topBar = {
-            TopAppBar(
-                title = { Text(title) },
-                navigationIcon = if (showNavigationAction) {
-                    {
-                        TextButton(onClick = onOpenNavigation) {
-                            Text(sidebarActionTitle)
+            } else {
+                {}
+            },
+            topBar = {
+                TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent,
+                    ),
+                    title = { Text(title) },
+                    navigationIcon = if (showNavigationAction) {
+                        {
+                            TextButton(onClick = onOpenNavigation) {
+                                Text(sidebarActionTitle)
+                            }
                         }
-                    }
-                } else {
-                    {}
-                },
-                actions = {
-                    TextButton(onClick = onToggleAgentsPaused) {
-                        Text(pauseAgentsTitle)
-                    }
-                    TextButton(onClick = onQuickFind) {
-                        Text(quickFindTitle)
-                    }
-                },
-            )
-        },
-    ) { contentPadding ->
-        when (val location = state.location) {
-            is TaskHomeLocation.Area -> AreasProjectsScreen(
-                graph = graph,
-                destination = AreasProjectsDestination.Area(location.id),
-                modifier = Modifier.padding(contentPadding),
-                rowMenuGroups = rowMenuGroups,
-                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                onTaskAction = onTaskAction,
-                onOpenProject = { projectId ->
-                    val project = state.projects.firstOrNull {
-                        (it.location as? TaskHomeLocation.Project)?.id == projectId
-                    }?.location ?: TaskHomeLocation.Project(projectId, "")
-                    onSelectHomeLocation(project)
-                },
-                onOpenTask = onOpenTask,
-            )
-            is TaskHomeLocation.Project -> AreasProjectsScreen(
-                graph = graph,
-                destination = AreasProjectsDestination.Project(location.id),
-                modifier = Modifier.padding(contentPadding),
-                onOpenTask = onOpenTask,
-                rowMenuGroups = rowMenuGroups,
-                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                onTaskAction = onTaskAction,
-            )
-            is TaskHomeLocation.SmartList -> TaskHomeContent(
-                quickAddTitle = quickAddTitle,
-                quickAddSubmitTitle = quickAddSubmitTitle,
-                completeTitle = completeTitle,
-                emptyTitle = emptyTitle,
-                emptyDescription = emptyDescription,
-                inboxBandTitle = inboxTitle,
-                todayTitle = todayTitle,
-                todayTint = MaterialTheme.colorScheme.secondary,
-                hasLoaded = state.hasLoaded,
-                isToday = location.destinationId == RegistryDestinationIds.TODAY,
-                inboxTasks = state.inboxTasks,
-                tasks = state.tasks,
-                canQuickAdd = state.canQuickAdd,
-                isDraftOpen = inlineDraftOpen,
-                canComplete = state.canComplete,
-                draftTitle = state.draftTitle,
-                errorMessage = state.errorMessage,
-                rowMenuGroups = rowMenuGroups,
-                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                modifier = Modifier.padding(contentPadding),
-                onDraftTitleChange = onDraftTitleChange,
-                onQuickAdd = onQuickAdd,
-                onComplete = onComplete,
-                onOpenTask = onOpenTask,
-                onTaskAction = onTaskAction,
-            )
+                    } else {
+                        {}
+                    },
+                    actions = {
+                        TextButton(onClick = onToggleAgentsPaused) {
+                            Text(pauseAgentsTitle)
+                        }
+                        TextButton(onClick = onQuickFind) {
+                            Text(quickFindTitle)
+                        }
+                    },
+                )
+            },
+        ) { contentPadding ->
+            when (val location = state.location) {
+                is TaskHomeLocation.Area -> AreasProjectsScreen(
+                    graph = graph,
+                    destination = AreasProjectsDestination.Area(location.id),
+                    modifier = Modifier.padding(contentPadding),
+                    rowMenuGroups = rowMenuGroups,
+                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    onTaskAction = onTaskAction,
+                    onOpenProject = { projectId ->
+                        val project = state.projects.firstOrNull {
+                            (it.location as? TaskHomeLocation.Project)?.id == projectId
+                        }?.location ?: TaskHomeLocation.Project(projectId, "")
+                        onSelectHomeLocation(project)
+                    },
+                    onOpenTask = onOpenTask,
+                )
+                is TaskHomeLocation.Project -> AreasProjectsScreen(
+                    graph = graph,
+                    destination = AreasProjectsDestination.Project(location.id),
+                    modifier = Modifier.padding(contentPadding),
+                    onOpenTask = onOpenTask,
+                    rowMenuGroups = rowMenuGroups,
+                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    onTaskAction = onTaskAction,
+                )
+                is TaskHomeLocation.SmartList -> TaskHomeContent(
+                    quickAddTitle = quickAddTitle,
+                    quickAddSubmitTitle = quickAddSubmitTitle,
+                    completeTitle = completeTitle,
+                    emptyTitle = emptyTitle,
+                    emptyDescription = emptyDescription,
+                    inboxBandTitle = inboxTitle,
+                    todayTitle = todayTitle,
+                    todayTint = MaterialTheme.colorScheme.secondary,
+                    hasLoaded = state.hasLoaded,
+                    isToday = location.destinationId == RegistryDestinationIds.TODAY,
+                    inboxTasks = state.inboxTasks,
+                    tasks = state.tasks,
+                    canQuickAdd = state.canQuickAdd,
+                    isDraftOpen = inlineDraftOpen,
+                    canComplete = state.canComplete,
+                    draftTitle = state.draftTitle,
+                    errorMessage = state.errorMessage,
+                    rowMenuGroups = rowMenuGroups,
+                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    modifier = Modifier.padding(contentPadding),
+                    onDraftTitleChange = onDraftTitleChange,
+                    onQuickAdd = onQuickAdd,
+                    onComplete = onComplete,
+                    onOpenTask = onOpenTask,
+                    onTaskAction = onTaskAction,
+                )
+            }
         }
     }
 }

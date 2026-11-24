@@ -100,7 +100,7 @@
       "default": "colorful",
       "ui": false,
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
-      "featureId": "settings.display"
+      "featureId": "appearance.accents"
     },
     "canvasTexture": {
       "scope": "synced",
@@ -110,7 +110,7 @@
       "default": "none",
       "ui": false,
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
-      "featureId": "settings.display"
+      "featureId": "appearance.textures"
     },
     "textureIntensity": {
       "scope": "synced",
@@ -121,7 +121,7 @@
       "default": 55,
       "ui": false,
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
-      "featureId": "settings.display"
+      "featureId": "appearance.textures"
     },
     "textureMotion": {
       "scope": "synced",
@@ -131,7 +131,7 @@
       "default": "still",
       "ui": false,
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
-      "featureId": "settings.display"
+      "featureId": "appearance.textures"
     },
     "smartListOrder": {
       "scope": "synced",
@@ -170,9 +170,14 @@
       "type": "enum",
       "enum": "appearanceMode",
       "default": "system",
+      "options": [
+        { "value": "system", "title": "System" },
+        { "value": "light", "title": "Light" },
+        { "value": "dark", "title": "Dark" }
+      ],
       "ui": false,
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
-      "featureId": "settings.display"
+      "featureId": "appearance.mode"
     },
     "syncTheme": {
       "scope": "device",
@@ -181,7 +186,7 @@
       "default": true,
       "ui": false,
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
-      "featureId": "settings.display"
+      "featureId": "appearance.mode"
     },
     "appIconFinish": {
       "scope": "device",
@@ -281,7 +286,7 @@
       "max": 2,
       "default": 0,
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
-      "featureId": "settings.display"
+      "featureId": "appearance.text-size"
     },
     "sidebarCounts": {
       "scope": "device",
@@ -703,7 +708,23 @@
               "surface": "accent_color",
               "label": "Accent",
               "icon": "settings.appearance",
-              "featureId": "settings.display"
+              "featureId": "appearance.accents",
+              "parts": [
+                { "id": "mode", "label": "Appearance", "featureId": "appearance.mode" },
+                { "id": "texture", "label": "Header Texture", "featureId": "appearance.textures" },
+                {
+                  "id": "motion",
+                  "label": "Slow drift",
+                  "detail": "Refreshes daily · pauses under Reduce Motion and Low Power.",
+                  "platformDetails": [
+                    {
+                      "platforms": ["android"],
+                      "detail": "Refreshes daily · pauses when animations are off or Battery Saver is on."
+                    }
+                  ],
+                  "featureId": "appearance.textures"
+                }
+              ]
             },
             {
               "kind": "setting",

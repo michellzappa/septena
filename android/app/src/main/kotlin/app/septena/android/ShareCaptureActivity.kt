@@ -7,13 +7,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
+import app.septena.android.ui.SeptenaAndroidTheme
 import app.septena.android.ui.ShareCaptureScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -32,7 +32,7 @@ class ShareCaptureActivity : ComponentActivity() {
         enableEdgeToEdge()
         val draft = captureDraft(intent)
         setContent {
-            MaterialTheme {
+            SeptenaAndroidTheme(graph.appearance) {
                 Surface(modifier = androidx.compose.ui.Modifier.safeDrawingPadding()) {
                     var saving by remember { mutableStateOf(false) }
                     var saveFailed by remember { mutableStateOf(false) }

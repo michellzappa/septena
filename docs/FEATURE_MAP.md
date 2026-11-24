@@ -8,10 +8,10 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 48 | 49 | 49 | 0 | 29 | 0 | 1 |
+| ships | 52 | 53 | 53 | 0 | 33 | 0 | 1 |
 | partial | 1 | 1 | 1 | 0 | 3 | 0 | 3 |
-| planned | 0 | 0 | 0 | 46 | 16 | 49 | 1 |
-| - | 4 | 3 | 3 | 7 | 5 | 4 | 48 |
+| planned | 0 | 0 | 0 | 50 | 16 | 53 | 1 |
+| - | 4 | 3 | 3 | 7 | 5 | 4 | 52 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|---|
@@ -68,3 +68,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `data.import-export` | Export as JSON, Markdown or CSV; import JSON with a preview | ships | ships | ships | planned | planned | planned | - |
 | `agents.list` | Connected agents: list, name, disconnect | ships | ships | ships | planned | ships | planned | - |
 | `settings.display` | Display, badge and privacy preferences | ships | ships | ships | planned | ships | planned | - |
+| `appearance.accents` | Accent colors (Colorful and the fruit accents) | ships | ships | ships | planned | ships | planned | - |
+| `appearance.textures` | Header textures with intensity and slow drift | ships | ships | ships | planned | ships | planned | - |
+| `appearance.mode` | Light, dark or system appearance | ships | ships | ships | planned | ships | planned | - |
+| `appearance.text-size` | Text size | ships | ships | ships | planned | ships | planned | - |
