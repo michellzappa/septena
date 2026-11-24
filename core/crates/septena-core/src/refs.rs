@@ -149,7 +149,10 @@ pub fn email_ref_keys(input: EmailRefInput) -> EmailRefKeys {
             let references = header_ids(input.message.references.as_deref());
             let replied = header_ids(input.message.in_reply_to.as_deref());
             return EmailRefKeys {
-                email: references.last().or(replied.first()).and_then(|id| message_ref(EMAIL, id)),
+                email: references
+                    .last()
+                    .or(replied.first())
+                    .and_then(|id| message_ref(EMAIL, id)),
                 thread: references.first().and_then(|id| message_ref(THREAD, id)),
             };
         }
@@ -465,7 +468,10 @@ fn file_key_ref(id: &str) -> Result<ParsedRef, CoreError> {
         ("icloud", path) => {
             let path: String = path.trim_matches('/').nfc().collect();
             // A path that leaves the user's iCloud Drive is not a reference.
-            if path.split('/').any(|part| part.is_empty() || part == "." || part == "..") {
+            if path
+                .split('/')
+                .any(|part| part.is_empty() || part == "." || part == "..")
+            {
                 return Err(bad());
             }
             build(FILE, format!("icloud/{path}"), id, None)
@@ -568,7 +574,11 @@ fn split_port(authority: &str) -> Option<(String, Option<u16>)> {
     if !valid_host(host) || !port.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    let port = if port.is_empty() { None } else { Some(port.parse().ok()?) };
+    let port = if port.is_empty() {
+        None
+    } else {
+        Some(port.parse().ok()?)
+    };
     Some((host.to_lowercase(), port))
 }
 

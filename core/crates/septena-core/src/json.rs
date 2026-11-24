@@ -8,12 +8,13 @@ use serde_json::{Value, json};
 use crate::error::CoreError;
 use crate::task_dates::patch_json;
 use crate::{
-    ConversationProjection, DateAction, EmailRefInput, FadeInput, OrdinalWeekday, PullPageHeader, PushOutcome, RecurrenceRule,
-    ReminderArmInput, TaskConversation, TaskSnapshot, TaskViewMembership, apply_date_action, check_pull_page,
-    checklist_occurrence_id, conversation_state, derive_conversation, email_ref_keys, fade_fill, find_issue_refs, next_occurrence_dates,
-    next_scheduled_date, normalize_ref_key, normalize_task_dates, occurrence_id, parse_ref, plan_pull_row, plan_push_response, row_opacity,
-    server_rejection_reason, shift_reminder_for_recurrence, shift_reminder_on_reschedule, should_arm_reminder,
-    should_fade, task_ref_id, task_view_membership,
+    ConversationProjection, DateAction, EmailRefInput, FadeInput, OrdinalWeekday, PullPageHeader, PushOutcome,
+    RecurrenceRule, ReminderArmInput, TaskConversation, TaskSnapshot, TaskViewMembership, apply_date_action,
+    check_pull_page, checklist_occurrence_id, conversation_state, derive_conversation, email_ref_keys, fade_fill,
+    find_issue_refs, next_occurrence_dates, next_scheduled_date, normalize_ref_key, normalize_task_dates,
+    occurrence_id, parse_ref, plan_pull_row, plan_push_response, row_opacity, server_rejection_reason,
+    shift_reminder_for_recurrence, shift_reminder_on_reschedule, should_arm_reminder, should_fade, task_ref_id,
+    task_view_membership,
 };
 
 /// The functions `invoke_json` accepts.
@@ -182,9 +183,7 @@ pub(crate) fn invoke_value(function: &str, input: Value) -> Result<Value, CoreEr
             let args: FindIssueRefsArgs = decode(input).map_err(|e| parse(&e))?;
             to_json(find_issue_refs(args.text))
         }
-        "emailRefKeys" => to_json(email_ref_keys(
-            decode::<EmailRefInput>(input).map_err(|e| parse(&e))?,
-        )),
+        "emailRefKeys" => to_json(email_ref_keys(decode::<EmailRefInput>(input).map_err(|e| parse(&e))?)),
         "taskRefId" => {
             let args: TaskRefIdArgs = decode(input).map_err(|e| parse(&e))?;
             Ok(json!(task_ref_id(args.task_id, args.key, args.deleted_count)))
