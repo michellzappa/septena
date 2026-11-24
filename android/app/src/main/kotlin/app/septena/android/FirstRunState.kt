@@ -30,7 +30,14 @@ class FirstRunState(
     enum class Phase { Unresolved, Show, Hidden }
 
     private val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    private val _phase = MutableStateFlow(Phase.Unresolved)
+    // Returning devices already know the first run is done: skip the blank spinner on Frame 1.
+    private val _phase = MutableStateFlow(
+        if (preferences.getBoolean(KEY_COMPLETED, false) && !preferences.getBoolean(KEY_FORCE, false)) {
+            Phase.Hidden
+        } else {
+            Phase.Unresolved
+        },
+    )
     val phase: StateFlow<Phase> = _phase.asStateFlow()
 
     /**
@@ -39,10 +46,10 @@ class FirstRunState(
      * a returning account is the bug this guards against.
      */
     suspend fun resolve(graph: AndroidAppGraph) {
-        if (_phase.value != Phase.Unresolved) return
         // A deleted account's rows must not count as this account's content. A wipe that fails again stays
         // pending and blocks the next sign-in.
         runCatching { graph.finishPendingWipe() }
+        if (_phase.value != Phase.Unresolved) return
         if (needsFirstRun() && graph.credentials.signedIn.value) runCatching { graph.sync.syncAndWait() }
         grandfatherIfEstablished(graph)
         _phase.value = if (needsFirstRun()) Phase.Show else Phase.Hidden

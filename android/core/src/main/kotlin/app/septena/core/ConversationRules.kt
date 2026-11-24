@@ -14,6 +14,18 @@ data class ConversationTurn(
     val confidence: Double? = null,
 )
 
+/** Single-call snapshot of the core's conversation predicates for one timestamp. */
+data class ConversationSnapshotState(
+    val isTerminal: Boolean,
+    val needsHumanReview: Boolean,
+    val awaitsHuman: Boolean,
+    val isClaimed: Boolean,
+    val agentStage: String?,
+) {
+    /** Matches core `deriveConversation(...).badge == "working"`. */
+    val isAgentWorking: Boolean get() = agentStage == "working"
+}
+
 data class TaskConversation(
     val confirmedIntent: String? = null,
     val thread: List<ConversationTurn> = emptyList(),
@@ -33,6 +45,18 @@ data class TaskConversation(
 ) {
     /** The core's predicates (`convo.rs`). A live claim needs a clock; these do not. */
     private fun state(now: Instant = Instant.now()) = conversationState(toCore(), now.toString())
+
+    /** Evaluates all core conversation predicates in one FFI call. */
+    fun evaluate(now: Instant = Instant.now()): ConversationSnapshotState {
+        val s = state(now)
+        return ConversationSnapshotState(
+            isTerminal = s.isTerminal,
+            needsHumanReview = s.needsHumanReview,
+            awaitsHuman = s.awaitsHuman,
+            isClaimed = s.isClaimed,
+            agentStage = s.agentStage,
+        )
+    }
 
     val isTerminal: Boolean get() = state().isTerminal
     val needsHumanReview: Boolean get() = state().needsHumanReview

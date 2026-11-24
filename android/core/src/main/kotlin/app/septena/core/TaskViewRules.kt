@@ -86,6 +86,24 @@ object TaskViewRules {
     const val DUE_OVERDUE = "overdue"
     const val DUE_TODAY = "dueToday"
 
+    /** Core membership for non-open, heading, or deleted rows without crossing JNA. */
+    val INACTIVE_MEMBERSHIP = TaskViewMembership(
+        isUnfiled = false,
+        isInboxMember = false,
+        inTriageBand = false,
+        isOnToday = false,
+        inTodayInbox = false,
+        daysOnToday = 0,
+        matchesView = mapOf(
+            RegistryDestinationIds.TODAY to false,
+            RegistryDestinationIds.INBOX to false,
+            RegistryDestinationIds.UPCOMING to false,
+            RegistryDestinationIds.ANYTIME to false,
+        ),
+        dueState = null,
+        deadlineRed = false,
+    )
+
     private val recurrenceUnits = setOf(
         RegistryEntityEnums.RecurrenceUnit.DAY,
         RegistryEntityEnums.RecurrenceUnit.WEEK,
@@ -124,7 +142,21 @@ object TaskViewRules {
         today: LocalDate,
         now: Instant,
     ): Boolean {
-        val activeMembership = membership(task, today, now).matchesView[destinationId]
+        val membership = if (task.status == RegistryEntityEnums.TaskStatus.OPEN && !task.isHeading && task.deletedAt == null) {
+            membership(task, today, now)
+        } else {
+            INACTIVE_MEMBERSHIP
+        }
+        return matchesView(task, membership, destinationId)
+    }
+
+    /** Reuses a precomputed core [TaskViewMembership] so list loops never cross FFI twice per task. */
+    fun matchesView(
+        task: TaskSnapshot,
+        membership: TaskViewMembership,
+        destinationId: String,
+    ): Boolean {
+        val activeMembership = membership.matchesView[destinationId]
         if (activeMembership != null) return activeMembership
 
         val isHeading = task.isHeading

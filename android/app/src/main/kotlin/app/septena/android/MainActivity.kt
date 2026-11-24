@@ -27,6 +27,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        graph.prewarm()
         setContent {
             SeptenaAndroidTheme(graph.appearance) {
                 Surface(modifier = Modifier.fillMaxSize()) {
