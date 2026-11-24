@@ -88,7 +88,7 @@ export const TASK_TOOLS: Tool[] = [
     name: "tasks_list",
     title: "List tasks",
     description:
-      "New here? Call tasks_orientation first. List Septena tasks for a given view (today, inbox, review, upcoming, anytime, completed). 'today' is the whole Today page the user sees: the Inbox section first, then the filed tasks on Today. 'inbox' is that Inbox section alone: unfiled tasks (no area or project) plus your proposals the user has not accepted. 'review' lists open tasks waiting for the user to check and accept (`needs_verify`). The user sees ONE Inbox; never describe it as two piles. Each row carries `inbox: true` when it sits in the Inbox, and `daysOnToday: N` when it has carried over on Today undone for N days (the app darkens its checkbox; flag rows at 7+ as stuck). Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
+      "New here? Call tasks_orientation first. List Septena tasks for a given view (today, inbox, review, upcoming, anytime, completed). 'today' is the whole Today page the user sees: the Inbox section first, then the filed tasks on Today. 'inbox' is that Inbox section alone: unfiled tasks (no area or project) plus your proposals the user has not accepted. 'review' lists open tasks waiting for the user to check and accept (`needs_verify`). The user sees ONE Inbox; never describe it as two piles. Each row carries `inbox: true` when it sits in the Inbox, and `daysOnToday: N` when it has carried over on Today undone for N days (the app darkens its checkbox; flag rows at 7+ as stuck). A row carries `issue` ({url, repo, number, kind}) when its conversation links a GitHub issue or PR (the chip the app shows), and `endState` when the conversation has ended (for example `decomposed`: already tracked elsewhere). Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
     inputSchema: listTasksJsonSchema,
     annotations: { title: "List tasks", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
@@ -102,7 +102,7 @@ export const TASK_TOOLS: Tool[] = [
   {
     name: "tasks_search",
     title: "Search tasks",
-    description: "Find tasks by words in their title or notes, best match first, with near matches so near-duplicates surface. Call it before tasks_create to check that the task does not exist yet. Filter by area, project and status (open by default; completed or all). Rows have the tasks_list shape plus `matched` (title or notes). Returns {tasks, total, truncated}.",
+    description: "Find tasks by words in their title or notes, best match first, with near matches so near-duplicates surface. Call it before tasks_create to check that the task does not exist yet. Filter by area, project and status (open by default; completed or all). Rows have the tasks_list shape (including `issue` and `endState`) plus `matched` (title or notes). Returns {tasks, total, truncated}.",
     inputSchema: searchTasksJsonSchema,
     annotations: { title: "Search tasks", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
@@ -110,7 +110,7 @@ export const TASK_TOOLS: Tool[] = [
     name: "tasks_get",
     title: "Get task",
     description:
-      "Inspect a single task by id: title, status, area, project, scheduled, deadline, today, completedAt, source, and a compact conversation summary. One call answers 'where is this task and what's its state?' regardless of view or status. Pass include_notes for the project and area notes: the context to read before deciding anything about the task.",
+      "Inspect a single task by id: title, status, area, project, scheduled, deadline, today, completedAt, source, `issue` (the linked GitHub issue or PR, when there is one), and a compact conversation summary. One call answers 'where is this task and what's its state?' regardless of view or status. Pass include_notes for the project and area notes: the context to read before deciding anything about the task.",
     inputSchema: getTaskJsonSchema,
     annotations: { title: "Get task", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },

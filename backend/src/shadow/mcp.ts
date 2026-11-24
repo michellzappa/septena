@@ -30,10 +30,13 @@ import {
   type PlanState,
 } from "../entitlement/entitlement.js";
 import {
+  type ConvoLinkSource,
   type ConvoTurn,
   type TaskConvo,
   type TaskOut,
   annotate,
+  parseIssueLink,
+  withConvoLink,
   notesRev,
   searchMatch,
   awaitsReasoning,
@@ -322,7 +325,8 @@ async function callTool(
       const r = await store.readTask(a.id as string);
       if (!r || r.task.kind === "heading") throw new Error(`Task not found: ${a.id}`);
       const tagMap = tagNameMap(await store.readTags());
-      const t = annotate(taskOut(r.task, tagMap), todayYMD(timeZone), Date.now());
+      const t = annotate(withConvoLink(taskOut(r.task, tagMap), convoLinkSource(convoOut(r.convo, r.turns))),
+        todayYMD(timeZone), Date.now());
       const checklistRows = await store.readChecklistItems(t.id);
       const checklist = checklistRows.map((c) => ({
         id: c.id as string,
@@ -492,15 +496,18 @@ export async function listTasks(
   const requiredTags = (rawTag === undefined ? [] : Array.isArray(rawTag) ? rawTag : [rawTag])
     .map((t) => t.trim().toLowerCase())
     .filter((t) => t.length > 0);
-  const [counts, tagRows] = await Promise.all([
+  const [counts, tagRows, links] = await Promise.all([
     store.readChecklistCounts(),
     store.readTags(),
+    convoLinkMap(store),
   ]);
   const tagMap = tagNameMap(tagRows);
+  // Checklist counts, then the conversation's `issue` and `endState`.
   const withChecklist = (t: TaskOut): TaskOut => {
     const c = counts[t.id];
-    if (!c || c.total <= 0) return t;
-    return { ...t, checklistCount: c.total, checklistDoneCount: c.done };
+    const out = withConvoLink(t, links.get(t.id));
+    if (!c || c.total <= 0) return out;
+    return { ...out, checklistCount: c.total, checklistDoneCount: c.done };
   };
   if (view === "completed") {
     const { rows, total } = await store.readTasks("done", requiredTags.length > 0 ? 500 : limit);
@@ -581,7 +588,8 @@ interface SearchArgs { query: string; area?: string; project?: string; status?: 
 export async function searchTasks(store: StoreRpc, timeZone: string, a: SearchArgs) {
   const status = a.status ?? "open";
   const limit = a.limit ?? 20;
-  const tagMap = tagNameMap(await store.readTags());
+  const [tagRows, links] = await Promise.all([store.readTags(), convoLinkMap(store)]);
+  const tagMap = tagNameMap(tagRows);
   const rows: Row[] = [];
   if (status !== "completed") rows.push(...(await store.readTasks("open", 500)).rows);
   if (status !== "open") rows.push(...(await store.readTasks("done", 500)).rows);
@@ -590,7 +598,7 @@ export async function searchTasks(store: StoreRpc, timeZone: string, a: SearchAr
   const today = todayYMD(timeZone);
   const nowMs = Date.now();
   const hits = rows
-    .map((row) => taskOut(row, tagMap))
+    .map((row) => withConvoLink(taskOut(row, tagMap), links.get(row.id as string)))
     .filter((t) => same(t.area, a.area) && same(t.project, a.project))
     .map((t, i) => ({ t, i, m: searchMatch(t, a.query) }))
     .filter((x): x is { t: TaskOut; i: number; m: NonNullable<ReturnType<typeof searchMatch>> } => x.m !== null)
@@ -651,6 +659,25 @@ function taskOut(r: Row, tagMap?: Map<string, string>): TaskOut {
     reminderAt: str(r.reminderAt),
     reminderMode: (str(r.reminderMode) as "floating" | "fixed" | undefined),
     reminderSnoozedUntil: str(r.reminderSnoozedUntil),
+  };
+}
+
+/// Task id → the conversation text `withConvoLink` reads, for list rows.
+async function convoLinkMap(store: StoreRpc): Promise<Map<string, ConvoLinkSource>> {
+  return new Map((await store.readConvoLinks()).map((r) => [r.id, r]));
+}
+
+/// The same source from a whole conversation (`tasks_get`): the newest
+/// provider turn that names a link stands in for `readConvoLinks`' turnText.
+function convoLinkSource(c: TaskConvo): ConvoLinkSource {
+  const turn = [...c.thread].reverse().find((t) =>
+    t.role === "provider" && (parseIssueLink(t.note) !== undefined || parseIssueLink(t.question) !== undefined));
+  return {
+    endState: c.endState,
+    endStateNote: c.endStateNote,
+    artifact: c.artifact,
+    handoffPayload: c.handoff?.payload,
+    turnText: turn ? `${turn.note ?? ""} ${turn.question ?? ""}` : null,
   };
 }
 

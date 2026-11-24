@@ -17,6 +17,7 @@ function makeRpcStore(store: Awaited<ReturnType<typeof createTestTaskStore>>["st
     readChecklistItems: async (taskId: string) => store.readChecklistItems(taskId),
     readChecklistItem: async (id: string) => store.readChecklistItem(id),
     readChecklistCounts: async () => store.readChecklistCounts(),
+    readConvoLinks: async () => store.readConvoLinks(),
     readTags: async () => store.readTags(),
     readTagByName: async (name: string) => store.readTagByName(name),
     readOrderTop: async () => store.readOrderTop(),

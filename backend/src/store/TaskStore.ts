@@ -177,6 +177,16 @@ function decodeTurnRow(raw: Record<string, unknown>): Record<string, unknown> {
 }
 
 /// An open task with a conversation, as the agent queue reads it.
+/// `readConvoLinks`: the conversation text that can name a GitHub issue.
+export type ConvoLinkRow = {
+  id: string;
+  endState: string | null;
+  endStateNote: string | null;
+  artifact: { title?: string; body?: string; refs?: string[] } | null;
+  handoffPayload: string | null;
+  turnText: string | null;
+};
+
 export type ConvoCandidate = {
   id: string; title: string | null; confirmedIntent: string | null;
   assignee: string | null; endState: string | null;
@@ -1005,6 +1015,33 @@ export class TaskStore extends DurableObject<Env> {
         AND (c.id IS NOT NULL OR EXISTS (SELECT 1 FROM turns WHERE taskId = t.id))
       ORDER BY t.rev
     `).toArray();
+  }
+
+  /// Per task, the conversation fields that can carry a GitHub link, plus the
+  /// end state: what `issueLink` (tools/taskShared.ts) reads to put `issue`
+  /// and `endState` on a list row. `turnText` is the newest provider turn
+  /// whose note or question names a github.com URL (note first).
+  readConvoLinks(): ConvoLinkRow[] {
+    return this.sql.exec(`
+      SELECT c.id AS id, c.endState AS endState, c.endStateNote AS endStateNote,
+             c.artifact AS artifact, c.handoff AS handoff,
+             (SELECT COALESCE(note, '') || ' ' || COALESCE(question, '') FROM turns
+                WHERE taskId = c.id AND role = 'provider'
+                  AND (note LIKE '%github.com/%' OR question LIKE '%github.com/%')
+                ORDER BY seq DESC LIMIT 1) AS turnText
+      FROM convos c
+      WHERE c.deletedAt IS NULL
+        AND (c.artifact IS NOT NULL OR c.handoff IS NOT NULL OR c.endState IS NOT NULL
+             OR EXISTS (SELECT 1 FROM turns WHERE taskId = c.id AND role = 'provider'
+                          AND (note LIKE '%github.com/%' OR question LIKE '%github.com/%')))
+    `).toArray().map((r) => ({
+      id: r.id as string,
+      endState: (r.endState as string | null) ?? null,
+      endStateNote: (r.endStateNote as string | null) ?? null,
+      artifact: r.artifact ? (JSON.parse(r.artifact as string) as ConvoLinkRow["artifact"]) : null,
+      handoffPayload: r.handoff ? ((JSON.parse(r.handoff as string) as { payload?: string }).payload ?? null) : null,
+      turnText: (r.turnText as string | null) ?? null,
+    }));
   }
 
   /// The lowest order key across live tasks, or null when there is none:

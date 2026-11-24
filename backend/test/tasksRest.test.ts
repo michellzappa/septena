@@ -15,6 +15,7 @@ async function harness() {
     readAreas: async (limit: number) => store.readAreas(limit),
     readProjects: async (status: "active" | "done" | "cancelled" | "all", limit: number) => store.readProjects(status, limit),
     readChecklistCounts: async () => store.readChecklistCounts(),
+    readConvoLinks: async () => store.readConvoLinks(),
     readTags: async () => store.readTags(),
     readSetting: async (key: string) => store.readSetting(key),
     readOrderTop: async () => store.readOrderTop(),
