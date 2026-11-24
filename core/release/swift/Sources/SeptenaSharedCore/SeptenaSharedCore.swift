@@ -3412,6 +3412,20 @@ public func checkPullPage(cursor: Int64, page: PullPageHeader, resetsSoFar: UInt
 })
 }
 /**
+ * The stable id of a checklist item copied onto a new occurrence: FNV-1a 64
+ * over `"<new task id>|chk|<index>|<source item id>"`. A phone and an agent
+ * completing the same task copy the same items to the same ids.
+ */
+public func checklistOccurrenceId(newTaskId: String, index: UInt32, sourceItemId: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_septena_core_fn_func_checklist_occurrence_id(
+        FfiConverterString.lower(newTaskId),
+        FfiConverterUInt32.lower(index),
+        FfiConverterString.lower(sourceItemId),$0
+    )
+})
+}
+/**
  * The predicates and the Agent-list stage of a conversation
  * (`docs/TASK_FACTORY_SPEC.md` §3). Review and Done win over a stale
  * assignee; a stop counts as Your turn, because only the human can resume it
@@ -3664,6 +3678,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_septena_core_checksum_func_check_pull_page() != 24761) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_septena_core_checksum_func_checklist_occurrence_id() != 31152) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_septena_core_checksum_func_conversation_state() != 24271) {

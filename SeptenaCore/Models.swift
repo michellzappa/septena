@@ -643,18 +643,6 @@ struct ChecklistItem: Identifiable, Codable, Hashable, Sendable {
     self.position = position
     self.createdAt = createdAt
   }
-
-  /// Deterministic ID for a checklist item copied onto a spawned recurring
-  /// occurrence: FNV-1a 64 over `"<newTaskID>|chk|<index>|<sourceItemID>"`
-  /// (`chk-` + 16 hex), LOCKSTEP with `backend/src/recurrence.ts` `checklistOccurrenceID`.
-  static func occurrenceItemID(newTaskID: String, index: Int, sourceItemID: String) -> String {
-    var hash: UInt64 = 14695981039346656037
-    for byte in "\(newTaskID)|chk|\(index)|\(sourceItemID)".utf8 {
-      hash ^= UInt64(byte)
-      hash &*= 1099511628211
-    }
-    return "chk-\(String(format: "%016llx", hash))"
-  }
 }
 
 // MARK: - Recurrence

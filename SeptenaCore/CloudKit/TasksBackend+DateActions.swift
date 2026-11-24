@@ -48,6 +48,17 @@ extension CloudKitTasksBackend {
   }
 }
 
+extension ChecklistItem {
+
+  /// Deterministic ID for a checklist item copied onto a spawned recurring
+  /// occurrence, so phone and agent completions converge. The shared core's
+  /// rule (`checklist_occurrence_id`, the same code the backend runs).
+  static func occurrenceItemID(newTaskID: String, index: Int, sourceItemID: String) -> String {
+    SeptenaSharedCore.checklistOccurrenceId(newTaskId: newTaskID, index: UInt32(clamping: index),
+                                            sourceItemId: sourceItemID)
+  }
+}
+
 extension TaskDateAction {
 
   /// The core's form of the action. Days go as `YYYY-MM-DD` in the app's
