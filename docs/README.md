@@ -75,6 +75,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 |---|---|
 | [SEPTASK.md](SEPTASK.md) | current (P0–P4 landed) |
 | [LINKED_PROJECTS_SPEC.md](LINKED_PROJECTS_SPEC.md) | accepted |
+| [TASK_REFERENCES_SPEC.md](TASK_REFERENCES_SPEC.md) | accepted (ADR 0031, #296) |
 | [PROJECT_SHARING_SPEC.md](PROJECT_SHARING_SPEC.md) | accepted |
 | [TASK_FACTORY_SPEC.md](TASK_FACTORY_SPEC.md) | accepted |
 | [TASK_FADE_SPEC.md](TASK_FADE_SPEC.md) | accepted (§6 amended by ADR 0014) |

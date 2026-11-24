@@ -23,6 +23,7 @@ Give every signed-in user a personal, revocable forwarding email address (e.g. `
 - **Placement:** Lands in the **Inbox band** (`status: "open"`, `area: null`, `project: null`, `today: false`, `source: "email"`, unacknowledged so it appears cleanly in Inbox for filing — never silently cluttering Today).
 - **Title:** Email `Subject` with leading `Fwd:` / `Re:` stripped and truncated to `textMax` (2,000 chars); fallback `"(No subject)"`.
 - **Notes:** Plain-text body (or HTML stripped conservatively to clean text), trimmed of excessive quoted-reply footers when obvious, clipped to `notesMax` (100,000 chars), prefixed with a quiet 1-line header (`From: <sender>`).
+- **References:** keep the Message-ID and the thread root as `email` and `thread` references. Which headers count for a forward, a redirect and an attached message, and the duplicate check: `docs/TASK_REFERENCES_SPEC.md` §6.1 and §6.2. Built in its phase R2.
 - **Attachments (honoring ADR 0010 paid sync gate):**
   - If user's plan table allows synced attachments (`attachmentsSyncEnabled` + under quota) and attachment ≤ 25 MB, store in R2 and insert `attachment` row linked to the task.
   - Otherwise (Free plan or over quota), skip attachment bytes cleanly and append one short line to task notes (`"1 attachment skipped (Plus syncs attachments)."`).

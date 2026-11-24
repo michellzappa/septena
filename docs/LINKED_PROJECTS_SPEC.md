@@ -83,6 +83,10 @@ format:
 - GitHub issue: `issue:<owner>/<repo>#<number>`
 - Starlings task: `task:<workspace host>/<id>`
 
+The normal form of every key, and the functions that parse it, are in
+`docs/TASK_REFERENCES_SPEC.md` §3 (ADR 0031). A task that is **about** a remote
+item has a reference, not an `extKey`.
+
 **The same issue can come through two links.** A Starlings project maps a
 GitHub repository, and its Work board shows that repo's issues. If mz links
 the repo and also the Starlings project, the issue arrives twice. Rule:
@@ -231,7 +235,8 @@ provider cannot do.
   Linear, GitLab.
 - **Capture feed** (inbound only): the adapter creates a task once per remote
   item, in the Inbox or a chosen project, and never syncs it again. No
-  ownership, no write-back, no conflicts. The item's URL goes in `extUrl`.
+  ownership, no write-back, no conflicts. The item's URL goes in `extUrl`, and
+  its key in a `from` reference (`docs/TASK_REFERENCES_SPEC.md` §6.1).
   Examples: starred Gmail, Granola action items, Slack "saved for later".
 
 ### Provider order
@@ -287,8 +292,8 @@ link pauses until another member reconnects it.
 - Existing task tools work unchanged on linked rows.
 - `tasks_get` returns `extKey`, `extUrl` and `extMeta`.
 - No new tools in v1. Link management stays in the app.
-- Land any tool shape change in both MCP servers together (`CLAUDE.md`, "Two
-  MCP servers").
+- There is one MCP server, `backend/src/shadow/mcp.ts` (`AGENTS.md`, "One MCP
+  server").
 
 ## 10. Phases
 
