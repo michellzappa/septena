@@ -98,8 +98,8 @@ Kotlin or TypeScript: call the core, or move the rule into it. Apps link a
 **released** core (tag `core-vX.Y.Z`, then `scripts/core-pin.sh X.Y.Z`), never
 a local build: `core/release/README.md`. Plan: `docs/SHARED_CORE_SPEC.md`.
 
-**Do NOT test — the user tests.** The compile above is the ONLY verification an
-agent runs. Never launch the app, boot a simulator, run UI tests, screenshot, or
+**Do NOT drive the app — the user tests it.** An agent runs the compile, CI on
+its PR, and cheap checks (typecheck, unit tests, lint, codegen). Never launch the app, boot a simulator, run UI tests, screenshot, or
 otherwise "verify it works" — when the change is built, report it and **ask the
 user to test**. And **NEVER download anything to unblock a build or test**
 (SDKs, simulator runtimes, platform components, packages, tools — e.g.
@@ -171,8 +171,13 @@ restored, **commit logically-complete, build-verified units yourself** — see
 "Don't leave work uncommitted across sessions" below, which is now your job, not
 the cron's. The same gap means `Config/Base.xcconfig` holds a stale build number
 (the cron stamped it); `scripts/stamp-version.sh` fixes it at archive time, so
-leave it alone. (You still must never `git push`, create branches, or rewrite
-history unless explicitly asked.)
+leave it alone. (Never rewrite shared history.)
+
+**A request goes to closure** (global `~/.claude/CLAUDE.md`, "A new request:
+take it to closure", 2026-11-24): a `wt/<name>` branch in a worktree off fresh
+`origin/main`, push, PR, green CI, merge, deploy the backend when it changed
+(`cd backend && pnpm run deploy`), report. That short-lived PR branch is
+sanctioned; the rules below forbid long-lived forks.
 
 **Default to committing on `main`. Do NOT create branches unless the user
 explicitly asks for one.** The user never asks for branches — every stray
