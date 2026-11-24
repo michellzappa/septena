@@ -61,6 +61,7 @@ fun QuickFindScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = pageTopAppBarColors(),
                 title = { Text(copy.title) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

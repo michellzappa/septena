@@ -397,7 +397,8 @@ private fun TaskHomeNavigation(
             val title = RegistryCatalog.destinationTitle(location.destinationId, languageTag).orEmpty()
             NavigationDrawerItem(
                 icon = {
-                    RegistryIcon(RegistryCatalog.destinationIcon(location.destinationId), contentDescription = null)
+                    val icon = RegistryCatalog.destinationIcon(location.destinationId)
+                    RegistryIcon(icon, contentDescription = null, tint = glyphTint(icon))
                 },
                 label = { Text(title) },
                 selected = state.location == item.location,
@@ -668,7 +669,12 @@ private fun TaskHomeScaffold(
             },
             floatingActionButton = if (!selecting && state.canQuickAdd && state.location is TaskHomeLocation.SmartList) {
                 {
-                    FloatingActionButton(onClick = { quickAddOpen = true }) {
+                    val orb = LocalAddButtonColors.current
+                    FloatingActionButton(
+                        onClick = { quickAddOpen = true },
+                        containerColor = orb.fill,
+                        contentColor = orb.ink,
+                    ) {
                         RegistryIcon(
                             RegistryCatalog.actionIcon(RegistryActionIds.APP_QUICK_ADD),
                             contentDescription = quickAddTitle,

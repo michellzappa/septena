@@ -60,8 +60,8 @@ struct TaskCardSliceShape: Shape {
 /// and the Next feed. Keeping it here makes their alignment a single contract.
 enum TaskCardMetrics {
   static let margin = Theme.pageGutter
-  static let contentInset: CGFloat = 10
-  static let radius: CGFloat = 14
+  static let contentInset = CGFloat(RegistryTokens.TaskCard.contentInset)
+  static let radius = CGFloat(RegistryTokens.TaskCard.radius)
   static let headerLeading = margin + contentInset
   static let groupGap = Theme.Spacing.sm
 }
@@ -172,7 +172,9 @@ private struct TaskCardChrome: ViewModifier {
             // backdrop blurs (`shape.fill(.thinMaterial)` on 15+ scrolling rows
             // stalls ProMotion 120 Hz). Keeps the exact luminous floating-glass
             // feel over the crisp Header Wash contours at zero blur cost.
-            shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.78 : 0.80))
+            shape.fill(Theme.cardSurface.opacity(colorScheme == .dark
+              ? RegistryTokens.TaskCard.texturedFillAlphaDark
+              : RegistryTokens.TaskCard.texturedFillAlphaLight))
             shape.strokeBorder(
               Color.white.opacity(colorScheme == .dark ? 0.07 : 0.48),
               lineWidth: 0.5

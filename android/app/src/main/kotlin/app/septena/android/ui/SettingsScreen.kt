@@ -1,5 +1,6 @@
 package app.septena.android.ui
 
+import app.septena.ui.taskCardSlice
 import app.septena.ui.RegistryIcon
 import app.septena.core.generated.RegistryIconIds
 import androidx.compose.material3.IconButton
@@ -17,7 +18,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -198,6 +198,7 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
+                colors = pageTopAppBarColors(),
                 title = { Text(currentTitle) },
                 navigationIcon = {
                     IconButton(onClick = ::closeOrPop, enabled = !signingOut) {
@@ -235,39 +236,7 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
                                     modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 2.dp),
                                 )
                             }
-                            visibleItems.forEach { item ->
-                                SettingsRegistryRow(
-                                    item = item,
-                                    languageTag = languageTag,
-                                    pages = pages,
-                                    definitions = settingDefinitions,
-                                    values = values,
-                                    saveTitle = saveTitle,
-                                    signedIn = signedIn,
-                                    signingOut = signingOut,
-                                    accessModel = accessModel,
-                                    surfaceEnv = surfaceEnv,
-                                    onPage = { target -> if (target in pages) pageStack.add(target) },
-                                    onValueChange = ::saveSetting,
-                                    onSignOut = ::signOut,
-                                )
-                            }
-                            HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
-                        }
-                    }
-                } else {
-                    val page = pages[pageId]
-                    page?.sections.orEmpty().filter { it.platforms.isEmpty() || RegistryPlatformIds.ANDROID in it.platforms }
-                        .forEach { section ->
-                            val visibleItems = section.items.filter { it.isVisible(signedIn) }
-                            if (visibleItems.isNotEmpty()) {
-                                if (section.header != null) {
-                                    Text(
-                                        section.header,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 2.dp),
-                                    )
-                                }
+                            SettingsCard(visibleItems) {
                                 visibleItems.forEach { item ->
                                     SettingsRegistryRow(
                                         item = item,
@@ -285,6 +254,41 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
                                         onSignOut = ::signOut,
                                     )
                                 }
+                            }
+                        }
+                    }
+                } else {
+                    val page = pages[pageId]
+                    page?.sections.orEmpty().filter { it.platforms.isEmpty() || RegistryPlatformIds.ANDROID in it.platforms }
+                        .forEach { section ->
+                            val visibleItems = section.items.filter { it.isVisible(signedIn) }
+                            if (visibleItems.isNotEmpty()) {
+                                if (section.header != null) {
+                                    Text(
+                                        section.header,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 2.dp),
+                                    )
+                                }
+                                SettingsCard(visibleItems) {
+                                    visibleItems.forEach { item ->
+                                        SettingsRegistryRow(
+                                            item = item,
+                                            languageTag = languageTag,
+                                            pages = pages,
+                                            definitions = settingDefinitions,
+                                            values = values,
+                                            saveTitle = saveTitle,
+                                            signedIn = signedIn,
+                                            signingOut = signingOut,
+                                            accessModel = accessModel,
+                                            surfaceEnv = surfaceEnv,
+                                            onPage = { target -> if (target in pages) pageStack.add(target) },
+                                            onValueChange = ::saveSetting,
+                                            onSignOut = ::signOut,
+                                        )
+                                    }
+                                }
                                 section.footer?.let { footer ->
                                     Text(
                                         footer,
@@ -293,7 +297,6 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
                                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                                     )
                                 }
-                                HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
                             }
                         }
                 }
@@ -303,6 +306,22 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * A settings group on one card, as an iPhone grouped form. The appearance
+ * picker draws its own cards, so its group gets none.
+ */
+@Composable
+private fun SettingsCard(items: List<RegistrySettingRow>, content: @Composable () -> Unit) {
+    val framed = items.none { it.surface == APPEARANCE_PICKER_SURFACE }
+    Column(
+        modifier = if (framed) {
+            Modifier.fillMaxWidth().taskCardSlice(first = true, last = true, gutter = 0.dp)
+        } else {
+            Modifier.fillMaxWidth()
+        },
+    ) { content() }
 }
 
 @Composable

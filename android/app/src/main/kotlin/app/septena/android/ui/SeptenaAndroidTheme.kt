@@ -1,5 +1,12 @@
 package app.septena.android.ui
 
+import app.septena.ui.TaskListStyle
+import app.septena.ui.LocalTaskListStyle
+import app.septena.core.generated.RegistryEntityEnums
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarColors
+import androidx.compose.material3.ExperimentalMaterial3Api
 import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -36,6 +43,11 @@ val LocalAppearanceStore = staticCompositionLocalOf<AppearanceStore?> { null }
 /** The applied appearance, for surfaces that draw with it (header texture, picker). */
 val LocalAppearance = staticCompositionLocalOf { AppearanceState.defaults() }
 
+/** Fill and ink of the add button (iPhone Magic Plus). */
+internal data class AddButtonColors(val fill: Color, val ink: Color)
+
+internal val LocalAddButtonColors = staticCompositionLocalOf<AddButtonColors> { error("No add button colors: use the app theme") }
+
 /** True when the applied appearance is dark (after the user's mode choice). */
 val LocalSeptenaDarkTheme = staticCompositionLocalOf { false }
 
@@ -61,7 +73,11 @@ fun SeptenaAndroidTheme(store: AppearanceStore, content: @Composable () -> Unit)
         } else {
             lightColorScheme()
         }
-        systemColors.withAccent(registryThemeColors(darkTheme, appearance.accentId))
+        systemColors.withAccent(registryThemeColors(darkTheme, appearance.accentId), darkTheme)
+    }
+    val theme = remember(darkTheme, appearance.accentId) { registryThemeColors(darkTheme, appearance.accentId) }
+    val listStyle = remember(colors, theme, darkTheme, appearance.hasActiveTexture) {
+        taskListStyle(colors, theme, darkTheme, appearance.hasActiveTexture)
     }
 
     // The status and navigation bar icons follow the chosen mode, not only the system's.
@@ -86,6 +102,8 @@ fun SeptenaAndroidTheme(store: AppearanceStore, content: @Composable () -> Unit)
         LocalAppearanceStore provides store,
         LocalAppearance provides appearance,
         LocalSeptenaDarkTheme provides darkTheme,
+        LocalTaskListStyle provides listStyle,
+        LocalAddButtonColors provides AddButtonColors(theme.orb, theme.onOrb),
     ) {
         MaterialTheme(colorScheme = colors, content = content)
     }
@@ -99,6 +117,9 @@ internal data class RegistryThemeColors(
     val todayGlyph: Color,
     /** Accent wash behind a selected item (tokens.json `selection`). */
     val selectionAlpha: Float,
+    /** Fill and ink of the add button: Persimmon under Colorful, else the accent (iPhone Magic Plus). */
+    val orb: Color,
+    val onOrb: Color,
 )
 
 /** One accent from registry/tokens.json `fruitAccents`. */
@@ -154,7 +175,15 @@ internal fun registryThemeColors(darkTheme: Boolean, accentId: String): Registry
     val selection = tokens.fields["selection"] as? JsonValue.ObjectValue
     val alphaKey = if (darkTheme) "emphasizedAlphaDark" else "emphasizedAlphaLight"
     val alpha = (selection?.fields?.get(alphaKey) as? JsonValue.DecimalValue)?.value?.toFloat() ?: 0.22f
-    return RegistryThemeColors(accent, fruit.check(darkTheme), todayGlyph, alpha)
+    val brand = if (fruit.multicolor) FruitAccents.resolve(RegistryEntityEnums.AccentColor.PERSIMMON) else fruit
+    return RegistryThemeColors(
+        accent = accent,
+        onAccent = fruit.check(darkTheme),
+        todayGlyph = todayGlyph,
+        selectionAlpha = alpha,
+        orb = brand.color(darkTheme),
+        onOrb = brand.check(darkTheme),
+    )
 }
 
 /** Text size factor for a step, from tokens.json `textScale`. */
@@ -170,11 +199,17 @@ internal fun textScaleFactor(step: Int): Float {
     }
 }
 
-private fun ColorScheme.withAccent(theme: RegistryThemeColors): ColorScheme {
+private fun ColorScheme.withAccent(theme: RegistryThemeColors, darkTheme: Boolean): ColorScheme {
+    // Pages are a grouped background and rows sit on lifted cards, as on
+    // iPhone. Both stay system surface roles: the wallpaper tints them.
+    val page = if (darkTheme) surfaceContainerLowest else surfaceContainer
+    val card = if (darkTheme) surfaceContainer else surfaceContainerLowest
     // Selected and emphasized containers are an accent wash with normal ink
     // (docs/DesignSpec.md §4.5), never a solid bar with white text.
-    val wash = theme.accent.copy(alpha = theme.selectionAlpha).compositeOver(surface)
+    val wash = theme.accent.copy(alpha = theme.selectionAlpha).compositeOver(card)
     return copy(
+        background = page,
+        surface = card,
         primary = theme.accent,
         onPrimary = theme.onAccent,
         primaryContainer = wash,
@@ -190,6 +225,54 @@ private fun ColorScheme.withAccent(theme: RegistryThemeColors): ColorScheme {
         onTertiaryContainer = onSurface,
     )
 }
+
+/** The list look for android/ui, from tokens.json `taskCard`, `spacing` and `selection`. */
+private fun taskListStyle(
+    colors: ColorScheme,
+    theme: RegistryThemeColors,
+    darkTheme: Boolean,
+    textured: Boolean,
+): TaskListStyle {
+    val fillAlpha = if (textured) {
+        tokenNumber("taskCard", if (darkTheme) "texturedFillAlphaDark" else "texturedFillAlphaLight")
+    } else {
+        1f
+    }
+    return TaskListStyle(
+        cardFill = colors.surface.copy(alpha = fillAlpha),
+        selectionFill = theme.accent.copy(alpha = theme.selectionAlpha),
+        cardRadius = tokenNumber("taskCard", "radius").dp,
+        pageGutter = tokenNumber("spacing", "pageGutter").dp,
+        groupGap = tokenNumber("spacing", "sm").dp,
+    )
+}
+
+internal fun tokenNumber(group: String, key: String): Float {
+    val values = RegistryCatalog.document("tokens").fields[group] as? JsonValue.ObjectValue
+    return when (val value = values?.fields?.get(key)) {
+        is JsonValue.DecimalValue -> value.value.toFloat()
+        is JsonValue.IntegerValue -> value.value.toFloat()
+        else -> error("Missing token $group.$key in registry/tokens.json")
+    }
+}
+
+/**
+ * Tint of a list or place glyph. Today wears [RegistryThemeColors.todayGlyph],
+ * the only glyph in tokens.json `multicolorGlyphs`; any other glyph recedes
+ * (iPhone `SmartListTile`).
+ */
+@Composable
+internal fun glyphTint(iconId: String?): Color =
+    if (iconId == RegistryIconIds.LIST_TODAY) MaterialTheme.colorScheme.secondary
+    else MaterialTheme.colorScheme.onSurfaceVariant
+
+/** An app bar that is part of the page, as on iPhone, not a separate strip. */
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+internal fun pageTopAppBarColors(): TopAppBarColors = TopAppBarDefaults.topAppBarColors(
+    containerColor = MaterialTheme.colorScheme.background,
+    scrolledContainerColor = MaterialTheme.colorScheme.background,
+)
 
 internal fun registryColor(value: JsonValue?): Color {
     val hex = requireNotNull(value.stringValue()) { "Missing color token" }.removePrefix("#")

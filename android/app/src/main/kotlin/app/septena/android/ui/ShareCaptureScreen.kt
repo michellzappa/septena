@@ -58,6 +58,7 @@ internal fun ShareCaptureScreen(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
+                colors = pageTopAppBarColors(),
                 title = { Text(labels.title) },
                 navigationIcon = {
                     // A close (x), not a "Cancel" text button: the same leading

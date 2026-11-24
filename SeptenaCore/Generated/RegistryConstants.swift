@@ -279,6 +279,12 @@ enum RegistryTokens {
     static let small: Double = 6
     static let transientSurface: Double = 12
   }
+  enum TaskCard {
+    static let radius: Double = 14
+    static let contentInset: Double = 10
+    static let texturedFillAlphaLight: Double = 0.8
+    static let texturedFillAlphaDark: Double = 0.78
+  }
   enum Spacing {
     static let xs: Double = 4
     static let sm: Double = 8

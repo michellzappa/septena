@@ -82,9 +82,6 @@ fun Modifier.selectableTaskRow(
     onLongClick = { if (selection.enabled) selection.onToggle(taskId) else onMenu() },
 )
 
-/** The selection wash on a selected row: the accent at low strength, ink stays normal. */
-const val SELECTION_WASH_ALPHA = 0.14f
-
 data class TaskRowMenuAction(
     val id: String,
     val title: String,
@@ -137,7 +134,11 @@ fun TaskHomeContent(
                         text = inboxBandTitle,
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
+                        modifier = Modifier.padding(
+                            start = LocalTaskListStyle.current.pageGutter,
+                            top = 12.dp,
+                            bottom = 6.dp,
+                        ),
                     )
                 }
             }
@@ -220,34 +221,51 @@ private fun LazyListScope.taskRows(
 ) {
     itemsIndexed(tasks, key = { _, task -> "$keyPrefix:${task.id}" }) { index, task ->
         val group = task.groupTitle
-        if (group != null && (index == 0 || tasks[index - 1].groupTitle != group)) {
-            Text(
-                text = group,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 6.dp),
-            )
-        }
-        TaskRow(
-            task = task,
-            completeTitle = completeTitle,
-            canComplete = canComplete,
-            todayTitle = todayTitle,
-            todayTint = todayTint,
-            showTodayIndicator = showTodayIndicator,
-            onComplete = onComplete,
-            onOpenTask = onOpenTask,
-            rowMenuGroups = rowMenuGroups,
-            rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-            selection = selection,
-            rowMenuIcon = rowMenuIcon,
-            onTaskAction = onTaskAction,
-        )
-        if (index < tasks.lastIndex) {
-            HorizontalDivider(
-                modifier = Modifier.padding(start = 72.dp, end = 16.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-            )
+        val startsGroup = index == 0 || tasks[index - 1].groupTitle != group
+        val endsGroup = index == tasks.lastIndex || tasks[index + 1].groupTitle != group
+        Column {
+            if (group != null && startsGroup) {
+                Text(
+                    text = group,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(
+                        start = LocalTaskListStyle.current.pageGutter,
+                        end = LocalTaskListStyle.current.pageGutter,
+                        top = 20.dp,
+                        bottom = 6.dp,
+                    ),
+                )
+            }
+            Column(
+                modifier = Modifier.taskCardSlice(
+                    first = startsGroup,
+                    last = endsGroup,
+                    selected = task.id in selection.selectedIds,
+                ),
+            ) {
+                TaskRow(
+                    task = task,
+                    completeTitle = completeTitle,
+                    canComplete = canComplete,
+                    todayTitle = todayTitle,
+                    todayTint = todayTint,
+                    showTodayIndicator = showTodayIndicator,
+                    onComplete = onComplete,
+                    onOpenTask = onOpenTask,
+                    rowMenuGroups = rowMenuGroups,
+                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    selection = selection,
+                    rowMenuIcon = rowMenuIcon,
+                    onTaskAction = onTaskAction,
+                )
+                if (!endsGroup) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                    )
+                }
+            }
         }
     }
 }
@@ -274,12 +292,8 @@ private fun TaskRow(
     val selecting = selection.isActive
     val selected = task.id in selection.selectedIds
     ListItem(
-        colors = if (selected) {
-            ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = SELECTION_WASH_ALPHA))
-        } else {
-            // Transparent so the header texture shows behind the first rows, as on iPhone.
-            ListItemDefaults.colors(containerColor = Color.Transparent)
-        },
+        // The card slice around the row draws the fill and the selection wash.
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier.fillMaxWidth().alpha(task.opacity).selectableTaskRow(
             taskId = task.id,
             selection = selection,

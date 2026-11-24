@@ -165,6 +165,9 @@ function validateTokens(tokens) {
       assert(/^#[0-9a-fA-F]{6}$/.test(tokens.colors?.[role] ?? ""), `tokens.json: multicolorGlyphs "${icon}" role "${role}" must name a hex in colors`);
     }
   }
+  for (const key of ["radius", "contentInset", "texturedFillAlphaLight", "texturedFillAlphaDark"]) {
+    assert(typeof tokens.taskCard?.[key] === "number", `tokens.json: taskCard.${key} must be a number`);
+  }
   assert(Array.isArray(tokens.textScale?.steps) && tokens.textScale.steps.length === 5, "tokens.json: textScale must have 5 steps");
 }
 
@@ -870,6 +873,12 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`    static let card: Double = ${tokens.radii.card}`);
   lines.push(`    static let small: Double = ${tokens.radii.small}`);
   lines.push(`    static let transientSurface: Double = ${tokens.radii.transientSurface}`);
+  lines.push("  }");
+  lines.push("  enum TaskCard {");
+  lines.push(`    static let radius: Double = ${tokens.taskCard.radius}`);
+  lines.push(`    static let contentInset: Double = ${tokens.taskCard.contentInset}`);
+  lines.push(`    static let texturedFillAlphaLight: Double = ${tokens.taskCard.texturedFillAlphaLight}`);
+  lines.push(`    static let texturedFillAlphaDark: Double = ${tokens.taskCard.texturedFillAlphaDark}`);
   lines.push("  }");
   lines.push("  enum Spacing {");
   lines.push(`    static let xs: Double = ${tokens.spacing.xs}`);

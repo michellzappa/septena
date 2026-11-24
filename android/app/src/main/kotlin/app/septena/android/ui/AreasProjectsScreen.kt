@@ -1,8 +1,10 @@
 package app.septena.android.ui
 
+import app.septena.ui.taskCardSlice
+import app.septena.ui.RegistryIcon
+import app.septena.ui.LocalTaskListStyle
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.clickable
@@ -45,7 +47,6 @@ import app.septena.core.generated.RegistryIconIds
 import app.septena.core.generated.RegistryPlacesScreenIds
 import app.septena.core.generated.RegistryPromptIds
 import app.septena.core.generated.RegistryTaskAttributeIds
-import app.septena.ui.SELECTION_WASH_ALPHA
 import app.septena.ui.TaskRowActionsMenu
 import app.septena.ui.TaskSelection
 import app.septena.ui.selectableTaskRow
@@ -84,8 +85,8 @@ fun AreasProjectsScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = LocalTaskListStyle.current.pageGutter, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 item(key = "place-title") {
                     Row(
@@ -140,7 +141,17 @@ fun AreasProjectsScreen(
                         items(state.projects, key = { "project:${it.id}" }) { project ->
                             ListItem(
                                 headlineContent = { Text(project.title) },
-                                modifier = Modifier.fillMaxWidth().clickable { onOpenProject(project.id) },
+                                leadingContent = {
+                                    RegistryIcon(
+                                        RegistryIconIds.PLACE_PROJECT,
+                                        contentDescription = null,
+                                        tint = glyphTint(RegistryIconIds.PLACE_PROJECT),
+                                    )
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .taskCardSlice(first = true, last = true, gutter = 0.dp)
+                                    .clickable { onOpenProject(project.id) },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             )
                         }
@@ -321,11 +332,7 @@ private fun PlaceTaskItem(
     val selected = task.id in selection.selectedIds
     ListItem(
         headlineContent = { Text(task.title) },
-        colors = if (selected) {
-            ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = SELECTION_WASH_ALPHA))
-        } else {
-            ListItemDefaults.colors(containerColor = Color.Transparent)
-        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         leadingContent = if (selection.isActive) {
             {
                 Checkbox(
@@ -335,7 +342,10 @@ private fun PlaceTaskItem(
                 )
             }
         } else null,
-        modifier = Modifier.fillMaxWidth().selectableTaskRow(task.id, selection, onOpenTask, onMenu = { menuExpanded = true }),
+        modifier = Modifier
+            .fillMaxWidth()
+            .taskCardSlice(first = true, last = true, selected = selected, gutter = 0.dp)
+            .selectableTaskRow(task.id, selection, onOpenTask, onMenu = { menuExpanded = true }),
         trailingContent = if (rowMenuGroups.isNotEmpty() && !selection.isActive) {
             {
                 TaskRowActionsMenu(

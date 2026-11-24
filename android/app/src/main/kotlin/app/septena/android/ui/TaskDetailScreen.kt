@@ -544,6 +544,7 @@ fun TaskDetailScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
+                colors = pageTopAppBarColors(),
                 title = { Text(labels.title) },
                 navigationIcon = {
                     IconButton(onClick = ::handleBack, enabled = !saving) {
