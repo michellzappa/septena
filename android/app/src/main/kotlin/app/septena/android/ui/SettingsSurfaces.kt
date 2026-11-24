@@ -1,6 +1,7 @@
 package app.septena.android.ui
 
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -50,7 +51,7 @@ internal class SettingsSurfaceEnv(
 /** The custom surfaces this file renders; the others stay in SettingsScreen or their own files. */
 internal val SETTINGS_SURFACES = setOf(
     "about_header", "send_feedback", "privacy_explainer", "ai_explainer", "septena_life_link",
-    "reset_get_started", "mcp_skills", "sync_diagnostics", "smart_lists_editor", "plus_offer", "calendar_detail",
+    "mcp_skills", "sync_diagnostics", "smart_lists_editor", "plus_offer", "calendar_detail",
     "reset_first_run", DELETE_ACCOUNT,
     "sign_in_approval", "claude_connector",
 )
@@ -66,7 +67,12 @@ internal fun SettingsCustomSurface(
     val context = LocalContext.current
     when (surface) {
         "about_header" -> AboutHeader(label, detail, context)
-        "send_feedback" -> ActionRow(label) { openUrl(context, FEEDBACK_URL) }
+        "send_feedback" -> ActionRow(label) {
+            if (!openUrl(context, FEEDBACK_URL)) {
+                copyToClipboard(context, label.orEmpty(), FEEDBACK_EMAIL)
+                Toast.makeText(context, FEEDBACK_EMAIL, Toast.LENGTH_SHORT).show()
+            }
+        }
         "privacy_explainer" -> detail?.let { Text(it, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
         "ai_explainer" -> ExpandableRow(label) { AiExplainer(appName(context), languageTag) }
         "septena_life_link" -> {
@@ -75,11 +81,7 @@ internal fun SettingsCustomSurface(
                 if (!openUrl(context, SEPTENA_LIFE_URL)) openUrl(context, SEPTENA_SITE_URL)
             }
         }
-        "reset_get_started" -> ActionRow(label) {
-            // Same as iOS `TaskNotices.resetGetStarted`: the notice and its steps start over on every device.
-            env.onValueChange(RegistrySettingKeys.GET_STARTED_DISMISSED, JsonValue.BooleanValue(false))
-            env.onValueChange(RegistrySettingKeys.GET_STARTED_STEPS, JsonValue.ArrayValue(emptyList()))
-        }
+        // `reset_get_started` is omitted on Android until Android renders the Get Started notice.
         // This device only: the synced `onboardedAt` stays, so other devices are not asked again (as on iOS).
         "reset_first_run" -> ActionRow(label) { env.graph.firstRun.showAgain() }
         DELETE_ACCOUNT -> DeleteAccountRow(env.graph, env.signedIn, languageTag)
@@ -254,6 +256,7 @@ private const val AI_EXPLAINER = "ai_explainer"
 private const val MCP_SKILLS = "mcp_skills"
 private const val SYNC_DIAGNOSTICS = "sync_diagnostics"
 private const val MAX_ISSUES = 20
+private const val FEEDBACK_EMAIL = "mz@envisioning.com"
 private const val FEEDBACK_URL = "mailto:mz@envisioning.com?subject=Septena%20feedback"
 private const val SEPTENA_LIFE_URL = "septena://"
 private const val SEPTENA_SITE_URL = "https://www.septena.app"

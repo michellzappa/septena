@@ -403,13 +403,6 @@ private fun SettingsRegistryRow(
                 }
                 else -> if (item.surface != null && item.surface in SETTINGS_SURFACES) {
                     SettingsCustomSurface(item.surface, item.label, item.detail, surfaceEnv, languageTag)
-                } else {
-                    if (item.label != null || item.detail != null) {
-                        ListItem(
-                            headlineContent = { item.label?.let { Text(it) } },
-                            supportingContent = item.detail?.let { detail -> ({ Text(detail) }) },
-                        )
-                    }
                 }
             }
         }

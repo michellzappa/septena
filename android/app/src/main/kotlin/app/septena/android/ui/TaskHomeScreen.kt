@@ -7,9 +7,12 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -35,11 +38,12 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -52,7 +56,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -67,9 +70,12 @@ import app.septena.core.generated.RegistryCapabilityIds
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistrySurfaceIds
+import app.septena.ui.LocalMagicPlusDrag
+import app.septena.ui.MagicPlusDragState
 import app.septena.ui.TaskHomeContent
 import app.septena.ui.TaskRowMenuAction
 import app.septena.ui.TaskSelection
+import app.septena.ui.insertionPosition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -288,6 +294,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         onQuickFind = { quickFindOpen = true },
                         onToggleAgentsPaused = { homeViewModel.setAgentsPaused(!state.agentsPaused) },
                         onSelectHomeLocation = selectHomeLocation,
+                        snackbarVisible = undoSnackbarHostState.currentSnackbarData != null,
                     )
                 }
             }
@@ -354,6 +361,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         onQuickFind = { quickFindOpen = true },
                         onToggleAgentsPaused = { homeViewModel.setAgentsPaused(!state.agentsPaused) },
                         onSelectHomeLocation = selectHomeLocation,
+                        snackbarVisible = undoSnackbarHostState.currentSnackbarData != null,
                     )
                 }
             }
@@ -520,7 +528,7 @@ private fun DrawerGroupTitle(title: String) {
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 private fun TaskHomeScaffold(
     graph: AndroidAppGraph,
     state: TaskHomeUiState,
@@ -546,13 +554,18 @@ private fun TaskHomeScaffold(
     onQuickFind: () -> Unit,
     onToggleAgentsPaused: () -> Unit,
     onSelectHomeLocation: (TaskHomeLocation) -> Unit,
+    snackbarVisible: Boolean = false,
 ) {
-    var quickAddOpen by rememberSaveable { mutableStateOf(false) }
+    var quickAddDraft by remember { mutableStateOf<QuickAddDraft?>(null) }
+    var newSectionTrigger by remember { mutableIntStateOf(0) }
     var selectionPicker by remember { mutableStateOf<SelectionPicker?>(null) }
     var allOnToday by remember { mutableStateOf(false) }
+    val magicPlusDrag = remember { MagicPlusDragState() }
     val context = LocalContext.current
     val selecting = state.selectedIds.isNotEmpty()
     val destinationId = (state.location as? TaskHomeLocation.SmartList)?.destinationId
+    val canCreateHere = state.location !is TaskHomeLocation.SmartList || state.canQuickAdd
+    val imeVisible = WindowInsets.isImeVisible
     val formLabels = remember(languageTag) { TaskFormLabels.fromRegistry(languageTag) }
     val selectToggleLabel = remember(languageTag) {
         RegistryCatalog.actionTitle(RegistryActionIds.TASK_SELECT, languageTag = languageTag).orEmpty()
@@ -569,17 +582,24 @@ private fun TaskHomeScaffold(
         onToggle = homeViewModel::toggleSelection,
     )
     LaunchedEffect(state.selectedIds) { allOnToday = homeViewModel.allOnToday(state.selectedIds) }
+    LaunchedEffect(state.location) { if (!magicPlusDrag.isDragging) magicPlusDrag.reset() }
     BackHandler(enabled = selecting) { homeViewModel.clearSelection() }
 
-    if (quickAddOpen) {
+    val openDefaultQuickAdd: () -> Unit = {
+        quickAddDraft = defaultQuickAddDraft(state.location)
+    }
+    magicPlusDrag.fallbackDrop = { if (canCreateHere) openDefaultQuickAdd() }
+
+    quickAddDraft?.let { initial ->
         QuickAddSheet(
             today = graph.clock.today(graph.clock.now()),
             errorMessage = state.errorMessage,
             areas = state.areas,
             projects = state.projects,
             languageTag = languageTag,
-            onDismiss = { quickAddOpen = false },
-            onAdd = { draft -> homeViewModel.quickAdd(draft) { quickAddOpen = false } },
+            initialDraft = initial,
+            onDismiss = { quickAddDraft = null },
+            onAdd = { draft -> homeViewModel.quickAdd(draft) { quickAddDraft = null } },
         )
     }
     when (selectionPicker) {
@@ -612,137 +632,182 @@ private fun TaskHomeScaffold(
 
     // The header texture sits behind the transparent app bar and the first
     // rows, on the page background (iPhone `HeaderWashView`).
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        HeaderWashBackdrop()
-        Scaffold(
-            containerColor = Color.Transparent,
-            bottomBar = if (selecting) {
-                {
-                    TaskSelectionBar(
-                        selectedCount = state.selectedIds.size,
-                        destinationId = destinationId,
-                        allOnToday = allOnToday,
-                        allSelected = remember(state.selectedIds, state.inboxTasks, state.tasks) {
-                            (state.inboxTasks + state.tasks).all { it.id in state.selectedIds }
-                        },
-                        canComplete = state.canComplete,
-                        languageTag = languageTag,
-                        onCommand = { command ->
-                            when (command) {
-                                is TaskSelectionCommand.Apply -> homeViewModel.applyToSelection(command.actionId)
-                                is TaskSelectionCommand.SetToday -> homeViewModel.applyToSelection(
-                                    RegistryActionIds.TASK_TOGGLE_TODAY,
-                                    todayEnabled = command.enabled,
-                                )
-                                TaskSelectionCommand.PickWhen -> { selectionPicker = SelectionPicker.When }
-                                TaskSelectionCommand.PickList -> { selectionPicker = SelectionPicker.List }
-                                TaskSelectionCommand.Copy -> homeViewModel.copySelection { text ->
-                                    context.getSystemService(ClipboardManager::class.java)
-                                        ?.setPrimaryClip(ClipData.newPlainText(null, text))
+    CompositionLocalProvider(LocalMagicPlusDrag provides magicPlusDrag) {
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            HeaderWashBackdrop()
+            Scaffold(
+                containerColor = Color.Transparent,
+                bottomBar = if (selecting) {
+                    {
+                        TaskSelectionBar(
+                            selectedCount = state.selectedIds.size,
+                            destinationId = destinationId,
+                            allOnToday = allOnToday,
+                            allSelected = remember(state.selectedIds, state.inboxTasks, state.tasks) {
+                                (state.inboxTasks + state.tasks).all { it.id in state.selectedIds }
+                            },
+                            canComplete = state.canComplete,
+                            languageTag = languageTag,
+                            onCommand = { command ->
+                                when (command) {
+                                    is TaskSelectionCommand.Apply -> homeViewModel.applyToSelection(command.actionId)
+                                    is TaskSelectionCommand.SetToday -> homeViewModel.applyToSelection(
+                                        RegistryActionIds.TASK_TOGGLE_TODAY,
+                                        todayEnabled = command.enabled,
+                                    )
+                                    TaskSelectionCommand.PickWhen -> { selectionPicker = SelectionPicker.When }
+                                    TaskSelectionCommand.PickList -> { selectionPicker = SelectionPicker.List }
+                                    TaskSelectionCommand.Copy -> homeViewModel.copySelection { text ->
+                                        context.getSystemService(ClipboardManager::class.java)
+                                            ?.setPrimaryClip(ClipData.newPlainText(null, text))
+                                    }
+                                    TaskSelectionCommand.ToggleSelectAll -> homeViewModel.toggleSelectAll()
+                                    TaskSelectionCommand.Done -> homeViewModel.clearSelection()
                                 }
-                                TaskSelectionCommand.ToggleSelectAll -> homeViewModel.toggleSelectAll()
-                                TaskSelectionCommand.Done -> homeViewModel.clearSelection()
+                            },
+                        )
+                    }
+                } else {
+                    {}
+                },
+                topBar = {
+                    TopAppBar(
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                            scrolledContainerColor = Color.Transparent,
+                        ),
+                        title = { Text(title) },
+                        navigationIcon = if (showNavigationAction) {
+                            {
+                                TextButton(onClick = onOpenNavigation) {
+                                    Text(sidebarActionTitle)
+                                }
+                            }
+                        } else {
+                            {}
+                        },
+                        actions = {
+                            TextButton(onClick = onToggleAgentsPaused) {
+                                Text(pauseAgentsTitle)
+                            }
+                            TextButton(onClick = onQuickFind) {
+                                Text(quickFindTitle)
                             }
                         },
                     )
-                }
-            } else {
-                {}
-            },
-            floatingActionButton = if (!selecting && state.canQuickAdd && state.location is TaskHomeLocation.SmartList) {
-                {
-                    FloatingActionButton(
-                        onClick = { quickAddOpen = true },
-                        modifier = Modifier.semantics { contentDescription = quickAddTitle },
-                    ) {
-                        Text(
-                            text = "+",
-                            style = MaterialTheme.typography.headlineSmall,
-                            textAlign = TextAlign.Center,
+                },
+            ) { contentPadding ->
+                when (val location = state.location) {
+                    is TaskHomeLocation.Area -> AreasProjectsScreen(
+                        graph = graph,
+                        destination = AreasProjectsDestination.Area(location.id),
+                        modifier = Modifier.padding(contentPadding),
+                        rowMenuGroups = rowMenuGroups,
+                        rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                        onTaskAction = onTaskAction,
+                        selection = selection,
+                        onOpenProject = { projectId ->
+                            val project = state.projects.firstOrNull {
+                                (it.location as? TaskHomeLocation.Project)?.id == projectId
+                            }?.location ?: TaskHomeLocation.Project(projectId, "")
+                            onSelectHomeLocation(project)
+                        },
+                        onOpenTask = onOpenTask,
+                        onMagicPlusDrop = { draft -> quickAddDraft = draft },
+                    )
+                    is TaskHomeLocation.Project -> AreasProjectsScreen(
+                        graph = graph,
+                        destination = AreasProjectsDestination.Project(location.id),
+                        modifier = Modifier.padding(contentPadding),
+                        onOpenTask = onOpenTask,
+                        rowMenuGroups = rowMenuGroups,
+                        rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                        onTaskAction = onTaskAction,
+                        selection = selection,
+                        newSectionTrigger = newSectionTrigger,
+                        onMagicPlusDrop = { draft -> quickAddDraft = draft },
+                    )
+                    is TaskHomeLocation.SmartList -> {
+                        val isTodayList = location.destinationId == RegistryDestinationIds.TODAY
+                        val inboxPositions = state.inboxTasks.map { it.position }
+                        val taskPositions = state.tasks.map { it.position }
+                        TaskHomeContent(
+                            completeTitle = completeTitle,
+                            emptyTitle = emptyTitle,
+                            emptyDescription = emptyDescription,
+                            inboxBandTitle = inboxTitle,
+                            todayTitle = todayTitle,
+                            todayTint = MaterialTheme.colorScheme.secondary,
+                            hasLoaded = state.hasLoaded,
+                            isToday = isTodayList,
+                            inboxTasks = state.inboxTasks,
+                            tasks = state.tasks,
+                            canQuickAdd = state.canQuickAdd,
+                            canComplete = state.canComplete,
+                            errorMessage = state.errorMessage,
+                            rowMenuGroups = rowMenuGroups,
+                            rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                            modifier = Modifier.padding(contentPadding),
+                            selection = selection,
+                            onComplete = onComplete,
+                            onOpenTask = onOpenTask,
+                            onTaskAction = onTaskAction,
+                            onDropInboxHeader = if (isTodayList && state.canQuickAdd) {
+                                {
+                                    quickAddDraft = QuickAddDraft(
+                                        today = false,
+                                        position = inboxPositions.firstOrNull()?.let { it - 1.0 },
+                                    )
+                                }
+                            } else null,
+                            onDropInboxRow = if (isTodayList && state.canQuickAdd) {
+                                { index, before ->
+                                    quickAddDraft = QuickAddDraft(
+                                        today = false,
+                                        position = insertionPosition(inboxPositions, index, before),
+                                    )
+                                }
+                            } else null,
+                            onDropTaskRow = if (state.canQuickAdd) {
+                                { index, before ->
+                                    quickAddDraft = defaultQuickAddDraft(location).copy(
+                                        position = insertionPosition(taskPositions, index, before),
+                                        useTodayPosition = isTodayList,
+                                    )
+                                }
+                            } else null,
                         )
                     }
                 }
-            } else {
-                {}
-            },
-            topBar = {
-                TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        scrolledContainerColor = Color.Transparent,
-                    ),
-                    title = { Text(title) },
-                    navigationIcon = if (showNavigationAction) {
-                        {
-                            TextButton(onClick = onOpenNavigation) {
-                                Text(sidebarActionTitle)
-                            }
-                        }
-                    } else {
-                        {}
-                    },
-                    actions = {
-                        TextButton(onClick = onToggleAgentsPaused) {
-                            Text(pauseAgentsTitle)
-                        }
-                        TextButton(onClick = onQuickFind) {
-                            Text(quickFindTitle)
-                        }
-                    },
-                )
-            },
-        ) { contentPadding ->
-            when (val location = state.location) {
-                is TaskHomeLocation.Area -> AreasProjectsScreen(
-                    graph = graph,
-                    destination = AreasProjectsDestination.Area(location.id),
-                    modifier = Modifier.padding(contentPadding),
-                    rowMenuGroups = rowMenuGroups,
-                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                    onTaskAction = onTaskAction,
-                    selection = selection,
-                    onOpenProject = { projectId ->
-                        val project = state.projects.firstOrNull {
-                            (it.location as? TaskHomeLocation.Project)?.id == projectId
-                        }?.location ?: TaskHomeLocation.Project(projectId, "")
-                        onSelectHomeLocation(project)
-                    },
-                    onOpenTask = onOpenTask,
-                )
-                is TaskHomeLocation.Project -> AreasProjectsScreen(
-                    graph = graph,
-                    destination = AreasProjectsDestination.Project(location.id),
-                    modifier = Modifier.padding(contentPadding),
-                    onOpenTask = onOpenTask,
-                    rowMenuGroups = rowMenuGroups,
-                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                    onTaskAction = onTaskAction,
-                    selection = selection,
-                )
-                is TaskHomeLocation.SmartList -> TaskHomeContent(
-                    completeTitle = completeTitle,
-                    emptyTitle = emptyTitle,
-                    emptyDescription = emptyDescription,
-                    inboxBandTitle = inboxTitle,
-                    todayTitle = todayTitle,
-                    todayTint = MaterialTheme.colorScheme.secondary,
-                    hasLoaded = state.hasLoaded,
-                    isToday = location.destinationId == RegistryDestinationIds.TODAY,
-                    inboxTasks = state.inboxTasks,
-                    tasks = state.tasks,
-                    canQuickAdd = state.canQuickAdd,
-                    canComplete = state.canComplete,
-                    errorMessage = state.errorMessage,
-                    rowMenuGroups = rowMenuGroups,
-                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                    modifier = Modifier.padding(contentPadding),
-                    selection = selection,
-                    onComplete = onComplete,
-                    onOpenTask = onOpenTask,
-                    onTaskAction = onTaskAction,
+            }
+
+            // Round Magic Plus orb (matches iPhone `MagicPlusOrb`): visible on
+            // creatable smart lists, areas and projects; hides during multi-select,
+            // while a snackbar is up, or when the software keyboard is showing.
+            if (canCreateHere && !selecting && !snackbarVisible && !imeVisible) {
+                MagicPlusOrb(
+                    drag = magicPlusDrag,
+                    isViewingProject = state.location is TaskHomeLocation.Project,
+                    accessibilityLabel = quickAddTitle,
+                    languageTag = languageTag,
+                    onNewTask = openDefaultQuickAdd,
+                    onNewSection = { newSectionTrigger += 1 },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 16.dp),
                 )
             }
         }
+    }
+}
+
+private fun defaultQuickAddDraft(location: TaskHomeLocation): QuickAddDraft = when (location) {
+    is TaskHomeLocation.Area -> QuickAddDraft(areaId = location.id)
+    is TaskHomeLocation.Project -> QuickAddDraft(projectId = location.id)
+    is TaskHomeLocation.SmartList -> when (location.destinationId) {
+        RegistryDestinationIds.TODAY -> QuickAddDraft(today = true)
+        RegistryDestinationIds.STARRED -> QuickAddDraft(starred = true)
+        else -> QuickAddDraft()
     }
 }
 

@@ -73,6 +73,10 @@ data class QuickAddDraft(
     val starred: Boolean = false,
     val areaId: String? = null,
     val projectId: String? = null,
+    val headingId: String? = null,
+    val today: Boolean = false,
+    val position: Double? = null,
+    val useTodayPosition: Boolean = false,
 )
 
 private data class LoadedTaskHome(
@@ -180,12 +184,21 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         title = title,
                         area = if (draft.projectId == null) draft.areaId else null,
                         project = draft.projectId,
+                        today = draft.today && draft.whenDay == null,
                         notes = draft.notes.trim().takeIf(String::isNotEmpty),
+                        heading = if (draft.projectId != null) draft.headingId else null,
+                        position = draft.position,
                     )
                     val fields = runCatching {
                         draft.whenDay?.let { graph.taskMutator.setWhen(created.id, it) }
                         draft.deadline?.let { graph.taskMutator.setDeadline(created.id, it) }
                         if (draft.starred) graph.taskMutator.setStarred(created.id, true)
+                        if (draft.useTodayPosition && draft.position != null) {
+                            graph.taskMutator.updateFields(
+                                created.id,
+                                mapOf(RegistryEntityFields.Task.TODAY_POSITION to JsonValue.DecimalValue(draft.position)),
+                            )
+                        }
                     }
                     graph.taskUndoHistory.recordCreated(created.asSyncRecord())
                     fields.exceptionOrNull()
@@ -495,14 +508,15 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     if (!listed) continue
                     val item = taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday)
                         .withFade(snapshot, conversation, now, today, showAging)
+                    val rowPosition = record.fields[positionField(resolvedLocation.destinationId)].numberValue()
+                        ?: record.fields[RegistryEntityFields.Task.POSITION].numberValue()
                     val positioned = PositionedTask(
                         if (resolvedLocation.destinationId == RegistryDestinationIds.AGENT) {
-                            item.copy(groupTitle = agentGroups[stage])
+                            item.copy(groupTitle = agentGroups[stage], position = rowPosition)
                         } else {
-                            item
+                            item.copy(position = rowPosition)
                         },
-                        record.fields[positionField(resolvedLocation.destinationId)].numberValue()
-                            ?: record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
+                        rowPosition,
                         archiveDate = when (resolvedLocation.destinationId) {
                             RegistryDestinationIds.LOGBOOK ->
                                 record.fields[RegistryEntityFields.Task.COMPLETED_AT].stringValue()

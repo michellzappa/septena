@@ -116,7 +116,10 @@ internal fun CalendarFeedSection(graph: AndroidAppGraph, signedIn: Boolean, lang
                     TextButton(onClick = { copyToClipboard(context, copy("feedToggle"), webcal) }, enabled = !busy) {
                         Text(copy("copyUrl"))
                     }
-                    TextButton(onClick = { openUrl(context, webcal) }) { Text(copy("openInCalendar")) }
+                    TextButton(onClick = {
+                        // Android has no webcal:// handler; fall back to Google Calendar's web subscribe URL.
+                        if (!openUrl(context, webcal)) openUrl(context, GOOGLE_CALENDAR_SUBSCRIBE + Uri.encode(webcal))
+                    }) { Text(copy("openInCalendar")) }
                     TextButton(onClick = { confirmRotate = true }, enabled = !busy) {
                         Text(copy("rotate"), color = MaterialTheme.colorScheme.error)
                     }
@@ -158,13 +161,29 @@ internal fun copyToClipboard(context: Context, label: String, text: String) {
 }
 
 /** Opens [url] in the app that handles it; false when no app does. */
-internal fun openUrl(context: Context, url: String): Boolean = try {
-    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    true
-} catch (_: ActivityNotFoundException) {
-    false
+internal fun openUrl(context: Context, url: String): Boolean {
+    val trimmed = url.trim()
+    if (trimmed.isEmpty()) return false
+    val uri = Uri.parse(
+        if ("://" in trimmed || trimmed.startsWith("mailto:", ignoreCase = true)) trimmed else "https://$trimmed",
+    )
+    if (trimmed.startsWith("mailto:", ignoreCase = true)) {
+        try {
+            context.startActivity(Intent(Intent.ACTION_SENDTO, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return true
+        } catch (_: ActivityNotFoundException) {
+            // Fall through to ACTION_VIEW.
+        }
+    }
+    return try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        true
+    } catch (_: ActivityNotFoundException) {
+        false
+    }
 }
 
 private const val CALENDAR = "calendar_detail"
+private const val GOOGLE_CALENDAR_SUBSCRIBE = "https://calendar.google.com/calendar/render?cid="
 private const val SCOPE_ALL = "all"
 private const val SCOPE_TIMED = "timed"
