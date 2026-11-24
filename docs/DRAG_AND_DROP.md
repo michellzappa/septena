@@ -46,6 +46,14 @@ device or app identity. Concretely —
 
 Everything below is a consequence of these two facts.
 
+**One landing mark** (mz, 2026-11-24). Inside a task list, a task drag and a
+Magic Plus drag show the same mark: `TaskInsertionMark`, a 6pt bar in the Magic
+Plus color, drawn over a row edge or under a header. The list does not move.
+The Mac list draws the same bar (`KitCardRowView.dropLine`). A container whose
+tasks are not on screen (a sidebar row, a project card on an area page, the Move
+panel) wears the selection fill, because there is no place to mark. Android has
+no task drag yet; when it gets one, it uses the same mark.
+
 ---
 
 ## 2. Platform matrix

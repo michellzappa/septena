@@ -3766,10 +3766,21 @@ struct TaskListView: View {
     return true
   }
 
+  /// A task dropped on a Today group header. The insertion mark shows under
+  /// the header, so the task is filed there and takes the group's first place.
+  private func handleTodayHeaderDrop(ids: [String], target: TodayDropTarget) -> Bool {
+    let first = excludingQuickAddCapture(visibleItems)
+      .first { isTask($0, alreadyIn: target) && !ids.contains($0.id) }
+    guard filter == .today, !TaskDragIDs.isNewTaskPayload(ids), let first else {
+      return handleTodayMoveDrop(ids: ids, target: target)
+    }
+    return handleReorderDrop(ids: ids, target: first, before: true, refileTo: target)
+  }
+
   private func todayMoveDrop(_ target: TodayDropTarget?) -> TaskMoveDrop {
     TaskMoveDrop(perform: target.map { target in
-      { ids in handleTodayMoveDrop(ids: ids, target: target) }
-    })
+      { ids in handleTodayHeaderDrop(ids: ids, target: target) }
+    }, showsMark: true)
   }
 
   private func handleUpcomingDateDrop(ids: [String], dateKey: String) -> Bool {
@@ -4664,7 +4675,7 @@ struct TaskListView: View {
     // also files a row dragged in from another group, so the row-level
     // group drop steps aside (the group headers keep theirs).
     let todayReorder = filter == .today
-    let rowMoveDrop = onDropIDs.map { TaskMoveDrop(perform: $0) }
+    let rowMoveDrop = onDropIDs.map { TaskMoveDrop(perform: $0, showsMark: true) }
       ?? todayMoveDrop(todayReorder ? nil : moveDropTarget)
     let canMagicRowDrop = reorderable || todayReorder
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
@@ -4676,7 +4687,6 @@ struct TaskListView: View {
       // main-thread stack (launch and opening a project with sections both
       // crashed, 2026-11-23). The row stays a direct child of the ForEach.
       AnyView(taskRow(task, quickMenu: quickMenu?(task) ?? false)
-        .modifier(rowMoveDrop)
         .taskCardChrome(position,
                         // An open inline editor keeps the clean card surface
                         // instead of painting the whole editor in selection blue;
@@ -4687,8 +4697,9 @@ struct TaskListView: View {
         // After the chrome, so the iOS lift preview includes the card
         // background, clipped to this row's slice of the card.
         .taskCardContextMenu(position) { taskContextMenu(for: task) }
-        // After the chrome, so the drop target (and its targeting wash) spans
+        // After the chrome, so the drop target (and its insertion mark) spans
         // the full card slice the user sees, not just the inner row content.
+        .modifier(rowMoveDrop)
         // In a project's grouped list a drop also re-files across headings
         // (`handleGroupedTaskDrop` reads the target row's group).
         .modifier(TaskReorderDrop(perform: canMagicRowDrop
@@ -4790,7 +4801,7 @@ struct TaskListView: View {
                            moveDropTarget: TodayDropTarget? = nil,
                            onDropIDs: (([String]) -> Bool)? = nil,
                            magicDropId: String? = nil) -> some View {
-    let dropModifier = onDropIDs.map { TaskMoveDrop(perform: $0) }
+    let dropModifier = onDropIDs.map { TaskMoveDrop(perform: $0, showsMark: true) }
       ?? todayMoveDrop(moveDropTarget)
     let resolvedMagicDrop: (([String]) -> Bool)? = onDropIDs ?? moveDropTarget.map { target in
       { ids in handleTodayMoveDrop(ids: ids, target: target) }
