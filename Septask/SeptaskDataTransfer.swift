@@ -27,7 +27,7 @@ enum TaskJSONTransfer {
     var attachmentCount: Int { tables["task_attachment"]?.count ?? 0 }
     var supportedRowCount: Int { areaCount + projectCount + taskCount + attachmentCount }
     var skippedRowCount: Int {
-      let supported: Set<String> = ["area", "project", "task", "task_attachment", "checklist_item", "tag"]
+      let supported: Set<String> = ["area", "project", "task", "task_attachment", "checklist_item", "task_ref", "tag"]
       return tables.reduce(0) { acc, pair in
         supported.contains(pair.key) ? acc : acc + pair.value.count
       }
@@ -107,6 +107,7 @@ enum TaskJSONTransfer {
       attachments = []
     }
     let checklistItems = try context.fetch(FetchDescriptor<TaskChecklistItemEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
+    let refs = try context.fetch(FetchDescriptor<TaskRefEntity>(sortBy: [SortDescriptor(\.taskID), SortDescriptor(\.id)]))
     let tags = try context.fetch(FetchDescriptor<TagEntity>(sortBy: [SortDescriptor(\.id)]))
 
     var tables: [String: [[String: Any]]] = [
@@ -114,6 +115,7 @@ enum TaskJSONTransfer {
       "project": projects.map(projectDict),
       "task": tasks.map(taskDict),
       "checklist_item": checklistItems.map(checklistItemDict),
+      "task_ref": refs.map(taskRefDict),
       "tag": tags.map(tagDict),
     ]
     if case .inline = attachmentMode {
@@ -227,6 +229,21 @@ enum TaskJSONTransfer {
     ])
   }
 
+  private static func taskRefDict(_ e: TaskRefEntity) -> [String: Any] {
+    compact([
+      "id": e.id,
+      "taskID": e.taskID,
+      "key": e.key,
+      "kind": e.kind.isEmpty ? nil : e.kind,
+      "role": e.role,
+      "snapshot": e.snapshotJSON.flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) },
+      "position": e.position,
+      "createdBy": e.createdBy,
+      "lastSeenAt": e.lastSeenAt,
+      "createdAt": e.createdAt == .distantPast ? nil : ISO8601DateFormatter().string(from: e.createdAt),
+    ])
+  }
+
   // MARK: - Parse
 
   static func parseEnvelope(_ data: Data) throws -> Envelope {
@@ -276,10 +293,11 @@ enum TaskJSONTransfer {
     var taskIDs: [String] = []
     var attachmentIDs: [String] = []
     var checklistIDs: [String] = []
+    var refIDs: [String] = []
     var tagIDs: [String] = []
     var tagIDRemap: [String: String] = [:]
 
-    // Order: tags → areas → projects → tasks (headings first) → attachments → checklist_item
+    // Order: tags → areas → projects → tasks (headings first) → attachments → checklist_item → task_ref
     // so FK references resolve cleanly and case-insensitive tag merges remap task.tags.
     if let rows = doc.tables["tag"] {
       for r in rows {
@@ -326,6 +344,16 @@ enum TaskJSONTransfer {
       }
     }
 
+    if let rows = doc.tables["task_ref"] {
+      for r in rows {
+        if let id = try upsertTaskRef(r, context: context) {
+          refIDs.append(id)
+        } else {
+          result.skipped += 1
+        }
+      }
+    }
+
     try StoreHealth.saveOrThrow(context, op: "TaskJSONTransfer.apply")
 
     for id in tagIDs { engine.noteTagChange(id: id) }
@@ -334,11 +362,12 @@ enum TaskJSONTransfer {
     for id in taskIDs { engine.noteTaskChange(id: id) }
     for id in attachmentIDs { engine.noteTaskAttachmentChange(id: id) }
     for id in checklistIDs { engine.noteChecklistItemChange(id: id) }
+    for id in refIDs { engine.noteTaskRefChange(id: id) }
 
     if !areaIDs.isEmpty || !projectIDs.isEmpty {
       NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
     }
-    if !taskIDs.isEmpty || !attachmentIDs.isEmpty || !checklistIDs.isEmpty || !tagIDs.isEmpty {
+    if !taskIDs.isEmpty || !attachmentIDs.isEmpty || !checklistIDs.isEmpty || !refIDs.isEmpty || !tagIDs.isEmpty {
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     }
     return result
@@ -532,6 +561,53 @@ enum TaskJSONTransfer {
     return id
   }
 
+  /// Nil when the row cannot come back: its task is not here, the task is at
+  /// its limit, the core does not read the key, or the row was deleted on the
+  /// backend and this build cannot mint its next id.
+  private static func upsertTaskRef(_ r: [String: Any], context: ModelContext) throws -> String? {
+    guard let id = nonEmptyString(r["id"]),
+          let taskID = nonEmptyString(r["taskID"] ?? r["taskId"]),
+          let rawKey = nonEmptyString(r["key"]) else {
+      throw TransferError.malformed("A reference row is missing id, taskID, or key.")
+    }
+    let role = nonEmptyString(r["role"]).flatMap { RegistryEntityEnums.taskRefRole.contains($0) ? $0 : nil }
+      ?? TaskRefRole.about.rawValue
+    let snapshotJSON = (r["snapshot"] as? [String: Any])
+      .flatMap { try? JSONSerialization.data(withJSONObject: $0) }
+      .flatMap { try? JSONDecoder().decode(TaskRefSnapshot.self, from: $0) }?
+      .storedJSON()
+
+    let parsed = TaskRefCore.parse(rawKey)
+    if TaskRefCore.isAvailable, parsed == nil { return nil }
+    let key = parsed?.key ?? rawKey
+    guard key.utf16.count <= RegistryEntityLimits.refKeyMax else { return nil }
+    let siblings = try context.fetch(FetchDescriptor<TaskRefEntity>(predicate: #Predicate { $0.taskID == taskID }))
+    if let existing = siblings.first(where: { $0.id == id }) ?? siblings.first(where: { $0.key == key }) {
+      existing.role = role
+      existing.snapshotJSON = snapshotJSON
+      existing.position = doubleValue(r["position"])
+      existing.updatedAt = Date()
+      return existing.id
+    }
+    // An id that another task's reference holds: an insert would overwrite it.
+    guard try context.fetchCount(FetchDescriptor<TaskRefEntity>(predicate: #Predicate { $0.id == id })) == 0,
+          try context.fetchCount(FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.id == taskID })) > 0,
+          siblings.count < RegistryEntityLimits.maxRefsPerTask else { return nil }
+    let sync = TaskSyncEngine.shared
+    let liveID = sync.canRevive(.taskRef, id) ? id : sync.nextTaskRefID(taskID: taskID, key: key)
+    guard let liveID else { return nil }
+    let entity = TaskRefEntity(
+      id: liveID, taskID: taskID, key: key, kind: parsed?.kind ?? (r["kind"] as? String) ?? "",
+      role: role, snapshotJSON: snapshotJSON, position: doubleValue(r["position"]))
+    entity.createdBy = nonEmptyString(r["createdBy"])
+    entity.lastSeenAt = nonEmptyString(r["lastSeenAt"])
+    if let stamp = nonEmptyString(r["createdAt"]), let date = ISO8601DateFormatter().date(from: stamp) {
+      entity.createdAt = date
+    }
+    context.insert(entity)
+    return liveID
+  }
+
   private static func tagDict(_ e: TagEntity) -> [String: Any] {
     compact([
       "id": e.id,
@@ -665,6 +741,7 @@ enum TaskJSONTransfer {
   static func exportMarkdown(context: ModelContext? = nil, includeCompleted: Bool = true) throws -> String {
     let context = context ?? LocalStore.shared.container.mainContext
     let tagsByID = LocalCache.tagsByID(in: context)
+    let refsByTask = LocalCache.taskRefsByTask(in: context)
     let areas = try context.fetch(FetchDescriptor<AreaEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
     let projects = try context.fetch(FetchDescriptor<ProjectEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
       .filter { $0.deletedAt == nil }
@@ -723,6 +800,11 @@ enum TaskJSONTransfer {
       for step in steps {
         let stepBox = step.checked ? "[x]" : "[ ]"
         lines.append("\(indent)  - \(stepBox) \(step.title)")
+      }
+      for ref in refsByTask[t.id] ?? [] {
+        let title = TaskTitleText.singleLine(ref.title ?? ref.key)
+        let url = ref.webURL.map { " \($0.absoluteString)" } ?? ""
+        lines.append("\(indent)  - \(title)\(url)")
       }
     }
 
@@ -791,13 +873,14 @@ enum TaskJSONTransfer {
     let areas = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<AreaEntity>()).map { ($0.id, $0.title) })
     let projects = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<ProjectEntity>()).map { ($0.id, $0) })
     let tagsByID = LocalCache.tagsByID(in: context)
+    let refsByTask = LocalCache.taskRefsByTask(in: context)
     let allTasks = try context.fetch(FetchDescriptor<TaskEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
       .filter { $0.deletedAt == nil }
     let headings = Dictionary(uniqueKeysWithValues: allTasks.filter(\.isHeading).map { ($0.id, $0.title) })
     let rows = allTasks.filter { !$0.isHeading && (includeCompleted || $0.status == .open) }
 
     var out: [String] = [
-      "\u{FEFF}id,title,status,area,project,section,today,starred,tags,scheduled,start_time,duration_minutes,deadline,reminder_at,recurrence,notes,created,completed_at"
+      "\u{FEFF}id,title,status,area,project,section,today,starred,tags,scheduled,start_time,duration_minutes,deadline,reminder_at,recurrence,notes,created,completed_at,references"
     ]
     for t in rows {
       let projectEntity = t.project.flatMap { projects[$0] }
@@ -824,6 +907,7 @@ enum TaskJSONTransfer {
         t.notes ?? "",
         t.created ?? "",
         t.completedAt ?? "",
+        (refsByTask[t.id] ?? []).map(\.key).joined(separator: " "),
       ]
       out.append(cols.map(csvEscape).joined(separator: ","))
     }

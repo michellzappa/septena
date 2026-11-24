@@ -617,6 +617,83 @@ struct ChecklistItem: Identifiable, Codable, Hashable, Sendable {
   }
 }
 
+// MARK: - Task reference (docs/TASK_REFERENCES_SPEC.md §4, ADR 0031)
+
+/// What a reference is to its task (`taskRefRole` in `registry/entities.json`).
+enum TaskRefRole: String, Codable, CaseIterable, Sendable {
+  /// The task is about the item.
+  case about
+  /// The task was created from the item.
+  case from
+  case blockedBy = "blocked_by"
+  case followUp = "follow_up"
+}
+
+/// What a reference shows when its target is gone or cannot be opened here
+/// (§4.1). No body and no excerpt.
+struct TaskRefSnapshot: Codable, Hashable, Sendable {
+  var title: String?
+  /// Sender, repo, organiser or host.
+  var subtitle: String?
+  var date: String?
+  /// Web address of the item, `http` or `https` only.
+  var url: String?
+  /// The id before normalisation, for the resolver.
+  var rawId: String?
+  /// The mail account address, for the Gmail resolver.
+  var account: String?
+}
+
+/// A pointer from a task to the thing it is about: a canonical key and a small
+/// snapshot. It never syncs fields with its target.
+struct TaskRef: Identifiable, Hashable, Sendable {
+  let id: String
+  let taskId: String
+  /// `<kind>:<id>` in the core's normal form.
+  let key: String
+  /// Derived from `key` by the core. A kind this build does not know is kept.
+  let kind: String
+  /// `TaskRefRole` raw value. Text, so a role from a newer build survives.
+  var role: String
+  /// The stored snapshot, kept whole.
+  var snapshotJSON: String?
+  var position: Double?
+  var createdBy: String?
+  var lastSeenAt: String?
+  var createdAt: Date?
+
+  var snapshot: TaskRefSnapshot {
+    snapshotJSON.flatMap { try? JSONDecoder().decode(TaskRefSnapshot.self, from: Data($0.utf8)) }
+      ?? TaskRefSnapshot()
+  }
+
+  /// The part of `key` after the kind.
+  var keyID: String {
+    key.hasPrefix(kind + ":") ? String(key.dropFirst(kind.count + 1)) : key
+  }
+
+  /// The row title (§8): the snapshot's title, `owner/repo#n` for an issue,
+  /// host and path for a web page. Nil for the rest, where the surface shows
+  /// the kind's label. Never fetched from the network.
+  var title: String? {
+    if let title = snapshot.title, !title.isEmpty { return title }
+    switch kind {
+    case "issue": return keyID
+    case "url":
+      guard let parts = URLComponents(string: keyID), let host = parts.host else { return keyID }
+      return host + (parts.path == "/" ? "" : parts.path)
+    default: return nil
+    }
+  }
+
+  /// The item's stored web address, `http` or `https` only.
+  var webURL: URL? {
+    guard let url = URL(string: snapshot.url ?? (kind == "url" ? keyID : "")),
+          let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return nil }
+    return url
+  }
+}
+
 // MARK: - Recurrence
 
 /// A recurring task spawns a new instance when completed. `afterCompletion`

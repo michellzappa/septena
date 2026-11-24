@@ -52,22 +52,6 @@
     "RegistryRules.fadeGraceDays": {
       "reason": "The fade grace period is read by the shared Rust core (ADR 0025); Swift calls the core for fadeFill.",
       "issue": "#250"
-    },
-    "RegistryEntityLimits.maxRefsPerTask": {
-      "reason": "The Apple apps get task references in R1.",
-      "issue": "#387"
-    },
-    "RegistryEntityLimits.refKeyMax": {
-      "reason": "The Apple apps get task references in R1.",
-      "issue": "#387"
-    },
-    "RegistryEntityLimits.refSnapshotMax": {
-      "reason": "The Apple apps get task references in R1.",
-      "issue": "#387"
-    },
-    "RegistryEntityEnums.taskRefRole": {
-      "reason": "The Apple apps get task references in R1.",
-      "issue": "#387"
     }
   },
   "ts": {

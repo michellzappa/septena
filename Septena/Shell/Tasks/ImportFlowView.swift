@@ -563,7 +563,7 @@ enum ImportCopy {
     case "checklist": String(localized: "Checklists")
     case "tags": String(localized: "Tags")
     case "starred": String(localized: "Stars")
-    case "sourceURL": String(localized: "Links")
+    case "sourceURL", "refs": String(localized: "Links")
     case "completedAt": String(localized: "Completion dates")
     case "reminder": String(localized: "Reminders")
     case "recurrence": String(localized: "Repeats")

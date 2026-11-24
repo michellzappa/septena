@@ -900,6 +900,7 @@ final class LocalStore {
     let schema = Schema([TaskEntity.self,
                          TaskAttachmentEntity.self,
                          TaskChecklistItemEntity.self,
+                         TaskRefEntity.self,
                          TagEntity.self,
                          ProjectEntity.self,
                          AreaEntity.self,
@@ -1720,6 +1721,91 @@ extension LocalCache {
       out[r.taskID] = entry
     }
     return out
+  }
+}
+
+// MARK: - TaskRefEntity (docs/TASK_REFERENCES_SPEC.md §4)
+
+@Model
+final class TaskRefEntity {
+  @Attribute(.unique) var id: String
+  var taskID: String
+  var key: String
+  var kind: String = ""
+  var role: String = "about"
+  /// The snapshot as JSON, kept whole so a field from a newer build survives.
+  var snapshotJSON: String? = nil
+  var position: Double? = nil
+  /// Server-owned, never pushed, as `lastSeenAt` is.
+  var createdBy: String? = nil
+  var lastSeenAt: String? = nil
+  var createdAt: Date = Date()
+  var updatedAt: Date = Date()
+
+  init(id: String,
+       taskID: String,
+       key: String,
+       kind: String,
+       role: String = TaskRefRole.about.rawValue,
+       snapshotJSON: String? = nil,
+       position: Double? = nil,
+       createdAt: Date = Date(),
+       updatedAt: Date = Date()) {
+    self.id = id
+    self.taskID = taskID
+    self.key = key
+    self.kind = kind
+    self.role = role
+    self.snapshotJSON = snapshotJSON
+    self.position = position
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+  }
+}
+
+extension TaskRef {
+  init(_ entity: TaskRefEntity) {
+    self.init(
+      id: entity.id,
+      taskId: entity.taskID,
+      key: entity.key,
+      kind: entity.kind,
+      role: entity.role,
+      snapshotJSON: entity.snapshotJSON,
+      position: entity.position,
+      createdBy: entity.createdBy,
+      lastSeenAt: entity.lastSeenAt,
+      createdAt: entity.createdAt == .distantPast ? nil : entity.createdAt
+    )
+  }
+}
+
+extension LocalCache {
+  /// A task's references in order, one per key: two devices can hold two rows
+  /// for one key until the store settles which one lives.
+  @MainActor
+  static func taskRefs(forTaskID taskID: String, in context: ModelContext) -> [TaskRef] {
+    inOrder(StoreHealth.fetch(context, FetchDescriptor<TaskRefEntity>(
+      predicate: #Predicate { $0.taskID == taskID })))
+  }
+
+  /// Every task's references, for a whole-store export.
+  @MainActor
+  static func taskRefsByTask(in context: ModelContext) -> [String: [TaskRef]] {
+    Dictionary(grouping: StoreHealth.fetch(context, FetchDescriptor<TaskRefEntity>()), by: \.taskID)
+      .mapValues(inOrder)
+  }
+
+  private static func inOrder(_ rows: [TaskRefEntity]) -> [TaskRef] {
+    var keys = Set<String>()
+    return rows
+      .sorted {
+        let a = $0.position ?? .greatestFiniteMagnitude, b = $1.position ?? .greatestFiniteMagnitude
+        if a != b { return a < b }
+        return $0.createdAt != $1.createdAt ? $0.createdAt < $1.createdAt : $0.id < $1.id
+      }
+      .filter { keys.insert($0.key).inserted }
+      .map(TaskRef.init)
   }
 }
 

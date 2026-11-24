@@ -238,6 +238,32 @@ enum TaskBackendMapping {
     return finish(.checklistItem, item.id, c, fields, deleted: false)
   }
 
+  /// `kind`, `createdBy` and `lastSeenAt` are server-owned and never pushed.
+  /// No problem text holds a key or a snapshot: problems are logged (§10).
+  @MainActor
+  static func taskRef(_ ref: TaskRefEntity) -> Result<BackendRowPlan, TaskBackendIssue> {
+    var c = Checker()
+    c.rowID(ref.id)
+    if ref.key.isEmpty { c.problems.append("key is empty") }
+    if !RegistryEntityEnums.taskRefRole.contains(ref.role) { c.problems.append("role is not known") }
+    var snapshot = BackendJSON.null
+    if let json = ref.snapshotJSON {
+      if json.utf8.count > RegistryEntityLimits.refSnapshotMax {
+        c.problems.append("snapshot is larger than \(RegistryEntityLimits.refSnapshotMax) bytes")
+      }
+      snapshot = .object(TaskSyncJSON.decode(Data(json.utf8)))
+    }
+    let fields: [String: BackendJSON] = [
+      "taskId": c.id("taskId", ref.taskID),
+      "key": c.text("key", ref.key, max: RegistryEntityLimits.refKeyMax),
+      "role": .string(ref.role),
+      "snapshot": snapshot,
+      "position": ref.position.map { c.real("position", $0) } ?? .null,
+      "createdAt": ref.createdAt == .distantPast ? .null : .string(stamp(ref.createdAt)),
+    ]
+    return finish(.taskRef, ref.id, c, fields, deleted: false)
+  }
+
   @MainActor
   static func tag(_ tag: TagEntity) -> Result<BackendRowPlan, TaskBackendIssue> {
     var c = Checker()

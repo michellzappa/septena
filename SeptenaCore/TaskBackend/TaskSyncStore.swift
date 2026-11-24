@@ -252,6 +252,12 @@ final class TaskSyncStore {
     return out
   }
 
+  /// Shadows of one entity's deleted rows.
+  func goneShadows(entity: String) -> [TaskSyncShadow] {
+    let gone = (try? context.fetch(FetchDescriptor<TaskSyncShadow>(predicate: #Predicate { $0.gone }))) ?? []
+    return gone.filter { $0.key.hasPrefix(entity + ":") }
+  }
+
   /// Creates the shadow when missing.
   func upsertShadow(_ key: String, fields: [String: BackendJSON], gone: Bool? = nil) {
     if let s = shadow(key) {

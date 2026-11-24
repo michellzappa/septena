@@ -717,6 +717,28 @@ enum TaskUndo {
            redo: { mutator.reorderChecklistItems(taskID: taskID, orderedIDs: afterIDs) })
   }
 
+  // MARK: - References (docs/TASK_REFERENCES_SPEC.md §8)
+
+  static func recordTaskRefAdd(_ ref: TaskRef, mutator: TaskMutator) {
+    mutator.touch(ids: [ref.taskId])
+    var live = ref
+    record(name: String(localized: "Add Reference", comment: "Undo action name"),
+           undo: { mutator.removeTaskRef(id: live.id) },
+           redo: {
+             if let restored = mutator.restoreTaskRef(live) { live = restored }
+           })
+  }
+
+  static func recordTaskRefRemove(_ ref: TaskRef, mutator: TaskMutator) {
+    mutator.touch(ids: [ref.taskId])
+    var live = ref
+    record(name: String(localized: "Remove Reference", comment: "Undo action name"),
+           undo: {
+             if let restored = mutator.restoreTaskRef(live) { live = restored }
+           },
+           redo: { mutator.removeTaskRef(id: live.id) })
+  }
+
   // MARK: - Tags (docs/TAGS_SPEC.md)
 
   static func recordTaskTags(name: String = String(localized: "Change Tags", comment: "Undo action name"),
