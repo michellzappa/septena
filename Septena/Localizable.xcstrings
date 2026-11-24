@@ -7385,6 +7385,18 @@
         }
       }
     },
+    "This Apple ID's Plus belongs to another Septena account. Sign in to that account to use it." : {
+      "comment" : "Generated from registry plans.paywall.ownedOtherAccount. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Plus deste ID Apple pertence a outra conta do Septena. Entre nessa conta para usá-lo."
+          }
+        }
+      }
+    },
     "This area was deleted or is no longer available." : {
 
     },

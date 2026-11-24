@@ -193,6 +193,7 @@
     "ownedWeb": "You have Plus through the web. Manage it at septena.app.",
     "ownedGoogle": "You have Plus through Google Play. Manage it in Google Play.",
     "ownedGrant": "Plus is on for this account.",
+    "ownedOtherAccount": "This Apple ID's Plus belongs to another Septena account. Sign in to that account to use it.",
     "syncThisDeviceFailed": "Septena could not reach the server. Try again in a moment.",
     "done": "Done"
   },
