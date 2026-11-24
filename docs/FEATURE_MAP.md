@@ -8,8 +8,8 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 48 | 49 | 49 | 0 | 29 | 0 | 1 |
-| partial | 1 | 1 | 1 | 0 | 3 | 0 | 3 |
+| ships | 48 | 49 | 49 | 0 | 30 | 0 | 1 |
+| partial | 1 | 1 | 1 | 0 | 2 | 0 | 3 |
 | planned | 0 | 0 | 0 | 46 | 16 | 49 | 1 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 48 |
 
@@ -23,7 +23,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `lists.anytime` | Anytime | ships | ships | ships | planned | ships | planned | - |
 | `lists.repeating` | Repeating | ships | ships | ships | planned | ships | planned | - |
 | `lists.logbook` | Logbook | ships | ships | ships | planned | ships | planned | - |
-| `lists.faded` | Faded pile | ships | ships | ships | planned | partial | planned | - |
+| `lists.faded` | Faded pile | ships | ships | ships | planned | ships | planned | - |
 | `lists.starred` | Favorites list | ships | ships | ships | planned | ships | planned | - |
 | `lists.recently-deleted` | Recently Deleted (30 days) | ships | ships | ships | planned | ships | planned | - |
 | `places.areas` | Areas | ships | ships | ships | planned | ships | planned | - |

@@ -118,6 +118,9 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
             }
             actionId == RegistryActionIds.TASK_DELETE -> homeViewModel.delete(id)
             actionId == RegistryActionIds.TASK_RESTORE -> homeViewModel.restore(id)
+            actionId == RegistryActionIds.TASK_ACCEPT_REVIEW -> homeViewModel.acceptReview(id)
+            actionId == RegistryActionIds.TASK_KEEP_FADED -> homeViewModel.keepFaded(id)
+            actionId == RegistryActionIds.TASK_LET_GO_FADED -> homeViewModel.letGoFaded(id)
         }
     }
     val undoTitle = RegistryCatalog.actionTitle(
@@ -656,6 +659,9 @@ private fun taskRowMenuGroups(
         setOf(RegistryActionIds.TASK_RESTORE)
     } else {
         setOf(
+            RegistryActionIds.TASK_ACCEPT_REVIEW,
+            RegistryActionIds.TASK_KEEP_FADED,
+            RegistryActionIds.TASK_LET_GO_FADED,
             RegistryActionIds.TASK_OPEN,
             RegistryActionIds.TASK_WHEN,
             RegistryActionIds.TASK_MOVE,

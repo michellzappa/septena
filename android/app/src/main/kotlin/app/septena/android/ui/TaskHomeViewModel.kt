@@ -197,6 +197,24 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
+    fun acceptReview(id: String) = editTask(id) { graph.taskMutator.acceptReview(id) }
+
+    fun keepFaded(id: String) = editTask(id) { graph.taskMutator.keepFaded(id) }
+
+    fun letGoFaded(id: String) = editTask(id) { graph.taskMutator.letGoFaded(id) }
+
+    /** One undoable task edit off the main thread, then a sync. */
+    private fun editTask(id: String, edit: suspend () -> Any?) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.captureTaskEdit(id) { check(edit() != null) }
+                }
+            }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
+                .onFailure { errorMessage.value = it.message }
+        }
+    }
+
     fun restore(id: String) {
         viewModelScope.launch {
             runCatching {
