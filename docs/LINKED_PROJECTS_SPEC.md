@@ -1,6 +1,7 @@
 # Linked projects — spec
 
 **Status:** accepted, not started. Written and accepted 2026-11-19. Open questions keep their defaults until mz overrules them.
+**GitHub is out of this spec** since 2026-11-24 (ADR 0032): issues are followed, not mirrored. See [GITHUB_SPEC.md](GITHUB_SPEC.md). Read every GitHub rule below as historical. The spec still holds for Starlings and Linear, where the first provider now also builds the shared parts of L0 and L1.
 **Decisions:** [ADR 0002](adr/0002-own-backend-replaces-icloud.md),
 [ADR 0003](adr/0003-external-links-run-server-side.md).
 **Depends on:** the task backend (`docs/SEPTASK_BACKEND.md`). This spec
@@ -299,8 +300,8 @@ link pauses until another member reconnects it.
 
 | Phase | What | Exit check |
 |---|---|---|
-| L0 | `connections` + `links` tables, GitHub App auth, inbound poll, read-only links. | One repo's open issues show as tasks on every device; closing on GitHub completes them in Septask. |
-| L1 | Outbound for complete / reopen / title. Echo suppression. | Completing in Septask closes the issue; no loop in `changes`. |
+| ~~L0~~ | GitHub: replaced by `GITHUB_SPEC.md` G0 and G1. The tables move to L2. Was: `connections` + `links` tables, GitHub App auth, inbound poll, read-only links. | One repo's open issues show as tasks on every device; closing on GitHub completes them in Septask. |
+| ~~L1~~ | GitHub: dropped. Write-back moves to L2. Was: Outbound for complete / reopen / title. Echo suppression. | Completing in Septask closes the issue; no loop in `changes`. |
 | L2 | Starlings provider, several workspaces, dedupe by `extKey`. | A repo linked both directly and through a Starlings project shows each issue once. |
 | L3 | Notes ↔ body, deadline ↔ due date, "Send to GitHub/Starlings" for local tasks. | Edits round-trip without loss on a real project. |
 
@@ -308,8 +309,8 @@ link pauses until another member reconnects it.
 | L5 | Capture feeds: Gmail first. | A starred mail creates one Inbox task, once. |
 | L6 | Linear. | Same exit check as L0–L1, on a Linear team. |
 
-Phases L0–L1 also feed the task factory (`docs/TASK_FACTORY_SPEC.md`): a
-project linked to a repo is where the agent works.
+The task factory (`docs/TASK_FACTORY_SPEC.md`) uses `GITHUB_SPEC.md` G0: the
+project's `githubRepo` is where the agent works.
 
 ## 11. Open questions for mz
 
@@ -317,7 +318,5 @@ project linked to a repo is where the agent works.
 |---|---|
 | One link per project, or several remote scopes merged into one project? | One. |
 | Do local tasks in a linked project push to the remote automatically? | No; explicit "Send to…". |
-| Include pull requests from GitHub? | No. |
-| Which GitHub issues: all open, or only assigned to mz? | All open, with an "assigned to me" filter per link. |
 | On unlink, keep the rows as local tasks or remove them? | Keep. |
 | Privacy text: third-party tokens stored on the backend. | Add to the backend privacy text (backend spec §10). |

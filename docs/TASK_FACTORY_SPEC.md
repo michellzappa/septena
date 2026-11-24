@@ -185,7 +185,7 @@ asking. Set on a project; an area's profile is the default for its projects
 | Field | Values |
 |---|---|
 | `workflow` | `code`, `research`, `errand` (§7) |
-| `repo` | from the project's GitHub link (`docs/LINKED_PROJECTS_SPEC.md`); required for `code` |
+| `repo` | the project's `githubRepo` (`docs/GITHUB_SPEC.md`); required for `code` |
 | `autonomy` | `ask-first` (every step is a card), `reversible` (do reversible work alone, ask at forks and outward actions), `ship` (also open and merge PRs, per mz's merge rules) |
 | `reads` | which Septena data the agent may read for grounding (tasks only by default) |
 | `budget` | max runs per task before it must ask; optional cost cap per day |
@@ -318,7 +318,7 @@ links (issue, PR, commit).
 | F1a | Multi-user wake transport (signed webhook URL + SSE/WebSocket stream on `api.septena.app`) and scheduled/waking runner on `mz-mini` (15 min, max 2 parallel). | mz answers a card on the phone; `mz-mini` wakes immediately and posts the next turn with no interactive session open. |
 | F1b | APNs push notifications when a provider turn with options commits + up to 3 option actions on iOS and watch (requires mz's APNs `.p8` key in Cloudflare). | A question arrives as a notification on iPhone/watch; mz taps an option from the lock screen and the turn commits. |
 | F2 | Work profiles and approval cards. `errand` workflow. Kill switch. | An outward action waits for Approve; nothing outward happens without it. |
-| F3 | `code` workflow on linked repos (needs linked projects L0–L1). Run log and inspector list. | A note becomes an issue, a PR and a merge on this repo; mz tests from the `needs_verify` list. |
+| F3 | `code` workflow on linked repos (needs `GITHUB_SPEC.md` G0). Run log and inspector list. | A note becomes an issue, a PR and a merge on this repo; mz tests from the `needs_verify` list. |
 | F4 | `factory-day` questions route to Septask; daily digest from the run log; cloud-routine host. | One morning report and one question inbox for all of mz's personal factories. |
 
 ## 12. Open questions for mz

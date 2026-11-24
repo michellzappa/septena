@@ -86,7 +86,7 @@ platforms get their types from the registry generator.
 | `taskId` | id, required | Immutable after insert. |
 | `key` | text, max 1,000, required | Normalised. Immutable after insert. |
 | `kind` | text, max 32, server-owned | Derived from `key`. |
-| `role` | enum `taskRefRole`, default `about` | `about`, `from`, `blocked_by`, `follow_up`. |
+| `role` | enum `taskRefRole`, default `about` | `about`, `from`, `blocked_by`, `follow_up`, `tracked` (`GITHUB_SPEC.md` §2). |
 | `snapshot` | json, max 2,048 bytes | §4.1. |
 | `position` | real, null | Order inside the task. |
 | `createdBy` | text, server-owned | The actor of the insert (`app:…`, `mcp:…`, `capture:<feed>`). |
@@ -235,7 +235,8 @@ An agent can read a referenced item and propose completion with
 The apps and MCP already derive `issue` from conversation text
 (`TaskConvo.linkedIssue`, `issueLink`). A reference of kind `issue` comes
 first in that order. The conversation text stays the fallback, so no old row
-changes. Nothing is migrated.
+changes. Nothing is migrated here. Role `tracked` makes the task follow the
+issue, and its backfill is part of `GITHUB_SPEC.md` G0 (ADR 0032).
 
 ## 7. MCP and REST
 

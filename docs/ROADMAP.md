@@ -19,7 +19,8 @@ on a listed issue without the label). Feature IDs: Starlings Docs
 | Track | Spec | Label |
 |---|---|---|
 | Backend — leave iCloud | `docs/SEPTASK_BACKEND.md`, ADR 0002, ADR 0011 | `track:backend` |
-| Linked projects | `docs/LINKED_PROJECTS_SPEC.md`, ADR 0003 | `track:links` |
+| Linked projects (Starlings, Linear) | `docs/LINKED_PROJECTS_SPEC.md`, ADR 0003 | `track:links` |
+| GitHub | `docs/GITHUB_SPEC.md`, ADR 0032 | `track:links` |
 | Task references | `docs/TASK_REFERENCES_SPEC.md`, ADR 0031 | `track:links` |
 | Task factory | `docs/TASK_FACTORY_SPEC.md`, ADR 0005, ADR 0008 | `track:factory` |
 | Project sharing | `docs/PROJECT_SHARING_SPEC.md`, ADR 0004 | `track:sharing` |
@@ -131,7 +132,6 @@ Alongside the features:
 - #71 Connected agents and last activity in Settings
 - F0 claims/stop/pause (built 2026-11-19) + Agent smart list UI
 - #5 F1 scheduled runner, push questions, wake on answer
-- #6 L0 GitHub links (read-only) → #7 L1 GitHub write-back
 - Project notes as agent context (`docs/PROJECT_NOTES_SPEC.md`, ADR 0012):
   #120 N0 store rules and history → #121 N1 MCP tools and claim payload ·
   #122 N2 notes first in the app → #123 N3 proposals and history UI ·
@@ -146,7 +146,9 @@ accepts the result with no device awake in between.
 GitHub milestone: `"M3 Factory ships code"`.
 
 - F2 work profiles, approval cards, `errand`, kill switch
-- F3 `code` workflow on linked repos, run log (needs L0–L1)
+- GitHub (`docs/GITHUB_SPEC.md`, ADR 0032): #6 G0 follow (needs #386) → #7 G1
+  browse and pull → G2 send
+- F3 `code` workflow on a project's repo, run log (needs #6)
 - Shared cross-platform registries ([ADR 0015](adr/0015-shared-registries-for-cross-platform-clients.md),
   accepted; prerequisites to `#21`, `#20`, `#136`): `#141`–`#145` done (`registry/`
   with 9 JSON registries, Swift/TS codegen, `lint-design.sh` drift gate, and
@@ -200,7 +202,8 @@ GitHub milestone: `"M5 Breadth"`.
   ([ADR 0013](adr/0013-native-windows-app-on-the-android-code.md)):
   W0 shared Kotlin core → W1 Cloud PC spike → W2 first release scope →
   W3 signed installer and Store → W4 parity ledger. Starts after the #20 spike.
-- L3 notes / deadline sync, "Send to…" · L4 moves across lists
+- L3 notes / deadline sync, "Send to Starlings" · L4 moves across lists (not
+  GitHub, ADR 0032)
 - #15 L5 capture feeds (Gmail first) · #16 L6 Linear
 - S2 viewer role, activity, assignment push · S3 agents on shared projects
 - F4 `factory-day` routes questions to Septena; daily digest
