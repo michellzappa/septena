@@ -324,7 +324,7 @@ struct DetectedToken: Identifiable {
   static func dateLabel(_ d: Date) -> String {
     let cal = Calendar.current
     if cal.isDateInToday(d) { return "Today" }
-    if cal.isDateInTomorrow(d) { return "Tomorrow" }
+    if cal.isDateInTomorrow(d) { return RegistrySurfaces.tomorrowLabel }
     let f = DateFormatter()
     f.setLocalizedDateFormatFromTemplate("MMMd")
     return f.string(from: d)

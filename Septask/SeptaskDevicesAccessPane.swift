@@ -55,7 +55,7 @@ struct SeptaskDevicesAccessPane: View {
       Button("Sign Out", role: .destructive) { Task { await signOut(device) } }
       Button(RegistryPrompts.cancelTitle, role: .cancel) {}
     } message: { _ in
-      Text("That device stops syncing within the hour. Its tasks stay on it until you sign in there again.")
+      Text(RegistrySettings.copy("access_devices", "signOutMessage"))
     }
   }
 
@@ -84,7 +84,7 @@ struct SeptaskDevicesAccessPane: View {
   private func deviceRow(_ device: BackendAccess.Device) -> some View {
     LabeledContent {
       if device.current {
-        Text("Current device").foregroundStyle(.secondary)
+        Text(RegistrySettings.copy("access_devices", "currentDevice")).foregroundStyle(.secondary)
       } else {
         Button("Sign Out", role: .destructive) { pendingDevice = device }
           .buttonStyle(.borderless)
@@ -149,13 +149,13 @@ struct SeptaskDevicesAccessPane: View {
   /// A device's `X-Septena-Client` name, in words.
   static func deviceName(_ client: String?) -> String {
     switch client {
-    case "septask-ios": return String(localized: "iPhone or iPad")
-    case "septask-mac": return String(localized: "Mac")
-    case "septask-watch": return String(localized: "Apple Watch")
-    case let name? where name.contains("android"): return String(localized: "Android")
-    case let name? where name.contains("web"): return String(localized: "Browser")
+    case "septask-ios": return RegistrySettings.copy("access_devices", "deviceApplePhone")
+    case "septask-mac": return RegistrySettings.copy("access_devices", "deviceMac")
+    case "septask-watch": return RegistrySettings.copy("access_devices", "deviceWatch")
+    case let name? where name.contains("android"): return RegistrySettings.copy("access_devices", "deviceAndroid")
+    case let name? where name.contains("web"): return RegistrySettings.copy("access_devices", "deviceBrowser")
     case let name? where !name.isEmpty: return name
-    default: return String(localized: "Unknown device")
+    default: return RegistrySettings.copy("access_devices", "deviceUnknown")
     }
   }
 

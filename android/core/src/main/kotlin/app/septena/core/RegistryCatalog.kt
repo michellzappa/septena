@@ -24,6 +24,15 @@ object TaskPageBlockKinds {
     const val HISTORY: String = "history"
 }
 
+/** The closed set of date board row kinds (surfaces.json `taskDateBoard.rows[].kind`). */
+object DateBoardRowKinds {
+    const val TOMORROW: String = "tomorrow"
+    const val CALENDAR: String = "calendar"
+    const val CLEAR: String = "clear"
+    const val REPEAT_RULE: String = "repeatRule"
+    const val TIME: String = "time"
+}
+
 /** The two depths of the task page (ADR 0029). */
 object TaskPageDepths {
     const val INLINE: String = "inline"
@@ -43,6 +52,12 @@ data class TaskPageBlock(
 )
 
 /** One task attribute (surfaces.json `taskAttributes`), in registry order. */
+data class DateBoardRow(
+    val id: String,
+    val kind: String,
+    val label: String,
+)
+
 data class TaskAttribute(
     val id: String,
     val label: String,
@@ -66,6 +81,7 @@ object RegistryCatalog {
             "destinations" to RegistryDocuments.destinationsJson,
             "actions" to RegistryDocuments.actionsJson,
             "surfaces" to RegistryDocuments.surfacesJson,
+            "plans" to RegistryDocuments.plansJson,
             "conformance" to RegistryDocuments.conformanceJson,
             "localizations" to RegistryDocuments.localizationsJson,
         ).mapValues { (_, json) ->
@@ -194,6 +210,45 @@ object RegistryCatalog {
         }
 
     /**
+     * The rows under the day strip of [attribute]'s date board, in registry
+     * order, with localized labels (an attribute's own label wins).
+     */
+    fun dateBoardRows(
+        attribute: String,
+        platform: String = RegistryPlatformIds.ANDROID,
+        languageTag: String = "en",
+    ): List<DateBoardRow> =
+        dateBoardRowObjects().mapNotNull { fields ->
+            val id = fields.stringAt("id") ?: return@mapNotNull null
+            val kind = fields.stringAt("kind") ?: return@mapNotNull null
+            val featureId = fields.stringAt("featureId") ?: return@mapNotNull null
+            if (fields.arrayAt("attributes").orEmpty().none { it.stringValue() == attribute }) return@mapNotNull null
+            if (capabilityStatus(featureId, platform) == CAPABILITY_NOT_APPLICABLE) return@mapNotNull null
+            val own = fields.arrayAt("attributeLabels").orEmpty()
+                .mapNotNull { it as? JsonValue.ObjectValue }
+                .firstOrNull { it.stringAt("attribute") == attribute }
+                ?.stringAt("label")
+            val label = own ?: fields.stringAt("label")
+            DateBoardRow(
+                id = id,
+                kind = kind,
+                label = label?.let { localizedString(it, languageTag) ?: it }
+                    ?: fields.stringAt("action")?.let { actionTitle(it, languageTag = languageTag) }.orEmpty(),
+            )
+        }
+
+    /** The calendar row's label when the task has a date past the day strip. */
+    fun dateBoardCalendarLabel(date: String, languageTag: String = "en"): String? =
+        dateBoardRowObjects().firstOrNull { it.stringAt("kind") == DateBoardRowKinds.CALENDAR }
+            ?.stringAt("valueLabel")
+            ?.let { localizedString(it, languageTag) ?: it }
+            ?.replace("{date}", date)
+
+    private fun dateBoardRowObjects(): List<JsonValue.ObjectValue> =
+        document("surfaces").objectAt(TASK_DATE_BOARD_KEY)?.arrayAt("rows").orEmpty()
+            .mapNotNull { it as? JsonValue.ObjectValue }
+
+    /**
      * The task page blocks for [depth], in registry order, with localized labels.
      * The capability gate drops a block whose feature is `not_applicable` on
      * [platform]. A `planned` block stays in the list: the platform decides if it
@@ -271,6 +326,7 @@ object RegistryCatalog {
 
     private const val TASK_ATTRIBUTES_KEY = "taskAttributes"
     private const val TASK_PAGE_KEY = "taskPage"
+    private const val TASK_DATE_BOARD_KEY = "taskDateBoard"
     private const val CAPABILITY_NOT_APPLICABLE = "not_applicable"
     private const val DESTINATION_INLINE_CREATE_FIELD = "supportsInlineCreate"
     private const val ACTION_ADD_TITLE_FIELD = "addTitle"

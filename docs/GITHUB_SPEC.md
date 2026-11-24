@@ -1,6 +1,6 @@
 # GitHub — spec
 
-**Status:** accepted 2026-11-24, not started.
+**Status:** dropped 2026-11-24, never built. Superseded by [ADR 0033](adr/0033-no-github-integration-issue-links-are-references.md). Issue links: [TASK_REFERENCES_SPEC.md](TASK_REFERENCES_SPEC.md) §6.6.
 **Decisions:** [ADR 0032](adr/0032-github-issues-are-followed-not-mirrored.md),
 [ADR 0031](adr/0031-references-are-keyed-pointers.md),
 [ADR 0003](adr/0003-external-links-run-server-side.md).

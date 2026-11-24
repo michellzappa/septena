@@ -8,9 +8,14 @@ import SwiftUI
 // each is a popover anchored to that row — no sheet, no modal window. The
 // Repeat editor below is the third member of that family.
 //
-// Layout is a ONE-WEEK day strip starting at TODAY, then "Pick another date",
-// then Clear: scheduling answers "which of the next few days", so the popover
-// shows seven labeled cells (weekday over day number) instead of a month grid.
+// Layout is a ONE-WEEK day strip starting at TODAY, then one list of rows
+// (Tomorrow, Pick another date, Clear, Repeat, Add time). The rows, their order
+// and their words come from the registry (`RegistrySurfaces.dateBoardRows`),
+// and every row is the same `KitDateCell`. Tomorrow is also the strip's second
+// cell; its row stays because "tomorrow" is an answer people look for by name
+// (decided 2026-11-24). Scheduling answers "which of the next few days", so the
+// popover shows seven labeled cells (weekday over day number) instead of a
+// month grid.
 // Today is the strip's FIRST CELL, and its weekday line reads "Today". There
 // used to be a separate Today row above a strip that started tomorrow — one
 // question asked by two controls in two vocabularies — and the two were
@@ -19,12 +24,12 @@ import SwiftUI
 // Anything further out than the strip lives behind "Pick another date", which
 // swaps the board for `NSDatePicker`'s month calendar in place (a nested
 // popover would dismiss this transient one). That row is the AppKit twin of
-// SwiftUI's, so both boards offer the same four things: the week, a month, a
-// clear, and nothing else.
+// SwiftUI's, so both boards offer the same things: the week, tomorrow, a month,
+// a clear, and (When only) the repeat and the time.
 //
 // The board is keyboard-first and walks ONE axis — time. ↓ and → step later,
-// ↑ and ← step earlier, straight through the seven days → Pick another date →
-// Clear. Return picks, Escape closes. On the calendar page the same four keys
+// ↑ and ← step earlier, straight through the seven days and then down the
+// rows. Return picks, Escape closes. On the calendar page the same four keys
 // move the date itself (←/→ a day, ↑/↓ a week), Return commits it and Escape
 // returns to the week. One highlight language throughout — the shell's
 // `SeptaskKitTheme.listSelectionFill` wash, moved by BOTH keyboard and hover,
@@ -36,19 +41,7 @@ import SwiftUI
 @MainActor
 enum SeptaskKitDatePopover {
 
-  enum Kind {
-    case when
-    case deadline
-
-    var clearTitle: String {
-      switch self {
-      case .when:
-        return String(localized: "Clear (Anytime)", comment: "SeptaskKit: date popover clear")
-      case .deadline:
-        return String(localized: "No Deadline", comment: "SeptaskKit: date popover clear")
-      }
-    }
-  }
+  typealias Kind = RegistryDateBoardAttribute
 
   /// `nil` date = the caller clears; `today` distinguishes the Today flag
   /// from a dated schedule for `.when`.
@@ -1381,11 +1374,11 @@ private final class KitReminderBoard: NSView {
 
 // MARK: - Board
 
-/// The popover's body: a seven-day strip starting today, "Pick another date",
-/// and Clear — plus the key handling that walks them.
+/// The popover's body: a seven-day strip starting today and the registry's
+/// date board rows — plus the key handling that walks them.
 ///
-/// Navigation is LINEAR, not grid-shaped: each day in order → Pick another
-/// date → Clear. ↓ and → both step forward in time, ↑ and ← both step back, so
+/// Navigation is LINEAR, not grid-shaped: each day in order, then each row
+/// in order. ↓ and → both step forward in time, ↑ and ← both step back, so
 /// "down" always means "later" no matter which part of the board holds focus.
 /// A ragged (row, column) model made ↓ jump from a day to Clear, which reads
 /// as a different axis than the one the user is walking.
@@ -1401,14 +1394,15 @@ private final class KitDateBoard: NSView {
   private let onRepeat: (() -> Void)?
   private var startTime: String?
   private var durationMinutes: Int?
-  private let timeDisclosureButton = NSButton()
+  private var timeCell: KitDateCell?
   private let timeControlsContainer = NSStackView()
   private let startTimePicker = NSDatePicker()
   private var durationPills: [(minutes: Int, pill: KitPillButton)] = []
 
-  /// Every focusable cell in time order: the seven days, then Pick another
-  /// date, then Clear.
+  /// Every focusable cell in order: the seven days, then the visible rows.
   private var cells: [KitDateCell] = []
+  private var dayCells: [KitDateCell] = []
+  private var rowCells: [KitDateCell] = []
   private var focusIndex = 0
 
   /// The one child of `pageHost` — the week board, or the month calendar.
@@ -1434,6 +1428,8 @@ private final class KitDateBoard: NSView {
   /// so a selected row never collides with the popover's rounded corners.
   private static let padding: CGFloat = 8
   private static let rowHeight: CGFloat = 32
+  /// Rows are one list: the gap only keeps two highlights from touching.
+  private static let rowSpacing: CGFloat = 2
   /// 44, not 40, so the first cell's "Today" label fits without shrinking.
   private static let dayWidth: CGFloat = 44
   private static let dayHeight: CGFloat = 48
@@ -1502,7 +1498,6 @@ private final class KitDateBoard: NSView {
     strip.orientation = .horizontal
     strip.spacing = Self.daySpacing
     strip.distribution = .fillEqually
-    var dayCells: [KitDateCell] = []
     for offset in Self.dayOffsets {
       let date = KitDayFormat.day(offset: offset) ?? today
       let cell = KitDateCell(radius: 10, height: Self.dayHeight) { [weak self] in
@@ -1518,11 +1513,8 @@ private final class KitDateBoard: NSView {
       dayCells.append(cell)
     }
 
-    let calendarCell = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
-      self?.showCalendar()
-    }
-    // A current value past the strip is named on this row, so the popover
-    // always shows what the task has now.
+    // A current value past the strip is named on the calendar row, so the
+    // popover always shows what the task has now.
     let beyondStrip = initial.map { value in
       !Self.dayOffsets.contains { offset in
         KitDayFormat.day(offset: offset).map {
@@ -1530,86 +1522,73 @@ private final class KitDateBoard: NSView {
         } ?? false
       }
     } ?? false
-    var calendarTitle = String(localized: "Pick another date",
-                               comment: "SeptaskKit: date popover calendar row")
-    if beyondStrip, let initial {
-      calendarTitle = String(format: String(localized: "Pick another date (%@)",
-                                            comment: "SeptaskKit: date popover calendar row with current value"),
-                             Self.setFormatter.string(from: initial))
-    }
-    calendarCell.fillRow(symbol: "calendar", tint: SeptaskKitTheme.inkSecondary,
-                         title: calendarTitle)
-    calendarCell.isCurrentValue = beyondStrip
-
-    let clearCell = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
-      self?.onPick(nil, false)
-    }
-    clearCell.fillRow(symbol: "xmark.circle", tint: SeptaskKitTheme.iconMuted,
-                      title: kind.clearTitle)
-
-    let topSeparator = NSBox()
-    topSeparator.boxType = .separator
-    let bottomSeparator = NSBox()
-    bottomSeparator.boxType = .separator
 
     typedLabel.font = SeptaskKitTheme.meta
     typedLabel.textColor = SeptaskKitTheme.iconMuted
     typedLabel.lineBreakMode = .byTruncatingTail
     updateTypedLabel()
 
-    let stack = NSStackView(views: [typedLabel, strip, topSeparator, calendarCell,
-                                    bottomSeparator, clearCell])
+    let separator = NSBox()
+    separator.boxType = .separator
+
+    let stack = NSStackView(views: [typedLabel, strip, separator])
     stack.orientation = .vertical
     stack.alignment = .leading
-    stack.spacing = 6
+    stack.spacing = Self.rowSpacing
     stack.detachesHiddenViews = true
     stack.setCustomSpacing(8, after: typedLabel)
     stack.setCustomSpacing(8, after: strip)
-    stack.setCustomSpacing(4, after: topSeparator)
-    stack.setCustomSpacing(8, after: calendarCell)
-    stack.setCustomSpacing(4, after: bottomSeparator)
+    stack.setCustomSpacing(4, after: separator)
 
-    // Repeat is set where the date is set: one row under Clear that opens
-    // the Repeat editor. Last cell on the time axis, so ↓ reaches it.
-    var repeatCell: KitDateCell?
-    if let repeatTitle, let onRepeat {
-      let repeatSeparator = NSBox()
-      repeatSeparator.boxType = .separator
-      let cell = KitDateCell(radius: 8, height: Self.rowHeight) { onRepeat() }
-      cell.fillRow(symbol: RegistryIcons.sfSymbol(for: "action.repeat"),
-                   tint: SeptaskKitTheme.inkSecondary, title: repeatTitle)
-      stack.setCustomSpacing(8, after: clearCell)
-      stack.addArrangedSubview(repeatSeparator)
+    var calendarCell: KitDateCell?
+    for row in RegistrySurfaces.dateBoardRows(for: kind, on: RegistryPlatform.current) {
+      var title = row.label(for: kind)
+      let action: () -> Void
+      switch row.kind {
+      case .tomorrow:
+        action = { [weak self] in
+          guard let tomorrow = KitDayFormat.day(offset: 1) else { return }
+          self?.pick(tomorrow)
+        }
+      case .calendar:
+        if beyondStrip, let initial {
+          title = RegistrySurfaces.dateBoardCalendarLabel(
+            date: Self.setFormatter.string(from: initial))
+        }
+        action = { [weak self] in self?.showCalendar() }
+      case .clear:
+        action = { [weak self] in self?.onPick(nil, false) }
+      case .repeatRule:
+        guard let repeatTitle, let onRepeat else { continue }
+        title = repeatTitle
+        action = onRepeat
+      case .time:
+        guard onTimeSlotChange != nil else { continue }
+        action = { [weak self] in self?.revealTimeControls() }
+      }
+      let cell = KitDateCell(radius: 8, height: Self.rowHeight, action: action)
+      cell.fillRow(symbol: row.sfSymbol, tint: SeptaskKitTheme.inkSecondary, title: title)
+      // A constant, not the strip's anchor: the stack detaches a hidden row
+      // (Add time), and a constraint across views would not survive that.
+      cell.widthAnchor.constraint(equalToConstant: Self.boardWidth).isActive = true
       stack.addArrangedSubview(cell)
-      stack.setCustomSpacing(4, after: repeatSeparator)
-      repeatSeparator.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
-      cell.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
-      repeatCell = cell
+      rowCells.append(cell)
+      if row.kind == .calendar {
+        cell.isCurrentValue = beyondStrip
+        calendarCell = cell
+      } else if row.kind == .time {
+        timeCell = cell
+      }
     }
 
     // Progressive-disclosure optional start/end time section (`.when` only,
     // docs/TASK_TIMES_AND_ICAL_SPEC.md §2).
-    if kind == .when, onTimeSlotChange != nil {
-      let timeSep = NSBox()
-      timeSep.boxType = .separator
-      stack.addArrangedSubview(timeSep)
-      timeSep.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
-
-      timeDisclosureButton.isBordered = false
-      timeDisclosureButton.bezelStyle = .inline
-      timeDisclosureButton.imagePosition = .imageLeading
-      timeDisclosureButton.image = NSImage(systemSymbolName: "clock", accessibilityDescription: nil)?
-        .withSymbolConfiguration(.init(pointSize: 11, weight: .regular))
-      timeDisclosureButton.title = String(localized: "Add time", comment: "SeptaskKit: add start time disclosure")
-      timeDisclosureButton.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
-      timeDisclosureButton.contentTintColor = SeptaskKitTheme.inkSecondary
-      timeDisclosureButton.target = self
-      timeDisclosureButton.action = #selector(revealTimeControls)
-      stack.addArrangedSubview(timeDisclosureButton)
-
+    if let timeCell {
       timeControlsContainer.orientation = .vertical
       timeControlsContainer.alignment = .leading
       timeControlsContainer.spacing = 6
+      // The same inset as a row, so the controls sit in the rows' column.
+      timeControlsContainer.edgeInsets = NSEdgeInsets(top: 6, left: 10, bottom: 4, right: 10)
       timeControlsContainer.translatesAutoresizingMaskIntoConstraints = false
 
       let topRow = NSStackView()
@@ -1660,19 +1639,17 @@ private final class KitDateBoard: NSView {
       timeControlsContainer.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
 
       let hasTime = startTime != nil
-      timeDisclosureButton.isHidden = hasTime
+      timeCell.isHidden = hasTime
       timeControlsContainer.isHidden = !hasTime
     }
 
-    // The strip sets the width; the single-cell rows match it so every
-    // highlight spans the same column.
-    for view in [typedLabel, calendarCell, clearCell, topSeparator,
-                 bottomSeparator] as [NSView] {
+    // The strip sets the width; everything else matches it.
+    for view in [typedLabel, separator] as [NSView] {
       view.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
     }
 
-    cells = dayCells + [calendarCell, clearCell] + (repeatCell.map { [$0] } ?? [])
-    for cell in cells {
+    refreshCells()
+    for cell in dayCells + rowCells {
       cell.onHover = { [weak self] hovered in self?.focus(cell: hovered) }
     }
 
@@ -1684,7 +1661,7 @@ private final class KitDateBoard: NSView {
       return Calendar.current.isDate(date, inSameDayAs: initial)
     }) {
       focusIndex = index
-    } else if beyondStrip, let index = cells.firstIndex(where: { $0 === calendarCell }) {
+    } else if beyondStrip, let calendarCell, let index = cells.firstIndex(where: { $0 === calendarCell }) {
       // Past the strip: start on "Pick another date", which opens on it.
       focusIndex = index
     }
@@ -1810,14 +1787,15 @@ private final class KitDateBoard: NSView {
     }
   }
 
-  @objc private func revealTimeControls() {
+  private func revealTimeControls() {
     if startTime == nil {
       startTime = "09:00"
       startTimePicker.dateValue = TaskTimeSlot.pickerDate(from: startTime)
       onTimeSlotChange?(startTime, durationMinutes)
     }
-    timeDisclosureButton.isHidden = true
+    timeCell?.isHidden = true
     timeControlsContainer.isHidden = false
+    refreshCells()
   }
 
   @objc private func startTimeChanged() {
@@ -1839,11 +1817,20 @@ private final class KitDateBoard: NSView {
     durationMinutes = nil
     for entry in durationPills { entry.pill.isOn = false }
     timeControlsContainer.isHidden = true
-    timeDisclosureButton.isHidden = false
+    timeCell?.isHidden = false
+    refreshCells()
     onTimeSlotChange?(nil, nil)
   }
 
   // MARK: Focus
+
+  /// The Add time row leaves the walk while its controls show.
+  private func refreshCells() {
+    rowCells.forEach { $0.isFocused = false }
+    cells = dayCells + rowCells.filter { !$0.isHidden }
+    focusIndex = min(focusIndex, cells.count - 1)
+    applyFocus()
+  }
 
   private func applyFocus() {
     for (index, cell) in cells.enumerated() {
@@ -2030,10 +2017,13 @@ private final class KitDateCell: NSView {
     image.symbolConfiguration = NSImage.SymbolConfiguration(
       pointSize: SeptenaTypeScale.size(.body), weight: .regular)
     image.contentTintColor = tint
+    // One icon column: symbols differ in width, and titles must line up.
+    image.widthAnchor.constraint(equalToConstant: SeptenaTypeScale.size(.body) + 6).isActive = true
 
     let label = NSTextField(labelWithString: title)
     label.font = .systemFont(ofSize: SeptenaTypeScale.size(.body))
     label.textColor = titleColor
+    label.lineBreakMode = .byTruncatingTail
 
     let stack = NSStackView(views: [image, label])
     stack.orientation = .horizontal

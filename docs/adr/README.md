@@ -8,7 +8,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 |---|---|---|
 | [0001](0001-record-decisions.md) | Record decisions as ADRs; plan with specs, roadmap, issues | accepted |
 | [0002](0002-own-backend-replaces-icloud.md) | Own backend replaces iCloud | accepted |
-| [0003](0003-external-links-run-server-side.md) | External links run on the server; the remote owns mapped fields | accepted; amended by 0032 for GitHub |
+| [0003](0003-external-links-run-server-side.md) | External links run on the server; the remote owns mapped fields | accepted; GitHub dropped by 0033 |
 | [0004](0004-shared-projects-own-store.md) | A shared project lives in its own store | accepted |
 | [0005](0005-tasks-as-factory-intake.md) | Tasks are factory intake; agents ask in the app | accepted |
 | [0006](0006-tasks-fade-by-default.md) | Tasks fade by default; the list asks why a task is stuck | accepted |
@@ -36,7 +36,8 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0028](0028-registry-owns-vocabulary-platforms-own-interaction.md) | The registry owns vocabulary; each platform owns layout and interaction | accepted |
 | [0029](0029-one-task-page-two-depths.md) | One task page with two depths; one picker per attribute | accepted |
 | [0031](0031-references-are-keyed-pointers.md) | A task reference is a keyed pointer, separate from a link | accepted |
-| [0032](0032-github-issues-are-followed-not-mirrored.md) | Follow GitHub issues, do not mirror them | accepted |
+| [0032](0032-github-issues-are-followed-not-mirrored.md) | Follow GitHub issues, do not mirror them | superseded by 0033 |
+| [0033](0033-no-github-integration-issue-links-are-references.md) | Drop the GitHub integration; issue links are references | accepted |
 
 ## Template
 

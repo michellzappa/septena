@@ -52,9 +52,9 @@ struct TaskListModalPresenter: ViewModifier {
           let slot = (!bulk && applyTimeSlot != nil) ? applyTimeSlot : nil
           DatePickerSheet(
             title: bulk ? "When (\(sheet.taskIds.count) tasks)" : "When",
+            attribute: .when,
             initialDate: currentScheduled(firstId),
             initialToday: !bulk && first?.today == true,
-            clearLabel: "No Date",
             initialStartTime: bulk ? nil : first?.startTime,
             initialDurationMinutes: bulk ? nil : first?.durationMinutes,
             onTimeSlotChange: slot.map { apply in { start, minutes in apply(sheet.taskIds, start, minutes) } },
@@ -69,8 +69,8 @@ struct TaskListModalPresenter: ViewModifier {
         case .deadline:
           DatePickerSheet(
             title: bulk ? "Deadline (\(sheet.taskIds.count) tasks)" : "Deadline",
-            initialDate: currentDeadline(firstId),
-            clearLabel: "Remove Deadline"
+            attribute: .deadline,
+            initialDate: currentDeadline(firstId)
           ) { date in
             applyWhen(sheet.taskIds, .deadline, date)
           }

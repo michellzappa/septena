@@ -150,6 +150,9 @@ enum RegistryIcons {
     "action.schedule": "calendar",
     "action.when": "calendar",
     "action.deadline": "flag",
+    "date.tomorrow": "sunrise",
+    "date.clear": "xmark.circle",
+    "date.time": "clock",
     "action.clear_schedule": "calendar.badge.minus",
     "action.move": "folder",
     "action.more": "ellipsis",
@@ -666,6 +669,79 @@ enum RegistrySettings {
   /// Label of a setting item; the key when the registry has none.
   static func label(key: String) -> String { itemByKey[key]?.label ?? key }
   static func aboutHeaderDetail(version: String) -> String { RegistryL10n.format("Version %@", english: "Version %@", args: [version]) }
+  /// Plain copy of a settings surface (`copy` in settings.json); the copy id when the registry has none.
+  static func copy(_ surface: String, _ id: String) -> String { copyTable[surface + "." + id] ?? id }
+  private static let copyTable: [String: String] = [
+    "account_profile_card.yourProfile": RegistryL10n.t("Your Profile"),
+    "account_profile_card.signInToSync": RegistryL10n.t("On this device · Sign in to sync"),
+    "syncStatus.syncing": RegistryL10n.t("Syncing"),
+    "syncStatus.synced": RegistryL10n.t("Synced"),
+    "syncStatus.offline": RegistryL10n.t("Offline"),
+    "syncStatus.needsSignIn": RegistryL10n.t("Sign in"),
+    "access_devices.currentDevice": RegistryL10n.t("Current device"),
+    "access_devices.signOutMessage": RegistryL10n.t("That device stops syncing within the hour. Its tasks stay on it until you sign in there again."),
+    "access_devices.deviceApplePhone": RegistryL10n.t("iPhone or iPad"),
+    "access_devices.deviceMac": RegistryL10n.t("Mac"),
+    "access_devices.deviceWatch": RegistryL10n.t("Apple Watch"),
+    "access_devices.deviceAndroid": RegistryL10n.t("Android"),
+    "access_devices.deviceBrowser": RegistryL10n.t("Browser"),
+    "access_devices.deviceUnknown": RegistryL10n.t("Unknown device"),
+    "ai_explainer.title": RegistryL10n.t("How AI helps"),
+    "ai_explainer.intro": RegistryL10n.t("Some tasks need thinking before you can act. Tap Discuss and talk them through, right on the task."),
+    "ai_explainer.flowHeader": RegistryL10n.t("How a task conversation moves"),
+    "ai_explainer.captureTitle": RegistryL10n.t("Capture"),
+    "ai_explainer.captureDetail": RegistryL10n.t("Jot down the task. A few words are enough."),
+    "ai_explainer.confirmTitle": RegistryL10n.t("Confirm"),
+    "ai_explainer.confirmDetail": RegistryL10n.t("AI asks what you mean. Nothing happens until you answer."),
+    "ai_explainer.lookUpTitle": RegistryL10n.t("Look up"),
+    "ai_explainer.lookUpDetail": RegistryL10n.t("Pulls relevant context from your own data."),
+    "ai_explainer.decideTitle": RegistryL10n.t("Decide"),
+    "ai_explainer.decideDetail": RegistryL10n.t("Offers a few options for you to pick. A harder call may use the cloud."),
+    "ai_explainer.workTitle": RegistryL10n.t("Work"),
+    "ai_explainer.workDetail": RegistryL10n.t("Does what it can: a draft, a comparison. Uses the web or your Claude only when needed."),
+    "ai_explainer.handOffTitle": RegistryL10n.t("Hand off"),
+    "ai_explainer.handOffDetail": RegistryL10n.t("Anything only you can do (pay, send) becomes one clear button."),
+    "ai_explainer.runsOnDevice": RegistryL10n.t("On-device"),
+    "ai_explainer.runsReaches": RegistryL10n.t("On-device ↗"),
+    "ai_explainer.flowFooter": RegistryL10n.t("On Automatic, every step runs on your device first. It reaches further only for steps your device can’t do (↗)."),
+    "ai_explainer.turnHeader": RegistryL10n.t("Whose turn?"),
+    "ai_explainer.turnYours": RegistryL10n.t("Your turn: a question is waiting"),
+    "ai_explainer.turnAI": RegistryL10n.t("AI’s turn: it’s working"),
+    "ai_explainer.turnDone": RegistryL10n.t("Done"),
+    "ai_explainer.localHeader": RegistryL10n.t("Some help is always on your device"),
+    "ai_explainer.privateHeader": RegistryL10n.t("Your AI, never our servers"),
+    "ai_explainer.closing": RegistryL10n.t("Nothing important happens on its own. AI can fill in small, reversible details; any real decision or action that can’t be undone waits for your confirmation."),
+    "mcp_skills.copySkill": RegistryL10n.t("Copy Skill"),
+    "mcp_skills.copyFooter": RegistryL10n.t("Paste into a model's context to teach it the task tools without connecting MCP."),
+    "mcp_skills.loadFailed": RegistryL10n.t("The brief did not load. Check your connection and open this page again."),
+    "smart_lists_editor.topHeader": RegistryL10n.t("Above Areas & Projects"),
+    "smart_lists_editor.topFooter": RegistryL10n.t("Working lists shown at the top of the sidebar."),
+    "smart_lists_editor.bottomHeader": RegistryL10n.t("Below Areas & Projects"),
+    "smart_lists_editor.bottomFooter": RegistryL10n.t("Archive and utility lists shown below your areas and projects. Drag to reorder within a section, or use the arrow button to move a list above or below. Changes sync across all your devices."),
+    "smart_lists_editor.bottomFooterButtons": RegistryL10n.t("Archive and utility lists shown below your areas and projects. Use the arrows to reorder a list or to move it above or below. Changes sync across all your devices."),
+    "smart_lists_editor.reset": RegistryL10n.t("Reset to Defaults"),
+    "smart_lists_editor.empty": RegistryL10n.t("No smart lists in this section"),
+    "smart_lists_editor.alwaysShown": RegistryL10n.t("Always shown"),
+    "smart_lists_editor.whenNonEmpty": RegistryL10n.t("Shown when non-empty"),
+    "smart_lists_editor.moveBelow": RegistryL10n.t("Move below Areas & Projects"),
+    "smart_lists_editor.moveAbove": RegistryL10n.t("Move above Areas & Projects"),
+    "smart_lists_editor.moveUp": RegistryL10n.t("Move up"),
+    "smart_lists_editor.moveDown": RegistryL10n.t("Move down"),
+    "sync_diagnostics.issues": RegistryL10n.t("Sync issues"),
+    "sync_diagnostics.clear": RegistryL10n.t("Clear sync issues"),
+    "calendar_detail.feedHeader": RegistryL10n.t("Calendar Feed (iCal)"),
+    "calendar_detail.feedSignIn": RegistryL10n.t("Sign in to Septena sync to create a private calendar feed URL for Apple Calendar, Google Calendar, or Outlook."),
+    "calendar_detail.feedToggle": RegistryL10n.t("Private iCal feed"),
+    "calendar_detail.include": RegistryL10n.t("Include"),
+    "calendar_detail.scopeAll": RegistryL10n.t("All dated tasks"),
+    "calendar_detail.scopeTimed": RegistryL10n.t("Timed tasks only"),
+    "calendar_detail.copyUrl": RegistryL10n.t("Copy URL"),
+    "calendar_detail.openInCalendar": RegistryL10n.t("Open in Calendar"),
+    "calendar_detail.rotate": RegistryL10n.t("Rotate Link"),
+    "calendar_detail.rotateTitle": RegistryL10n.t("Rotate Calendar Feed Link?"),
+    "calendar_detail.rotateMessage": RegistryL10n.t("Rotating replaces your private feed link immediately. Existing calendar subscriptions will stop updating until you re-subscribe with the new URL."),
+    "calendar_detail.feedFooter": RegistryL10n.t("Read-only subscription feed for your scheduled tasks and deadlines. Anyone with the private URL can read titles and notes in the feed; rotate or disable it anytime."),
+  ]
 }
 
 /// Canonical smart-list metadata (`registry/destinations.json`).
@@ -1500,6 +1576,21 @@ enum RegistrySurfaces {
   static func taskPageBlocks(_ depth: RegistryTaskPageDepth, on platform: String, isEditing: Bool = true) -> [RegistryTaskPageBlock] {
     taskPageBlocks.filter { $0.depths.contains(depth) && $0.applies(to: platform) && (isEditing || !$0.editOnly) }
   }
+  /// The rows under the date board's day strip, in order (`surfaces.json` `taskDateBoard`).
+  static let dateBoardRows: [RegistryDateBoardRow] = [
+    RegistryDateBoardRow(id: "dateBoard.tomorrow", kind: .tomorrow, label: RegistryL10n.t("Tomorrow"), attributeLabels: [:], sfSymbol: "sunrise", attributes: [.when, .deadline], featureId: "task.when-deadline"),
+    RegistryDateBoardRow(id: "dateBoard.calendar", kind: .calendar, label: RegistryL10n.t("Pick another date"), attributeLabels: [:], sfSymbol: "calendar", attributes: [.when, .deadline], featureId: "task.when-deadline"),
+    RegistryDateBoardRow(id: "dateBoard.clear", kind: .clear, label: RegistryL10n.t("Clear (Anytime)"), attributeLabels: [.deadline: RegistryL10n.t("No Deadline")], sfSymbol: "xmark.circle", attributes: [.when, .deadline], featureId: "task.when-deadline"),
+    RegistryDateBoardRow(id: "dateBoard.repeatRule", kind: .repeatRule, label: RegistryL10n.t("Repeat…"), attributeLabels: [:], sfSymbol: "arrow.clockwise", attributes: [.when], featureId: "task.repeat"),
+    RegistryDateBoardRow(id: "dateBoard.time", kind: .time, label: RegistryL10n.t("Add time"), attributeLabels: [:], sfSymbol: "clock", attributes: [.when], featureId: "task.when-deadline"),
+  ]
+  static func dateBoardRows(for attribute: RegistryDateBoardAttribute, on platform: String) -> [RegistryDateBoardRow] {
+    dateBoardRows.filter { $0.applies(to: attribute, on: platform) }
+  }
+  /// The calendar row when the task has a date past the day strip.
+  static func dateBoardCalendarLabel(date: String) -> String { RegistryL10n.format("Pick another date (%@)", english: "Pick another date (%@)", args: [date]) }
+  /// The word for the day after today, in the date board and in date labels.
+  static let tomorrowLabel: String = RegistryL10n.t("Tomorrow")
   /// Provenance block (`taskPage.provenance`): the name a task you added shows as,
   /// the name for an agent row with no `sourceClient`, and the agent glyph.
   static let provenanceSelfLabel: String = RegistryL10n.t("You")
@@ -1509,6 +1600,38 @@ enum RegistrySurfaces {
   static func taskPageBlock(_ kind: RegistryTaskPageBlockKind) -> RegistryTaskPageBlock {
     guard let b = taskPageBlocks.first(where: { $0.kind == kind }) else { preconditionFailure("no task page block \(kind)") }
     return b
+  }
+}
+
+/// The attributes that the date board edits.
+enum RegistryDateBoardAttribute: String, Sendable, Hashable {
+  case when
+  case deadline
+}
+
+/// The closed set of date board rows. Each platform writes one handler per kind.
+enum RegistryDateBoardRowKind: String, Sendable, Hashable {
+  case tomorrow
+  case calendar
+  case clear
+  case repeatRule
+  case time
+}
+
+/// One row under the date board's day strip (`surfaces.json` `taskDateBoard.rows`).
+struct RegistryDateBoardRow: Sendable, Hashable, Identifiable {
+  let id: String
+  let kind: RegistryDateBoardRowKind
+  let label: String
+  /// Attribute → label that replaces `label` in that attribute's picker.
+  let attributeLabels: [RegistryDateBoardAttribute: String]
+  let sfSymbol: String
+  let attributes: [RegistryDateBoardAttribute]
+  let featureId: String
+  func label(for attribute: RegistryDateBoardAttribute) -> String { attributeLabels[attribute] ?? label }
+  /// The row shows in `attribute`'s picker on `platform` when its capability ships there (ADR 0015).
+  func applies(to attribute: RegistryDateBoardAttribute, on platform: String) -> Bool {
+    attributes.contains(attribute) && RegistryCapabilities.isAvailable(featureId, on: platform)
   }
 }
 
@@ -1687,7 +1810,7 @@ enum RegistryPlans {
       RegistryPlanRow(id: "export", label: RegistryL10n.t("Export as JSON"), planned: false, device: .included, account: .included, plus: .included),
     ]),
     RegistryPlanOutcome(id: "agents", icon: "onboarding.agent", title: RegistryL10n.t("Help that keeps working"), detail: RegistryL10n.t("Connect Claude or another agent to your list. It asks before it acts, and you can stop it at any time."), rows: [
-      RegistryPlanRow(id: "connector", label: RegistryL10n.t("Claude connector"), planned: false, device: .text(RegistryL10n.t("Local server on the Mac")), account: .text(RegistryL10n.t("Reads, and 25 changes a day")), plus: .text(RegistryL10n.t("No daily cap"))),
+      RegistryPlanRow(id: "connector", label: RegistryL10n.t("Claude connector"), planned: false, device: .notIncluded, account: .text(RegistryL10n.t("Reads, and 25 changes a day")), plus: .text(RegistryL10n.t("No daily cap"))),
       RegistryPlanRow(id: "runs", label: RegistryL10n.t("Agent runs"), planned: false, device: .notIncluded, account: .text(RegistryL10n.t("10 a month")), plus: .text(RegistryL10n.t("Within a monthly run budget"))),
       RegistryPlanRow(id: "share", label: RegistryL10n.t("Shared projects"), planned: true, device: .notIncluded, account: .text(RegistryL10n.t("Join")), plus: .text(RegistryL10n.t("Create and invite"))),
       RegistryPlanRow(id: "links", label: RegistryL10n.t("Linked projects (GitHub, Linear)"), planned: true, device: .notIncluded, account: .text(RegistryL10n.t("1")), plus: .text(RegistryL10n.t("No cap"))),
@@ -1761,13 +1884,13 @@ enum RegistryPlans {
 /// Canonical capability parity ledger (`registry/capabilities.json`, ADR 0013 / ADR 0015).
 enum RegistryCapabilities {
   static let byPlatform: [String: [String: String]] = [
-    "ios": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "not_applicable", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "settings.display": "ships"],
-    "ipados": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "ships", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "settings.display": "ships"],
-    "macos": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "partial", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "not_applicable", "capture.share-target": "not_applicable", "capture.quick-entry": "ships", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "ships", "mac.updates": "ships", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "settings.display": "ships"],
-    "web": ["lists.inbox": "planned", "lists.today": "planned", "lists.review": "planned", "lists.agent": "planned", "lists.upcoming": "planned", "lists.anytime": "planned", "lists.repeating": "planned", "lists.logbook": "planned", "lists.faded": "planned", "lists.starred": "planned", "lists.recently-deleted": "planned", "places.areas": "planned", "places.projects": "planned", "places.sections": "planned", "task.when-deadline": "planned", "task.repeat": "planned", "task.notes": "planned", "task.attachments": "planned", "task.history": "planned", "task.provenance": "planned", "task.aging": "planned", "task.checklists": "planned", "task.tags": "planned", "task.share": "planned", "task.alerts": "planned", "fade.sweep": "planned", "capture.quick-add": "planned", "capture.share-target": "planned", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "not_applicable", "edit.undo": "planned", "edit.multi-select": "planned", "find.quick-find": "planned", "task.page": "planned", "mac.keyboard": "planned", "mac.updates": "not_applicable", "calendar.events": "planned", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "planned", "ai.reach-dial": "planned", "agents.connector": "planned", "onboarding.first-run": "planned", "agents.stop-pause": "planned", "sync.backend": "planned", "account.delete": "planned", "settings.display": "planned"],
-    "android": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "partial", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "planned", "fade.sweep": "planned", "capture.quick-add": "planned", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "planned", "edit.undo": "ships", "edit.multi-select": "planned", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "planned", "mac.updates": "not_applicable", "calendar.events": "planned", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "planned", "ai.reach-dial": "planned", "agents.connector": "planned", "onboarding.first-run": "planned", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "planned", "settings.display": "ships"],
-    "windows": ["lists.inbox": "planned", "lists.today": "planned", "lists.review": "planned", "lists.agent": "planned", "lists.upcoming": "planned", "lists.anytime": "planned", "lists.repeating": "planned", "lists.logbook": "planned", "lists.faded": "planned", "lists.starred": "planned", "lists.recently-deleted": "planned", "places.areas": "planned", "places.projects": "planned", "places.sections": "planned", "task.when-deadline": "planned", "task.repeat": "planned", "task.notes": "planned", "task.attachments": "planned", "task.history": "planned", "task.provenance": "planned", "task.aging": "planned", "task.checklists": "planned", "task.tags": "planned", "task.share": "planned", "task.alerts": "planned", "fade.sweep": "planned", "capture.quick-add": "not_applicable", "capture.share-target": "planned", "capture.quick-entry": "planned", "edit.filing-suggestion": "planned", "edit.undo": "planned", "edit.multi-select": "planned", "find.quick-find": "planned", "task.page": "planned", "mac.keyboard": "planned", "mac.updates": "planned", "calendar.events": "planned", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "planned", "ai.reach-dial": "planned", "agents.connector": "planned", "onboarding.first-run": "planned", "agents.stop-pause": "planned", "sync.backend": "planned", "account.delete": "planned", "settings.display": "planned"],
-    "watchos": ["lists.inbox": "partial", "lists.today": "partial", "lists.review": "not_applicable", "lists.agent": "not_applicable", "lists.upcoming": "not_applicable", "lists.anytime": "not_applicable", "lists.repeating": "not_applicable", "lists.logbook": "not_applicable", "lists.faded": "not_applicable", "lists.starred": "not_applicable", "lists.recently-deleted": "not_applicable", "places.areas": "not_applicable", "places.projects": "not_applicable", "places.sections": "not_applicable", "task.when-deadline": "not_applicable", "task.repeat": "not_applicable", "task.notes": "not_applicable", "task.attachments": "not_applicable", "task.history": "not_applicable", "task.provenance": "not_applicable", "task.aging": "not_applicable", "task.checklists": "not_applicable", "task.tags": "not_applicable", "task.share": "not_applicable", "task.alerts": "not_applicable", "fade.sweep": "not_applicable", "capture.quick-add": "not_applicable", "capture.share-target": "not_applicable", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "not_applicable", "edit.undo": "not_applicable", "edit.multi-select": "not_applicable", "find.quick-find": "not_applicable", "task.page": "partial", "mac.keyboard": "not_applicable", "mac.updates": "not_applicable", "calendar.events": "not_applicable", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "not_applicable", "ai.reach-dial": "not_applicable", "agents.connector": "not_applicable", "onboarding.first-run": "not_applicable", "agents.stop-pause": "not_applicable", "sync.backend": "planned", "account.delete": "not_applicable", "settings.display": "not_applicable"],
+    "ios": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "not_applicable", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "ships", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships"],
+    "ipados": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "ships", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "ships", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships"],
+    "macos": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "not_applicable", "capture.share-target": "not_applicable", "capture.quick-entry": "ships", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "ships", "mac.updates": "ships", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "ships", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships"],
+    "web": ["lists.inbox": "planned", "lists.today": "planned", "lists.review": "planned", "lists.agent": "planned", "lists.upcoming": "planned", "lists.anytime": "planned", "lists.repeating": "planned", "lists.logbook": "planned", "lists.faded": "planned", "lists.starred": "planned", "lists.recently-deleted": "planned", "places.areas": "planned", "places.projects": "planned", "places.sections": "planned", "task.when-deadline": "planned", "task.repeat": "planned", "task.notes": "planned", "task.attachments": "planned", "task.history": "planned", "task.provenance": "planned", "task.aging": "planned", "task.checklists": "planned", "task.tags": "planned", "task.share": "planned", "task.alerts": "planned", "fade.sweep": "planned", "capture.quick-add": "planned", "capture.share-target": "planned", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "not_applicable", "edit.undo": "planned", "edit.multi-select": "planned", "find.quick-find": "planned", "task.page": "planned", "mac.keyboard": "planned", "mac.updates": "not_applicable", "calendar.events": "planned", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "planned", "ai.reach-dial": "planned", "agents.connector": "planned", "onboarding.first-run": "planned", "agents.stop-pause": "planned", "sync.backend": "planned", "account.delete": "planned", "task.times": "planned", "calendar.feed": "planned", "widgets.tasks": "not_applicable", "watch.app": "not_applicable", "data.import-export": "planned", "agents.list": "planned", "settings.display": "planned"],
+    "android": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "partial", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "planned", "fade.sweep": "planned", "capture.quick-add": "planned", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "planned", "edit.undo": "ships", "edit.multi-select": "planned", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "planned", "mac.updates": "not_applicable", "calendar.events": "planned", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "planned", "ai.reach-dial": "planned", "agents.connector": "planned", "onboarding.first-run": "planned", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "planned", "task.times": "planned", "calendar.feed": "planned", "widgets.tasks": "planned", "watch.app": "not_applicable", "data.import-export": "planned", "agents.list": "ships", "settings.display": "ships"],
+    "windows": ["lists.inbox": "planned", "lists.today": "planned", "lists.review": "planned", "lists.agent": "planned", "lists.upcoming": "planned", "lists.anytime": "planned", "lists.repeating": "planned", "lists.logbook": "planned", "lists.faded": "planned", "lists.starred": "planned", "lists.recently-deleted": "planned", "places.areas": "planned", "places.projects": "planned", "places.sections": "planned", "task.when-deadline": "planned", "task.repeat": "planned", "task.notes": "planned", "task.attachments": "planned", "task.history": "planned", "task.provenance": "planned", "task.aging": "planned", "task.checklists": "planned", "task.tags": "planned", "task.share": "planned", "task.alerts": "planned", "fade.sweep": "planned", "capture.quick-add": "not_applicable", "capture.share-target": "planned", "capture.quick-entry": "planned", "edit.filing-suggestion": "planned", "edit.undo": "planned", "edit.multi-select": "planned", "find.quick-find": "planned", "task.page": "planned", "mac.keyboard": "planned", "mac.updates": "planned", "calendar.events": "planned", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "planned", "ai.reach-dial": "planned", "agents.connector": "planned", "onboarding.first-run": "planned", "agents.stop-pause": "planned", "sync.backend": "planned", "account.delete": "planned", "task.times": "planned", "calendar.feed": "planned", "widgets.tasks": "planned", "watch.app": "not_applicable", "data.import-export": "planned", "agents.list": "planned", "settings.display": "planned"],
+    "watchos": ["lists.inbox": "partial", "lists.today": "partial", "lists.review": "not_applicable", "lists.agent": "not_applicable", "lists.upcoming": "not_applicable", "lists.anytime": "not_applicable", "lists.repeating": "not_applicable", "lists.logbook": "not_applicable", "lists.faded": "not_applicable", "lists.starred": "not_applicable", "lists.recently-deleted": "not_applicable", "places.areas": "not_applicable", "places.projects": "not_applicable", "places.sections": "not_applicable", "task.when-deadline": "not_applicable", "task.repeat": "not_applicable", "task.notes": "not_applicable", "task.attachments": "not_applicable", "task.history": "not_applicable", "task.provenance": "not_applicable", "task.aging": "not_applicable", "task.checklists": "not_applicable", "task.tags": "not_applicable", "task.share": "not_applicable", "task.alerts": "not_applicable", "fade.sweep": "not_applicable", "capture.quick-add": "not_applicable", "capture.share-target": "not_applicable", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "not_applicable", "edit.undo": "not_applicable", "edit.multi-select": "not_applicable", "find.quick-find": "not_applicable", "task.page": "partial", "mac.keyboard": "not_applicable", "mac.updates": "not_applicable", "calendar.events": "not_applicable", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "not_applicable", "ai.reach-dial": "not_applicable", "agents.connector": "not_applicable", "onboarding.first-run": "not_applicable", "agents.stop-pause": "not_applicable", "sync.backend": "planned", "account.delete": "not_applicable", "task.times": "not_applicable", "calendar.feed": "not_applicable", "widgets.tasks": "not_applicable", "watch.app": "ships", "data.import-export": "not_applicable", "agents.list": "not_applicable", "settings.display": "not_applicable"],
   ]
 
   /// `ships`, `partial`, `planned` or `not_applicable`; nil for an unknown platform or ID.
