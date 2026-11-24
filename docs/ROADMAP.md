@@ -20,6 +20,7 @@ on a listed issue without the label). Feature IDs: Starlings Docs
 |---|---|---|
 | Backend — leave iCloud | `docs/SEPTASK_BACKEND.md`, ADR 0002, ADR 0011 | `track:backend` |
 | Linked projects | `docs/LINKED_PROJECTS_SPEC.md`, ADR 0003 | `track:links` |
+| Task references | `docs/TASK_REFERENCES_SPEC.md`, ADR 0031 | `track:links` |
 | Task factory | `docs/TASK_FACTORY_SPEC.md`, ADR 0005, ADR 0008 | `track:factory` |
 | Project sharing | `docs/PROJECT_SHARING_SPEC.md`, ADR 0004 | `track:sharing` |
 | Switcher essentials, moving in & other clients (web, Android) | Starlings `/strategy/product-roadmap`, `docs/ANDROID_CLIENT_SPEC.md`, ADR 0016 sign-in | `track:clients` |
@@ -163,6 +164,9 @@ GitHub milestone: `"M3 Factory ships code"`.
 - #21 Web client on `api.septena.app` (`docs/WEB_CLIENT_SPEC.md`, phases WB0 to WB5) (Rank 4 first wave — reaches Windows,
   Linux and browsers first; #43 Stripe billing pairs here)
 - #133 natural-language capture in titles · #134 email-to-task address
+- Task references (`docs/TASK_REFERENCES_SPEC.md`, ADR 0031): #386 R0 core, store
+  and MCP → #387 R1 Apple apps · #388 R2 forwarded mail, no duplicates (after
+  #134) → #389 R3 new-reply mark · #390 R4 back-links, drag, Android, web
 - #137 Sign in with Google, Microsoft or an email link (decided 2026-11-21):
   the web client, Android, Windows and self-hosting all need a way in that is
   not Sign in with Apple. Changes the "no email address" privacy promise.
