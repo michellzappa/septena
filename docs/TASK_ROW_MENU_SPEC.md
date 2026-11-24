@@ -74,9 +74,15 @@ copies. The text comes from `TaskShareText` in `SeptenaCore/Models.swift`.
 
 ## The When picker
 
-The When picker answers "when, and how often". It shows, in order: the
-seven-day strip with Today first, Pick another date, Clear, and a Repeat
-row. The Repeat row reads "Repeat…", or "Repeat: &lt;rule&gt;" when the task
+The When picker answers "when, and how often". It shows the seven-day
+strip with Today first, then one list of rows: Tomorrow, Pick another date,
+Clear, Repeat and Add time. Every row has the same shape on a platform.
+The rows, their order and their words are in `registry/surfaces.json`
+`taskDateBoard`. Tomorrow has a strip cell and a row (decided 2026-11-24).
+Android has no Repeat row (Repeat is the next row of its task page) and no
+time editor yet.
+
+The Repeat row reads "Repeat…", or "Repeat: &lt;rule&gt;" when the task
 already repeats. It closes the When picker and opens the Repeat editor,
 which also holds Pause.
 

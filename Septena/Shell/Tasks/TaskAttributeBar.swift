@@ -463,9 +463,9 @@ struct TaskAttributeBar: View {
     case .when:
       DatePickerSheet(
         title: attr.label,
+        attribute: .when,
         initialDate: draft.scheduled,
         initialToday: draft.onToday && draft.scheduled == nil,
-        clearLabel: "No Date",
         initialStartTime: draft.startTime,
         initialDurationMinutes: draft.durationMinutes,
         onTimeSlotChange: { start, minutes in
@@ -487,8 +487,8 @@ struct TaskAttributeBar: View {
         if let date { draft.setScheduled(date) } else { draft.clearWhen() }
       }
     case .deadline:
-      DatePickerSheet(title: attr.label, initialDate: draft.deadline,
-                      clearLabel: "Remove Deadline") { date in
+      DatePickerSheet(title: attr.label, attribute: .deadline,
+                      initialDate: draft.deadline) { date in
         draft.deadline = date
       }
     case .reminder:
@@ -587,7 +587,7 @@ struct TaskAttributeBar: View {
   static func dateLabel(_ d: Date) -> String {
     let cal = Calendar.current
     if cal.isDateInToday(d) { return String(localized: "Today", comment: "Relative date") }
-    if cal.isDateInTomorrow(d) { return String(localized: "Tomorrow", comment: "Relative date") }
+    if cal.isDateInTomorrow(d) { return RegistrySurfaces.tomorrowLabel }
     return SeptenaDate.monthDay(d)
   }
 }

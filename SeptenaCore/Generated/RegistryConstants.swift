@@ -154,6 +154,9 @@ enum RegistryIcons {
     "action.schedule": "calendar",
     "action.when": "calendar",
     "action.deadline": "flag",
+    "date.tomorrow": "sunrise",
+    "date.clear": "xmark.circle",
+    "date.time": "clock",
     "action.clear_schedule": "calendar.badge.minus",
     "action.move": "folder",
     "action.more": "ellipsis",
@@ -1610,6 +1613,21 @@ enum RegistrySurfaces {
   static func taskPageBlocks(_ depth: RegistryTaskPageDepth, on platform: String, isEditing: Bool = true) -> [RegistryTaskPageBlock] {
     taskPageBlocks.filter { $0.depths.contains(depth) && $0.applies(to: platform) && (isEditing || !$0.editOnly) }
   }
+  /// The rows under the date board's day strip, in order (`surfaces.json` `taskDateBoard`).
+  static let dateBoardRows: [RegistryDateBoardRow] = [
+    RegistryDateBoardRow(id: "dateBoard.tomorrow", kind: .tomorrow, label: RegistryL10n.t("Tomorrow"), attributeLabels: [:], sfSymbol: "sunrise", attributes: [.when, .deadline], featureId: "task.when-deadline"),
+    RegistryDateBoardRow(id: "dateBoard.calendar", kind: .calendar, label: RegistryL10n.t("Pick another date"), attributeLabels: [:], sfSymbol: "calendar", attributes: [.when, .deadline], featureId: "task.when-deadline"),
+    RegistryDateBoardRow(id: "dateBoard.clear", kind: .clear, label: RegistryL10n.t("Clear (Anytime)"), attributeLabels: [.deadline: RegistryL10n.t("No Deadline")], sfSymbol: "xmark.circle", attributes: [.when, .deadline], featureId: "task.when-deadline"),
+    RegistryDateBoardRow(id: "dateBoard.repeatRule", kind: .repeatRule, label: RegistryL10n.t("Repeat…"), attributeLabels: [:], sfSymbol: "arrow.clockwise", attributes: [.when], featureId: "task.repeat"),
+    RegistryDateBoardRow(id: "dateBoard.time", kind: .time, label: RegistryL10n.t("Add time"), attributeLabels: [:], sfSymbol: "clock", attributes: [.when], featureId: "task.when-deadline"),
+  ]
+  static func dateBoardRows(for attribute: RegistryDateBoardAttribute, on platform: String) -> [RegistryDateBoardRow] {
+    dateBoardRows.filter { $0.applies(to: attribute, on: platform) }
+  }
+  /// The calendar row when the task has a date past the day strip.
+  static func dateBoardCalendarLabel(date: String) -> String { RegistryL10n.format("Pick another date (%@)", english: "Pick another date (%@)", args: [date]) }
+  /// The word for the day after today, in the date board and in date labels.
+  static let tomorrowLabel: String = RegistryL10n.t("Tomorrow")
   /// Provenance block (`taskPage.provenance`): the name a task you added shows as,
   /// the name for an agent row with no `sourceClient`, and the agent glyph.
   static let provenanceSelfLabel: String = RegistryL10n.t("You")
@@ -1619,6 +1637,38 @@ enum RegistrySurfaces {
   static func taskPageBlock(_ kind: RegistryTaskPageBlockKind) -> RegistryTaskPageBlock {
     guard let b = taskPageBlocks.first(where: { $0.kind == kind }) else { preconditionFailure("no task page block \(kind)") }
     return b
+  }
+}
+
+/// The attributes that the date board edits.
+enum RegistryDateBoardAttribute: String, Sendable, Hashable {
+  case when
+  case deadline
+}
+
+/// The closed set of date board rows. Each platform writes one handler per kind.
+enum RegistryDateBoardRowKind: String, Sendable, Hashable {
+  case tomorrow
+  case calendar
+  case clear
+  case repeatRule
+  case time
+}
+
+/// One row under the date board's day strip (`surfaces.json` `taskDateBoard.rows`).
+struct RegistryDateBoardRow: Sendable, Hashable, Identifiable {
+  let id: String
+  let kind: RegistryDateBoardRowKind
+  let label: String
+  /// Attribute → label that replaces `label` in that attribute's picker.
+  let attributeLabels: [RegistryDateBoardAttribute: String]
+  let sfSymbol: String
+  let attributes: [RegistryDateBoardAttribute]
+  let featureId: String
+  func label(for attribute: RegistryDateBoardAttribute) -> String { attributeLabels[attribute] ?? label }
+  /// The row shows in `attribute`'s picker on `platform` when its capability ships there (ADR 0015).
+  func applies(to attribute: RegistryDateBoardAttribute, on platform: String) -> Bool {
+    attributes.contains(attribute) && RegistryCapabilities.isAvailable(featureId, on: platform)
   }
 }
 
