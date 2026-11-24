@@ -628,6 +628,9 @@ struct TaskRow: View {
   /// Optional 1-level checklist progress summary (`done/total`). Zero extra
   /// chrome when nil or `total == 0` (docs/CHECKLISTS_SPEC.md §4).
   var checklistSummary: (done: Int, total: Int)? = nil
+  /// The kind of the item this task was created from (its `from` reference).
+  /// Nil draws nothing.
+  var fromKind: RegistryTaskReferenceKind? = nil
   /// Resolved live tags on this task (empty when untagged -> zero chrome).
   var tagChips: [TaskTag] = []
   /// Hero-animation anchors forwarded to `CheckableRow` so the closed row's
@@ -714,14 +717,11 @@ struct TaskRow: View {
 
   // Right-side order (left → right): variable-width elements inboard, fixed-width
   // pinned to the right edge so the row's right margin stays stable.
-  //   accessory (Inbox "file here") · issue · date  →  recurrence · notes · status-dot
-  // Accessory, issue chip and date flex with their content; recurrence / notes /
+  //   accessory (Inbox "file here") · date  →  recurrence · reference · notes · status-dot
+  // Accessory and date flex with their content; recurrence / reference / notes /
   // agent glyphs are fixed and anchor the trailing edge.
   @ViewBuilder private var trailing: some View {
     if let accessory { accessory }
-    if let issue = task.linkedIssue {
-      TaskIssueChip(issue: issue)
-    }
     if showsFadedIndicator && task.isFaded {
       TaskStatusPill(symbol: "circle.dashed",
                      title: TaskFilter.faded.title)
@@ -805,6 +805,12 @@ struct TaskRow: View {
         .scaledFont(size: 11)
         .foregroundStyle(Theme.todayAccent)
         .accessibilityLabel(TaskFilter.starred.title)
+    }
+    if let fromKind {
+      Image(systemName: fromKind.sfSymbol)
+        .scaledFont(size: 11)
+        .foregroundStyle(Theme.inkSecondary)
+        .accessibilityLabel(RegistryTaskReferences.createdFrom(name: fromKind.label))
     }
     // An agent-authored row carries its notes as the agent's write-up, so the
     // agent glyph already says "there is more here". One glyph, not two.
@@ -926,28 +932,6 @@ private struct TaskStatusPill: View {
     .padding(.vertical, 2.5)
     .modifier(RowGlassPillSurface(reduceTransparency: reduceTransparency))
     .accessibilityLabel(title)
-  }
-}
-
-/// Quiet read-only issue badge (`◉ #147`) on a task row when an agent has
-/// associated a GitHub issue or PR with the task. Non-interactive so row taps
-/// always open the task/conversation (where the clickable link lives).
-private struct TaskIssueChip: View {
-  let issue: ConvoIssueLink
-  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-  var body: some View {
-    HStack(spacing: 3) {
-      Image(systemName: issue.symbolName)
-        .scaledFont(size: 10)
-      Text(issue.shortLabel)
-        .font(.septenaMetaSmall)
-    }
-    .foregroundStyle(Theme.inkSecondary)
-    .padding(.horizontal, 7)
-    .padding(.vertical, 2.5)
-    .modifier(RowGlassPillSurface(reduceTransparency: reduceTransparency))
-    .accessibilityLabel(issue.fullLabel)
   }
 }
 

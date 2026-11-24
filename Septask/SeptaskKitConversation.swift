@@ -25,6 +25,8 @@ final class KitConversationView: NSView {
   private var taskID: String?
   private var convo = TaskConvo()
   private var isTaskOpen = true
+  /// The task's newest `issue` reference: the Open link.
+  private var issue: TaskRefRow?
   /// The free-text escape hatch is collapsed until asked for, like SwiftUI's
   /// `showOther` — options first, typing second.
   private var showOther = false
@@ -87,6 +89,7 @@ final class KitConversationView: NSView {
       return false
     }
     isHidden = false
+    issue = LocalCache.newestIssueRef(forTaskID: taskID, in: LocalStore.shared.container.mainContext)
     // A refresh of the SAME task while the reply field is being typed in
     // must not rebuild: `rebuild()` pulls the field out of the view tree,
     // which ends the edit and drops the keyboard mid-sentence. The new turns
@@ -128,8 +131,8 @@ final class KitConversationView: NSView {
     }
     if let agent = agentRow() { stack.addArrangedSubview(agent) }
     if let artifact = convo.artifact { stack.addArrangedSubview(artifactBlock(artifact)) }
-    if convo.artifact?.linkedIssue == nil, let issue = convo.linkedIssue {
-      stack.addArrangedSubview(issueLinkButton(issue))
+    if let issue, convo.artifact?.shows(issue) != true, let button = issueLinkButton(issue) {
+      stack.addArrangedSubview(button)
     }
     if let handoff = convo.handoff { stack.addArrangedSubview(handoffView(handoff)) }
 
@@ -390,8 +393,7 @@ final class KitConversationView: NSView {
   }
 
   /// What the agent produced. Selectable on purpose — an artifact is usually
-  /// meant to be copied out. URL refs (especially GitHub issues/PRs) render as
-  /// clickable buttons so the user can jump straight to the issue.
+  /// meant to be copied out. Refs that are links render as buttons.
   private func artifactBlock(_ artifact: ConvoArtifact) -> NSView {
     let heading = NSTextField(labelWithString: artifact.title)
     heading.font = NSFont.systemFont(ofSize: SeptenaTypeScale.size(.body), weight: .medium)
@@ -412,10 +414,8 @@ final class KitConversationView: NSView {
     }
     if let refs = artifact.refs, !refs.isEmpty {
       for ref in refs {
-        if let issue = ConvoIssueLink.parse(in: ref) {
-          block.addArrangedSubview(issueLinkButton(issue))
-        } else if let url = ConvoIssueLink.parseURL(ref) {
-          block.addArrangedSubview(urlLinkButton(title: ref, symbol: "arrow.up.right.square", url: url))
+        if let link = TaskRefRows.artifactLink(ref) {
+          block.addArrangedSubview(urlLinkButton(title: link.title, symbol: link.sfSymbol, url: link.url))
         } else {
           let line = NSTextField(wrappingLabelWithString: ref)
           line.font = SeptaskKitTheme.chip
@@ -424,8 +424,6 @@ final class KitConversationView: NSView {
           block.addArrangedSubview(line)
         }
       }
-    } else if let issue = artifact.linkedIssue {
-      block.addArrangedSubview(issueLinkButton(issue))
     }
     block.wantsLayer = true
     block.layer?.cornerRadius = 12
@@ -434,11 +432,11 @@ final class KitConversationView: NSView {
     return block
   }
 
-  private func issueLinkButton(_ issue: ConvoIssueLink) -> NSButton {
-    let title = String(localized: "Open \(issue.fullLabel)",
-                       comment: "SeptaskKit: open linked GitHub issue or pull request")
-    let button = urlLinkButton(title: title, symbol: issue.symbolName, url: issue.url)
-    button.toolTip = issue.url.absoluteString
+  private func issueLinkButton(_ issue: TaskRefRow) -> NSButton? {
+    guard let link = issue.link else { return nil }
+    let button = urlLinkButton(title: RegistryTaskReferences.open(name: issue.title),
+                               symbol: issue.sfSymbol, url: link)
+    button.toolTip = link.absoluteString
     return button
   }
 

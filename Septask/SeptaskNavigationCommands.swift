@@ -186,6 +186,7 @@ private struct SeptaskTaskMenu: View {
     case "task.toggleStar": return .toggleStar
     case "task.tags": return .editTags
     case "task.addChecklistItem": return .addChecklistItem
+    case "task.addReference": return TaskRefActions.canAdd ? .addReference : nil
     case "task.when": return .when
     case "task.deadline": return .deadline
     case "task.reminder": return .reminder

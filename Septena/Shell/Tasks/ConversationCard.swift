@@ -22,6 +22,8 @@ struct ConversationCard: View {
   @State private var showReply = false
   @State private var replyText = ""
   @State private var showInfo = false
+  /// The task's newest `issue` reference: the Open link.
+  @State private var issue: TaskRefRow?
 
   /// Seed `convo` from the already-loaded task so the card paints on the FIRST
   /// frame (no fetch-on-open lag); `onAppear`/`.septenaTasksChanged` then refresh
@@ -47,8 +49,8 @@ struct ConversationCard: View {
           // Agent deliverable (agent_assisted) — what Claude produced.
           if let artifact = convo.artifact { artifactBlock(artifact) }
 
-          // Associated GitHub issue/PR when not already shown inside an artifact block.
-          if convo.artifact?.linkedIssue == nil, let issue = convo.linkedIssue {
+          // The task's issue, when the artifact block does not show it already.
+          if let issue, convo.artifact?.shows(issue) != true {
             issueLinkPill(issue)
           }
 
@@ -280,7 +282,7 @@ struct ConversationCard: View {
 
   @ViewBuilder private func artifactBlock(_ a: ConvoArtifact) -> some View {
     VStack(alignment: .leading, spacing: 6) {
-      Label(a.title, systemImage: a.linkedIssue?.symbolName ?? "doc.text")
+      Label(a.title, systemImage: "doc.text")
         .font(.septenaLabel)
       if !a.body.isEmpty {
         Text(a.body).font(.septenaCaption).foregroundStyle(.primary)
@@ -289,8 +291,6 @@ struct ConversationCard: View {
         ForEach(refs, id: \.self) { ref in
           artifactRefRow(ref)
         }
-      } else if let issue = a.linkedIssue {
-        issueLinkPill(issue)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -300,11 +300,9 @@ struct ConversationCard: View {
   }
 
   @ViewBuilder private func artifactRefRow(_ ref: String) -> some View {
-    if let issue = ConvoIssueLink.parse(in: ref) {
-      issueLinkPill(issue)
-    } else if let url = ConvoIssueLink.parseURL(ref) {
-      Link(destination: url) {
-        Label(ref, systemImage: "arrow.up.right.square")
+    if let link = TaskRefRows.artifactLink(ref) {
+      Link(destination: link.url) {
+        Label(link.title, systemImage: link.sfSymbol)
           .font(.septenaCaption)
           .lineLimit(1)
           .truncationMode(.middle)
@@ -314,19 +312,22 @@ struct ConversationCard: View {
     }
   }
 
-  @ViewBuilder private func issueLinkPill(_ issue: ConvoIssueLink) -> some View {
-    Link(destination: issue.url) {
-      HStack(spacing: 5) {
-        Image(systemName: issue.symbolName)
-        Text("Open \(issue.fullLabel)")
-        Image(systemName: "arrow.up.right")
+  @ViewBuilder private func issueLinkPill(_ issue: TaskRefRow) -> some View {
+    if let link = issue.link {
+      Link(destination: link) {
+        HStack(spacing: 5) {
+          Image(systemName: issue.sfSymbol)
+          Text(RegistryTaskReferences.open(name: issue.title))
+            .lineLimit(1)
+          Image(systemName: "arrow.up.right")
+        }
+        .font(.septenaLabel)
       }
-      .font(.septenaLabel)
+      .buttonStyle(.bordered)
+      .buttonBorderShape(.capsule)
+      .controlSize(.small)
+      .tint(accent)
     }
-    .buttonStyle(.bordered)
-    .buttonBorderShape(.capsule)
-    .controlSize(.small)
-    .tint(accent)
   }
 
   @ViewBuilder private func handoffButton(_ h: ConvoHandoff) -> some View {
@@ -372,6 +373,7 @@ struct ConversationCard: View {
 
   private func reload() {
     let ctx = LocalStore.shared.container.mainContext
+    issue = LocalCache.newestIssueRef(forTaskID: taskID, in: ctx)
     if let task = LocalCache.task(id: taskID, in: ctx) {
       convo = task.conversation
       isTaskOpen = task.status == .open

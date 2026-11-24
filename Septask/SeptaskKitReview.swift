@@ -117,7 +117,8 @@ final class KitReviewTaskCell: NSTableCellView {
     super.layout()
   }
 
-  func configure(with task: SeptenaTask, contextText: String?) {
+  /// `issue` is the task's newest `issue` reference.
+  func configure(with task: SeptenaTask, issue: TaskRefRow?, contextText: String?) {
     taskId = task.id
     let composed = NSMutableAttributedString(
       string: task.title,
@@ -138,7 +139,7 @@ final class KitReviewTaskCell: NSTableCellView {
     let checkNote = Self.noteText(for: task)
     noteLabel.stringValue = checkNote
 
-    if let meta = Self.metaSummary(for: task) {
+    if let meta = Self.metaSummary(for: task, issue: issue) {
       metaLabel.stringValue = meta
       metaLabel.isHidden = false
     } else {
@@ -171,10 +172,10 @@ final class KitReviewTaskCell: NSTableCellView {
     return String(localized: "Ready for review", comment: "SeptaskKit: fallback review note")
   }
 
-  static func metaSummary(for task: SeptenaTask) -> String? {
+  static func metaSummary(for task: SeptenaTask, issue: TaskRefRow?) -> String? {
     var parts: [String] = []
-    if let issue = task.linkedIssue {
-      parts.append(issue.fullLabel)
+    if let issue {
+      parts.append(issue.title)
     }
     if let artifact = task.conversation.artifact, !artifact.title.isEmpty {
       parts.append(artifact.title)
@@ -182,7 +183,7 @@ final class KitReviewTaskCell: NSTableCellView {
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
-  static func height(for task: SeptenaTask, width: CGFloat) -> CGFloat {
+  static func height(for task: SeptenaTask, issue: TaskRefRow?, width: CGFloat) -> CGFloat {
     let inset = SeptaskKitLayout.inset(for: max(width, 360))
     // Reserve leading glyph + padding + trailing buttons (~170pt).
     let textWidth = max(140, width - inset * 2 - SeptaskKitLayout.rowLeadingPad - KitCheckboxView.tapSize - 195)
@@ -193,7 +194,7 @@ final class KitReviewTaskCell: NSTableCellView {
       attributes: [.font: SeptaskKitTheme.meta])
     let titleHeight = ceil(SeptaskKitTheme.taskTitle.ascender - SeptaskKitTheme.taskTitle.descender) + 2
     let noteHeight = min(ceil(noteRect.height) + 2, ceil(SeptaskKitTheme.meta.pointSize * 1.4 * 3))
-    let metaHeight: CGFloat = metaSummary(for: task) == nil
+    let metaHeight: CGFloat = metaSummary(for: task, issue: issue) == nil
       ? 0
       : 3 + ceil(SeptaskKitTheme.chip.ascender - SeptaskKitTheme.chip.descender) + 2
     return max(58, 10 + titleHeight + 3 + noteHeight + metaHeight + 10)

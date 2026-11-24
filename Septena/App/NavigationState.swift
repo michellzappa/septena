@@ -130,6 +130,8 @@ final class NavigationState {
   struct TaskReveal: Equatable {
     let taskID: String
     let routeID: String
+    /// Also open the task page (a reference to another task).
+    var opensPage = false
   }
   var pendingTaskReveal: TaskReveal?
 

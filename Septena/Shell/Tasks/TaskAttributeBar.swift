@@ -41,6 +41,9 @@ struct TaskAttributeBar: View {
   /// its panel.
   var showsChecklist: Bool = true
   var showsAttachments: Bool = true
+  /// The task page's `references` block is on at this depth (page only). It
+  /// shows for a task that has references.
+  var showsReferences: Bool = false
   /// The task page's `history` block is on at this depth (page only).
   var showsHistory: Bool = false
   /// The task page's `conversation` block is on at this depth (page only).
@@ -97,6 +100,7 @@ struct TaskAttributeBar: View {
     let stepsDone: Int
     let stepsTotal: Int
     let attachments: Int
+    let hasReferences: Bool
 
     @MainActor init(task: SeptenaTask) {
       let ctx = LocalStore.shared.container.mainContext
@@ -106,6 +110,7 @@ struct TaskAttributeBar: View {
       stepsDone = steps.filter(\.checked).count
       stepsTotal = steps.count
       attachments = SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: task.id)
+      hasReferences = LocalCache.hasTaskRefs(taskID: task.id, in: ctx)
     }
   }
 
@@ -121,6 +126,8 @@ struct TaskAttributeBar: View {
   @State private var editRevision = 0
   @State private var discussStarted: Bool
   @State private var discussWorking = false
+  /// The Add Reference sheet, from the References block.
+  @State private var addingReference = false
   /// The Checklist pill was tapped on a task with no steps yet. A task WITH
   /// steps shows its checklist without this (same as the Mac composer).
   @State private var checklistOpened = false
@@ -134,7 +141,7 @@ struct TaskAttributeBar: View {
        discussVisible: Binding<Bool> = .constant(false),
        moveFocus: ((Bool) -> Void)? = nil,
        showsChecklist: Bool = true, showsAttachments: Bool = true,
-       showsHistory: Bool = false, showsConversation: Bool = false,
+       showsReferences: Bool = false, showsHistory: Bool = false, showsConversation: Bool = false,
        leading: AnyView? = nil, layout: Layout = .rail) {
     _draft = draft
     self.areas = areas
@@ -148,6 +155,7 @@ struct TaskAttributeBar: View {
     self.moveFocus = moveFocus
     self.showsChecklist = showsChecklist
     self.showsAttachments = showsAttachments
+    self.showsReferences = showsReferences
     self.showsHistory = showsHistory
     self.showsConversation = showsConversation
     self.leading = leading
@@ -177,6 +185,12 @@ struct TaskAttributeBar: View {
       }
     }) { attr in
       pickerSheet(attr)
+    }
+    .sheet(isPresented: $addingReference) {
+      if let task = discussTask {
+        AddReferenceSheet(taskID: task.id)
+          .taskPickerChrome(TaskPickerDetents.standard)
+      }
     }
     // Keyboard Space / Return on a focused pill arrives here.
     .onChange(of: activate) { _, attr in
@@ -220,6 +234,12 @@ struct TaskAttributeBar: View {
 
       if showsAttachments, let task = discussTask {
         pageSection(.attachments) { TaskAttachmentsPanel(taskID: task.id) }
+      }
+
+      if showsReferences, let task = discussTask, edit?.hasReferences == true {
+        pageSection(.references) {
+          TaskReferencesPanel(taskID: task.id) { addingReference = true }
+        }
       }
     }
   }

@@ -1680,12 +1680,6 @@ enum TaskInbox {
   }
 }
 
-extension SeptenaTask {
-  /// Associated GitHub issue or PR for this task, if any.
-  /// Single entry point so L0 (`extKey`/`extUrl`) can plug in ahead of `conversation`.
-  var linkedIssue: ConvoIssueLink? { conversation.linkedIssue }
-}
-
 /// The text the row menu's Share… hands to the system share sheet
 /// (`task.share`, docs/TASK_ROW_MENU_SPEC.md). One builder for both shells,
 /// so iOS and the Mac share the same words.

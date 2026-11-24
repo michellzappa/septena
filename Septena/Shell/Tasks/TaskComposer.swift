@@ -392,7 +392,7 @@ struct TaskComposerCard: View {
         pastedImagesStrip
       })
     case .attributes:
-      // The rail hosts the checklist, attachments and history panels; their blocks
+      // The bar hosts the checklist, attachments, references and history panels; their blocks
       // gate them (`kinds`), so the registry decides where they show.
       return AnyView(TaskAttributeBar(
         draft: $draft,
@@ -407,6 +407,7 @@ struct TaskComposerCard: View {
         moveFocus: { moveFocus(forward: $0) },
         showsChecklist: kinds.contains(.checklist),
         showsAttachments: kinds.contains(.attachments),
+        showsReferences: kinds.contains(.references),
         showsHistory: kinds.contains(.history),
         // On the page the conversation runs inside the Discuss card.
         showsConversation: pageDepth == .page && kinds.contains(.conversation),
@@ -417,7 +418,7 @@ struct TaskComposerCard: View {
         // out as a column of rows with checklist and attachments as sections.
         layout: pageDepth == .page ? .rows : .rail
       ))
-    case .checklist, .attachments:
+    case .checklist, .attachments, .references:
       return AnyView(EmptyView()) // rendered by the attribute bar, see `.attributes`
     case .history:
       // On the page, history is its own section in registry order.
@@ -489,10 +490,10 @@ struct TaskComposerCard: View {
       if kinds.contains(.header) { titleNotesCard }
 
       VStack(alignment: .leading, spacing: inline ? 10 : 14) {
-        // Header draws above this column; checklist and attachments draw
+        // Header draws above this column; checklist, attachments and references draw
         // inside the attribute bar. History draws here on the page only (the
         // inline depth has no history block).
-        ForEach(blocks.filter { ![.header, .checklist, .attachments].contains($0.kind) }) { block in
+        ForEach(blocks.filter { ![.header, .checklist, .attachments, .references].contains($0.kind) }) { block in
           blockView(block, kinds: kinds)
         }
       }

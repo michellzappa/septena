@@ -47,6 +47,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let historyButton = NSButton()
   private let attachmentsLabel = NSTextField(labelWithString: "")
   private let attachmentsView = KitAttachmentsView()
+  private let referencesLabel = NSTextField(labelWithString: "")
+  private let referencesView = KitReferencesView()
+  private let addReferenceButton = NSButton()
   private let placeholder = NSTextField(labelWithString: String(localized: "No Selection",
                                                                  comment: "SeptaskKit: inspector empty"))
   private let form = NSStackView()
@@ -159,6 +162,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     }
     for (button, action) in [(addChecklistButton, #selector(addChecklistStep)),
                              (attachFileButton, #selector(attachFile)),
+                             (addReferenceButton, #selector(addReference)),
                              (historyButton, #selector(toggleHistory))] {
       button.bezelStyle = .rounded
       button.target = self
@@ -202,6 +206,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
         }
       case .checklist: last = addChecklistBlock(block)
       case .attachments: last = addAttachmentsBlock(block)
+      case .references: last = addReferencesBlock(block)
       case .conversation:
         if conversationPlaced {
           last = nil
@@ -388,6 +393,34 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     return attachFileButton
   }
 
+  /// References (docs/TASK_REFERENCES_SPEC.md §8). Every view of the block is
+  /// hidden on a task that has none: Add Reference is in the task's menu then.
+  private func addReferencesBlock(_ block: RegistryTaskPageBlock) -> NSView {
+    styleHeading(referencesLabel, block)
+    referencesView.translatesAutoresizingMaskIntoConstraints = false
+    addReferenceButton.title = RegistryActions.title("task.addReference")
+    form.addArrangedSubview(referencesLabel)
+    form.addArrangedSubview(referencesView)
+    form.addArrangedSubview(addReferenceButton)
+    fillWidth(referencesView)
+    return addReferenceButton
+  }
+
+  private func refreshReferences(_ next: SeptenaTask) {
+    referencesView.configure(rows: LocalCache.taskRefRows(forTaskID: next.id, in: context))
+    referencesLabel.isHidden = referencesView.isEmpty
+    referencesView.isHidden = referencesView.isEmpty
+    addReferenceButton.isHidden = referencesView.isEmpty || !TaskRefActions.canAdd
+    // The section gap follows the last view that shows.
+    form.setCustomSpacing(addReferenceButton.isHidden ? 14 : form.spacing, after: referencesView)
+  }
+
+  @objc private func addReference() {
+    guard let task else { return }
+    SeptaskKitAddReferencePopover.present(taskID: task.id, relativeTo: addReferenceButton.bounds,
+                                          of: addReferenceButton)
+  }
+
   /// The conversation, under the Discuss heading: the pane has no Discuss
   /// row, so the heading carries the Discuss attribute's registry label and
   /// the block sits directly under the attribute rows (see `loadView`), the
@@ -507,6 +540,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       if let next {
         reloadTextIfIdle(next)
         refreshReadOnlyFields(next)
+        refreshReferences(next)
         refreshConversation(next)
         historyButton.isHidden = !historyView.configure(taskID: next.id)
       }
@@ -543,6 +577,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     attachmentsView.configure(taskID: next.id)
     updateAttachmentsVisibility()
     refreshReadOnlyFields(next)
+    refreshReferences(next)
     refreshConversation(next)
     historyButton.isHidden = !historyView.configure(taskID: next.id)
     formScroll?.contentView.scroll(to: .zero)

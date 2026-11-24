@@ -6,6 +6,8 @@ import SwiftUI
 /// note and reopens the conversation for Claude) actions.
 struct ReviewTaskRow: View {
   let task: SeptenaTask
+  /// The task's newest `issue` reference.
+  var issue: TaskRefRow? = nil
   let isSelected: Bool
   let onOpen: () -> Void
   let onAccept: () -> Void
@@ -40,12 +42,13 @@ struct ReviewTaskRow: View {
             .font(.septenaMeta)
             .foregroundStyle(Theme.inkSecondary)
             .lineLimit(3)
-          if task.linkedIssue != nil || task.conversation.artifact != nil {
+          if issue != nil || task.conversation.artifact != nil {
             HStack(spacing: 8) {
-              if let issue = task.linkedIssue {
-                Label(issue.shortLabel, systemImage: issue.symbolName)
+              if let issue {
+                Label(issue.title, systemImage: issue.sfSymbol)
                   .font(.septenaCaption)
                   .foregroundStyle(Theme.inkSecondary)
+                  .lineLimit(1)
               }
               if let artifact = task.conversation.artifact, !artifact.title.isEmpty {
                 Label(artifact.title, systemImage: "doc.text")
