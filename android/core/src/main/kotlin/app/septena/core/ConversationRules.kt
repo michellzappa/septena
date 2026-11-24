@@ -1,5 +1,6 @@
 package app.septena.core
 
+import app.septena.core.generated.RegistryEntityFields
 import app.septena.sharedcore.conversationState
 import app.septena.sharedcore.deriveConversation
 import java.time.Instant
@@ -23,6 +24,12 @@ data class TaskConversation(
     val assignee: String? = null,
     val stoppedAt: String? = null,
     val claimUntil: String? = null,
+    /**
+     * When `endState` last changed (`convos.endStateAt`). Server-owned: the app
+     * reads it for "{ago}" on the agent prompt and never writes it. Kotlin-side
+     * only; the core's conversation rules do not use it.
+     */
+    val endStateAt: String? = null,
 ) {
     /** The core's predicates (`convo.rs`). A live claim needs a clock; these do not. */
     private fun state(now: Instant = Instant.now()) = conversationState(toCore(), now.toString())
@@ -74,6 +81,7 @@ data class TaskConversation(
                 assignee = fields["assignee"].stringValue(),
                 stoppedAt = fields["stoppedAt"].stringValue(),
                 claimUntil = fields["claimUntil"].stringValue(),
+                endStateAt = fields[RegistryEntityFields.Convo.END_STATE_AT].stringValue(),
             )
         }
     }
