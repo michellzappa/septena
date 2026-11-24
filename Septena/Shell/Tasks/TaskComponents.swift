@@ -899,7 +899,7 @@ struct TaskRow: View {
   static func shortDate(_ d: Date) -> String {
     let cal = Calendar.current
     if cal.isDateInToday(d) { return "Today" }
-    if cal.isDateInTomorrow(d) { return "Tomorrow" }
+    if cal.isDateInTomorrow(d) { return RegistrySurfaces.tomorrowLabel }
     return SeptenaDate.monthDay(d)
   }
 }
@@ -1105,8 +1105,10 @@ struct WeekStrip: View {
 
 /// THE date board for tasks — one component, every task date surface.
 ///
-/// Shape, in order: a **seven-day strip starting TODAY**, **Pick another
-/// date** (Apple's month calendar, for anything further out), and **Clear**.
+/// Shape, in order: a **seven-day strip starting TODAY**, then one list of
+/// rows from the registry (`RegistrySurfaces.dateBoardRows`): Tomorrow, Pick
+/// another date (Apple's month calendar, for anything further out), Clear,
+/// and for When, Repeat and Add time. Every row is a `TaskDateBoardRow`.
 /// It is the SwiftUI twin of the AppKit shell's ⌘S / ⌘⇧D popover
 /// (`Septask/SeptaskKitDatePopover.swift`), so When and Deadline ask the
 /// question the same way in both apps.
@@ -1115,6 +1117,8 @@ struct WeekStrip: View {
 /// carry both — a Today row over a strip that started tomorrow — which asked
 /// one question (which day?) with two controls in two vocabularies. One strip
 /// answers it on one axis, and the cell people pick most is the leading one.
+/// Tomorrow has both a cell and a row, because "tomorrow" is an answer people
+/// look for by name (decided 2026-11-24).
 ///
 /// Every control commits on the spot — there is no confirm button.
 ///
@@ -1124,17 +1128,19 @@ struct WeekStrip: View {
 struct TaskDateBoard: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(DayClock.self) private var clock
+  /// Which attribute the board edits. The registry picks the rows for it.
+  let attribute: RegistryDateBoardAttribute
   /// The dated value the board should show as chosen, or nil for none.
   let selected: Date?
   /// Whether the Today row itself is the current value.
   var todayActive: Bool = false
-  /// e.g. "No Date" / "Remove Deadline". The row hides when nil.
-  var clearLabel: String?
   /// When only: the Repeat row's title ("Repeat…" / "Repeat: Every week").
   /// The row hides when nil. Repeat is set where the date is set
   /// (docs/TASK_ROW_MENU_SPEC.md).
   var repeatLabel: String? = nil
   var onRepeat: (() -> Void)? = nil
+  /// When only: opens the time controls. The row hides when nil.
+  var onAddTime: (() -> Void)? = nil
   let onToday: () -> Void
   let onPick: (Date) -> Void
   let onClear: () -> Void
@@ -1165,90 +1171,77 @@ struct TaskDateBoard: View {
 
       Hairline(leadingInset: 0)
 
-      calendarButton
-        .padding(.vertical, 12)
+      VStack(spacing: 0) {
+        ForEach(RegistrySurfaces.dateBoardRows(for: attribute, on: RegistryPlatform.current)) { row in
+          boardRow(row)
+        }
+      }
+      .padding(.top, 4)
+    }
+  }
 
+  @ViewBuilder
+  private func boardRow(_ row: RegistryDateBoardRow) -> some View {
+    switch row.kind {
+    case .tomorrow:
+      TaskDateBoardRow(symbol: row.sfSymbol, title: row.label(for: attribute)) {
+        guard let tomorrow = cal.date(byAdding: .day, value: 1, to: anchorDay) else { return }
+        Haptics.selection()
+        onPick(tomorrow)
+      }
+    case .calendar:
+      calendarRow(row)
       if embedding != nil && showingCalendar {
         calendar
           .padding(.bottom, 8)
           .transition(.opacity.combined(with: .move(edge: .top)))
       }
-
-      if let clearLabel {
-        Hairline(leadingInset: 0)
-        row(symbol: "xmark.circle", tint: Theme.iconMuted,
-            title: clearLabel, active: false) {
-          Haptics.commit()
-          onClear()
-        }
-        .padding(.top, 4)
+    case .clear:
+      TaskDateBoardRow(symbol: row.sfSymbol, title: row.label(for: attribute)) {
+        Haptics.commit()
+        onClear()
       }
-
+    case .repeatRule:
       if let repeatLabel, let onRepeat {
-        Hairline(leadingInset: 0)
-        row(symbol: RegistryIcons.sfSymbol(for: "action.repeat"), tint: Theme.inkSecondary,
-            title: repeatLabel, active: false) {
+        TaskDateBoardRow(symbol: row.sfSymbol, title: repeatLabel) {
           Haptics.press()
           onRepeat()
         }
-        .padding(.top, 4)
+      }
+    case .time:
+      if let onAddTime {
+        TaskDateBoardRow(symbol: row.sfSymbol, title: row.label(for: attribute)) {
+          Haptics.press()
+          onAddTime()
+        }
       }
     }
   }
 
-  /// One full-width row — symbol, then title. The AppKit board's row shape,
-  /// wearing the inset palette highlight when it holds the current value.
-  /// `.contentShape` is required: a `.plain` button is only tappable where it
-  /// draws, so without it the trailing half of the row is a dead zone.
-  private func row(symbol: String, tint: Color, title: String, active: Bool,
-                   action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      HStack(spacing: 10) {
-        Image(systemName: symbol)
-          .scaledFont(size: 17)
-          .foregroundStyle(tint)
-          .frame(width: 22)
-        Text(title)
-          .scaledFont(size: 16)
-          .foregroundStyle(Theme.inkPrimary)
-        Spacer(minLength: 0)
-      }
-      .padding(.horizontal, 10)
-      .padding(.vertical, 11)
-      .contentShape(Rectangle())
-      .background(InsetSelectionBackground(isSelected: active, horizontalInset: 0))
-    }
-    .buttonStyle(.plain)
-    .accessibilityAddTraits(active ? .isSelected : [])
+  /// A value past the strip. The calendar row names it, so the board always
+  /// shows what the task has now.
+  private var dateBeyondStrip: Date? {
+    guard let selected else { return nil }
+    let days = cal.dateComponents([.day], from: anchorDay, to: cal.startOfDay(for: selected)).day ?? 0
+    return (0...6).contains(days) ? nil : selected
   }
 
   /// The "further out" path. The strip already covers the coming week, so the
   /// month calendar hides behind one tap — popover on iPad/Mac, small sheet on
   /// iPhone — and picking a day there commits it, like every other control.
-  private var calendarButton: some View {
-    Button {
+  private func calendarRow(_ row: RegistryDateBoardRow) -> some View {
+    TaskDateBoardRow(
+      symbol: row.sfSymbol,
+      title: dateBeyondStrip.map {
+        RegistrySurfaces.dateBoardCalendarLabel(
+          date: $0.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
+      } ?? row.label(for: attribute),
+      active: dateBeyondStrip != nil
+    ) {
       Haptics.press()
       calendarDate = selected ?? anchorDay
       a11yAnimate(.snappy(duration: 0.22)) { showingCalendar.toggle() }
-    } label: {
-      HStack(spacing: 8) {
-        Image(systemName: "calendar")
-          .scaledFont(size: 17)
-          .foregroundStyle(Theme.inkSecondary)
-        Text("Pick another date")
-          .scaledFont(size: 16, weight: .medium)
-          .foregroundStyle(.primary)
-        Image(systemName: "chevron.right")
-          .scaledFont(size: 13, weight: .semibold)
-          .foregroundStyle(Theme.iconMuted)
-      }
-      .frame(maxWidth: .infinity)
-      .padding(.vertical, 13)
-      .background(Capsule().fill(Theme.inkSecondary.opacity(0.08)))
-      .overlay(Capsule().strokeBorder(Theme.border, lineWidth: 0.5))
-      .contentShape(Capsule())
     }
-    .buttonStyle(.plain)
     .popover(isPresented: Binding(get: { embedding == nil && showingCalendar },
                                   set: { showingCalendar = $0 })) {
       calendar
@@ -1286,6 +1279,56 @@ struct TaskDateBoard: View {
   private func commitCalendarDate() {
     showingCalendar = false
     onPick(cal.startOfDay(for: calendarDate))
+  }
+}
+
+/// One full-width row of the date board — symbol, then title. The AppKit
+/// board's row shape, wearing the inset palette highlight when it holds the
+/// current value. `.contentShape` is required: a `.plain` button is only
+/// tappable where it draws, so without it the trailing half of the row is a
+/// dead zone.
+struct TaskDateBoardRow: View {
+  /// The When sheet's time controls line up with the rows' symbol and title.
+  static let horizontalPadding: CGFloat = 10
+  static let verticalPadding: CGFloat = 12
+
+  let symbol: String
+  let title: String
+  var active: Bool = false
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: 0) {
+        TaskDateBoardRowLabel(symbol: symbol, title: title)
+        Spacer(minLength: 0)
+      }
+      .padding(.horizontal, Self.horizontalPadding)
+      .padding(.vertical, Self.verticalPadding)
+      .contentShape(Rectangle())
+      .background(InsetSelectionBackground(isSelected: active, horizontalInset: 0))
+    }
+    .buttonStyle(.plain)
+    .accessibilityAddTraits(active ? .isSelected : [])
+  }
+}
+
+/// A row's symbol and title, shared with the open time controls.
+struct TaskDateBoardRowLabel: View {
+  let symbol: String
+  let title: String
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: symbol)
+        .scaledFont(size: 17)
+        .foregroundStyle(Theme.inkSecondary)
+        .frame(width: 22)
+      Text(title)
+        .scaledFont(size: 16)
+        .foregroundStyle(Theme.inkPrimary)
+        .lineLimit(1)
+    }
   }
 }
 

@@ -18,7 +18,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,7 +32,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -78,7 +76,6 @@ import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
@@ -611,9 +608,11 @@ fun TaskDetailScreen(
                                         enabled = canEdit,
                                         onToggle = { openAttribute(RegistryTaskAttributeIds.WHEN) },
                                     ) {
-                                        EmbeddedDatePicker(
+                                        TaskDateBoard(
+                                            attribute = RegistryTaskAttributeIds.WHEN,
                                             initialDay = scheduled ?: if (isToday) graph.clock.today(graph.clock.now()).toString() else null,
-                                            clearLabel = labels.clear,
+                                            today = graph.clock.today(graph.clock.now()),
+                                            languageTag = languageTag,
                                             enabled = canEdit,
                                             onSelect = { day -> openPicker = null; setWhen(day) },
                                             onClear = { openPicker = null; setWhen(null) },
@@ -626,9 +625,11 @@ fun TaskDetailScreen(
                                         enabled = canEdit,
                                         onToggle = { openAttribute(RegistryTaskAttributeIds.DEADLINE) },
                                     ) {
-                                        EmbeddedDatePicker(
+                                        TaskDateBoard(
+                                            attribute = RegistryTaskAttributeIds.DEADLINE,
                                             initialDay = deadline,
-                                            clearLabel = labels.clear,
+                                            today = graph.clock.today(graph.clock.now()),
+                                            languageTag = languageTag,
                                             enabled = canEdit,
                                             onSelect = { day -> openPicker = null; setDeadline(day) },
                                             onClear = { openPicker = null; setDeadline(null) },
@@ -970,39 +971,6 @@ private fun ChoiceRow(
     )
 }
 
-/**
- * The month calendar, embedded in its attribute row. A pick of a day commits
- * it; Clear removes the date. Both fold the row through the caller.
- */
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun EmbeddedDatePicker(
-    initialDay: String?,
-    clearLabel: String,
-    enabled: Boolean,
-    onSelect: (String) -> Unit,
-    onClear: () -> Unit,
-) {
-    val initialMillis = remember(initialDay) { initialDay?.let(::dayToEpochMillis) }
-    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
-    val selectedMillis = datePickerState.selectedDateMillis
-    LaunchedEffect(selectedMillis) {
-        if (enabled && selectedMillis != null && selectedMillis != initialMillis) {
-            onSelect(Instant.ofEpochMilli(selectedMillis).atZone(ZoneOffset.UTC).toLocalDate().toString())
-        }
-    }
-    DatePicker(
-        state = datePickerState,
-        title = null,
-        showModeToggle = false,
-    )
-    TextButton(
-        onClick = onClear,
-        enabled = enabled,
-        modifier = Modifier.padding(horizontal = 8.dp),
-    ) { Text(clearLabel) }
-}
-
 @Composable
 private fun RepeatEditor(
     labels: TaskDetailLabels,
@@ -1308,7 +1276,6 @@ private data class TaskDetailLabels(
     val noDate: String,
     val noArea: String,
     val noProject: String,
-    val clear: String,
     val selectDate: String,
     val repeatUnits: List<RepeatUnitOption>,
     val weekdays: List<RepeatChoice>,
@@ -1367,7 +1334,6 @@ private data class TaskDetailLabels(
                 noDate = controls[RegistryTaskDetail.Controls.NO_DATE].orEmpty(),
                 noArea = controls[RegistryTaskDetail.Controls.NO_AREA].orEmpty(),
                 noProject = controls[RegistryTaskDetail.Controls.NO_PROJECT].orEmpty(),
-                clear = controls[RegistryTaskDetail.Controls.CLEAR].orEmpty(),
                 selectDate = controls[RegistryTaskDetail.Controls.SELECT_DATE].orEmpty(),
                 repeatUnits = units,
                 weekdays = repeatChoices("weekdays", hasShortTitle = true),
@@ -1447,9 +1413,6 @@ private fun formatDay(day: String, languageTag: String): String = runCatching {
         .withLocale(Locale.forLanguageTag(languageTag))
         .format(LocalDate.parse(day.take(10)))
 }.getOrDefault(day)
-
-private fun dayToEpochMillis(day: String): Long? =
-    runCatching { LocalDate.parse(day.take(10)).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() }.getOrNull()
 
 private fun JsonValue?.longValue(): Long? = when (this) {
     is JsonValue.IntegerValue -> value
