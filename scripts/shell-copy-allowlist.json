@@ -13,16 +13,6 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septena/Shell/Capture/QuickFindView.swift",
-      "literal": "Search Tasks",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Capture/QuickFindView.swift",
-      "literal": "Find any task, project, or area.",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septena/Shell/Sections/SectionDrawer.swift",
       "literal": "Couldn't load",
       "reasonId": "predates-rule"
@@ -195,16 +185,6 @@
     {
       "file": "Septena/Shell/Tasks/ConversationCard.swift",
       "literal": "Agent work stopped",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Resume",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Stop",
       "reasonId": "predates-rule"
     },
     {
@@ -583,11 +563,6 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septena/Shell/UI/Accessibility.swift",
-      "literal": "Undo",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septena/Shell/UI/AppIconPickerSection.swift",
       "literal": "App Icon",
       "reasonId": "predates-rule"
@@ -780,16 +755,6 @@
     {
       "file": "Septask/SeptaskSettingsView.swift",
       "literal": "Smart Lists",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Sign out",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Sync",
       "reasonId": "predates-rule"
     },
     {

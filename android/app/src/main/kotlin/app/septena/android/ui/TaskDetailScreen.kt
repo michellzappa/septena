@@ -68,6 +68,7 @@ import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityLimits
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.generated.RegistryEntities
+import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.core.generated.RegistryTaskAttributeIds
 import app.septena.core.generated.RegistryTaskDetail
 import app.septena.core.stringValue
@@ -1335,7 +1336,7 @@ private data class TaskTagPickerLabels(
 )
 
 private fun taskTagPickerLabels(languageTag: String): TaskTagPickerLabels {
-    val surface = RegistryCatalog.surface("taskTagsPicker")
+    val surface = RegistryCatalog.surface(RegistrySurfaceIds.TASK_TAGS_PICKER)
     fun label(field: String): String {
         val key = surface?.fields?.get(field).stringValue().orEmpty()
         return RegistryCatalog.localizedString(key, languageTag) ?: key

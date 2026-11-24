@@ -26,7 +26,7 @@ struct QuickFindView: View {
 
   private static let resultLimit = 12
 
-  private static let searchPrompt = "Search tasks, projects, areas…"
+  private static let searchPrompt = RegistrySurfaces.quickFindPlaceholder
 
   var body: some View {
     searchHost
@@ -232,7 +232,7 @@ struct QuickFindView: View {
     if let aid = t.area, let a = areas.first(where: { $0.id == aid }) {
       return a.title
     }
-    if t.status == .done { return "Completed" }
+    if t.status == .done { return RegistrySurfaces.quickFindCompletedLabel }
     if t.isOnToday { return TaskFilter.today.title }
     return nil
   }
@@ -262,9 +262,9 @@ struct QuickFindView: View {
   // Tasks domain only.
   private var emptyPrompt: some View {
     ContentUnavailableView {
-      Label("Search Tasks", systemImage: "magnifyingglass")
+      Label(RegistrySurfaces.quickFindEmptyTitle, systemImage: "magnifyingglass")
     } description: {
-      Text("Find any task, project, or area.")
+      Text(RegistrySurfaces.quickFindEmptyDetail)
     }
   }
 }

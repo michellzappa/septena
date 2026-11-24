@@ -35,6 +35,7 @@ import app.septena.android.AndroidAppGraph
 import app.septena.core.RegistryCatalog
 import app.septena.core.JsonValue
 import app.septena.core.generated.RegistryActionIds
+import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.core.stringValue
 
 /** Registry-driven local search; the shell supplies result routing. */
@@ -154,7 +155,7 @@ private data class QuickFindCopy(
 ) {
     companion object {
         fun fromRegistry(languageTag: String): QuickFindCopy {
-            val surface = RegistryCatalog.surface("quickFind")
+            val surface = RegistryCatalog.surface(RegistrySurfaceIds.QUICK_FIND)
             fun copy(vararg path: String): String {
                 var value: JsonValue? = surface
                 path.forEach { key ->

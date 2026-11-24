@@ -3,7 +3,8 @@ name: Backend
 # The task backend and MCP connector (backend/, Cloudflare Worker). Type
 # check and tests on every change that can affect it (F1, #342,
 # docs/ENGINEERING_PLAN.md). The core's WASM package and the conformance
-# vectors live outside backend/, so their paths count too.
+# vectors live outside backend/, so their paths count too. A push to main
+# also deploys the Worker (F2, #343).
 
 on:
   push:
@@ -57,3 +58,67 @@ jobs:
 
       - name: Tests
         run: pnpm test
+
+  # F2 (#343): a backend change on main goes live from CI, then /health
+  # must answer. Without the CLOUDFLARE_API_TOKEN secret the job skips
+  # with a warning, so main stays green until mz sets it.
+  deploy:
+    name: Deploy the Worker
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: backend-deploy
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      # The default working directory (backend/) exists only after the
+      # checkout, so this step runs from the workspace root.
+      - name: Token present
+        id: token
+        working-directory: .
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::warning::Secret CLOUDFLARE_API_TOKEN is missing. The Worker was not deployed."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true'
+
+      - uses: pnpm/action-setup@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Install
+        if: steps.token.outputs.ok == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Deploy
+        if: steps.token.outputs.ok == 'true'
+        run: pnpm exec wrangler deploy
+
+      - name: Health check
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          for i in 1 2 3 4 5; do
+            if curl -fsS https://api.septena.app/health; then exit 0; fi
+            sleep 5
+          done
+          echo "::error::https://api.septena.app/health did not answer after the deploy."
+          exit 1

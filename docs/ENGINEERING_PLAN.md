@@ -51,7 +51,7 @@ order and the reasons.
 
 | Phase | Work | Issues | Needs from mz |
 |---|---|---|---|
-| F — Foundation | F1 backend CI · F2 deploy from CI · F3 Android conformance + launch guard · F4 protected `main`, builds that finish | #342 #343 #344 #345 | F2: a Cloudflare API token. F4: yes to branch protection. |
+| F — Foundation | F1 backend CI · F2 deploy from CI · F3 Android conformance + launch guard · F4 protected `main`, builds that finish | #342 #343 #344 #345 | F2: the deploy job is in backend.yml and skips until the CLOUDFLARE_API_TOKEN secret exists. F4: a ruleset blocks force pushes and deletion of `main`; required checks are off because every agent pushes to `main` directly, and runs on `main` finish (#410). |
 | C — Core complete | Apple lists on the core (D3 read half) · Android sync on the core · server fade pass · iCal on the core | #290 #173/#247 #271 #291 | #250 device test (gates D3). #271: yes to the server running the fade pass. |
 | L — Launch | The launch milestone in `docs/ROADMAP.md`: paid sync, free limits, App Store sets | Launch milestone | The store and account steps marked (mz). |
 | W — Web client | Spec, then the client on the core's WASM (C2) | #21 #248 | Review of the spec. |

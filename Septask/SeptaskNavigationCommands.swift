@@ -538,7 +538,7 @@ private struct SeptaskUndoRedoCommands: View {
 
   var body: some View {
     Group {
-      Button(undoName.isEmpty ? "Undo" : "Undo \(undoName)") { perform(undo: true) }
+      Button(undoName.isEmpty ? RegistryActions.title("app.undo") : "\(RegistryActions.title("app.undo")) \(undoName)") { perform(undo: true) }
         .keyboardShortcut("z", modifiers: .command)
       Button(redoName.isEmpty ? "Redo" : "Redo \(redoName)") { perform(undo: false) }
         .keyboardShortcut("z", modifiers: [.command, .shift])

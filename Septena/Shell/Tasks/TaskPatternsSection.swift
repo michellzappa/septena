@@ -52,7 +52,7 @@ struct TaskPatternsSection: View {
 
   var body: some View {
     if hasData {
-      DrawerSection("Completed") {
+      DrawerSection("Completed") { // septena-lint:allow registry-owned-literal — throughput heatmap section heading, not QuickFind/history copy
         VStack(alignment: .leading, spacing: 14) {
           HStack(alignment: .top, spacing: 22) {
             stat("\(last30Total)", "last 30 days")
@@ -70,7 +70,7 @@ struct TaskPatternsSection: View {
         }
       }
     } else if !loading {
-      DrawerSection("Completed") {
+      DrawerSection("Completed") { // septena-lint:allow registry-owned-literal — throughput heatmap section heading, not QuickFind/history copy
         Text("Check a few things off and your completion pattern shows up here.")
           .font(.subheadline)
           .foregroundStyle(.secondary)

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -47,6 +48,9 @@ import app.septena.core.generated.RegistryTaskAttributeIds
 import app.septena.ui.SELECTION_WASH_ALPHA
 import app.septena.ui.TaskRowActionsMenu
 import app.septena.ui.TaskSelection
+import app.septena.ui.insertionPosition
+import app.septena.ui.magicPlusRowDrop
+import app.septena.ui.magicPlusSectionDrop
 import app.septena.ui.selectableTaskRow
 import app.septena.ui.TaskRowMenuAction
 
@@ -62,6 +66,8 @@ fun AreasProjectsScreen(
     rowMenuAccessibilityLabel: String = "",
     onTaskAction: (String, String) -> Unit = { _, _ -> },
     selection: TaskSelection = TaskSelection(),
+    newSectionTrigger: Int = 0,
+    onMagicPlusDrop: ((QuickAddDraft) -> Unit)? = null,
 ) {
     val factory = remember(graph) { AreasProjectsViewModel.Factory(graph) }
     val viewModel: AreasProjectsViewModel = viewModel(key = destination.key, factory = factory)
@@ -76,6 +82,11 @@ fun AreasProjectsScreen(
 
     LaunchedEffect(destination) { viewModel.select(destination) }
     LaunchedEffect(state.destination, state.notes) { notesDraft = state.notes }
+    LaunchedEffect(newSectionTrigger) {
+        if (newSectionTrigger > 0 && destination is AreasProjectsDestination.Project) {
+            dialog = PlacesDialog.CreateSection
+        }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         if (state.isLoading) {
@@ -83,7 +94,7 @@ fun AreasProjectsScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item(key = "place-title") {
@@ -145,7 +156,23 @@ fun AreasProjectsScreen(
                         }
                     }
                     item(key = "area-tasks-heading") {
-                        Text(surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag))
+                        Text(
+                            surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .magicPlusSectionDrop(
+                                    id = "mp-area-tasks-${destination.id}",
+                                    enabled = onMagicPlusDrop != null,
+                                    onDrop = {
+                                        onMagicPlusDrop?.invoke(
+                                            QuickAddDraft(
+                                                areaId = destination.id,
+                                                position = state.areaTasks.firstOrNull()?.position?.let { it - 1.0 },
+                                            ),
+                                        )
+                                    },
+                                ),
+                        )
                     }
                     item(key = "area-quick-add") {
                         QuickAddRow(
@@ -163,8 +190,28 @@ fun AreasProjectsScreen(
                             Text(surfaceText(RegistryPlacesScreenIds.EMPTY_AREA_TASKS, "title", languageTag))
                         }
                     } else {
-                        items(state.areaTasks, key = { "task:${it.id}" }) { task ->
-                            PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, selection, onOpenTask, onTaskAction)
+                        val areaPositions = state.areaTasks.map(PlaceTaskRow::position)
+                        itemsIndexed(state.areaTasks, key = { _, it -> "task:${it.id}" }) { index, task ->
+                            PlaceTaskItem(
+                                task = task,
+                                rowMenuGroups = rowMenuGroups,
+                                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                                selection = selection,
+                                onOpenTask = onOpenTask,
+                                onTaskAction = onTaskAction,
+                                dropModifier = Modifier.magicPlusRowDrop(
+                                    id = "mp-area-row-${task.id}",
+                                    enabled = onMagicPlusDrop != null,
+                                    onDrop = { before ->
+                                        onMagicPlusDrop?.invoke(
+                                            QuickAddDraft(
+                                                areaId = destination.id,
+                                                position = insertionPosition(areaPositions, index, before),
+                                            ),
+                                        )
+                                    },
+                                ),
+                            )
                         }
                     }
                 }
@@ -179,7 +226,23 @@ fun AreasProjectsScreen(
                         }
                     }
                     item(key = "project-tasks-heading") {
-                        Text(surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag))
+                        Text(
+                            surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .magicPlusSectionDrop(
+                                    id = "mp-project-tasks-${destination.id}",
+                                    enabled = onMagicPlusDrop != null,
+                                    onDrop = {
+                                        onMagicPlusDrop?.invoke(
+                                            QuickAddDraft(
+                                                projectId = destination.id,
+                                                position = state.unsectionedTasks.firstOrNull()?.position?.let { it - 1.0 },
+                                            ),
+                                        )
+                                    },
+                                ),
+                        )
                     }
                     item(key = "project-quick-add") {
                         QuickAddRow(
@@ -198,8 +261,28 @@ fun AreasProjectsScreen(
                         }
                     }
                     if (state.unsectionedTasks.isNotEmpty()) {
-                        items(state.unsectionedTasks, key = { "task:${it.id}" }) { task ->
-                            PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, selection, onOpenTask, onTaskAction)
+                        val projectPositions = state.unsectionedTasks.map(PlaceTaskRow::position)
+                        itemsIndexed(state.unsectionedTasks, key = { _, it -> "task:${it.id}" }) { index, task ->
+                            PlaceTaskItem(
+                                task = task,
+                                rowMenuGroups = rowMenuGroups,
+                                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                                selection = selection,
+                                onOpenTask = onOpenTask,
+                                onTaskAction = onTaskAction,
+                                dropModifier = Modifier.magicPlusRowDrop(
+                                    id = "mp-project-row-${task.id}",
+                                    enabled = onMagicPlusDrop != null,
+                                    onDrop = { before ->
+                                        onMagicPlusDrop?.invoke(
+                                            QuickAddDraft(
+                                                projectId = destination.id,
+                                                position = insertionPosition(projectPositions, index, before),
+                                            ),
+                                        )
+                                    },
+                                ),
+                            )
                         }
                     }
                     if (state.sections.isEmpty()) {
@@ -209,6 +292,7 @@ fun AreasProjectsScreen(
                     } else {
                         items(state.sections, key = { "section:${it.id}" }) { section ->
                             PlaceSectionBlock(
+                                projectId = destination.id,
                                 section = section,
                                 languageTag = languageTag,
                                 taskDraft = sectionTaskDrafts[section.id].orEmpty(),
@@ -224,6 +308,7 @@ fun AreasProjectsScreen(
                                 onTaskAction = onTaskAction,
                                 onRename = { dialog = PlacesDialog.RenameSection(section.id, section.title) },
                                 onDelete = { dialog = PlacesDialog.DeleteSection(section.id) },
+                                onMagicPlusDrop = onMagicPlusDrop,
                             )
                         }
                     }
@@ -315,6 +400,7 @@ private fun PlaceTaskItem(
     selection: TaskSelection,
     onOpenTask: (String) -> Unit,
     onTaskAction: (String, String) -> Unit,
+    dropModifier: Modifier = Modifier,
 ) {
     var menuExpanded by remember(task.id) { mutableStateOf(false) }
     val selected = task.id in selection.selectedIds
@@ -334,7 +420,7 @@ private fun PlaceTaskItem(
                 )
             }
         } else null,
-        modifier = Modifier.fillMaxWidth().selectableTaskRow(task.id, selection, onOpenTask, onMenu = { menuExpanded = true }),
+        modifier = dropModifier.fillMaxWidth().selectableTaskRow(task.id, selection, onOpenTask, onMenu = { menuExpanded = true }),
         trailingContent = if (rowMenuGroups.isNotEmpty() && !selection.isActive) {
             {
                 TaskRowActionsMenu(
@@ -358,6 +444,7 @@ private fun PlaceTaskItem(
 
 @Composable
 private fun PlaceSectionBlock(
+    projectId: String,
     section: PlaceSectionRow,
     languageTag: String,
     taskDraft: String,
@@ -370,9 +457,27 @@ private fun PlaceSectionBlock(
     onTaskAction: (String, String) -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
+    onMagicPlusDrop: ((QuickAddDraft) -> Unit)? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .magicPlusSectionDrop(
+                    id = "mp-heading-${section.id}",
+                    enabled = onMagicPlusDrop != null,
+                    onDrop = {
+                        onMagicPlusDrop?.invoke(
+                            QuickAddDraft(
+                                projectId = projectId,
+                                headingId = section.id,
+                                position = section.tasks.firstOrNull()?.position?.let { it - 1.0 },
+                            ),
+                        )
+                    },
+                ),
+        ) {
             Text(section.title, modifier = Modifier.weight(1f))
             TextButton(onClick = onRename) {
                 Text(actionTitle(RegistryActionIds.SECTION_RENAME, languageTag))
@@ -384,8 +489,29 @@ private fun PlaceSectionBlock(
         if (section.tasks.isEmpty()) {
             Text(surfaceText(RegistryPlacesScreenIds.EMPTY_SECTION_TASKS, "title", languageTag), modifier = Modifier.padding(start = 12.dp))
         } else {
-            section.tasks.forEach { task ->
-                PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, selection, onOpenTask, onTaskAction)
+            val sectionPositions = section.tasks.map(PlaceTaskRow::position)
+            section.tasks.forEachIndexed { index, task ->
+                PlaceTaskItem(
+                    task = task,
+                    rowMenuGroups = rowMenuGroups,
+                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    selection = selection,
+                    onOpenTask = onOpenTask,
+                    onTaskAction = onTaskAction,
+                    dropModifier = Modifier.magicPlusRowDrop(
+                        id = "mp-section-row-${task.id}",
+                        enabled = onMagicPlusDrop != null,
+                        onDrop = { before ->
+                            onMagicPlusDrop?.invoke(
+                                QuickAddDraft(
+                                    projectId = projectId,
+                                    headingId = section.id,
+                                    position = insertionPosition(sectionPositions, index, before),
+                                ),
+                            )
+                        },
+                    ),
+                )
             }
         }
         QuickAddRow(

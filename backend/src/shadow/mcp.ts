@@ -111,7 +111,8 @@ async function connectorPlan(env: Env, userId: string, surface: string): Promise
   try {
     return { state: await planFor(env, userId, [usageKeys.connectorWrites(), usageKeys.agentRuns()]), block: false };
   } catch (e) {
-    return { state: null, block: planCheckFailed(env, userId, surface, e) === "block" };
+    // Connector writes and agent claims stay fail-closed (spec §6.4 finding 6).
+    return { state: null, block: planCheckFailed(env, userId, surface, e, "closed") === "block" };
   }
 }
 

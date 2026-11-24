@@ -29,6 +29,13 @@ export function installWorkerTestHooks(): void {
       if (specifier === "cloudflare:workers") {
         return { url: "virtual:cloudflare-workers", shortCircuit: true };
       }
+      if (specifier === "qrcode-generator") {
+        try {
+          return nextResolve(specifier, context);
+        } catch {
+          return { url: "virtual:qrcode-generator", shortCircuit: true };
+        }
+      }
       if ((specifier.startsWith("./") || specifier.startsWith("../")) && specifier.endsWith(".js") && context.parentURL) {
         const dir = dirname(fileURLToPath(context.parentURL));
         const tsCandidate = resolve(dir, specifier.slice(0, -3) + ".ts");
@@ -39,6 +46,13 @@ export function installWorkerTestHooks(): void {
       return nextResolve(specifier, context);
     },
     load(url, context, nextLoad) {
+      if (url === "virtual:qrcode-generator") {
+        return {
+          format: "module",
+          shortCircuit: true,
+          source: `export default function qrcode() { return { addData() {}, make() {}, getModuleCount() { return 0; }, isDark() { return false; } }; }`,
+        };
+      }
       if (url === "virtual:cloudflare-workers") {
         return {
           format: "module",

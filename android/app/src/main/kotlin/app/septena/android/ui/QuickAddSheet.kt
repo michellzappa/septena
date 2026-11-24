@@ -61,13 +61,14 @@ fun QuickAddSheet(
     areas: List<TaskHomeNavigationItem>,
     projects: List<TaskHomeNavigationItem>,
     languageTag: String,
+    initialDraft: QuickAddDraft = QuickAddDraft(),
     onDismiss: () -> Unit,
     onAdd: (QuickAddDraft) -> Unit,
 ) {
     val labels = remember(languageTag) { TaskFormLabels.fromRegistry(languageTag) }
     val attributes = remember(languageTag) { RegistryCatalog.taskAttributes(languageTag).filterNot { it.editOnly } }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var draft by rememberSaveable(stateSaver = QuickAddDraftSaver) { mutableStateOf(QuickAddDraft()) }
+    var draft by rememberSaveable(initialDraft, stateSaver = QuickAddDraftSaver) { mutableStateOf(initialDraft) }
     var openAttribute by rememberSaveable { mutableStateOf<String?>(null) }
     val titleFocus = remember { FocusRequester() }
     val canAdd = draft.title.isNotBlank()
@@ -196,7 +197,12 @@ fun QuickAddSheet(
 
 /** Keeps a half-typed task through a rotation. */
 private val QuickAddDraftSaver: Saver<QuickAddDraft, Any> = listSaver<QuickAddDraft, Any?>(
-    save = { listOf(it.title, it.notes, it.whenDay, it.deadline, it.starred, it.areaId, it.projectId) },
+    save = {
+        listOf(
+            it.title, it.notes, it.whenDay, it.deadline, it.starred,
+            it.areaId, it.projectId, it.headingId, it.today, it.position, it.useTodayPosition,
+        )
+    },
     restore = {
         QuickAddDraft(
             title = it[0] as String,
@@ -206,6 +212,10 @@ private val QuickAddDraftSaver: Saver<QuickAddDraft, Any> = listSaver<QuickAddDr
             starred = it[4] as Boolean,
             areaId = it[5] as String?,
             projectId = it[6] as String?,
+            headingId = it[7] as String?,
+            today = it[8] as Boolean,
+            position = it[9] as Double?,
+            useTodayPosition = it[10] as Boolean,
         )
     },
 )
