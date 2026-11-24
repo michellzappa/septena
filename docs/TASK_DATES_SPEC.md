@@ -253,5 +253,12 @@ does. REST `untoday` is plain A3, so an arrived deadline goes too (Q2).
 Worker's WASM. The recurrence spawn takes its date fields from
 `nextOccurrenceDates` (A10). Left: iCal reads use their own window rules.
 
+**D5 status (2026-11-24).** Android's `TaskMutator` turns When, Today,
+deadline and time-slot edits into §4 actions the core decides
+(`applyDateAction`, Kotlin bindings), in one queued write. This fixes W8 and
+W13. Completing a repeating task now creates the next row (W12) with the
+core's next date, row id, date fields (`nextOccurrenceDates`) and checklist
+ids. List membership was already the core's (C1, #336).
+
 MCP tool changes in D4 land in both MCP servers and their skills in the same
 change (AGENTS.md, "Two MCP servers").

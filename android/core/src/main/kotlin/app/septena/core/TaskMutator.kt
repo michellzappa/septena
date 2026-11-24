@@ -3,7 +3,12 @@ package app.septena.core
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityLimits
 import app.septena.core.generated.RegistryEntityNames
+import app.septena.sharedcore.DateAction
+import app.septena.sharedcore.RescheduleMode
 import java.time.Duration
+import app.septena.sharedcore.TaskSnapshot as CoreTaskSnapshot
+import app.septena.sharedcore.applyDateAction as coreApplyDateAction
+import app.septena.sharedcore.nextOccurrenceDates as coreNextOccurrenceDates
 
 /** User writes cross this boundary so optimistic rows and outbox operations stay atomic. */
 class TaskMutator(
@@ -118,69 +123,70 @@ class TaskMutator(
         return updated
     }
 
-    suspend fun setToday(id: String, enabled: Boolean): TaskRecord? = updateFields(
-        id,
-        linkedMapOf(
-            RegistryEntityFields.Task.TODAY to JsonValue.BooleanValue(enabled),
-            RegistryEntityFields.Task.TODAY_SET_ON to if (enabled) JsonValue.StringValue(clock.today(clock.now()).toString()) else JsonValue.Null,
-        ),
-    )
+    /** A1 when [enabled], else A3 (Remove from Today): the core decides the fields. */
+    suspend fun setToday(id: String, enabled: Boolean): TaskRecord? =
+        applyDateAction(id, if (enabled) DateAction.PutOnToday(RescheduleMode.MAKE_EXCEPTION) else DateAction.RemoveFromToday)
 
     suspend fun setStarred(id: String, starred: Boolean): TaskRecord? = updateFields(
         id,
         mapOf(RegistryEntityFields.Task.STARRED to JsonValue.BooleanValue(starred)),
     )
 
-    suspend fun schedule(id: String, day: String?): TaskRecord? {
-        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
-        if (existing.deletedAt != null) return null
-        val oldDay = existing.fields[RegistryEntityFields.Task.SCHEDULED].stringValue()
-        val oldReminder = existing.fields[RegistryEntityFields.Task.REMINDER_AT].stringValue()
-        val shiftedReminder = TaskReminderRules.shiftOnReschedule(oldReminder, oldDay, day)
-        val changes = linkedMapOf<String, JsonValue>(
-            RegistryEntityFields.Task.SCHEDULED to JsonValue.stringOrNull(day),
-        )
-        if (shiftedReminder != oldReminder) {
-            changes[RegistryEntityFields.Task.REMINDER_AT] = JsonValue.stringOrNull(shiftedReminder)
-        }
-        return updateFields(id, changes)
-    }
+    /** A2 for a day (a day on or before today is A1), A5 for none. */
+    suspend fun schedule(id: String, day: String?): TaskRecord? = setWhen(id, day)
 
-    /** Sets the user-visible When value in one queued write, keeping Today and its date exclusive. */
-    suspend fun setWhen(id: String, day: String?): TaskRecord? {
-        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
-        if (existing.deletedAt != null) return null
-        val today = clock.today(clock.now()).toString()
-        val isToday = day == today
-        val scheduled = day?.takeUnless { isToday }
-        val oldScheduled = existing.fields[RegistryEntityFields.Task.SCHEDULED].stringValue()
-        val oldReminder = existing.fields[RegistryEntityFields.Task.REMINDER_AT].stringValue()
-        val shiftedReminder = TaskReminderRules.shiftOnReschedule(oldReminder, oldScheduled, scheduled)
-        val changes = linkedMapOf<String, JsonValue>(
-            RegistryEntityFields.Task.SCHEDULED to JsonValue.stringOrNull(scheduled),
-            RegistryEntityFields.Task.TODAY to JsonValue.BooleanValue(isToday),
-            RegistryEntityFields.Task.TODAY_SET_ON to JsonValue.stringOrNull(if (isToday) today else null),
-        )
-        if (shiftedReminder != oldReminder) {
-            changes[RegistryEntityFields.Task.REMINDER_AT] = JsonValue.stringOrNull(shiftedReminder)
-        }
-        return updateFields(id, changes)
-    }
-
-    suspend fun setTimeSlot(id: String, startTime: String?, durationMinutes: Long?, timeZone: String?): TaskRecord? =
-        updateFields(
-            id,
-            linkedMapOf(
-                RegistryEntityFields.Task.START_TIME to JsonValue.stringOrNull(startTime),
-                RegistryEntityFields.Task.DURATION_MINUTES to JsonValue.integerOrNull(durationMinutes),
-                RegistryEntityFields.Task.TIME_ZONE to JsonValue.stringOrNull(timeZone),
-            ),
-        )
-
-    suspend fun setDeadline(id: String, day: String?): TaskRecord? = updateFields(
+    /** The user-visible When value: A2 for a day (today or earlier is A1), A5 for none. */
+    suspend fun setWhen(id: String, day: String?): TaskRecord? = applyDateAction(
         id,
-        mapOf(RegistryEntityFields.Task.DEADLINE to JsonValue.stringOrNull(day)),
+        if (day == null) DateAction.ClearWhenDate else DateAction.ScheduleFor(day, RescheduleMode.MAKE_EXCEPTION),
     )
+
+    /** A9: set or clear the time slot. A time with no day pins the task to Today. */
+    suspend fun setTimeSlot(id: String, startTime: String?, durationMinutes: Long?, timeZone: String?): TaskRecord? =
+        applyDateAction(id, DateAction.SetTimeSlot(startTime, durationMinutes?.toInt(), timeZone))
+
+    /** A7 / A8: set or clear the deadline. */
+    suspend fun setDeadline(id: String, day: String?): TaskRecord? = applyDateAction(id, DateAction.SetDeadline(day))
+
+    /**
+     * One date action of docs/TASK_DATES_SPEC.md §4 (D5, #292). The shared core
+     * decides every date field (When, deadline, Today pin and its stamp, time
+     * slot, a reminder that follows the When date, the fixed-repeat slot, the
+     * agent cue); this writes the changed fields in one queued write. No date
+     * rule lives in Kotlin.
+     */
+    suspend fun applyDateAction(id: String, action: DateAction): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.deletedAt != null) return null
+        val now = clock.now()
+        val patch = coreApplyDateAction(
+            existing.toCoreSnapshot(),
+            action,
+            clock.today(now).toString(),
+            WireTimestamp.format(now),
+        )
+        if (patch.changed.isEmpty()) return existing
+        val f = patch.fields
+        val changes = linkedMapOf<String, JsonValue>()
+        for (name in patch.changed) {
+            changes[name] = when (name) {
+                RegistryEntityFields.Task.SCHEDULED -> JsonValue.stringOrNull(f.scheduled)
+                RegistryEntityFields.Task.DEADLINE -> JsonValue.stringOrNull(f.deadline)
+                RegistryEntityFields.Task.TODAY -> JsonValue.BooleanValue(f.today)
+                RegistryEntityFields.Task.TODAY_SET_ON -> JsonValue.stringOrNull(f.todaySetOn)
+                RegistryEntityFields.Task.START_TIME -> JsonValue.stringOrNull(f.startTime)
+                RegistryEntityFields.Task.DURATION_MINUTES -> JsonValue.integerOrNull(f.durationMinutes?.toLong())
+                RegistryEntityFields.Task.TIME_ZONE -> JsonValue.stringOrNull(f.timeZone)
+                RegistryEntityFields.Task.REMINDER_AT -> JsonValue.stringOrNull(f.reminderAt)
+                RegistryEntityFields.Task.REMINDER_SNOOZED_UNTIL -> JsonValue.stringOrNull(f.reminderSnoozedUntil)
+                RegistryEntityFields.Task.REMINDER_DISMISSED_AT -> JsonValue.stringOrNull(f.reminderDismissedAt)
+                RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE -> JsonValue.stringOrNull(f.recurrenceAnchorDate)
+                RegistryEntityFields.Task.ACKNOWLEDGED_AT -> JsonValue.stringOrNull(f.acknowledgedAt)
+                else -> error("The core changed an unknown date field: $name")
+            }
+        }
+        return updateFields(id, changes)
+    }
 
     suspend fun setNotes(id: String, notes: String?): TaskRecord? = updateFields(
         id,
@@ -208,7 +214,105 @@ class TaskMutator(
         val updated = existing.changing(changes)
         val operation = SyncOperation.Upsert(ids.nextClientOpId(), RegistryEntityNames.TASK, id, changes)
         store.writeLocalAndEnqueue(updated.asSyncRecord(), operation)
+        spawnNextOccurrence(existing)
         return updated
+    }
+
+    /**
+     * A completed repeating task creates its next row (spec A10, W12), as the
+     * apps and the backend do. The core computes the next day, the row id and
+     * its date fields, so a completion here and one on the phone or by an
+     * agent converge on the same row. An existing row with that id is kept.
+     */
+    private suspend fun spawnNextOccurrence(source: TaskRecord) {
+        val f = source.fields
+        val unit = f[RegistryEntityFields.Task.RECURRENCE_UNIT].stringValue() ?: return
+        if (f[RegistryEntityFields.Task.RECURRENCE_PAUSED].booleanValue() == true) return
+        val ordinal = f[RegistryEntityFields.Task.RECURRENCE_ORDINAL_WEEKDAY] as? JsonValue.ObjectValue
+        val rule = RecurrenceRule(
+            unit = unit,
+            interval = f[RegistryEntityFields.Task.RECURRENCE_INTERVAL].longValue()?.toInt() ?: 1,
+            afterCompletion = f[RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION].booleanValue() ?: true,
+            weekdays = (f[RegistryEntityFields.Task.RECURRENCE_WEEKDAYS] as? JsonValue.ArrayValue)
+                ?.values?.mapNotNull { it.longValue()?.toInt() },
+            monthDay = f[RegistryEntityFields.Task.RECURRENCE_MONTH_DAY].longValue()?.toInt(),
+            ordinalWeekday = ordinal?.let {
+                val o = it["ordinal"].longValue()?.toInt()
+                val w = it["weekday"].longValue()?.toInt()
+                if (o != null && w != null) OrdinalWeekday(o, w) else null
+            },
+        )
+        val now = clock.now()
+        val today = clock.today(now).toString()
+        val next = RecurrenceRules.nextScheduledDate(
+            completedOn = today,
+            scheduled = f[RegistryEntityFields.Task.SCHEDULED].stringValue(),
+            logicalScheduled = f[RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE].stringValue(),
+            rule = rule,
+        ) ?: return
+        val nextId = RecurrenceRules.occurrenceId(source.id, next)
+        if (store.record(RegistryEntityNames.TASK, nextId) != null) return
+
+        val fields = linkedMapOf<String, JsonValue>(
+            RegistryEntityFields.Task.STATUS to JsonValue.StringValue(app.septena.core.generated.RegistryEntityEnums.TaskStatus.OPEN),
+            RegistryEntityFields.Task.CREATED to JsonValue.StringValue(today),
+            RegistryEntityFields.Task.CREATED_AT to JsonValue.StringValue(WireTimestamp.format(now)),
+            RegistryEntityFields.Task.RECURRENCE_SERIES_ID to JsonValue.StringValue(
+                f[RegistryEntityFields.Task.RECURRENCE_SERIES_ID].stringValue() ?: source.id,
+            ),
+            RegistryEntityFields.Task.RECURRENCE_PAUSED to JsonValue.BooleanValue(false),
+        )
+        for (name in listOf(
+            RegistryEntityFields.Task.TITLE, RegistryEntityFields.Task.KIND, RegistryEntityFields.Task.HEADING,
+            RegistryEntityFields.Task.AREA, RegistryEntityFields.Task.PROJECT, RegistryEntityFields.Task.NOTES,
+            RegistryEntityFields.Task.STARRED, RegistryEntityFields.Task.TAGS, RegistryEntityFields.Task.POSITION,
+            RegistryEntityFields.Task.SOURCE, RegistryEntityFields.Task.SOURCE_CLIENT,
+            RegistryEntityFields.Task.RECURRENCE_UNIT, RegistryEntityFields.Task.RECURRENCE_INTERVAL,
+            RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION, RegistryEntityFields.Task.RECURRENCE_WEEKDAYS,
+            RegistryEntityFields.Task.RECURRENCE_MONTH_DAY, RegistryEntityFields.Task.RECURRENCE_ORDINAL_WEEKDAY,
+        )) {
+            val value = f[name]
+            if (value != null && value != JsonValue.Null) fields[name] = value
+        }
+        val dates = coreNextOccurrenceDates(source.toCoreSnapshot(), next, WireTimestamp.format(now))
+        fields[RegistryEntityFields.Task.SCHEDULED] = JsonValue.stringOrNull(dates.scheduled)
+        fields[RegistryEntityFields.Task.TODAY] = JsonValue.BooleanValue(dates.today)
+        dates.startTime?.let { fields[RegistryEntityFields.Task.START_TIME] = JsonValue.StringValue(it) }
+        dates.durationMinutes?.let { fields[RegistryEntityFields.Task.DURATION_MINUTES] = JsonValue.IntegerValue(it.toLong()) }
+        dates.timeZone?.let { fields[RegistryEntityFields.Task.TIME_ZONE] = JsonValue.StringValue(it) }
+        dates.reminderAt?.let {
+            fields[RegistryEntityFields.Task.REMINDER_AT] = JsonValue.StringValue(it)
+            fields[RegistryEntityFields.Task.REMINDER_MODE] =
+                JsonValue.StringValue(f[RegistryEntityFields.Task.REMINDER_MODE].stringValue() ?: "floating")
+        }
+        dates.recurrenceAnchorDate?.let { fields[RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE] = JsonValue.StringValue(it) }
+        dates.acknowledgedAt?.let { fields[RegistryEntityFields.Task.ACKNOWLEDGED_AT] = JsonValue.StringValue(it) }
+        RegistryValidator.requireValidUpsert(RegistryEntityNames.TASK, nextId, fields, insert = true)
+        val task = TaskRecord(nextId, fields)
+        store.writeLocalAndEnqueue(task.asSyncRecord(), task.toUpsert(ids.nextClientOpId()))
+
+        // The open checklist comes along, unchecked, with ids every device derives alike.
+        val items = store.records(RegistryEntityNames.CHECKLIST_ITEM)
+            .filter { it.deletedAt == null && it.fields[RegistryEntityFields.ChecklistItem.TASK_ID].stringValue() == source.id }
+            .sortedBy { item ->
+                val position = item.fields[RegistryEntityFields.ChecklistItem.POSITION]
+                (position as? JsonValue.DecimalValue)?.value ?: position.longValue()?.toDouble() ?: 0.0
+            }
+        items.forEachIndexed { index, item ->
+            val itemId = RecurrenceRules.checklistOccurrenceId(nextId, index, item.id)
+            val itemFields = linkedMapOf<String, JsonValue>(
+                RegistryEntityFields.ChecklistItem.TASK_ID to JsonValue.StringValue(nextId),
+                RegistryEntityFields.ChecklistItem.TITLE to (item.fields[RegistryEntityFields.ChecklistItem.TITLE] ?: JsonValue.StringValue("")),
+                RegistryEntityFields.ChecklistItem.CHECKED to JsonValue.BooleanValue(false),
+                RegistryEntityFields.ChecklistItem.CREATED_AT to JsonValue.StringValue(WireTimestamp.format(now)),
+            )
+            item.fields[RegistryEntityFields.ChecklistItem.POSITION]?.let { itemFields[RegistryEntityFields.ChecklistItem.POSITION] = it }
+            RegistryValidator.requireValidUpsert(RegistryEntityNames.CHECKLIST_ITEM, itemId, itemFields, insert = true)
+            store.writeLocalAndEnqueue(
+                SyncRecord(RegistryEntityNames.CHECKLIST_ITEM, itemId, itemFields),
+                SyncOperation.Upsert(ids.nextClientOpId(), RegistryEntityNames.CHECKLIST_ITEM, itemId, itemFields),
+            )
+        }
     }
 
     suspend fun cancel(id: String): TaskRecord? = updateFields(
@@ -244,4 +348,20 @@ class TaskMutator(
         val maximum = RegistryEntityLimits.TEXT_MAX
         require(title.length.toLong() <= maximum) { "Task title exceeds the registry limit of $maximum characters" }
     }
+}
+
+/** The task as the shared core reads it, every date field included. */
+internal fun TaskRecord.toCoreSnapshot(): CoreTaskSnapshot {
+    val base = TaskSnapshot.from(asSyncRecord()).toCore()
+    val f = fields
+    return base.copy(
+        startTime = f[RegistryEntityFields.Task.START_TIME].stringValue(),
+        durationMinutes = (f[RegistryEntityFields.Task.DURATION_MINUTES] as? JsonValue.IntegerValue)?.value?.toInt(),
+        timeZone = f[RegistryEntityFields.Task.TIME_ZONE].stringValue(),
+        reminderAt = f[RegistryEntityFields.Task.REMINDER_AT].stringValue(),
+        reminderSnoozedUntil = f[RegistryEntityFields.Task.REMINDER_SNOOZED_UNTIL].stringValue(),
+        reminderDismissedAt = f[RegistryEntityFields.Task.REMINDER_DISMISSED_AT].stringValue(),
+        recurrenceAfterCompletion = f[RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION].booleanValue(),
+        recurrenceAnchorDate = f[RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE].stringValue(),
+    )
 }

@@ -42,6 +42,13 @@ fun JsonValue?.stringValue(): String? = (this as? JsonValue.StringValue)?.value
 
 fun JsonValue?.booleanValue(): Boolean? = (this as? JsonValue.BooleanValue)?.value
 
+/** A whole number, from an integer or an integral decimal. */
+fun JsonValue?.longValue(): Long? = when (this) {
+    is JsonValue.IntegerValue -> value
+    is JsonValue.DecimalValue -> value.takeIf { it == kotlin.math.floor(it) }?.toLong()
+    else -> null
+}
+
 private fun quoteJson(value: String): String = buildString(value.length + 2) {
     append('"')
     value.forEach { character ->
