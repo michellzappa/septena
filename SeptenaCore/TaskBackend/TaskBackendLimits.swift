@@ -30,8 +30,6 @@ struct BackendLimitError: Decodable, Equatable, Sendable {
     case attachmentQuota
     /// Change history window edge (`limit: "changeLogDays"`, `upsell: "history_edge"`).
     case historyEdge
-    /// Monthly agent run cap (`limit: "agentRunsPerMonth"`, `upsell: "agent_runs"`).
-    case agentRuns
     /// Daily connector write cap (`limit: "connectorWritesPerDay"`, `upsell: "connector_cap"`).
     case connectorCap
     /// Creating a shared project requires Plus (`limit: "createShares"`, `upsell: "share_create"`).
@@ -68,8 +66,6 @@ struct BackendLimitError: Decodable, Equatable, Sendable {
       return .attachmentQuota
     case "history_edge", "history_not_in_plan":
       return .historyEdge
-    case "agent_runs", "agent_runs_exceeded", "agent_runs_limit":
-      return .agentRuns
     case "connector_cap", "connector_writes_exceeded", "connector_writes_limit":
       return .connectorCap
     case "share_create", "shares_not_in_plan":
@@ -80,7 +76,6 @@ struct BackendLimitError: Decodable, Equatable, Sendable {
       case "liveSync": return .liveSyncNotInPlan
       case "attachmentsGB": return .attachmentsNotInPlan
       case "changeLogDays": return .historyEdge
-      case "agentRunsPerMonth": return .agentRuns
       case "connectorWritesPerDay": return .connectorCap
       case "createShares": return .shareCreate
       default: break
@@ -89,7 +84,6 @@ struct BackendLimitError: Decodable, Equatable, Sendable {
       case "second_device": return .deviceNotSyncing
       case "file_elsewhere": return .attachmentsNotInPlan
       case "history_edge": return .historyEdge
-      case "agent_runs": return .agentRuns
       case "connector_cap": return .connectorCap
       case "share_create": return .shareCreate
       default: return .other(error)
@@ -115,7 +109,6 @@ struct BackendLimitError: Decodable, Equatable, Sendable {
     case .liveSyncNotInPlan: return nil
     case .attachmentsNotInPlan, .attachmentQuota: return "file_elsewhere"
     case .historyEdge: return "history_edge"
-    case .agentRuns: return "agent_runs"
     case .connectorCap: return "connector_cap"
     case .shareCreate: return "share_create"
     case .other: return nil

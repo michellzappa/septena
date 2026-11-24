@@ -79,7 +79,6 @@ import Testing
   @Test func decodesAllOtherSpec63LimitCodes() {
     let cases: [(String, String, String, BackendLimitError.Kind)] = [
       ("history_edge", "changeLogDays", "history_edge", .historyEdge),
-      ("agent_runs", "agentRunsPerMonth", "agent_runs", .agentRuns),
       ("connector_cap", "connectorWritesPerDay", "connector_cap", .connectorCap),
       ("share_create", "createShares", "share_create", .shareCreate),
     ]

@@ -39,11 +39,9 @@ struct BackendEntitlement: Decodable, Sendable {
     let devices: Int?
     let liveSync: Bool?
     let changeLogDays: Int?
-    let logbookDays: Int?
     let recentlyDeletedDays: Int?
     let attachmentsGB: Double?
     let connectorWritesPerDay: Int?
-    let agentRunsPerMonth: Int?
     let createShares: Bool?
   }
 
@@ -204,7 +202,7 @@ final class PlanStatus {
       deviceSyncing = false
       serverBlockedDevice = true
     case .liveSyncNotInPlan, .attachmentsNotInPlan, .attachmentQuota,
-         .historyEdge, .agentRuns, .connectorCap, .shareCreate, .other:
+         .historyEdge, .connectorCap, .shareCreate, .other:
       break
     }
     if noticeInputs != before {
