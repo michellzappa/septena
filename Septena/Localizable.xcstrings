@@ -5229,6 +5229,18 @@
         }
       }
     },
+    "Favorites" : {
+      "comment" : "Generated from registry destinations.destinations.starred.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favoritos"
+          }
+        }
+      }
+    },
     "Fiber" : {
       "localizations" : {
         "pt-BR" : {
@@ -8161,6 +8173,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nenhuma tarefa esmaecida"
+          }
+        }
+      }
+    },
+    "No Favorites" : {
+      "comment" : "Generated from registry destinations.destinations.starred.emptyState.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum favorito"
           }
         }
       }

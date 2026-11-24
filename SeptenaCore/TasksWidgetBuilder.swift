@@ -89,7 +89,7 @@ enum TasksWidgetBuilder {
       makeSummary(
         id: TasksWidgetListSummary.starredID,
         kind: .starred,
-        title: String(localized: "Starred"),
+        title: String(localized: "Favorites"),
         symbol: RegistryIcons.sfSymbol(for: "list.starred"),
         tasks: starredTasks,
         today: today,

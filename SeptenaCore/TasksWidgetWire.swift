@@ -186,7 +186,7 @@ public struct TasksWidgetSnapshot: Codable, Equatable, Sendable {
         TasksWidgetListSummary(
           id: TasksWidgetListSummary.starredID,
           kind: .starred,
-          title: "Starred",
+          title: "Favorites",
           symbol: "star",
           count: 1,
           items: [

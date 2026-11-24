@@ -178,7 +178,7 @@ enum RegistryIcons {
     "auth.device": "laptopcomputer.and.iphone",
     "settings.general": "slider.horizontal.3",
     "settings.tasks": "checklist",
-    "task.added_by_agent": "cpu",
+    "task.added_by_agent": "text.bubble.badge.sparkles",
     "settings.ai_agents": "cpu",
     "settings.claude": "bubble.left.and.text.bubble.right",
     "settings.connections_ai": "brain.head.profile",
@@ -706,7 +706,7 @@ enum RegistryDestinations {
     RegistryDestination(id: "repeating", navigationKey: "repeating", serverView: "all", title: RegistryL10n.t("Repeating"), iconId: "list.repeating", sfSymbol: "arrow.clockwise", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No repeating tasks"), emptyDetail: RegistryL10n.t("Give any task a Repeat rule and it will show up here."), featureId: "lists.repeating"),
     RegistryDestination(id: "anytime", navigationKey: "unscheduled", serverView: "unscheduled", title: RegistryL10n.t("Anytime"), iconId: "list.anytime", sfSymbol: "rectangle.stack.fill", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: true, shortcutKeycaps: ["⌘", "3"], emptyTitle: RegistryL10n.t("Nothing in Anytime"), emptyDetail: RegistryL10n.t("Open tasks without a date live here."), featureId: "lists.anytime"),
     RegistryDestination(id: "logbook", navigationKey: "logbook", serverView: "logbook", title: RegistryL10n.t("Logbook"), iconId: "list.logbook", sfSymbol: "checkmark", sidebarSection: "bottom", visibility: "always", canHide: true, canMoveSection: true, shortcutKeycaps: ["⌘", "4"], emptyTitle: RegistryL10n.t("Logbook is empty"), emptyDetail: RegistryL10n.t("Tasks you complete or let go end up here."), featureId: "lists.logbook"),
-    RegistryDestination(id: "starred", navigationKey: "starred", serverView: "all", title: RegistryL10n.t("Starred"), iconId: "list.starred", sfSymbol: "star.fill", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Starred Tasks"), emptyDetail: RegistryL10n.t("Favorite important tasks to keep them one tap away."), featureId: "lists.starred"),
+    RegistryDestination(id: "starred", navigationKey: "starred", serverView: "all", title: RegistryL10n.t("Favorites"), iconId: "list.starred", sfSymbol: "star.fill", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Favorites"), emptyDetail: RegistryL10n.t("Favorite important tasks to keep them one tap away."), featureId: "lists.starred"),
     RegistryDestination(id: "faded", navigationKey: "faded", serverView: "all", title: RegistryL10n.t("Faded"), iconId: "list.faded", sfSymbol: "circle.dashed", sidebarSection: "bottom", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Faded Tasks"), emptyDetail: RegistryL10n.t("Undated tasks without activity for 14 days appear here until you keep them or let them go."), featureId: "lists.faded"),
     RegistryDestination(id: "recentlyDeleted", navigationKey: "recentlyDeleted", serverView: "all", title: RegistryL10n.t("Deleted"), iconId: "list.recently_deleted", sfSymbol: "trash", sidebarSection: "bottom", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Deleted Tasks"), emptyDetail: RegistryL10n.t("Septena keeps deleted tasks here for 30 days, then deletes them for good."), featureId: "lists.recently-deleted"),
   ]
@@ -1480,7 +1480,7 @@ enum RegistrySurfaces {
   /// the name for an agent row with no `sourceClient`, and the agent glyph.
   static let provenanceSelfLabel: String = RegistryL10n.t("You")
   static let provenanceAgentFallbackName: String = "Claude"
-  static let provenanceAgentSymbol: String = "cpu"
+  static let provenanceAgentSymbol: String = "text.bubble.badge.sparkles"
   /// The block of `kind`. Each kind appears exactly once (the generator checks it).
   static func taskPageBlock(_ kind: RegistryTaskPageBlockKind) -> RegistryTaskPageBlock {
     guard let b = taskPageBlocks.first(where: { $0.kind == kind }) else { preconditionFailure("no task page block \(kind)") }

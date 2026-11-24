@@ -886,6 +886,12 @@
       "destinations.destinations.starred.emptyState.detail"
     ]
   },
+  "Favorites": {
+    "text": "Favorites",
+    "paths": [
+      "destinations.destinations.starred.title"
+    ]
+  },
   "Field Matrix": {
     "text": "Field Matrix",
     "paths": [
@@ -1457,8 +1463,8 @@
       "destinations.destinations.faded.emptyState.title"
     ]
   },
-  "No Starred Tasks": {
-    "text": "No Starred Tasks",
+  "No Favorites": {
+    "text": "No Favorites",
     "paths": [
       "destinations.destinations.starred.emptyState.title"
     ]
@@ -2372,12 +2378,6 @@
     "paths": [
       "settings.rootGroups.lists_root.items.0.label",
       "settings.pages.smart_lists.title"
-    ]
-  },
-  "Starred": {
-    "text": "Starred",
-    "paths": [
-      "destinations.destinations.starred.title"
     ]
   },
   "Still want any of them?": {

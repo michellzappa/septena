@@ -214,10 +214,15 @@ function validateSettings(settings, entities, icons, caps) {
   }
 
   // mz (2026-11-22): AI is never drawn with sparkles, on any platform.
+  // One exception, chosen by mz on 2026-11-24: the "added by agent" mark is
+  // SF `text.bubble.badge.sparkles` (a text bubble with a small sparkles
+  // badge). Material and Lucide stay sparkle-free.
+  const SPARKLES_ALLOWED = new Set(["task.added_by_agent:sfSymbol"]);
   for (const [id, icon] of Object.entries(icons.icons)) {
     if (!/(^|[._])(ai|agent|agents|claude)([._]|$)/.test(id)) continue;
-    for (const v of [icon.sfSymbol, icon.material, icon.lucide]) {
-      assert(!/sparkle|auto_awesome/.test(v ?? ""), `icons.json: ${id} uses a sparkles glyph; AI icons never use sparkles`);
+    for (const family of ["sfSymbol", "material", "lucide"]) {
+      if (SPARKLES_ALLOWED.has(`${id}:${family}`)) continue;
+      assert(!/sparkle|auto_awesome/.test(icon[family] ?? ""), `icons.json: ${id} uses a sparkles glyph; AI icons never use sparkles`);
     }
   }
   assert(Array.isArray(settings.pages) && settings.pages.length > 0, "settings.json: missing pages");

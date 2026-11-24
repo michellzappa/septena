@@ -164,8 +164,8 @@ enum TaskHistory {
     }
     if diff["starred"] != nil {
       lines.append(after("starred") == .bool(true)
-        ? String(localized: "Starred", comment: "Task history")
-        : String(localized: "Unstarred", comment: "Task history"))
+        ? String(localized: "Favorited", comment: "Task history")
+        : String(localized: "Unfavorited", comment: "Task history"))
     }
     // Order, Today bookkeeping, acknowledgement and provenance fields are
     // left out: they change on every reorder and mean nothing to read.

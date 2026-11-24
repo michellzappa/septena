@@ -13,7 +13,7 @@
     "lists.repeating": { "title": "Repeating", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "lists.logbook": { "title": "Logbook", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "lists.faded": { "title": "Faded pile", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
-    "lists.starred": { "title": "Starred list", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
+    "lists.starred": { "title": "Favorites list", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
     "lists.recently-deleted": { "title": "Recently Deleted (30 days)", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "places.areas": { "title": "Areas", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "places.projects": { "title": "Projects", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
