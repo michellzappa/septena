@@ -55,5 +55,8 @@ fun SeptenaAndroidTheme(content: @Composable () -> Unit) {
 private fun registryColor(value: JsonValue?): Color {
     val hex = requireNotNull(value.stringValue()) { "Missing color token" }.removePrefix("#")
     val rgb = requireNotNull(hex.toLongOrNull(16)) { "Invalid color token '#$hex'" }
-    return Color((0xFF000000L or rgb).toULong())
+    // Color(Long) reads 0xAARRGGBB in sRGB. Color(ULong) is the packed internal
+    // form, whose low bits name the color space: 0xFF…RRGGBB there read as
+    // color space 63 and crashed at launch (ArrayIndexOutOfBounds, index 63).
+    return Color(0xFF000000L or rgb)
 }
