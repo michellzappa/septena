@@ -45,7 +45,7 @@ const VISUAL = {
     chat: { top: 730, you: "Remind me to check the download links before the launch.", agent: "Done. It’s in your Septena Inbox." },
   },
   // Every device: a render of the Mac, iPad, iPhone and Apple Watch on a desk
-  // (mz, 2026-11-24, marketing-3d iso_vertical_4dev). Its dark top holds the title.
+  // (mz, 2026-11-24, tools/3d-studio iso_vertical_4dev). Its dark top holds the title.
   // The focus keeps the iPhone whole at the right edge; the Mac runs off the left.
   devices:        { photo: { src: "art/photo-devices.png", zoom: 1, focus: "92% 100%", shade: 0.55, fade: 700 }, background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" } },
   // Slide 3: Discuss. The conversation in an iOS-style card over the phone's
