@@ -29,16 +29,27 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SeptenaAndroidTheme(graph.appearance) {
-                Surface(modifier = Modifier.safeDrawingPadding()) {
+                Surface(modifier = Modifier.fillMaxSize()) {
                     val signedIn by graph.credentials.signedIn.collectAsStateWithLifecycle()
                     val firstRun by graph.firstRun.phase.collectAsStateWithLifecycle()
                     LaunchedEffect(Unit) { withContext(Dispatchers.IO) { graph.firstRun.resolve(graph) } }
                     when (firstRun) {
-                        FirstRunState.Phase.Unresolved -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        FirstRunState.Phase.Unresolved -> Box(
+                            Modifier.fillMaxSize().safeDrawingPadding(),
+                            contentAlignment = Alignment.Center,
+                        ) {
                             CircularProgressIndicator()
                         }
-                        FirstRunState.Phase.Show -> FirstRunScreen(graph)
-                        FirstRunState.Phase.Hidden -> if (signedIn) TaskHomeScreen(graph) else SignInScreen(graph)
+                        FirstRunState.Phase.Show -> Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                            FirstRunScreen(graph)
+                        }
+                        FirstRunState.Phase.Hidden -> if (signedIn) {
+                            TaskHomeScreen(graph)
+                        } else {
+                            Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                                SignInScreen(graph)
+                            }
+                        }
                     }
                 }
             }

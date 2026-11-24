@@ -73,7 +73,8 @@ fun SeptenaAndroidTheme(store: AppearanceStore, content: @Composable () -> Unit)
         systemColors.withAccent(themeColors)
     }
 
-    // The status and navigation bar icons follow the chosen mode, not only the system's.
+    // The status and navigation bars stay completely transparent so the Header Wash
+    // and canvas fill edge-to-edge, while bar icons follow the chosen appearance mode.
     val activity = LocalActivity.current as? ComponentActivity
     LaunchedEffect(activity, darkTheme) {
         activity?.enableEdgeToEdge(
@@ -81,8 +82,14 @@ fun SeptenaAndroidTheme(store: AppearanceStore, content: @Composable () -> Unit)
                 android.graphics.Color.TRANSPARENT,
                 android.graphics.Color.TRANSPARENT,
             ) { darkTheme },
-            navigationBarStyle = SystemBarStyle.auto(LIGHT_SCRIM, DARK_SCRIM) { darkTheme },
+            navigationBarStyle = SystemBarStyle.auto(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT,
+            ) { darkTheme },
         )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            activity?.window?.isNavigationBarContrastEnforced = false
+        }
     }
 
     // The step scales on top of the system font size, as iPhone offsets
@@ -228,8 +235,3 @@ internal fun registryColor(value: JsonValue?): Color {
     // color space 63 and crashed at launch (ArrayIndexOutOfBounds, index 63).
     return Color(0xFF000000L or rgb)
 }
-
-// The scrims androidx.activity uses by default for a three-button navigation
-// bar, as ARGB ints (android.graphics.Color is not available in unit tests).
-private val LIGHT_SCRIM: Int = 0xE6FFFFFF.toInt()
-private val DARK_SCRIM: Int = 0x801B1B1B.toInt()
