@@ -105,6 +105,10 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
         RegistryActionIds.APP_QUICK_ADD,
         languageTag = languageTag,
     ).orEmpty()
+    val quickAddSubmitTitle = RegistryCatalog.actionAddTitle(
+        RegistryActionIds.APP_QUICK_ADD,
+        languageTag = languageTag,
+    ).orEmpty()
     val quickFindTitle = RegistryCatalog.actionTitle(
         RegistryActionIds.APP_QUICK_FIND,
         languageTag = languageTag,
@@ -129,8 +133,12 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
     val areasTitle = RegistryCatalog.capabilityTitle(RegistryCapabilityIds.PLACES_AREAS, languageTag).orEmpty()
     val projectsTitle = RegistryCatalog.capabilityTitle(RegistryCapabilityIds.PLACES_PROJECTS, languageTag).orEmpty()
     val inboxTitle = RegistryCatalog.destinationTitle(RegistryDestinationIds.INBOX, languageTag).orEmpty()
+    val todayTitle = RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag).orEmpty()
     val emptyTitle = (state.location as? TaskHomeLocation.SmartList)
         ?.let { RegistryCatalog.destinationEmptyTitle(it.destinationId, languageTag) }
+        .orEmpty()
+    val emptyDescription = (state.location as? TaskHomeLocation.SmartList)
+        ?.let { RegistryCatalog.destinationEmptyDetail(it.destinationId, languageTag) }
         .orEmpty()
     val openQuickFindTarget: (QuickFindTarget) -> Unit = { target ->
         quickFindOpen = false
@@ -193,11 +201,14 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         title = pageTitle,
                         sidebarActionTitle = sidebarActionTitle,
                         quickAddTitle = quickAddTitle,
+                        quickAddSubmitTitle = quickAddSubmitTitle,
                         quickFindTitle = quickFindTitle,
                         pauseAgentsTitle = pauseAgentsTitle,
                         completeTitle = completeTitle,
                         emptyTitle = emptyTitle,
+                        emptyDescription = emptyDescription,
                         inboxTitle = inboxTitle,
+                        todayTitle = todayTitle,
                         showNavigationAction = false,
                         onDraftTitleChange = homeViewModel::updateDraft,
                         onQuickAdd = homeViewModel::quickAdd,
@@ -247,11 +258,14 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         title = pageTitle,
                         sidebarActionTitle = sidebarActionTitle,
                         quickAddTitle = quickAddTitle,
+                        quickAddSubmitTitle = quickAddSubmitTitle,
                         quickFindTitle = quickFindTitle,
                         pauseAgentsTitle = pauseAgentsTitle,
                         completeTitle = completeTitle,
                         emptyTitle = emptyTitle,
+                        emptyDescription = emptyDescription,
                         inboxTitle = inboxTitle,
+                        todayTitle = todayTitle,
                         showNavigationAction = true,
                         onOpenNavigation = { scope.launch { drawerState.open() } },
                         onDraftTitleChange = homeViewModel::updateDraft,
@@ -354,11 +368,14 @@ private fun TaskHomeScaffold(
     title: String,
     sidebarActionTitle: String,
     quickAddTitle: String,
+    quickAddSubmitTitle: String,
     quickFindTitle: String,
     pauseAgentsTitle: String,
     completeTitle: String,
     emptyTitle: String,
+    emptyDescription: String,
     inboxTitle: String,
+    todayTitle: String,
     showNavigationAction: Boolean,
     onOpenNavigation: () -> Unit = {},
     onDraftTitleChange: (String) -> Unit,
@@ -414,9 +431,14 @@ private fun TaskHomeScaffold(
             )
             is TaskHomeLocation.SmartList -> TaskHomeContent(
                 quickAddTitle = quickAddTitle,
+                quickAddSubmitTitle = quickAddSubmitTitle,
                 completeTitle = completeTitle,
                 emptyTitle = emptyTitle,
+                emptyDescription = emptyDescription,
                 inboxBandTitle = inboxTitle,
+                todayTitle = todayTitle,
+                todayTint = MaterialTheme.colorScheme.secondary,
+                hasLoaded = state.hasLoaded,
                 isToday = location.destinationId == RegistryDestinationIds.TODAY,
                 inboxTasks = state.inboxTasks,
                 tasks = state.tasks,

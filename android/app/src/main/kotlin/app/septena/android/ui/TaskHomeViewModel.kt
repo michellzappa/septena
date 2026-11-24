@@ -8,6 +8,7 @@ import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
 import app.septena.core.SmartListResolver
+import app.septena.core.SyncRecord
 import app.septena.core.TaskFadeRules
 import app.septena.core.TaskProvenance
 import app.septena.core.TaskSnapshot
@@ -45,6 +46,7 @@ data class TaskHomeNavigationItem(
 )
 
 data class TaskHomeUiState(
+    val hasLoaded: Boolean = false,
     val location: TaskHomeLocation = TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY),
     val smartLists: List<TaskHomeNavigationItem> = emptyList(),
     val areas: List<TaskHomeNavigationItem> = emptyList(),
@@ -59,6 +61,7 @@ data class TaskHomeUiState(
 )
 
 private data class LoadedTaskHome(
+    val hasLoaded: Boolean,
     val location: TaskHomeLocation,
     val smartLists: List<TaskHomeNavigationItem>,
     val areas: List<TaskHomeNavigationItem>,
@@ -91,6 +94,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     val state: StateFlow<TaskHomeUiState> = combine(loaded, draftTitle, errorMessage) { home, draft, error ->
         TaskHomeUiState(
+            hasLoaded = home.hasLoaded,
             location = home.location,
             smartLists = home.smartLists,
             areas = home.areas,
@@ -169,6 +173,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     }
 
     private fun loadInitial() = LoadedTaskHome(
+        hasLoaded = false,
         location = TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY),
         smartLists = emptyList(),
         areas = emptyList(),
@@ -213,6 +218,15 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             .sortedBy { (id, _) -> if (id == RegistryDestinationIds.TODAY) 0 else 1 }
             .map { it.second }
 
+        val areaTitles = areaRecords.mapNotNull { item ->
+            val area = item.location as? TaskHomeLocation.Area ?: return@mapNotNull null
+            area.id to area.title
+        }.toMap()
+        val projectTitles = projectRecords.mapNotNull { item ->
+            val project = item.location as? TaskHomeLocation.Project ?: return@mapNotNull null
+            project.id to project.title
+        }.toMap()
+
         val allSnapshots = taskRecords.mapNotNull { record ->
             runCatching { record to TaskSnapshot.from(record) }.getOrNull()
         }
@@ -236,7 +250,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 is TaskHomeLocation.SmartList -> {
                     if (!TaskViewRules.matchesView(snapshot, resolvedLocation.destinationId, today, now)) continue
                     val positioned = PositionedTask(
-                        TaskListItem(record.id, snapshot.title, agentName(snapshot)),
+                        taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday),
                         record.fields[positionField(resolvedLocation.destinationId)].numberValue()
                             ?: record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                         archiveDate = when (resolvedLocation.destinationId) {
@@ -255,14 +269,14 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 is TaskHomeLocation.Area -> {
                     if (snapshot.area != resolvedLocation.id || !isOpenVisible(snapshot)) continue
                     visible += PositionedTask(
-                        TaskListItem(record.id, snapshot.title, agentName(snapshot)),
+                        taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
                 }
                 is TaskHomeLocation.Project -> {
                     if (snapshot.project != resolvedLocation.id || !isOpenVisible(snapshot)) continue
                     visible += PositionedTask(
-                        TaskListItem(record.id, snapshot.title, agentName(snapshot)),
+                        taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
                 }
@@ -292,6 +306,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         ) && destinationId != RegistryDestinationIds.LOGBOOK &&
             destinationId != RegistryDestinationIds.RECENTLY_DELETED
         return LoadedTaskHome(
+            hasLoaded = true,
             location = resolvedLocation,
             smartLists = smartListItems,
             areas = areaRecords,
@@ -310,6 +325,31 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         } else {
             RegistryEntityFields.Task.POSITION
         }
+
+    private fun taskListItem(
+        record: SyncRecord,
+        snapshot: TaskSnapshot,
+        selected: TaskHomeLocation,
+        areaTitles: Map<String, String>,
+        projectTitles: Map<String, String>,
+        isOnToday: Boolean,
+    ): TaskListItem {
+        val projectTitle = snapshot.project?.let(projectTitles::get)
+        val areaTitle = snapshot.area?.let(areaTitles::get)
+        val subtitle = when (selected) {
+            is TaskHomeLocation.SmartList -> projectTitle ?: areaTitle
+            is TaskHomeLocation.Area -> projectTitle
+            is TaskHomeLocation.Project -> null
+        }
+        return TaskListItem(
+            id = record.id,
+            title = snapshot.title,
+            agentName = agentName(snapshot),
+            subtitle = subtitle,
+            isCompleted = snapshot.status == RegistryEntityEnums.TaskStatus.DONE,
+            isOnToday = isOnToday,
+        )
+    }
 
     private fun isOpenVisible(task: TaskSnapshot): Boolean =
             task.status == RegistryEntityEnums.TaskStatus.OPEN &&

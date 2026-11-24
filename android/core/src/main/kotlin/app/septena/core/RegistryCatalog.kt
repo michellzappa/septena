@@ -123,6 +123,9 @@ object RegistryCatalog {
     fun destinationEmptyTitle(id: String, languageTag: String = "en"): String? =
         destination(id)?.objectAt("emptyState")?.stringAt("title")?.let { localizedString(it, languageTag) ?: it }
 
+    fun destinationEmptyDetail(id: String, languageTag: String = "en"): String? =
+        destination(id)?.objectAt("emptyState")?.stringAt("detail")?.let { localizedString(it, languageTag) ?: it }
+
     fun actionTitle(id: String, field: String = "title", languageTag: String = "en"): String? =
         action(id)?.stringAt(field)?.let { localizedString(it, languageTag) ?: it }
 

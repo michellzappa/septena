@@ -9,29 +9,50 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 
 /** [agentName] is set when an agent added the task (`task.provenance`); the row names it. */
-data class TaskListItem(val id: String, val title: String, val agentName: String? = null)
+data class TaskListItem(
+    val id: String,
+    val title: String,
+    val agentName: String? = null,
+    val subtitle: String? = null,
+    val isCompleted: Boolean = false,
+    val isOnToday: Boolean = false,
+)
 
 /** Portable task-list surface. Platform hosts provide registry copy and bind actions to their mutators. */
 @Composable
 fun TaskHomeContent(
     quickAddTitle: String,
+    quickAddSubmitTitle: String,
     completeTitle: String,
     emptyTitle: String,
+    emptyDescription: String,
     inboxBandTitle: String,
+    todayTitle: String,
+    todayTint: Color,
+    hasLoaded: Boolean,
     isToday: Boolean,
     inboxTasks: List<TaskListItem>,
     tasks: List<TaskListItem>,
@@ -46,17 +67,17 @@ fun TaskHomeContent(
     onOpenTask: (String) -> Unit,
 ) {
     Column(
-        modifier = modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.fillMaxSize().padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (canQuickAdd && !isToday) {
-            QuickAddRow(quickAddTitle, draftTitle, onDraftTitleChange, onQuickAdd)
+            QuickAddRow(quickAddTitle, quickAddSubmitTitle, draftTitle, onDraftTitleChange, onQuickAdd)
         }
 
         errorMessage?.let { Text(it) }
 
         LazyColumn(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
             if (isToday && (inboxTasks.isNotEmpty() || canQuickAdd)) {
@@ -64,32 +85,94 @@ fun TaskHomeContent(
                     Text(
                         text = inboxBandTitle,
                         style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
                     )
                 }
             }
-            if (isToday && inboxTasks.isNotEmpty()) {
-                items(inboxTasks, key = TaskListItem::id) { task ->
-                    TaskRow(task, completeTitle, canComplete, onComplete, onOpenTask)
-                }
+            if (isToday) {
+                taskRows(
+                    tasks = inboxTasks,
+                    keyPrefix = "inbox",
+                    completeTitle = completeTitle,
+                    canComplete = canComplete,
+                    todayTitle = todayTitle,
+                    todayTint = todayTint,
+                    showTodayIndicator = false,
+                    onComplete = onComplete,
+                    onOpenTask = onOpenTask,
+                )
             }
             if (isToday && canQuickAdd) {
                 item(key = "inbox-capture") {
-                    QuickAddRow(quickAddTitle, draftTitle, onDraftTitleChange, onQuickAdd)
+                    QuickAddRow(quickAddTitle, quickAddSubmitTitle, draftTitle, onDraftTitleChange, onQuickAdd)
                 }
             }
-            if (!canQuickAdd && tasks.isEmpty() && inboxTasks.isEmpty() && emptyTitle.isNotBlank()) {
+            if (hasLoaded && !canQuickAdd && tasks.isEmpty() && inboxTasks.isEmpty() && emptyTitle.isNotBlank()) {
                 item(key = "empty-state") {
-                    Text(
-                        text = emptyTitle,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),
-                    )
+                    Column(
+                        modifier = Modifier.fillParentMaxSize().padding(horizontal = 32.dp, vertical = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = emptyTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            textAlign = TextAlign.Center,
+                        )
+                        if (emptyDescription.isNotBlank()) {
+                            Text(
+                                text = emptyDescription,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
                 }
             }
-            items(tasks, key = TaskListItem::id) { task ->
-                TaskRow(task, completeTitle, canComplete, onComplete, onOpenTask)
-            }
+            taskRows(
+                tasks = tasks,
+                keyPrefix = "task",
+                completeTitle = completeTitle,
+                canComplete = canComplete,
+                todayTitle = todayTitle,
+                todayTint = todayTint,
+                showTodayIndicator = !isToday,
+                onComplete = onComplete,
+                onOpenTask = onOpenTask,
+            )
+        }
+    }
+}
+
+private fun LazyListScope.taskRows(
+    tasks: List<TaskListItem>,
+    keyPrefix: String,
+    completeTitle: String,
+    canComplete: Boolean,
+    todayTitle: String,
+    todayTint: Color,
+    showTodayIndicator: Boolean,
+    onComplete: (String) -> Unit,
+    onOpenTask: (String) -> Unit,
+) {
+    itemsIndexed(tasks, key = { _, task -> "$keyPrefix:${task.id}" }) { index, task ->
+        TaskRow(
+            task = task,
+            completeTitle = completeTitle,
+            canComplete = canComplete,
+            todayTitle = todayTitle,
+            todayTint = todayTint,
+            showTodayIndicator = showTodayIndicator,
+            onComplete = onComplete,
+            onOpenTask = onOpenTask,
+        )
+        if (index < tasks.lastIndex) {
+            HorizontalDivider(
+                modifier = Modifier.padding(start = 72.dp, end = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+            )
         }
     }
 }
@@ -97,6 +180,7 @@ fun TaskHomeContent(
 @Composable
 private fun QuickAddRow(
     quickAddTitle: String,
+    submitTitle: String,
     draftTitle: String,
     onDraftTitleChange: (String) -> Unit,
     onQuickAdd: () -> Unit,
@@ -113,7 +197,7 @@ private fun QuickAddRow(
             label = { Text(quickAddTitle) },
         )
         TextButton(enabled = draftTitle.isNotBlank(), onClick = onQuickAdd) {
-            Text(quickAddTitle)
+            Text(submitTitle)
         }
     }
 }
@@ -123,29 +207,75 @@ private fun TaskRow(
     task: TaskListItem,
     completeTitle: String,
     canComplete: Boolean,
+    todayTitle: String,
+    todayTint: Color,
+    showTodayIndicator: Boolean,
     onComplete: (String) -> Unit,
     onOpenTask: (String) -> Unit,
 ) {
+    val showToday = showTodayIndicator && task.isOnToday && !task.isCompleted
     ListItem(
         modifier = Modifier.fillMaxWidth().clickable { onOpenTask(task.id) },
-        headlineContent = { Text(task.title, style = MaterialTheme.typography.bodyLarge) },
-        // Permanent provenance marker. Apple rows show the registry glyph
-        // (`task.added_by_agent`); Android has no icon set yet (no Material
-        // icons dependency), so the row shows the agent's name as quiet text.
-        trailingContent = task.agentName?.let { name ->
+        headlineContent = {
+            Text(
+                text = task.title,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                ),
+                color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant
+                else MaterialTheme.colorScheme.onSurface,
+            )
+        },
+        supportingContent = if (task.subtitle != null) {
             {
                 Text(
-                    name,
-                    style = MaterialTheme.typography.labelSmall,
+                    task.subtitle,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
             }
+        } else {
+            null
         },
-        leadingContent = if (canComplete) {
+        trailingContent = if (showToday || task.agentName != null) {
+            {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (showToday) {
+                        Surface(color = todayTint.copy(alpha = 0.16f), shape = CircleShape) {
+                            Text(
+                                text = todayTitle,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = todayTint,
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
+                    task.agentName?.let { name ->
+                        Text(
+                            name,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        } else {
+            null
+        },
+        leadingContent = if (canComplete || task.isCompleted) {
             {
                 Checkbox(
-                    checked = false,
-                    onCheckedChange = { onComplete(task.id) },
+                    checked = task.isCompleted,
+                    enabled = canComplete && !task.isCompleted,
+                    onCheckedChange = { checked -> if (checked) onComplete(task.id) },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = MaterialTheme.colorScheme.primary,
+                        checkmarkColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
                     modifier = Modifier.semantics { contentDescription = completeTitle },
                 )
             }
