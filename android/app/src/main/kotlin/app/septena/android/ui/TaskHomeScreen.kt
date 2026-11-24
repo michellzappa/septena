@@ -1,5 +1,6 @@
 package app.septena.android.ui
 
+import androidx.compose.ui.text.font.FontWeight
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -690,7 +691,19 @@ private fun TaskHomeScaffold(
                         containerColor = Color.Transparent,
                         scrolledContainerColor = Color.Transparent,
                     ),
-                    title = { Text(title) },
+                    // A place shows its title in the page, as on iPhone; a list shows it here with its glyph.
+                    title = {
+                        if (destinationId != null) {
+                            val icon = RegistryCatalog.destinationIcon(destinationId)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+                            ) {
+                                RegistryIcon(icon, contentDescription = null, tint = glyphTint(icon))
+                                Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    },
                     navigationIcon = if (showNavigationAction) {
                         {
                             IconButton(onClick = onOpenNavigation) {
@@ -751,6 +764,7 @@ private fun TaskHomeScaffold(
                     rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                     onTaskAction = onTaskAction,
                     selection = selection,
+                    onComplete = onComplete,
                     onOpenProject = { projectId ->
                         val project = state.projects.firstOrNull {
                             (it.location as? TaskHomeLocation.Project)?.id == projectId
@@ -768,12 +782,14 @@ private fun TaskHomeScaffold(
                     rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                     onTaskAction = onTaskAction,
                     selection = selection,
+                    onComplete = onComplete,
                 )
                 is TaskHomeLocation.SmartList -> TaskHomeContent(
                     completeTitle = completeTitle,
                     emptyTitle = emptyTitle,
                     emptyDescription = emptyDescription,
                     inboxBandTitle = inboxTitle,
+                    inboxBandIcon = RegistryCatalog.destinationIcon(RegistryDestinationIds.INBOX),
                     todayTitle = todayTitle,
                     todayTint = MaterialTheme.colorScheme.secondary,
                     hasLoaded = state.hasLoaded,

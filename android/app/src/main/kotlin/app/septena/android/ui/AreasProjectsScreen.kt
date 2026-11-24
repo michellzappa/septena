@@ -1,12 +1,17 @@
 package app.septena.android.ui
 
+import app.septena.ui.TaskRow
+import app.septena.ui.TaskListItem
+import app.septena.ui.TaskGroupHeader
+import app.septena.core.generated.RegistryDestinationIds
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.lazy.itemsIndexed
 import app.septena.ui.taskCardSlice
 import app.septena.ui.RegistryIcon
 import app.septena.ui.LocalTaskListStyle
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -47,9 +52,7 @@ import app.septena.core.generated.RegistryIconIds
 import app.septena.core.generated.RegistryPlacesScreenIds
 import app.septena.core.generated.RegistryPromptIds
 import app.septena.core.generated.RegistryTaskAttributeIds
-import app.septena.ui.TaskRowActionsMenu
 import app.septena.ui.TaskSelection
-import app.septena.ui.selectableTaskRow
 import app.septena.ui.TaskRowMenuAction
 
 /** Detail content for an area or project. The shell owns navigation and routes callbacks to these details. */
@@ -64,6 +67,7 @@ fun AreasProjectsScreen(
     rowMenuAccessibilityLabel: String = "",
     onTaskAction: (String, String) -> Unit = { _, _ -> },
     selection: TaskSelection = TaskSelection(),
+    onComplete: (String) -> Unit = {},
 ) {
     val factory = remember(graph) { AreasProjectsViewModel.Factory(graph) }
     val viewModel: AreasProjectsViewModel = viewModel(key = destination.key, factory = factory)
@@ -76,6 +80,17 @@ fun AreasProjectsScreen(
     var projectTaskDraft by rememberSaveable(destination.key) { mutableStateOf("") }
     var sectionTaskDrafts by remember(destination.key) { mutableStateOf(emptyMap<String, String>()) }
 
+    val rows = PlaceRowContext(
+        completeTitle = actionTitle(RegistryActionIds.TASK_TOGGLE_COMPLETE, languageTag),
+        todayTitle = RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag).orEmpty(),
+        onComplete = onComplete,
+        onOpenTask = onOpenTask,
+        rowMenuGroups = rowMenuGroups,
+        rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+        selection = selection,
+        onTaskAction = onTaskAction,
+    )
+
     LaunchedEffect(destination) { viewModel.select(destination) }
     LaunchedEffect(state.destination, state.notes) { notesDraft = state.notes }
 
@@ -86,7 +101,6 @@ fun AreasProjectsScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = LocalTaskListStyle.current.pageGutter, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 item(key = "place-title") {
                     Row(
@@ -101,7 +115,12 @@ fun AreasProjectsScreen(
                                 onClick = { emojiPickerOpen = true },
                             )
                         }
-                        Text(state.title, modifier = Modifier.weight(1f))
+                        Text(
+                            state.title,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                        )
                         TextButton(onClick = { dialog = PlacesDialog.RenamePlace(state.title) }) {
                             Text(actionTitle(destination.renameAction(), languageTag))
                         }
@@ -126,7 +145,7 @@ fun AreasProjectsScreen(
 
                 if (destination is AreasProjectsDestination.Area) {
                     item(key = "projects-heading") {
-                        Text(surfaceText(RegistryPlacesScreenIds.AREA_PROJECTS_HEADING, "label", languageTag))
+                        TaskGroupHeader(surfaceText(RegistryPlacesScreenIds.AREA_PROJECTS_HEADING, "label", languageTag), Modifier.padding(top = 18.dp, bottom = 6.dp))
                     }
                     item(key = "new-project") {
                         Button(onClick = { dialog = PlacesDialog.CreateProject }) {
@@ -157,7 +176,7 @@ fun AreasProjectsScreen(
                         }
                     }
                     item(key = "area-tasks-heading") {
-                        Text(surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag))
+                        TaskGroupHeader(surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag), Modifier.padding(top = 18.dp, bottom = 6.dp))
                     }
                     item(key = "area-quick-add") {
                         QuickAddRow(
@@ -175,15 +194,15 @@ fun AreasProjectsScreen(
                             Text(surfaceText(RegistryPlacesScreenIds.EMPTY_AREA_TASKS, "title", languageTag))
                         }
                     } else {
-                        items(state.areaTasks, key = { "task:${it.id}" }) { task ->
-                            PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, selection, onOpenTask, onTaskAction)
+                        itemsIndexed(state.areaTasks, key = { _, it -> "task:${it.id}" }) { index, task ->
+                            PlaceTaskItem(task, rows, first = index == 0, last = index == state.areaTasks.lastIndex)
                         }
                     }
                 }
 
                 if (destination is AreasProjectsDestination.Project) {
                     item(key = "sections-heading") {
-                        Text(surfaceText(RegistryPlacesScreenIds.SECTIONS_HEADING, "label", languageTag))
+                        TaskGroupHeader(surfaceText(RegistryPlacesScreenIds.SECTIONS_HEADING, "label", languageTag), Modifier.padding(top = 18.dp, bottom = 6.dp))
                     }
                     item(key = "new-section") {
                         Button(onClick = { dialog = PlacesDialog.CreateSection }) {
@@ -191,7 +210,7 @@ fun AreasProjectsScreen(
                         }
                     }
                     item(key = "project-tasks-heading") {
-                        Text(surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag))
+                        TaskGroupHeader(surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag), Modifier.padding(top = 18.dp, bottom = 6.dp))
                     }
                     item(key = "project-quick-add") {
                         QuickAddRow(
@@ -210,8 +229,8 @@ fun AreasProjectsScreen(
                         }
                     }
                     if (state.unsectionedTasks.isNotEmpty()) {
-                        items(state.unsectionedTasks, key = { "task:${it.id}" }) { task ->
-                            PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, selection, onOpenTask, onTaskAction)
+                        itemsIndexed(state.unsectionedTasks, key = { _, it -> "task:${it.id}" }) { index, task ->
+                            PlaceTaskItem(task, rows, first = index == 0, last = index == state.unsectionedTasks.lastIndex)
                         }
                     }
                     if (state.sections.isEmpty()) {
@@ -229,11 +248,7 @@ fun AreasProjectsScreen(
                                     viewModel.createTask(sectionTaskDrafts[section.id].orEmpty(), section.id)
                                     sectionTaskDrafts = sectionTaskDrafts + (section.id to "")
                                 },
-                                onOpenTask = onOpenTask,
-                                rowMenuGroups = rowMenuGroups,
-                                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                                selection = selection,
-                                onTaskAction = onTaskAction,
+                                rows = rows,
                                 onRename = { dialog = PlacesDialog.RenameSection(section.id, section.title) },
                                 onDelete = { dialog = PlacesDialog.DeleteSection(section.id) },
                             )
@@ -319,53 +334,51 @@ private fun QuickAddRow(
     }
 }
 
+/** What a place's task rows need from the shell. */
+private class PlaceRowContext(
+    val completeTitle: String,
+    val todayTitle: String,
+    val onComplete: (String) -> Unit,
+    val onOpenTask: (String) -> Unit,
+    val rowMenuGroups: List<List<TaskRowMenuAction>>,
+    val rowMenuAccessibilityLabel: String,
+    val selection: TaskSelection,
+    val onTaskAction: (String, String) -> Unit,
+)
+
+/** The shared task row, on its own card: the place's gutter is the list padding. */
 @Composable
-private fun PlaceTaskItem(
-    task: PlaceTaskRow,
-    rowMenuGroups: List<List<TaskRowMenuAction>>,
-    rowMenuAccessibilityLabel: String,
-    selection: TaskSelection,
-    onOpenTask: (String) -> Unit,
-    onTaskAction: (String, String) -> Unit,
-) {
-    var menuExpanded by remember(task.id) { mutableStateOf(false) }
-    val selected = task.id in selection.selectedIds
-    ListItem(
-        headlineContent = { Text(task.title) },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        leadingContent = if (selection.isActive) {
-            {
-                Checkbox(
-                    checked = selected,
-                    onCheckedChange = { selection.onToggle(task.id) },
-                    modifier = Modifier.semantics { contentDescription = selection.toggleLabel },
-                )
-            }
-        } else null,
-        modifier = Modifier
-            .fillMaxWidth()
-            .taskCardSlice(first = true, last = true, selected = selected, gutter = 0.dp)
-            .selectableTaskRow(task.id, selection, onOpenTask, onMenu = { menuExpanded = true }),
-        trailingContent = if (rowMenuGroups.isNotEmpty() && !selection.isActive) {
-            {
-                TaskRowActionsMenu(
-                    groups = rowMenuGroups.map { group ->
-                        group.map { action ->
-                            if (action.selectedTitle != null || action.unselectedTitle != null) action.copy(
-                                title = if (task.isStarred) action.selectedTitle ?: action.title
-                                else action.unselectedTitle ?: action.title,
-                            ) else action
-                        }
-                    },
-                    accessibilityLabel = rowMenuAccessibilityLabel,
-                    icon = RegistryIconIds.ACTION_MORE,
-                    expanded = menuExpanded,
-                    onExpandedChange = { menuExpanded = it },
-                    onAction = { onTaskAction(task.id, it) },
-                )
-            }
-        } else null,
-    )
+private fun PlaceTaskItem(task: TaskListItem, rows: PlaceRowContext, first: Boolean, last: Boolean) {
+    Column(
+        modifier = Modifier.taskCardSlice(
+            first = first,
+            last = last,
+            selected = task.id in rows.selection.selectedIds,
+            gutter = 0.dp,
+        ),
+    ) {
+        TaskRow(
+            task = task,
+            completeTitle = rows.completeTitle,
+            canComplete = true,
+            todayTitle = rows.todayTitle,
+            todayTint = MaterialTheme.colorScheme.secondary,
+            showTodayIndicator = true,
+            onComplete = rows.onComplete,
+            onOpenTask = rows.onOpenTask,
+            rowMenuGroups = rows.rowMenuGroups,
+            rowMenuAccessibilityLabel = rows.rowMenuAccessibilityLabel,
+            selection = rows.selection,
+            rowMenuIcon = RegistryIconIds.ACTION_MORE,
+            onTaskAction = rows.onTaskAction,
+        )
+        if (!last) {
+            HorizontalDivider(
+                modifier = Modifier.padding(start = 48.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+            )
+        }
+    }
 }
 
 @Composable
@@ -375,17 +388,13 @@ private fun PlaceSectionBlock(
     taskDraft: String,
     onTaskDraftChange: (String) -> Unit,
     onAddTask: () -> Unit,
-    onOpenTask: (String) -> Unit,
-    rowMenuGroups: List<List<TaskRowMenuAction>>,
-    rowMenuAccessibilityLabel: String,
-    selection: TaskSelection,
-    onTaskAction: (String, String) -> Unit,
+    rows: PlaceRowContext,
     onRename: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(section.title, modifier = Modifier.weight(1f))
+            TaskGroupHeader(section.title, Modifier.weight(1f).padding(top = 18.dp, bottom = 6.dp))
             TextButton(onClick = onRename) {
                 Text(actionTitle(RegistryActionIds.SECTION_RENAME, languageTag))
             }
@@ -396,8 +405,10 @@ private fun PlaceSectionBlock(
         if (section.tasks.isEmpty()) {
             Text(surfaceText(RegistryPlacesScreenIds.EMPTY_SECTION_TASKS, "title", languageTag), modifier = Modifier.padding(start = 12.dp))
         } else {
-            section.tasks.forEach { task ->
-                PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, selection, onOpenTask, onTaskAction)
+            Column {
+                section.tasks.forEachIndexed { index, task ->
+                    PlaceTaskItem(task, rows, first = index == 0, last = index == section.tasks.lastIndex)
+                }
             }
         }
         QuickAddRow(

@@ -1,5 +1,13 @@
 package app.septena.ui
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +26,6 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -39,6 +46,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 
+enum class TaskSignalTone { Muted, Overdue, Star }
+
+/** One trailing signal of a row: a glyph (icons.json ID), a short text, or both. */
+data class TaskRowSignal(
+    val icon: String?,
+    val text: String? = null,
+    /** Accessibility label of the glyph. */
+    val label: String = "",
+    val tone: TaskSignalTone = TaskSignalTone.Muted,
+)
+
 /** [agentName] is set when an agent added the task (`task.provenance`); the row names it. */
 data class TaskListItem(
     val id: String,
@@ -52,6 +70,8 @@ data class TaskListItem(
     val opacity: Float = 1f,
     /** A section heading shown above this row when it differs from the row before (Agent stages). */
     val groupTitle: String? = null,
+    val signals: List<TaskRowSignal> = emptyList(),
+    val tags: List<String> = emptyList(),
 )
 
 /**
@@ -99,6 +119,7 @@ fun TaskHomeContent(
     emptyTitle: String,
     emptyDescription: String,
     inboxBandTitle: String,
+    inboxBandIcon: String?,
     todayTitle: String,
     todayTint: Color,
     hasLoaded: Boolean,
@@ -130,10 +151,9 @@ fun TaskHomeContent(
         ) {
             if (isToday && inboxTasks.isNotEmpty()) {
                 item(key = "inbox-band-title") {
-                    Text(
-                        text = inboxBandTitle,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    TaskGroupHeader(
+                        title = inboxBandTitle,
+                        icon = inboxBandIcon,
                         modifier = Modifier.padding(
                             start = LocalTaskListStyle.current.pageGutter,
                             top = 12.dp,
@@ -223,12 +243,10 @@ private fun LazyListScope.taskRows(
         val group = task.groupTitle
         val startsGroup = index == 0 || tasks[index - 1].groupTitle != group
         val endsGroup = index == tasks.lastIndex || tasks[index + 1].groupTitle != group
-        Column {
+        Column(modifier = Modifier.animateItem()) {
             if (group != null && startsGroup) {
-                Text(
-                    text = group,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                TaskGroupHeader(
+                    title = group,
                     modifier = Modifier.fillMaxWidth().padding(
                         start = LocalTaskListStyle.current.pageGutter,
                         end = LocalTaskListStyle.current.pageGutter,
@@ -261,7 +279,7 @@ private fun LazyListScope.taskRows(
                 )
                 if (!endsGroup) {
                     HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp),
+                        modifier = Modifier.padding(start = 48.dp),
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
                     )
                 }
@@ -270,9 +288,9 @@ private fun LazyListScope.taskRows(
     }
 }
 
+/** One task row, as the iPhone row reads: checkbox, title with its place below, trailing signals. */
 @Composable
-@OptIn(ExperimentalFoundationApi::class)
-private fun TaskRow(
+fun TaskRow(
     task: TaskListItem,
     completeTitle: String,
     canComplete: Boolean,
@@ -290,108 +308,159 @@ private fun TaskRow(
     val showToday = showTodayIndicator && task.isOnToday && !task.isCompleted
     var menuExpanded by remember(task.id) { mutableStateOf(false) }
     val selecting = selection.isActive
-    val selected = task.id in selection.selectedIds
-    ListItem(
-        // The card slice around the row draws the fill and the selection wash.
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        modifier = Modifier.fillMaxWidth().alpha(task.opacity).selectableTaskRow(
-            taskId = task.id,
-            selection = selection,
-            onOpen = onOpenTask,
-            onMenu = { menuExpanded = true },
-        ),
-        headlineContent = {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(task.opacity)
+            .selectableTaskRow(
+                taskId = task.id,
+                selection = selection,
+                onOpen = onOpenTask,
+                onMenu = { menuExpanded = true },
+            )
+            .heightIn(min = 48.dp)
+            .padding(end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Material keeps a 48dp touch target around the 18dp box, so the box and
+        // the title line up with the iPhone columns.
+        when {
+            selecting -> Checkbox(
+                checked = task.id in selection.selectedIds,
+                onCheckedChange = { selection.onToggle(task.id) },
+                modifier = Modifier.semantics { contentDescription = selection.toggleLabel },
+            )
+            canComplete || task.isCompleted -> Checkbox(
+                checked = task.isCompleted,
+                enabled = canComplete && !task.isCompleted,
+                onCheckedChange = { checked -> if (checked) onComplete(task.id) },
+                colors = CheckboxDefaults.colors(
+                    checkedColor = MaterialTheme.colorScheme.primary,
+                    checkmarkColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+                modifier = Modifier.semantics { contentDescription = completeTitle },
+            )
+            else -> Spacer(Modifier.width(16.dp))
+        }
+        Column(
+            modifier = Modifier.weight(1f).padding(vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             Text(
                 text = task.title,
                 style = MaterialTheme.typography.bodyLarge.copy(
                     textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
                 ),
-                color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant
-                else MaterialTheme.colorScheme.onSurface,
+                color = if (task.isCompleted) muted else MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
-        },
-        supportingContent = if (task.subtitle != null) {
-            {
+            task.subtitle?.let { place ->
                 Text(
-                    task.subtitle,
+                    place,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = muted,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-        } else {
-            null
-        },
-        trailingContent = if (showToday || task.agentName != null || (rowMenuGroups.isNotEmpty() && !selecting)) {
-            {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (showToday) {
-                        Surface(color = todayTint.copy(alpha = 0.16f), shape = CircleShape) {
-                            Text(
-                                text = todayTitle,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = todayTint,
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                            )
-                        }
-                    }
-                    task.agentName?.let { name ->
-                        Text(
-                            name,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (rowMenuGroups.isNotEmpty() && !selecting) {
-                        TaskRowActionsMenu(
-                            groups = rowMenuGroups.map { group ->
-                                group.map { action ->
-                                    if (action.selectedTitle != null || action.unselectedTitle != null) action.copy(
-                                        title = if (task.isStarred) action.selectedTitle ?: action.title
-                                        else action.unselectedTitle ?: action.title,
-                                    ) else action
-                                }
-                            },
-                            accessibilityLabel = rowMenuAccessibilityLabel,
-                            icon = rowMenuIcon,
-                            expanded = menuExpanded,
-                            onExpandedChange = { menuExpanded = it },
-                            onAction = { id -> onTaskAction(task.id, id) },
-                        )
-                    }
+        }
+        Row(
+            modifier = Modifier.padding(start = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (showToday) {
+                Surface(color = todayTint.copy(alpha = 0.16f), shape = CircleShape) {
+                    Text(
+                        text = todayTitle,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                    )
                 }
             }
-        } else {
-            null
-        },
-        leadingContent = if (selecting) {
-            {
-                Checkbox(
-                    checked = selected,
-                    onCheckedChange = { selection.onToggle(task.id) },
-                    modifier = Modifier.semantics { contentDescription = selection.toggleLabel },
+            task.signals.forEach { SignalView(it) }
+            task.tags.take(MAX_ROW_TAGS).forEach { tag ->
+                Surface(
+                    color = Color.Transparent,
+                    shape = CircleShape,
+                    border = BorderStroke(0.75.dp, muted.copy(alpha = 0.28f)),
+                ) {
+                    Text(
+                        tag,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = muted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 72.dp).padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
+            }
+            if (task.tags.size > MAX_ROW_TAGS) {
+                Text("+${task.tags.size - MAX_ROW_TAGS}", style = MaterialTheme.typography.labelSmall, color = muted)
+            }
+            task.agentName?.let { name ->
+                Text(name, style = MaterialTheme.typography.labelSmall, color = muted, maxLines = 1)
+            }
+            // iPhone opens the menu with a long press. Here a long press selects
+            // (Android convention), so the row keeps a quiet menu button.
+            if (rowMenuGroups.isNotEmpty() && !selecting) {
+                TaskRowActionsMenu(
+                    groups = rowMenuGroups.map { group ->
+                        group.map { action ->
+                            if (action.selectedTitle != null || action.unselectedTitle != null) action.copy(
+                                title = if (task.isStarred) action.selectedTitle ?: action.title
+                                else action.unselectedTitle ?: action.title,
+                            ) else action
+                        }
+                    },
+                    accessibilityLabel = rowMenuAccessibilityLabel,
+                    icon = rowMenuIcon,
+                    expanded = menuExpanded,
+                    onExpandedChange = { menuExpanded = it },
+                    onAction = { id -> onTaskAction(task.id, id) },
                 )
             }
-        } else if (canComplete || task.isCompleted) {
-            {
-                Checkbox(
-                    checked = task.isCompleted,
-                    enabled = canComplete && !task.isCompleted,
-                    onCheckedChange = { checked -> if (checked) onComplete(task.id) },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = MaterialTheme.colorScheme.primary,
-                        checkmarkColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
-                    modifier = Modifier.semantics { contentDescription = completeTitle },
-                )
-            }
-        } else {
-            null
-        },
-    )
+        }
+    }
+}
+
+private const val MAX_ROW_TAGS = 2
+
+@Composable
+private fun SignalView(signal: TaskRowSignal) {
+    val tint = when (signal.tone) {
+        TaskSignalTone.Muted -> MaterialTheme.colorScheme.onSurfaceVariant
+        TaskSignalTone.Overdue -> MaterialTheme.colorScheme.error
+        TaskSignalTone.Star -> LocalTaskListStyle.current.starTint
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        RegistryIcon(signal.icon, contentDescription = signal.label.ifEmpty { null }, tint = tint, size = 13.dp)
+        signal.text?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (signal.tone == TaskSignalTone.Overdue) FontWeight.SemiBold else FontWeight.Normal,
+                color = tint,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** A group heading above a card (iPhone `sectionGroupHeaderTitleStyle`, 18pt semibold). */
+@Composable
+fun TaskGroupHeader(title: String, modifier: Modifier = Modifier, icon: String? = null) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        RegistryIcon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 16.dp)
+        Text(title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+    }
 }
 
 @Composable

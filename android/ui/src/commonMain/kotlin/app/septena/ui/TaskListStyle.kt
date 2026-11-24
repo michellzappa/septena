@@ -20,6 +20,8 @@ data class TaskListStyle(
     val cardFill: Color,
     /** The one selection treatment of a list row: the accent wash over the card. */
     val selectionFill: Color,
+    /** Star glyph on a starred row (`todayAccent`). */
+    val starTint: Color,
     val cardRadius: Dp,
     val pageGutter: Dp,
     val groupGap: Dp,

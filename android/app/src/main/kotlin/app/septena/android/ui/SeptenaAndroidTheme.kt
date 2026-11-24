@@ -241,6 +241,9 @@ private fun taskListStyle(
     return TaskListStyle(
         cardFill = colors.surface.copy(alpha = fillAlpha),
         selectionFill = theme.accent.copy(alpha = theme.selectionAlpha),
+        starTint = registryColor(
+            (RegistryCatalog.document("tokens").fields["colors"] as? JsonValue.ObjectValue)?.fields?.get("todayAccent"),
+        ),
         cardRadius = tokenNumber("taskCard", "radius").dp,
         pageGutter = tokenNumber("spacing", "pageGutter").dp,
         groupGap = tokenNumber("spacing", "sm").dp,

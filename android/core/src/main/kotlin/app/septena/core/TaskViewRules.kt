@@ -72,6 +72,8 @@ data class TaskViewMembership(
     val inTodayInbox: Boolean,
     val daysOnToday: Int,
     val matchesView: Map<String, Boolean>,
+    /** The core's due state (views.rs R3): overdue, dueToday, or null. */
+    val dueState: String? = null,
 )
 
 /**
@@ -101,6 +103,7 @@ object TaskViewRules {
                 RegistryDestinationIds.UPCOMING to m.matchesUpcoming,
                 RegistryDestinationIds.ANYTIME to m.matchesAnytime,
             ),
+            dueState = m.dueState,
         )
     }
 

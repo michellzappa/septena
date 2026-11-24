@@ -1,5 +1,6 @@
 package app.septena.android.ui
 
+import app.septena.core.TaskViewMembership
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.septena.android.AndroidAppGraph
@@ -474,6 +475,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             is TaskHomeLocation.SmartList -> selected
         }
 
+        val rows = TaskRowSource.load(graph, today)
         val inbox = mutableListOf<PositionedTask>()
         val visible = mutableListOf<PositionedTask>()
         for ((record, snapshot) in allSnapshots) {
@@ -493,7 +495,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         else -> TaskViewRules.matchesView(snapshot, resolvedLocation.destinationId, today, now)
                     }
                     if (!listed) continue
-                    val item = taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday)
+                    val item = taskListItem(rows, record, snapshot, resolvedLocation, areaTitles, projectTitles, membership)
                         .withFade(snapshot, conversation, now, today, showAging)
                     val positioned = PositionedTask(
                         if (resolvedLocation.destinationId == RegistryDestinationIds.AGENT) {
@@ -519,7 +521,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 is TaskHomeLocation.Area -> {
                     if (snapshot.area != resolvedLocation.id || !isOpenVisible(snapshot)) continue
                     visible += PositionedTask(
-                        taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday)
+                        taskListItem(rows, record, snapshot, resolvedLocation, areaTitles, projectTitles, membership)
                             .withFade(snapshot, conversations[snapshot.id], now, today, showAging),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
@@ -527,7 +529,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 is TaskHomeLocation.Project -> {
                     if (snapshot.project != resolvedLocation.id || !isOpenVisible(snapshot)) continue
                     visible += PositionedTask(
-                        taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday)
+                        taskListItem(rows, record, snapshot, resolvedLocation, areaTitles, projectTitles, membership)
                             .withFade(snapshot, conversations[snapshot.id], now, today, showAging),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
@@ -587,12 +589,13 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
 
     private fun taskListItem(
+        rows: TaskRowSource,
         record: SyncRecord,
         snapshot: TaskSnapshot,
         selected: TaskHomeLocation,
         areaTitles: Map<String, String>,
         projectTitles: Map<String, String>,
-        isOnToday: Boolean,
+        membership: TaskViewMembership,
     ): TaskListItem {
         val projectTitle = snapshot.project?.let(projectTitles::get)
         val areaTitle = snapshot.area?.let(areaTitles::get)
@@ -601,15 +604,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             is TaskHomeLocation.Area -> projectTitle
             is TaskHomeLocation.Project -> null
         }
-        return TaskListItem(
-            id = record.id,
-            title = snapshot.title,
-            agentName = agentName(snapshot),
-            subtitle = subtitle,
-            isCompleted = snapshot.status == RegistryEntityEnums.TaskStatus.DONE,
-            isOnToday = isOnToday,
-            isStarred = snapshot.starred,
-        )
+        val onTodayList = (selected as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.TODAY
+        return rows.item(record, snapshot, membership, subtitle, showsToday = !onTodayList)
     }
 
     /**
@@ -706,11 +702,3 @@ private fun JsonValue?.numberValue(): Double? = when (this) {
     is JsonValue.DecimalValue -> value
     else -> null
 }
-
-/** The agent's name for a row an agent added (`task.provenance`), else null. */
-private fun agentName(snapshot: TaskSnapshot): String? =
-    if (TaskProvenance.isAgentAuthored(snapshot.source)) {
-        TaskProvenance.addedByName(snapshot.source, snapshot.sourceClient)
-    } else {
-        null
-    }
