@@ -353,6 +353,10 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     list?.select(taskId: taskId)
     if opensPage { setInspector(visible: true) }
   }
+  func openTaskConversation(id taskId: String, in filter: TaskFilter) {
+    revealTask(id: taskId, in: filter)
+    setInspector(visible: true)
+  }
   func newTask() { list?.createTask() }
   func newProject() { sidebar?.newProject() }
   func newArea() { sidebar?.newArea() }
