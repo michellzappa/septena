@@ -362,6 +362,51 @@ class TaskMutator(
         }
     }
 
+    /** Clear the agent cue: the user engaged with an agent's row. No-op for other rows. */
+    suspend fun acknowledge(id: String): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        val f = existing.fields
+        if (f[RegistryEntityFields.Task.SOURCE].stringValue() != app.septena.core.generated.RegistryEntityEnums.TaskSource.MCP ||
+            f[RegistryEntityFields.Task.ACKNOWLEDGED_AT].stringValue() != null
+        ) return existing
+        return updateFields(id, mapOf(RegistryEntityFields.Task.ACKNOWLEDGED_AT to JsonValue.StringValue(WireTimestamp.format(clock.now()))))
+    }
+
+    /** Review ▸ Accept (as iOS): complete the task and clear the agent cue. */
+    suspend fun acceptReview(id: String): TaskRecord? {
+        val done = complete(id) ?: return null
+        acknowledge(id)
+        return done
+    }
+
+    /**
+     * Faded ▸ Keep (docs/TASK_FADE_SPEC.md §4, as iOS TasksBackend.touch):
+     * the user touched the task, so its fade clock restarts and it returns
+     * to its list.
+     */
+    suspend fun keepFaded(id: String): TaskRecord? = updateFields(
+        id,
+        linkedMapOf(
+            RegistryEntityFields.Task.TOUCHED_AT to JsonValue.StringValue(WireTimestamp.format(clock.now())),
+            RegistryEntityFields.Task.DEFER_COUNT to JsonValue.IntegerValue(0),
+            RegistryEntityFields.Task.FADED_AT to JsonValue.Null,
+        ),
+    )
+
+    /** Faded ▸ Let Go (spec §5, as iOS dropFaded): cancel it with dropReason "faded"; it goes to the Logbook. */
+    suspend fun letGoFaded(id: String): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.deletedAt != null || existing.status != TaskStatus.OPEN) return null
+        return updateFields(
+            id,
+            linkedMapOf(
+                RegistryEntityFields.Task.STATUS to JsonValue.StringValue(app.septena.core.generated.RegistryEntityEnums.TaskStatus.CANCELLED),
+                RegistryEntityFields.Task.DROP_REASON to JsonValue.StringValue("faded"),
+                RegistryEntityFields.Task.COMPLETED_AT to JsonValue.StringValue(WireTimestamp.format(clock.now())),
+            ),
+        )
+    }
+
     suspend fun cancel(id: String): TaskRecord? = updateFields(
         id,
         linkedMapOf(
