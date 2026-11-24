@@ -7,12 +7,14 @@ on:
       - "android/**"
       - "registry/**"
       - "scripts/gen-registries.mjs"
+      - "core/release/**"
       - ".github/workflows/android.yml"
   pull_request:
     paths:
       - "android/**"
       - "registry/**"
       - "scripts/gen-registries.mjs"
+      - "core/release/**"
       - ".github/workflows/android.yml"
   workflow_dispatch:
 
@@ -66,6 +68,15 @@ jobs:
         run: |
           ./gradlew --no-daemon :app:assembleDebug -PseptenaBuildNumber="$(git rev-list --count HEAD)" ${SIGN:-}
           rm -f "$RUNNER_TEMP/tester.p12"
+
+      # The shared conformance vectors on the JVM, through the core's Linux
+      # natives (F3, #344). :core:test runs them.
+      - name: Core conformance vectors
+        run: ./gradlew --no-daemon :core:test
+
+      # JVM unit tests of the app, the theme launch guard among them (#344).
+      - name: App unit tests
+        run: ./gradlew --no-daemon :app:testDebugUnitTest
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4

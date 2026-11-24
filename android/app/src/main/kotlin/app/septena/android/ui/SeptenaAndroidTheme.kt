@@ -21,17 +21,7 @@ fun SeptenaAndroidTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
     val darkTheme = isSystemInDarkTheme()
     val colors = remember(darkTheme) {
-        val tokens = RegistryCatalog.document("tokens")
-        val accents = (tokens.fields["fruitAccents"] as? JsonValue.ArrayValue)?.values.orEmpty()
-        val colorful = accents
-            .mapNotNull { it as? JsonValue.ObjectValue }
-            .firstOrNull { it.fields["id"].stringValue() == "colorful" }
-            ?: error("Missing Colorful accent in registry/tokens.json")
-        val accent = registryColor(colorful.fields[if (darkTheme) "dark" else "light"])
-        val onAccent = registryColor(colorful.fields[if (darkTheme) "checkDark" else "checkLight"])
-        val tokenColors = tokens.fields["colors"] as? JsonValue.ObjectValue
-            ?: error("Missing semantic colors in registry/tokens.json")
-        val today = registryColor(tokenColors.fields["todayAccent"])
+        val (accent, onAccent, today) = registryThemeColors(darkTheme)
         val systemColors = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         } else if (darkTheme) {
@@ -50,6 +40,21 @@ fun SeptenaAndroidTheme(content: @Composable () -> Unit) {
     }
 
     MaterialTheme(colorScheme = colors, content = content)
+}
+
+/** Accent, on-accent and Today colors from registry/tokens.json. Unit-tested (F3, #344). */
+internal fun registryThemeColors(darkTheme: Boolean): Triple<Color, Color, Color> {
+    val tokens = RegistryCatalog.document("tokens")
+    val accents = (tokens.fields["fruitAccents"] as? JsonValue.ArrayValue)?.values.orEmpty()
+    val colorful = accents
+        .mapNotNull { it as? JsonValue.ObjectValue }
+        .firstOrNull { it.fields["id"].stringValue() == "colorful" }
+        ?: error("Missing Colorful accent in registry/tokens.json")
+    val accent = registryColor(colorful.fields[if (darkTheme) "dark" else "light"])
+    val onAccent = registryColor(colorful.fields[if (darkTheme) "checkDark" else "checkLight"])
+    val tokenColors = tokens.fields["colors"] as? JsonValue.ObjectValue
+        ?: error("Missing semantic colors in registry/tokens.json")
+    return Triple(accent, onAccent, registryColor(tokenColors.fields["todayAccent"]))
 }
 
 private fun registryColor(value: JsonValue?): Color {
