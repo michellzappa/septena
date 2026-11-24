@@ -108,7 +108,12 @@ class TaskAttachmentStore(
     /** Deletes the row (the server then removes the bytes) and this device's copy. */
     suspend fun remove(record: SyncRecord) {
         mutator.delete(RegistryEntityNames.ATTACHMENT, record.id)
-        File(root, record.id).deleteRecursively()
+        deleteLocalCopy(record.id)
+    }
+
+    /** Removes this device's cached copy of an attachment deleted locally or on another device. */
+    fun deleteLocalCopy(id: String) {
+        File(root, id).deleteRecursively()
     }
 
     /** The file on this device, downloaded first when only the server has it. */
@@ -135,7 +140,9 @@ class TaskAttachmentStore(
 
     /**
      * Runs after each sync. Uploads every row that is on the server without its
-     * bytes when this device holds them, and removes this device's copy of rows deleted elsewhere.
+     * bytes when this device holds them. Remote attachment tombstones remove
+     * their cached files as sync applies them ([deleteLocalCopy]); any locally
+     * soft-deleted rows are cleaned up here too.
      * Returns true when an upload landed, so the caller pulls the new state.
      */
     suspend fun afterSync(): Boolean {
@@ -143,7 +150,7 @@ class TaskAttachmentStore(
         val (deleted, live) = records.partition { it.deletedAt != null }
         // Only a known tombstone frees a copy: a row that is missing for a moment
         // (a reset pull) must never cost the only copy of a file.
-        deleted.forEach { File(root, it.id).deleteRecursively() }
+        deleted.forEach { deleteLocalCopy(it.id) }
         var landed = false
         for (record in live) {
             if (record.revision == null) continue
