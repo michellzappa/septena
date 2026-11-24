@@ -3,6 +3,7 @@ package app.septena.core
 import app.septena.core.generated.RegistryCapabilities
 import app.septena.core.generated.RegistryDocuments
 import app.septena.core.generated.RegistryPlatformIds
+import java.util.concurrent.ConcurrentHashMap
 
 data class FeatureCapability(
     val id: String,
@@ -71,28 +72,40 @@ data class RegistryMenuActionGroup(val actionIds: List<String>)
 
 /** Runtime view over the complete generated registries. No Android-only copy of product contracts. */
 object RegistryCatalog {
-    private val documents: Map<String, JsonValue.ObjectValue> by lazy {
-        linkedMapOf(
-            "entities" to RegistryDocuments.entitiesJson,
-            "rules" to RegistryDocuments.rulesJson,
-            "icons" to RegistryDocuments.iconsJson,
-            "tokens" to RegistryDocuments.tokensJson,
-            "capabilities" to RegistryDocuments.capabilitiesJson,
-            "settings" to RegistryDocuments.settingsJson,
-            "destinations" to RegistryDocuments.destinationsJson,
-            "actions" to RegistryDocuments.actionsJson,
-            "surfaces" to RegistryDocuments.surfacesJson,
-            "plans" to RegistryDocuments.plansJson,
-            "conformance" to RegistryDocuments.conformanceJson,
-            "localizations" to RegistryDocuments.localizationsJson,
-        ).mapValues { (_, json) ->
-            JsonValue.parse(json) as? JsonValue.ObjectValue
-                ?: error("Generated registry document must be a JSON object")
-        }
-    }
+    private val rawDocuments: Map<String, () -> String> = linkedMapOf(
+        "entities" to { RegistryDocuments.entitiesJson },
+        "rules" to { RegistryDocuments.rulesJson },
+        "icons" to { RegistryDocuments.iconsJson },
+        "tokens" to { RegistryDocuments.tokensJson },
+        "capabilities" to { RegistryDocuments.capabilitiesJson },
+        "settings" to { RegistryDocuments.settingsJson },
+        "destinations" to { RegistryDocuments.destinationsJson },
+        "actions" to { RegistryDocuments.actionsJson },
+        "surfaces" to { RegistryDocuments.surfacesJson },
+        "plans" to { RegistryDocuments.plansJson },
+        "conformance" to { RegistryDocuments.conformanceJson },
+        "localizations" to { RegistryDocuments.localizationsJson },
+    )
+
+    // Parse each registry document lazily on first use so cold boot never parses
+    // runtime-unused documents (like conformance test vectors) on the main thread.
+    private val parsedDocuments = ConcurrentHashMap<String, JsonValue.ObjectValue>()
+    private val surfaceById = ConcurrentHashMap<String, JsonValue.ObjectValue>()
 
     fun document(name: String): JsonValue.ObjectValue =
-        documents[name] ?: error("Unknown generated registry document '$name'")
+        parsedDocuments.computeIfAbsent(name) { key ->
+            val supplier = rawDocuments[key] ?: error("Unknown generated registry document '$key'")
+            JsonValue.parse(supplier()) as? JsonValue.ObjectValue
+                ?: error("Generated registry document must be a JSON object")
+        }
+
+    /** Pre-parses only the small set of registry docs needed for the first frame, off the main thread. */
+    fun prewarmStartup() {
+        document("tokens")
+        document("destinations")
+        document("actions")
+        document("localizations")
+    }
 
     fun capabilityStatus(featureId: String, platform: String = RegistryPlatformIds.ANDROID): String? {
         val feature = RegistryCapabilities.statusByFeatureAndPlatform[featureId] ?: return null
@@ -191,7 +204,8 @@ object RegistryCatalog {
         capabilities(RegistryPlatformIds.ANDROID).firstOrNull { it.id == id }?.title
             ?.let { localizedString(it, languageTag) ?: it }
 
-    fun surface(id: String): JsonValue.ObjectValue? = findObjectWithId(document("surfaces"), id)
+    fun surface(id: String): JsonValue.ObjectValue? =
+        surfaceById[id] ?: findObjectWithId(document("surfaces"), id)?.also { surfaceById[id] = it }
 
     /**
      * The task attributes in registry order, with localized labels. The task page

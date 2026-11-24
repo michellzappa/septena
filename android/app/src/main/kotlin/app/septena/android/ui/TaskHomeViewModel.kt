@@ -491,7 +491,15 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     )
 
     private suspend fun load(selected: TaskHomeLocation): LoadedTaskHome {
-        val taskRecords = graph.taskStore.records(EntityNames.TASK)
+        val selectedDestId = (selected as? TaskHomeLocation.SmartList)?.destinationId
+        val needsFullHistory = selectedDestId == RegistryDestinationIds.LOGBOOK ||
+            selectedDestId == RegistryDestinationIds.AGENT
+        // Fast path for Today / active lists: read only open + soft-deleted tasks (skips thousands of Logbook rows).
+        val taskRecords = if (needsFullHistory) {
+            graph.taskStore.records(EntityNames.TASK)
+        } else {
+            graph.taskStore.activeTasks()
+        }
         val areaRecords = graph.taskStore.records(EntityNames.AREA)
             .filter { it.deletedAt == null }
             .mapNotNull { record ->
@@ -552,10 +560,13 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         val metadataCatalog = TaskRowMetadataCatalog.load(graph.taskStore)
         val now = graph.clock.now()
         val today = graph.clock.today(now)
-        // Load all turns in 2 bulk queries (cached) and evaluate each conversation ONCE.
+        // Load all turns in 2 bulk queries (cached) and evaluate only relevant conversations ONCE.
         val turnsByTask = graph.taskStore.allTurnsByTask()
+        val relevantTaskIds = if (needsFullHistory) null else allSnapshots.mapTo(HashSet(allSnapshots.size)) { it.second.id }
         val conversations = graph.taskStore.records(EntityNames.CONVO)
+            .asSequence()
             .filter { it.deletedAt == null }
+            .filter { relevantTaskIds == null || it.id in relevantTaskIds }
             .associate { it.id to runCatching { TaskConversation.from(it, turnsByTask[it.id].orEmpty()) }.getOrNull() }
         val convoStates = HashMap<String, app.septena.core.ConversationSnapshotState>(conversations.size)
         for ((id, convo) in conversations) {
@@ -566,7 +577,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
         // Compute core TaskViewMembership ONCE per open non-heading non-deleted task
         // (avoids ~8,000 redundant JNA roundtrips across Done/Cancelled Logbook rows).
-        val memberships = HashMap<String, app.septena.core.TaskViewMembership>(512)
+        val memberships = HashMap<String, app.septena.core.TaskViewMembership>(allSnapshots.size)
         var todayCount = 0
         var upcomingCount = 0
         var repeatingCount = 0
@@ -576,11 +587,11 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         var starredCount = 0
         var fadedCount = 0
         var deletedCount = 0
-        var doneTodayCount = 0
+        val zoneId = java.time.ZoneId.systemDefault()
+        var doneTodayCount = if (needsFullHistory) 0 else graph.taskStore.countDoneTasksOnLocalDay(today, zoneId)
         val projectOpenCounts = mutableMapOf<String, Int>()
         val projectDoneCounts = mutableMapOf<String, Int>()
         val areaDirectOpenCounts = mutableMapOf<String, Int>()
-        val zoneId = java.time.ZoneId.systemDefault()
         val activeProjectAreaById = projectRecords.mapNotNull { item ->
             val proj = item.location as? TaskHomeLocation.Project ?: return@mapNotNull null
             item.parentAreaId?.let { proj.id to it }

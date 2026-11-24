@@ -39,6 +39,12 @@ class SeptenaAndroidApp : Application() {
     val graph: AndroidAppGraph by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         AndroidAppGraph(this)
     }
+
+    override fun onCreate() {
+        super.onCreate()
+        // Start warming registries and the active-task SQLite cache before Activity.onCreate.
+        graph.prewarm()
+    }
 }
 
 class AndroidAppGraph(application: Application) {
@@ -83,12 +89,17 @@ class AndroidAppGraph(application: Application) {
 
     /** The app day the fade pass last ran in this process. */
     @Volatile private var lastFadePassDay: String? = null
+    private val prewarmed = java.util.concurrent.atomic.AtomicBoolean(false)
 
-    /** Starts warming the SQLite read cache in parallel with the first Compose frame. */
+    /** Starts warming startup registries and active-task caches in parallel with Compose's first frame. */
     fun prewarm() {
+        if (!prewarmed.compareAndSet(false, true)) return
+        appScope.launch(Dispatchers.Default) {
+            runCatching { app.septena.core.RegistryCatalog.prewarmStartup() }
+        }
         appScope.launch(Dispatchers.IO) {
             runCatching {
-                taskStore.records(RegistryEntityNames.TASK)
+                taskStore.activeTasks()
                 taskStore.records(RegistryEntityNames.AREA)
                 taskStore.records(RegistryEntityNames.PROJECT)
                 taskStore.records(RegistryEntityNames.CONVO)

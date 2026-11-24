@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.Septena" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#121214</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowSplashScreenBackground">#121214</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_splash_empty</item>
+    </style>
+</resources>

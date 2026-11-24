@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap
 class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
     private val queries = database.syncQueries
     private val recordsCache = ConcurrentHashMap<String, List<SyncRecord>>()
+    @Volatile private var activeTasksCache: List<SyncRecord>? = null
     @Volatile private var allTurnsCache: Map<String, List<SyncTurn>>? = null
 
     /**
@@ -50,6 +51,43 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
                 SyncRecord(row.entity, row.id, parseObject(row.fieldsJson), row.revision, row.updatedAt, row.deletedAt)
             }
         }
+
+    /**
+     * Fast boot path: loads only open and soft-deleted tasks (skipping closed Logbook rows)
+     * so Today renders without parsing thousands of archived tasks.
+     */
+    suspend fun activeTasks(): List<SyncRecord> {
+        recordsCache[RegistryEntityNames.TASK]?.let { all ->
+            return all.filter {
+                it.deletedAt != null || it.fields["status"].stringValue() == "open"
+            }
+        }
+        activeTasksCache?.let { return it }
+        val loaded = queries.selectActiveTasks().executeAsList().map { row ->
+            SyncRecord(row.entity, row.id, parseObject(row.fieldsJson), row.revision, row.updatedAt, row.deletedAt)
+        }
+        activeTasksCache = loaded
+        return loaded
+    }
+
+    /** Counts tasks completed on [localDay] without scanning the whole Logbook. */
+    suspend fun countDoneTasksOnLocalDay(localDay: java.time.LocalDate, zoneId: java.time.ZoneId): Int {
+        val prevDay = localDay.minusDays(1)
+        val nextDay = localDay.plusDays(1)
+        val rows = queries.selectDoneTasksMatchingDays(
+            "%\"completedAt\":\"$localDay%",
+            "%\"completedAt\":\"$prevDay%",
+            "%\"completedAt\":\"$nextDay%",
+        ).executeAsList()
+        var count = 0
+        for (json in rows) {
+            val completedAt = runCatching { parseObject(json)["completedAt"].stringValue() }.getOrNull() ?: continue
+            val day = runCatching { Instant.parse(completedAt).atZone(zoneId).toLocalDate() }.getOrNull()
+                ?: runCatching { java.time.LocalDate.parse(completedAt.take(10)) }.getOrNull()
+            if (day == localDay) count += 1
+        }
+        return count
+    }
 
     /** Loads every task's server + pending turns in 2 bulk queries (cached until the next turn write). */
     suspend fun allTurnsByTask(): Map<String, List<SyncTurn>> {
@@ -83,10 +121,14 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
     private fun invalidateCache(entity: String? = null) {
         if (entity == null) {
             recordsCache.clear()
+            activeTasksCache = null
             allTurnsCache = null
         } else {
             recordsCache.remove(entity)
-            if (entity == RegistryEntityNames.TASK || entity == "turn") {
+            if (entity == RegistryEntityNames.TASK) {
+                activeTasksCache = null
+                allTurnsCache = null
+            } else if (entity == "turn") {
                 allTurnsCache = null
             }
         }
