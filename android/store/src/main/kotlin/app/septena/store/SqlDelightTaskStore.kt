@@ -15,6 +15,7 @@ import app.septena.core.WireTimestamp
 import app.septena.core.stringValue
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.store.db.SeptenaDatabase
+import app.septena.sharedcore.CoreException
 import app.septena.sharedcore.PullRowPlan
 import app.septena.sharedcore.planPullRow
 import java.time.Instant
@@ -204,13 +205,19 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
                 val id = change.row["id"].stringValue()
                 val key = id?.let { change.entity to it }
                 val currentRow = id?.let { queries.selectRecord(change.entity, it).executeAsOneOrNull() }
-                val plan = planPullRow(
-                    entity = change.entity,
-                    rowJson = rowJson,
-                    currentFieldsJson = currentRow?.fieldsJson,
-                    pendingFields = key?.let { pendingFields[it]?.toList() }.orEmpty(),
-                    pendingDelete = key != null && key in pendingDeletes,
-                )
+                // A malformed row is a store error (IllegalStateException), as
+                // before the core: the whole page rolls back.
+                val plan = try {
+                    planPullRow(
+                        entity = change.entity,
+                        rowJson = rowJson,
+                        currentFieldsJson = currentRow?.fieldsJson,
+                        pendingFields = key?.let { pendingFields[it]?.toList() }.orEmpty(),
+                        pendingDelete = key != null && key in pendingDeletes,
+                    )
+                } catch (e: CoreException.InvalidInput) {
+                    error(e.reason)
+                }
                 when (plan) {
                     is PullRowPlan.Turn -> queries.upsertTurn(plan.taskId, plan.seq, canonical(plan.rowJson))
                     PullRowPlan.Skip -> Unit
