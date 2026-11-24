@@ -1,13 +1,15 @@
 #if os(macOS)
 import AppKit
+import SwiftData
 
-// Review stage rows and Send-back popover for the AppKit shell (#87).
+// Review stage rows for the AppKit shell (#87, docs/AGENT_PROMPT_SPEC.md).
 //
 // Lists `needs_verify` tasks inside the standard `KitCardRowView` card run:
-// each row shows the task title, what Claude asked the user to check
-// (`endStateNote`), and two direct actions — Accept (completes the task) and
-// Send back (opens a Tier 1 `KitPopover` to append a user turn with a note
-// and reopen the conversation for Claude).
+// each row shows the task title, what the agent asked the user to check
+// (`endStateNote`), the list and "asked {ago}", then two direct actions —
+// Accept (completes the task) and Send back. Send back does not open a field
+// in the row: the list opens the inspector with the Send back field open and
+// focused (the agent prompt in `KitConversationView`).
 
 @MainActor
 final class KitReviewTaskCell: NSTableCellView {
@@ -22,13 +24,14 @@ final class KitReviewTaskCell: NSTableCellView {
   private var taskId: String = ""
 
   var onAccept: ((String) -> Void)?
-  var onSendBack: ((String, NSView) -> Void)?
+  var onSendBack: ((String) -> Void)?
 
   init(identifier: NSUserInterfaceItemIdentifier) {
     super.init(frame: .zero)
     self.identifier = identifier
 
     titleLabel.font = SeptaskKitTheme.taskTitle
+    titleLabel.textColor = .labelColor
     titleLabel.lineBreakMode = .byTruncatingTail
     titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
@@ -55,19 +58,24 @@ final class KitReviewTaskCell: NSTableCellView {
     acceptButton.title = RegistryActions.title("task.acceptReview")
     acceptButton.bezelStyle = .rounded
     acceptButton.controlSize = .small
+    // Primary look without a Return key equivalent: a default button would
+    // answer Return anywhere in the window, list included.
+    acceptButton.bezelColor = .controlAccentColor
     acceptButton.target = self
     acceptButton.action = #selector(acceptTapped)
     // Space in a selected row must never trigger a row button (CLAUDE.md).
     acceptButton.refusesFirstResponder = true
 
-    sendBackButton.title = String(localized: "Send back", comment: "SeptaskKit: send back review task")
+    sendBackButton.title = RegistryActions.title("task.sendBackReview")
     sendBackButton.bezelStyle = .rounded
     sendBackButton.controlSize = .small
     sendBackButton.target = self
     sendBackButton.action = #selector(sendBackTapped)
     sendBackButton.refusesFirstResponder = true
 
-    buttons.setViews([sendBackButton, acceptButton], in: .leading)
+    // Accept first, Send back second: the same order on every surface
+    // (docs/AGENT_PROMPT_SPEC.md).
+    buttons.setViews([acceptButton, sendBackButton], in: .leading)
     buttons.orientation = .horizontal
     buttons.alignment = .centerY
     buttons.spacing = 6
@@ -110,28 +118,16 @@ final class KitReviewTaskCell: NSTableCellView {
     super.layout()
   }
 
+  /// `contextText` is the list the task is in ("Area › Project",
+  /// `KitListPath`), shown on the meta line with "asked {ago}".
   func configure(with task: SeptenaTask, contextText: String?) {
     taskId = task.id
-    let composed = NSMutableAttributedString(
-      string: task.title,
-      attributes: [
-        .font: SeptaskKitTheme.taskTitle,
-        .foregroundColor: NSColor.labelColor,
-      ])
-    if let contextText, !contextText.isEmpty {
-      composed.append(NSAttributedString(
-        string: "  " + contextText,
-        attributes: [
-          .font: SeptaskKitTheme.meta,
-          .foregroundColor: SeptaskKitTheme.inkSecondary,
-        ]))
-    }
-    titleLabel.attributedStringValue = composed
+    titleLabel.stringValue = task.title
 
     let checkNote = Self.noteText(for: task)
     noteLabel.stringValue = checkNote
 
-    if let meta = Self.metaSummary(for: task) {
+    if let meta = Self.metaSummary(for: task, contextText: contextText) {
       metaLabel.stringValue = meta
       metaLabel.isHidden = false
     } else {
@@ -145,7 +141,7 @@ final class KitReviewTaskCell: NSTableCellView {
   }
 
   override func accessibilityChildren() -> [Any]? {
-    [sendBackButton, acceptButton]
+    [acceptButton, sendBackButton]
   }
 
   @objc private func acceptTapped() {
@@ -153,7 +149,7 @@ final class KitReviewTaskCell: NSTableCellView {
   }
 
   @objc private func sendBackTapped() {
-    onSendBack?(taskId, sendBackButton)
+    onSendBack?(taskId)
   }
 
   static func noteText(for task: SeptenaTask) -> String {
@@ -164,17 +160,28 @@ final class KitReviewTaskCell: NSTableCellView {
     return String(localized: "Ready for review", comment: "SeptaskKit: fallback review note")
   }
 
-  static func metaSummary(for task: SeptenaTask) -> String? {
-    if let artifact = task.conversation.artifact, !artifact.title.isEmpty {
-      return artifact.title
+  /// The meta line: the list, "asked {ago}" (only when the backend stamped
+  /// `endStateAt`) and the artifact title, joined by " · ".
+  static func metaSummary(for task: SeptenaTask, contextText: String?) -> String? {
+    var parts: [String] = []
+    if let contextText, !contextText.isEmpty { parts.append(contextText) }
+    if let asked = task.conversation.endStateAt {
+      let ago = TaskHistory.relative(asked, now: DayClock.appNow)
+      if !ago.isEmpty {
+        parts.append(String(localized: "asked \(ago)",
+                            comment: "SeptaskKit: review row, when the agent asked for review"))
+      }
     }
-    return nil
+    if let artifact = task.conversation.artifact, !artifact.title.isEmpty {
+      parts.append(artifact.title)
+    }
+    return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
   private static let buttonGap: CGFloat = 8
   private static let buttonRowHeight: CGFloat = 22
 
-  static func height(for task: SeptenaTask, width: CGFloat) -> CGFloat {
+  static func height(for task: SeptenaTask, contextText: String?, width: CGFloat) -> CGFloat {
     let inset = SeptaskKitLayout.inset(for: max(width, 360))
     let textWidth = max(140, width - inset * 2 - SeptaskKitLayout.rowLeadingPad - 10)
     let note = noteText(for: task) as NSString
@@ -184,83 +191,28 @@ final class KitReviewTaskCell: NSTableCellView {
       attributes: [.font: SeptaskKitTheme.meta])
     let titleHeight = ceil(SeptaskKitTheme.taskTitle.ascender - SeptaskKitTheme.taskTitle.descender) + 2
     let noteHeight = ceil(noteRect.height) + 2
-    let metaHeight: CGFloat = metaSummary(for: task) == nil
+    let metaHeight: CGFloat = metaSummary(for: task, contextText: contextText) == nil
       ? 0
       : 3 + ceil(SeptaskKitTheme.chip.ascender - SeptaskKitTheme.chip.descender) + 2
     return 10 + titleHeight + 3 + noteHeight + metaHeight + buttonGap + buttonRowHeight + 10
   }
 }
 
-/// Tier 1 anchored popover for typing a "Send back" note from the Review list.
+/// The list a task is in, as one line: "Area › Project", or just the area
+/// or the project. Nil when the task is in no list. The Review row and the
+/// inspector's review depth both read it.
 @MainActor
-final class KitSendBackPopover {
-  private let field = NSTextField()
-  private let handle = KitPopoverHandle()
-  private let onSend: (String) -> Void
-
-  init(onSend: @escaping (String) -> Void) {
-    self.onSend = onSend
-  }
-
-  @discardableResult
-  static func present(relativeTo view: NSView,
-                      onSend: @escaping (String) -> Void,
-                      onClose: (() -> Void)? = nil) -> KitSendBackPopover {
-    let presenter = KitSendBackPopover(onSend: onSend)
-    presenter.show(relativeTo: view, onClose: onClose)
-    return presenter
-  }
-
-  private func show(relativeTo anchor: NSView, onClose: (() -> Void)?) {
-    let heading = NSTextField(labelWithString: String(
-      localized: "Send back for another pass",
-      comment: "SeptaskKit: send-back popover heading"))
-    heading.font = SeptaskKitTheme.chip
-    heading.textColor = SeptaskKitTheme.inkSecondary
-
-    field.placeholderString = String(
-      localized: "What needs another pass?",
-      comment: "SeptaskKit: send-back note placeholder")
-    field.font = SeptaskKitTheme.taskTitle
-    field.bezelStyle = .roundedBezel
-    field.target = self
-    field.action = #selector(submit)
-    field.setContentHuggingPriority(.defaultLow, for: .horizontal)
-
-    let send = NSButton(
-      title: String(localized: "Send", comment: "SeptaskKit: submit send-back note"),
-      target: self, action: #selector(submit))
-    send.bezelStyle = .rounded
-    send.controlSize = .small
-    send.keyEquivalent = "\r"
-
-    let row = NSStackView(views: [field, send])
-    row.orientation = .horizontal
-    row.alignment = .centerY
-    row.spacing = 6
-
-    let stack = NSStackView(views: [heading, row])
-    stack.orientation = .vertical
-    stack.alignment = .leading
-    stack.spacing = 8
-    stack.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
-    row.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -24).isActive = true
-
-    KitPopover.present(stack,
-                       size: NSSize(width: 310, height: 80),
-                       relativeTo: anchor.bounds,
-                       of: anchor,
-                       preferredEdge: .maxY,
-                       focus: field,
-                       handle: handle,
-                       onClose: onClose)
-  }
-
-  @objc private func submit() {
-    let text = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !text.isEmpty else { return }
-    onSend(text)
-    handle.close()
+enum KitListPath {
+  static func text(for task: SeptenaTask, in context: ModelContext) -> String? {
+    let snapshot = StructureCache.snapshot(in: context)
+    let project = task.project.flatMap { id in snapshot.projects.first { $0.id == id } }
+    let areaID = project?.area ?? task.area
+    let area = areaID.flatMap { id in snapshot.areas.first { $0.id == id } }
+    let parts = [area?.title, project?.title].compactMap { title -> String? in
+      guard let title, !title.isEmpty else { return nil }
+      return title
+    }
+    return parts.isEmpty ? nil : parts.joined(separator: " › ")
   }
 }
 #endif

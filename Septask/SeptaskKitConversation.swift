@@ -20,19 +20,27 @@ import AppKit
 @MainActor
 final class KitConversationView: NSView {
   private let stack = NSStackView()
-  private let otherField = NSTextField()
-  private let sendBackField = NSTextField()
+  /// The one free-text field of the agent prompt ("Tell the agent instead",
+  /// docs/AGENT_PROMPT_SPEC.md). Only one prompt can hold it at a time, so
+  /// one box serves the open question's Other… and the review's Send back.
+  private let replyBox = KitPromptReplyBox()
   private var taskID: String?
   private var convo = TaskConvo()
   private var isTaskOpen = true
-  /// The free-text escape hatch is collapsed until asked for, like SwiftUI's
-  /// `showOther` — options first, typing second.
-  private var showOther = false
-  /// Send-back note input for `needs_verify` review tasks.
-  private var showSendBack = false
+
+  /// Which prompt's free-text choice is open. Collapsed until asked for —
+  /// choices first, typing second.
+  enum ReplyMode: Equatable { case none, other, sendBack }
+  private var replyMode: ReplyMode = .none
+  /// Half-typed replies by task id, so the draft stays while the user looks
+  /// at another task in this session (docs/AGENT_PROMPT_SPEC.md part 4).
+  private static var drafts: [String: (mode: ReplyMode, text: String)] = [:]
 
   /// Called after a turn is appended, so the host can re-read and redraw.
   var onAppend: (() -> Void)?
+  /// Called when a reply is sent or cancelled, so the host can hand the
+  /// keyboard back (the inspector gives it to the list).
+  var onEndReply: (() -> Void)?
 
   private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
 
@@ -50,19 +58,9 @@ final class KitConversationView: NSView {
       stack.bottomAnchor.constraint(equalTo: bottomAnchor),
     ])
 
-    otherField.placeholderString = String(localized: "Type your answer",
-                                          comment: "SeptaskKit: conversation free-text reply")
-    otherField.font = SeptaskKitTheme.taskTitle
-    otherField.bezelStyle = .roundedBezel
-    otherField.target = self
-    otherField.action = #selector(submitOther)
-
-    sendBackField.placeholderString = String(localized: "What needs another pass?",
-                                             comment: "SeptaskKit: send-back note placeholder")
-    sendBackField.font = SeptaskKitTheme.taskTitle
-    sendBackField.bezelStyle = .roundedBezel
-    sendBackField.target = self
-    sendBackField.action = #selector(submitSendBack)
+    replyBox.translatesAutoresizingMaskIntoConstraints = false
+    replyBox.onSend = { [weak self] text in self?.submitReply(text) }
+    replyBox.onCancel = { [weak self] in self?.cancelReply() }
   }
 
   required init?(coder: NSCoder) { fatalError("KitConversationView is code-only") }
@@ -72,12 +70,17 @@ final class KitConversationView: NSView {
   @discardableResult
   func configure(taskID: String, convo: TaskConvo, isTaskOpen: Bool = true) -> Bool {
     let sameTask = self.taskID == taskID
-    // A different task must not inherit the previous one's half-typed reply.
+    // A different task must not inherit the previous one's half-typed reply;
+    // it keeps its own draft instead.
     if !sameTask {
-      showOther = false
-      otherField.stringValue = ""
-      showSendBack = false
-      sendBackField.stringValue = ""
+      stashDraft()
+      if let draft = Self.drafts[taskID] {
+        replyMode = draft.mode
+        replyBox.text = draft.text
+      } else {
+        replyMode = .none
+        replyBox.text = ""
+      }
     }
     self.taskID = taskID
     self.convo = convo
@@ -96,10 +99,30 @@ final class KitConversationView: NSView {
     return true
   }
 
-  /// The free-text reply or send-back field holds the keyboard.
+  /// The free-text reply field holds the keyboard.
   var isEditingReply: Bool {
-    guard let editor = window?.firstResponder as? NSTextView else { return false }
-    return editor.delegate === otherField || editor.delegate === sendBackField
+    window?.firstResponder === replyBox.textView
+  }
+
+  /// Open the review's Send back field and give it the keyboard — how Send
+  /// back on a Review row lands here. No-op when the task is not in Review.
+  func openSendBack() {
+    guard convo.needsHumanReview, isTaskOpen, !isHidden else { return }
+    if replyMode != .sendBack {
+      replyMode = .sendBack
+      rebuild()
+    }
+    focusReply()
+  }
+
+  /// ⌘↩ while the reply field holds the keyboard sends it. The window asks
+  /// (through the inspector) before any view's key equivalents run.
+  func handleCommandReturn() -> Bool {
+    guard isEditingReply else { return false }
+    // Deferred a tick: the send's synchronous mutator notification must not
+    // re-enter the responder chain while this key event is on the stack.
+    DispatchQueue.main.async { [weak self] in self?.replyBox.submit() }
+    return true
   }
 
   // MARK: - Building
@@ -188,56 +211,71 @@ final class KitConversationView: NSView {
     return line
   }
 
-  /// The open question, promoted to a title with its options beneath — the
-  /// shape SwiftUI's `questionBlock` uses. Options are `KitPillButton`s
-  /// (the shell's existing recessed-capsule language), never a second style.
+  /// The open question as an agent prompt: kicker, the question, each
+  /// option as a full-width choice, then Other… (docs/AGENT_PROMPT_SPEC.md).
   private func questionBlock(_ question: ConvoTurn) -> NSView {
-    let title = NSTextField(wrappingLabelWithString: question.question ?? "")
-    title.font = SeptaskKitTheme.heading
-    title.textColor = SeptaskKitTheme.inkPrimary
-    title.isSelectable = true
-
-    let rawOptions = question.options ?? []
-    let stackVertically = rawOptions.contains(where: { $0.count > 22 }) || rawOptions.count > 3
-    let options = NSStackView()
-    options.orientation = stackVertically ? .vertical : .horizontal
-    options.alignment = stackVertically ? .leading : .centerY
-    options.spacing = 6
-    for option in rawOptions {
-      let pill = KitPillButton()
-      pill.title = option
-      pill.onPress = { [weak self] _ in
+    let choices = (question.options ?? []).map { option in
+      KitPromptChoiceButton(title: option) { [weak self] in
         self?.choose(option, replyTo: question.seq, step: question.step)
       }
-      options.addArrangedSubview(pill)
     }
-    let other = KitPillButton()
-    other.title = String(localized: "Other…",
-                         comment: "SeptaskKit: conversation free-text escape hatch")
-    other.onPress = { [weak self] _ in self?.toggleOther() }
-    options.addArrangedSubview(other)
+    return promptBlock(
+      kicker: String(localized: "Your agent asks",
+                     comment: "SeptaskKit: agent prompt kicker for an open question"),
+      question: question.question ?? "",
+      choices: choices,
+      freeText: .other)
+  }
 
-    let block = NSStackView(views: [title, options])
+  /// One agent prompt, top to bottom: kicker (small, secondary ink, no
+  /// icon), the question (primary ink, wrapping, never truncated), the
+  /// choices as a vertical list of full-width buttons, and last the free
+  /// text choice, which turns in place into the multi-line reply field.
+  private func promptBlock(kicker: String, question: String,
+                           choices: [NSButton], freeText mode: ReplyMode) -> NSView {
+    let block = NSStackView()
     block.orientation = .vertical
     block.alignment = .leading
-    block.spacing = 8
+    block.spacing = 6
 
-    if showOther {
-      // Return in the field submits; the button is for pointer users.
-      let send = NSButton(title: String(localized: "Send",
-                                        comment: "SeptaskKit: send a free-text reply"),
-                          target: self, action: #selector(submitOther))
-      send.bezelStyle = .rounded
-      send.keyEquivalent = "\r"
-      let replyRow = NSStackView(views: [otherField, send])
-      replyRow.orientation = .horizontal
-      replyRow.alignment = .centerY
-      replyRow.spacing = 6
-      otherField.setContentHuggingPriority(.defaultLow, for: .horizontal)
-      block.addArrangedSubview(replyRow)
-      replyRow.widthAnchor.constraint(equalTo: block.widthAnchor).isActive = true
+    let kickerLabel = NSTextField(wrappingLabelWithString: kicker)
+    kickerLabel.font = SeptaskKitTheme.meta
+    kickerLabel.textColor = SeptaskKitTheme.inkSecondary
+    block.addArrangedSubview(kickerLabel)
+    block.setCustomSpacing(4, after: kickerLabel)
+
+    let questionLabel = NSTextField(wrappingLabelWithString: question)
+    questionLabel.font = SeptaskKitTheme.taskTitle
+    questionLabel.textColor = SeptaskKitTheme.inkPrimary
+    questionLabel.isSelectable = true
+    block.addArrangedSubview(questionLabel)
+    block.setCustomSpacing(10, after: questionLabel)
+
+    for choice in choices { block.addArrangedSubview(choice) }
+
+    let prompt = Self.textPrompt(for: mode)
+    if replyMode == mode {
+      replyBox.configure(prompt)
+      block.addArrangedSubview(replyBox)
+    } else {
+      let title = mode == .sendBack ? RegistryActions.title("task.sendBackReview") : prompt.title
+      block.addArrangedSubview(KitPromptChoiceButton(title: title) { [weak self] in
+        self?.openReply(mode)
+      })
+    }
+
+    for view in block.arrangedSubviews {
+      view.widthAnchor.constraint(equalTo: block.widthAnchor).isActive = true
     }
     return block
+  }
+
+  /// The registry copy for a free-text choice (`surfaces.json`
+  /// `prompts.text`).
+  private static func textPrompt(for mode: ReplyMode) -> RegistryTextPrompt {
+    let id = mode == .sendBack ? "sendBackReview" : "conversationOther"
+    return RegistryPrompts.text[id]
+      ?? RegistryTextPrompt(id: id, title: "", placeholder: "", confirmTitle: RegistryPrompts.errorConfirmTitle)
   }
 
   /// Acceptance (the AGENT-done bar, distinct from the task's own status) and
@@ -302,66 +340,49 @@ final class KitConversationView: NSView {
   }
 
   /// Agent finished and asked the human to verify (`needs_verify`, #87).
-  /// Offers Accept (marks the task done) and Send back (appends a user turn
-  /// with a note and reopens the conversation for Claude).
+  /// Open: the agent prompt with Accept (marks the task done) and Send back
+  /// (appends a user turn with a note and reopens the conversation for the
+  /// agent). Accepted: one quiet line.
   private func reviewBlock() -> NSView {
-    let block = NSStackView()
-    block.orientation = .vertical
-    block.alignment = .leading
-    block.spacing = 8
-
-    let heading = isTaskOpen
-      ? String(localized: "Needs review", comment: "SeptaskKit: conversation needs_verify heading")
-      : String(localized: "Accepted", comment: "SeptaskKit: conversation needs_verify accepted")
-    block.addArrangedSubview(row(symbol: isTaskOpen ? "eye" : "checkmark.seal.fill",
-                                 tint: isTaskOpen ? .systemYellow : .systemGreen,
-                                 text: heading, font: SeptaskKitTheme.taskTitle,
-                                 ink: SeptaskKitTheme.inkPrimary))
-
-    if let note = convo.endStateNote, !note.isEmpty {
-      let detail = NSTextField(wrappingLabelWithString: note)
-      detail.font = SeptaskKitTheme.meta
-      detail.textColor = SeptaskKitTheme.inkSecondary
-      detail.isSelectable = true
-      block.addArrangedSubview(detail)
-    }
-
-    if isTaskOpen {
-      let accept = NSButton(title: RegistryActions.title("task.acceptReview"),
-                            target: self, action: #selector(acceptReview))
-      accept.bezelStyle = .rounded
-      accept.controlSize = .small
-      accept.refusesFirstResponder = true
-
-      let sendBack = NSButton(title: String(localized: "Send back", comment: "SeptaskKit: send back review task"),
-                              target: self, action: #selector(toggleSendBack))
-      sendBack.bezelStyle = .rounded
-      sendBack.controlSize = .small
-      sendBack.refusesFirstResponder = true
-
-      // Same order as the Review row: Send back, then Accept (primary last).
-      let actions = NSStackView(views: [sendBack, accept])
-      actions.orientation = .horizontal
-      actions.alignment = .centerY
-      actions.spacing = 8
-      block.addArrangedSubview(actions)
-
-      if showSendBack {
-        let send = NSButton(title: String(localized: "Send", comment: "SeptaskKit: send back with note"),
-                            target: self, action: #selector(submitSendBack))
-        send.bezelStyle = .rounded
-        send.controlSize = .small
-        send.keyEquivalent = "\r"
-        let replyRow = NSStackView(views: [sendBackField, send])
-        replyRow.orientation = .horizontal
-        replyRow.alignment = .centerY
-        replyRow.spacing = 6
-        sendBackField.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        block.addArrangedSubview(replyRow)
-        replyRow.widthAnchor.constraint(equalTo: block.widthAnchor).isActive = true
+    let note = convo.endStateNote?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    guard isTaskOpen else {
+      let block = NSStackView()
+      block.orientation = .vertical
+      block.alignment = .leading
+      block.spacing = 2
+      block.addArrangedSubview(row(symbol: "checkmark.seal.fill", tint: .systemGreen,
+                                   text: String(localized: "Accepted",
+                                                comment: "SeptaskKit: conversation needs_verify accepted"),
+                                   font: SeptaskKitTheme.taskTitle,
+                                   ink: SeptaskKitTheme.inkPrimary))
+      if !note.isEmpty {
+        let detail = NSTextField(wrappingLabelWithString: note)
+        detail.font = SeptaskKitTheme.meta
+        detail.textColor = SeptaskKitTheme.inkSecondary
+        detail.isSelectable = true
+        block.addArrangedSubview(detail)
       }
+      return block
     }
-    return block
+
+    let kicker: String
+    if let asked = convo.endStateAt,
+       case let ago = TaskHistory.relative(asked, now: DayClock.appNow), !ago.isEmpty {
+      kicker = String(localized: "Review requested · \(ago)",
+                      comment: "SeptaskKit: agent prompt kicker for a review, with how long ago")
+    } else {
+      kicker = String(localized: "Review requested",
+                      comment: "SeptaskKit: agent prompt kicker for a review")
+    }
+    let question = note.isEmpty
+      ? String(localized: "Ready for review", comment: "SeptaskKit: fallback review note")
+      : note
+    let accept = KitPromptChoiceButton(title: RegistryActions.title("task.acceptReview"),
+                                       primary: true) { [weak self] in
+      self?.acceptReview()
+    }
+    // Accept first, Send back second: the same order on every surface.
+    return promptBlock(kicker: kicker, question: question, choices: [accept], freeText: .sendBack)
   }
 
   /// The conversation reached a terminal state. `wontDo` reads grey and
@@ -513,10 +534,52 @@ final class KitConversationView: NSView {
 
   // MARK: - Actions
 
-  private func toggleOther() {
-    showOther.toggle()
+  private func openReply(_ mode: ReplyMode) {
+    replyMode = mode
     rebuild()
-    if showOther { window?.makeFirstResponder(otherField) }
+    focusReply()
+  }
+
+  /// The field takes the keyboard and scrolls into view once laid out.
+  private func focusReply() {
+    window?.makeFirstResponder(replyBox.textView)
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.replyBox.superview != nil else { return }
+      self.replyBox.scrollToVisible(self.replyBox.bounds)
+    }
+  }
+
+  private func cancelReply() {
+    closeReply()
+    rebuild()
+  }
+
+  /// Clear the field and its draft, and hand the keyboard back first: the
+  /// rebuild that follows pulls the field out of the view tree.
+  private func closeReply() {
+    replyMode = .none
+    replyBox.text = ""
+    if let taskID { Self.drafts[taskID] = nil }
+    onEndReply?()
+  }
+
+  /// Keep the shown task's half-typed reply before another task replaces it.
+  private func stashDraft() {
+    guard let taskID else { return }
+    let text = replyBox.text
+    if replyMode != .none, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      Self.drafts[taskID] = (replyMode, text)
+    } else {
+      Self.drafts[taskID] = nil
+    }
+  }
+
+  private func submitReply(_ text: String) {
+    switch replyMode {
+    case .other: submitOther(text)
+    case .sendBack: submitSendBack(text)
+    case .none: break
+    }
   }
 
   private func choose(_ label: String, replyTo: Int, step: ConvoTurn.Step) {
@@ -524,12 +587,9 @@ final class KitConversationView: NSView {
                      chosen: label, inReplyTo: replyTo, ts: Date()))
   }
 
-  @objc private func submitOther() {
+  private func submitOther(_ text: String) {
     guard let open = openQuestion else { return }
-    let text = otherField.stringValue.trimmingCharacters(in: .whitespaces)
-    guard !text.isEmpty else { return }
-    otherField.stringValue = ""
-    showOther = false
+    closeReply()
     append(ConvoTurn(seq: 0, role: .user, step: open.step,
                      otherText: text, inReplyTo: open.seq, ts: Date()))
   }
@@ -541,7 +601,7 @@ final class KitConversationView: NSView {
     rebuild()
   }
 
-  @objc private func acceptReview() {
+  private func acceptReview() {
     guard let taskID else { return }
     let previousNote = convo.endStateNote
     mutator.complete(id: taskID)
@@ -549,23 +609,18 @@ final class KitConversationView: NSView {
     TaskUndo.recordAcceptReview(id: taskID, previousNote: previousNote, mutator: mutator)
     convo = mutator.conversation(id: taskID) ?? convo
     isTaskOpen = false
-    showSendBack = false
+    if replyMode == .sendBack {
+      replyMode = .none
+      replyBox.text = ""
+      Self.drafts[taskID] = nil
+    }
     rebuild()
     onAppend?()
   }
 
-  @objc private func toggleSendBack() {
-    showSendBack.toggle()
-    rebuild()
-    if showSendBack { window?.makeFirstResponder(sendBackField) }
-  }
-
-  @objc private func submitSendBack() {
+  private func submitSendBack(_ text: String) {
     guard let taskID else { return }
-    let text = sendBackField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !text.isEmpty else { return }
-    sendBackField.stringValue = ""
-    showSendBack = false
+    closeReply()
     let before = convo
     mutator.sendBackConvo(id: taskID, note: text)
     let after = mutator.conversation(id: taskID) ?? before
@@ -587,6 +642,196 @@ final class KitConversationView: NSView {
     rebuild()
     onAppend?()
   }
+}
+
+/// One choice of an agent prompt: a full-width push button with a closure.
+/// At most one per prompt is primary — the accent bezel, never a Return key
+/// equivalent, which would answer Return anywhere in the window.
+@MainActor
+final class KitPromptChoiceButton: NSButton {
+  private let onPress: () -> Void
+
+  init(title: String, primary: Bool = false, onPress: @escaping () -> Void) {
+    self.onPress = onPress
+    super.init(frame: .zero)
+    self.title = title
+    bezelStyle = .rounded
+    controlSize = .small
+    if primary { bezelColor = .controlAccentColor }
+    // Keyboard focus stays with the list and the fields (CLAUDE.md: Space
+    // must never fire a button in a selected row).
+    refusesFirstResponder = true
+    setContentHuggingPriority(.defaultLow, for: .horizontal)
+    target = self
+    action = #selector(pressed)
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitPromptChoiceButton is code-only") }
+
+  @objc private func pressed() { onPress() }
+}
+
+/// "Tell the agent instead": a multi-line wrapping field that grows to about
+/// six lines, with Cancel and a primary send button under it. Copy comes from
+/// a registry text prompt. ⌘↩ sends (through the window, see
+/// `KitConversationView.handleCommandReturn`, and here as a fallback); Escape
+/// cancels; Return types a new line.
+@MainActor
+final class KitPromptReplyBox: NSView, NSTextViewDelegate {
+  let textView: NSTextView
+  private let scroll: NSScrollView
+  private let placeholder = KitPassThroughLabel(labelWithString: "")
+  private let sendButton = NSButton()
+  private let cancelButton = NSButton()
+  private var scrollHeight: NSLayoutConstraint!
+  private static let maxLines: CGFloat = 6
+  private static let minLines: CGFloat = 2
+
+  var onSend: ((String) -> Void)?
+  var onCancel: (() -> Void)?
+
+  override init(frame frameRect: NSRect) {
+    scroll = NSTextView.scrollableTextView()
+    // swiftlint:disable:next force_cast
+    textView = scroll.documentView as! NSTextView
+    super.init(frame: frameRect)
+
+    scroll.borderType = .bezelBorder
+    scroll.hasVerticalScroller = true
+    scroll.autohidesScrollers = true
+    scroll.translatesAutoresizingMaskIntoConstraints = false
+
+    textView.font = SeptaskKitTheme.taskTitle
+    textView.textColor = SeptaskKitTheme.inkPrimary
+    textView.isRichText = false
+    textView.importsGraphics = false
+    textView.allowsUndo = true
+    textView.isAutomaticQuoteSubstitutionEnabled = false
+    textView.textContainerInset = NSSize(width: 2, height: 5)
+    textView.delegate = self
+
+    placeholder.font = SeptaskKitTheme.taskTitle
+    placeholder.textColor = .placeholderTextColor
+    placeholder.lineBreakMode = .byTruncatingTail
+    placeholder.translatesAutoresizingMaskIntoConstraints = false
+    placeholder.kitA11yIgnore()
+
+    cancelButton.bezelStyle = .rounded
+    cancelButton.controlSize = .small
+    cancelButton.refusesFirstResponder = true
+    cancelButton.target = self
+    cancelButton.action = #selector(cancelPressed)
+    sendButton.bezelStyle = .rounded
+    sendButton.controlSize = .small
+    sendButton.bezelColor = .controlAccentColor
+    sendButton.refusesFirstResponder = true
+    sendButton.target = self
+    sendButton.action = #selector(sendPressed)
+
+    let actions = NSStackView()
+    actions.setViews([cancelButton, sendButton], in: .trailing)
+    actions.orientation = .horizontal
+    actions.spacing = 6
+    actions.translatesAutoresizingMaskIntoConstraints = false
+
+    addSubview(scroll)
+    addSubview(placeholder)
+    addSubview(actions)
+    scrollHeight = scroll.heightAnchor.constraint(equalToConstant: 44)
+    NSLayoutConstraint.activate([
+      scroll.topAnchor.constraint(equalTo: topAnchor),
+      scroll.leadingAnchor.constraint(equalTo: leadingAnchor),
+      scroll.trailingAnchor.constraint(equalTo: trailingAnchor),
+      scrollHeight,
+      placeholder.topAnchor.constraint(equalTo: scroll.topAnchor, constant: 6),
+      placeholder.leadingAnchor.constraint(equalTo: scroll.leadingAnchor, constant: 8),
+      placeholder.trailingAnchor.constraint(lessThanOrEqualTo: scroll.trailingAnchor, constant: -8),
+      actions.topAnchor.constraint(equalTo: scroll.bottomAnchor, constant: 6),
+      actions.leadingAnchor.constraint(equalTo: leadingAnchor),
+      actions.trailingAnchor.constraint(equalTo: trailingAnchor),
+      actions.bottomAnchor.constraint(equalTo: bottomAnchor),
+    ])
+    refreshState()
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitPromptReplyBox is code-only") }
+
+  var text: String {
+    get { textView.string }
+    set {
+      textView.string = newValue
+      refreshState()
+    }
+  }
+
+  func configure(_ prompt: RegistryTextPrompt) {
+    placeholder.stringValue = prompt.placeholder
+    sendButton.title = prompt.confirmTitle
+    cancelButton.title = RegistryPrompts.cancelTitle
+    textView.setAccessibilityLabel(prompt.title)
+    textView.setAccessibilityPlaceholderValue(prompt.placeholder)
+  }
+
+  /// Send the trimmed text. Empty does nothing.
+  func submit() {
+    let trimmed = textView.string.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    onSend?(trimmed)
+  }
+
+  @objc private func sendPressed() { submit() }
+  @objc private func cancelPressed() { onCancel?() }
+
+  override func layout() {
+    super.layout()
+    // The wrap width changes with the pane; the height follows it.
+    updateHeight()
+  }
+
+  /// Grow with the text from two lines to six, then scroll.
+  private func updateHeight() {
+    guard let layoutManager = textView.layoutManager,
+          let container = textView.textContainer else { return }
+    layoutManager.ensureLayout(for: container)
+    let used = layoutManager.usedRect(for: container).height
+    let line = layoutManager.defaultLineHeight(for: SeptaskKitTheme.taskTitle)
+    let chrome = textView.textContainerInset.height * 2 + 2
+    let height = ceil(min(max(used, line * Self.minLines), line * Self.maxLines) + chrome)
+    if abs(scrollHeight.constant - height) > 0.5 {
+      scrollHeight.constant = height
+    }
+  }
+
+  private func refreshState() {
+    placeholder.isHidden = !textView.string.isEmpty
+    sendButton.isEnabled = !textView.string
+      .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    updateHeight()
+  }
+
+  func textDidChange(_ notification: Notification) { refreshState() }
+
+  func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+    switch commandSelector {
+    case #selector(NSResponder.cancelOperation(_:)):
+      // Deferred: cancelling pulls this view out of the tree.
+      DispatchQueue.main.async { [weak self] in self?.onCancel?() }
+      return true
+    case #selector(NSResponder.insertNewline(_:)), NSSelectorFromString("noop:"):
+      // Plain Return types a new line. ⌘↩ normally never gets here (the
+      // window routes it first); this covers a host window that does not.
+      guard NSApp.currentEvent?.modifierFlags.contains(.command) == true else { return false }
+      DispatchQueue.main.async { [weak self] in self?.submit() }
+      return true
+    default:
+      return false
+    }
+  }
+}
+
+/// A placeholder label that lets clicks through to the field under it.
+private final class KitPassThroughLabel: NSTextField {
+  override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 /// Opens a handoff's URL. A shared shim so each handoff button doesn't need a
