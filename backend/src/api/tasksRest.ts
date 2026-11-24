@@ -7,10 +7,10 @@ import type { Row } from "../store/TaskStore.js";
 import { addDaysYMD, isValidTz, todayYMD } from "../tz.js";
 import type { TaskOut } from "../tools/taskShared.js";
 import { matchesView } from "../tools/taskShared.js";
-import { listTasks } from "../shadow/mcp.js";
+import { listTasks, taskOut } from "../shadow/mcp.js";
 import { MAX_REF_INPUT, findByRef, zRefs } from "../shadow/refs.js";
 import { DESIGN_TOKENS } from "../generated/registries.js";
-import { rpcStoreFor, runWriteTool, zWriteArgs, type StoreRpc, type WriteContext, type WriteToolName } from "../shadow/writes.js";
+import { AGENT_FALLBACK_NAME, rpcStoreFor, runWriteTool, zWriteArgs, type StoreRpc, type WriteContext, type WriteToolName } from "../shadow/writes.js";
 
 // A small REST surface over the MCP task tools for thin app clients, first of
 // all the Apple Watch (docs/WATCH.md in the app repo). The watch has no task
@@ -70,8 +70,15 @@ export interface ClientTask {
   checklistDoneCount?: number;
   /// How many references the task has (docs/TASK_REFERENCES_SPEC.md).
   refCount?: number;
-  /// What the agent said when it handed the task over (the review view).
+  /// What the agent said when it handed the task over, and when (the review
+  /// view). A task sent back and handed over again has a new `reviewAt`.
   reviewNote?: string;
+  reviewAt?: string;
+  /// When it was created (ms), and who added it: "You" or the agent's name
+  /// (the added view; the same names as the task page's "Added by").
+  createdAt?: number;
+  addedBy?: "you" | "agent";
+  agentName?: string;
 }
 
 /// The user's synced accent with its hexes, so a thin client that has no
@@ -101,12 +108,47 @@ export function clientTask(t: TaskOut, names: Map<string, string>): ClientTask {
   if (t.completedAt) out.completedAt = t.completedAt;
   if (t.refCount) out.refCount = t.refCount;
   if (t.reviewNote) out.reviewNote = t.reviewNote;
+  if (t.reviewAt) out.reviewAt = t.reviewAt;
   if (t.daysOnToday) out.daysOnToday = t.daysOnToday;
   if (t.checklistCount) {
     out.checklistCount = t.checklistCount;
     out.checklistDoneCount = t.checklistDoneCount ?? 0;
   }
   return out;
+}
+
+const ADDED_WINDOW_MS = 24 * 60 * 60 * 1000;
+const ADDED_MAX = 50;
+
+/// The added view (docs/COMPANION_DEVICES_SPEC.md §6): open tasks that a
+/// person or an agent created in the last 24 hours, newest first, wherever
+/// they sit. Imports and spawned repeat occurrences are not in it: nobody
+/// added those now.
+export function addedTasks(rows: Row[], names: Map<string, string>, nowMs: number): { tasks: ClientTask[]; total: number } {
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  const found: { row: Row; at: number }[] = [];
+  for (const row of rows) {
+    const at = Date.parse(str(row.createdAt));
+    if (!Number.isFinite(at) || nowMs - at > ADDED_WINDOW_MS) continue;
+    if (row.fadedAt) continue;
+    const source = str(row.source);
+    if (source === "things" || source.startsWith("import:")) continue;
+    const series = str(row.recurrenceSeriesID);
+    if (series && series !== row.id) continue;
+    // A row with no title yet is being typed on another device.
+    if (!str(row.title).trim()) continue;
+    found.push({ row, at });
+  }
+  found.sort((a, b) => b.at - a.at);
+  const tasks = found.slice(0, ADDED_MAX).map(({ row, at }) => {
+    const out = clientTask(taskOut(row), names);
+    delete out.notes;
+    out.createdAt = at;
+    out.addedBy = row.source === "mcp" ? "agent" : "you";
+    if (out.addedBy === "agent") out.agentName = str(row.sourceClient).trim() || AGENT_FALLBACK_NAME;
+    return out;
+  });
+  return { tasks, total: found.length };
 }
 
 function containerNames(areas: Row[], projects: Row[]): Map<string, string> {
@@ -117,7 +159,7 @@ function containerNames(areas: Row[], projects: Row[]): Map<string, string> {
   return m;
 }
 
-const zView = z.enum(["today", "inbox", "upcoming", "repeating", "anytime", "completed", "starred", "review"]);
+const zView = z.enum(["today", "inbox", "upcoming", "repeating", "anytime", "completed", "starred", "review", "added"]);
 
 /// Mirrors `TaskStructureOrder.positionOrdered` in SeptenaCore: positive
 /// `position` ascending, unset (`0` / missing) sinks to the bottom, ties break
@@ -217,6 +259,23 @@ tasksRest.get("/", async (c) => {
   if (!q.success) return c.json({ error: "invalid_request" }, 400);
   const store = rpcStoreFor(c.env, c.get("userId"));
   const timeZone = await timeZoneFor(c, store);
+  if (q.data.view === "added") {
+    const [open, areas, projects, accentSetting] = await Promise.all([
+      store.readTasks("open", 500),
+      store.readAreas(500),
+      store.readProjects("active", 500),
+      store.readSetting("accentColor"),
+    ]);
+    const added = addedTasks(open.rows, containerNames(areas, projects), Date.now());
+    return c.json({
+      view: "added",
+      today: todayYMD(timeZone),
+      accent: accentFor(accentSetting),
+      total: added.total,
+      truncated: added.total > added.tasks.length,
+      tasks: added.tasks,
+    });
+  }
   const needsAll = !!q.data.area || !!q.data.project || q.data.view === "repeating" || q.data.view === "starred";
   const [list, areas, projects, accentSetting] = await Promise.all([
     listTasks(store, timeZone, needsAll ? "all" : q.data.view, needsAll ? 500 : q.data.limit),

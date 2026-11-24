@@ -7,7 +7,7 @@ import { applyDateAction, nextOccurrenceDates, normalizeTaskDates, taskRefId, ta
 import { storeFor } from "../api/session.js";
 import { MAX_REFS_PER_TASK, MAX_TAGS_PER_TASK, TAG_NAME_MAX, zId } from "../store/columns.js";
 import { zPushBody, type Op, type OpResult } from "../store/ops.js";
-import { AGENT_WRITE_RULES, type Row, type TaskStore } from "../store/TaskStore.js";
+import { AGENT_WRITE_RULES, isAgentActor, type Row, type TaskStore } from "../store/TaskStore.js";
 import {
   type CreateTaskInput,
   type RecurrenceRuleInput,
@@ -233,7 +233,7 @@ export interface WriteContext {
 /// The registry's name for an agent author when the connection has no
 /// client name (`surfaces.json` `taskPage.provenance.agentFallbackName`).
 const PROVENANCE_BLOCK = SURFACES_CATALOG.taskPage.blocks.find((b) => b.kind === "provenance");
-const AGENT_FALLBACK_NAME: string =
+export const AGENT_FALLBACK_NAME: string =
   PROVENANCE_BLOCK && "agentFallbackName" in PROVENANCE_BLOCK ? PROVENANCE_BLOCK.agentFallbackName : "Claude";
 
 /// The `sourceClient` an MCP-created task carries: the connector's client
@@ -788,7 +788,10 @@ async function completeTask(ctx: WriteContext, id: string) {
   // Don't batch a next-occurrence insert alongside a completion the store will
   // refuse (stopped or Claude-assigned): `ops[0]` still hits TaskStore so the
   // store remains the single enforcer, without leaving an orphan occurrence.
-  const canSpawnOccurrence = !current.convo?.stoppedAt && current.convo?.assignee !== "claude";
+  // The store refuses only agents: a person who completes the task here (the
+  // watch, the desk orb) keeps the series going.
+  const refusable = isAgentActor(ctx.actor ?? MCP_ACTOR);
+  const canSpawnOccurrence = !refusable || (!current.convo?.stoppedAt && current.convo?.assignee !== "claude");
   if (unit && src.recurrencePaused !== true && canSpawnOccurrence) {
     const interval = Number(src.recurrenceInterval ?? 1) || 1;
     const afterCompletion = src.recurrenceAfterCompletion === true;

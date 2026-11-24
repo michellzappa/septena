@@ -63,6 +63,8 @@ export interface TaskOut {
   inbox?: true;
   daysOnToday?: number;
   reviewNote?: string;
+  // When the agent handed it over (the review view; `convos.endStateAt`).
+  reviewAt?: string;
   // Added by `withTaskLinks` (absent = none): `refCount` = how many references
   // the task has; `issue` = its newest `issue` reference; `endState` = the
   // conversation's end state, when it is not `open`.

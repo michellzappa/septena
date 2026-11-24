@@ -545,11 +545,12 @@ export async function listTasks(
     };
   }
   if (view === "review") {
-    const { rows, notes, total } = await store.readReviewTasks(limit);
+    const { rows, notes, ats, total } = await store.readReviewTasks(limit);
     const tasks = rows.map((row) => {
       const out = withChecklist(taskOut(row));
       const note = notes[out.id];
-      return stripDays(note ? { ...out, reviewNote: note } : out);
+      const at = ats[out.id];
+      return stripDays({ ...out, ...(note ? { reviewNote: note } : {}), ...(at ? { reviewAt: at } : {}) });
     });
     return { tasks, total, truncated: total > rows.length };
   }
@@ -635,7 +636,7 @@ export async function searchTasks(store: StoreRpc, timeZone: string, a: SearchAr
 
 /// A TaskStore task row in the live `tasks_list` shape (tools/taskShared.ts
 /// TaskOut), key order included.
-function taskOut(r: Row, tagMap?: Map<string, string>): TaskOut {
+export function taskOut(r: Row, tagMap?: Map<string, string>): TaskOut {
   const unit = str(r.recurrenceUnit);
   const resolvedTags = Array.isArray(r.tags) && tagMap
     ? (r.tags as unknown[])
