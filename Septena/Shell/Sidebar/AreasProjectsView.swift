@@ -316,7 +316,13 @@ struct AreaDetailView: View {
       VStack(alignment: .leading, spacing: 0) {
         VStack(alignment: .leading, spacing: 10) {
           HStack(spacing: Theme.iconTextGap) {
-            Button { showingEmojiEditor = true } label: {
+            Button {
+              notesFocused = false
+              #if os(iOS)
+              Haptics.press()
+              #endif
+              showingEmojiEditor = true
+            } label: {
               AreaIcon(diameter: Theme.checkboxTap,
                        emoji: draftEmoji.isEmpty ? nil : draftEmoji)
                 .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
@@ -324,6 +330,7 @@ struct AreaDetailView: View {
                 .inlineHover(capsule: true)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Emoji")
             .popover(isPresented: $showingEmojiEditor) {
               EmojiPickerContent(emoji: $draftEmoji) { commitEmoji($0) }
             }
