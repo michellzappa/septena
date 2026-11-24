@@ -90,6 +90,7 @@
 		28E6C6D574345F838074BDEB /* ImportLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89DE35F20091FCD1A25A4FC9 /* ImportLedger.swift */; };
 		29FFCA28F73906960B8D822A /* SeptaskKitRegistryMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 302C01F4346CEA58E00FF8A7 /* SeptaskKitRegistryMenu.swift */; };
 		2A325FD63D83A302DFCADF3C /* TasksWidgetBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA8F5D4A96860985631CC60B /* TasksWidgetBuilder.swift */; };
+		2A5D80607ECBB64E9D4C0C65 /* TaskRefCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C69009AA5DF09463B2866B65 /* TaskRefCore.swift */; };
 		2AE90E48B3A618367052F73E /* OpenNewTaskRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = E85658815D797A7AD141AF84 /* OpenNewTaskRouting.swift */; };
 		2AFB36A63BE9FAA6218AD0A3 /* SharedAppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89AFE66AACDB29E77B118877 /* SharedAppEnvironment.swift */; };
 		2B11A0D2ADBC55240BDBAD0E /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 956B63623DD41B9C88E7A7FF /* FlowLayout.swift */; };
@@ -484,6 +485,7 @@
 		D7F582D7E0E7BF0DDE50CC13 /* ConvoReviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9E713ED7497C52844672431 /* ConvoReviewTests.swift */; };
 		D81A99CBA5A617354448B2B9 /* QuickFindView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67B23DB30F74DB6CE84F7C6E /* QuickFindView.swift */; };
 		D89C0BD2D8EF998007D8CCFD /* SeptaskKitReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECB4F9345EF991AD81B85073 /* SeptaskKitReview.swift */; };
+		D901C38D5E803C57643BCB87 /* TaskRefCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C69009AA5DF09463B2866B65 /* TaskRefCore.swift */; };
 		D9929D799EDCAD375B9DE289 /* DayClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFD8EA98B891BB43A0CE4640 /* DayClock.swift */; };
 		DA409E38D4FF126240A5B8CE /* AddInfoRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9613C2B13F48E7166D5EA2D5 /* AddInfoRouter.swift */; };
 		DB996C5C71E60B52AD23788F /* TaskSyncStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26EA38B9C0D0D7A759838CAA /* TaskSyncStore.swift */; };
@@ -898,6 +900,7 @@
 		C5D637607A9CE367E563C401 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		C5EA4C66F76F8C8CA332C697 /* WatchStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchStore.swift; sourceTree = "<group>"; };
 		C641220AFE9A17115F46A97C /* ReasoningProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReasoningProvider.swift; sourceTree = "<group>"; };
+		C69009AA5DF09463B2866B65 /* TaskRefCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskRefCore.swift; sourceTree = "<group>"; };
 		C71A4E1AB6E0523DC1EFBCDA /* TasksSkillPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksSkillPane.swift; sourceTree = "<group>"; };
 		C76671701936DCFC77B97142 /* SeptaskUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SeptaskUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResponseCache.swift; sourceTree = "<group>"; };
@@ -1516,6 +1519,7 @@
 				22A8E34A615D06FDC1DF1773 /* TaskListOrder.swift */,
 				53A8C9FE4AD5493CB159FC27 /* TaskListRules.swift */,
 				2FEC52E838E893E9D37A00D6 /* TaskRecordNames.swift */,
+				C69009AA5DF09463B2866B65 /* TaskRefCore.swift */,
 				1771CDE768EFDFECB5DE5A97 /* TaskReminderScheduler.swift */,
 				E4FD8156022B5BC0FAA1DDC2 /* TaskStructureOrder.swift */,
 				5BC3E1673BA9289B29884918 /* TasksWatchWire.swift */,
@@ -2298,6 +2302,7 @@
 				434D2E9EE8E08BF36EA2B5ED /* TaskPickerSheets.swift in Sources */,
 				3E86C458DD50C0143EE6C258 /* TaskReads.swift in Sources */,
 				B09E65F1746E1B5CC311CFED /* TaskRecordNames.swift in Sources */,
+				2A5D80607ECBB64E9D4C0C65 /* TaskRefCore.swift in Sources */,
 				3A8A8BDBD41CAD23DA99D3C4 /* TaskReminderScheduler.swift in Sources */,
 				03FE984F48F40345769DC87C /* TaskSkeletonRows.swift in Sources */,
 				5484B3B6E3B1D48668A842E6 /* TaskStoreMode.swift in Sources */,
@@ -2581,6 +2586,7 @@
 				AE7D28112FB5E32562A58283 /* TaskPickerSheets.swift in Sources */,
 				C23DB117D9740A048D5DA42B /* TaskReads.swift in Sources */,
 				846F71B34106883861EE2215 /* TaskRecordNames.swift in Sources */,
+				D901C38D5E803C57643BCB87 /* TaskRefCore.swift in Sources */,
 				3ADD5FF47A92DA71CC701AED /* TaskReminderScheduler.swift in Sources */,
 				F27E163709DD0E60D26DA5FF /* TaskSkeletonRows.swift in Sources */,
 				F380018B18448B1F2F21A330 /* TaskStoreMode.swift in Sources */,
