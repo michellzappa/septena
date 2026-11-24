@@ -1,10 +1,4 @@
 {
-  "1": {
-    "text": "1",
-    "paths": [
-      "plans.outcomes.agents.rows.links.cells.account"
-    ]
-  },
   "1, backed up": {
     "text": "1, backed up",
     "paths": [
@@ -1449,12 +1443,6 @@
       "settings.keys.pccReasoning.options.0.title"
     ]
   },
-  "Linked projects (GitHub, Linear)": {
-    "text": "Linked projects (GitHub, Linear)",
-    "paths": [
-      "plans.outcomes.agents.rows.links.label"
-    ]
-  },
   "List": {
     "text": "List",
     "paths": [
@@ -1768,12 +1756,6 @@
     "text": "No agent work",
     "paths": [
       "destinations.destinations.agent.emptyState.title"
-    ]
-  },
-  "No cap": {
-    "text": "No cap",
-    "paths": [
-      "plans.outcomes.agents.rows.links.cells.plus"
     ]
   },
   "No daily cap": {

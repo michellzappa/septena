@@ -1813,7 +1813,6 @@ enum RegistryPlans {
       RegistryPlanRow(id: "connector", label: RegistryL10n.t("Claude connector"), planned: false, device: .notIncluded, account: .text(RegistryL10n.t("Reads, and 25 changes a day")), plus: .text(RegistryL10n.t("No daily cap"))),
       RegistryPlanRow(id: "runs", label: RegistryL10n.t("Agent runs"), planned: false, device: .notIncluded, account: .text(RegistryL10n.t("10 a month")), plus: .text(RegistryL10n.t("Within a monthly run budget"))),
       RegistryPlanRow(id: "share", label: RegistryL10n.t("Shared projects"), planned: true, device: .notIncluded, account: .text(RegistryL10n.t("Join")), plus: .text(RegistryL10n.t("Create and invite"))),
-      RegistryPlanRow(id: "links", label: RegistryL10n.t("Linked projects (GitHub, Linear)"), planned: true, device: .notIncluded, account: .text(RegistryL10n.t("1")), plus: .text(RegistryL10n.t("No cap"))),
     ]),
   ] }
   static var promises: [RegistryPlanNote] { [
