@@ -613,11 +613,6 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septena/Shell/UI/ProfileAvatar.swift",
-      "literal": "Free",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septena/Shell/UI/SeptenaPage.swift",
       "literal": "Quick Find (⌘⇧F)",
       "reasonId": "predates-rule"

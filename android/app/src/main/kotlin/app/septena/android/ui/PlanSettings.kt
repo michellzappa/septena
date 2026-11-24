@@ -187,7 +187,8 @@ internal fun PlusOffer(plans: PlanSettingsModel, languageTag: String) {
         )
     }
 
-    val freeTitle = plansText(languageTag, "status", "free")
+    val freeTitle = document.objects("cards").firstOrNull { it.fields["id"].stringValue() == "free" }
+        ?.let { registryText(it.fields["title"].stringValue(), languageTag) }.orEmpty()
     val plusTitle = plansText(languageTag, "shortName")
     document.objects("outcomes").forEach { outcome ->
         HorizontalDivider()
@@ -199,7 +200,7 @@ internal fun PlusOffer(plans: PlanSettingsModel, languageTag: String) {
                 headlineContent = { Text(registryText(row.fields["label"].stringValue(), languageTag)) },
                 supportingContent = {
                     Column {
-                        Text("$freeTitle: ${planCell(cells?.fields?.get("account"), languageTag)}")
+                        Text("$freeTitle: ${planCell(cells?.fields?.get("free"), languageTag)}")
                         Text("$plusTitle: ${planCell(cells?.fields?.get("plus"), languageTag)}")
                         if (planned) {
                             Text(

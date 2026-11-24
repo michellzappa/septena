@@ -637,7 +637,8 @@ const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checkli
 const TASK_PAGE_DEPTHS = new Set(["inline", "page", "review"]);
 
 // ---- plans.json (ADR 0010, ADR 0023) ----
-const PLAN_LEVELS = ["device", "account", "plus"];
+// Pro is planned: the site shows it, the apps and the server do not (ADR 0037).
+const PLAN_LEVELS = ["free", "plus", "pro"];
 const PLAN_LIMIT_PLANS = ["account", "plus"];
 
 /** Every string in a JSON value, with its path. */
@@ -651,7 +652,7 @@ function stringsOf(node, p, out = []) {
 function validatePlans(plans, icons, caps) {
   assert(plans.version === 1, "plans.json: version must be 1");
   assert(plans.featureId in caps.capabilities, `plans.json: unknown featureId "${plans.featureId}"`);
-  for (const f of ["name", "shortName", "headline", "subhead"]) assert(typeof plans[f] === "string" && plans[f].length > 0, `plans.json: ${f} missing`);
+  for (const f of ["name", "shortName", "headline", "subhead", "ladderHeadline", "accountNote", "agentNote"]) assert(typeof plans[f] === "string" && plans[f].length > 0, `plans.json: ${f} missing`);
   // House rule: rendered copy has no em or en dashes.
   for (const [p, v] of stringsOf(plans, "plans")) assert(!/[–—]/.test(v), `plans.json: ${p} contains an em or en dash`);
   assert(typeof plans.checkout?.open === "boolean", "plans.json: checkout.open must be a boolean");
@@ -673,7 +674,8 @@ function validatePlans(plans, icons, caps) {
   assert(plans.prices.filter((x) => x.highlighted).length === 1, "plans.json: exactly one price must be highlighted");
 
   assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
-  assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(["free", "account", "plus"]), "plans.json: cards must be free, account, plus");
+  assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: cards must be ${PLAN_LEVELS.join(", ")}`);
+  assert(plans.cards.find((c) => c.id === "pro").status === "planned", "plans.json: the pro card must be planned");
   assert(plans.cards.filter((c) => c.highlighted).length === 1, "plans.json: exactly one card must be highlighted");
   for (const k of ["seePlus", "startTrial", "trialStarted", "trialBilling", "success", "pending", "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "done"]) {
     assert(typeof plans.paywall?.[k] === "string" && plans.paywall[k].length > 0, `plans.json: paywall.${k} missing`);
@@ -708,7 +710,7 @@ function validatePlans(plans, icons, caps) {
         // The copy states the number the server enforces.
         for (const plan of PLAN_LIMIT_PLANS) {
           const v = lim[plan][r.limit];
-          const cell = r.cells[plan];
+          const cell = r.cells[plan === "account" ? "free" : plan];
           if (Number.isInteger(v) && v > 0) {
             assert(typeof cell === "string" && new RegExp(`(^|\\D)${v}(\\D|$)`).test(cell), `plans.json: row ${r.id} ${plan} cell must state the limit ${v}`);
           }
@@ -716,6 +718,8 @@ function validatePlans(plans, icons, caps) {
       }
     }
   }
+  for (const id of plans.cardRows) assert(rowIds.has(id), `plans.json: cardRows names unknown row "${id}"`);
+  assert(plans.fullApp?.title && plans.fullApp.points?.length > 0, "plans.json: fullApp needs title and points");
   for (const list of ["promises", "upsells"]) {
     const ids = new Set();
     for (const n of plans[list]) {
@@ -1802,7 +1806,6 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  /// Registry icon id (icons.json).");
   lines.push("  let icon: String");
   lines.push("  let detail: String");
-  lines.push("  let points: [String]");
   lines.push("  let footnote: String?");
   lines.push("  let highlighted: Bool");
   lines.push("}");
@@ -1811,8 +1814,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let id: String");
   lines.push("  let label: String");
   lines.push("  let planned: Bool");
-  lines.push("  let device: RegistryPlanCell");
-  lines.push("  let account: RegistryPlanCell");
+  lines.push("  let free: RegistryPlanCell");
   lines.push("  let plus: RegistryPlanCell");
   lines.push("}");
   lines.push("");
@@ -1843,11 +1845,11 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const pr of P.prices) lines.push(`    RegistryPlanPrice(id: ${swiftStr(pr.id)}, productId: ${swiftStr(pr.productId)}, amountMinor: ${pr.amountMinor}, currency: ${swiftStr(pr.currency)}, interval: ${swiftStr(pr.interval)}, highlighted: ${pr.highlighted}, label: ${L(pr.label, pr, "label")}, detail: ${L(pr.detail, pr, "detail")}),`);
   lines.push("  ] }");
   lines.push("  static var cards: [RegistryPlanCard] { [");
-  for (const c of P.cards) lines.push(`    RegistryPlanCard(id: ${swiftStr(c.id)}, title: ${L(c.title, c, "title")}, icon: ${swiftStr(c.icon)}, detail: ${L(c.detail, c, "detail")}, points: [${c.points.map((pt) => L(pt, null, null)).join(", ")}], footnote: ${LOpt(c.footnote, c, "footnote")}, highlighted: ${c.highlighted === true}),`);
+  for (const c of P.cards.filter((c) => c.status !== "planned")) lines.push(`    RegistryPlanCard(id: ${swiftStr(c.id)}, title: ${L(c.title, c, "title")}, icon: ${swiftStr(c.icon)}, detail: ${L(c.detail, c, "detail")}, footnote: ${LOpt(c.footnote, c, "footnote")}, highlighted: ${c.highlighted === true}),`);
   lines.push("  ] }");
   lines.push("  static var outcomes: [RegistryPlanOutcome] { [");
   for (const o of P.outcomes) {
-    const rows = o.rows.map((r) => `RegistryPlanRow(id: ${swiftStr(r.id)}, label: ${L(r.label, r, "label")}, planned: ${r.status === "planned"}, device: ${cellSwift(r.cells.device, r, "device")}, account: ${cellSwift(r.cells.account, r, "account")}, plus: ${cellSwift(r.cells.plus, r, "plus")})`).join(",\n      ");
+    const rows = o.rows.map((r) => `RegistryPlanRow(id: ${swiftStr(r.id)}, label: ${L(r.label, r, "label")}, planned: ${r.status === "planned"}, free: ${cellSwift(r.cells.free, r, "free")}, plus: ${cellSwift(r.cells.plus, r, "plus")})`).join(",\n      ");
     lines.push(`    RegistryPlanOutcome(id: ${swiftStr(o.id)}, icon: ${swiftStr(o.icon)}, title: ${L(o.title, o, "title")}, detail: ${L(o.detail, o, "detail")}, rows: [\n      ${rows},\n    ]),`);
   }
   lines.push("  ] }");
@@ -1856,6 +1858,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     for (const n of P[list]) lines.push(`    RegistryPlanNote(id: ${swiftStr(n.id)}, title: ${L(n.title, n, "title")}, detail: ${L(n.detail, n, "detail")}),`);
     lines.push("  ] }");
   }
+  lines.push("  static func card(_ id: String) -> RegistryPlanCard? { cards.first { $0.id == id } }");
   lines.push("  static func upsell(_ id: String) -> RegistryPlanNote? { upsells.first { $0.id == id } }");
   lines.push("  /// The paywall's Terms of Use and Privacy Policy links (App Review 3.1.2).");
   lines.push(`  static let termsURL = URL(string: ${swiftStr(P.legal.terms)})!`);

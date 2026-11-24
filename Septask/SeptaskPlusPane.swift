@@ -75,7 +75,7 @@ struct SeptaskPlusPane: View {
           Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
             GridRow {
               Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-              Label(RegistryPlans.Status.free, systemImage: Self.cardSymbol("free"))
+              Label(RegistryPlans.card("free")?.title ?? "", systemImage: Self.cardSymbol("free"))
                 .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
               Label(RegistryPlans.shortName, systemImage: Self.cardSymbol("plus"))
                 .font(.caption.weight(.semibold)).foregroundStyle(.tint)
@@ -88,7 +88,7 @@ struct SeptaskPlusPane: View {
                     Text(RegistryPlans.Copy.planned).font(.caption).foregroundStyle(.secondary)
                   }
                 }
-                PlanCellView(cell: row.account)
+                PlanCellView(cell: row.free)
                 PlanCellView(cell: row.plus)
               }
             }
@@ -128,8 +128,7 @@ struct SeptaskPlusPane: View {
 
   /// SF Symbol of a plan card's registry icon (plans.json `cards[].icon`).
   private static func cardSymbol(_ id: String) -> String {
-    let icon = RegistryPlans.cards.first { $0.id == id }?.icon ?? ""
-    return RegistryIcons.sfSymbols[icon] ?? "circle"
+    RegistryIcons.sfSymbols[RegistryPlans.card(id)?.icon ?? ""] ?? "circle"
   }
 }
 

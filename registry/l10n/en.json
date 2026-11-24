@@ -2,19 +2,20 @@
   "1": {
     "text": "1",
     "paths": [
-      "plans.outcomes.agents.rows.connected.cells.account"
+      "plans.outcomes.everywhere.rows.devices.cells.free",
+      "plans.outcomes.agents.rows.connected.cells.free"
     ]
   },
-  "1, backed up": {
-    "text": "1, backed up",
+  "3": {
+    "text": "3",
     "paths": [
-      "plans.outcomes.everywhere.rows.devices.cells.account"
+      "plans.outcomes.agents.rows.connected.cells.plus"
     ]
   },
-  "1, not synced": {
-    "text": "1, not synced",
+  "10 GB synced": {
+    "text": "10 GB synced",
     "paths": [
-      "plans.outcomes.everywhere.rows.devices.cells.device"
+      "plans.outcomes.nothing_lost.rows.files.cells.plus"
     ]
   },
   "1st": {
@@ -32,20 +33,8 @@
   "30 days": {
     "text": "30 days",
     "paths": [
-      "plans.outcomes.nothing_lost.rows.history.cells.account",
-      "plans.outcomes.nothing_lost.rows.deleted.cells.device",
-      "plans.outcomes.nothing_lost.rows.deleted.cells.account"
-    ]
-  },
-  "30 days of change history": {
-    "text": "30 days of change history",
-    "paths": [
-      "plans.cards.account.points.3"
-    ]
-  },
-  "30 days, 90 planned": {
-    "text": "30 days, 90 planned",
-    "paths": [
+      "plans.outcomes.nothing_lost.rows.history.cells.free",
+      "plans.outcomes.nothing_lost.rows.deleted.cells.free",
       "plans.outcomes.nothing_lost.rows.deleted.cells.plus"
     ]
   },
@@ -67,12 +56,6 @@
       "surfaces.taskDetail.ordinals.3.title"
     ]
   },
-  "A backup of the device you use": {
-    "text": "A backup of the device you use",
-    "paths": [
-      "plans.cards.account.points.0"
-    ]
-  },
   "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit.": {
     "text": "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit.",
     "paths": [
@@ -89,12 +72,6 @@
     "text": "A free account syncs one device. Plus syncs all of them. You can also move your free account to this device.",
     "paths": [
       "plans.upsells.second_device.detail"
-    ]
-  },
-  "A year of change history": {
-    "text": "A year of change history",
-    "paths": [
-      "plans.cards.plus.points.1"
     ]
   },
   "ABCD-EFGH": {
@@ -286,19 +263,8 @@
     "text": "Agents",
     "paths": [
       "settings.rootGroups.ai_agents_root.items.1.label",
-      "settings.pages.agents.title"
-    ]
-  },
-  "Agents read and change your tasks": {
-    "text": "Agents read and change your tasks",
-    "paths": [
-      "plans.outcomes.agents.rows.connector.label"
-    ]
-  },
-  "Agents work on the copy on our server, so an agent needs an account.": {
-    "text": "Agents work on the copy on our server, so an agent needs an account.",
-    "paths": [
-      "plans.cards.account.footnote"
+      "settings.pages.agents.title",
+      "plans.outcomes.agents.rows.connected.label"
     ]
   },
   "All dated tasks": {
@@ -381,12 +347,6 @@
       "settings.copy.access_devices.deviceWatch.label"
     ]
   },
-  "Apple Watch through the server": {
-    "text": "Apple Watch through the server",
-    "paths": [
-      "plans.outcomes.everywhere.rows.watch.label"
-    ]
-  },
   "Approve": {
     "text": "Approve",
     "paths": [
@@ -433,7 +393,7 @@
   "Areas, projects, sections, notes and attachments": {
     "text": "Areas, projects, sections, notes and attachments",
     "paths": [
-      "plans.cards.free.points.1"
+      "plans.fullApp.points.1"
     ]
   },
   "Attachments": {
@@ -452,6 +412,12 @@
     "text": "Açaí",
     "paths": [
       "tokens.fruitAccents.acai.name"
+    ]
+  },
+  "Backup on our server": {
+    "text": "Backup on our server",
+    "paths": [
+      "plans.outcomes.everywhere.rows.backup.label"
     ]
   },
   "Balanced": {
@@ -576,12 +542,6 @@
     "text": "Change history",
     "paths": [
       "plans.outcomes.nothing_lost.rows.history.label"
-    ]
-  },
-  "Changes from your agent arrive live": {
-    "text": "Changes from your agent arrive live",
-    "paths": [
-      "plans.cards.account.points.2"
     ]
   },
   "Changes the server refused appear here, newest first. The server kept its own version of each.": {
@@ -756,8 +716,7 @@
   "Connected agents": {
     "text": "Connected agents",
     "paths": [
-      "settings.pages.agents.sections.agents.header",
-      "plans.outcomes.agents.rows.connected.label"
+      "settings.pages.agents.sections.agents.header"
     ]
   },
   "Connections": {
@@ -1169,7 +1128,7 @@
   "Early builds on TestFlight": {
     "text": "Early builds on TestFlight",
     "paths": [
-      "plans.cards.plus.points.4"
+      "plans.outcomes.everywhere.rows.beta.label"
     ]
   },
   "Edit Details…": {
@@ -1214,22 +1173,28 @@
       "plans.trial.title"
     ]
   },
+  "Every plan has the full task app": {
+    "text": "Every plan has the full task app",
+    "paths": [
+      "plans.fullApp.title"
+    ]
+  },
   "Every task feature is free on the device you use. A free account adds a backup and lets you connect one agent. Plus covers all your devices, three agents, synced files and a longer history.": {
     "text": "Every task feature is free on the device you use. A free account adds a backup and lets you connect one agent. Plus covers all your devices, three agents, synced files and a longer history.",
     "paths": [
       "plans.subhead"
     ]
   },
-  "Everything in the free account is included.": {
-    "text": "Everything in the free account is included.",
+  "Everything in Free is included.": {
+    "text": "Everything in Free is included.",
     "paths": [
       "plans.cards.plus.footnote"
     ]
   },
-  "Export and import": {
-    "text": "Export and import",
+  "Everything in Plus is included.": {
+    "text": "Everything in Plus is included.",
     "paths": [
-      "plans.outcomes.everywhere.rows.new_device.cells.device"
+      "plans.cards.pro.footnote"
     ]
   },
   "Export as JSON": {
@@ -1241,7 +1206,7 @@
   "Export everything as plain JSON": {
     "text": "Export everything as plain JSON",
     "paths": [
-      "plans.cards.free.points.5"
+      "plans.fullApp.points.5"
     ]
   },
   "Export works on every plan. A limit hides older items. It never deletes them, and Plus shows them again.": {
@@ -1294,16 +1259,10 @@
       "surfaces.taskReferences.kinds.file.label"
     ]
   },
-  "Files and images": {
-    "text": "Files and images",
+  "Files": {
+    "text": "Files",
     "paths": [
       "plans.outcomes.nothing_lost.rows.files.label"
-    ]
-  },
-  "Files and images synced, up to 10 GB": {
-    "text": "Files and images synced, up to 10 GB",
-    "paths": [
-      "plans.cards.plus.points.2"
     ]
   },
   "Find any task, project, or area.": {
@@ -1324,11 +1283,22 @@
       "surfaces.taskReferences.roles.follow_up.label"
     ]
   },
+  "For people who run many agents on one list.": {
+    "text": "For people who run many agents on one list.",
+    "paths": [
+      "plans.cards.pro.detail"
+    ]
+  },
+  "Free": {
+    "text": "Free",
+    "paths": [
+      "plans.levels.free.title",
+      "plans.cards.free.title"
+    ]
+  },
   "Free account": {
     "text": "Free account",
     "paths": [
-      "plans.levels.account.title",
-      "plans.cards.account.title",
       "plans.status.free"
     ]
   },
@@ -1513,7 +1483,7 @@
   "Import from Things and Apple Reminders": {
     "text": "Import from Things and Apple Reminders",
     "paths": [
-      "plans.cards.free.points.4"
+      "plans.fullApp.points.4"
     ]
   },
   "Import from another app": {
@@ -1591,7 +1561,7 @@
   "Join": {
     "text": "Join",
     "paths": [
-      "plans.outcomes.agents.rows.share.cells.account"
+      "plans.outcomes.agents.rows.share.cells.free"
     ]
   },
   "Jot down the task. A few words are enough.": {
@@ -1686,12 +1656,6 @@
     "text": "Lists",
     "paths": [
       "settings.rootGroups.lists_root.header"
-    ]
-  },
-  "Live sync on every iPhone, iPad and Mac": {
-    "text": "Live sync on every iPhone, iPad and Mac",
-    "paths": [
-      "plans.cards.plus.points.0"
     ]
   },
   "Logbook": {
@@ -1897,12 +1861,6 @@
       "actions.actions.task.move.title"
     ]
   },
-  "Moving to a new device is free": {
-    "text": "Moving to a new device is free",
-    "paths": [
-      "plans.cards.account.points.4"
-    ]
-  },
   "Name this agent": {
     "text": "Name this agent",
     "paths": [
@@ -1976,12 +1934,6 @@
     "text": "No Favorites",
     "paths": [
       "destinations.destinations.starred.emptyState.title"
-    ]
-  },
-  "No account": {
-    "text": "No account",
-    "paths": [
-      "plans.levels.device.detail"
     ]
   },
   "No agent work": {
@@ -2170,19 +2122,9 @@
       "surfaces.firstRun.steps.welcome.points.0.title"
     ]
   },
-  "On the device that added them": {
-    "text": "On the device that added them",
-    "paths": [
-      "plans.outcomes.nothing_lost.rows.files.cells.account"
-    ]
-  },
   "On this device": {
     "text": "On this device",
     "paths": [
-      "plans.levels.device.title",
-      "plans.cards.free.title",
-      "plans.outcomes.nothing_lost.rows.history.cells.device",
-      "plans.outcomes.nothing_lost.rows.files.cells.device",
       "plans.status.device"
     ]
   },
@@ -2190,6 +2132,12 @@
     "text": "On this device · Sign in to sync",
     "paths": [
       "settings.copy.account_profile_card.signInToSync.label"
+    ]
+  },
+  "On your device": {
+    "text": "On your device",
+    "paths": [
+      "plans.outcomes.nothing_lost.rows.files.cells.free"
     ]
   },
   "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:": {
@@ -2220,12 +2168,6 @@
     "text": "One",
     "paths": [
       "settings.keys.tasksTitleLines.options.0.title"
-    ]
-  },
-  "One agent, such as Claude, connected to your list": {
-    "text": "One agent, such as Claude, connected to your list",
-    "paths": [
-      "plans.cards.account.points.1"
     ]
   },
   "Only This Task": {
@@ -2388,6 +2330,12 @@
       "plans.labels.planned"
     ]
   },
+  "Planned: €120 a year or €14 a month": {
+    "text": "Planned: €120 a year or €14 a month",
+    "paths": [
+      "plans.levels.pro.detail"
+    ]
+  },
   "Plus": {
     "text": "Plus",
     "paths": [
@@ -2486,6 +2434,12 @@
     "text": "Private iCal feed",
     "paths": [
       "settings.copy.calendar_detail.feedToggle.label"
+    ]
+  },
+  "Pro": {
+    "text": "Pro",
+    "paths": [
+      "plans.levels.pro.title"
     ]
   },
   "Project": {
@@ -2949,6 +2903,12 @@
       "plans.cards.plus.title"
     ]
   },
+  "Septena Pro": {
+    "text": "Septena Pro",
+    "paths": [
+      "plans.cards.pro.title"
+    ]
+  },
   "Septena Window": {
     "text": "Septena Window",
     "paths": [
@@ -3154,8 +3114,7 @@
   "Sign in with Apple": {
     "text": "Sign in with Apple",
     "paths": [
-      "surfaces.firstRun.steps.account.primary.title",
-      "plans.levels.account.detail"
+      "surfaces.firstRun.steps.account.primary.title"
     ]
   },
   "Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.": {
@@ -3301,12 +3260,6 @@
       "settings.copy.syncStatus.synced.label"
     ]
   },
-  "Synced, up to 10 GB": {
-    "text": "Synced, up to 10 GB",
-    "paths": [
-      "plans.outcomes.nothing_lost.rows.files.cells.plus"
-    ]
-  },
   "Syncing": {
     "text": "Syncing",
     "paths": [
@@ -3371,7 +3324,7 @@
   "Task conversations with the on-device model": {
     "text": "Task conversations with the on-device model",
     "paths": [
-      "plans.cards.free.points.3"
+      "plans.fullApp.points.3"
     ]
   },
   "Task deleted": {
@@ -3499,18 +3452,6 @@
     "text": "The purchase did not go through. Try again in a moment.",
     "paths": [
       "plans.paywall.failed"
-    ]
-  },
-  "The same app on all your devices, with more agents and your files.": {
-    "text": "The same app on all your devices, with more agents and your files.",
-    "paths": [
-      "plans.cards.plus.detail"
-    ]
-  },
-  "The same app, with a copy of your list on our server. Sign in with Apple.": {
-    "text": "The same app, with a copy of your list on our server. Sign in with Apple.",
-    "paths": [
-      "plans.cards.account.detail"
     ]
   },
   "The same tasks on your phone, tablet and Mac, updated as you type.": {
@@ -3649,7 +3590,7 @@
   "Today with its Inbox, Upcoming, Anytime, Faded and Logbook": {
     "text": "Today with its Inbox, Upcoming, Anytime, Faded and Logbook",
     "paths": [
-      "plans.cards.free.points.0"
+      "plans.fullApp.points.0"
     ]
   },
   "Toggle Checklist Item": {
@@ -3753,18 +3694,6 @@
     "text": "Unknown device",
     "paths": [
       "settings.copy.access_devices.deviceUnknown.label"
-    ]
-  },
-  "Up to 3": {
-    "text": "Up to 3",
-    "paths": [
-      "plans.outcomes.agents.rows.connected.cells.plus"
-    ]
-  },
-  "Up to 3 agents connected to your list": {
-    "text": "Up to 3 agents connected to your list",
-    "paths": [
-      "plans.cards.plus.points.3"
     ]
   },
   "Upcoming": {
@@ -3889,7 +3818,7 @@
   "When dates, deadlines and repeats": {
     "text": "When dates, deadlines and repeats",
     "paths": [
-      "plans.cards.free.points.2"
+      "plans.fullApp.points.2"
     ]
   },
   "When off, tasks appear in one list with their project or area underneath.": {
@@ -4096,6 +4025,12 @@
     "text": "Your list everywhere",
     "paths": [
       "plans.outcomes.everywhere.title"
+    ]
+  },
+  "Your list on every device, updated live.": {
+    "text": "Your list on every device, updated live.",
+    "paths": [
+      "plans.cards.plus.detail"
     ]
   },
   "Your name": {
@@ -4344,8 +4279,14 @@
   "€0": {
     "text": "€0",
     "paths": [
-      "plans.cards.free.priceLabel",
-      "plans.cards.account.priceLabel"
+      "plans.levels.free.detail",
+      "plans.cards.free.priceLabel"
+    ]
+  },
+  "€120 a year": {
+    "text": "€120 a year",
+    "paths": [
+      "plans.cards.pro.priceLabel"
     ]
   },
   "€5 a month. You save €24 against paying monthly.": {
