@@ -463,7 +463,7 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.selectionHighlightStyle = .none
     // Default `.gap` punches a row-height hole at the drop, which splits a
     // per-row card into two and leaves a chrome-less duplicate in the gap.
-    // `.none` keeps the card intact; we draw SwiftUI's insertion line instead.
+    // `.none` keeps the card intact; we draw SwiftUI's `TaskInsertionMark` instead.
     tableView.draggingDestinationFeedbackStyle = .none
     tableView.dataSource = self
     tableView.delegate = self
@@ -4828,12 +4828,13 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       rowView.dropLine = .none
       return
     }
-    if drop == row {
-      rowView.dropLine = .top
-    } else if drop >= rows.count && row == rows.count - 1 {
-      rowView.dropLine = .bottom
+    // Above a card row the bar sits on the row before it, like SwiftUI's
+    // `taskInsertionMark`: between cells, and clear of the card's rounded top.
+    let onRowBefore = drop > 0 && (drop >= rows.count || rows[drop].isCardRow)
+    if onRowBefore {
+      rowView.dropLine = row == min(drop, rows.count) - 1 ? .bottom : .none
     } else {
-      rowView.dropLine = .none
+      rowView.dropLine = row == drop ? .top : .none
     }
   }
 
