@@ -63,7 +63,7 @@
     {
       "id": "account",
       "title": "Free account",
-      "icon": "settings.account",
+      "icon": "settings.data",
       "priceLabel": "€0",
       "detail": "The same app, with a copy of your list on our server. Sign in with Apple.",
       "points": [
