@@ -93,6 +93,7 @@ struct ImportPlannedTask: Sendable, Hashable {
   var position: Double
   var reminder: ImportReminder?
   var recurrence: ImportRecurrence?
+  var refs: [ImportTaskRef] = []
 }
 
 struct ImportEntityCounts: Codable, Sendable, Hashable {
@@ -308,7 +309,16 @@ enum ImportPlanner {
         if options.tagsIntoNotes { noteParts.append(tags.map { "#\($0)" }.joined(separator: " ")) }
       }
       if task.starred == true { saw("starred") }
-      if let url = task.sourceURL, !url.isEmpty { saw("sourceURL"); noteParts.append(url) }
+      var refs = task.refs ?? []
+      if let url = task.sourceURL, !url.isEmpty {
+        if TaskRefCore.parse(url) != nil {
+          refs.append(ImportTaskRef(key: url, role: .from))
+        } else {
+          saw("sourceURL")
+          noteParts.append(url)
+        }
+      }
+      if !refs.isEmpty { saw("refs") }
       if task.reminder != nil { saw("reminder") }
       if task.recurrence != nil { saw("recurrence") }
       if task.completedAt != nil, task.status == .done { saw("completedAt") }
@@ -328,7 +338,8 @@ enum ImportPlanner {
         deadline: task.deadline.flatMap(dayDate),
         position: task.position ?? Double(index),
         reminder: task.reminder,
-        recurrence: task.recurrence))
+        recurrence: task.recurrence,
+        refs: refs))
       taskCounts.create += 1
     }
     report.counts[.task] = taskCounts
@@ -359,6 +370,8 @@ enum ImportPlanner {
       return (.preserved, String(localized: "Kept with the import. A star marker comes to Septena later."))
     case "sourceURL":
       return (.transformed, String(localized: "Added to notes as a link."))
+    case "refs":
+      return (TaskRefCore.isAvailable ? .mapped : .preserved, nil)
     case "completedAt":
       return (.transformed, String(localized: "Completed tasks show the import day in the Logbook."))
     default:

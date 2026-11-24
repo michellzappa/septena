@@ -92,6 +92,16 @@ struct ImportChecklistItem: Codable, Sendable, Hashable {
   var done: Bool
 }
 
+/// A reference to what the task is about or came from
+/// (docs/TASK_REFERENCES_SPEC.md §9).
+struct ImportTaskRef: Codable, Sendable, Hashable {
+  /// A reference key, a web URL or a `message://` link.
+  var key: String
+  /// Nil means `about`.
+  var role: TaskRefRole?
+  var snapshot: TaskRefSnapshot?
+}
+
 struct ImportReminder: Codable, Sendable, Hashable {
   /// Same two shapes as `TaskReminder.fireAt`: wall-clock `YYYY-MM-DDTHH:MM`
   /// (floating) or UTC `YYYY-MM-DDTHH:MM:SSZ` (fixed).
@@ -137,6 +147,7 @@ struct ImportTask: Codable, Sendable, Hashable {
   var tags: [String]?
   var starred: Bool?
   var sourceURL: String?
+  var refs: [ImportTaskRef]?
   var original: ImportOriginal?
 }
 

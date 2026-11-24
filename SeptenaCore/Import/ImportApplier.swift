@@ -114,6 +114,10 @@ enum ImportApplier {
         if let recurrence = task.recurrence {
           taskMutator.setRecurrence(id: created.id, recurrence: recurrence.recurrence)
         }
+        for ref in task.refs {
+          taskMutator.addTaskRef(taskID: created.id, input: ref.key, role: ref.role ?? .about,
+                                 snapshot: ref.snapshot ?? TaskRefSnapshot())
+        }
         switch task.status {
         case .open: break
         case .done: taskMutator.complete(id: created.id)

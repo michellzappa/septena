@@ -120,7 +120,8 @@ include trashed `false`, merge matching titles `true`, checklist into notes
 | tags | `preserved`; `transformed` into notes on the option | `mapped` (#96) |
 | starred | `preserved` | `mapped` (#127) |
 | reminder, recurrence, headings, dates, notes, status, order | `mapped` | |
-| sourceURL | `transformed`: appended to notes as a link line | |
+| refs | `preserved` until the core that reads a reference key is pinned | `mapped` (#387) |
+| sourceURL | A `from` reference when the core reads it, else `transformed`: appended to notes as a link line | |
 
 A `preserved` field is never lost: the batch ledger keeps the item's original
 and the bundle values. When the feature ships, a re-run of the batch fills
