@@ -118,6 +118,12 @@ struct SeptaskPairingCodeField: View {
         .disabled(!sync.signedIn)
       Button("Continue", action: review)
         .disabled(!sync.signedIn || SeptaskApproveSignInFlow.normalized(pairCode) == nil)
+      if sync.signedIn {
+        SeptaskScanCodeButton { scanned in
+          reviewing = ReviewedCode(code: scanned)
+        }
+        .labelStyle(.iconOnly)
+      }
     }
     .sheet(item: $reviewing) { reviewed in
       SeptaskApproveSignInFlow(initialCode: reviewed.code) { _ in

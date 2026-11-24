@@ -75,6 +75,23 @@ Accepted by mz on 2026-11-21 with all defaults below.
   codes. Device approval works without it.
 - Account deletion must also delete the account's identity rows.
 
+## The QR code (implemented 2026-11-24)
+
+- Every screen that shows a sign-in code also shows it as a QR code: the
+  Claude authorize page and the Android sign-in screen. The QR holds
+  `https://api.septena.app/pair/<CODE>`. One encoder lives in the backend
+  (`backend/src/shadow/pairQr.ts`): the page draws its SVG, and
+  `POST /v1/auth/device/start` returns the module matrix (`qr.size`,
+  `qr.modules`) so a client draws it with no QR library.
+- The approving app has a Scan Code button next to every code field
+  (`Septask/SeptaskSignInCodeScanner.swift`, iPhone, iPad and Mac). A scan
+  only fills in the code. The app then shows the same "Sign in on
+  <device>?" confirmation as for a typed code.
+- The app registers no handler for the `/pair/` URL, on purpose. A link in
+  an email or a chat must never open a prefilled approval. A phone's system
+  camera opens the URL in a browser, and that page only says where to scan
+  it. It looks nothing up and approves nothing.
+
 ## Open questions
 
 | Question | Default |

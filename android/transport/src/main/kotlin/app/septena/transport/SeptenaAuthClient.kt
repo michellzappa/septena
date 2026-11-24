@@ -18,9 +18,31 @@ data class DeviceCode(
     val pollSecret: String,
     val expiresInSeconds: Long,
     val intervalSeconds: Long,
+    /** The sign-in QR from the backend (`src/shadow/pairQr.ts`); null from a backend that does not send it. */
+    val qr: SignInQr? = null,
 ) {
     /** The code as the backend's pairing page shows it: `ABCD-EFGH`. */
     val displayCode: String get() = if (code.length == 8) code.take(4) + "-" + code.drop(4) else code
+}
+
+/**
+ * A QR code as the backend encodes it: [size] modules per side, [modules] row by row, `true` dark.
+ * The backend owns the one QR encoder, so this app needs no QR library. The drawer adds the quiet zone.
+ */
+class SignInQr(val size: Int, val modules: BooleanArray) {
+    fun isDark(row: Int, col: Int): Boolean = modules[row * size + col]
+
+    companion object {
+        /** Null unless the JSON is a well-formed QR matrix (21 to 177 modules per side, only `0` and `1`). */
+        fun parse(json: JsonValue?): SignInQr? {
+            val obj = json as? JsonValue.ObjectValue ?: return null
+            val size = (obj["size"] as? JsonValue.IntegerValue)?.value?.toInt() ?: return null
+            val text = obj["modules"].stringValue() ?: return null
+            if (size !in 21..177 || (size - 17) % 4 != 0 || text.length != size * size) return null
+            if (text.any { it != '0' && it != '1' }) return null
+            return SignInQr(size, BooleanArray(text.length) { text[it] == '1' })
+        }
+    }
 }
 
 sealed interface DevicePollResult {
@@ -51,6 +73,7 @@ class SeptenaAuthClient(
             pollSecret = json["pollSecret"].stringValue() ?: error("Device start response is missing pollSecret"),
             expiresInSeconds = json["expiresIn"].longValue() ?: 600L,
             intervalSeconds = json["interval"].longValue() ?: 3L,
+            qr = SignInQr.parse(json["qr"]),
         )
     }
 

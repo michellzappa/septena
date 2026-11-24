@@ -1,10 +1,12 @@
 package app.septena.android.ui
 
 import android.os.Build
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -16,11 +18,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.septena.android.AndroidAppGraph
 import app.septena.transport.DeviceCode
 import app.septena.transport.DevicePollResult
+import app.septena.transport.SignInQr
 import kotlinx.coroutines.delay
 
 private sealed interface SignInStep {
@@ -76,7 +82,8 @@ fun SignInScreen(graph: AndroidAppGraph) {
             }
             SignInStep.Requesting -> CircularProgressIndicator()
             is SignInStep.ShowCode -> {
-                Text("On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Enter this code:")
+                Text("On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:")
+                current.device.qr?.let { SignInQrImage(it) }
                 Text(
                     current.device.displayCode,
                     style = MaterialTheme.typography.displaySmall,
@@ -88,6 +95,31 @@ fun SignInScreen(graph: AndroidAppGraph) {
             is SignInStep.Failed -> {
                 Text(current.message)
                 Button(onClick = { step = SignInStep.Requesting }) { Text("Get a new code") }
+            }
+        }
+    }
+}
+
+/**
+ * The sign-in QR, drawn from the backend's module matrix. Black on white with the 4-module quiet zone in both
+ * themes: not every scanner reads an inverted QR. The approving app reads the same code it would get typed.
+ */
+@Composable
+private fun SignInQrImage(qr: SignInQr) {
+    // Decorative for TalkBack: the same code is the text right below it.
+    Canvas(modifier = Modifier.size(220.dp)) {
+        val quiet = 4
+        val module = size.minDimension / (qr.size + quiet * 2)
+        drawRect(Color.White)
+        for (row in 0 until qr.size) {
+            for (col in 0 until qr.size) {
+                if (!qr.isDark(row, col)) continue
+                drawRect(
+                    Color.Black,
+                    topLeft = Offset((col + quiet) * module, (row + quiet) * module),
+                    // A hair of overlap so no seam shows between neighbouring modules.
+                    size = Size(module + 0.5f, module + 0.5f),
+                )
             }
         }
     }

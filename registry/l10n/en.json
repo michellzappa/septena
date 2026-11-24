@@ -240,6 +240,12 @@
       "plans.outcomes.everywhere.rows.devices.cells.plus"
     ]
   },
+  "Allow camera access for Septena in Settings, or enter the code instead.": {
+    "text": "Allow camera access for Septena in Settings, or enter the code instead.",
+    "paths": [
+      "surfaces.prompts.items.cameraUnavailable.message"
+    ]
+  },
   "An agent below": {
     "text": "An agent below",
     "paths": [
@@ -1881,6 +1887,12 @@
       "plans.status.trialEnds"
     ]
   },
+  "Point the camera at the QR code on the other screen.": {
+    "text": "Point the camera at the QR code on the other screen.",
+    "paths": [
+      "surfaces.prompts.items.scanSignInCode.message"
+    ]
+  },
   "Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.": {
     "text": "Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.",
     "paths": [
@@ -2156,6 +2168,18 @@
       "actions.actions.place.saveNotes.title"
     ]
   },
+  "Scan Code": {
+    "text": "Scan Code",
+    "paths": [
+      "surfaces.prompts.items.scanSignInCode.confirmTitle"
+    ]
+  },
+  "Scan a sign-in code": {
+    "text": "Scan a sign-in code",
+    "paths": [
+      "surfaces.prompts.items.scanSignInCode.title"
+    ]
+  },
   "Schedule": {
     "text": "Schedule",
     "paths": [
@@ -2264,6 +2288,12 @@
     "text": "Septena Window",
     "paths": [
       "actions.actions.app.septenaWindow.title"
+    ]
+  },
+  "Septena can’t use the camera": {
+    "text": "Septena can’t use the camera",
+    "paths": [
+      "surfaces.prompts.items.cameraUnavailable.title"
     ]
   },
   "Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import.": {

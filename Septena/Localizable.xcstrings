@@ -2209,6 +2209,10 @@
     "All-day events" : {
 
     },
+    "Allow camera access for Septena in Settings, or enter the code instead." : {
+      "comment" : "Generated from registry surfaces.prompts.items.cameraUnavailable.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Already added" : {
       "localizations" : {
         "pt-BR" : {
@@ -9510,6 +9514,10 @@
       "comment" : "Generated from registry plans.status.trialEnds. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Point the camera at the QR code on the other screen." : {
+      "comment" : "Generated from registry surfaces.prompts.items.scanSignInCode.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Potassium" : {
       "localizations" : {
         "pt-BR" : {
@@ -10470,6 +10478,14 @@
         }
       }
     },
+    "Scan a sign-in code" : {
+      "comment" : "Generated from registry surfaces.prompts.items.scanSignInCode.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Scan Code" : {
+      "comment" : "Generated from registry surfaces.prompts.items.scanSignInCode.confirmTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Schedule" : {
       "comment" : "Generated from registry actions.actions.task.when.shortTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -10696,6 +10712,10 @@
           }
         }
       }
+    },
+    "Septena can’t use the camera" : {
+      "comment" : "Generated from registry surfaces.prompts.items.cameraUnavailable.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import." : {
       "comment" : "Generated from registry settings.pages.import_export.sections.move_in.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
