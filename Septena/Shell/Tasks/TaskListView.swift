@@ -1037,6 +1037,7 @@ struct TaskListView: View {
     .onChange(of: nav.shouldCreateHeading) { _, want in
       guard want, isOnScreen, case .project(let pid) = filter else { return }
       nav.shouldCreateHeading = false
+      closeActiveEditIfNeeded()
       headingDraftTitle = ""
       headingCreateProject = pid
     }
@@ -1083,6 +1084,7 @@ struct TaskListView: View {
           areas: areas,
           projects: projects,
           accent: theme.color(for: "tasks"),
+          allowsHeadingPrefix: isProjectFilter,
           onDone: {
             if case .edit(let task) = mode { repatchTask(id: task.id) }
             reloadOrDeferWhileEditing()
@@ -1392,7 +1394,8 @@ struct TaskListView: View {
       expandedEditId = nil
     }
     if usesSelectionModel {
-      if let closingId, selection.isEmpty || selection == [closingId] {
+      if let closingId, currentTask(id: closingId) != nil,
+         selection.isEmpty || selection == [closingId] {
         selection = [closingId]
       }
     } else if let closingId {
@@ -2833,10 +2836,16 @@ struct TaskListView: View {
     #endif
   }
 
+  private var isProjectFilter: Bool {
+    if case .project = filter { return true }
+    return false
+  }
+
   /// The toolbar "+" menu's New Section on a project page; nil elsewhere.
   private var projectSectionCreateAction: (() -> Void)? {
     guard case .project(let pid) = filter else { return nil }
     return {
+      closeActiveEditIfNeeded()
       headingDraftTitle = ""
       headingCreateProject = pid
     }
@@ -3006,14 +3015,20 @@ struct TaskListView: View {
   private func commitHeadingCreate(title: String, project: String) {
     let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return }
-    mutator.createHeading(title: trimmed, project: project)
+    if let created = mutator.createHeading(title: trimmed, project: project) {
+      TaskUndo.recordHeadingCreate(id: created.id, title: trimmed,
+                                   project: project, position: created.position,
+                                   mutator: mutator)
+    }
     Task { await load() }
   }
 
   private func commitHeadingRename(_ heading: SeptenaTask, title: String) {
     let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty, trimmed != heading.title else { return }
-    mutator.update(id: heading.id, title: trimmed, notes: nil)
+    if mutator.update(id: heading.id, title: trimmed, notes: nil) {
+      TaskUndo.recordRename(id: heading.id, before: heading.title, after: trimmed, mutator: mutator)
+    }
     Task { await load() }
   }
 
@@ -3852,6 +3867,7 @@ struct TaskListView: View {
       accent: theme.color(for: "tasks"),
       presentation: .inline,
       deferredCreate: draftEditIds.contains(task.id),
+      allowsHeadingPrefix: isProjectFilter,
       onClose: { collapseEdit() },
       onToggleComplete: { toggle(task) },
       titleMatchID: "edit-title-\(task.id)",
@@ -3862,7 +3878,12 @@ struct TaskListView: View {
       onDone: {
         if draftEditIds.contains(task.id) { draftEditIds.remove(task.id) }
         clearQuickAddCaptureSlot(for: task.id)
-        repatchTask(id: task.id)
+        if LocalCache.task(id: task.id, in: modelContext) == nil {
+          removeLocally(id: task.id)
+          selection.remove(task.id)
+        } else {
+          repatchTask(id: task.id)
+        }
         // persistOnce can run mid-edit: the inline host is a LazyVStack, so
         // `.onDisappear` fires when the row merely wraps or scrolls out of the
         // materialization window. A full `load()` here would re-diff the list

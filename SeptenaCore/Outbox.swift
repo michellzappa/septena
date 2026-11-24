@@ -530,12 +530,14 @@ final class TaskMutator {
 
   /// Create a project section-divider "heading" (docs/ORDERING_AND_HEADINGS_PLAN.md).
   @discardableResult
-  func createHeading(title: String, project: String, atTop: Bool = false) -> SeptenaTask? {
+  func createHeading(title: String, project: String, atTop: Bool = false,
+                     afterHeadingID: String? = nil) -> SeptenaTask? {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] createHeading called before CK bound — dropping", nil)
       return nil
     }
-    return cloudBackend.createHeading(title: title, project: project, atTop: atTop)
+    return cloudBackend.createHeading(title: title, project: project, atTop: atTop,
+                                      afterHeadingID: afterHeadingID)
   }
 
   /// File a task under a heading (or clear it with `nil`).
@@ -717,6 +719,16 @@ enum TaskTitleText {
   /// space here would leave a stray gap wherever the caret sat mid-title.
   static func withoutLineBreaks(_ raw: String) -> String {
     String(raw.filter { !$0.isNewline })
+  }
+
+  /// Parse a `# Heading` title shortcut inside a project (#209).
+  /// Matches a single `#` followed by a space and non-empty trimmed text
+  /// (e.g. `# Design` → `Design`). Rejects `## ...`, `#tag`, and bare `# `.
+  static func headingPrefixTitle(_ raw: String) -> String? {
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed.hasPrefix("# ") else { return nil }
+    let rest = trimmed.dropFirst(2).trimmingCharacters(in: .whitespacesAndNewlines)
+    return rest.isEmpty ? nil : rest
   }
 
   /// A title longer than this goes to notes in full; the title keeps a

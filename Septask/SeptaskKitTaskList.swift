@@ -542,8 +542,21 @@ final class SeptaskKitTaskListController: NSViewController {
       }
       // Only a TASK row has a task menu. A header, an event, the "New task"
       // line or a reminder used to get the full menu, with every command
-      // aimed at whatever happened to be selected elsewhere.
-      guard self.rows.indices.contains(row), self.rows[row].task != nil else { return }
+      // aimed at whatever happened to be selected elsewhere. On a project
+      // page, right-clicking the page title, project notes, or Add Section
+      // row offers the same "New Section" menu as blank space below the list.
+      guard self.rows.indices.contains(row) else { return }
+      guard self.rows[row].task != nil else {
+        if case .project = self.filter {
+          switch self.rows[row] {
+          case .screenTitle, .containerNotes, .addSection:
+            self.buildBlankSpaceMenu().popUp(positioning: nil, at: point, in: tableView)
+          default:
+            break
+          }
+        }
+        return
+      }
       if !tableView.selectedRowIndexes.contains(row) {
         tableView.selectRowIndexes([row], byExtendingSelection: false)
       }
@@ -3212,9 +3225,27 @@ final class SeptaskKitTaskListController: NSViewController {
     // owns the marker now, and wiping it would leave that row unpurgeable.
     if wasNew { pendingNewTaskId = nil }
     if wasNew, trimmed.isEmpty {
-      // The ⌘N row was escaped/committed empty — it never really existed for
-      // the user, so remove it entirely rather than soft-deleting to trash.
+      // The ⌘N / New Section row was escaped/committed empty — it never really
+      // existed for the user, so remove it entirely rather than soft-deleting.
       mutator.purge(id: id)
+    } else if wasNew, let existing = LocalCache.task(id: id, in: context), existing.isHeading {
+      // Brand-new project heading created via New Section (#209): update title
+      // if edited and record creation undo (never rename-back-to-placeholder).
+      var landed = true
+      if trimmed != existing.title {
+        landed = mutator.update(id: id, title: trimmed)
+      }
+      if landed, let projectId = existing.project {
+        TaskUndo.recordHeadingCreate(id: id, title: trimmed, project: projectId,
+                                     position: existing.position, mutator: mutator)
+      } else if !landed {
+        SeptenaLog.error(
+          "[SeptaskKit] title for new heading id=\(id) did not land — no undo entry registered", nil)
+      }
+    } else if wasNew, let existing = LocalCache.task(id: id, in: context),
+              let match = headingPrefixForNewTask(title: trimmed, task: existing) {
+      // `# Heading` shortcut on a new task inside a project (#209).
+      convertNewTaskDraftToHeading(draft: existing, title: match.title, projectId: match.projectId)
     } else if wasNew {
       // The row was born titleless, so undo here means "un-create", not
       // "rename back to empty" — which is what the rename branch below used
@@ -3767,10 +3798,27 @@ final class SeptaskKitTaskListController: NSViewController {
     // user did type has already landed on the model.
     if taskId == pendingNewTaskId {
       pendingNewTaskId = nil
+      // `# Heading` shortcut inside a project (#209): convert the brand-new
+      // task draft into a project heading on commit, purge the placeholder,
+      // and record creation undo.
+      if let existing = LocalCache.task(id: taskId, in: context),
+         let match = headingPrefixForNewTask(title: typedTitle, task: existing) {
+        convertNewTaskDraftToHeading(draft: existing, title: match.title, projectId: match.projectId)
+        return
+      }
       // Read the STORE, not `rows` — `SeptenaTask` is a struct, so the row
       // array still holds the pre-commit copy and a title the user just typed
       // would look empty here and get the row purged out from under them.
-      let stored = LocalCache.task(id: taskId, in: context)?.title ?? ""
+      let trimmedTyped = typedTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+      var stored = LocalCache.task(id: taskId, in: context)?.title ?? ""
+      // If `onCommit` deferred writing a `# ` title while in a project and the
+      // user moved the draft out of the project before closing, persist it now.
+      if !trimmedTyped.isEmpty,
+         stored.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+         !mutator.lastWriteFailed(id: taskId),
+         mutator.update(id: taskId, title: trimmedTyped) {
+        stored = trimmedTyped
+      }
       // Purge needs BOTH to be empty. The store alone is not enough evidence:
       // `cell.commit()` routes through `StoreHealth.save`, which ROLLS BACK a
       // failed write — so a title the user really did type can leave the store
@@ -3778,7 +3826,7 @@ final class SeptaskKitTaskListController: NSViewController {
       // trash entry, nothing to restore). `typedTitle` is read straight off
       // the field, so it survives a rolled-back save and keeps the row alive.
       // A wrongly-kept blank row is one ⌘⌫ away; a wrongly-purged task is gone.
-      let nothingTyped = typedTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      let nothingTyped = trimmedTyped.isEmpty
       let nothingStored = stored.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       if nothingTyped, nothingStored, !mutator.lastWriteFailed(id: taskId) {
         mutator.purge(id: taskId)
@@ -4004,6 +4052,12 @@ final class SeptaskKitTaskListController: NSViewController {
             // a pill, a sync batch or an earlier commit may have moved it on.
             let current = LocalCache.task(id: task.id, in: self.context) else { return }
       let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+      // A brand-new `# Heading` draft inside a project converts on collapse
+      // (`collapseComposer`) — don't push the raw `# ...` string as a task first.
+      if task.id == self.pendingNewTaskId,
+         self.headingPrefixForNewTask(title: trimmed, task: current) != nil {
+        return
+      }
       let titleChanged = !trimmed.isEmpty && trimmed != current.title
       // Same normalization on both sides as the cell applies to what it
       // saves (trailing whitespace only), so an untouched row never rewrites
@@ -4535,18 +4589,83 @@ final class SeptaskKitTaskListController: NSViewController {
     openNoticeStep(step.id)
   }
 
+  /// True when the list is showing a project (the only surface where headings live).
+  var isViewingProject: Bool {
+    if case .project = filter { return true }
+    return false
+  }
+
+  /// Create a new heading in the current project and focus its title for typing.
+  func createSection() {
+    menuNewSection()
+  }
+
+  /// Project header `…` overflow menu: New Section + New Task, built from
+  /// canonical registry titles so the Mac project header mirrors iOS's `…`.
+  private func buildProjectOverflowMenu() -> NSMenu {
+    KitRegistryMenu.build([
+      RegistryMenuEntry.slot(
+        id: "project.newSection",
+        title: RegistryActions.title("section.new"),
+        sfSymbol: "rectangle.split.1x2"
+      ) { [weak self] in self?.menuNewSection() },
+      RegistryMenuEntry.slot(
+        id: "project.newTask",
+        title: RegistryActions.title("app.newTask"),
+        sfSymbol: "checkmark.circle"
+      ) { [weak self] in self?.createTask() },
+    ])
+  }
+
+  /// Non-nil when a brand-new task draft inside a project starts with `# `
+  /// and should convert into a project heading on commit (#209). Never fires
+  /// outside projects, never on edits, and never on `## ` or bare `# `.
+  private func headingPrefixForNewTask(
+    title: String,
+    task: SeptenaTask
+  ) -> (title: String, projectId: String)? {
+    guard case .project(let projectId) = filter,
+          !task.isHeading,
+          task.project == projectId,
+          let headingTitle = TaskTitleText.headingPrefixTitle(title)
+    else { return nil }
+    return (headingTitle, projectId)
+  }
+
+  /// Replace a brand-new push-deferred task draft with a project heading
+  /// (`# Design` → heading `Design`), record creation undo, reload, and select it.
+  private func convertNewTaskDraftToHeading(draft: SeptenaTask,
+                                            title: String,
+                                            projectId: String) {
+    let created = mutator.createHeading(title: title, project: projectId,
+                                        afterHeadingID: draft.heading)
+    mutator.purge(id: draft.id)
+    if let created {
+      TaskUndo.recordHeadingCreate(id: created.id, title: title,
+                                   project: projectId, position: created.position,
+                                   mutator: mutator)
+    }
+    reload(animated: false)
+    if let id = created?.id,
+       let row = rows.firstIndex(where: { $0.task?.id == id }) {
+      tableView.selectRowIndexes([row], byExtendingSelection: false)
+      tableView.scrollRowToVisible(row)
+    }
+  }
+
   /// New Section lands as a named row and opens for editing, the way ⌘N lands
   /// a new task and the way Finder lands a new folder. It used to stop the app
   /// with a modal text prompt while the row it was about to create sat right
   /// there, editable.
   private func menuNewSection() {
     guard case .project(let projectId) = filter else { return }
-    let heading = mutator.createHeading(
+    commitOpenEdits()
+    guard let heading = mutator.createHeading(
       title: RegistryActions.title("section.new"),
-      project: projectId)
-    reload()
-    guard let id = heading?.id,
-          let row = rows.firstIndex(where: { $0.task?.id == id }) else { return }
+      project: projectId) else { return }
+    pendingNewTaskId = heading.id
+    reload(animated: false)
+    guard let row = rows.firstIndex(where: { $0.task?.id == heading.id }) else { return }
     tableView.selectRowIndexes([row], byExtendingSelection: false)
     tableView.scrollRowToVisible(row)
     beginEditingRow(row)
@@ -5323,6 +5442,11 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         }
       } else {
         cell.onPickGlyph = nil
+      }
+      if case .project = filter {
+        cell.onOpenOverflowMenu = { [weak self] in self?.buildProjectOverflowMenu() }
+      } else {
+        cell.onOpenOverflowMenu = nil
       }
       return cell
 
@@ -6493,6 +6617,16 @@ final class KitScreenTitleCell: NSTableCellView {
   /// A borderless, title-less `NSButton` over the glyph slot — an
   /// `NSControl` for the same reason as `button` above.
   private let glyphButton = NSButton()
+  /// Project page trailing `…` overflow menu button (New Section, New Task —
+  /// #209). Hidden on every non-project page.
+  var onOpenOverflowMenu: (() -> NSMenu?)? {
+    didSet {
+      moreButton.isHidden = onOpenOverflowMenu == nil
+      window?.invalidateCursorRects(for: self)
+    }
+  }
+  private let moreButton = NSButton()
+  private var moreTrailingConstraint: NSLayoutConstraint!
 
   private static var font: NSFont { .systemFont(ofSize: SeptenaTypeScale.size(.title2), weight: .bold) }
 
@@ -6539,6 +6673,21 @@ final class KitScreenTitleCell: NSTableCellView {
     glyphButton.isHidden = true
     glyphButton.setAccessibilityLabel(RegistryActions.title("area.changeEmoji"))
 
+    moreButton.translatesAutoresizingMaskIntoConstraints = false
+    moreButton.isBordered = false
+    moreButton.bezelStyle = .inline
+    moreButton.title = ""
+    moreButton.image = NSImage(systemSymbolName: "ellipsis", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 15, weight: .medium))
+    moreButton.imagePosition = .imageOnly
+    moreButton.contentTintColor = SeptaskKitTheme.inkSecondary
+    moreButton.target = self
+    moreButton.action = #selector(openOverflowMenu)
+    moreButton.refusesFirstResponder = true
+    moreButton.isHidden = true
+    moreButton.toolTip = RegistryActions.title("section.new")
+    moreButton.setAccessibilityLabel(RegistryActions.title("section.new"))
+
     icon.kitA11yIgnore()
     emoji.kitA11yIgnore()
 
@@ -6547,16 +6696,19 @@ final class KitScreenTitleCell: NSTableCellView {
     addSubview(button)
     addSubview(titleLabel)
     addSubview(glyphButton)
+    addSubview(moreButton)
     leadingConstraint = icon.centerXAnchor.constraint(
       equalTo: leadingAnchor,
       constant: KitCardRowView.horizontalInset + SeptaskKitLayout.leadingGlyphCenterX)
     buttonLeadingConstraint = button.leadingAnchor.constraint(
       equalTo: leadingAnchor,
       constant: KitCardRowView.horizontalInset + SeptaskKitLayout.screenTitleLeading)
+    moreTrailingConstraint = moreButton.trailingAnchor.constraint(
+      equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
     trailingConstraint = button.trailingAnchor.constraint(
-      lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+      lessThanOrEqualTo: moreButton.leadingAnchor, constant: -6)
     labelTrailingConstraint = titleLabel.trailingAnchor.constraint(
-      lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+      lessThanOrEqualTo: moreButton.leadingAnchor, constant: -6)
     NSLayoutConstraint.activate([
       leadingConstraint,
       buttonLeadingConstraint,
@@ -6568,6 +6720,10 @@ final class KitScreenTitleCell: NSTableCellView {
       glyphButton.centerYAnchor.constraint(equalTo: icon.centerYAnchor),
       glyphButton.widthAnchor.constraint(equalToConstant: 28),
       glyphButton.heightAnchor.constraint(equalToConstant: 28),
+      moreTrailingConstraint,
+      moreButton.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+      moreButton.widthAnchor.constraint(equalToConstant: 28),
+      moreButton.heightAnchor.constraint(equalToConstant: 28),
       button.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
       trailingConstraint,
       titleLabel.leadingAnchor.constraint(equalTo: button.leadingAnchor),
@@ -6580,6 +6736,13 @@ final class KitScreenTitleCell: NSTableCellView {
 
   @objc private func pickGlyph() {
     onPickGlyph?(glyphButton)
+  }
+
+  @objc private func openOverflowMenu() {
+    guard let menu = onOpenOverflowMenu?() else { return }
+    menu.popUp(positioning: nil,
+               at: NSPoint(x: 0, y: -4),
+               in: moreButton)
   }
 
   /// Fired by the button's own target/action — no hand-tracked mouse handling.
@@ -6601,6 +6764,9 @@ final class KitScreenTitleCell: NSTableCellView {
     if showsNavMenu {
       addCursorRect(button.frame, cursor: .pointingHand)
     }
+    if !moreButton.isHidden {
+      addCursorRect(moreButton.frame, cursor: .pointingHand)
+    }
   }
 
   /// Same width-dependent centered-column margin as every other row.
@@ -6608,8 +6774,7 @@ final class KitScreenTitleCell: NSTableCellView {
     let inset = SeptaskKitLayout.inset(for: bounds.width)
     leadingConstraint.constant = inset + SeptaskKitLayout.leadingGlyphCenterX
     buttonLeadingConstraint.constant = inset + SeptaskKitLayout.screenTitleLeading
-    trailingConstraint.constant = -(inset + 8)
-    labelTrailingConstraint.constant = -(inset + 8)
+    moreTrailingConstraint.constant = -(inset + 8)
     super.layout()
   }
 

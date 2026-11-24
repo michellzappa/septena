@@ -353,6 +353,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     list?.select(taskId: taskId)
   }
   func newTask() { list?.createTask() }
+  var canCreateSection: Bool { list?.isViewingProject ?? false }
+  func newSection() { list?.createSection() }
   func newProject() { sidebar?.newProject() }
   func newArea() { sidebar?.newArea() }
   func showQuickFind() { quickFind?.show() }
@@ -577,6 +579,8 @@ enum SeptaskKitCommands {
     controller.go(to: filter)
   }
   static func newTask() { shell?.newTask() }
+  static var canCreateSection: Bool { shell?.canCreateSection ?? false }
+  static func newSection() { shell?.newSection() }
   static func newProject() { shell?.newProject() }
   static func newArea() { shell?.newArea() }
   static func quickFind() { shell?.showQuickFind() }

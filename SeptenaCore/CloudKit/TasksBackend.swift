@@ -636,6 +636,9 @@ final class CloudKitTasksBackend {
   /// durable and retried until success; an offline purge drains on reconnect.
   func purge(id: String) {
     guard let entity = fetch(id: id) else { return }
+    if entity.isHeading {
+      dissolveHeadingMembers(headingID: id)
+    }
     purgeAttachments(taskID: id)
     purgeChecklistItems(taskID: id)
     purgeTaskRefs(taskID: id)
@@ -1714,11 +1717,17 @@ final class CloudKitTasksBackend {
   /// `TaskEntity.isHeading`). Appends to the foot of the project by default —
   /// "New heading" adds a fresh section at the bottom; pass `atTop` to prepend.
   @discardableResult
-  func createHeading(title: String, project: String, atTop: Bool = false) -> SeptenaTask {
+  func createHeading(title: String, project: String, atTop: Bool = false,
+                     afterHeadingID: String? = nil) -> SeptenaTask {
     let id = uniqueTaskID()
-    let position = atTop
-      ? TaskOrder.topPosition(in: context)
-      : TaskOrder.bottomPosition(in: context)
+    let position: Double
+    if let afterHeadingID, let afterPos = headingPosition(after: afterHeadingID, inProject: project) {
+      position = afterPos
+    } else {
+      position = atTop
+        ? TaskOrder.topPosition(in: context)
+        : TaskOrder.bottomPosition(in: context)
+    }
     let entity = TaskEntity(
       id: id,
       title: title,
@@ -1735,6 +1744,24 @@ final class CloudKitTasksBackend {
     context.insert(entity)
     commitAndPush(entity, op: "createHeading")
     return SeptenaTask(entity)
+  }
+
+  /// Compute a manual order key directly after `afterHeadingID` among the
+  /// project's live headings, or nil if that heading isn't found.
+  private func headingPosition(after afterHeadingID: String, inProject project: String) -> Double? {
+    let headings = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { e in
+        e.deletedAt == nil && !e.pendingDeletion
+          && e.project == project && e.kind == "heading"
+      }
+    )).sorted {
+      TaskOrder.key($0) != TaskOrder.key($1)
+        ? TaskOrder.key($0) < TaskOrder.key($1) : $0.id < $1.id
+    }
+    guard let idx = headings.firstIndex(where: { $0.id == afterHeadingID }) else { return nil }
+    let above = TaskOrder.key(headings[idx])
+    let below = idx + 1 < headings.count ? TaskOrder.key(headings[idx + 1]) : nil
+    return TaskOrder.positions(count: 1, above: above, below: below).first
   }
 
   /// File a task under a heading (`heading = headingID`) or out of one (`nil`).

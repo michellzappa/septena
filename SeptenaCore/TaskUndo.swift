@@ -229,6 +229,27 @@ enum TaskUndo {
            redo: { current = rebuild() })
   }
 
+  /// Undo for a freshly created project heading (section divider, #209).
+  /// Undo purges the heading (dissolving any members); redo re-creates it in
+  /// the same project at its manual position so it lands back in place.
+  static func recordHeadingCreate(id: String,
+                                  title: String,
+                                  project: String,
+                                  position: Double? = nil,
+                                  mutator: TaskMutator) {
+    recordCreate(
+      name: RegistryActions.title("section.new"),
+      ids: [id],
+      mutator: mutator,
+      rebuild: { [mutator] in
+        guard let recreated = mutator.createHeading(title: title, project: project) else { return [] }
+        if let position, position != 0 {
+          mutator.reorder(id: recreated.id, toPosition: position)
+        }
+        return [recreated.id]
+      })
+  }
+
   // MARK: - Common single-value changes
   //
   // The three every surface needs. Each is a thin wrapper over `record` — the
