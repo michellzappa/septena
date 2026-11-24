@@ -725,43 +725,62 @@ def build_iphone(ios_screen_path, phone_type="pro", keep_notch=False, preset="he
     return root, objs
 
 
-def relax_watch_soft_strap(watch_obj):
-    """Flatten the rigid circular sport-band loop into a soft relaxed strap so the Watch lies low on the desk."""
-    strap_mats = {
-        i for i, m in enumerate(watch_obj.data.materials)
-        if m and (m.name.startswith("Rubber") or m.name == "Metal" or m.name.startswith("Metal."))
-    }
+def squish_watch_onto_table(root, watch_obj, objs, case_clearance=0.0035):
+    """
+    Seat the Apple Watch low onto the desk (`Z = 0`) as if resting on a soft silicone strap:
+    1. Position the watch case itself so its lowest vertex sits just `case_clearance` (~3.5mm) above Z=0.
+    2. In world space, squish the flexible Rubber strap vertices behind/beneath the case smoothly flat
+       against the table surface (`Z >= 0`) so the band drapes naturally with tight floor contact and
+       zero floating gap.
+    """
+    bpy.context.view_layer.update()
     case_mats = {
         i for i, m in enumerate(watch_obj.data.materials)
         if m and (m.name.startswith("Black metal") or m.name.startswith("Screen"))
     }
+    strap_mats = {
+        i for i, m in enumerate(watch_obj.data.materials)
+        if m and (m.name.startswith("Rubber") or m.name == "Metal" or m.name.startswith("Metal."))
+    }
+
+    # 1. Measure lowest world Z of the rigid watch case and lower root so case rests just above the desk
+    mw = watch_obj.matrix_world
     bm = bmesh.new()
     bm.from_mesh(watch_obj.data)
     case_verts = {v for f in bm.faces if f.material_index in case_mats for v in f.verts}
     strap_verts = {v for f in bm.faces if f.material_index in strap_mats for v in f.verts} - case_verts
 
-    # Case back sits around y = -0.022; compress strap depth behind case & tuck bottom stilt loop gently up
-    y_back = -0.022
-    z_case_bot = 0.0165
-    pin_mats = {i for i, m in enumerate(watch_obj.data.materials) if m and (m.name == "Metal" or m.name.startswith("Metal."))}
-    pin_verts = {v for f in bm.faces if f.material_index in pin_mats for v in f.verts}
+    case_min_z = min((mw @ v.co).z for v in case_verts)
+    root.location.z += (case_clearance - case_min_z)
+    bpy.context.view_layer.update()
+
+    # 2. Squish strap vertices in world space so the band flattens gently onto Z=0 behind/under the watch
+    mw = watch_obj.matrix_world
+    mw_inv = mw.inverted()
+    case_center_y = sum((mw @ v.co).y for v in case_verts) / max(len(case_verts), 1)
+
     for v in strap_verts:
-        if v.co.y > y_back:
-            dy = v.co.y - y_back
-            # Smoothly compress rear strap loop to ~42% depth (relaxed silicone drape)
-            v.co.y = y_back + dy * 0.42
-        if v.co.z < z_case_bot:
-            # Tuck the rigid bottom band loop close under the watch body so the watch sits low on the floor
-            dz = z_case_bot - v.co.z
-            v.co.z = z_case_bot - dz * 0.28
-        if v in pin_verts:
-            # Keep underside clasp pin tucked inside the relaxed strap so it never pokes under the watch
-            v.co.z += 0.010
-            v.co.y -= 0.004
+        w = mw @ v.co
+        # Compress strap thickness behind the watch body toward the desk
+        if w.y > case_center_y + 0.004:
+            dy = w.y - (case_center_y + 0.004)
+            w.y = (case_center_y + 0.004) + dy * 0.55
+            # Softly droop the rear strap loop down toward the desk
+            blend = min(dy / 0.025, 1.0)
+            w.z = w.z * (1.0 - 0.55 * blend)
+        # Flatten any strap portion pressing into the table cleanly onto Z = 0..2.5mm
+        if w.z < 0.0025:
+            # Smooth soft floor pancake instead of hard knife-edge crease
+            depth = 0.0025 - w.z
+            w.z = max(0.0, 0.0025 - depth * 0.12)
+            # Subtle lateral/rear spread as silicone squishes against the desk
+            w.y += depth * 0.35
+        v.co = mw_inv @ w
 
     bm.to_mesh(watch_obj.data)
     bm.free()
     watch_obj.data.update()
+    drop_to_floor(root, objs, 0.0)
 
 
 def build_watch(watch_screen_path, preset="hero-vertical"):
@@ -770,7 +789,6 @@ def build_watch(watch_screen_path, preset="hero-vertical"):
 
     watch_mesh = next((o for o in objs if o.name.startswith("A smartwatch")), None)
     if watch_mesh:
-        relax_watch_soft_strap(watch_mesh)
         for m in watch_mesh.data.materials:
             if not m:
                 continue
@@ -785,8 +803,7 @@ def build_watch(watch_screen_path, preset="hero-vertical"):
                 reproject_planar_uv(watch_mesh, m.name, u_axis='x', v_axis='z', flip_u=False, flip_v=False)
                 make_emissive_screen_material(m, watch_screen_path, cam_strength=1.75, bounce_strength=3.5, glass_gloss=0.02)
 
-    # Remove detached rear clasp pin (Cylinder.003) since the relaxed strap compresses forward,
-    # and shade the Digital Crown (wheel.001) in dark warm titanium
+    # Remove detached rear clasp pin (Cylinder.003) and shade Digital Crown (wheel.001)
     kept_objs = []
     for o in objs:
         if o.type == 'MESH' and o.name.startswith("Cylinder"):
@@ -800,14 +817,17 @@ def build_watch(watch_screen_path, preset="hero-vertical"):
     objs = kept_objs
 
     if preset == "iso-vertical":
-        # Laid low on the desk resting naturally on its relaxed soft strap between iPad Mini and iPhone
-        root.rotation_euler = (math.radians(-46.0), 0.0, math.radians(-18.0))
+        # Laid low on the desk resting solidly on its squished soft strap between iPad Mini and iPhone
+        root.rotation_euler = (math.radians(-42.0), 0.0, math.radians(-18.0))
         root.location = (-0.002, -0.228, 0.0)
     else:
-        # Tilt face upward toward camera (-34 deg) resting firmly on desk, yaw slightly left (-12 deg) showing crown
         root.rotation_euler = (math.radians(-34.0), 0.0, math.radians(-12.0))
         root.location = (-0.068, -0.255, 0.0)
-    drop_to_floor(root, objs, 0.0)
+
+    if watch_mesh:
+        squish_watch_onto_table(root, watch_mesh, objs, case_clearance=0.003)
+    else:
+        drop_to_floor(root, objs, 0.0)
     return root, objs
 
 
