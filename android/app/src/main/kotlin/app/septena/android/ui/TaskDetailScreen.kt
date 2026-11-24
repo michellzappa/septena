@@ -57,6 +57,7 @@ import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.SyncRecord
+import app.septena.core.TaskConversation
 import app.septena.core.TaskPageBlockKinds
 import app.septena.core.TaskProvenance
 import app.septena.core.TaskPageDepths
@@ -104,6 +105,8 @@ private data class TaskDetailData(
     val projects: List<DetailListItem>,
     val checklist: List<ChecklistLine>,
     val tags: List<TagLine>,
+    /** The task's conversation hands it to the user for review (`needs_verify`). */
+    val needsReview: Boolean = false,
 )
 
 private data class RepeatUnitOption(val value: String, val title: String)
@@ -127,9 +130,6 @@ fun TaskDetailScreen(
 ) {
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val labels = remember(languageTag) { TaskDetailLabels.fromRegistry(languageTag) }
-    val pageBlocks = remember(languageTag) {
-        RegistryCatalog.taskPageBlocks(TaskPageDepths.PAGE, languageTag = languageTag)
-    }
     val attributes = remember(languageTag) { RegistryCatalog.taskAttributes(languageTag) }
     val dataVersion by graph.sync.dataVersion.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -266,6 +266,16 @@ fun TaskDetailScreen(
     val savedTask = data?.task
     val canEdit = savedTask != null && !deleted && !saving
     val isTaskOpen = taskFields[RegistryEntityFields.Task.STATUS].stringValue() == RegistryEntityEnums.TaskStatus.OPEN && !deleted
+    // An open task waiting for the user to accept it opens at the registry review
+    // depth (docs/AGENT_PROMPT_SPEC.md). The depth follows the loaded data, so the
+    // page switches when the task loads, is accepted or is sent back.
+    val isReviewDepth = isTaskOpen && data?.needsReview == true
+    val pageBlocks = remember(languageTag, isReviewDepth) {
+        RegistryCatalog.taskPageBlocks(
+            if (isReviewDepth) TaskPageDepths.REVIEW else TaskPageDepths.PAGE,
+            languageTag = languageTag,
+        )
+    }
     val repeatSummary = labels.repeatUnits.firstOrNull { it.value == repeatUnit }?.title?.let { unitTitle ->
         if (repeatInterval > 1L) "$repeatInterval × $unitTitle" else unitTitle
     }
@@ -569,6 +579,19 @@ fun TaskDetailScreen(
                                 enabled = canEdit,
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                             )
+
+                            // At the review depth the list (area › project) shows as one read-only line under the title.
+                            if (isReviewDepth) {
+                                val reviewList = listOfNotNull(selectedArea?.title, selectedProject?.title)
+                                    .joinToString(" › ")
+                                if (reviewList.isNotEmpty()) {
+                                    Text(
+                                        reviewList,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
 
                             // The save error shows below the text fields. With no notes block, it shows below the header.
                             if (saveFailed && pageBlocks.none { it.kind == TaskPageBlockKinds.NOTES }) {
@@ -1426,7 +1449,10 @@ private suspend fun loadTaskDetail(graph: AndroidAppGraph, taskId: String): Task
             row.fields[RegistryEntityFields.Tag.NAME].stringValue()?.let { name -> TagLine(row.id, name) }
         }
         .sortedBy { it.name.lowercase() }
-    return TaskDetailData(task, areas, projects, checklist, tags)
+    val conversation = graph.taskStore.record(RegistryEntityNames.CONVO, taskId)?.let { record ->
+        TaskConversation.from(record, graph.taskStore.turns(taskId))
+    }
+    return TaskDetailData(task, areas, projects, checklist, tags, needsReview = conversation?.needsHumanReview == true)
 }
 
 /** When the task was added: the creation instant in the device zone, else its creation day. */
