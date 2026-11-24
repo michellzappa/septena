@@ -149,6 +149,12 @@
       "actions.actions.task.acceptReview.title"
     ]
   },
+  "Accepted": {
+    "text": "Accepted",
+    "paths": [
+      "surfaces.taskPage.blocks.taskPage.conversation.acceptedLabel"
+    ]
+  },
   "Account": {
     "text": "Account",
     "paths": [
@@ -2290,6 +2296,12 @@
       "plans.outcomes.agents.rows.connector.cells.account"
     ]
   },
+  "Ready for review": {
+    "text": "Ready for review",
+    "paths": [
+      "surfaces.taskPage.blocks.taskPage.conversation.reviewFallback"
+    ]
+  },
   "Recently Deleted": {
     "text": "Recently Deleted",
     "paths": [
@@ -2451,6 +2463,12 @@
       "surfaces.notices.items.weeklySweep.primaryTitle"
     ]
   },
+  "Review requested": {
+    "text": "Review requested",
+    "paths": [
+      "surfaces.taskPage.blocks.taskPage.conversation.reviewKicker"
+    ]
+  },
   "Review…": {
     "text": "Review…",
     "paths": [
@@ -2589,6 +2607,18 @@
     "text": "Send Back…",
     "paths": [
       "actions.actions.task.sendBackReview.title"
+    ]
+  },
+  "Send back": {
+    "text": "Send back",
+    "paths": [
+      "surfaces.prompts.text.sendBackReview.confirmTitle"
+    ]
+  },
+  "Send back for another pass": {
+    "text": "Send back for another pass",
+    "paths": [
+      "surfaces.prompts.text.sendBackReview.title"
     ]
   },
   "Send feedback": {
@@ -3397,6 +3427,12 @@
       "surfaces.firstRun.steps.welcome.title"
     ]
   },
+  "What needs another pass?": {
+    "text": "What needs another pass?",
+    "paths": [
+      "surfaces.prompts.text.sendBackReview.placeholder"
+    ]
+  },
   "When": {
     "text": "When",
     "paths": [
@@ -3571,6 +3607,12 @@
     "text": "Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are.",
     "paths": [
       "plans.upsells.trial_end.detail"
+    ]
+  },
+  "Your agent asks": {
+    "text": "Your agent asks",
+    "paths": [
+      "surfaces.taskPage.blocks.taskPage.conversation.askKicker"
     ]
   },
   "Your agents do the work": {

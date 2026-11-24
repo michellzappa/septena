@@ -336,6 +336,9 @@ export const ENTITIES = {
       // only by TaskStore.claim / release, never by a push.
       claimedBy: { kind: "text", zod: z.never() },
       claimUntil: { kind: "text", zod: z.never() },
+      // When `endState` last changed. Server-owned: TaskStore.apply stamps
+      // it, a push never sets it. Review shows it as "asked 2h ago".
+      endStateAt: { kind: "text", zod: z.never() },
       // Fresh claims since the human last wrote a turn. The run budget: at
       // AGENT_RUN_BUDGET the agent must ask before it may claim again.
       runsSinceUser: { kind: "int", zod: z.never() },

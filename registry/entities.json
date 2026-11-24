@@ -231,6 +231,7 @@
         "stoppedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
         "claimedBy": { "kind": "text", "serverOwned": true },
         "claimUntil": { "kind": "text", "serverOwned": true },
+        "endStateAt": { "kind": "text", "serverOwned": true },
         "runsSinceUser": { "kind": "int", "serverOwned": true }
       }
     },

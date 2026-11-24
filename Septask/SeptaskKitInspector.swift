@@ -28,6 +28,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
                                            KitInlineSurfaceHost {
 
   private let titleField = NSTextField()
+  /// The list (area › project), one read-only line under the title. Shown
+  /// only at the review depth (docs/AGENT_PROMPT_SPEC.md "Review page"): the
+  /// full page has the List row instead.
+  private let reviewListLabel = NSTextField(labelWithString: "")
   private let notesView = NSTextView()
   private let whenButton = KitInspectorAttributeButton()
   private let deadlineButton = KitInspectorAttributeButton()
@@ -50,6 +54,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let placeholder = NSTextField(labelWithString: String(localized: "No Selection",
                                                                  comment: "SeptaskKit: inspector empty"))
   private let form = NSStackView()
+  /// Views of the blocks the review depth leaves out, keyed by block kind.
+  /// A task waiting for the user to accept it hides them (ADR 0029 `review`).
+  private var pageOnlyViews: [RegistryTaskPageBlockKind: [NSView]] = [:]
+  private var showsReviewDepth = false
   /// Task Conversations — the agent's work log for this row. Shown only when
   /// a conversation exists; a task with no agent history gets no header and no
   /// empty box (docs/SEPTASK_CONVERSATIONS_PLAN.md).
@@ -214,6 +222,16 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       }
       if let last { form.setCustomSpacing(14, after: last) }
     }
+    let reviewKinds = Set(RegistrySurfaces.taskPageBlocks(.review, on: RegistryPlatform.current).map(\.kind))
+    for block in blocks where !reviewKinds.contains(block.kind) {
+      switch block.kind {
+      case .attributes: pageOnlyViews[.attributes] = orderedAttributeButtons
+      case .checklist: pageOnlyViews[.checklist] = [checklistLabel, addChecklistButton, checklistView]
+      case .attachments: pageOnlyViews[.attachments] = [attachmentsLabel, attachmentsView, attachFileButton]
+      case .history: pageOnlyViews[.history] = [historyButton, historyView]
+      case .header, .notes, .conversation, .provenance: break
+      }
+    }
 
     placeholder.textColor = SeptaskKitTheme.iconMuted
     placeholder.translatesAutoresizingMaskIntoConstraints = false
@@ -329,7 +347,17 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     // -52, not the -28 the notes field uses: the title shares its band with
     // the close button and must not run under it.
     fillWidth(titleField, inset: -52)
-    return titleField
+    reviewListLabel.font = SeptaskKitTheme.meta
+    reviewListLabel.textColor = SeptaskKitTheme.inkSecondary
+    reviewListLabel.lineBreakMode = .byTruncatingTail
+    reviewListLabel.isSelectable = true
+    reviewListLabel.isHidden = true
+    form.addArrangedSubview(reviewListLabel)
+    fillWidth(reviewListLabel)
+    // The title's own gap follows the line (`applyDepth`): tight above it
+    // when shown, the section gap when it is hidden and detached.
+    form.setCustomSpacing(14, after: titleField)
+    return reviewListLabel
   }
 
   private func addNotesBlock(_ block: RegistryTaskPageBlock) -> NSView {
@@ -399,6 +427,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     // A reply appends a turn, which posts a task change; re-read so the new
     // turn lands in the transcript the same way an agent turn would.
     conversationView.onAppend = { [weak self] in self?.refresh() }
+    // A sent or cancelled reply hands the keyboard back to the list, the
+    // same exit the title and notes use.
+    conversationView.onEndReply = { [weak self] in self?.onRequestFocusList?() }
     form.addArrangedSubview(conversationLabel)
     form.addArrangedSubview(conversationView)
     fillWidth(conversationView)
@@ -463,6 +494,8 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// key equivalents (`KitShellWindow`). Returns false — and does nothing —
   /// when the keyboard is elsewhere, so the list's own ⌘↩ still works.
   func handleCommandReturn() -> Bool {
+    // ⌘↩ in the conversation's reply field sends the reply.
+    if conversationView.handleCommandReturn() { return true }
     guard let responder = view.window?.firstResponder as? NSView,
           responder.isDescendant(of: view) else { return false }
     // Deferred a tick: the commit's synchronous mutator notification can call
@@ -509,6 +542,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
         refreshReadOnlyFields(next)
         refreshConversation(next)
         historyButton.isHidden = !historyView.configure(taskID: next.id)
+        applyDepth(for: next)
       }
       return
     }
@@ -545,7 +579,37 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     refreshReadOnlyFields(next)
     refreshConversation(next)
     historyButton.isHidden = !historyView.configure(taskID: next.id)
+    applyDepth(for: next)
     formScroll?.contentView.scroll(to: .zero)
+  }
+
+  /// A task waiting for the user to accept it shows the review depth: title,
+  /// notes, the conversation (with Accept and Send back) and who added it.
+  /// Same rule as the SwiftUI task page.
+  private func applyDepth(for task: SeptenaTask) {
+    let review = task.conversation.needsHumanReview
+    let listPath = review ? KitListPath.text(for: task, in: context) : nil
+    reviewListLabel.stringValue = listPath ?? ""
+    reviewListLabel.isHidden = listPath == nil
+    form.setCustomSpacing(listPath == nil ? 14 : 2, after: titleField)
+    if review {
+      for views in pageOnlyViews.values { views.forEach { $0.isHidden = true } }
+    } else if showsReviewDepth {
+      for views in pageOnlyViews.values { views.forEach { $0.isHidden = false } }
+      updateChecklistVisibility()
+      updateAttachmentsVisibility()
+      historyButton.isHidden = !historyView.configure(taskID: task.id)
+    }
+    showsReviewDepth = review
+  }
+
+  /// Send back on a Review row: open the conversation's Send back field for
+  /// the shown task and give it the keyboard. No-op when the shown task is
+  /// not waiting for review.
+  func openSendBack() {
+    guard let task, !form.isHidden else { return }
+    applyDepth(for: task)
+    conversationView.openSendBack()
   }
 
   /// Called when the inspector opens from collapsed state; keeps the loaded

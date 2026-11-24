@@ -550,6 +550,13 @@ function validateSurfaces(surfaces, icons, caps, plans) {
     if (["checklist", "attachments", "conversation", "history"].includes(b.kind)) {
       assert(typeof b.label === "string" || b.attribute !== undefined, `surfaces.json: taskPage block ${b.id} needs a label or an attribute`);
     }
+    // The agent prompt copy (docs/AGENT_PROMPT_SPEC.md): the kickers, the
+    // question when a hand-off has no note, and the line after Accept.
+    if (b.kind === "conversation") {
+      for (const k of ["askKicker", "reviewKicker", "reviewFallback", "acceptedLabel"]) {
+        assert(typeof b[k] === "string" && b[k].length > 0, `surfaces.json: taskPage block ${b.id} needs ${k}`);
+      }
+    }
     // Provenance (who added the task) is permanent metadata: the label, the
     // name a human author shows as, the name for an agent row that carries
     // no `sourceClient`, and the agent glyph the row and the page share.
@@ -605,7 +612,7 @@ function checkOpensAttribute({ actions, surfaces }) {
   }
 }
 const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checklist", "attachments", "conversation", "provenance", "history"]);
-const TASK_PAGE_DEPTHS = new Set(["inline", "page"]);
+const TASK_PAGE_DEPTHS = new Set(["inline", "page", "review"]);
 
 // ---- plans.json (ADR 0010, ADR 0023) ----
 const PLAN_LEVELS = ["device", "account", "plus"];
@@ -1576,6 +1583,11 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`  static let provenanceSelfLabel: String = ${L(prov.selfLabel, prov, "selfLabel")}`);
   lines.push(`  static let provenanceAgentFallbackName: String = ${swiftStr(prov.agentFallbackName)}`);
   lines.push(`  static let provenanceAgentSymbol: String = ${swiftStr(icons.icons[prov.icon].sfSymbol)}`);
+  const convoBlock = surfaces.taskPage.blocks.find((b) => b.kind === "conversation");
+  lines.push("  /// Agent prompt copy (`taskPage.conversation`, docs/AGENT_PROMPT_SPEC.md).");
+  for (const k of ["askKicker", "reviewKicker", "reviewFallback", "acceptedLabel"]) {
+    lines.push(`  static let agentPrompt${k[0].toUpperCase()}${k.slice(1)}: String = ${L(convoBlock[k], convoBlock, k)}`);
+  }
   lines.push("  /// The block of `kind`. Each kind appears exactly once (the generator checks it).");
   lines.push("  static func taskPageBlock(_ kind: RegistryTaskPageBlockKind) -> RegistryTaskPageBlock {");
   lines.push("    guard let b = taskPageBlocks.first(where: { $0.kind == kind }) else { preconditionFailure(\"no task page block \\(kind)\") }");
@@ -1615,7 +1627,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const k of TASK_PAGE_BLOCK_KINDS) lines.push(`  case ${k}`);
   lines.push("}");
   lines.push("");
-  lines.push("/// Where a task page block shows: `inline` (the quick edit in the row) or `page` (the full task page).");
+  lines.push("/// Where a task page block shows: `inline` (the quick edit in the row), `page` (the full task page), or `review` (the page of a task waiting for the user to accept it).");
   lines.push("enum RegistryTaskPageDepth: String, Sendable, Hashable {");
   for (const d of TASK_PAGE_DEPTHS) lines.push(`  case ${d}`);
   lines.push("}");

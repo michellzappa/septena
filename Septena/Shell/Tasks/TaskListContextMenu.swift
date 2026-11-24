@@ -15,15 +15,10 @@ struct TaskListModalPresenter: ViewModifier {
   @Binding var repeatTargetId: String?
   var reminderTargetId: Binding<String?> = .constant(nil)
   var tagsTargetIds: Binding<[String]> = .constant([])
-  /// The Review row whose Send Back… alert is open (row menu
-  /// `task.sendBackReview`).
-  var sendBackTargetId: Binding<String?> = .constant(nil)
-  var applySendBack: ((String, String) -> Void)? = nil
 
   /// Set by the When sheet's Repeat row: the Repeat sheet opens for this task
   /// once the When sheet has finished dismissing (two sheets can't overlap).
   @State private var pendingRepeatId: String?
-  @State private var sendBackNote = ""
 
   let areas: [Area]
   let projects: [Project]
@@ -134,19 +129,6 @@ struct TaskListModalPresenter: ViewModifier {
           tagsTargetIds.wrappedValue = []
         }
         .taskPickerChrome(TaskPickerDetents.standard)
-      }
-      .alert(String(localized: "Send Back"), isPresented: Binding(
-        get: { sendBackTargetId.wrappedValue != nil },
-        set: { if !$0 { sendBackTargetId.wrappedValue = nil; sendBackNote = "" } }
-      )) {
-        TextField(String(localized: "What needs another pass?"), text: $sendBackNote)
-        Button(String(localized: "Cancel"), role: .cancel) {}
-        Button(String(localized: "Send Back")) {
-          let note = sendBackNote.trimmingCharacters(in: .whitespacesAndNewlines)
-          if let id = sendBackTargetId.wrappedValue, !note.isEmpty {
-            applySendBack?(id, note)
-          }
-        }
       }
   }
 

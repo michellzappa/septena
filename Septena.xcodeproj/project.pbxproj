@@ -338,6 +338,7 @@
 		9789D2FB98DDEE500D638DD7 /* ImportSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2DDC3697E8BB67FA753362 /* ImportSource.swift */; };
 		97F4DD6B14B4E425A9024356 /* SeptaskWatchSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D7BFE489024C6B8198CBE08 /* SeptaskWatchSettings.swift */; };
 		981F706FF8C3DC3A56DC0431 /* CalendarEventRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E76BB68C1E939296A1D7857C /* CalendarEventRow.swift */; };
+		991090B44A4C66B957B08B7C /* AgentPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40E3ED388D15D44A2ADAB124 /* AgentPrompt.swift */; };
 		991939086074915FCC609A96 /* ProjectsBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FD1B7B2BAE523F2E4D3F99C /* ProjectsBackend.swift */; };
 		9925791F7DB4A045952D01A1 /* AddInfoSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 052BBEE4E640F3B46CCF8550 /* AddInfoSection.swift */; };
 		995990844492DA8FF49B8B02 /* SeptaskWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 36235E5F9E8A6529AC5024DE /* SeptaskWidgets.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -469,6 +470,7 @@
 		D01A5FF847D182F863CE4756 /* TaskKeyboardContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90855FEBFCEB8B3CC9343F88 /* TaskKeyboardContractTests.swift */; };
 		D01DAC94CC67D20253CF94C9 /* AIModelTagBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F853E986171CC85B026A757B /* AIModelTagBadge.swift */; };
 		D1C66C384DE615A4804EA895 /* TaskListNotice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ADF209352C378192DB1CC2D /* TaskListNotice.swift */; };
+		D309DC6AF888BBD014691800 /* AgentPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40E3ED388D15D44A2ADAB124 /* AgentPrompt.swift */; };
 		D356A8AE54C2FB0B13A86E03 /* SeptaskKitSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A08FC40736AFD2B5755C8D81 /* SeptaskKitSettings.swift */; };
 		D3F6EA4C19924E4D8AE0B669 /* TasksBackend+DateActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3C46430849CC5C72FA432EE /* TasksBackend+DateActions.swift */; };
 		D4923CC37DCC9742A83144BE /* SmartListPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DB99A8A48340E6BAE0EA29F /* SmartListPreferences.swift */; };
@@ -736,6 +738,7 @@
 		3B9559BEC76161CBDBE76A10 /* TaskConvo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskConvo.swift; sourceTree = "<group>"; };
 		3E418CC1AA1FCF5734F1B6B6 /* WeightUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightUnit.swift; sourceTree = "<group>"; };
 		40D69E5B60F439D89D647DC6 /* TaskBackendWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskBackendWire.swift; sourceTree = "<group>"; };
+		40E3ED388D15D44A2ADAB124 /* AgentPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentPrompt.swift; sourceTree = "<group>"; };
 		42633764DDF43F00D2D74256 /* TextSizeScale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextSizeScale.swift; sourceTree = "<group>"; };
 		44C7B41F8744B2EADC170EC8 /* Telemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry.swift; sourceTree = "<group>"; };
 		46077D40BFADE69BDE238E84 /* Changelog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Changelog.swift; sourceTree = "<group>"; };
@@ -1313,6 +1316,7 @@
 			isa = PBXGroup;
 			children = (
 				7256E038ADBC6321AF6725E5 /* AddTaskPage.swift */,
+				40E3ED388D15D44A2ADAB124 /* AgentPrompt.swift */,
 				E76BB68C1E939296A1D7857C /* CalendarEventRow.swift */,
 				514B2164CFF2A2C8D2F777F6 /* ConversationCard.swift */,
 				15F376CF1F8AAFD193002AF6 /* ConversationEngine.swift */,
@@ -2098,6 +2102,7 @@
 				DE222C131C0ABECB081CC330 /* AddInfoRow.swift in Sources */,
 				0A762319C3174BE7C211158D /* AddInfoSection.swift in Sources */,
 				D692AB0445E6A12DB7D413E6 /* AddTaskPage.swift in Sources */,
+				991090B44A4C66B957B08B7C /* AgentPrompt.swift in Sources */,
 				A2D70CFB1614E759AC7B1936 /* AmbientLight.swift in Sources */,
 				7B4865B23D69CE16BAE01ACE /* AppAttestClient.swift in Sources */,
 				4AD46D10C3F517C3364FC13D /* AppDisplayName.swift in Sources */,
@@ -2379,6 +2384,7 @@
 				6F216CDD7293EE04B4515180 /* AddInfoRow.swift in Sources */,
 				9925791F7DB4A045952D01A1 /* AddInfoSection.swift in Sources */,
 				59FB182D0B798326E2D154CE /* AddTaskPage.swift in Sources */,
+				D309DC6AF888BBD014691800 /* AgentPrompt.swift in Sources */,
 				4461BE59032CC49ECC674966 /* AmbientLight.swift in Sources */,
 				C731BE7C8C89D773D8D8BCF8 /* AppAttestClient.swift in Sources */,
 				9C7638375D2BCAB65980F9EE /* AppDisplayName.swift in Sources */,

@@ -1,13 +1,13 @@
 package app.septena.android.ui
 
-import androidx.compose.foundation.horizontalScroll
+import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -20,7 +20,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -36,10 +39,12 @@ import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.generated.RegistryPromptIds
+import app.septena.core.generated.RegistryTaskPageBlockIds
 import app.septena.core.stringValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Instant
 
 private data class ConversationLine(
     val sequence: Long,
@@ -74,6 +79,8 @@ internal fun TaskConversationSection(
     var replyVisible by remember(taskId) { mutableStateOf(false) }
     var otherText by remember(taskId) { mutableStateOf("") }
     var replyText by remember(taskId) { mutableStateOf("") }
+    var sendBackVisible by remember(taskId) { mutableStateOf(false) }
+    var sendBackText by remember(taskId) { mutableStateOf("") }
     var busy by remember(taskId) { mutableStateOf(false) }
 
     LaunchedEffect(graph, taskId, dataVersion) {
@@ -106,6 +113,17 @@ internal fun TaskConversationSection(
     val replyTitle = RegistryCatalog.actionTitle(RegistryActionIds.TASK_CONVERSATION_REPLY, languageTag = languageTag).orEmpty()
     val otherPrompt = conversationTextPrompt(RegistryPromptIds.CONVERSATION_OTHER, languageTag)
     val replyPrompt = conversationTextPrompt(RegistryPromptIds.CONVERSATION_REPLY, languageTag)
+    val sendBackPrompt = conversationTextPrompt(RegistryPromptIds.SEND_BACK_REVIEW, languageTag)
+    val acceptTitle = RegistryCatalog.actionTitle(RegistryActionIds.TASK_ACCEPT_REVIEW, languageTag = languageTag).orEmpty()
+    val sendBackTitle = RegistryCatalog.actionTitle(RegistryActionIds.TASK_SEND_BACK_REVIEW, languageTag = languageTag).orEmpty()
+    fun localized(key: String) = RegistryCatalog.localizedString(key, languageTag) ?: key
+    val cancelTitle = localized("Cancel")
+    // The kickers never name one agent: several can hand off.
+    val promptCopy = RegistryCatalog.surface(RegistryTaskPageBlockIds.TASK_PAGE_CONVERSATION)?.fields
+    val askKicker = registryText(promptCopy?.get("askKicker").stringValue(), languageTag)
+    val reviewRequested = registryText(promptCopy?.get("reviewKicker").stringValue(), languageTag)
+    val reviewKicker = relativeAgo(conversation.endStateAt)?.let { "$reviewRequested · $it" } ?: reviewRequested
+    val readyForReview = registryText(promptCopy?.get("reviewFallback").stringValue(), languageTag)
 
     fun appendTurn(fields: Map<String, JsonValue>, afterSuccess: () -> Unit = {}) {
         if (!canWrite || busy) return
@@ -157,6 +175,94 @@ internal fun TaskConversationSection(
         }
     }
 
+    /**
+     * Accept = complete the task and clear the review, as iOS does
+     * (`TaskMutator.complete` + `acknowledge`): the task is done, the
+     * conversation leaves `needs_verify` for `agent_assisted_done` (the note
+     * stays for history), and an agent-added task is acknowledged.
+     */
+    fun acceptReview() {
+        if (!canWrite || busy) return
+        scope.launch {
+            busy = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.captureTaskEdit(taskId) {
+                        graph.taskMutator.complete(taskId)
+                        val task = graph.taskStore.record(RegistryEntityNames.TASK, taskId)
+                        val fields = task?.fields.orEmpty()
+                        if (fields[RegistryEntityFields.Task.SOURCE].stringValue() == RegistryEntityEnums.TaskSource.MCP &&
+                            fields[RegistryEntityFields.Task.ACKNOWLEDGED_AT].stringValue() == null
+                        ) {
+                            graph.taskMutator.updateFields(
+                                taskId,
+                                mapOf(
+                                    RegistryEntityFields.Task.ACKNOWLEDGED_AT to
+                                        JsonValue.StringValue(WireTimestamp.format(graph.clock.now())),
+                                ),
+                            )
+                        }
+                    }
+                    graph.conversationMutator.update(
+                        taskId,
+                        mapOf(
+                            RegistryEntityFields.Convo.END_STATE to
+                                JsonValue.StringValue(RegistryEntityEnums.ConvoEndState.AGENT_ASSISTED_DONE),
+                        ),
+                    )
+                }
+            }.onSuccess {
+                sendBackVisible = false
+                graph.sync.noteLocalChange()
+                graph.sync.requestSync()
+            }
+            busy = false
+        }
+    }
+
+    /**
+     * Send back = the iOS `sendBackConvo` writes: a user turn with the note, then
+     * the conversation reopens for the agent (`endState` open, no note, not
+     * stopped, assigned to Claude).
+     */
+    fun sendBack() {
+        val clean = sendBackText.trim()
+        if (clean.isEmpty() || !canWrite || busy) return
+        scope.launch {
+            busy = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.conversationMutator.appendTurn(
+                        taskId,
+                        mapOf(
+                            "role" to JsonValue.StringValue(RegistryEntityEnums.ConvoTurnRole.USER),
+                            "step" to JsonValue.StringValue(RegistryEntityEnums.ConvoTurnStep.WORK),
+                            "note" to JsonValue.StringValue(clean),
+                            "ts" to JsonValue.StringValue(WireTimestamp.format(graph.clock.now())),
+                        ),
+                    )
+                    graph.conversationMutator.update(
+                        taskId,
+                        mapOf(
+                            RegistryEntityFields.Convo.END_STATE to
+                                JsonValue.StringValue(RegistryEntityEnums.ConvoEndState.OPEN),
+                            RegistryEntityFields.Convo.END_STATE_NOTE to JsonValue.Null,
+                            RegistryEntityFields.Convo.STOPPED_AT to JsonValue.Null,
+                            RegistryEntityFields.Convo.ASSIGNEE to
+                                JsonValue.StringValue(RegistryEntityEnums.ConvoAssignee.CLAUDE),
+                        ),
+                    )
+                }
+            }.onSuccess {
+                sendBackText = ""
+                sendBackVisible = false
+                graph.sync.noteLocalChange()
+                graph.sync.requestSync()
+            }
+            busy = false
+        }
+    }
+
     fun toggleStopped() {
         if (!canWrite || busy) return
         val stopped = conversation.stoppedAt != null
@@ -197,11 +303,7 @@ internal fun TaskConversationSection(
             if (!text.isNullOrBlank()) {
                 Text(
                     text = text,
-                    style = if (line.role == RegistryEntityEnums.ConvoTurnRole.PROVIDER) {
-                        MaterialTheme.typography.bodyMedium
-                    } else {
-                        MaterialTheme.typography.bodyMedium
-                    },
+                    style = MaterialTheme.typography.bodyMedium,
                     color = if (line.role == RegistryEntityEnums.ConvoTurnRole.PROVIDER && line.question == null) {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     } else {
@@ -211,63 +313,80 @@ internal fun TaskConversationSection(
             }
         }
 
+        // The agent prompt (docs/AGENT_PROMPT_SPEC.md): kicker, question, a vertical
+        // list of full-width choices, and a last choice that turns into a field.
         if (openQuestion != null) {
+            AgentPromptKicker(askKicker)
             Text(openQuestion.question.orEmpty(), style = MaterialTheme.typography.titleMedium)
-            if (openQuestion.options.any { it.length > 22 }) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    openQuestion.options.forEach { option ->
-                        OutlinedButton(
-                            onClick = { answer(openQuestion, option) },
-                            enabled = canWrite && !busy,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(option, modifier = Modifier.fillMaxWidth())
-                        }
-                    }
-                    TextButton(onClick = { otherVisible = !otherVisible }, enabled = canWrite && !busy) {
-                        Text(otherTitle)
-                    }
-                }
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+            openQuestion.options.forEach { option ->
+                OutlinedButton(
+                    onClick = { answer(openQuestion, option) },
+                    enabled = canWrite && !busy,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = PROMPT_TARGET_HEIGHT),
                 ) {
-                    openQuestion.options.forEach { option ->
-                        FilterChip(
-                            selected = false,
-                            onClick = { answer(openQuestion, option) },
-                            enabled = canWrite && !busy,
-                            label = { Text(option) },
-                        )
-                    }
-                    FilterChip(
-                        selected = false,
-                        onClick = { otherVisible = !otherVisible },
-                        enabled = canWrite && !busy,
-                        label = { Text(otherTitle) },
-                    )
+                    Text(option, modifier = Modifier.fillMaxWidth())
                 }
             }
-
             if (otherVisible) {
-                OutlinedTextField(
+                AgentPromptField(
                     value = otherText,
                     onValueChange = { otherText = it },
-                    label = { Text(otherPrompt.placeholder) },
-                    modifier = Modifier.fillMaxWidth(),
+                    label = otherPrompt.placeholder,
+                    minLines = 3,
+                    confirmTitle = otherPrompt.confirmTitle.ifEmpty { sendTitle },
+                    cancelTitle = cancelTitle,
                     enabled = canWrite && !busy,
-                    singleLine = true,
+                    onSend = { answer(openQuestion, otherText, asOther = true) },
+                    onCancel = { otherVisible = false },
                 )
-                TextButton(
-                    onClick = { answer(openQuestion, otherText, asOther = true) },
-                    enabled = canWrite && !busy && otherText.isNotBlank(),
+            } else {
+                OutlinedButton(
+                    onClick = { otherVisible = true },
+                    enabled = canWrite && !busy,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = PROMPT_TARGET_HEIGHT),
                 ) {
-                    Text(sendTitle)
+                    Text(otherTitle, modifier = Modifier.fillMaxWidth())
                 }
             }
         } else if (conversation.needsHumanReview) {
-            conversation.endStateNote?.takeIf(String::isNotBlank)?.let { Text(it) }
+            if (isTaskOpen) {
+                AgentPromptKicker(reviewKicker)
+                Text(
+                    conversation.endStateNote?.takeIf(String::isNotBlank) ?: readyForReview,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                // Accept first, Send back second, on every surface.
+                Button(
+                    onClick = ::acceptReview,
+                    enabled = canWrite && !busy,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = PROMPT_TARGET_HEIGHT),
+                ) {
+                    Text(acceptTitle)
+                }
+                if (sendBackVisible) {
+                    AgentPromptField(
+                        value = sendBackText,
+                        onValueChange = { sendBackText = it },
+                        label = sendBackPrompt.placeholder,
+                        minLines = 3,
+                        confirmTitle = sendBackPrompt.confirmTitle.ifEmpty { sendTitle },
+                        cancelTitle = cancelTitle,
+                        enabled = canWrite && !busy,
+                        onSend = ::sendBack,
+                        onCancel = { sendBackVisible = false },
+                    )
+                } else {
+                    OutlinedButton(
+                        onClick = { sendBackVisible = true },
+                        enabled = canWrite && !busy,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = PROMPT_TARGET_HEIGHT),
+                    ) {
+                        Text(sendBackTitle)
+                    }
+                }
+            } else {
+                conversation.endStateNote?.takeIf(String::isNotBlank)?.let { Text(it) }
+            }
         } else if (!conversation.isTerminal && !conversation.handoffExists) {
             TextButton(onClick = ::toggleStopped, enabled = canWrite && !busy) {
                 Text(stopTitle)
@@ -276,17 +395,17 @@ internal fun TaskConversationSection(
 
         if (openQuestion == null && isTaskOpen && !conversation.needsHumanReview) {
             if (replyVisible) {
-                OutlinedTextField(
+                AgentPromptField(
                     value = replyText,
                     onValueChange = { replyText = it },
-                    label = { Text(replyPrompt.placeholder) },
-                    modifier = Modifier.fillMaxWidth(),
+                    label = replyPrompt.placeholder,
+                    minLines = 2,
+                    confirmTitle = replyPrompt.confirmTitle.ifEmpty { sendTitle },
+                    cancelTitle = cancelTitle,
                     enabled = canWrite && !busy,
-                    singleLine = true,
+                    onSend = ::sendReply,
+                    onCancel = { replyVisible = false },
                 )
-                TextButton(onClick = ::sendReply, enabled = canWrite && !busy && replyText.isNotBlank()) {
-                    Text(sendTitle)
-                }
             } else {
                 TextButton(onClick = { replyVisible = true }, enabled = canWrite && !busy) {
                     Text(replyTitle)
@@ -294,6 +413,73 @@ internal fun TaskConversationSection(
             }
         }
     }
+}
+
+/** 48dp: the Material touch target, the Android match for the 44pt agent prompt targets. */
+private val PROMPT_TARGET_HEIGHT = 48.dp
+
+/** The agent prompt kicker: who asks and when, one small line in secondary ink. */
+@Composable
+private fun AgentPromptKicker(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/**
+ * "Tell the agent instead": a multi-line field that grows to about six lines,
+ * a primary send button and Cancel. The field takes focus when it appears.
+ * The draft lives in the caller's state, so Cancel keeps it for the next open.
+ */
+@Composable
+private fun AgentPromptField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    minLines: Int,
+    confirmTitle: String,
+    cancelTitle: String,
+    enabled: Boolean,
+    onSend: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+        enabled = enabled,
+        singleLine = false,
+        minLines = minLines,
+        maxLines = 6,
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = PROMPT_TARGET_HEIGHT)) {
+            Text(cancelTitle)
+        }
+        Button(
+            onClick = onSend,
+            enabled = enabled && value.isNotBlank(),
+            modifier = Modifier.heightIn(min = PROMPT_TARGET_HEIGHT),
+        ) {
+            Text(confirmTitle)
+        }
+    }
+}
+
+/** "2 hours ago" from a wire timestamp, or null when it is missing or unreadable. */
+private fun relativeAgo(stamp: String?): String? {
+    if (stamp == null) return null
+    val millis = runCatching { Instant.parse(stamp).toEpochMilli() }.getOrNull() ?: return null
+    return DateUtils.getRelativeTimeSpanString(millis, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
 }
 
 private fun SyncTurn.asConversationLine(): ConversationLine = ConversationLine(
@@ -312,9 +498,13 @@ private fun SyncTurn.asConversationLine(): ConversationLine = ConversationLine(
     },
 )
 
-private data class ConversationTextPrompt(val placeholder: String)
+private data class ConversationTextPrompt(val placeholder: String, val confirmTitle: String)
 
 private fun conversationTextPrompt(id: String, languageTag: String): ConversationTextPrompt {
-    val value = RegistryCatalog.surface(id)?.fields?.get("placeholder").stringValue().orEmpty()
-    return ConversationTextPrompt(RegistryCatalog.localizedString(value, languageTag) ?: value)
+    val fields = RegistryCatalog.surface(id)?.fields
+    fun text(key: String): String {
+        val value = fields?.get(key).stringValue().orEmpty()
+        return if (value.isEmpty()) value else RegistryCatalog.localizedString(value, languageTag) ?: value
+    }
+    return ConversationTextPrompt(placeholder = text("placeholder"), confirmTitle = text("confirmTitle"))
 }

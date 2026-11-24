@@ -32,6 +32,7 @@ const FIELDS = {
     "title", "primaryTitle", "detail", "message", "confirmTitle", "cancelTitle", "dismissTitle", "format",
     "emptyTitleFormat", "singularFormat", "body", "footnote", "returningTitle", "returningBody",
     "label", "countLabel", "workingLabel", "valueLabel", "instructions", "setup", "first", "placeholder", "untitledName", "selfLabel",
+    "askKicker", "reviewKicker", "reviewFallback", "acceptedLabel",
   ]),
   tokens: new Set(["name", "tag", "label"]),
   plans: new Set([
