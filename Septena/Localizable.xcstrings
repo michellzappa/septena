@@ -3925,6 +3925,18 @@
         }
       }
     },
+    "Inbox zero animation" : {
+      "comment" : "Generated from registry settings.pages.appearance.sections.appearance.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Animação ao esvaziar a caixa de entrada"
+          }
+        }
+      }
+    },
     "Include" : {
       "comment" : "Generated from registry settings.copy.calendar_detail.include.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -5512,6 +5524,18 @@
     "Planned: €120 a year or €14 a month" : {
       "comment" : "Generated from registry plans.levels.pro.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
+    },
+    "Play a short animation when you empty the Inbox." : {
+      "comment" : "Generated from registry settings.pages.appearance.sections.appearance.items.4.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reproduz uma animação curta quando você esvazia a caixa de entrada."
+          }
+        }
+      }
     },
     "Plus" : {
       "comment" : "Generated from registry plans.shortName. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
