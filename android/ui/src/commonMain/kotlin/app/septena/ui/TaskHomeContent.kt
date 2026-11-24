@@ -268,7 +268,8 @@ private fun TaskRow(
         colors = if (selected) {
             ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = SELECTION_WASH_ALPHA))
         } else {
-            ListItemDefaults.colors()
+            // Transparent so the header texture shows behind the first rows, as on iPhone.
+            ListItemDefaults.colors(containerColor = Color.Transparent)
         },
         modifier = Modifier.fillMaxWidth().alpha(task.opacity).selectableTaskRow(
             taskId = task.id,
@@ -276,8 +277,6 @@ private fun TaskRow(
             onOpen = onOpenTask,
             onMenu = { menuExpanded = true },
         ),
-        // Transparent so the header texture shows behind the first rows, as on iPhone.
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = {
             Text(
                 text = task.title,
