@@ -296,7 +296,7 @@ struct SyncThisDeviceButton: View {
       .buttonStyle(.bordered)
       .disabled(working)
       if failed {
-        Text(RegistryPlans.Paywall.syncThisDeviceFailed)
+        Text(PlanStatus.shared.syncThisDeviceLimitMessage ?? RegistryPlans.Paywall.syncThisDeviceFailed)
           .font(.footnote)
           .foregroundStyle(.secondary)
       }

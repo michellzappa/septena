@@ -16,6 +16,8 @@ import Security
 
 enum TaskBackendError: LocalizedError, Equatable {
   case notSignedIn
+  /// HTTP 402 plan-limit refusal (`{ error, limit, upsell, message }`, spec §6.3).
+  case limitReached(BackendLimitError)
   case http(status: Int, code: String)
   case badResponse(String)
   case network(String)
@@ -23,6 +25,7 @@ enum TaskBackendError: LocalizedError, Equatable {
   var errorDescription: String? {
     switch self {
     case .notSignedIn: return "Not signed in to Septena sync."
+    case .limitReached(let limit): return limit.userMessage
     case .http(let status, let code): return "The server answered \(status) (\(code))."
     case .badResponse(let what): return "The server sent a reply the app couldn’t read (\(what))."
     case .network(let what): return "Network error: \(what)"
@@ -448,6 +451,9 @@ actor TaskBackendClient {
   }
 
   private static func httpError(_ status: Int, _ data: Data) -> TaskBackendError {
+    if status == 402 {
+      return .limitReached(BackendLimitError.decode(from: data))
+    }
     let code = (try? JSONDecoder().decode(BackendErrorBody.self, from: data))?.error ?? "no detail"
     return .http(status: status, code: code)
   }
