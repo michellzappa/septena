@@ -6,6 +6,8 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -16,9 +18,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -35,11 +44,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -47,22 +51,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import kotlin.math.cos
-import kotlin.math.sin
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -76,8 +82,15 @@ import app.septena.core.generated.RegistryCapabilityIds
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistrySurfaceIds
+import app.septena.ui.CheckmarkGlyph
+import app.septena.ui.ChevronDownGlyph
 import app.septena.ui.LocalMagicPlusDrag
 import app.septena.ui.MagicPlusDragState
+import app.septena.ui.MoreDotsGlyph
+import app.septena.ui.SeptenaGlyph
+import app.septena.ui.SeptenaIconKind
+import app.septena.ui.StarGlyph
+import app.septena.ui.TaskCardMetrics
 import app.septena.ui.TaskHomeContent
 import app.septena.ui.TaskRowMenuAction
 import app.septena.ui.TaskSelection
@@ -191,9 +204,8 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
         RegistryActionIds.APP_SETTINGS,
         languageTag = languageTag,
     ).orEmpty()
-    val pauseAgentsTitle = RegistryCatalog.actionTitle(
-        RegistryActionIds.APP_PAUSE_AGENTS,
-        field = if (state.agentsPaused) "activeTitle" else "title",
+    val starredFilterTitle = RegistryCatalog.destinationTitle(
+        RegistryDestinationIds.STARRED,
         languageTag = languageTag,
     ).orEmpty()
     val completeTitle = RegistryCatalog.actionTitle(
@@ -208,12 +220,21 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
     val projectsTitle = RegistryCatalog.capabilityTitle(RegistryCapabilityIds.PLACES_PROJECTS, languageTag).orEmpty()
     val inboxTitle = RegistryCatalog.destinationTitle(RegistryDestinationIds.INBOX, languageTag).orEmpty()
     val todayTitle = RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag).orEmpty()
-    val emptyTitle = (state.location as? TaskHomeLocation.SmartList)
-        ?.let { RegistryCatalog.destinationEmptyTitle(it.destinationId, languageTag) }
-        .orEmpty()
-    val emptyDescription = (state.location as? TaskHomeLocation.SmartList)
-        ?.let { RegistryCatalog.destinationEmptyDetail(it.destinationId, languageTag) }
-        .orEmpty()
+    val fadedTitle = RegistryCatalog.destinationTitle(RegistryDestinationIds.FADED, languageTag).orEmpty()
+    val emptyTitle = if (state.starredOnly) {
+        RegistryCatalog.destinationEmptyTitle(RegistryDestinationIds.STARRED, languageTag).orEmpty()
+    } else {
+        (state.location as? TaskHomeLocation.SmartList)
+            ?.let { RegistryCatalog.destinationEmptyTitle(it.destinationId, languageTag) }
+            .orEmpty()
+    }
+    val emptyDescription = if (state.starredOnly) {
+        RegistryCatalog.destinationEmptyDetail(RegistryDestinationIds.STARRED, languageTag).orEmpty()
+    } else {
+        (state.location as? TaskHomeLocation.SmartList)
+            ?.let { RegistryCatalog.destinationEmptyDetail(it.destinationId, languageTag) }
+            .orEmpty()
+    }
     val openQuickFindTarget: (QuickFindTarget) -> Unit = { target ->
         quickFindOpen = false
         when (target) {
@@ -283,12 +304,14 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         sidebarActionTitle = sidebarActionTitle,
                         quickAddTitle = quickAddTitle,
                         quickFindTitle = quickFindTitle,
+                        starredFilterTitle = starredFilterTitle,
                         settingsTitle = settingsTitle,
                         completeTitle = completeTitle,
                         emptyTitle = emptyTitle,
                         emptyDescription = emptyDescription,
                         inboxTitle = inboxTitle,
                         todayTitle = todayTitle,
+                        fadedTitle = fadedTitle,
                         homeViewModel = homeViewModel,
                         languageTag = languageTag,
                         showNavigationAction = false,
@@ -297,6 +320,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                         onOpenTask = { openTaskWithAttribute(it, null) },
                         onTaskAction = onTaskAction,
+                        onToggleStarFilter = homeViewModel::toggleStarFilter,
                         onQuickFind = { quickFindOpen = true },
                         onOpenSettings = { settingsOpen = true },
                         onSelectHomeLocation = selectHomeLocation,
@@ -349,12 +373,14 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         sidebarActionTitle = sidebarActionTitle,
                         quickAddTitle = quickAddTitle,
                         quickFindTitle = quickFindTitle,
+                        starredFilterTitle = starredFilterTitle,
                         settingsTitle = settingsTitle,
                         completeTitle = completeTitle,
                         emptyTitle = emptyTitle,
                         emptyDescription = emptyDescription,
                         inboxTitle = inboxTitle,
                         todayTitle = todayTitle,
+                        fadedTitle = fadedTitle,
                         homeViewModel = homeViewModel,
                         languageTag = languageTag,
                         showNavigationAction = true,
@@ -364,6 +390,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                         onOpenTask = { openTaskWithAttribute(it, null) },
                         onTaskAction = onTaskAction,
+                        onToggleStarFilter = homeViewModel::toggleStarFilter,
                         onQuickFind = { quickFindOpen = true },
                         onOpenSettings = { settingsOpen = true },
                         onSelectHomeLocation = selectHomeLocation,
@@ -393,6 +420,9 @@ private fun TaskHomeNavigation(
     onSetAreaEmoji: (String, String?) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
+    val todayTint = MaterialTheme.colorScheme.secondary
+    val mutedIcon = MaterialTheme.colorScheme.onSurfaceVariant
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -402,7 +432,14 @@ private fun TaskHomeNavigation(
         state.smartLists.forEach { item ->
             val location = item.location as TaskHomeLocation.SmartList
             val title = RegistryCatalog.destinationTitle(location.destinationId, languageTag).orEmpty()
+            val iconKind = destinationIconKind(location.destinationId)
+            val iconTint = if (iconKind == SeptenaIconKind.Today || iconKind == SeptenaIconKind.Starred) todayTint else mutedIcon
             NavigationDrawerItem(
+                icon = {
+                    Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
+                        SeptenaGlyph(kind = iconKind, tint = iconTint, size = 19.dp)
+                    }
+                },
                 label = { Text(title) },
                 selected = state.location == item.location,
                 onClick = { onSelect(item.location) },
@@ -430,6 +467,11 @@ private fun TaskHomeNavigation(
                 )
                 projectsByArea[area.id].orEmpty().forEach { projectItem ->
                     NavigationDrawerItem(
+                        icon = {
+                            Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
+                                SeptenaGlyph(kind = SeptenaIconKind.Project, tint = mutedIcon, size = 16.dp)
+                            }
+                        },
                         label = { Text(projectItem.title.orEmpty()) },
                         selected = state.location == projectItem.location,
                         onClick = { onSelect(projectItem.location) },
@@ -444,6 +486,11 @@ private fun TaskHomeNavigation(
             DrawerGroupTitle(projectsTitle)
             standaloneProjects.forEach { item ->
                 NavigationDrawerItem(
+                    icon = {
+                        Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
+                            SeptenaGlyph(kind = SeptenaIconKind.Project, tint = mutedIcon, size = 16.dp)
+                        }
+                    },
                     label = { Text(item.title.orEmpty()) },
                     selected = state.location == item.location,
                     onClick = { onSelect(item.location) },
@@ -453,6 +500,11 @@ private fun TaskHomeNavigation(
         }
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         NavigationDrawerItem(
+            icon = {
+                Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
+                    SeptenaGlyph(kind = SeptenaIconKind.Settings, tint = mutedIcon, size = 19.dp)
+                }
+            },
             label = { Text(settingsTitle) },
             selected = false,
             onClick = onOpenSettings,
@@ -496,12 +548,20 @@ private fun AreaNavigationDrawerItem(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         NavigationDrawerItem(
-            label = {
-                Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
-                    item.emoji?.let { Text(it) }
-                    Text(item.title.orEmpty())
+            icon = {
+                Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
+                    if (item.emoji != null) {
+                        Text(item.emoji, fontSize = 18.sp)
+                    } else {
+                        SeptenaGlyph(
+                            kind = SeptenaIconKind.Area,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            size = 18.dp,
+                        )
+                    }
                 }
             },
+            label = { Text(item.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
             selected = selected,
             onClick = onSelect,
             modifier = Modifier.weight(1f),
@@ -512,7 +572,7 @@ private fun AreaNavigationDrawerItem(
                     onClick = { menuExpanded = true },
                     modifier = Modifier.semantics { contentDescription = changeEmojiTitle },
                 ) {
-                    Text("⋮", style = MaterialTheme.typography.titleLarge)
+                    MoreDotsGlyph(tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 18.dp)
                 }
                 DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                     DropdownMenuItem(
@@ -541,8 +601,234 @@ private fun DrawerGroupTitle(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = 28.dp, top = 12.dp, bottom = 4.dp),
     )
+}
+
+/**
+ * Large list/section title with leading icon + nav dropdown menu, aligned to the
+ * shared leading grid (`TaskCardMetrics.HeaderLeading` + `LeadingColumnWidth`) so
+ * the Today sun / destination icon / area emoji / project ring sits directly above
+ * every area emoji and task checkbox, and the title aligns with area & task titles
+ * (mirrors iOS `ScreenTitleMenuLabel` + `TaskNavMenu`).
+ */
+@Composable
+private fun SectionTitleDropdownHeader(
+    state: TaskHomeUiState,
+    title: String,
+    languageTag: String,
+    settingsTitle: String,
+    onSelectLocation: (TaskHomeLocation) -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    val todayTint = MaterialTheme.colorScheme.secondary
+    val mutedIcon = MaterialTheme.colorScheme.onSurfaceVariant
+    val currentAreaEmoji = (state.location as? TaskHomeLocation.Area)?.let { area ->
+        state.areas.firstOrNull { (it.location as? TaskHomeLocation.Area)?.id == area.id }?.emoji
+    }
+
+    val (iconKind, iconTint) = when (val loc = state.location) {
+        is TaskHomeLocation.SmartList -> {
+            val kind = destinationIconKind(loc.destinationId)
+            val tint = if (kind == SeptenaIconKind.Today || kind == SeptenaIconKind.Starred) {
+                todayTint
+            } else {
+                MaterialTheme.colorScheme.primary
+            }
+            kind to tint
+        }
+        is TaskHomeLocation.Area -> SeptenaIconKind.Area to MaterialTheme.colorScheme.primary
+        is TaskHomeLocation.Project -> SeptenaIconKind.Project to MaterialTheme.colorScheme.primary
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = TaskCardMetrics.HeaderLeading,
+                end = TaskCardMetrics.Margin,
+                top = 4.dp,
+                bottom = 14.dp,
+            ),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(TaskCardMetrics.IconTextGap),
+            modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { menuExpanded = true }
+                .padding(vertical = 4.dp),
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
+            ) {
+                if (currentAreaEmoji != null) {
+                    Text(text = currentAreaEmoji, fontSize = 23.sp, lineHeight = 26.sp)
+                } else {
+                    SeptenaGlyph(
+                        kind = iconKind,
+                        tint = iconTint,
+                        size = if (iconKind == SeptenaIconKind.Project) 20.dp else 23.dp,
+                    )
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 28.sp,
+                    lineHeight = 33.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                ChevronDownGlyph(
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                    size = 18.dp,
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false },
+        ) {
+            state.smartLists.forEach { item ->
+                val loc = item.location as TaskHomeLocation.SmartList
+                val itemTitle = RegistryCatalog.destinationTitle(loc.destinationId, languageTag).orEmpty()
+                val kind = destinationIconKind(loc.destinationId)
+                val tint = if (kind == SeptenaIconKind.Today || kind == SeptenaIconKind.Starred) todayTint else mutedIcon
+                val isCurrent = state.location == loc
+                DropdownMenuItem(
+                    leadingIcon = {
+                        Box(modifier = Modifier.width(22.dp), contentAlignment = Alignment.Center) {
+                            SeptenaGlyph(kind = kind, tint = tint, size = 18.dp)
+                        }
+                    },
+                    text = {
+                        Text(
+                            text = itemTitle,
+                            fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                        )
+                    },
+                    trailingIcon = if (isCurrent) {
+                        { CheckmarkGlyph(tint = MaterialTheme.colorScheme.primary, size = 16.dp) }
+                    } else null,
+                    onClick = {
+                        menuExpanded = false
+                        onSelectLocation(loc)
+                    },
+                )
+            }
+
+            val areaIds = state.areas.mapNotNull { (it.location as? TaskHomeLocation.Area)?.id }.toSet()
+            val projectsByArea = state.projects.groupBy { it.parentAreaId }
+            val standaloneProjects = state.projects.filter { it.parentAreaId == null || it.parentAreaId !in areaIds }
+
+            if (standaloneProjects.isNotEmpty()) {
+                HorizontalDivider()
+                standaloneProjects.forEach { projItem ->
+                    val isCurrent = state.location == projItem.location
+                    DropdownMenuItem(
+                        leadingIcon = {
+                            Box(modifier = Modifier.width(22.dp), contentAlignment = Alignment.Center) {
+                                SeptenaGlyph(kind = SeptenaIconKind.Project, tint = mutedIcon, size = 15.dp)
+                            }
+                        },
+                        text = {
+                            Text(
+                                text = projItem.title.orEmpty(),
+                                fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                            )
+                        },
+                        trailingIcon = if (isCurrent) {
+                            { CheckmarkGlyph(tint = MaterialTheme.colorScheme.primary, size = 16.dp) }
+                        } else null,
+                        onClick = {
+                            menuExpanded = false
+                            onSelectLocation(projItem.location)
+                        },
+                    )
+                }
+            }
+
+            state.areas.forEach { areaItem ->
+                val area = areaItem.location as? TaskHomeLocation.Area ?: return@forEach
+                val areaCurrent = state.location == area
+                HorizontalDivider()
+                DropdownMenuItem(
+                    leadingIcon = {
+                        Box(modifier = Modifier.width(22.dp), contentAlignment = Alignment.Center) {
+                            if (areaItem.emoji != null) {
+                                Text(areaItem.emoji, fontSize = 16.sp)
+                            } else {
+                                SeptenaGlyph(kind = SeptenaIconKind.Area, tint = mutedIcon, size = 17.dp)
+                            }
+                        }
+                    },
+                    text = {
+                        Text(
+                            text = area.title,
+                            fontWeight = if (areaCurrent) FontWeight.SemiBold else FontWeight.Medium,
+                        )
+                    },
+                    trailingIcon = if (areaCurrent) {
+                        { CheckmarkGlyph(tint = MaterialTheme.colorScheme.primary, size = 16.dp) }
+                    } else null,
+                    onClick = {
+                        menuExpanded = false
+                        onSelectLocation(area)
+                    },
+                )
+                projectsByArea[area.id].orEmpty().forEach { projItem ->
+                    val projCurrent = state.location == projItem.location
+                    DropdownMenuItem(
+                        leadingIcon = {
+                            Box(
+                                modifier = Modifier.padding(start = 14.dp).width(22.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                SeptenaGlyph(kind = SeptenaIconKind.Project, tint = mutedIcon, size = 14.dp)
+                            }
+                        },
+                        text = {
+                            Text(
+                                text = projItem.title.orEmpty(),
+                                fontWeight = if (projCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                            )
+                        },
+                        trailingIcon = if (projCurrent) {
+                            { CheckmarkGlyph(tint = MaterialTheme.colorScheme.primary, size = 16.dp) }
+                        } else null,
+                        onClick = {
+                            menuExpanded = false
+                            onSelectLocation(projItem.location)
+                        },
+                    )
+                }
+            }
+
+            HorizontalDivider()
+            DropdownMenuItem(
+                leadingIcon = {
+                    Box(modifier = Modifier.width(22.dp), contentAlignment = Alignment.Center) {
+                        SeptenaGlyph(kind = SeptenaIconKind.Settings, tint = mutedIcon, size = 18.dp)
+                    }
+                },
+                text = { Text(settingsTitle) },
+                onClick = {
+                    menuExpanded = false
+                    onOpenSettings()
+                },
+            )
+        }
+    }
 }
 
 @Composable
@@ -554,12 +840,14 @@ private fun TaskHomeScaffold(
     sidebarActionTitle: String,
     quickAddTitle: String,
     quickFindTitle: String,
+    starredFilterTitle: String,
     settingsTitle: String,
     completeTitle: String,
     emptyTitle: String,
     emptyDescription: String,
     inboxTitle: String,
     todayTitle: String,
+    fadedTitle: String,
     homeViewModel: TaskHomeViewModel,
     languageTag: String,
     showNavigationAction: Boolean,
@@ -569,6 +857,7 @@ private fun TaskHomeScaffold(
     onComplete: (String) -> Unit,
     onOpenTask: (String) -> Unit,
     onTaskAction: (String, String) -> Unit,
+    onToggleStarFilter: () -> Unit,
     onQuickFind: () -> Unit,
     onOpenSettings: () -> Unit,
     onSelectHomeLocation: (TaskHomeLocation) -> Unit,
@@ -580,9 +869,13 @@ private fun TaskHomeScaffold(
     var allOnToday by remember { mutableStateOf(false) }
     val magicPlusDrag = remember { MagicPlusDragState() }
     val context = LocalContext.current
+    val isDark = LocalSeptenaDarkTheme.current
+    val appearance = LocalAppearance.current
     val selecting = state.selectedIds.isNotEmpty()
     val destinationId = (state.location as? TaskHomeLocation.SmartList)?.destinationId
     val canCreateHere = state.location !is TaskHomeLocation.SmartList || state.canQuickAdd
+    val showStarFilterButton = destinationId != RegistryDestinationIds.STARRED &&
+        destinationId != RegistryDestinationIds.RECENTLY_DELETED
     val imeVisible = WindowInsets.isImeVisible
     val formLabels = remember(languageTag) { TaskFormLabels.fromRegistry(languageTag) }
     val selectToggleLabel = remember(languageTag) {
@@ -607,6 +900,23 @@ private fun TaskHomeScaffold(
         quickAddDraft = defaultQuickAddDraft(state.location)
     }
     magicPlusDrag.fallbackDrop = { if (canCreateHere) openDefaultQuickAdd() }
+
+    val openGroupTarget: (String) -> Unit = { targetKey ->
+        when {
+            targetKey.startsWith("area:") -> {
+                val id = targetKey.removePrefix("area:")
+                val dest = state.areas.firstOrNull { (it.location as? TaskHomeLocation.Area)?.id == id }?.location
+                    ?: TaskHomeLocation.Area(id, "")
+                onSelectHomeLocation(dest)
+            }
+            targetKey.startsWith("project:") -> {
+                val id = targetKey.removePrefix("project:")
+                val dest = state.projects.firstOrNull { (it.location as? TaskHomeLocation.Project)?.id == id }?.location
+                    ?: TaskHomeLocation.Project(id, "")
+                onSelectHomeLocation(dest)
+            }
+        }
+    }
 
     quickAddDraft?.let { initial ->
         QuickAddSheet(
@@ -648,10 +958,27 @@ private fun TaskHomeScaffold(
         null -> Unit
     }
 
-    // The header texture sits behind the transparent app bar and the first
-    // rows, on the page background (iPhone `HeaderWashView`).
+    val sectionHeader: @Composable () -> Unit = {
+        SectionTitleDropdownHeader(
+            state = state,
+            title = title,
+            languageTag = languageTag,
+            settingsTitle = settingsTitle,
+            onSelectLocation = onSelectHomeLocation,
+            onOpenSettings = onOpenSettings,
+        )
+    }
+
+    // Grouped canvas background so translucent glass task cards lift gently off the
+    // canvas and let the procedural Header Wash texture shine through at the top.
+    val canvasBackground = if (isDark) {
+        MaterialTheme.colorScheme.background
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerLow
+    }
+
     CompositionLocalProvider(LocalMagicPlusDrag provides magicPlusDrag) {
-        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Box(modifier = Modifier.fillMaxSize().background(canvasBackground)) {
             HeaderWashBackdrop()
             Scaffold(
                 containerColor = Color.Transparent,
@@ -694,7 +1021,8 @@ private fun TaskHomeScaffold(
                             containerColor = Color.Transparent,
                             scrolledContainerColor = Color.Transparent,
                         ),
-                        title = { Text(title) },
+                        // Title + icon + nav dropdown sits below over the Header Wash (iOS `ScreenTitleMenuLabel`).
+                        title = {},
                         navigationIcon = if (showNavigationAction) {
                             {
                                 IconButton(
@@ -707,18 +1035,29 @@ private fun TaskHomeScaffold(
                         } else {
                             {}
                         },
+                        // Home top nav is Star + Search (matching iOS; Settings lives in sidebar & title nav menu).
                         actions = {
+                            if (showStarFilterButton) {
+                                IconButton(
+                                    onClick = onToggleStarFilter,
+                                    modifier = Modifier.semantics { contentDescription = starredFilterTitle },
+                                ) {
+                                    StarGlyph(
+                                        filled = state.starredOnly,
+                                        tint = if (state.starredOnly) {
+                                            MaterialTheme.colorScheme.secondary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        },
+                                        size = 21.dp,
+                                    )
+                                }
+                            }
                             IconButton(
                                 onClick = onQuickFind,
                                 modifier = Modifier.semantics { contentDescription = quickFindTitle },
                             ) {
                                 SearchGlyph(tint = MaterialTheme.colorScheme.onSurface)
-                            }
-                            IconButton(
-                                onClick = onOpenSettings,
-                                modifier = Modifier.semantics { contentDescription = settingsTitle },
-                            ) {
-                                SettingsGearGlyph(tint = MaterialTheme.colorScheme.onSurface)
                             }
                         },
                     )
@@ -729,8 +1068,14 @@ private fun TaskHomeScaffold(
                         graph = graph,
                         destination = AreasProjectsDestination.Area(location.id),
                         modifier = Modifier.padding(contentPadding),
+                        starredOnly = state.starredOnly,
+                        completeTitle = completeTitle,
+                        todayTitle = todayTitle,
+                        fadedTitle = fadedTitle,
+                        headerContent = sectionHeader,
                         rowMenuGroups = rowMenuGroups,
                         rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                        onComplete = onComplete,
                         onTaskAction = onTaskAction,
                         selection = selection,
                         onOpenProject = { projectId ->
@@ -746,6 +1091,12 @@ private fun TaskHomeScaffold(
                         graph = graph,
                         destination = AreasProjectsDestination.Project(location.id),
                         modifier = Modifier.padding(contentPadding),
+                        starredOnly = state.starredOnly,
+                        completeTitle = completeTitle,
+                        todayTitle = todayTitle,
+                        fadedTitle = fadedTitle,
+                        headerContent = sectionHeader,
+                        onComplete = onComplete,
                         onOpenTask = onOpenTask,
                         rowMenuGroups = rowMenuGroups,
                         rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
@@ -765,6 +1116,11 @@ private fun TaskHomeScaffold(
                             inboxBandTitle = inboxTitle,
                             todayTitle = todayTitle,
                             todayTint = MaterialTheme.colorScheme.secondary,
+                            fadedTitle = fadedTitle,
+                            showFadedIndicator = location.destinationId != RegistryDestinationIds.FADED,
+                            isDarkTheme = isDark,
+                            hasActiveTexture = appearance.hasActiveTexture,
+                            headerContent = sectionHeader,
                             hasLoaded = state.hasLoaded,
                             isToday = isTodayList,
                             inboxTasks = state.inboxTasks,
@@ -779,6 +1135,7 @@ private fun TaskHomeScaffold(
                             onComplete = onComplete,
                             onOpenTask = onOpenTask,
                             onTaskAction = onTaskAction,
+                            onOpenGroupTarget = openGroupTarget,
                             onDropInboxHeader = if (isTodayList && state.canQuickAdd) {
                                 {
                                     quickAddDraft = QuickAddDraft(
@@ -853,8 +1210,8 @@ private fun SidebarMenuGlyph(tint: Color) {
 
 @Composable
 private fun SearchGlyph(tint: Color) {
-    Canvas(modifier = Modifier.size(22.dp)) {
-        val stroke = 2.dp.toPx()
+    Canvas(modifier = Modifier.size(21.dp)) {
+        val stroke = 1.9.dp.toPx()
         val radius = size.minDimension * 0.30f
         val center = Offset(size.width * 0.43f, size.height * 0.43f)
         drawCircle(tint, radius = radius, center = center, style = Stroke(width = stroke))
@@ -866,32 +1223,6 @@ private fun SearchGlyph(tint: Color) {
             strokeWidth = stroke,
             cap = StrokeCap.Round,
         )
-    }
-}
-
-@Composable
-private fun SettingsGearGlyph(tint: Color) {
-    Canvas(modifier = Modifier.size(22.dp)) {
-        val stroke = 1.9.dp.toPx()
-        val cx = size.width / 2f
-        val cy = size.height / 2f
-        val innerR = size.minDimension * 0.17f
-        val midR = size.minDimension * 0.31f
-        val outerR = size.minDimension * 0.44f
-        drawCircle(tint, radius = innerR, center = Offset(cx, cy), style = Stroke(width = stroke))
-        drawCircle(tint, radius = midR, center = Offset(cx, cy), style = Stroke(width = stroke))
-        for (i in 0 until 8) {
-            val angle = i * (Math.PI / 4.0)
-            val cosA = cos(angle).toFloat()
-            val sinA = sin(angle).toFloat()
-            drawLine(
-                tint,
-                Offset(cx + cosA * midR, cy + sinA * midR),
-                Offset(cx + cosA * outerR, cy + sinA * outerR),
-                strokeWidth = stroke * 1.15f,
-                cap = StrokeCap.Round,
-            )
-        }
     }
 }
 

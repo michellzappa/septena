@@ -72,6 +72,10 @@ data class TaskViewMembership(
     val inTodayInbox: Boolean,
     val daysOnToday: Int,
     val matchesView: Map<String, Boolean>,
+    /** Core R3: `"overdue"` or `"dueToday"`, else null. */
+    val dueState: String? = null,
+    /** Core R4: true when the deadline renders in red. */
+    val deadlineRed: Boolean = false,
 )
 
 /**
@@ -79,6 +83,9 @@ data class TaskViewMembership(
  * rule the Apple apps and the backend run. today and now come from DayClock.
  */
 object TaskViewRules {
+    const val DUE_OVERDUE = "overdue"
+    const val DUE_TODAY = "dueToday"
+
     private val recurrenceUnits = setOf(
         RegistryEntityEnums.RecurrenceUnit.DAY,
         RegistryEntityEnums.RecurrenceUnit.WEEK,
@@ -101,6 +108,8 @@ object TaskViewRules {
                 RegistryDestinationIds.UPCOMING to m.matchesUpcoming,
                 RegistryDestinationIds.ANYTIME to m.matchesAnytime,
             ),
+            dueState = m.dueState,
+            deadlineRed = m.deadlineRed,
         )
     }
 

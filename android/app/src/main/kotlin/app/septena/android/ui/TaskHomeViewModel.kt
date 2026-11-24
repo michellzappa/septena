@@ -24,6 +24,8 @@ import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames as EntityNames
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistrySettingKeys
+import app.septena.ui.SeptenaIconKind
+import app.septena.ui.TaskGroupHeader
 import app.septena.ui.TaskListItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -61,6 +63,8 @@ data class TaskHomeUiState(
     val canQuickAdd: Boolean = false,
     val canComplete: Boolean = false,
     val agentsPaused: Boolean = false,
+    /** Top-nav Star filter toggle: shows only starred tasks in the current list. */
+    val starredOnly: Boolean = false,
     /** Task ids picked by a long-press; non-empty means the list is in selection mode. */
     val selectedIds: Set<String> = emptySet(),
     val errorMessage: String? = null,
@@ -99,6 +103,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private val location = MutableStateFlow<TaskHomeLocation>(
         TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY),
     )
+    private val starredOnly = MutableStateFlow(false)
     private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
     private val errorMessage = MutableStateFlow<String?>(null)
 
@@ -117,18 +122,20 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         initialValue = loadInitial(),
     )
 
-    val state: StateFlow<TaskHomeUiState> = combine(loaded, selectedIds, errorMessage) { home, selected, error ->
+    val state: StateFlow<TaskHomeUiState> = combine(loaded, starredOnly, selectedIds, errorMessage) { home, starFilter, selected, error ->
+        val applyStar = starFilter && (home.location as? TaskHomeLocation.SmartList)?.destinationId != RegistryDestinationIds.STARRED
         TaskHomeUiState(
             hasLoaded = home.hasLoaded,
             location = home.location,
             smartLists = home.smartLists,
             areas = home.areas,
             projects = home.projects,
-            inboxTasks = home.inboxTasks,
-            tasks = home.tasks,
+            inboxTasks = if (applyStar) home.inboxTasks.filter(TaskListItem::isStarred) else home.inboxTasks,
+            tasks = if (applyStar) home.tasks.filter(TaskListItem::isStarred) else home.tasks,
             canQuickAdd = home.canQuickAdd,
             canComplete = home.canComplete,
             agentsPaused = home.agentsPaused,
+            starredOnly = applyStar,
             selectedIds = selected,
             errorMessage = error,
         )
@@ -140,7 +147,12 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     fun select(location: TaskHomeLocation) {
         selectedIds.value = emptySet()
+        starredOnly.value = false
         this.location.value = location
+    }
+
+    fun toggleStarFilter() {
+        starredOnly.value = !starredOnly.value
     }
 
     /** Long-press enters selection with the row; in selection a tap adds or removes a row. */
@@ -498,6 +510,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         val allSnapshots = taskRecords.mapNotNull { record ->
             runCatching { record to TaskSnapshot.from(record) }.getOrNull()
         }
+        val metadataCatalog = TaskRowMetadataCatalog.load(graph.taskStore)
         val now = graph.clock.now()
         val today = graph.clock.today(now)
         // Conversations (one per task id) drive Review, Agent and the fade
@@ -536,13 +549,36 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         else -> TaskViewRules.matchesView(snapshot, resolvedLocation.destinationId, today, now)
                     }
                     if (!listed) continue
-                    val item = taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday)
-                        .withFade(snapshot, conversation, now, today, showAging)
+                    val inTodayInbox = resolvedLocation.destinationId == RegistryDestinationIds.TODAY && membership.inTodayInbox
+                    val item = taskListItem(
+                        record = record,
+                        snapshot = snapshot,
+                        membership = membership,
+                        selected = resolvedLocation,
+                        areaTitles = areaTitles,
+                        projectTitles = projectTitles,
+                        catalog = metadataCatalog,
+                        today = today,
+                        now = now,
+                        showTodayIndicator = resolvedLocation.destinationId != RegistryDestinationIds.TODAY && !inTodayInbox,
+                        isLogbook = resolvedLocation.destinationId == RegistryDestinationIds.LOGBOOK,
+                    ).withFade(snapshot, conversation, now, today, showAging)
                     val rowPosition = record.fields[positionField(resolvedLocation.destinationId)].numberValue()
                         ?: record.fields[RegistryEntityFields.Task.POSITION].numberValue()
                     val positioned = PositionedTask(
                         if (resolvedLocation.destinationId == RegistryDestinationIds.AGENT) {
-                            item.copy(groupTitle = agentGroups[stage], position = rowPosition)
+                            val stageTitle = agentGroups[stage]
+                            item.copy(
+                                group = stageTitle?.let {
+                                    TaskGroupHeader(
+                                        key = "agent:${stage.orEmpty()}",
+                                        title = it,
+                                        iconKind = SeptenaIconKind.None,
+                                    )
+                                },
+                                groupTitle = stageTitle,
+                                position = rowPosition,
+                            )
                         } else {
                             item.copy(position = rowPosition)
                         },
@@ -556,7 +592,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         areaId = snapshot.area,
                         projectId = snapshot.project,
                     )
-                    if (resolvedLocation.destinationId == RegistryDestinationIds.TODAY && membership.inTodayInbox) {
+                    if (inTodayInbox) {
                         inbox += positioned
                     } else {
                         visible += positioned
@@ -565,16 +601,36 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 is TaskHomeLocation.Area -> {
                     if (snapshot.area != resolvedLocation.id || !isOpenVisible(snapshot)) continue
                     visible += PositionedTask(
-                        taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday)
-                            .withFade(snapshot, conversations[snapshot.id], now, today, showAging),
+                        taskListItem(
+                            record = record,
+                            snapshot = snapshot,
+                            membership = membership,
+                            selected = resolvedLocation,
+                            areaTitles = areaTitles,
+                            projectTitles = projectTitles,
+                            catalog = metadataCatalog,
+                            today = today,
+                            now = now,
+                            showTodayIndicator = true,
+                        ).withFade(snapshot, conversations[snapshot.id], now, today, showAging),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
                 }
                 is TaskHomeLocation.Project -> {
                     if (snapshot.project != resolvedLocation.id || !isOpenVisible(snapshot)) continue
                     visible += PositionedTask(
-                        taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday)
-                            .withFade(snapshot, conversations[snapshot.id], now, today, showAging),
+                        taskListItem(
+                            record = record,
+                            snapshot = snapshot,
+                            membership = membership,
+                            selected = resolvedLocation,
+                            areaTitles = areaTitles,
+                            projectTitles = projectTitles,
+                            catalog = metadataCatalog,
+                            today = today,
+                            now = now,
+                            showTodayIndicator = true,
+                        ).withFade(snapshot, conversations[snapshot.id], now, today, showAging),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
                 }
@@ -647,10 +703,15 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private fun taskListItem(
         record: SyncRecord,
         snapshot: TaskSnapshot,
+        membership: app.septena.core.TaskViewMembership,
         selected: TaskHomeLocation,
         areaTitles: Map<String, String>,
         projectTitles: Map<String, String>,
-        isOnToday: Boolean,
+        catalog: TaskRowMetadataCatalog,
+        today: java.time.LocalDate,
+        now: java.time.Instant,
+        showTodayIndicator: Boolean,
+        isLogbook: Boolean = false,
     ): TaskListItem {
         val projectTitle = snapshot.project?.let(projectTitles::get)
         val areaTitle = snapshot.area?.let(areaTitles::get)
@@ -659,14 +720,16 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             is TaskHomeLocation.Area -> projectTitle
             is TaskHomeLocation.Project -> null
         }
-        return TaskListItem(
-            id = record.id,
-            title = snapshot.title,
-            agentName = agentName(snapshot),
+        return buildTaskListItem(
+            record = record,
+            snapshot = snapshot,
+            membership = membership,
             subtitle = subtitle,
-            isCompleted = snapshot.status == RegistryEntityEnums.TaskStatus.DONE,
-            isOnToday = isOnToday,
-            isStarred = snapshot.starred,
+            catalog = catalog,
+            today = today,
+            now = now,
+            showTodayIndicator = showTodayIndicator,
+            isLogbook = isLogbook,
         )
     }
 
@@ -761,24 +824,36 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         if (destinationId != RegistryDestinationIds.TODAY) {
             sorted.filter { it.projectId == null && it.areaId == null }.forEach { entry ->
                 emitted += entry.item.id
-                result += entry.item.copy(groupTitle = null)
+                result += entry.item.copy(group = null, groupTitle = null)
             }
         }
 
         val areaIds = areas.mapNotNull { (it.location as? TaskHomeLocation.Area)?.id }.toSet()
         for (areaItem in areas) {
             val area = areaItem.location as? TaskHomeLocation.Area ?: continue
-            val areaHeader = listOfNotNull(areaItem.emoji, area.title).joinToString(" ")
+            val areaHeader = TaskGroupHeader(
+                key = "area:${area.id}",
+                title = area.title,
+                iconKind = SeptenaIconKind.Area,
+                emoji = areaItem.emoji,
+                targetLocationKey = "area:${area.id}",
+            )
             byArea[area.id].orEmpty().forEach { entry ->
                 emitted += entry.item.id
-                result += entry.item.copy(groupTitle = areaHeader, subtitle = null)
+                result += entry.item.copy(group = areaHeader, groupTitle = area.title, subtitle = null)
             }
             for (projectItem in projects) {
                 if (projectItem.parentAreaId != area.id) continue
                 val project = projectItem.location as? TaskHomeLocation.Project ?: continue
+                val projectHeader = TaskGroupHeader(
+                    key = "project:${project.id}",
+                    title = project.title,
+                    iconKind = SeptenaIconKind.Project,
+                    targetLocationKey = "project:${project.id}",
+                )
                 byProject[project.id].orEmpty().forEach { entry ->
                     emitted += entry.item.id
-                    result += entry.item.copy(groupTitle = project.title, subtitle = null)
+                    result += entry.item.copy(group = projectHeader, groupTitle = project.title, subtitle = null)
                 }
             }
         }
@@ -787,9 +862,15 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         for (projectItem in projects) {
             if (projectItem.parentAreaId != null && projectItem.parentAreaId in areaIds) continue
             val project = projectItem.location as? TaskHomeLocation.Project ?: continue
+            val projectHeader = TaskGroupHeader(
+                key = "project:${project.id}",
+                title = project.title,
+                iconKind = SeptenaIconKind.Project,
+                targetLocationKey = "project:${project.id}",
+            )
             byProject[project.id].orEmpty().forEach { entry ->
                 emitted += entry.item.id
-                result += entry.item.copy(groupTitle = project.title, subtitle = null)
+                result += entry.item.copy(group = projectHeader, groupTitle = project.title, subtitle = null)
             }
         }
 
@@ -829,11 +910,3 @@ private fun JsonValue?.numberValue(): Double? = when (this) {
     is JsonValue.DecimalValue -> value
     else -> null
 }
-
-/** The agent's name for a row an agent added (`task.provenance`), else null. */
-private fun agentName(snapshot: TaskSnapshot): String? =
-    if (TaskProvenance.isAgentAuthored(snapshot.source)) {
-        TaskProvenance.addedByName(snapshot.source, snapshot.sourceClient)
-    } else {
-        null
-    }

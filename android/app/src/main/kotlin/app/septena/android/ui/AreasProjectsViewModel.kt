@@ -6,12 +6,16 @@ import androidx.lifecycle.viewModelScope
 import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
+import app.septena.core.TaskFadeRules
 import app.septena.core.TaskSnapshot
+import app.septena.core.TaskViewRules
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.generated.RegistryPlacesScreenIds
+import app.septena.core.generated.RegistrySettingKeys
 import app.septena.core.stringValue
+import app.septena.ui.TaskListItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,7 +41,13 @@ sealed interface AreasProjectsDestination {
 }
 
 data class PlaceProjectRow(val id: String, val title: String)
-data class PlaceTaskRow(val id: String, val title: String, val isStarred: Boolean = false, val position: Double? = null)
+data class PlaceTaskRow(
+    val id: String,
+    val title: String,
+    val isStarred: Boolean = false,
+    val position: Double? = null,
+    val item: TaskListItem = TaskListItem(id = id, title = title, isStarred = isStarred, position = position),
+)
 data class PlaceSectionRow(val id: String, val title: String, val tasks: List<PlaceTaskRow>)
 
 data class AreasProjectsUiState(
@@ -292,6 +302,10 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
         val title = container.fields[titleField].stringValue().orEmpty()
         val notes = container.fields[notesField].stringValue().orEmpty()
+        val now = graph.clock.now()
+        val today = graph.clock.today(now)
+        val metadataCatalog = TaskRowMetadataCatalog.load(graph.taskStore)
+        val showAging = graph.deviceSettings.bool(RegistrySettingKeys.TASKS_SHOW_AGING)
         val taskRows = graph.taskStore.records(RegistryEntityNames.TASK)
             .asSequence()
             .filter { it.deletedAt == null }
@@ -300,6 +314,50 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             }
             .filter { (_, task) -> task.status == RegistryEntityEnums.TaskStatus.OPEN }
             .toList()
+
+        fun placeRow(record: app.septena.core.SyncRecord, task: TaskSnapshot, pos: Double?): PlaceTaskRow {
+            val membership = TaskViewRules.membership(task, today, now)
+            val base = buildTaskListItem(
+                record = record,
+                snapshot = task,
+                membership = membership,
+                subtitle = null,
+                catalog = metadataCatalog,
+                today = today,
+                now = now,
+                showTodayIndicator = true,
+            ).copy(position = pos)
+            val opacity = if (showAging) {
+                val fill = runCatching {
+                    TaskFadeRules.fadeFill(
+                        isOpen = true,
+                        isHeading = false,
+                        isDeleted = false,
+                        isFaded = base.isFaded,
+                        deadline = task.deadline,
+                        scheduled = task.scheduled,
+                        hasRecurrence = task.recurrenceUnit != null,
+                        isAgentTurn = false,
+                        isAssignedToClaude = false,
+                        showsAgentCue = false,
+                        touchedAt = task.touchedAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() },
+                        createdAt = task.createdAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() },
+                        created = task.created,
+                        now = now,
+                        today = today.toString(),
+                        isAwaitingHuman = false,
+                    )
+                }.getOrNull()
+                TaskFadeRules.rowOpacity(fill).toFloat()
+            } else 1f
+            return PlaceTaskRow(
+                id = record.id,
+                title = task.title,
+                isStarred = task.starred,
+                position = pos,
+                item = base.copy(opacity = opacity),
+            )
+        }
 
         return when (selected) {
             is AreasProjectsDestination.Area -> {
@@ -320,7 +378,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     .filter { (_, task) -> task.area == selected.id && task.project == null && !task.isHeading }
                     .map { (record, task) ->
                         val pos = record.fields[RegistryEntityFields.Task.POSITION].numberValue()
-                        PositionedPlaceTask(PlaceTaskRow(record.id, task.title, task.starred, pos), pos)
+                        PositionedPlaceTask(placeRow(record, task, pos), pos)
                     }
                     .sortedWith(PLACE_TASK_ORDER)
                     .map { it.task }
@@ -342,7 +400,11 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         val pos = record.fields[RegistryEntityFields.Task.POSITION].numberValue()
                         ProjectTask(
                             recordId = record.id,
-                            row = PlaceTaskRow(record.id, task.title, task.starred, pos),
+                            row = if (task.isHeading) {
+                                PlaceTaskRow(record.id, task.title, task.starred, pos)
+                            } else {
+                                placeRow(record, task, pos)
+                            },
                             headingId = record.fields[RegistryEntityFields.Task.HEADING].stringValue(),
                             isHeading = task.isHeading,
                             position = pos,
