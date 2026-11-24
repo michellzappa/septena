@@ -138,9 +138,7 @@ private struct TaskCardChrome: ViewModifier {
   @State private var hovered = false
   @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
   @Environment(\.colorScheme) private var colorScheme
-  #if SEPTASK
   private let appearance = AppearancePreferences.shared
-  #endif
 
   /// Every row — including an open inline composer (create or edit) — inherits
   /// its card position's corner rounding (top / middle / bottom / solo) so it
@@ -151,11 +149,7 @@ private struct TaskCardChrome: ViewModifier {
   }
 
   private var useLiquidGlass: Bool {
-    #if SEPTASK
     return appearance.hasActiveTexture && !reduceTransparency && !isEditing
-    #else
-    return false
-    #endif
   }
 
   func body(content: Content) -> some View {

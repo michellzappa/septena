@@ -216,7 +216,6 @@ enum RegistryIcons {
     "settings.animations": "party.popper",
     "settings.feedback": "paperplane",
     "settings.paste": "doc.on.clipboard",
-    "settings.companion_app": "arrow.up.forward.app",
     "settings.plus": "plus.circle.fill",
     "plans.free": "iphone",
     "plans.history": "clock.arrow.circlepath",
@@ -650,9 +649,6 @@ enum RegistrySettings {
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_get_started", label: RegistryL10n.t("Show Get Started Again"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_first_run", label: RegistryL10n.t("Show Welcome Again"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "onboarding.first-run"),
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "send_feedback", label: RegistryL10n.t("Send feedback"), detail: nil, iconId: "settings.feedback", sfSymbol: "paperplane", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
-      ]),
-      RegistrySettingsSection(id: "companion", header: RegistryL10n.t("Septena Life"), footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "septena_life_link", label: RegistryL10n.t("Open Septena Life"), detail: RegistryL10n.t("Septena Life is the companion app for habits, training, food, sleep, mood, and health."), iconId: "settings.companion_app", sfSymbol: "arrow.up.forward.app", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
       RegistrySettingsSection(id: "advanced_link", header: nil, footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "pageLink", key: nil, page: "advanced", surface: nil, label: RegistryL10n.t("Advanced"), detail: nil, iconId: "settings.advanced", sfSymbol: "wrench.and.screwdriver", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),

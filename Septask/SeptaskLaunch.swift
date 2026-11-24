@@ -353,7 +353,7 @@ enum SeptaskDeepLinkRouter {
     guard let link = TasksWidgetDeepLink.parse(url) else { return }
     switch link {
     case .quickAdd:
-      navigation.presentAddInfo(section: .tasks)
+      navigation.presentAddInfo()
     case .list(let id):
       navigation.go(to: route(forListID: id))
     case .task(let taskID):

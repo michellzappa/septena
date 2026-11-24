@@ -161,7 +161,6 @@ final class TaskSyncEngine {
 
   /// Called from `SeptenaServices.start()`. No-op outside Septask.
   func start() {
-    #if SEPTASK
     guard !isRunning, !DemoSeedMode.isOn else { return }
     guard let store = store() else { return }
     if !settingsReady || !taskRefsReady {
@@ -194,7 +193,6 @@ final class TaskSyncEngine {
       }
     }
     startPolling()
-    #endif
   }
 
   func stop() {
@@ -348,7 +346,6 @@ final class TaskSyncEngine {
   /// against its shadow and queues the changed fields. Safe before `start()`:
   /// the outbox is persistent and drains once the engine runs.
   func captureLocalChange(_ entity: BackendEntity, id: String) {
-    #if SEPTASK
     guard !DemoSeedMode.isOn, let store = store() else { return }
     let lookup: (String) -> TaskSyncShadow? = { store.shadow($0) }
     switch entity {
@@ -363,7 +360,6 @@ final class TaskSyncEngine {
     }
     refreshPendingCount()
     if isRunning, signedIn, !deviceNotSyncing { scheduleSync(after: 0.8) }
-    #endif
   }
 
   /// True when a deleted area / project can come back under its own id: the
@@ -371,16 +367,12 @@ final class TaskSyncEngine {
   /// `deleteGrace`). False once the delete reached the backend, which never
   /// revives a deleted row — undo then has to mint a new id.
   func canRevive(_ entity: BackendEntity, _ id: String) -> Bool {
-    #if SEPTASK
     guard let store = store() else { return true }
     guard let shadow = store.shadow("\(entity.rawValue):\(id)"), shadow.gone else { return true }
     guard let last = store.lastRowOp(entity: entity.rawValue, rowID: id) else {
       return false
     }
     return last.kind == TaskSyncOpKind.delete && !last.sent
-    #else
-    return true
-    #endif
   }
 
   /// The id of the task's next reference to this key (§4): `n` counts the rows
@@ -390,7 +382,6 @@ final class TaskSyncEngine {
   /// (purged tombstones lower the count). Nil until the core mints ids.
   func nextTaskRefID(taskID: String, key: String) -> String? {
     var deleted = 0
-    #if SEPTASK
     if let store = store() {
       let entity = BackendEntity.taskRef
       deleted = store.goneShadows(entity: entity.rawValue).filter { shadow in
@@ -399,7 +390,6 @@ final class TaskSyncEngine {
           && !canRevive(entity, String(shadow.key.dropFirst(entity.rawValue.count + 1)))
       }.count
     }
-    #endif
     while let id = TaskRefCore.mintID(taskID: taskID, key: key, deletedCount: deleted) {
       if canRevive(.taskRef, id) { return id }
       deleted += 1
@@ -411,12 +401,8 @@ final class TaskSyncEngine {
   /// a delete must be sent rather than kept local. Septena never opens the
   /// store and answers true: its notes are dropped by the freeze anyway.
   func backendKnowsTask(_ id: String) -> Bool {
-    #if SEPTASK
     guard let store = store(), let shadow = store.shadow("task:\(id)") else { return false }
     return TaskSyncJSON.decode(shadow.fields)["_remote"] == .bool(true) || shadow.gone
-    #else
-    return true
-    #endif
   }
 
   /// Diffs every local row against its shadow and queues what differs. Picks
@@ -1536,7 +1522,7 @@ final class TaskSyncEngine {
     // The launch snapshot shows this account's Today (#82).
     TodaySnapshotStore.invalidate()
     TasksWidgetSnapshotStore.invalidate()
-    #if os(iOS) && SEPTASK
+    #if os(iOS)
     WatchBridge.shared.accountChanged()
     #endif
   }
@@ -1604,7 +1590,7 @@ final class TaskSyncEngine {
     // Account switch / delete: the launch snapshot holds the old rows (#82).
     TodaySnapshotStore.invalidate()
     TasksWidgetSnapshotStore.invalidate()
-    #if os(iOS) && SEPTASK
+    #if os(iOS)
     WatchBridge.shared.accountChanged()
     #endif
     store()?.deleteEverything()
@@ -1641,11 +1627,9 @@ final class TaskSyncEngine {
   /// first settings pull has run; before that, `reconcileSettings` after
   /// the pull picks it up (and the backend's value wins if it has one).
   func captureSettings() {
-    #if SEPTASK
     guard !DemoSeedMode.isOn, settingsReady, let store = store() else { return }
     if reconcileSettings(store: store), isRunning, signedIn, !deviceNotSyncing { scheduleSync(after: 0.8) }
     refreshPendingCount()
-    #endif
   }
 
   /// Diffs each synced setting against its shadow and queues an upsert for
@@ -1654,7 +1638,6 @@ final class TaskSyncEngine {
   /// something was queued.
   @discardableResult
   func reconcileSettings(store: TaskSyncStore) -> Bool {
-    #if SEPTASK
     guard settingsReady, !settingsRefused else { return false }
     let current = SeptaskSyncedSettings.current()
     var queued = false
@@ -1670,9 +1653,6 @@ final class TaskSyncEngine {
       queued = true
     }
     return queued
-    #else
-    return false
-    #endif
   }
 
   private func enqueueSetting(_ key: String, _ value: BackendJSON, store: TaskSyncStore) {
@@ -1686,64 +1666,6 @@ final class TaskSyncEngine {
     }
   }
 
-  #if !SEPTASK
-  // MARK: - Septena-only: the rollback writer's helpers (TaskStoreRollback)
-  //
-  // Septask no longer compiles the rollback (it is backend-only); Septena
-  // still does, and these are all it calls.
-
-  /// Rollback step 1: try once to send what the outbox holds, so the backend
-  /// copy left behind is current. Failure is not fatal; the local rows are
-  /// what goes to CloudKit.
-  func flushBeforeRollback() async {
-    guard isRunning, store() != nil else { return }
-    await runSync(reconcileFirst: true)
-  }
-
-  /// Rollback's last step: the mode is cloudkit again.
-  func didRollBack() {
-    stop()
-    storeCache?.deleteEverything()
-    since = 0
-    refreshPendingCount()
-  }
-
-  /// CloudKit record names for every local row of the four task types.
-  func localTaskRecordNames() -> Set<String> {
-    var names = Set<String>()
-    for a in (try? main.fetch(FetchDescriptor<AreaEntity>())) ?? [] { names.insert(AreaCloudKitSchema.recordName(for: a.id)) }
-    for p in (try? main.fetch(FetchDescriptor<ProjectEntity>())) ?? [] { names.insert(ProjectCloudKitSchema.recordName(for: p.id)) }
-    for t in (try? main.fetch(FetchDescriptor<TaskEntity>())) ?? [] { names.insert(t.id) }
-    for a in (try? main.fetch(FetchDescriptor<TaskAttachmentEntity>())) ?? [] {
-      names.insert(TaskAttachmentCloudKitSchema.recordName(for: a.id))
-    }
-    return names
-  }
-
-  /// CloudKit record names of rows that were deleted while on the backend
-  /// and are no longer in SwiftData. The rollback writer deletes those
-  /// records, so CloudKit does not bring them back.
-  func goneRecordNames() -> Set<String> {
-    guard let store = storeCache ?? (try? TaskSyncStore()) else { return [] }
-    let present = localTaskRecordNames()
-    var names = Set<String>()
-    for (key, shadow) in store.allShadows() {
-      guard let colon = key.firstIndex(of: ":") else { continue }
-      let kind = String(key[..<colon])
-      let id = String(key[key.index(after: colon)...])
-      let name: String
-      switch kind {
-      case "task": name = id
-      case "area": name = AreaCloudKitSchema.recordName(for: id)
-      case "project": name = ProjectCloudKitSchema.recordName(for: id)
-      case "attachment": name = TaskAttachmentCloudKitSchema.recordName(for: id)
-      default: continue
-      }
-      if shadow.gone, !present.contains(name) { names.insert(name) }
-    }
-    return names
-  }
-  #endif
 }
 
 // MARK: - Attachment bytes on demand

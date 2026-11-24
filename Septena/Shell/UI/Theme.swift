@@ -149,11 +149,7 @@ enum Theme {
   /// the active accent so light-valued dark-mode accents (Yuzu, Carambola,
   /// Jabuticaba) switch to dark ink `#141518` instead of white-on-light.
   @MainActor static var checkboxCheck: Color {
-    #if SEPTASK
     return AppearancePreferences.shared.checkInkSwiftUIColor
-    #else
-    return .white
-    #endif
   }
 
   /// Icon color when an icon should recede behind row text. `.tertiary`
@@ -216,15 +212,7 @@ enum Theme {
   /// Restrained reach (ADR 0019): selection wash, done checkboxes, active
   /// chips/pills, active iOS tab, primary modal CTA, unread dot, header wash.
   @MainActor static var selectionAccent: Color {
-    #if SEPTASK
     return AppearancePreferences.shared.accentSwiftUIColor
-    #elseif os(macOS)
-    return Color(nsColor: systemAccentNSColor)
-    #elseif canImport(UIKit)
-    return Color(uiColor: .systemBlue)
-    #else
-    return Color.blue
-    #endif
   }
 
   /// Fill behind a selected row: a wash of `selectionAccent`, light enough
@@ -232,23 +220,7 @@ enum Theme {
   /// uses), never a solid accent bar with white text. Painted via
   /// `listRowBackground` because `List(selection:)` ignores `.tint` on iPad.
   @MainActor static var listSelectionFill: Color {
-    #if SEPTASK
     return AppearancePreferences.shared.selectionFillSwiftUIColor
-    #elseif os(macOS)
-    let accent = systemAccentNSColor
-    return Color(nsColor: NSColor(name: nil) { appearance in
-      let isDark = appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
-      let alpha = isDark ? RegistryTokens.Selection.emphasizedAlphaDark : RegistryTokens.Selection.emphasizedAlphaLight
-      return accent.withAlphaComponent(alpha)
-    })
-    #else
-    return Color(uiColor: UIColor { traits in
-      let alpha = traits.userInterfaceStyle == .dark
-        ? RegistryTokens.Selection.emphasizedAlphaDark
-        : RegistryTokens.Selection.emphasizedAlphaLight
-      return UIColor.systemBlue.withAlphaComponent(alpha)
-    })
-    #endif
   }
 
   /// Opacity of the primary-color wash painted under a pointer / Apple Pencil

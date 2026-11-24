@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 //
 // Free on every tier, with no account and no network
 // (docs/SYNC_SUBSCRIPTION_SPEC.md §3). Uses the same `septena_export_version: 1`
-// envelope as Septena Life so exports round-trip cleanly and a full Septena
+// envelope as the old life OS so exports round-trip cleanly and a full Septena
 // Life backup can import its tasks/areas/projects/attachments directly here
 // (non-task tables are skipped and counted).
 

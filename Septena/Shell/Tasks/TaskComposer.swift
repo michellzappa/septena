@@ -1159,7 +1159,6 @@ struct TaskComposerCard: View {
       let created = draft.create(via: mutator)
       attachPastedImages(to: created.id)
       recordCreateUndo(id: created.id)
-      AddInfoSection.tasks.notifyTilesChanged()
       return true
     case .edit(let task):
       if seededDeferredCreate {
@@ -1176,7 +1175,6 @@ struct TaskComposerCard: View {
           recordedCreateUndo = true
           recordCreateUndo(id: task.id)
         }
-        AddInfoSection.tasks.notifyTilesChanged()
         return landed
       }
       // Ratify (acknowledge → leave the Inbox) only when this save actually

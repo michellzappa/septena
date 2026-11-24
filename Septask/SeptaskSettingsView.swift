@@ -950,21 +950,6 @@ private struct SeptaskAboutPane: View {
       Link(destination: URL(string: "mailto:mz@envisioning.com?subject=Septena%20feedback")!) {
         label(item)
       }
-    case "septena_life_link":
-      if let detail = item.detail {
-        Text(detail)
-          .font(.callout)
-          .foregroundStyle(.secondary)
-      }
-      Button {
-        openURL(URL(string: "septena://")!) { accepted in
-          if !accepted {
-            openURL(URL(string: "https://www.septena.app")!)
-          }
-        }
-      } label: {
-        label(item)
-      }
     default:
       EmptyView()
     }

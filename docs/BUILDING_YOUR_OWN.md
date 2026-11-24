@@ -1,5 +1,8 @@
 # Building Your Own Copy
 
+> iCloud-era. The app now syncs with the backend in `backend/` and needs no
+> CloudKit container, HealthKit or Live Activities.
+
 Septena is an Apple-platform app with entitlements. A plain clone can generate
 the Xcode project, but a fully signed build needs your own Apple Developer
 account, bundle identifiers, CloudKit container, and app group.

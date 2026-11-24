@@ -2190,12 +2190,6 @@
       "actions.actions.notice.openStep.title"
     ]
   },
-  "Open Septena Life": {
-    "text": "Open Septena Life",
-    "paths": [
-      "settings.pages.about.sections.companion.items.0.label"
-    ]
-  },
   "Open Today": {
     "text": "Open Today",
     "paths": [
@@ -2880,18 +2874,6 @@
     "text": "Septena",
     "paths": [
       "actions.menuBar.app.title"
-    ]
-  },
-  "Septena Life": {
-    "text": "Septena Life",
-    "paths": [
-      "settings.pages.about.sections.companion.header"
-    ]
-  },
-  "Septena Life is the companion app for habits, training, food, sleep, mood, and health.": {
-    "text": "Septena Life is the companion app for habits, training, food, sleep, mood, and health.",
-    "paths": [
-      "settings.pages.about.sections.companion.items.0.detail"
     ]
   },
   "Septena Plus": {

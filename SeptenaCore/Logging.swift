@@ -1,12 +1,7 @@
 import Foundation
 import os
 
-// App-wide logger + a couple of shared error / notification types that
-// the rest of the codebase relies on. These used to live in
-// `SeptenaClient.swift` alongside the FastAPI proxy; that file has
-// been removed now that every backend interaction is either direct
-// (OuraProvider / WithingsProvider) or CloudKit-mirrored, so this
-// file is the new home for the bits that outlived it.
+// App-wide logger and the shared notification names.
 
 // MARK: - Change notification
 
@@ -30,19 +25,12 @@ extension Notification.Name {
   ///   • unscoped — no userInfo; "anything may have changed". Reserved for
   ///     CloudKit batch arrival, section seeding, and settings-level changes.
   static let septenaDataChanged = Notification.Name("septena.dataChanged")
-  /// Posted by the macOS menu bar's "New Task" item. ContentView
-  /// listens and starts an inline draft on Inbox — same flow as ⌘N.
-  static let septenaOpenQuickAdd = Notification.Name("septena.openQuickAdd")
   /// Posted when a task *view* option flips (currently only
   /// `SettingsKey.todayGroupByList`, from the View menu / the Tasks "···"
   /// menu / Settings). SwiftUI surfaces bind the key through `@AppStorage` and
   /// repaint themselves; Septask's AppKit list reads `UserDefaults` directly
   /// and has no observation of it, so it needs this nudge to rebuild its rows.
   static let septenaTaskViewOptionsChanged = Notification.Name("septena.taskViewOptionsChanged")
-  /// Posted whenever the Claude gateway's token state changes (refreshed,
-  /// connected, disconnected). The notification scheduler re-arms the
-  /// pre-expiry reconnect nudge off the new `lastRefreshAt`.
-  static let septenaClaudeGatewayChanged = Notification.Name("septena.claudeGatewayChanged")
 }
 
 // MARK: - Scoped task changes
@@ -66,26 +54,6 @@ enum TaskChange {
 
 // MARK: - Scoped data changes
 
-/// Section scoping for `.septenaDataChanged`. A mutator posts with the
-/// `SectionManifest` key(s) of the data it touched ("caffeine", "nutrition",
-/// …; plus the non-section scopes "coach" and "milestones"), and listeners
-/// that only show one section check `affectsSection` before reloading. This
-/// is what keeps a single logged supplement from refetching every dashboard
-/// tile, destination view, and open sheet in the app.
-///
-/// Unscoped posts (plain `NotificationCenter.post`, no userInfo) still mean
-/// "anything may have changed" and pass every listener's filter — CloudKit
-/// batch arrival and settings-level changes stay on that path.
-enum DataChange {
-  static let sectionsKey = "septena.changedSections"
-
-  /// Post `.septenaDataChanged` scoped to the given section keys.
-  static func post(_ sections: String...) {
-    NotificationCenter.default.post(name: .septenaDataChanged, object: nil,
-                                    userInfo: [sectionsKey: Set(sections)])
-  }
-}
-
 extension Notification {
   /// Changed task ids for a local optimistic mutation; nil for an unscoped
   /// batch where any task may have changed.
@@ -93,27 +61,6 @@ extension Notification {
     userInfo?[TaskChange.idsKey] as? Set<String>
   }
 
-  /// Section keys this `.septenaDataChanged` touched; nil for an unscoped
-  /// post (treat as "everything changed").
-  var changedSections: Set<String>? {
-    userInfo?[DataChange.sectionsKey] as? Set<String>
-  }
-
-  /// True when the post came from an inbound CloudKit batch (`applyDidFinishBatch`
-  /// posts unscoped). Scoped local mutator writes carry `changedSections`; only
-  /// remote arrivals are unscoped. Listeners that keep session-local UI state
-  /// (settle beats, acted-row sets) should do a full mirror reload on this path
-  /// only — not on scoped local posts.
-  var isCloudKitBatch: Bool { changedSections == nil }
-
-  /// Whether a listener showing `sections` should react. True when either
-  /// side is unscoped (nil) or the two sets intersect.
-  func affectsAnySection(of sections: Set<String>?) -> Bool {
-    guard let changed = changedSections, let sections else { return true }
-    return !changed.isDisjoint(with: sections)
-  }
-
-  func affectsSection(_ key: String) -> Bool { affectsAnySection(of: [key]) }
 }
 
 // MARK: - Logger
@@ -146,38 +93,6 @@ enum Log {
   static func category(_ name: String) -> Logger {
     Logger(subsystem: subsystem, category: name)
   }
-}
-
-/// Master switch for the app's *diagnostic* output — the informational logging
-/// and the `PerfTrace` spans. Errors are never gated; they are rare and they are
-/// the only record of something going wrong.
-///
-/// OFF by default in Release, so a shipping build (and, since the Run schemes
-/// build Release, an ordinary ⌘R speed test) pays nothing: no string building,
-/// no `os_log` calls, no signposts. ON by default in Debug.
-///
-/// Override either way with a launch argument, so the tracing is one scheme
-/// edit away when you actually want to read it:
-///     -SeptenaVerbose      force diagnostics on  (e.g. to use PerfTrace in Release)
-///     -SeptenaQuiet        force diagnostics off
-/// Which configuration this binary was compiled as.
-///
-/// Exists because "is this actually a Release build?" is otherwise unanswerable
-/// from the device, and it's the first question worth settling whenever the app
-/// feels slower than it should — a Debug binary running under the debugger is a
-/// completely different animal, and Xcode will happily keep running a stale one
-/// after the project is regenerated underneath it. Surfaced in Settings ▸ About.
-public enum BuildConfig {
-  public static var isDebug: Bool {
-    #if DEBUG
-    return true
-    #else
-    return false
-    #endif
-  }
-
-  /// "Debug" / "Release" — shown verbatim in the About pane.
-  public static var name: String { isDebug ? "Debug" : "Release" }
 }
 
 public enum Diagnostics {
@@ -369,20 +284,3 @@ enum LaunchTrace {
 }
 
 // MARK: - Errors
-
-/// Shared error type used by OuraProvider / WithingsProvider for HTTP
-/// + decoding failures. Pre-dates those providers; lived in
-/// SeptenaClient.swift originally.
-enum SeptenaError: LocalizedError {
-  case server(Int, String)
-  case decoding(String)
-  case invalidURL
-
-  var errorDescription: String? {
-    switch self {
-    case .server(let code, let body): return "Server \(code): \(body)"
-    case .decoding(let s): return "Decode failed: \(s)"
-    case .invalidURL: return "Invalid URL"
-    }
-  }
-}

@@ -11,7 +11,7 @@ import Foundation
 // each app's sync would keep writing the other's older value back.
 //
 // In Septask, `SettingsMirror.loadSettings` reads this blob and
-// `SettingsMirror.upsert` writes it (both `#if SEPTASK`), so `SettingsStore`
+// `SettingsMirror.upsert` writes it, so `SettingsStore`
 // and every caller keep their API. A write diffs the keys and hands the
 // changed ones to `TaskSyncEngine.captureSettings()`; a pull writes the blob
 // with `write(_:)`, which captures nothing.
@@ -47,8 +47,7 @@ enum SeptaskSyncedSettings {
   }
 
   static var empty: AppSettings {
-    AppSettings(sectionOrder: nil, targets: nil, units: nil, time: nil,
-                theme: nil, eink: nil, nutrition: nil, hkSync: nil)
+    AppSettings()
   }
 
   /// Keeps only the synced keys, so a caller that passed a whole settings

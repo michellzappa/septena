@@ -375,9 +375,7 @@ struct SelectableScrollList<Content: View>: View {
       .background {
         ZStack(alignment: .top) {
           canvasFill
-          #if SEPTASK
           HeaderWashView()
-          #endif
         }
         .ignoresSafeArea()
         .contentShape(Rectangle())

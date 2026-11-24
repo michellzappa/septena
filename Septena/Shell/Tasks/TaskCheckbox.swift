@@ -180,9 +180,7 @@ struct TaskCheckbox: View {
   /// and dark-mode check ink render faithfully.
   private var usesStandardCheckbox: Bool {
     #if os(macOS)
-    #if SEPTASK
     if isDone && !AppearancePreferences.shared.isColorful { return false }
-    #endif
     return !dashed || isDone
     #else
     return false

@@ -385,7 +385,7 @@ struct AreaDetailView: View {
     }
     .septenaToastOverlay(store: toastStore)
     .septenaInlineTitle()
-    #if os(iOS) && SEPTASK
+    #if os(iOS)
     .toolbar {
       if !usesPushNavigation {
         ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }
@@ -746,11 +746,7 @@ struct ProjectDetailView: View {
   /// just like macOS.
   @ToolbarContentBuilder
   private var projectDetailToolbar: some ToolbarContent {
-    #if os(iOS) && !SEPTASK
-    if !usesPushNavigation {
-      ToolbarItem(placement: .primaryAction) { projectOverflowMenu }
-    }
-    #elseif os(iOS) && SEPTASK
+    #if os(iOS)
     if !usesPushNavigation {
       ToolbarItem(placement: .topBarTrailing) { projectOverflowMenu }
       ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }

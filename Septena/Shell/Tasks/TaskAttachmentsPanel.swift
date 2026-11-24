@@ -85,9 +85,7 @@ struct TaskAttachmentsPanel: View {
     .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
     .onAppear(perform: reload)
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in reload() }
-    #if SEPTASK
     .sheet(isPresented: $showingPlus) { SeptaskPlusSheet(upsellID: activeUpsell?.id ?? "file_elsewhere") }
-    #endif
     .fileImporter(isPresented: $importing, allowedContentTypes: [.item],
                   allowsMultipleSelection: true) { result in
       do {
@@ -111,7 +109,6 @@ struct TaskAttachmentsPanel: View {
       if !upsellSeen {
         Text(moment.detail).font(.caption2).foregroundStyle(.secondary)
       }
-      #if SEPTASK
       Button(RegistryPlans.Paywall.seePlus) {
         TaskNotices.markUpsellSeen(moment.id, context: modelContext)
         upsellSeen = true
@@ -119,7 +116,6 @@ struct TaskAttachmentsPanel: View {
       }
       .font(.caption)
       .buttonStyle(.borderless)
-      #endif
     }
     .padding(.top, 2)
   }

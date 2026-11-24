@@ -186,15 +186,6 @@ final class NavigationState {
   /// flip, then resets this to nil. nil means "no pending shortcut".
   var pendingShortcut: ShortcutAction?
 
-  /// One-shot tab switch from a deep link (e.g. the Next widget's
-  /// `septena://next`). RootTabView observes it, selects the tab, then
-  /// resets to nil. nil means "no pending switch".
-  var pendingTab: SeptenaTab?
-
-  /// One-shot Section Tile widget deep link (`septena://section/<itemID>`).
-  /// WeekDashboardView consumes this to mirror a dashboard tile tap.
-  var pendingDashboardTile: String?
-
   /// macOS sidebar visibility — toggled by Command-/. `.all` shows both columns,
   /// `.detailOnly` collapses the sidebar so detail content runs edge-to-edge.
   /// Persisted device-locally via `SettingsKey.tasksSidebarVisibility`.
@@ -213,37 +204,13 @@ final class NavigationState {
   /// lights so it closes like any window.
   var showSettings = false
 
-  /// Optional deep-link target for the Settings surface — set alongside
-  /// `showSettings` by the contextual entry points ("Customize <Section>",
-  /// the Insights gear) so Settings opens already pushed to that pane.
-  /// `nil` opens the default root (Sections). Cleared on dismiss.
-  /// Septask doesn't compile the full Settings surface (its own settings
-  /// shell is P3 — docs/SEPTASK.md), so the property is gated with the type.
-  #if !SEPTASK
-  var settingsDestination: SettingsView.SettingsDestination?
-  #endif
-
   /// The one app-global modal sheet currently presented (or nil). All the
-  /// app-level palettes/sheets — Quick Find, Add Info, the Quick-Action section
-  /// sheet, the Training logger, the Mood check-in, the keyboard cheat-sheet —
+  /// app-level sheets — Quick Find, quick add, the keyboard cheat-sheet —
   /// route through this single optional + one `.sheet(item:)` at the tab root,
   /// instead of a boolean-per-sheet plus its own `onChange`/`onDismiss`
   /// cleanup. Settings is the deliberate exception (macOS opens it as a Window,
   /// so it keeps `showSettings`).
   var presentedModal: AppModal? = nil
-
-  /// Set by the first-run welcome as it finishes, consumed by the welcome
-  /// gate's `onDismiss`: once the welcome cover is gone, open the Add Info
-  /// quick-add for this section so the user logs their first thing. Routed
-  /// through the gate (not fired inline) so the sheet presents cleanly after
-  /// the cover dismisses rather than racing it. Nil → no first-log nudge.
-  var pendingFirstLog: AddInfoSection? = nil
-
-  /// Optional pre-selected session type. When non-nil, the Training
-  /// session sheet auto-starts a draft of this type on appear and skips
-  /// the picker step — used by the dashboard QuickAdd menu's smart
-  /// shortcuts ("Start: Upper", etc.). Cleared after consumption.
-  var pendingTrainingType: String? = nil
 
   // MARK: - Modal convenience
 
@@ -255,32 +222,14 @@ final class NavigationState {
     get { presentedModal == .quickFind }
     set { setModal(.quickFind, newValue) }
   }
-  var showTrainingSession: Bool {
-    get { presentedModal == .trainingSession }
-    set { setModal(.trainingSession, newValue) }
-  }
-  var showMoodCheckin: Bool {
-    get { presentedModal == .moodCheckin }
-    set { setModal(.moodCheckin, newValue) }
-  }
   var showKeyboardShortcuts: Bool {
     get { presentedModal == .keyboardShortcuts }
     set { setModal(.keyboardShortcuts, newValue) }
   }
 
-  /// Present the Add Info palette, optionally jumping straight to a section.
-  func presentAddInfo(section: AddInfoSection? = nil) {
-    presentedModal = .addInfo(section: section)
-  }
-
-  /// Present one intake tracker's page from the global Add Info palette.
-  func presentIntakeKind(_ id: String) {
-    presentedModal = .intakeKind(id: id)
-  }
-
-  /// Present the Quick-Action / deep-link section sheet for a manifest key.
-  func presentSection(key: String) {
-    presentedModal = .section(key: key)
+  /// Present the quick-add sheet.
+  func presentAddInfo() {
+    presentedModal = .addInfo
   }
 
   private func setModal(_ modal: AppModal, _ on: Bool) {
@@ -329,21 +278,13 @@ extension NavigationState {
 /// blocks. `id` keys the sheet identity (payloads don't re-trigger it).
 enum AppModal: Identifiable, Hashable {
   case quickFind
-  case addInfo(section: AddInfoSection?)
-  case section(key: String)
-  case intakeKind(id: String)
-  case trainingSession
-  case moodCheckin
+  case addInfo
   case keyboardShortcuts
 
   var id: String {
     switch self {
     case .quickFind:          return "quickFind"
     case .addInfo:            return "addInfo"
-    case .section(let key):   return "section.\(key)"
-    case .intakeKind(let id): return "intakeKind.\(id)"
-    case .trainingSession:    return "trainingSession"
-    case .moodCheckin:        return "moodCheckin"
     case .keyboardShortcuts:  return "keyboardShortcuts"
     }
   }
