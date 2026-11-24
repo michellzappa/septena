@@ -220,6 +220,17 @@ enum RegistryIcons {
   static func sfSymbol(for id: String) -> String {
     sfSymbols[id] ?? "circle"
   }
+
+  /// Filled variants (`icons.json` `sfSymbolOn`) a control shows while it is on.
+  static let sfSymbolsOn: [String: String] = [
+    "action.star": "star.fill",
+  ]
+
+  /// The symbol for `id` in a control's state: its filled variant while on,
+  /// when the icon declares one. Every on/off control reads its icon here.
+  static func sfSymbol(for id: String, on: Bool) -> String {
+    on ? (sfSymbolsOn[id] ?? sfSymbol(for: id)) : sfSymbol(for: id)
+  }
 }
 
 /// Exotic-fruit app accent descriptor (`registry/tokens.json`, ADR 0019).
@@ -695,7 +706,7 @@ enum RegistryDestinations {
     RegistryDestination(id: "repeating", navigationKey: "repeating", serverView: "all", title: RegistryL10n.t("Repeating"), iconId: "list.repeating", sfSymbol: "arrow.clockwise", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No repeating tasks"), emptyDetail: RegistryL10n.t("Give any task a Repeat rule and it will show up here."), featureId: "lists.repeating"),
     RegistryDestination(id: "anytime", navigationKey: "unscheduled", serverView: "unscheduled", title: RegistryL10n.t("Anytime"), iconId: "list.anytime", sfSymbol: "rectangle.stack.fill", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: true, shortcutKeycaps: ["⌘", "3"], emptyTitle: RegistryL10n.t("Nothing in Anytime"), emptyDetail: RegistryL10n.t("Open tasks without a date live here."), featureId: "lists.anytime"),
     RegistryDestination(id: "logbook", navigationKey: "logbook", serverView: "logbook", title: RegistryL10n.t("Logbook"), iconId: "list.logbook", sfSymbol: "checkmark", sidebarSection: "bottom", visibility: "always", canHide: true, canMoveSection: true, shortcutKeycaps: ["⌘", "4"], emptyTitle: RegistryL10n.t("Logbook is empty"), emptyDetail: RegistryL10n.t("Tasks you complete or let go end up here."), featureId: "lists.logbook"),
-    RegistryDestination(id: "starred", navigationKey: "starred", serverView: "all", title: RegistryL10n.t("Starred"), iconId: "list.starred", sfSymbol: "star.fill", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Starred Tasks"), emptyDetail: RegistryL10n.t("Star important tasks to keep them one tap away."), featureId: "lists.starred"),
+    RegistryDestination(id: "starred", navigationKey: "starred", serverView: "all", title: RegistryL10n.t("Starred"), iconId: "list.starred", sfSymbol: "star.fill", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Starred Tasks"), emptyDetail: RegistryL10n.t("Favorite important tasks to keep them one tap away."), featureId: "lists.starred"),
     RegistryDestination(id: "faded", navigationKey: "faded", serverView: "all", title: RegistryL10n.t("Faded"), iconId: "list.faded", sfSymbol: "circle.dashed", sidebarSection: "bottom", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Faded Tasks"), emptyDetail: RegistryL10n.t("Undated tasks without activity for 14 days appear here until you keep them or let them go."), featureId: "lists.faded"),
     RegistryDestination(id: "recentlyDeleted", navigationKey: "recentlyDeleted", serverView: "all", title: RegistryL10n.t("Deleted"), iconId: "list.recently_deleted", sfSymbol: "trash", sidebarSection: "bottom", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, shortcutKeycaps: nil, emptyTitle: RegistryL10n.t("No Deleted Tasks"), emptyDetail: RegistryL10n.t("Septena keeps deleted tasks here for 30 days, then deletes them for good."), featureId: "lists.recently-deleted"),
   ]
@@ -786,7 +797,7 @@ enum RegistryActions {
     "task.toggleComplete": RegistryL10n.t("Mark as Complete"),
     "task.cancel": RegistryL10n.t("Cancel Task"),
     "task.toggleToday": RegistryL10n.t("Toggle Today"),
-    "task.toggleStar": RegistryL10n.t("Toggle Star"),
+    "task.toggleStar": RegistryL10n.t("Toggle Favorite"),
     "task.tags": RegistryL10n.t("Tags…"),
     "task.addChecklistItem": RegistryL10n.t("Add Checklist Item"),
     "task.detail.save": RegistryL10n.t("Save"),
@@ -940,7 +951,7 @@ enum RegistryActions {
     "task.duplicate": ["pluralTitle": RegistryL10n.t("Duplicate Tasks")],
     "task.cancel": ["pluralTitle": RegistryL10n.t("Cancel Tasks")],
     "task.toggleToday": ["addTitle": RegistryL10n.t("Move to Today"), "removeTitle": RegistryL10n.t("Remove from Today"), "shortTitle": RegistryL10n.t("Today")],
-    "task.toggleStar": ["addTitle": RegistryL10n.t("Star"), "removeTitle": RegistryL10n.t("Remove Star")],
+    "task.toggleStar": ["addTitle": RegistryL10n.t("Favorite"), "removeTitle": RegistryL10n.t("Unfavorite")],
     "task.when": ["shortTitle": RegistryL10n.t("Schedule")],
     "task.reminder": ["addTitle": RegistryL10n.t("Add Reminder…")],
     "task.move": ["pluralTitle": RegistryL10n.t("Move Tasks"), "shortTitle": RegistryL10n.t("Move")],
@@ -1105,7 +1116,7 @@ enum RegistryActions {
       RegistryMenuItem(kind: "submenu", id: "move", title: RegistryL10n.t("Move"), sfSymbol: "folder", items: [RegistryMenuItem(kind: "slot", id: "sectionDestinations", title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "divider", id: "divider.1", title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "slot", id: "moveDestinations", title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "divider", id: "divider.3", title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "action", id: "task.move", title: RegistryL10n.t("Move…"), sfSymbol: "folder", items: [])]),
       RegistryMenuItem(kind: "action", id: "task.tags", title: RegistryL10n.t("Tags…"), sfSymbol: "tag", items: []),
       RegistryMenuItem(kind: "action", id: "task.deadline", title: RegistryL10n.t("Deadline…"), sfSymbol: "flag", items: []),
-      RegistryMenuItem(kind: "action", id: "task.toggleStar", title: RegistryL10n.t("Toggle Star"), sfSymbol: "star", items: []),
+      RegistryMenuItem(kind: "action", id: "task.toggleStar", title: RegistryL10n.t("Toggle Favorite"), sfSymbol: "star", items: []),
       RegistryMenuItem(kind: "divider", id: "divider.9", title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "task.open", title: RegistryL10n.t("Open"), sfSymbol: "arrow.up.left.and.arrow.down.right", items: []),
       RegistryMenuItem(kind: "action", id: "task.duplicate", title: RegistryL10n.t("Duplicate"), sfSymbol: "plus.square.on.square", items: []),
@@ -1217,7 +1228,7 @@ enum RegistryActions {
       RegistryMenuItem(kind: "action", id: "task.tags", title: RegistryL10n.t("Tags…"), sfSymbol: "tag", items: []),
       RegistryMenuItem(kind: "action", id: "task.deadline", title: RegistryL10n.t("Deadline…"), sfSymbol: "flag", items: []),
       RegistryMenuItem(kind: "action", id: "task.reminder", title: RegistryL10n.t("Reminder…"), sfSymbol: "bell", items: []),
-      RegistryMenuItem(kind: "action", id: "task.toggleStar", title: RegistryL10n.t("Toggle Star"), sfSymbol: "star", items: []),
+      RegistryMenuItem(kind: "action", id: "task.toggleStar", title: RegistryL10n.t("Toggle Favorite"), sfSymbol: "star", items: []),
       RegistryMenuItem(kind: "divider", id: "divider.14", title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "task.editDetails", title: RegistryL10n.t("Rename"), sfSymbol: "info.circle", items: []),
       RegistryMenuItem(kind: "action", id: "task.duplicate", title: RegistryL10n.t("Duplicate"), sfSymbol: "plus.square.on.square", items: []),
@@ -1249,7 +1260,7 @@ enum RegistryActions {
     RegistryShortcutEntry(id: "task.toggleComplete", label: RegistryL10n.t("Mark as Complete"), keycaps: ["⌘", "K"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.cancel", label: RegistryL10n.t("Cancel Task"), keycaps: ["⌥", "⌘", "K"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.toggleToday", label: RegistryL10n.t("Toggle Today"), keycaps: ["⌘", "T"], excludePlatforms: []),
-    RegistryShortcutEntry(id: "task.toggleStar", label: RegistryL10n.t("Toggle Star"), keycaps: ["⌥", "⌘", "S"], excludePlatforms: []),
+    RegistryShortcutEntry(id: "task.toggleStar", label: RegistryL10n.t("Toggle Favorite"), keycaps: ["⌥", "⌘", "S"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.tags", label: RegistryL10n.t("Tags…"), keycaps: ["⇧", "⌘", "T"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.addChecklistItem", label: RegistryL10n.t("Add Checklist Item"), keycaps: ["⇧", "⌘", "C"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.when", label: RegistryL10n.t("When…"), keycaps: ["⌘", "S"], excludePlatforms: []),
@@ -1409,6 +1420,8 @@ struct RegistryTaskAttribute: Sendable, Hashable, Identifiable {
   /// Pill text while the attribute's work runs (Discuss).
   let workingLabel: String?
   var isPill: Bool { surfaceTier == "inline" || surfaceTier == "popover" }
+  /// The attribute's symbol in its state: the filled variant while set or on.
+  func sfSymbol(on: Bool) -> String { RegistryIcons.sfSymbol(for: iconId, on: on) }
   /// The attribute shows on `platform` when its capability ships (ADR 0015).
   func applies(to platform: String) -> Bool { RegistryCapabilities.isAvailable(featureId, on: platform) }
 }
@@ -1421,7 +1434,7 @@ enum RegistrySurfaces {
     RegistryTaskAttribute(id: "deadline", label: RegistryL10n.t("Deadline"), iconId: "action.deadline", sfSymbol: "flag", commitContract: "pickCommits", surfaceTier: "popover", featureId: "task.when-deadline", editOnly: false, workingLabel: nil),
     RegistryTaskAttribute(id: "reminder", label: RegistryL10n.t("Remind"), iconId: "action.reminder", sfSymbol: "bell", commitContract: "pickCommits", surfaceTier: "popover", featureId: "task.alerts", editOnly: false, workingLabel: nil),
     RegistryTaskAttribute(id: "repeat", label: RegistryL10n.t("Repeat"), iconId: "action.repeat", sfSymbol: "arrow.clockwise", commitContract: "closeCommits", surfaceTier: "popover", featureId: "task.repeat", editOnly: false, workingLabel: nil),
-    RegistryTaskAttribute(id: "star", label: RegistryL10n.t("Star"), iconId: "action.star", sfSymbol: "star", commitContract: "pickCommits", surfaceTier: "inline", featureId: "lists.starred", editOnly: false, workingLabel: nil),
+    RegistryTaskAttribute(id: "star", label: RegistryL10n.t("Favorite"), iconId: "action.star", sfSymbol: "star", commitContract: "pickCommits", surfaceTier: "inline", featureId: "lists.starred", editOnly: false, workingLabel: nil),
     RegistryTaskAttribute(id: "list", label: RegistryL10n.t("List"), iconId: "action.move", sfSymbol: "folder", commitContract: "pickCommits", surfaceTier: "popover", featureId: "places.projects", editOnly: false, workingLabel: nil),
     RegistryTaskAttribute(id: "tags", label: RegistryL10n.t("Tags"), iconId: "action.tag", sfSymbol: "tag", commitContract: "pickCommits", surfaceTier: "popover", featureId: "task.tags", editOnly: true, workingLabel: nil),
     RegistryTaskAttribute(id: "checklist", label: RegistryL10n.t("Checklist"), iconId: "action.checklist", sfSymbol: "checklist", commitContract: "pickCommits", surfaceTier: "inline", featureId: "task.checklists", editOnly: true, workingLabel: nil),

@@ -5205,6 +5205,30 @@
         }
       }
     },
+    "Favorite" : {
+      "comment" : "Generated from registry actions.actions.task.toggleStar.addTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favoritar"
+          }
+        }
+      }
+    },
+    "Favorite important tasks to keep them one tap away." : {
+      "comment" : "Generated from registry destinations.destinations.starred.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favorite tarefas importantes para tê-las a um toque."
+          }
+        }
+      }
+    },
     "Fiber" : {
       "localizations" : {
         "pt-BR" : {
@@ -12816,6 +12840,18 @@
       "comment" : "Generated from registry actions.actions.task.toggleChecklistItem.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Toggle Favorite" : {
+      "comment" : "Generated from registry actions.actions.task.toggleStar.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alternar favorito"
+          }
+        }
+      }
+    },
     "Toggle Star" : {
       "comment" : "Generated from registry actions.actions.task.toggleStar.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -13105,6 +13141,18 @@
     "Undo" : {
       "comment" : "Generated from registry actions.actions.app.undo.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
+    },
+    "Unfavorite" : {
+      "comment" : "Generated from registry actions.actions.task.toggleStar.removeTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desfavoritar"
+          }
+        }
+      }
     },
     "Universal conventions every section relies on. Each section skill below extends this." : {
       "localizations" : {

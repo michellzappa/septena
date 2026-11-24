@@ -199,7 +199,7 @@
       "supportsInlineCreate": true,
       "dropBehavior": "none",
       "featureId": "lists.starred",
-      "emptyState": { "title": "No Starred Tasks", "detail": "Star important tasks to keep them one tap away." }
+      "emptyState": { "title": "No Starred Tasks", "detail": "Favorite important tasks to keep them one tap away." }
     },
     {
       "id": "faded",

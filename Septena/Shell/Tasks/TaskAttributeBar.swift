@@ -74,6 +74,9 @@ struct TaskAttributeBar: View {
     static let draftCases: [Attribute] = rail.filter { !$0.editOnly }
 
     var icon: String { registry.sfSymbol }
+    /// The symbol in the pill's state: the filled variant while set or on
+    /// (`icons.json` `sfSymbolOn`; DesignSpec "a toggle that is on is filled").
+    func icon(on: Bool) -> String { registry.sfSymbol(on: on) }
     var label: String { registry.label }
     /// Needs a saved task (tags, checklist, attachments, discuss).
     var editOnly: Bool { registry.editOnly }
@@ -189,7 +192,7 @@ struct TaskAttributeBar: View {
       // on the page rather than a line in a list.
       VStack(spacing: 10) {
         ForEach(rowAttributes) { attr in
-          AttributeRow(icon: attr.icon, label: attr.label,
+          AttributeRow(icon: attr.icon(on: isSet(attr, edit: edit)), label: attr.label,
                        value: value(for: attr, edit: edit), isSet: isSet(attr, edit: edit),
                        opensPicker: attr.presentsSheet,
                        isLoading: attr == .discuss && discussWorking,
@@ -252,7 +255,7 @@ struct TaskAttributeBar: View {
           if let leading { leading }
           ForEach(Attribute.rail) { attr in
             if shows(attr) {
-              AttributePill(icon: attr.icon, label: attr.label,
+              AttributePill(icon: attr.icon(on: isSet(attr, edit: edit)), label: attr.label,
                             value: value(for: attr, edit: edit), isSet: isSet(attr, edit: edit),
                             isActive: attr != .discuss && expanded == attr,
                             isLoading: attr == .discuss && discussWorking,

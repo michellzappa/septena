@@ -801,7 +801,7 @@ struct TaskRow: View {
         .accessibilityLabel(TaskA11y.recurring)
     }
     if task.starred {
-      Image(systemName: "star.fill")
+      Image(systemName: RegistryIcons.sfSymbol(for: "action.star", on: true))
         .scaledFont(size: 11)
         .foregroundStyle(Theme.todayAccent)
         .accessibilityLabel(TaskFilter.starred.title)

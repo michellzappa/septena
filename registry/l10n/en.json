@@ -873,6 +873,19 @@
       "destinations.destinations.faded.title"
     ]
   },
+  "Favorite": {
+    "text": "Favorite",
+    "paths": [
+      "actions.actions.task.toggleStar.addTitle",
+      "surfaces.taskAttributes.star.label"
+    ]
+  },
+  "Favorite important tasks to keep them one tap away.": {
+    "text": "Favorite important tasks to keep them one tap away.",
+    "paths": [
+      "destinations.destinations.starred.emptyState.detail"
+    ]
+  },
   "Field Matrix": {
     "text": "Field Matrix",
     "paths": [
@@ -1920,12 +1933,6 @@
       "actions.actions.task.reminder.title"
     ]
   },
-  "Remove Star": {
-    "text": "Remove Star",
-    "paths": [
-      "actions.actions.task.toggleStar.removeTitle"
-    ]
-  },
   "Remove from Today": {
     "text": "Remove from Today",
     "paths": [
@@ -2367,19 +2374,6 @@
       "settings.pages.smart_lists.title"
     ]
   },
-  "Star": {
-    "text": "Star",
-    "paths": [
-      "actions.actions.task.toggleStar.addTitle",
-      "surfaces.taskAttributes.star.label"
-    ]
-  },
-  "Star important tasks to keep them one tap away.": {
-    "text": "Star important tasks to keep them one tap away.",
-    "paths": [
-      "destinations.destinations.starred.emptyState.detail"
-    ]
-  },
   "Starred": {
     "text": "Starred",
     "paths": [
@@ -2728,8 +2722,8 @@
       "actions.actions.task.toggleChecklistItem.title"
     ]
   },
-  "Toggle Star": {
-    "text": "Toggle Star",
+  "Toggle Favorite": {
+    "text": "Toggle Favorite",
     "paths": [
       "actions.actions.task.toggleStar.title"
     ]
@@ -2793,6 +2787,12 @@
     "text": "Undo",
     "paths": [
       "actions.actions.app.undo.title"
+    ]
+  },
+  "Unfavorite": {
+    "text": "Unfavorite",
+    "paths": [
+      "actions.actions.task.toggleStar.removeTitle"
     ]
   },
   "Upcoming": {

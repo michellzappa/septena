@@ -68,7 +68,7 @@
     "action.checklist": { "sfSymbol": "checklist", "material": "checklist", "lucide": "list-checks" },
     "action.tag": { "sfSymbol": "tag", "material": "label", "lucide": "tag" },
     "action.reminder": { "sfSymbol": "bell", "material": "notifications", "lucide": "bell" },
-    "action.star": { "sfSymbol": "star", "material": "star", "lucide": "star" },
+    "action.star": { "sfSymbol": "star", "sfSymbolOn": "star.fill", "material": "star", "lucide": "star" },
     "action.emoji": { "sfSymbol": "face.smiling", "material": "mood", "lucide": "smile" },
     "settings.account": { "sfSymbol": "person.crop.circle", "material": "account_circle", "lucide": "user-circle" },
     "settings.devices": { "sfSymbol": "laptopcomputer.and.iphone", "material": "devices", "lucide": "monitor-smartphone" },
