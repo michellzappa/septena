@@ -7,6 +7,7 @@ import { isValidTz, todayYMD } from "../tz.js";
 import { MAX_ATTACHMENT_BYTES, zId } from "../store/columns.js";
 import { zPushBody, type Op } from "../store/ops.js";
 import type { ChangeEntry } from "../store/TaskStore.js";
+import { USER_ID_RE, accountStoreFor } from "../store/AccountStore.js";
 import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from "./appleIdentity.js";
 import { issueSession, refreshSession, revokeSession, storeFor, verifyAccessToken } from "./session.js";
 import {
@@ -103,7 +104,13 @@ api.post("/auth/apple", async (c) => {
   if (body instanceof Response) return body;
   try {
     const { sub } = await verifyAppleIdentityToken(body.identityToken, body.nonce, c.env.APPLE_AUDIENCES.split(","));
-    const userId = await userIdForAppleSub(sub);
+    const derivedUserId = await userIdForAppleSub(sub);
+    // Keep existing Apple accounts on their derived `u_` id while recording
+    // `apple:<sub>` -> `userId` in the global identity table (ADR 0016, #168).
+    const accounts = accountStoreFor(c.env);
+    const userId = accounts
+      ? (await accounts.resolveOrCreateIdentity("apple", sub, derivedUserId)).userId
+      : derivedUserId;
     // Every new account starts with 14 days of Plus (spec §3). Only the
     // first sign-in writes the row; a KV marker keeps account deletion from
     // granting a second trial (spec §6.4 finding 4).
@@ -644,7 +651,7 @@ async function adminAllowed(c: Ctx): Promise<boolean> {
   return diff === 0;
 }
 
-const zUserId = z.string().regex(/^u_[A-Za-z0-9_-]{20,64}$/);
+const zUserId = z.string().regex(USER_ID_RE);
 const zGrantName = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,39}$/);
 
 api.post("/admin/grants", async (c) => {
@@ -874,6 +881,8 @@ api.delete("/account", async (c) => {
   // up with the same Apple id never starts a second trial (spec §6.4 finding 4).
   if (entitlements.some((r) => r.id === TRIAL_ROW_ID)) await markTrialUsed(c.env, userId);
   await store.deleteAccount();
+  const accounts = accountStoreFor(c.env);
+  if (accounts) await accounts.deleteIdentitiesForUser(userId);
   const prefix = `u/${userId}/`;
   let cursor: string | undefined;
   do {
