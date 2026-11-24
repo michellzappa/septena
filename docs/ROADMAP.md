@@ -147,7 +147,7 @@ GitHub milestone: `"M3 Factory ships code"`.
 
 - F2 work profiles, approval cards, `errand`, kill switch
 - GitHub (`docs/GITHUB_SPEC.md`, ADR 0032): #6 G0 follow (needs #386) → #7 G1
-  browse and pull → G2 send
+  browse and pull → #393 G2 send
 - F3 `code` workflow on a project's repo, run log (needs #6)
 - Shared cross-platform registries ([ADR 0015](adr/0015-shared-registries-for-cross-platform-clients.md),
   accepted; prerequisites to `#21`, `#20`, `#136`): `#141`–`#145` done (`registry/`
