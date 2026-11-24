@@ -1,6 +1,6 @@
 # Task factory — spec
 
-**Status:** accepted. F0 claims, stop and pause built 2026-11-19 (§5, ADR 0008). Agent smart list and manual runner built 2026-11-22 (§3, §4.1). Written and accepted 2026-11-19. Open questions keep their defaults until mz overrules them.
+**Status:** accepted. F0 claims, stop and pause built 2026-11-19 (§5, ADR 0008). Agent smart list and manual runner built 2026-11-22 (§3, §4.1). F1a multi-user wake transport (SSE/WebSocket stream + signed webhooks) and scheduled/waking runner built 2026-11-24 (§4.2, §8, `#5`). Written and accepted 2026-11-19. Open questions keep their defaults until mz overrules them.
 **Decisions:** [ADR 0002](adr/0002-own-backend-replaces-icloud.md),
 [ADR 0005](adr/0005-tasks-as-factory-intake.md).
 **Builds on:** the task conversation loop (`docs/TASK_CONVERSATIONS_PLAN.md`,
@@ -137,6 +137,35 @@ handles `research`-shaped work only.
 - **Stops:** a claim or write refused as `paused` or `stopped` ends the pass;
   the script exits 3. Only mz resumes, in the app.
 - **Log:** `~/Library/Logs/septena-runner/<timestamp>.log`.
+
+### 4.2 Scheduled & waking runner on `mz-mini` (F1a, `#5`)
+
+Two LaunchAgent templates live under `docs/agents/`:
+
+- `docs/agents/app.septena.task-runner.plist` — scheduled 15-minute pass (`scripts/task-runner.sh --max 2`).
+- `docs/agents/app.septena.task-runner-wake.plist` — persistent SSE wake listener (`scripts/task-runner-wake.mjs`) subscribed to `GET https://api.septena.app/v1/agent/events/stream`, triggering `scripts/task-runner.sh --max 2` immediately on `assigned`, `user_turn`, and `resumed` events.
+
+`scripts/task-runner.sh` guards against overlap with an atomic `mkdir` lock (`/tmp/septena-task-runner.lock.d`, with stale-lock recovery), runs `--max 2` as two bounded parallel worker slots (`<agent>:w1` / `<agent>:w2`) with per-slot log isolation, and rotates logs in `~/Library/Logs/septena-runner/` (keeping the newest 100 by default).
+
+**Install on `mz-mini`:**
+
+1. Ensure Claude Code is paired with `https://api.septena.app/mcp` (see §4.1).
+2. Store a bearer token (`sa1.*` app session or `sm1.*` MCP OAuth token with `tasks:read`) in a private file for the wake listener:
+   ```bash
+   mkdir -p ~/.config/septena ~/Library/Logs/septena-runner
+   chmod 700 ~/.config/septena
+   printf '%s\n' '<bearer-token>' > ~/.config/septena/wake-token
+   chmod 600 ~/.config/septena/wake-token
+   ```
+3. Copy both plist templates into `~/Library/LaunchAgents/`, replace `REPLACE_WITH_USER` with your macOS username, and load them:
+   ```bash
+   for f in app.septena.task-runner.plist app.septena.task-runner-wake.plist; do
+     sed "s/REPLACE_WITH_USER/$(whoami)/g" "docs/agents/$f" > "$HOME/Library/LaunchAgents/$f"
+     launchctl bootout "gui/$(id -u)" "$HOME/Library/LaunchAgents/$f" 2>/dev/null || true
+     launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$f"
+   done
+   ```
+4. **Outbound webhooks (optional, for cloud routines / OpenClaw / n8n):** register an `https://` URL via `POST /v1/agent/webhooks` (`{ "url": "https://...", "secret": "..." }`, authenticated with a user bearer token). Every wake event (`assigned`, `user_turn`, `resumed`) sends a pointer-only JSON POST signed with `X-Septena-Signature: sha256=<hex>` over `${X-Septena-Timestamp}.${rawBody}` using HMAC-SHA256.
 
 ## 5. Claims
 

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  LaunchAgent template: persistent SSE wake listener on mz-mini.
+  Opens GET https://api.septena.app/v1/agent/events/stream and triggers
+  scripts/task-runner.sh immediately on assigned / user_turn / resumed events.
+  See docs/TASK_FACTORY_SPEC.md §4.2 for installation instructions.
+  Replace REPLACE_WITH_USER with the local macOS username before loading.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>app.septena.task-runner-wake</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>/Users/REPLACE_WITH_USER/Dev/septena/scripts/task-runner-wake.mjs</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/REPLACE_WITH_USER/Dev/septena</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/Users/REPLACE_WITH_USER/.local/bin</string>
+    <key>SEPTENA_API_URL</key>
+    <string>https://api.septena.app</string>
+    <key>SEPTENA_WAKE_TOKEN_FILE</key>
+    <string>/Users/REPLACE_WITH_USER/.config/septena/wake-token</string>
+    <key>SEPTENA_MCP_SERVER</key>
+    <string>septena</string>
+    <key>SEPTENA_RUNNER_MAX</key>
+    <string>2</string>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/Users/REPLACE_WITH_USER/Library/Logs/septena-runner/launchd-wake.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/REPLACE_WITH_USER/Library/Logs/septena-runner/launchd-wake.err.log</string>
+</dict>
+</plist>

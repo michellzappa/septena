@@ -22,13 +22,23 @@ import type { EntitlementRow } from "../entitlement/entitlement.js";
 import type { IcalTask } from "../ical.js";
 import { DOMAIN_RULES, ENTITY_LIMITS, TURN_FIELDS } from "../generated/registries.js";
 import { MCP_REFRESH_TTL_S } from "../shadow/tokens.js";
-import { logEvent } from "../util.js";
+import { logEvent, randomId } from "../util.js";
 import {
   sendAgentQuestionPushes,
   type AgentQuestionPush,
   type PushPlatform,
   type PushTokenRow,
 } from "../api/apns.js";
+import {
+  MAX_AGENT_WEBHOOKS,
+  SSE_HEARTBEAT_MS,
+  deliverWebhookEvent,
+  formatSseEvent,
+  formatSseKeepalive,
+  formatSseReady,
+  isWakeEventKind,
+  type AgentWebhookTarget,
+} from "../api/agentWake.js";
 
 /// Task fields only the app writes (docs/TASK_FADE_SPEC.md §3): the fade
 /// clock and its outcome. An agent cannot keep a task alive by touching it.
@@ -79,6 +89,22 @@ export interface AgentEvent {
   kind: "assigned" | "user_turn" | "stopped" | "resumed" | "paused" | "unpaused";
   taskId: string | null;
   at: string;
+}
+
+/// Public view of a per-user outbound agent wake webhook (never exposes `secret`).
+export interface AgentWebhookPublic {
+  id: string;
+  url: string;
+  enabled: boolean;
+  createdAt: string;
+  lastDeliveredAt: string | null;
+  lastStatus: number | null;
+  failureCount: number;
+}
+
+/// Returned once on creation so the caller can store the signing secret.
+export interface AgentWebhookCreated extends AgentWebhookPublic {
+  secret: string;
 }
 
 /// Agent writers (the MCP connector) carry an `mcp:` actor. Everything else
@@ -238,6 +264,12 @@ export interface PushOutcome {
 
 export class TaskStore extends DurableObject<Env> {
   private sql: SqlStorage;
+  private sseSubscribers = new Set<{
+    send: (chunk: string) => boolean;
+    close: () => void;
+    lastRev: number;
+  }>();
+  private sseHeartbeatMs = SSE_HEARTBEAT_MS;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -447,6 +479,16 @@ export class TaskStore extends DurableObject<Env> {
         updatedAt TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS push_tokens_device ON push_tokens(deviceId);
+      CREATE TABLE IF NOT EXISTS agent_webhooks (
+        id TEXT PRIMARY KEY,
+        url TEXT NOT NULL,
+        secret TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        createdAt TEXT NOT NULL,
+        lastDeliveredAt TEXT,
+        lastStatus INTEGER,
+        failureCount INTEGER NOT NULL DEFAULT 0
+      );
     `);
     // A session's stable id (one per sign-in on one install). It survives
     // refresh-token rotation, so it names the device for the sync slot.
@@ -544,6 +586,7 @@ export class TaskStore extends DurableObject<Env> {
   push(ops: Op[], actor: string, reason: string | null = null): PushOutcome {
     const purgedAttachmentIds: string[] = [];
     const agentQuestions: AgentQuestionPush[] = [];
+    const prevRev = this.meta("rev");
     this.reason = reason;
     let results: OpResult[];
     try {
@@ -558,7 +601,13 @@ export class TaskStore extends DurableObject<Env> {
       this.reason = null;
     }
     const appliedThrough = this.meta("rev");
-    if (results.some((r) => r.status === "applied")) this.broadcast(appliedThrough);
+    if (results.some((r) => r.status === "applied")) {
+      this.broadcast(appliedThrough);
+      if (appliedThrough > prevRev && !isAgentActor(actor)) {
+        const { events } = this.agentEvents(prevRev, 500);
+        if (events.length > 0) this.dispatchAgentEvents(events);
+      }
+    }
     if (agentQuestions.length > 0) {
       const tokens = this.listPushTokens();
       if (tokens.length > 0) {
@@ -2063,25 +2112,264 @@ export class TaskStore extends DurableObject<Env> {
     return this.copySnapshot();
   }
 
+  // ---- agent wake webhooks (docs/TASK_FACTORY_SPEC.md §8, issue #5) ----
+
+  listAgentWebhooks(): AgentWebhookPublic[] {
+    return this.sql.exec<{
+      id: string; url: string; enabled: number; createdAt: string;
+      lastDeliveredAt: string | null; lastStatus: number | null; failureCount: number;
+    }>(
+      "SELECT id, url, enabled, createdAt, lastDeliveredAt, lastStatus, failureCount FROM agent_webhooks ORDER BY createdAt DESC, id",
+    ).toArray().map((r) => ({
+      id: r.id,
+      url: r.url,
+      enabled: r.enabled !== 0,
+      createdAt: r.createdAt,
+      lastDeliveredAt: r.lastDeliveredAt,
+      lastStatus: r.lastStatus,
+      failureCount: r.failureCount,
+    }));
+  }
+
+  createAgentWebhook(
+    url: string,
+    secret: string,
+    enabled = true,
+  ): { ok: true; webhook: AgentWebhookCreated } | { ok: false; reason: "limit_reached" } {
+    return this.ctx.storage.transactionSync(() => {
+      const count = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM agent_webhooks").one().n;
+      if (count >= MAX_AGENT_WEBHOOKS) return { ok: false as const, reason: "limit_reached" as const };
+      const id = `wh_${randomId(12)}`;
+      const createdAt = new Date().toISOString();
+      this.sql.exec(
+        "INSERT INTO agent_webhooks (id, url, secret, enabled, createdAt, lastDeliveredAt, lastStatus, failureCount) VALUES (?, ?, ?, ?, ?, NULL, NULL, 0)",
+        id, url, secret, enabled ? 1 : 0, createdAt,
+      );
+      return {
+        ok: true as const,
+        webhook: {
+          id,
+          url,
+          secret,
+          enabled,
+          createdAt,
+          lastDeliveredAt: null,
+          lastStatus: null,
+          failureCount: 0,
+        },
+      };
+    });
+  }
+
+  deleteAgentWebhook(id: string): boolean {
+    return this.sql.exec("DELETE FROM agent_webhooks WHERE id = ?", id).rowsWritten > 0;
+  }
+
+  private recordAgentWebhookDelivery(id: string, status: number, ok: boolean, deliveredAt: string): void {
+    if (ok) {
+      this.sql.exec(
+        "UPDATE agent_webhooks SET lastDeliveredAt = ?, lastStatus = ?, failureCount = 0 WHERE id = ?",
+        deliveredAt, status, id,
+      );
+    } else {
+      this.sql.exec(
+        "UPDATE agent_webhooks SET lastDeliveredAt = ?, lastStatus = ?, failureCount = failureCount + 1 WHERE id = ?",
+        deliveredAt, status, id,
+      );
+    }
+  }
+
+  private dispatchAgentEvents(events: AgentEvent[]): void {
+    // 1. Live SSE subscribers
+    if (this.sseSubscribers.size > 0) {
+      for (const sub of [...this.sseSubscribers]) {
+        for (const ev of events) {
+          if (ev.rev <= sub.lastRev) continue;
+          sub.lastRev = ev.rev;
+          if (!sub.send(formatSseEvent(ev))) break;
+        }
+      }
+    }
+
+    // 2. Live agent-events WebSocket subscribers
+    const agentSockets = this.ctx.getWebSockets("agent-events");
+    if (agentSockets.length > 0) {
+      for (const ev of events) {
+        const frame = JSON.stringify({ type: "event", event: ev });
+        for (const ws of agentSockets) {
+          try { ws.send(frame); } catch { /* dead socket; reaped by runtime */ }
+        }
+      }
+    }
+
+    // 3. Outbound signed webhooks for wake-worthy events (assigned, user_turn, resumed)
+    const wakeEvents = events.filter((ev) => isWakeEventKind(ev.kind));
+    if (wakeEvents.length === 0) return;
+    const targets: AgentWebhookTarget[] = this.sql.exec<{ id: string; url: string; secret: string }>(
+      "SELECT id, url, secret FROM agent_webhooks WHERE enabled = 1",
+    ).toArray();
+    if (targets.length === 0) return;
+
+    const delivery = this.deliverAgentWebhooks(targets, wakeEvents).catch(() => {
+      // Delivery errors are recorded per webhook; never break the main write.
+    });
+    if (typeof this.ctx.waitUntil === "function") {
+      this.ctx.waitUntil(delivery);
+    }
+  }
+
+  private async deliverAgentWebhooks(targets: AgentWebhookTarget[], events: AgentEvent[]): Promise<void> {
+    await Promise.allSettled(
+      targets.flatMap((target) =>
+        events.map(async (ev) => {
+          const res = await deliverWebhookEvent(target, ev);
+          try {
+            this.recordAgentWebhookDelivery(target.id, res.status, res.ok, res.deliveredAt);
+          } catch {
+            // Store may have been deleted while delivery was in flight.
+          }
+        }),
+      ),
+    );
+  }
+
   /// Account deletion (§10). The Worker empties the user's R2 prefix.
   async deleteAccount(): Promise<void> {
+    for (const sub of [...this.sseSubscribers]) sub.close();
     for (const ws of this.ctx.getWebSockets()) ws.close(1000, "account deleted");
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
   }
 
-  // ---- live nudge (§6.3) ----
+  // ---- live nudge (§6.3) & agent event stream (docs/TASK_FACTORY_SPEC.md §8) ----
 
   override async fetch(request: Request): Promise<Response> {
-    if (request.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
+    const url = new URL(request.url);
+    if (url.pathname.endsWith("/agent/events/stream")) {
+      return this.handleAgentEventsStream(request, url);
+    }
+    if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
+      return new Response("expected websocket", { status: 426 });
+    }
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1]);
     pair[1].send(JSON.stringify({ rev: this.meta("rev") }));
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
 
+  private handleAgentEventsStream(request: Request, url: URL): Response {
+    const rawCursor = url.searchParams.get("since") ?? request.headers.get("Last-Event-ID");
+    let hasCursor = false;
+    let cursor = 0;
+    if (rawCursor !== null && rawCursor !== "") {
+      if (!/^\d+$/.test(rawCursor)) {
+        return new Response(JSON.stringify({ error: "invalid_request" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      cursor = Number(rawCursor);
+      if (!Number.isSafeInteger(cursor) || cursor < 0) {
+        return new Response(JSON.stringify({ error: "invalid_request" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      hasCursor = true;
+    }
+
+    const head = this.meta("rev");
+    const paused = this.readSetting("agentsPaused") === true;
+    const replay: AgentEvent[] = [];
+    if (hasCursor && cursor < head) {
+      let c = cursor;
+      for (let page = 0; page < 5 && c < head; page++) {
+        const batch = this.agentEvents(c, 500);
+        replay.push(...batch.events);
+        if (batch.nextSince <= c) break;
+        c = batch.nextSince;
+      }
+    }
+
+    if (request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
+      const pair = new WebSocketPair();
+      this.ctx.acceptWebSocket(pair[1], ["agent-events"]);
+      pair[1].send(JSON.stringify({ type: "ready", head, paused }));
+      for (const ev of replay) {
+        pair[1].send(JSON.stringify({ type: "event", event: ev }));
+      }
+      return new Response(null, { status: 101, webSocket: pair[0] });
+    }
+
+    const encoder = new TextEncoder();
+    const subscribers = this.sseSubscribers;
+    const heartbeatMs = this.sseHeartbeatMs;
+    const initialLastRev = replay.length > 0 ? replay[replay.length - 1].rev : (hasCursor ? cursor : head);
+    let cleanupRef: (() => void) | null = null;
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        let closed = false;
+        let timer: ReturnType<typeof setInterval> | null = null;
+
+        const detach = () => {
+          if (closed) return;
+          closed = true;
+          if (timer !== null) {
+            clearInterval(timer);
+            timer = null;
+          }
+          subscribers.delete(sub);
+        };
+        cleanupRef = detach;
+
+        const sub = {
+          lastRev: initialLastRev,
+          send(chunk: string): boolean {
+            if (closed) return false;
+            try {
+              controller.enqueue(encoder.encode(chunk));
+              return true;
+            } catch {
+              detach();
+              return false;
+            }
+          },
+          close(): void {
+            if (closed) return;
+            detach();
+            try { controller.close(); } catch { /* already closed */ }
+          },
+        };
+
+        sub.send(formatSseReady(head, paused));
+        for (const ev of replay) {
+          if (!sub.send(formatSseEvent(ev))) return;
+        }
+        subscribers.add(sub);
+        timer = setInterval(() => {
+          sub.send(formatSseKeepalive());
+        }, heartbeatMs);
+        request.signal?.addEventListener("abort", () => sub.close(), { once: true });
+      },
+      cancel() {
+        cleanupRef?.();
+      },
+    });
+
+    return new Response(stream, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      },
+    });
+  }
+
   override async webSocketMessage(): Promise<void> {
-    // The socket carries nudges only; clients send nothing but pings.
+    // The socket carries nudges / events only; clients send nothing but pings.
   }
 
   override async webSocketClose(ws: WebSocket, code: number): Promise<void> {
@@ -2090,7 +2378,9 @@ export class TaskStore extends DurableObject<Env> {
 
   private broadcast(rev: number): void {
     const msg = JSON.stringify({ rev });
+    const agentSockets = new Set(this.ctx.getWebSockets("agent-events"));
     for (const ws of this.ctx.getWebSockets()) {
+      if (agentSockets.has(ws)) continue;
       try { ws.send(msg); } catch { /* dead socket; the runtime reaps it */ }
     }
   }
