@@ -383,6 +383,36 @@ actor TaskBackendClient {
     guard status == 204 || status == 200 else { throw Self.httpError(status, data) }
   }
 
+  // MARK: - APNs Push Tokens (F1b #213)
+
+  /// Registers this device's APNs hex token (`POST /v1/devices/push-token`)
+  /// so agent question turns can deliver push notifications.
+  func registerPushToken(
+    _ hexToken: String,
+    platform: String = "ios",
+    sandbox: Bool,
+    deviceId: String? = nil
+  ) async throws {
+    struct Payload: Encodable {
+      let token: String
+      let platform: String
+      let sandbox: Bool
+      let deviceId: String?
+    }
+    let body = try JSONEncoder().encode(
+      Payload(token: hexToken.lowercased(), platform: platform, sandbox: sandbox, deviceId: deviceId)
+    )
+    let (data, status) = try await authed(path: "/v1/devices/push-token", method: "POST", body: body)
+    guard status == 200 || status == 204 else { throw Self.httpError(status, data) }
+  }
+
+  /// Removes a previously registered APNs token (`DELETE /v1/devices/push-token`).
+  func deletePushToken(_ hexToken: String) async throws {
+    let body = try JSONEncoder().encode(["token": hexToken.lowercased()])
+    let (data, status) = try await authed(path: "/v1/devices/push-token", method: "DELETE", body: body)
+    guard status == 204 || status == 200 else { throw Self.httpError(status, data) }
+  }
+
   // MARK: - HTTP
 
   /// Sends with a bearer token. On 401 it refreshes once and retries. A

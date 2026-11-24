@@ -229,6 +229,7 @@ async function apiHostOnly(c: Ctx, next: Next) {
 api.use("/sync/*", requireUser, loadPlan("open", "sync"), requireSyncDevice);
 api.use("/attachments/*", requireUser, loadPlan("closed", "attachments"), requireSyncDevice);
 api.use("/account", requireUser);
+api.use("/devices/*", requireUser);
 api.use("/ical/settings", requireUser);
 api.use("/changes", requireUser, loadPlan("open", "changes"), requireSyncDevice);
 api.use("/pair/*", requireUser);
@@ -395,6 +396,40 @@ api.post("/auth/device", async (c) => {
   const userId = c.get("userId");
   logEvent("api_device_session", { by: c.get("actor") });
   return c.json(await issueSession(c.env, userId));
+});
+
+// ---- APNs device push tokens (F1b #213, docs/TASK_FACTORY_SPEC.md §8) ----
+
+const zPushToken = z.string().regex(/^[0-9a-fA-F]{32,256}$/);
+const zPushTokenRegisterBody = z.object({
+  token: zPushToken,
+  platform: z.enum(["ios", "watchos"]).default("ios"),
+  sandbox: z.boolean().default(false),
+  deviceId: z.string().trim().min(1).max(128).optional(),
+}).strict();
+const zPushTokenDeleteBody = z.object({
+  token: zPushToken,
+}).strict();
+
+api.post("/devices/push-token", async (c) => {
+  const body = await parse(c, zPushTokenRegisterBody);
+  if (body instanceof Response) return body;
+  const saved = await storeFor(c.env, c.get("userId")).upsertPushToken({
+    token: body.token.toLowerCase(),
+    deviceId: body.deviceId ?? c.get("sid") ?? null,
+    platform: body.platform,
+    sandbox: body.sandbox,
+  });
+  logEvent("push_token_registered", { platform: saved.platform, sandbox: saved.sandbox });
+  return c.json({ ok: true, platform: saved.platform, sandbox: saved.sandbox }, 200, { "Cache-Control": "no-store" });
+});
+
+api.delete("/devices/push-token", async (c) => {
+  const body = await parse(c, zPushTokenDeleteBody);
+  if (body instanceof Response) return body;
+  const removed = await storeFor(c.env, c.get("userId")).deletePushToken(body.token.toLowerCase());
+  logEvent("push_token_deleted", { removed });
+  return c.body(null, 204);
 });
 
 // ---- task views and verbs for thin clients (src/api/tasksRest.ts) ----
