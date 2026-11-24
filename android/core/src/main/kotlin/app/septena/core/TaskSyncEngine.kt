@@ -1,7 +1,12 @@
 package app.septena.core
 
 import app.septena.core.generated.RegistryEntityLimits
-import app.septena.core.stringValue
+import app.septena.sharedcore.PullPageDecision
+import app.septena.sharedcore.PullPageHeader
+import app.septena.sharedcore.PushOutcome
+import app.septena.sharedcore.PushPlan
+import app.septena.sharedcore.checkPullPage
+import app.septena.sharedcore.planPushResponse
 
 data class SyncSummary(val pushedOperations: Int, val pulledPages: Int)
 
@@ -54,98 +59,72 @@ class TaskSyncEngine(
         pushValidatedOperations(valid)
     }
 
+    /**
+     * Sends one batch. What to do with the answer is the shared core's
+     * decision (`planPushResponse`, sync-engine.json): apply the results, or
+     * on a 400 split the batch until the bad operation stands alone and mark
+     * only it rejected, with the server's reason.
+     */
     private suspend fun pushValidatedOperations(operations: List<SyncOperation>) {
         if (operations.isEmpty()) return
-
-        try {
-            val response = transport.push(operations)
-            val expectedIds = operations.map(SyncOperation::clientOpId)
-            val actualIds = response.results.map(SyncOperationResult::clientOpId)
-            require(actualIds == expectedIds) { "Push response did not match the submitted operation order" }
-            store.applyPushResults(response.results, clock.now())
+        val sentIds = operations.map(SyncOperation::clientOpId)
+        val response = try {
+            transport.push(operations)
         } catch (failure: SyncHttpFailure) {
-            if (failure.statusCode != 400) throw failure
+            act(planPushResponse(sentIds, PushOutcome.HttpFailure(failure.statusCode.toUShort(), failure.responseBody)), operations, failure)
+            return
+        }
+        when (val plan = planPushResponse(sentIds, PushOutcome.Response(response.results.map(SyncOperationResult::clientOpId)))) {
+            PushPlan.ApplyResults -> store.applyPushResults(response.results, clock.now())
+            else -> act(plan, operations, null)
+        }
+    }
 
-            if (operations.size == 1) {
-                store.applyPushResults(
-                    listOf(
-                        SyncOperationResult(
-                            clientOpId = operations.single().clientOpId,
-                            status = SyncResultStatus.REJECTED,
-                            reason = serverRejectionReason(failure),
-                        ),
-                    ),
-                    clock.now(),
-                )
-            } else {
-                val split = operations.size / 2
+    private suspend fun act(plan: PushPlan, operations: List<SyncOperation>, failure: SyncHttpFailure?) {
+        when (plan) {
+            PushPlan.ApplyResults -> error("A push failure cannot apply results")
+            is PushPlan.RejectOne -> store.applyPushResults(
+                listOf(SyncOperationResult(plan.clientOpId, SyncResultStatus.REJECTED, reason = plan.reason)),
+                clock.now(),
+            )
+            is PushPlan.Bisect -> {
+                val split = plan.splitAt.toInt()
                 pushValidatedOperations(operations.subList(0, split))
                 pushValidatedOperations(operations.subList(split, operations.size))
             }
+            is PushPlan.Propagate -> throw failure ?: SyncHttpFailure(plan.status.toInt(), "")
+            is PushPlan.Fail -> throw IllegalArgumentException(plan.reason)
         }
     }
 
-    private fun serverRejectionReason(failure: SyncHttpFailure): String {
-        val body = failure.responseBody.trim()
-        val root = try {
-            JsonValue.parse(body) as? JsonValue.ObjectValue
-        } catch (_: RuntimeException) {
-            null
-        }
-        val issues = (root?.fields?.get("issues") as? JsonValue.ArrayValue)?.values.orEmpty()
-            .mapNotNull { value ->
-                val fields = (value as? JsonValue.ObjectValue)?.fields ?: return@mapNotNull null
-                val message = fields["message"].stringValue() ?: return@mapNotNull null
-                val path = (fields["path"] as? JsonValue.ArrayValue)?.values.orEmpty()
-                    .mapNotNull { part ->
-                        when (part) {
-                            is JsonValue.StringValue -> part.value
-                            is JsonValue.IntegerValue -> part.value.toString()
-                            else -> null
-                        }
-                    }
-                    .joinToString(".")
-                if (path.isEmpty()) message else "$path: $message"
-            }
-
-        return issues.takeIf { it.isNotEmpty() }?.joinToString("; ")
-            ?: root?.fields?.get("message").stringValue()
-            ?: root?.fields?.get("error").stringValue()
-            ?: body.takeIf(String::isNotBlank)
-            ?: "The server rejected this operation with HTTP ${failure.statusCode}"
-    }
-
+    /**
+     * Pulls until caught up. Each page's fate (apply, continue, reset once,
+     * fail) is the shared core's decision (`checkPullPage`, sync-engine.json).
+     */
     private suspend fun pullUntilCaughtUp(): Int {
         val pageLimit = RegistryEntityLimits.MAX_PULL.toInt()
         var pages = 0
-        var resetCount = 0
+        var resets = 0u
+        var cursor = store.syncCursor()
         while (true) {
-            var cursor = store.syncCursor()
-            var page = transport.pull(cursor, pageLimit)
-            if (page.resetRequired) {
-                require(resetCount++ == 0) { "Server requested another sync reset from revision 0" }
-                store.resetForFullPull()
-                continue
-            }
-
-            var restartFromZero = false
-            while (true) {
-                if (page.resetRequired) {
-                    require(resetCount++ == 0) { "Server requested another sync reset from revision 0" }
-                    store.resetForFullPull()
-                    restartFromZero = true
-                    break
+            val page = transport.pull(cursor, pageLimit)
+            when (val decision = checkPullPage(cursor, PullPageHeader(page.resetRequired, page.nextSince, page.hasMore), resets)) {
+                PullPageDecision.Apply -> {
+                    store.applyPullPage(page, clock.now())
+                    return pages + 1
                 }
-                require(page.nextSince >= cursor) { "Sync cursor moved backwards" }
-                if (page.hasMore) require(page.nextSince > cursor) { "Sync pull made no progress while more pages remain" }
-                store.applyPullPage(page, clock.now())
-                pages++
-                if (!page.hasMore) return pages
-
-                cursor = page.nextSince
-                page = transport.pull(cursor, pageLimit)
+                is PullPageDecision.ApplyAndContinue -> {
+                    store.applyPullPage(page, clock.now())
+                    pages++
+                    cursor = decision.nextCursor
+                }
+                PullPageDecision.Reset -> {
+                    resets++
+                    store.resetForFullPull()
+                    cursor = store.syncCursor()
+                }
+                is PullPageDecision.Fail -> throw IllegalArgumentException(decision.reason)
             }
-            if (!restartFromZero) return pages
         }
     }
 }

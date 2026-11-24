@@ -199,6 +199,31 @@ private struct SeptaskTaskMenu: View {
   #endif
 }
 
+/// The Go menu's `smartLists` slot: every list enabled in the sidebar, in
+/// sidebar order, with the digit its place gives it. A view rather than inline
+/// menu content, so it observes `SmartListPreferences` and the menu bar follows
+/// a hide, move or sync at once.
+private struct SmartListCommands: View {
+  let canNavigate: Bool
+  let go: (TaskFilter) -> Void
+
+  var body: some View {
+    let prefs = SmartListPreferences.shared
+    let digits = prefs.digitShortcuts
+    ForEach(prefs.enabledDestinations) { dest in
+      if let filter = TaskFilter(destinationID: dest.id) {
+        let digit = digits[dest.id]
+        Button(dest.title) { go(filter) }
+          .keyboardShortcut(digit?.keyboardShortcut)
+          .disabled(!canNavigate)
+          // A menu item keeps the key equivalent it was built with: a new
+          // digit needs a new item.
+          .id("\(dest.id).\(digit?.key ?? "")")
+      }
+    }
+  }
+}
+
 /// The app-level menu shell reads the focused main-window actions instead of a
 /// NavigationState stored on `App`. This keeps two restored/windows scenes from
 /// steering each other while preserving the standard menu shortcuts.
@@ -266,19 +291,6 @@ struct SeptaskCommandMenus: Commands {
     }
     return menu
   }()
-
-  /// The smart lists the Go menu lists, in registry order.
-  private static let goDestinations: [TaskFilter] = goMenu.items
-    .filter { $0.kind == "destination" }
-    .filter { RegistryDestinations.byId[$0.id]?.applies(to: RegistryPlatform.current) ?? true }
-    .compactMap { TaskFilter(destinationID: $0.id) }
-
-  /// The ⌘-digit shortcut a destination's registry keycaps name, if any.
-  private static func shortcut(for filter: TaskFilter) -> KeyboardShortcut? {
-    guard let caps = filter.registryDestination?.shortcutKeycaps,
-          let key = caps.last?.first, caps.dropLast().allSatisfy({ $0 == "⌘" }) else { return nil }
-    return KeyboardShortcut(KeyEquivalent(key), modifiers: .command)
-  }
 
   private func go(_ filter: TaskFilter) {
     if let actions {
@@ -435,14 +447,7 @@ struct SeptaskCommandMenus: Commands {
 
   var body: some Commands {
     CommandMenu(Self.goMenu.title) {
-      // Destinations from the registry's `go` menu (`registry/actions.json`):
-      // titles and ⌘-digit shortcuts from `registry/destinations.json`, the
-      // same rows the sidebar and title dropdown show.
-      ForEach(Self.goDestinations, id: \.self) { filter in
-        Button(filter.title) { go(filter) }
-          .keyboardShortcut(Self.shortcut(for: filter))
-          .disabled(!canNavigate)
-      }
+      SmartListCommands(canNavigate: canNavigate, go: go)
 
       Divider()
 
@@ -454,8 +459,8 @@ struct SeptaskCommandMenus: Commands {
       Divider()
 
       // The AppKit shell is the default window on macOS; this reopens it if
-      // it was closed. No shortcut: ⌘0 is Reset Text Size, ⌘1–4 are the
-      // lists, and the Dock icon reopens the window too.
+      // it was closed. No shortcut: ⌘0 is Reset Text Size, ⌘-digits are
+      // the lists, and the Dock icon reopens the window too.
       Button(RegistryActions.title("app.septenaWindow")) { SeptaskKitWindowController.show() }
       ClassicWindowCommand()
 

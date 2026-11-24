@@ -13,7 +13,7 @@ iOS, iPadOS, macOS, Backend/MCP, Web, Android, and Windows. See
 | `registry/conformance/*.json` | Language-neutral golden test vectors run by Swift, TypeScript, Kotlin and the Rust core (`sync-engine.json` is run by the Rust core first, ADR 0025) | R0 (`#141`) |
 | `registry/settings.json` | Synced + device-local task settings schema, defaults, and flattened Settings taxonomy | R1 (`#142`) |
 | `registry/actions.json` | Actions, context menus, menu bar, swipe slots, platform-neutral shortcuts, shortcuts sheet | R2 (`#143`) |
-| `registry/destinations.json` | Smart lists, aliases, sidebar order, visibility, drop rules, empty states | R3 (`#144`) |
+| `registry/destinations.json` | Smart lists, aliases, sidebar order, visibility, digit shortcuts (⌘1, ⌘2, … count the `always` lists the user has enabled, in sidebar order), drop rules, empty states | R3 (`#144`) |
 | `registry/surfaces.json` | Notices, destructive/fork prompts, toasts, task composer attributes | R3 (`#144`) |
 | `registry/icons.json` | Semantic icon ID → SF Symbol / Material / Lucide map | R4 (`#145`) |
 | `registry/tokens.json` | Semantic design tokens, selection washes, 16-color palette, 5-step text scale | R4 (`#145`) |

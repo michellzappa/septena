@@ -76,6 +76,10 @@ jobs:
       - name: Core conformance vectors
         run: ./gradlew --no-daemon :core:test
 
+      # The SQLDelight store's pull merge and outbox against sync-engine.json.
+      - name: Store conformance vectors
+        run: ./gradlew --no-daemon :store:test
+
       # JVM unit tests of the app, the theme launch guard among them (#344).
       - name: App unit tests
         run: ./gradlew --no-daemon :app:testDebugUnitTest

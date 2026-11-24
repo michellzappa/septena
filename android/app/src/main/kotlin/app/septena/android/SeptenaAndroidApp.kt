@@ -20,6 +20,7 @@ import app.septena.store.SqlDelightTaskStore
 import app.septena.store.db.SeptenaDatabase
 import app.septena.transport.SeptenaAccessClient
 import app.septena.transport.SeptenaAuthClient
+import app.septena.transport.SeptenaTaskBackendClient
 import app.septena.transport.UrlConnectionSyncTransport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -59,7 +60,9 @@ class AndroidAppGraph(application: Application) {
     val credentials = AppCredentials(SessionStore(application), auth)
     private val transport = UrlConnectionSyncTransport(credentials, clientVersion)
     val access = SeptenaAccessClient(credentials, clientVersion)
-    val sync = SyncController(TaskSyncEngine(taskStore, transport, clock), appScope)
+    val taskBackend = SeptenaTaskBackendClient(credentials, clientVersion)
+    val attachments = TaskAttachmentStore(application, taskStore, registryEntityMutator, clock, taskBackend)
+    val sync = SyncController(TaskSyncEngine(taskStore, transport, clock), appScope, afterSync = attachments::afterSync)
 
     /**
      * Wraps a user gesture's task write so undo captures only that local edit.
