@@ -43,6 +43,7 @@ sealed interface TaskHomeLocation {
 data class TaskHomeNavigationItem(
     val location: TaskHomeLocation,
     val title: String? = null,
+    val emoji: String? = null,
 )
 
 data class TaskHomeUiState(
@@ -115,6 +116,23 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     fun select(location: TaskHomeLocation) {
         this.location.value = location
+    }
+
+    fun setAreaEmoji(areaId: String, emoji: String?) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.registryEntityMutator.update(
+                        EntityNames.AREA,
+                        areaId,
+                        mapOf(RegistryEntityFields.Area.EMOJI to JsonValue.stringOrNull(emoji?.takeIf(String::isNotBlank))),
+                    ) != null
+                }
+            }.onSuccess { changed ->
+                errorMessage.value = null
+                if (changed) noteLocalChangeAndSync()
+            }.onFailure { errorMessage.value = it.message }
+        }
     }
 
     fun updateDraft(title: String) {
@@ -191,7 +209,11 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             .filter { it.deletedAt == null }
             .mapNotNull { record ->
                 record.fields[RegistryEntityFields.Area.TITLE].stringValue()?.let { title ->
-                    TaskHomeNavigationItem(TaskHomeLocation.Area(record.id, title), title)
+                    TaskHomeNavigationItem(
+                        TaskHomeLocation.Area(record.id, title),
+                        title,
+                        record.fields[RegistryEntityFields.Area.EMOJI].stringValue()?.takeIf(String::isNotBlank),
+                    )
                 }
             }
         val projectRecords = graph.taskStore.records(EntityNames.PROJECT)

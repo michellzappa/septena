@@ -44,6 +44,7 @@ data class AreasProjectsUiState(
     val destination: AreasProjectsDestination? = null,
     val isLoading: Boolean = true,
     val title: String = "",
+    val emoji: String? = null,
     val notes: String = "",
     val projects: List<PlaceProjectRow> = emptyList(),
     val areaTasks: List<PlaceTaskRow> = emptyList(),
@@ -119,6 +120,17 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 selected.entityName(),
                 selected.id,
                 mapOf(field to JsonValue.stringOrNull(notes)),
+            ) != null
+        }
+    }
+
+    fun setAreaEmoji(emoji: String?) {
+        val selected = destination.value as? AreasProjectsDestination.Area ?: return
+        mutate {
+            graph.registryEntityMutator.update(
+                RegistryEntityNames.AREA,
+                selected.id,
+                mapOf(RegistryEntityFields.Area.EMOJI to JsonValue.stringOrNull(emoji?.takeIf(String::isNotBlank))),
             ) != null
         }
     }
@@ -314,6 +326,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     destination = selected,
                     isLoading = false,
                     title = title,
+                    emoji = container.fields[RegistryEntityFields.Area.EMOJI].stringValue()?.takeIf(String::isNotBlank),
                     notes = notes,
                     projects = projects,
                     areaTasks = tasks,

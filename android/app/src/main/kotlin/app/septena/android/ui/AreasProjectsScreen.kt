@@ -53,6 +53,7 @@ fun AreasProjectsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     var dialog by remember { mutableStateOf<PlacesDialog?>(null) }
+    var emojiPickerOpen by rememberSaveable(destination.key) { mutableStateOf(false) }
     var notesDraft by rememberSaveable(destination.key) { mutableStateOf("") }
     var areaTaskDraft by rememberSaveable(destination.key) { mutableStateOf("") }
     var projectTaskDraft by rememberSaveable(destination.key) { mutableStateOf("") }
@@ -76,6 +77,13 @@ fun AreasProjectsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
+                        if (destination is AreasProjectsDestination.Area) {
+                            AreaEmojiButton(
+                                emoji = state.emoji,
+                                accessibilityLabel = actionTitle(RegistryActionIds.AREA_CHANGE_EMOJI, languageTag),
+                                onClick = { emojiPickerOpen = true },
+                            )
+                        }
                         Text(state.title, modifier = Modifier.weight(1f))
                         TextButton(onClick = { dialog = PlacesDialog.RenamePlace(state.title) }) {
                             Text(actionTitle(destination.renameAction(), languageTag))
@@ -202,6 +210,15 @@ fun AreasProjectsScreen(
                 }
             }
         }
+    }
+
+    if (emojiPickerOpen && destination is AreasProjectsDestination.Area) {
+        AreaEmojiPickerSheet(
+            initialEmoji = state.emoji,
+            languageTag = languageTag,
+            onDismissRequest = { emojiPickerOpen = false },
+            onSelect = viewModel::setAreaEmoji,
+        )
     }
 
     state.errorMessage?.let { message ->

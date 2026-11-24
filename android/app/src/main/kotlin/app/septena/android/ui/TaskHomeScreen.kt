@@ -2,7 +2,9 @@ package app.septena.android.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -24,8 +26,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,10 +51,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.septena.android.AndroidAppGraph
+import app.septena.core.RegistryActionContext
+import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryCapabilityIds
 import app.septena.core.generated.RegistryDestinationIds
+import app.septena.core.generated.RegistryPlatformIds
 import app.septena.ui.TaskHomeContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -192,6 +200,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                             projectsTitle = projectsTitle,
                             settingsTitle = settingsTitle,
                             onSelect = selectHomeLocation,
+                            onSetAreaEmoji = homeViewModel::setAreaEmoji,
                             onOpenSettings = { settingsOpen = true },
                         )
                     }
@@ -244,6 +253,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                             areasTitle = areasTitle,
                             projectsTitle = projectsTitle,
                             settingsTitle = settingsTitle,
+                            onSetAreaEmoji = homeViewModel::setAreaEmoji,
                             onSelect = { location ->
                                 selectHomeLocation(location)
                                 scope.launch { drawerState.close() }
@@ -310,6 +320,7 @@ private fun TaskHomeNavigation(
     projectsTitle: String,
     settingsTitle: String,
     onSelect: (TaskHomeLocation) -> Unit,
+    onSetAreaEmoji: (String, String?) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     Column(
@@ -335,11 +346,15 @@ private fun TaskHomeNavigation(
         if (areasTitle.isNotEmpty()) {
             DrawerGroupTitle(areasTitle)
             state.areas.forEach { item ->
-                NavigationDrawerItem(
-                    label = { Text(item.title.orEmpty()) },
+                AreaNavigationDrawerItem(
+                    item = item,
                     selected = state.location == item.location,
-                    onClick = { onSelect(item.location) },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                    languageTag = languageTag,
+                    onSelect = { onSelect(item.location) },
+                    onSetEmoji = { emoji ->
+                        val area = item.location as TaskHomeLocation.Area
+                        onSetAreaEmoji(area.id, emoji)
+                    },
                 )
             }
         }
@@ -360,6 +375,81 @@ private fun TaskHomeNavigation(
             selected = false,
             onClick = onOpenSettings,
             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+        )
+    }
+}
+
+@Composable
+private fun AreaNavigationDrawerItem(
+    item: TaskHomeNavigationItem,
+    selected: Boolean,
+    languageTag: String,
+    onSelect: () -> Unit,
+    onSetEmoji: (String?) -> Unit,
+) {
+    val area = item.location as? TaskHomeLocation.Area ?: return
+    var menuExpanded by rememberSaveable(area.id) { mutableStateOf(false) }
+    var emojiPickerOpen by rememberSaveable(area.id) { mutableStateOf(false) }
+    val menuActions = remember {
+        RegistryCatalog.menuActionIds("sidebar.area")
+    }
+    val actionContext = remember {
+        RegistryActionContext(
+            platform = RegistryPlatformIds.ANDROID,
+            destinationId = null,
+            selectedCount = 1,
+        )
+    }
+    val changeEmojiAvailable = RegistryActionIds.AREA_CHANGE_EMOJI in menuActions &&
+        RegistryActionResolver.isAvailable(RegistryActionIds.AREA_CHANGE_EMOJI, actionContext)
+    val changeEmojiTitle = RegistryCatalog.actionTitle(
+        RegistryActionIds.AREA_CHANGE_EMOJI,
+        languageTag = languageTag,
+    ).orEmpty()
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(NavigationDrawerItemDefaults.ItemPadding),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        NavigationDrawerItem(
+            label = {
+                Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
+                    item.emoji?.let { Text(it) }
+                    Text(item.title.orEmpty())
+                }
+            },
+            selected = selected,
+            onClick = onSelect,
+            modifier = Modifier.weight(1f),
+        )
+        if (changeEmojiAvailable) {
+            Box {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier.semantics { contentDescription = changeEmojiTitle },
+                ) {
+                    Text("⋮", style = MaterialTheme.typography.titleLarge)
+                }
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    DropdownMenuItem(
+                        text = { Text(changeEmojiTitle) },
+                        onClick = {
+                            menuExpanded = false
+                            emojiPickerOpen = true
+                        },
+                    )
+                }
+            }
+        }
+    }
+    if (emojiPickerOpen) {
+        AreaEmojiPickerSheet(
+            initialEmoji = item.emoji,
+            languageTag = languageTag,
+            onDismissRequest = { emojiPickerOpen = false },
+            onSelect = onSetEmoji,
         )
     }
 }

@@ -96,6 +96,13 @@ object RegistryCatalog {
     fun action(id: String): JsonValue.ObjectValue? =
         document("actions").objectAt("actions")?.get(id) as? JsonValue.ObjectValue
 
+    /** Action IDs in a registry context menu, preserving its declared order. */
+    fun menuActionIds(id: String): List<String> =
+        document("actions").objectAt("menus")?.arrayAt(id).orEmpty().mapNotNull { raw ->
+            val entry = raw as? JsonValue.ObjectValue ?: return@mapNotNull null
+            if (entry.stringAt("kind") == "action") entry.stringAt("id") else null
+        }
+
     fun setting(key: String): JsonValue.ObjectValue? =
         document("settings").objectAt("keys")?.get(key) as? JsonValue.ObjectValue
 
