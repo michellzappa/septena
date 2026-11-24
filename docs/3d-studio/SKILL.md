@@ -25,7 +25,8 @@ All scripts live in `tools/3d-studio/`:
   - **Low-angle true orthographic isometric** (`~9.5°` elevation, ~`21°` front-left azimuth).
   - **Tight zoom:** MacBook bleeds slightly off the left edge while keeping the entire Mac app window visible; the iPhone's gleaming right titanium rail sits right along the right edge of the frame with ~1% breathing sliver (no empty right-hand margin).
   - **Midpoint vertical anchor:** Devices occupy the vertical middle of the 9:16 frame, leaving ~25–28% dark topographic headroom above for headline copy (e.g. *"One list, every device."*) and a smooth warm-lit dark slate desk below.
-  - **4-device array:** MacBook Pro 14" in back, landscape iPad Mini in front of the left half of the MacBook keyboard, iPhone in front of the right keyboard edge, and Apple Watch laid low in front-center between iPad and iPhone. Overlap over the lower MacBook display is fine and keeps all screens large and legible.
+  - **4-device Apple array (`--platform apple`, default):** MacBook Pro 14" in back, landscape iPad Mini in front of the left half of the MacBook keyboard, iPhone in front of the right keyboard edge, and Apple Watch laid low in front-center between iPad and iPhone. Overlap over the lower MacBook display is fine and keeps all screens large and legible.
+  - **Windows + Android array (`--platform android`):** 14" aluminum Windows ultrabook (`windows_laptop_14.blend`, 4K PBR keyboard textures preserved with metallic roughness clamped `>= 0.42`) paired with either **Samsung Galaxy S25 Ultra** (`--android-phone galaxy`, default — squared titanium flagship) or **Google Pixel 9 Pro** (`--android-phone pixel`). Front punch-hole camera meshes are removed by default (`--keep-notch` keeps them) and overlay touch glass is switched to `BsdfTransparent` so the dual-path emissive screen shines cleanly with zero double-glass glare.
 - **Industrial-design details (all applied procedurally in `render.py`):**
   - **MacBook Pro 14":** Notchless OLED display with **symmetric rounded corners on BOTH top and bottom** (`corner_radius=0.036, aspect=1.522` analytic SDF mask), velvety bead-blasted anodized aluminum (`metallic=0.88`, `roughness=0.42`, micro-bead bump `scale=1800, strength=0.015` — **never** shiny `0.25` chrome), dark matte keyboard (`Emission Strength = 0.0`).
   - **iPad Mini:** Chunky stock 10 mm bezels thinned procedurally via `thin_ipad_bezels()` down to uniform **~4.2 mm** bezels, paired with an **analytic concentric inner corner radius** (`corner_radius=0.068, aspect=1.507` → `8.4 mm = outer 12.6 mm − 4.2 mm bezel`) so corner curvature tracks the outer glass rim concentrically.
@@ -54,16 +55,23 @@ All scripts live in `tools/3d-studio/`:
      --preset iso-vertical --scale 0.5 --samples 32 \
      --out /tmp/preview.png
    ```
-2. **Production render (`1080×1920` ~80s; add `--scale 2.0` for 4K):**
+2. **Production renders (`1080×1920` ~80s; add `--scale 2.0` for 4K):**
    ```bash
+   # Apple ecosystem (MacBook Pro 14" + iPad Mini + iPhone + Watch)
    blender -b --python tools/3d-studio/render.py -- \
-     --preset iso-vertical \
-     --mac path/to/mac.png \
-     --ipad path/to/ipad.png \
-     --ios path/to/ios.png \
-     --watch path/to/watch.png \
+     --platform apple --preset iso-vertical \
+     --mac path/to/mac.png --ipad path/to/ipad.png \
+     --ios path/to/ios.png --watch path/to/watch.png \
      --samples 112 \
      --save-blend tools/3d-studio/studio_iso.blend \
      --out tools/3d-studio/renders/iso_vertical_4dev.png
+
+   # Windows + Android (Windows 14" ultrabook + Galaxy S25 Ultra or Pixel 9 Pro)
+   blender -b --python tools/3d-studio/render.py -- \
+     --platform android --android-phone galaxy --preset iso-vertical \
+     --mac path/to/windows.png --ios path/to/android.png \
+     --samples 112 \
+     --save-blend tools/3d-studio/studio_iso_android.blend \
+     --out tools/3d-studio/renders/iso_vertical_android_galaxy.png
    ```
 3. **Real screenshots:** Current Septena task-app screens come from `node appstore/export-scenes.mjs` (`appstore/scenes/`) or user-supplied native Mac/iPad/iPhone/Watch captures. Do **not** reuse the older June all-in-one Septena Life screenshots in `appstore/raw/`.

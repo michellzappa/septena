@@ -33,12 +33,14 @@ def parse_args():
     else:
         argv = []
     p = argparse.ArgumentParser(description="Render Septena 3D marketing scene")
-    p.add_argument("--mac", default=os.path.join(SCREENS_DIR, "demo_mac.png"))
+    p.add_argument("--platform", choices=["apple", "android"], default="apple", help="Device ecosystem: apple (Mac/iPad/iPhone/Watch) or android (Windows laptop + Pixel/Galaxy)")
+    p.add_argument("--mac", default=None, help="Laptop screen PNG (defaults to demo_mac.png or demo_windows.png)")
     p.add_argument("--ipad", default=os.path.join(SCREENS_DIR, "demo_ipad.png"))
-    p.add_argument("--no-ipad", action="store_true", help="Omit the iPad Mini from the scene")
-    p.add_argument("--ios", default=os.path.join(SCREENS_DIR, "demo_ios.png"))
+    p.add_argument("--no-ipad", action="store_true", help="Omit the iPad Mini from the Apple scene")
+    p.add_argument("--ios", default=None, help="Phone screen PNG (defaults to demo_ios.png or demo_android.png)")
     p.add_argument("--watch", default=os.path.join(SCREENS_DIR, "demo_watch.png"))
     p.add_argument("--phone", choices=["pro", "air"], default="pro")
+    p.add_argument("--android-phone", choices=["galaxy", "pixel"], default="galaxy", help="Android phone model when --platform android")
     p.add_argument("--mac-finish", choices=["silver", "space-black"], default="silver")
     p.add_argument("--preset", choices=["hero-vertical", "ortho-vertical", "iso-vertical", "hero-wide", "square", "closeup-phone"], default="hero-vertical")
     p.add_argument("--keep-notch", action="store_true", help="Keep the MacBook camera notch (removed by default)")
@@ -952,10 +954,136 @@ def setup_camera(scene, preset, scale):
     return cobj
 
 
+def build_windows_laptop(laptop_screen_path, finish="silver"):
+    """Build the 14-inch aluminum Windows laptop with satin-matte PBR aluminum & crisp emissive screen."""
+    col, objs = append_all_objects(os.path.join(MODELS_DIR, "windows_laptop_14.blend"), "WindowsLaptop")
+    root = create_root_empty("WindowsLaptopRoot", objs, col)
+
+    # Preserve original 4K keyboard/trackpad PBR texture maps while clamping metallic roughness >= 0.40
+    # so the aluminum chassis reads as velvety bead-blasted anodized aluminum rather than shiny chrome.
+    for mat in bpy.data.materials:
+        if mat.name.startswith("Laptop14_mat") and mat.node_tree:
+            nt = mat.node_tree
+            bsdf = next((n for n in nt.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+            if bsdf:
+                if finish == "space-black" and bsdf.inputs['Base Color'].is_linked:
+                    src = bsdf.inputs['Base Color'].links[0].from_socket
+                    hsv = nt.nodes.new('ShaderNodeHueSaturation')
+                    hsv.inputs['Value'].default_value = 0.22
+                    nt.links.new(src, hsv.inputs['Color'])
+                    nt.links.new(hsv.outputs['Color'], bsdf.inputs['Base Color'])
+                if bsdf.inputs['Roughness'].is_linked:
+                    src = bsdf.inputs['Roughness'].links[0].from_socket
+                    mx = nt.nodes.new('ShaderNodeMath')
+                    mx.operation = 'MAXIMUM'
+                    mx.inputs[1].default_value = 0.42
+                    nt.links.new(src, mx.inputs[0])
+                    nt.links.new(mx.outputs['Value'], bsdf.inputs['Roughness'])
+                else:
+                    bsdf.inputs['Roughness'].default_value = 0.42
+
+    scr_obj = next((o for o in objs if o.type == 'MESH' and "screen" in o.name.lower()), None)
+    if scr_obj:
+        scr_mat = next((m for m in scr_obj.data.materials if m and "screen" in m.name.lower()), None)
+        if scr_mat:
+            reproject_planar_uv(scr_obj, scr_mat.name, u_axis='x', v_axis='z', flip_u=False, flip_v=False)
+            make_emissive_screen_material(
+                scr_mat, laptop_screen_path,
+                cam_strength=1.52, bounce_strength=8.5, glass_gloss=0.015,
+                corner_radius=0.018, aspect=1.488,
+            )
+
+    root.location = (0.0, 0.03, 0.0)
+    drop_to_floor(root, objs, 0.0)
+    return root, objs
+
+
+def make_transparent_material(mat):
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new('ShaderNodeOutputMaterial')
+    tr = nt.nodes.new('ShaderNodeBsdfTransparent')
+    nt.links.new(tr.outputs['BSDF'], out.inputs['Surface'])
+
+
+def build_android_phone(android_screen_path, model="pixel", keep_notch=False, preset="iso-vertical"):
+    """Build Google Pixel 9 Pro or Samsung Galaxy S25 Ultra with crisp emissive screen & titanium rails."""
+    if model == "galaxy":
+        blend_fn = "galaxy_s25_ultra.blend"
+        screen_obj_name = "Screen"
+        cam_obj_prefix = "Front-facing camera"
+        aspect = 0.473
+        corner_r = 0.014
+    else:
+        blend_fn = "pixel_9_pro.blend"
+        screen_obj_name = "Screen Emission"
+        cam_obj_prefix = "Front camera"
+        aspect = 0.464
+        corner_r = 0.056
+
+    col, objs = append_all_objects(os.path.join(MODELS_DIR, blend_fn), "AndroidPhone")
+    root = create_root_empty("AndroidPhoneRoot", objs, col)
+
+    # Remove front punch-hole camera object for a clean uninterrupted top edge unless --keep-notch
+    kept = []
+    for o in objs:
+        if not keep_notch and o.type == 'MESH' and o.name.startswith(cam_obj_prefix):
+            bpy.data.objects.remove(o, do_unlink=True)
+            continue
+        kept.append(o)
+    objs = kept
+
+    scr_obj = next((o for o in objs if o.type == 'MESH' and o.name.startswith(screen_obj_name)), None)
+    if scr_obj and scr_obj.data.materials:
+        scr_mat = scr_obj.data.materials[0]
+        reproject_planar_uv(scr_obj, scr_mat.name, u_axis='x', v_axis='y', flip_u=False, flip_v=False)
+        make_emissive_screen_material(
+            scr_mat, android_screen_path,
+            cam_strength=1.48, bounce_strength=4.5, glass_gloss=0.018,
+            corner_radius=corner_r, aspect=aspect,
+        )
+
+    # Make overlay touch glass transparent (screen material already supplies subtle Fresnel glass sheen),
+    # polish bezel glossy jet black, and refine titanium rails.
+    for o in objs:
+        if o.type != 'MESH' or o == scr_obj:
+            continue
+        for m in o.data.materials:
+            if not m:
+                continue
+            low = m.name.lower()
+            if "glass" in low and ("touch" in o.name.lower() or m.name.startswith("Glass")):
+                make_transparent_material(m)
+            elif "screen black" in low or low == "jet black" or low == "black":
+                set_simple_pbr(m, (0.005, 0.005, 0.006), metallic=0.0, roughness=0.05, coat=0.7)
+            elif "titanium" in low:
+                # Warm satin natural titanium rail matching our studio palette
+                set_simple_pbr(m, (0.68, 0.60, 0.54), metallic=0.95, roughness=0.22, coat=0.2, bump_scale=1200.0, bump_strength=0.004)
+
+    # Both Pixel 9 Pro and Galaxy S25 Ultra lie face-up (+Z normal, +Y top, +X right) in source .blend:
+    # rot_x = +76 deg stands upright facing -Y leaned back 14 deg; rot_z = -22 deg faces toward iso camera.
+    if preset == "iso-vertical":
+        root.rotation_euler = (math.radians(76.0), 0.0, math.radians(-22.0))
+        root.location = (0.082, -0.120, 0.0)
+    else:
+        root.rotation_euler = (math.radians(79.0), 0.0, math.radians(-14.0))
+        root.location = (0.056, -0.245, 0.0)
+    drop_to_floor(root, objs, 0.0)
+    return root, objs
+
+
 def main():
     args = parse_args()
     os.makedirs(RENDERS_DIR, exist_ok=True)
-    out_path = args.out or os.path.join(RENDERS_DIR, f"{args.preset}_{args.phone}.png")
+    if args.platform == "android":
+        mac_screen = args.mac or os.path.join(SCREENS_DIR, "demo_windows.png")
+        phone_screen = args.ios or os.path.join(SCREENS_DIR, "demo_android.png")
+        default_name = f"{args.preset}_android_{args.android_phone}.png"
+    else:
+        mac_screen = args.mac or os.path.join(SCREENS_DIR, "demo_mac.png")
+        phone_screen = args.ios or os.path.join(SCREENS_DIR, "demo_ios.png")
+        default_name = f"{args.preset}_{args.phone}.png"
+    out_path = args.out or os.path.join(RENDERS_DIR, default_name)
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
 
     clear_scene()
@@ -963,11 +1091,15 @@ def main():
     setup_cycles(scene, args.samples)
     build_desk(scene)
     build_topo_backdrop(scene, preset=args.preset)
-    build_macbook(args.mac, keep_notch=args.keep_notch, finish=args.mac_finish)
-    if not args.no_ipad:
-        build_ipad(args.ipad, preset=args.preset, finish=args.mac_finish)
-    build_iphone(args.ios, args.phone, keep_notch=args.keep_notch, preset=args.preset)
-    build_watch(args.watch, preset=args.preset)
+    if args.platform == "android":
+        build_windows_laptop(mac_screen, finish=args.mac_finish)
+        build_android_phone(phone_screen, model=args.android_phone, keep_notch=args.keep_notch, preset=args.preset)
+    else:
+        build_macbook(mac_screen, keep_notch=args.keep_notch, finish=args.mac_finish)
+        if not args.no_ipad:
+            build_ipad(args.ipad, preset=args.preset, finish=args.mac_finish)
+        build_iphone(phone_screen, args.phone, keep_notch=args.keep_notch, preset=args.preset)
+        build_watch(args.watch, preset=args.preset)
     setup_lighting_and_world(scene)
     setup_camera(scene, args.preset, args.scale)
 
