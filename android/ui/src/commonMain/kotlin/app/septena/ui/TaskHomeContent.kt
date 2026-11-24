@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -48,6 +49,10 @@ data class TaskListItem(
     val isCompleted: Boolean = false,
     val isOnToday: Boolean = false,
     val isStarred: Boolean = false,
+    /** Row opacity from the fade fill (1 = full strength), as on iOS. */
+    val opacity: Float = 1f,
+    /** A section heading shown above this row when it differs from the row before (Agent stages). */
+    val groupTitle: String? = null,
 )
 
 data class TaskRowMenuAction(
@@ -189,6 +194,15 @@ private fun LazyListScope.taskRows(
     onTaskAction: (String, String) -> Unit,
 ) {
     itemsIndexed(tasks, key = { _, task -> "$keyPrefix:${task.id}" }) { index, task ->
+        val group = task.groupTitle
+        if (group != null && (index == 0 || tasks[index - 1].groupTitle != group)) {
+            Text(
+                text = group,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 6.dp),
+            )
+        }
         TaskRow(
             task = task,
             completeTitle = completeTitle,
@@ -254,7 +268,7 @@ private fun TaskRow(
     val showToday = showTodayIndicator && task.isOnToday && !task.isCompleted
     var menuExpanded by remember(task.id) { mutableStateOf(false) }
     ListItem(
-        modifier = Modifier.fillMaxWidth().combinedClickable(
+        modifier = Modifier.fillMaxWidth().alpha(task.opacity).combinedClickable(
             onClick = { onOpenTask(task.id) },
             onLongClick = { menuExpanded = true },
         ),

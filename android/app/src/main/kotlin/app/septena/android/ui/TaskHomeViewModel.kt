@@ -9,6 +9,7 @@ import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
 import app.septena.core.SmartListResolver
 import app.septena.core.SyncRecord
+import app.septena.core.TaskConversation
 import app.septena.core.TaskFadeRules
 import app.septena.core.TaskProvenance
 import app.septena.core.TaskSnapshot
@@ -319,6 +320,13 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
         val now = graph.clock.now()
         val today = graph.clock.today(now)
+        // Conversations (one per task id) drive Review, Agent and the fade
+        // exemptions; their rules are the core's (convo.rs).
+        val conversations = graph.taskStore.records(EntityNames.CONVO)
+            .filter { it.deletedAt == null }
+            .associate { it.id to runCatching { TaskConversation.from(it, graph.taskStore.turns(it.id)) }.getOrNull() }
+        val agentGroups = agentGroupTitles()
+        val showAging = graph.deviceSettings.bool(RegistrySettingKeys.TASKS_SHOW_AGING)
         val resolvedLocation = when (selected) {
             is TaskHomeLocation.Area -> areaRecords.firstOrNull {
                 (it.location as? TaskHomeLocation.Area)?.id == selected.id
@@ -335,9 +343,27 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             val membership = TaskViewRules.membership(snapshot, today, now)
             when (resolvedLocation) {
                 is TaskHomeLocation.SmartList -> {
-                    if (!TaskViewRules.matchesView(snapshot, resolvedLocation.destinationId, today, now)) continue
+                    val conversation = conversations[snapshot.id]
+                    val stage = conversation?.agentStage(now)
+                    val listed = when (resolvedLocation.destinationId) {
+                        // Review: open tasks an agent handed back to verify.
+                        RegistryDestinationIds.REVIEW ->
+                            snapshot.status == RegistryEntityEnums.TaskStatus.OPEN && !snapshot.isHeading &&
+                                snapshot.deletedAt == null && conversation?.needsHumanReview == true
+                        // Agent: every task with an agent stage, grouped by stage.
+                        RegistryDestinationIds.AGENT ->
+                            stage != null && !snapshot.isHeading && snapshot.deletedAt == null
+                        else -> TaskViewRules.matchesView(snapshot, resolvedLocation.destinationId, today, now)
+                    }
+                    if (!listed) continue
+                    val item = taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday)
+                        .withFade(snapshot, conversation, now, today, showAging)
                     val positioned = PositionedTask(
-                        taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday),
+                        if (resolvedLocation.destinationId == RegistryDestinationIds.AGENT) {
+                            item.copy(groupTitle = agentGroups[stage])
+                        } else {
+                            item
+                        },
                         record.fields[positionField(resolvedLocation.destinationId)].numberValue()
                             ?: record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                         archiveDate = when (resolvedLocation.destinationId) {
@@ -356,14 +382,16 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 is TaskHomeLocation.Area -> {
                     if (snapshot.area != resolvedLocation.id || !isOpenVisible(snapshot)) continue
                     visible += PositionedTask(
-                        taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday),
+                        taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday)
+                            .withFade(snapshot, conversations[snapshot.id], now, today, showAging),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
                 }
                 is TaskHomeLocation.Project -> {
                     if (snapshot.project != resolvedLocation.id || !isOpenVisible(snapshot)) continue
                     visible += PositionedTask(
-                        taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday),
+                        taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday)
+                            .withFade(snapshot, conversations[snapshot.id], now, today, showAging),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
                 }
@@ -392,6 +420,14 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             ),
         ) && destinationId != RegistryDestinationIds.LOGBOOK &&
             destinationId != RegistryDestinationIds.RECENTLY_DELETED
+        val stageOrder = agentGroups.values.toList()
+        val orderedTasks = visible.sortedTaskItems(destinationId).let { items ->
+            if (destinationId == RegistryDestinationIds.AGENT) {
+                items.sortedBy { stageOrder.indexOf(it.groupTitle).let { i -> if (i < 0) Int.MAX_VALUE else i } }
+            } else {
+                items
+            }
+        }
         return LoadedTaskHome(
             hasLoaded = true,
             location = resolvedLocation,
@@ -399,7 +435,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             areas = areaRecords,
             projects = projectRecords,
             inboxTasks = inbox.sortedTaskItems(),
-            tasks = visible.sortedTaskItems(destinationId),
+            tasks = orderedTasks,
             canQuickAdd = canQuickAdd,
             canComplete = canComplete,
             agentsPaused = agentsPaused,
@@ -439,6 +475,56 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         )
     }
 
+    /**
+     * Row opacity from the core's fade fill (fade.rs), as on iOS: an
+     * untouched open task fades over the fade window. Agent work, waiting
+     * conversations, dated, deadline and repeating tasks never fade.
+     */
+    private fun TaskListItem.withFade(
+        snapshot: TaskSnapshot,
+        conversation: TaskConversation?,
+        now: java.time.Instant,
+        today: java.time.LocalDate,
+        showAging: Boolean,
+    ): TaskListItem {
+        // Settings ▸ Lists ▸ "Fade inactive tasks" (tasksShowAging) off: rows stay at full strength.
+        if (!showAging) return this
+        val fill = runCatching {
+            TaskFadeRules.fadeFill(
+                isOpen = snapshot.status == RegistryEntityEnums.TaskStatus.OPEN,
+                isHeading = snapshot.isHeading,
+                isDeleted = snapshot.deletedAt != null,
+                isFaded = TaskFadeRules.isFaded(snapshot.fadedAt),
+                deadline = snapshot.deadline,
+                scheduled = snapshot.scheduled,
+                hasRecurrence = snapshot.recurrenceUnit != null,
+                isAgentTurn = conversation?.isAgentTurn(now) == true,
+                isAssignedToClaude = conversation?.assignee == RegistryEntityEnums.ConvoAssignee.CLAUDE,
+                showsAgentCue = TaskProvenance.isAgentAuthored(snapshot.source) && snapshot.acknowledgedAt == null,
+                touchedAt = snapshot.touchedAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() },
+                createdAt = snapshot.createdAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() },
+                created = snapshot.created,
+                now = now,
+                today = today.toString(),
+                isAwaitingHuman = conversation?.awaitsHuman == true,
+            )
+        }.getOrNull()
+        return copy(opacity = TaskFadeRules.rowOpacity(fill).toFloat())
+    }
+
+    /** Agent stage id to its title, in the order registry/destinations.json lists the groups. */
+    private fun agentGroupTitles(): LinkedHashMap<String?, String> {
+        val groups = (RegistryCatalog.destination(RegistryDestinationIds.AGENT)?.fields?.get("groups") as? JsonValue.ArrayValue)
+            ?.values.orEmpty()
+        val out = LinkedHashMap<String?, String>()
+        for (group in groups) {
+            val g = (group as? JsonValue.ObjectValue)?.fields ?: continue
+            val id = g["id"].stringValue() ?: continue
+            out[id] = g["title"].stringValue() ?: id
+        }
+        return out
+    }
+
     private fun isOpenVisible(task: TaskSnapshot): Boolean =
             task.status == RegistryEntityEnums.TaskStatus.OPEN &&
             !task.isHeading && task.deletedAt == null && !TaskFadeRules.isFaded(task.fadedAt)
@@ -465,8 +551,12 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private companion object {
         val SHELL_DESTINATIONS = setOf(
             RegistryDestinationIds.TODAY,
+            RegistryDestinationIds.REVIEW,
+            RegistryDestinationIds.AGENT,
             RegistryDestinationIds.UPCOMING,
             RegistryDestinationIds.REPEATING,
+            RegistryDestinationIds.STARRED,
+            RegistryDestinationIds.FADED,
             RegistryDestinationIds.ANYTIME,
             RegistryDestinationIds.LOGBOOK,
             RegistryDestinationIds.RECENTLY_DELETED,
