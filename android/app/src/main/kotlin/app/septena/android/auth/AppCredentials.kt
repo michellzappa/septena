@@ -17,6 +17,8 @@ class AppCredentials(
     private val store: SessionStore,
     private val auth: SeptenaAuthClient,
     private val nowMs: () -> Long = System::currentTimeMillis,
+    /** Must succeed before a new session is stored: the wipe of a deleted account, when one is pending. */
+    private val beforeAdopt: suspend () -> Unit = {},
 ) : SyncCredentials {
     private val mutex = Mutex()
     @Volatile private var access: String? = null
@@ -25,7 +27,10 @@ class AppCredentials(
     private val _signedIn = MutableStateFlow(store.load() != null)
     val signedIn: StateFlow<Boolean> = _signedIn.asStateFlow()
 
-    suspend fun adopt(tokens: SessionTokens) = mutex.withLock { remember(tokens) }
+    suspend fun adopt(tokens: SessionTokens) {
+        beforeAdopt()
+        mutex.withLock { remember(tokens) }
+    }
 
     override suspend fun accessToken(): String? {
         val current = access
