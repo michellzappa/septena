@@ -57,6 +57,7 @@ fun TaskHomeContent(
     inboxTasks: List<TaskListItem>,
     tasks: List<TaskListItem>,
     canQuickAdd: Boolean,
+    isDraftOpen: Boolean,
     canComplete: Boolean,
     draftTitle: String,
     errorMessage: String?,
@@ -70,17 +71,13 @@ fun TaskHomeContent(
         modifier = modifier.fillMaxSize().padding(vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (canQuickAdd && !isToday) {
-            QuickAddRow(quickAddTitle, quickAddSubmitTitle, draftTitle, onDraftTitleChange, onQuickAdd)
-        }
-
         errorMessage?.let { Text(it) }
 
         LazyColumn(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            if (isToday && (inboxTasks.isNotEmpty() || canQuickAdd)) {
+            if (isToday && (inboxTasks.isNotEmpty() || (canQuickAdd && isDraftOpen))) {
                 item(key = "inbox-band-title") {
                     Text(
                         text = inboxBandTitle,
@@ -103,8 +100,13 @@ fun TaskHomeContent(
                     onOpenTask = onOpenTask,
                 )
             }
-            if (isToday && canQuickAdd) {
+            if (isToday && canQuickAdd && isDraftOpen) {
                 item(key = "inbox-capture") {
+                    QuickAddRow(quickAddTitle, quickAddSubmitTitle, draftTitle, onDraftTitleChange, onQuickAdd)
+                }
+            }
+            if (!isToday && canQuickAdd && isDraftOpen) {
+                item(key = "list-capture") {
                     QuickAddRow(quickAddTitle, quickAddSubmitTitle, draftTitle, onDraftTitleChange, onQuickAdd)
                 }
             }

@@ -25,6 +25,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,6 +37,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -57,9 +61,14 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
     var openedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var quickFindOpen by rememberSaveable { mutableStateOf(false) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    var inlineDraftOpen by rememberSaveable { mutableStateOf(false) }
     val factory = remember(graph) { TaskHomeViewModelFactory(graph) }
     val homeViewModel: TaskHomeViewModel = viewModel(factory = factory)
     val state by homeViewModel.state.collectAsStateWithLifecycle()
+    val selectHomeLocation: (TaskHomeLocation) -> Unit = { location ->
+        inlineDraftOpen = false
+        homeViewModel.select(location)
+    }
     val undoSnackbarHostState = remember { SnackbarHostState() }
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val wideLayout = LocalConfiguration.current.screenWidthDp >= 600
@@ -153,20 +162,20 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                     }?.location ?: TaskHomeLocation.Area(target.areaId, "")
                     else -> TaskHomeLocation.SmartList(target.destinationId ?: RegistryDestinationIds.TODAY)
                 }
-                homeViewModel.select(destination)
+                selectHomeLocation(destination)
                 openedTaskId = target.taskId
             }
             is QuickFindTarget.Area -> {
                 val destination = state.areas.firstOrNull {
                     (it.location as? TaskHomeLocation.Area)?.id == target.areaId
                 }?.location ?: TaskHomeLocation.Area(target.areaId, "")
-                homeViewModel.select(destination)
+                selectHomeLocation(destination)
             }
             is QuickFindTarget.Project -> {
                 val destination = state.projects.firstOrNull {
                     (it.location as? TaskHomeLocation.Project)?.id == target.projectId
                 }?.location ?: TaskHomeLocation.Project(target.projectId, "")
-                homeViewModel.select(destination)
+                selectHomeLocation(destination)
             }
         }
     }
@@ -182,7 +191,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                             areasTitle = areasTitle,
                             projectsTitle = projectsTitle,
                             settingsTitle = settingsTitle,
-                            onSelect = homeViewModel::select,
+                            onSelect = selectHomeLocation,
                             onOpenSettings = { settingsOpen = true },
                         )
                     }
@@ -209,6 +218,8 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         emptyDescription = emptyDescription,
                         inboxTitle = inboxTitle,
                         todayTitle = todayTitle,
+                        inlineDraftOpen = inlineDraftOpen,
+                        onOpenInlineDraft = { inlineDraftOpen = true },
                         showNavigationAction = false,
                         onDraftTitleChange = homeViewModel::updateDraft,
                         onQuickAdd = homeViewModel::quickAdd,
@@ -216,7 +227,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         onOpenTask = { openedTaskId = it },
                         onQuickFind = { quickFindOpen = true },
                         onToggleAgentsPaused = { homeViewModel.setAgentsPaused(!state.agentsPaused) },
-                        onSelectHomeLocation = homeViewModel::select,
+                        onSelectHomeLocation = selectHomeLocation,
                     )
                 }
             }
@@ -234,7 +245,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                             projectsTitle = projectsTitle,
                             settingsTitle = settingsTitle,
                             onSelect = { location ->
-                                homeViewModel.select(location)
+                                selectHomeLocation(location)
                                 scope.launch { drawerState.close() }
                             },
                             onOpenSettings = {
@@ -266,6 +277,8 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         emptyDescription = emptyDescription,
                         inboxTitle = inboxTitle,
                         todayTitle = todayTitle,
+                        inlineDraftOpen = inlineDraftOpen,
+                        onOpenInlineDraft = { inlineDraftOpen = true },
                         showNavigationAction = true,
                         onOpenNavigation = { scope.launch { drawerState.open() } },
                         onDraftTitleChange = homeViewModel::updateDraft,
@@ -274,7 +287,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         onOpenTask = { openedTaskId = it },
                         onQuickFind = { quickFindOpen = true },
                         onToggleAgentsPaused = { homeViewModel.setAgentsPaused(!state.agentsPaused) },
-                        onSelectHomeLocation = homeViewModel::select,
+                        onSelectHomeLocation = selectHomeLocation,
                     )
                 }
             }
@@ -376,6 +389,8 @@ private fun TaskHomeScaffold(
     emptyDescription: String,
     inboxTitle: String,
     todayTitle: String,
+    inlineDraftOpen: Boolean,
+    onOpenInlineDraft: () -> Unit,
     showNavigationAction: Boolean,
     onOpenNavigation: () -> Unit = {},
     onDraftTitleChange: (String) -> Unit,
@@ -387,6 +402,22 @@ private fun TaskHomeScaffold(
     onSelectHomeLocation: (TaskHomeLocation) -> Unit,
 ) {
     Scaffold(
+        floatingActionButton = if (state.canQuickAdd && state.location is TaskHomeLocation.SmartList) {
+            {
+                FloatingActionButton(
+                    onClick = onOpenInlineDraft,
+                    modifier = Modifier.semantics { contentDescription = quickAddTitle },
+                ) {
+                    Text(
+                        text = "+",
+                        style = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        } else {
+            {}
+        },
         topBar = {
             TopAppBar(
                 title = { Text(title) },
@@ -443,6 +474,7 @@ private fun TaskHomeScaffold(
                 inboxTasks = state.inboxTasks,
                 tasks = state.tasks,
                 canQuickAdd = state.canQuickAdd,
+                isDraftOpen = inlineDraftOpen,
                 canComplete = state.canComplete,
                 draftTitle = state.draftTitle,
                 errorMessage = state.errorMessage,
