@@ -165,10 +165,6 @@
       "reason": "Task conversations are not on Android yet.",
       "issue": "#242"
     },
-    "RegistryEntityFields.Attachment.*": {
-      "reason": "Attachments are not on Android yet.",
-      "issue": "#174"
-    },
     "RegistryEntityFields.Tag.*": {
       "reason": "Quick Find indexes task tag names; tag editing is not on Android yet.",
       "issue": "#174"
@@ -183,10 +179,6 @@
     },
     "RegistryEntityFields.Task.*": {
       "reason": "Reminder fields: reminders are not on Android yet.",
-      "issue": "#174"
-    },
-    "RegistryEntityNames.ATTACHMENT": {
-      "reason": "Attachments are not on Android yet.",
       "issue": "#174"
     },
     "RegistryDestinationIds.REVIEW": {

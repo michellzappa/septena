@@ -272,8 +272,8 @@ Judged against Septask on feel and density, per `docs/DesignSpec.md`.
 **A3 — Welcome, Settings, accent, conversations.**
 
 **A4 — Platform polish:** Glance widgets, share-sheet quick-add, App
-Shortcuts, tablet two-pane, hardware-keyboard shortcuts (Ctrl+1–4 mirroring
-⌘1–4), calendar strip via CalendarContract, re-auth UX refinement.
+Shortcuts, tablet two-pane, hardware-keyboard shortcuts (Ctrl+digit mirroring
+⌘-digit: `digitShortcuts` in `registry/destinations.json`), calendar strip via CalendarContract, re-auth UX refinement.
 
 ### Sizing honesty
 

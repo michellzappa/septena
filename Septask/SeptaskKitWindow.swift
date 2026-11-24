@@ -530,7 +530,7 @@ enum SeptaskKitCommands {
   static var canHandle: Bool { shell != nil }
 
   /// Navigation targets the shell whenever one EXISTS, not only when its
-  /// window is key. Keying it to `isKeyWindow` is what made ⌘1–4 look
+  /// window is key. Keying it to `isKeyWindow` is what made ⌘-digits look
   /// unreliable: Quick Find, Quick Entry and the Move panel are all
   /// `NSPanel`s with `canBecomeKey`, and the Settings window is a window of
   /// its own, so while any of them was up the shell was not key, `canHandle`

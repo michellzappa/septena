@@ -8,6 +8,7 @@ import { addDaysYMD, isValidTz, todayYMD } from "../tz.js";
 import type { TaskOut } from "../tools/taskShared.js";
 import { matchesView } from "../tools/taskShared.js";
 import { listTasks } from "../shadow/mcp.js";
+import { DESIGN_TOKENS } from "../generated/registries.js";
 import { rpcStoreFor, runWriteTool, zWriteArgs, type StoreRpc, type WriteContext, type WriteToolName } from "../shadow/writes.js";
 
 // A small REST surface over the MCP task tools for thin app clients, first of
@@ -60,9 +61,23 @@ export interface ClientTask {
   inbox?: true;
   repeats?: true;
   starred?: true;
+  /// When it was completed (the completed view). Local wall-clock time in the
+  /// user's zone, so its first ten characters compare with `today`.
+  completedAt?: string;
   daysOnToday?: number;
   checklistCount?: number;
   checklistDoneCount?: number;
+  /// What the agent said when it handed the task over (the review view).
+  reviewNote?: string;
+}
+
+/// The user's synced accent with its hexes, so a thin client that has no
+/// registry (the desk orb) draws in the same color as the apps. Colorful is
+/// the default and the fallback for an unknown id.
+export function accentFor(setting: unknown): { id: string; light: string; dark: string } {
+  const all = DESIGN_TOKENS.fruitAccents;
+  const a = all.find((x) => x.id === setting) ?? all.find((x) => x.id === "colorful") ?? all[0];
+  return { id: a.id, light: a.light, dark: a.dark };
 }
 
 /// No derived "overdue": the client compares `deadline` with the `today` the
@@ -80,6 +95,8 @@ export function clientTask(t: TaskOut, names: Map<string, string>): ClientTask {
   if (t.inbox) out.inbox = true;
   if (t.recurrence) out.repeats = true;
   if (t.starred) out.starred = true;
+  if (t.completedAt) out.completedAt = t.completedAt;
+  if (t.reviewNote) out.reviewNote = t.reviewNote;
   if (t.daysOnToday) out.daysOnToday = t.daysOnToday;
   if (t.checklistCount) {
     out.checklistCount = t.checklistCount;
@@ -197,10 +214,11 @@ tasksRest.get("/", async (c) => {
   const store = rpcStoreFor(c.env, c.get("userId"));
   const timeZone = await timeZoneFor(c, store);
   const needsAll = !!q.data.area || !!q.data.project || q.data.view === "repeating" || q.data.view === "starred";
-  const [list, areas, projects] = await Promise.all([
+  const [list, areas, projects, accentSetting] = await Promise.all([
     listTasks(store, timeZone, needsAll ? "all" : q.data.view, needsAll ? 500 : q.data.limit),
     store.readAreas(500),
     store.readProjects("active", 500),
+    store.readSetting("accentColor"),
   ]);
   const today = todayYMD(timeZone);
   const names = containerNames(areas, projects);
@@ -237,6 +255,7 @@ tasksRest.get("/", async (c) => {
   return c.json({
     view: q.data.view,
     today,
+    accent: accentFor(accentSetting),
     total,
     truncated,
     tasks: tasks.map((t) => clientTask(t, names)),

@@ -204,6 +204,7 @@
 		5AE252335A072E51B298169C /* TasksWidgetIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4E616A4E568573A7B74D78B /* TasksWidgetIntents.swift */; };
 		5B61E5271D0A19521BDAC647 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 1832202BA32458ABC7F91CD0 /* PrivacyInfo.xcprivacy */; };
 		5CA33E4BE455E0E90E79531C /* TasksTodayComplicationBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76AE5AD5849D62B848A1EA73 /* TasksTodayComplicationBundle.swift */; };
+		5DF65708A5F3C5D5C72C6036 /* TaskSyncDecisions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B065AC2B13D3BA48D599F4 /* TaskSyncDecisions.swift */; };
 		5E167985F9FBBA7EC11B59A1 /* RuntimeProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11B77F95468462520A3168ED /* RuntimeProfile.swift */; };
 		5E24A1977518399F75E161F4 /* DemoSeedMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF00EC44C1E78BE7E1417CDF /* DemoSeedMode.swift */; };
 		5F53FF9B9634410259C04219 /* SkyAtmosphere.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C28B8649D3BF1411D598399 /* SkyAtmosphere.swift */; };
@@ -413,6 +414,7 @@
 		B7DEFEF891C4C8E76E49CCAC /* TasksWidgetWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC669F29CAAD92C342D2F4E1 /* TasksWidgetWire.swift */; };
 		B814C3C476D3B17B73CDBFAE /* TaskListModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BAC9ABF14F0984E76B2A56C /* TaskListModel.swift */; };
 		B8387D9DDE7760C7E98700E4 /* TaskAttachments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05E2A7AB5904326E9BD02D85 /* TaskAttachments.swift */; };
+		B8914CA427FA11628F25CFE1 /* TaskSyncDecisions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B065AC2B13D3BA48D599F4 /* TaskSyncDecisions.swift */; };
 		B8B87DD4C6A9F9A5C459873C /* SeptaskKitPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3189A3B4E867D370B59957C5 /* SeptaskKitPrompt.swift */; };
 		B98FFC73F7489C1BDF7FD5F1 /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE89901CA806AA91E0441236 /* Logging.swift */; };
 		BA1E07483CC146375A7520F9 /* WatchPhoneLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 392BC172AFC4D18F54BD4F34 /* WatchPhoneLink.swift */; };
@@ -702,6 +704,7 @@
 		1E598D0EF28BF638E97F3F22 /* AreasBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreasBackend.swift; sourceTree = "<group>"; };
 		1EE6ECE04B7D61B124B0989B /* SeptaskSignInCodeScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskSignInCodeScanner.swift; sourceTree = "<group>"; };
 		2046720C20A0CC987F77C61B /* SeptaskWatchComplication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SeptaskWatchComplication.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		20B065AC2B13D3BA48D599F4 /* TaskSyncDecisions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskSyncDecisions.swift; sourceTree = "<group>"; };
 		21F0EA07D40D59DA28FF257E /* ListKeyboardNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListKeyboardNavigation.swift; sourceTree = "<group>"; };
 		21FC87654F413302D31832AE /* TasksWidgetSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksWidgetSnapshotStore.swift; sourceTree = "<group>"; };
 		22A8E34A615D06FDC1DF1773 /* TaskListOrder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListOrder.swift; sourceTree = "<group>"; };
@@ -1084,6 +1087,7 @@
 				18E48AC7FB126378FB07EF7F /* TaskHistory.swift */,
 				49D2B9672D1A58699C7DF9DC /* TaskStoreMode.swift */,
 				6066BCBF19FFC0F308332140 /* TaskSyncApply.swift */,
+				20B065AC2B13D3BA48D599F4 /* TaskSyncDecisions.swift */,
 				CE26D9948A0F34D8F43A8536 /* TaskSyncEngine.swift */,
 				27FA03898C42E65AE7DA8E3C /* TaskSyncSettings.swift */,
 				26EA38B9C0D0D7A759838CAA /* TaskSyncStore.swift */,
@@ -2299,6 +2303,7 @@
 				5484B3B6E3B1D48668A842E6 /* TaskStoreMode.swift in Sources */,
 				BD91368937B7553C9000819A /* TaskStructureOrder.swift in Sources */,
 				C198BDE12989B374F22532AA /* TaskSyncApply.swift in Sources */,
+				B8914CA427FA11628F25CFE1 /* TaskSyncDecisions.swift in Sources */,
 				0754DC69042950D6BDDE6003 /* TaskSyncEngine.swift in Sources */,
 				A1B187EF1D5DE9860C7E8A43 /* TaskSyncSettings.swift in Sources */,
 				DB996C5C71E60B52AD23788F /* TaskSyncStore.swift in Sources */,
@@ -2581,6 +2586,7 @@
 				F380018B18448B1F2F21A330 /* TaskStoreMode.swift in Sources */,
 				DD8D3125F2016A19FF560B04 /* TaskStructureOrder.swift in Sources */,
 				36FDEE4B559BEE283F1892B8 /* TaskSyncApply.swift in Sources */,
+				5DF65708A5F3C5D5C72C6036 /* TaskSyncDecisions.swift in Sources */,
 				5736519D317A1BC1BCAC7539 /* TaskSyncEngine.swift in Sources */,
 				FFBB289E59C8EF74068E0182 /* TaskSyncSettings.swift in Sources */,
 				CD37788D0758EE17F62D71BA /* TaskSyncStore.swift in Sources */,

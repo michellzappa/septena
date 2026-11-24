@@ -350,6 +350,14 @@ function validateDestinations(dests, icons, caps) {
       }
     }
   }
+  // Primary+digit follows the account's sidebar, so no destination owns a key.
+  const digits = dests.digitShortcuts;
+  assert(Array.isArray(digits?.modifiers) && digits.modifiers.length > 0, "destinations.json: digitShortcuts.modifiers missing");
+  assert(Number.isInteger(digits.max) && digits.max >= 1 && digits.max <= 9, "destinations.json: digitShortcuts.max must be 1-9");
+  assert(dests.destinations.some((d) => d.visibility === digits.visibility), `destinations.json: digitShortcuts.visibility "${digits.visibility}" matches no destination`);
+  for (const d of dests.destinations) {
+    assert(d.shortcut === undefined, `destinations.json: ${d.id} cannot own a shortcut; digitShortcuts numbers the lists`);
+  }
   for (const f of ["title", "detail", "pointerDetail", "touchDetail", "syncingTitle"]) {
     assert(typeof dests.genericEmptyState?.[f] === "string", `destinations.json: genericEmptyState.${f} missing`);
   }
@@ -1046,7 +1054,6 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let visibility: String");
   lines.push("  let canHide: Bool");
   lines.push("  let canMoveSection: Bool");
-  lines.push("  let shortcutKeycaps: [String]?");
   lines.push("  let emptyTitle: String");
   lines.push("  let emptyDetail: String");
   lines.push("  let featureId: String");
@@ -1071,15 +1078,25 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("");
   lines.push("  static let all: [RegistryDestination] = [");
   for (const d of dests.destinations) {
-    const capsList = d.shortcut ? `[${appleKeycaps(d.shortcut).map(swiftStr).join(", ")}]` : "nil";
     lines.push(
-      `    RegistryDestination(id: ${swiftStr(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, sidebarSection: ${swiftStr(d.sidebarSection ?? "top")}, visibility: ${swiftStr(d.visibility)}, canHide: ${d.canHide ? "true" : "false"}, canMoveSection: ${d.canMoveSection ? "true" : "false"}, shortcutKeycaps: ${capsList}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}, featureId: ${swiftStr(d.featureId)}),`
+      `    RegistryDestination(id: ${swiftStr(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, sidebarSection: ${swiftStr(d.sidebarSection ?? "top")}, visibility: ${swiftStr(d.visibility)}, canHide: ${d.canHide ? "true" : "false"}, canMoveSection: ${d.canMoveSection ? "true" : "false"}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}, featureId: ${swiftStr(d.featureId)}),`
     );
   }
   lines.push("  ]");
   lines.push("");
   lines.push("  static let byId: [String: RegistryDestination] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })");
   lines.push("  static let byNavigationKey: [String: RegistryDestination] = Dictionary(uniqueKeysWithValues: all.map { ($0.navigationKey, $0) })");
+  lines.push("");
+  lines.push("  /// Digit shortcuts in order (`digitShortcuts` in destinations.json): the first");
+  lines.push("  /// enabled list in the sidebar takes the first one.");
+  lines.push("  static let digitShortcuts: [RegistryShortcut] = [");
+  for (let n = 1; n <= dests.digitShortcuts.max; n++) {
+    const sc = { key: String(n), modifiers: dests.digitShortcuts.modifiers };
+    lines.push(`    RegistryShortcut(key: ${swiftStr(sc.key)}, modifiers: [${sc.modifiers.map(swiftStr).join(", ")}], keycaps: [${appleKeycaps(sc).map(swiftStr).join(", ")}], excludePlatforms: []),`);
+  }
+  lines.push("  ]");
+  lines.push("  /// Only lists with this `visibility` take a digit.");
+  lines.push(`  static let digitShortcutVisibility: String = ${swiftStr(dests.digitShortcuts.visibility)}`);
   lines.push("");
   lines.push("  /// Ordered row groups per destination id (`groups` in destinations.json).");
   lines.push("  static let groups: [String: [RegistryDestinationGroup]] = [");
