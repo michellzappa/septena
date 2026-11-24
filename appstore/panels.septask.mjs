@@ -74,7 +74,9 @@ const VISUAL = {
   // notice from the registry, counted from the screen.
   "lets-go":      {
     fruit: "pitaya", texture: "washiPaper",
-    card: { kind: "notice", notice: "weeklySweep", top: 1800, actions: false },
+    // The notice in the accent, with its symbol and Review button, so it reads
+    // as the app's notice, not an agent card (mz, 2026-11-24).
+    card: { kind: "notice", notice: "weeklySweep", style: "accent", top: 1800 },
   },
   // Slide 7: bring your tasks with you. Anytime with areas and projects, and
   // the app's own "Move from another app" words from registry/settings.json.
@@ -83,7 +85,14 @@ const VISUAL = {
     fruit: "tamarillo", texture: "topography",
     // Tasks arriving from your other app: copies of four rows slide in from
     // both edges onto their own rows. Same centred phone as every panel.
-    shot: { incoming: ["task-reply", "task-dentist", "task-receipts", "task-photos"] },
+    shot: {
+      incomingStyle: "pill",
+      incoming: [
+        { id: "task-reply", icon: "mail" }, { id: "task-dentist", icon: "calendar" },
+        { id: "task-receipts", icon: "receipt" }, { id: "task-brief", icon: "file-text" },
+        { id: "task-photos", icon: "image" },
+      ],
+    },
     card: { kind: "section", page: "import_export", section: "move_in", top: 2160 },
   },
   // Slide 8: yours, built in the open. No screen: one symbol per claim

@@ -146,13 +146,38 @@ function shot(s, device, tint) {
 }
 
 // --------------------------------------------------------------- incoming
-// Tasks arriving from another app: a copy of each row slides in from the
-// left, its right end over the phone's edge at the row it lands on, with an
-// accent trail behind it. Rows further down sit further out, still on their
-// way. Titles and positions come from the screen's .elements.json.
+// Tasks arriving from another app, at the rows they land on. Titles,
+// positions and symbols come from the screen's .elements.json and the panel
+// config. Three styles (mz is choosing, 2026-11-24):
+//   pill      a white copy of the row over the phone's edge, accent outline
+//   inverted  the same copy in deep accent with white text
+//   icons     a symbol per task, coming out from behind the phone, with a
+//             fading trail toward the panel edge
 function incoming(inc, { w, pad, tint, margin }) {
   const k = (w - 2 * pad) / (inc.screenWidth ?? 402);
   const ui = String(theme.fonts.ui).replace(/"/g, "'");
+  const deep = `color-mix(in oklab, ${tint} 72%, #000)`;
+  if (inc.style === "icons") {
+    const S = 168; // tile size
+    const glyph = (node, size) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${node.map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).filter(([a]) => a !== "key").map(([a, v]) => `${a}="${esc(String(v))}"`).join(" ")}/>`).join("")}</svg>`;
+    return inc.rows.map((r, i) => {
+      if (!r.node) throw new Error(`incoming icons: row "${r.label}" has no icon`);
+      const [, y, , h] = r.frame;
+      const top = pad + (y + h / 2) * k;
+      const left = i % 2 === 0;
+      const tilt = (left ? -1 : 1) * (6 + (i % 3) * 3);
+      // The tile closest to the phone tucks 40% under its edge; the trail
+      // tiles sit further out, smaller and fainter.
+      const steps = [{ out: 0.6, scale: 1, alpha: 1 }, { out: 1.55, scale: 0.74, alpha: 0.5 }, { out: 2.3, scale: 0.52, alpha: 0.22 }];
+      return steps.map((st, j) => {
+        const size = Math.round(S * st.scale);
+        const off = Math.round(S * st.out); // distance of the tile's centre outside the phone edge
+        const x = left ? `left:${-off - size / 2}px` : `right:${-off - size / 2}px`;
+        return `<div style="position:absolute; z-index:0; ${x}; top:${top}px; width:${size}px; height:${size}px; transform:translateY(-50%) rotate(${tilt}deg); opacity:${st.alpha}; display:flex; align-items:center; justify-content:center; background:${deep}; border-radius:${Math.round(size * 0.27)}px; box-shadow:0 0 0 ${Math.max(2, Math.round(4 * st.scale))}px rgb(255 255 255 / .9), 0 ${Math.round(24 * st.scale)}px ${Math.round(50 * st.scale)}px rgb(0 0 0 / .3);">${j === 0 || st.alpha > 0.3 ? glyph(r.node, Math.round(size * 0.52)) : ""}</div>`;
+      }).join("");
+    }).join("");
+  }
+  const inverted = inc.style === "inverted";
   // Each copy sits on the row it lands on, alternating left and right: its
   // outer end near the panel edge, the rest over the phone, about to settle
   // on its row. The whole title always shows.
@@ -161,8 +186,8 @@ function incoming(inc, { w, pad, tint, margin }) {
     const [, y, , h] = r.frame;
     const top = pad + (y + h / 2) * k;
     const left = i % 2 === 0;
-    const pill = `<span style="display:flex; align-items:center; gap:22px; padding:22px 30px; background:#fff; border-radius:26px; box-shadow:0 0 0 4px ${tint}, 0 24px 50px rgb(0 0 0 / .28); font:500 34px/1.2 ${ui}; color:#141518; white-space:nowrap;">
-        <span style="flex:none; width:40px; height:40px; border:4px solid #C7C7CC; border-radius:11px;"></span>${esc(r.label)}
+    const pill = `<span style="display:flex; align-items:center; gap:22px; padding:22px 30px; background:${inverted ? deep : "#fff"}; border-radius:26px; box-shadow:0 0 0 4px ${inverted ? "rgb(255 255 255 / .9)" : tint}, 0 24px 50px rgb(0 0 0 / .28); font:500 34px/1.2 ${ui}; color:${inverted ? "#fff" : "#141518"}; white-space:nowrap;">
+        <span style="flex:none; width:40px; height:40px; border:4px solid ${inverted ? "rgb(255 255 255 / .75)" : "#C7C7CC"}; border-radius:11px;"></span>${esc(r.label)}
       </span>`;
     return `<div style="position:absolute; z-index:4; ${left ? `left:${edge}px` : `right:${edge}px`}; top:${top}px; transform:translateY(-50%); display:flex; align-items:center;">
       ${pill}
@@ -274,6 +299,19 @@ function card(c) {
       <span style="flex:1; min-width:0; font:500 46px/1.2 ${ui}; color:#141518;">${esc(r.title)}</span>
       ${r.face ? avatar(r.face, 64) : ""}${r.meta ? `<span style="font:400 36px/1 ${ui}; color:#8E8E93;">${esc(r.meta)}</span>` : ""}
     </div>`).join("")}</div>` : "";
+  if (c.style === "accent") {
+    // A notice in the panel's accent: symbol, white words, a white button.
+    const glyph = c.iconNode ? `<svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;">${c.iconNode.map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).filter(([a]) => a !== "key").map(([a, v]) => `${a}="${esc(String(v))}"`).join(" ")}/>`).join("")}</svg>` : "";
+    return `
+  <div style="position:absolute; z-index:5; left:${c.left ?? 90}px; right:${c.right ?? 90}px; top:${c.top}px; padding:48px 52px; background:color-mix(in oklab, ${tint} 88%, #000); border-radius:56px; box-shadow:0 0 0 4px rgb(255 255 255 / .9), 0 50px 100px rgb(0 0 0 / .3); display:flex; align-items:center; gap:36px;">
+    ${glyph}
+    <div style="flex:1; min-width:0;">
+      <div style="font:600 50px/1.2 ${ui}; color:#fff;">${esc(c.title)}</div>
+      ${c.subtitle ? `<div style="font:400 40px/1.3 ${ui}; color:rgb(255 255 255 / .82); margin-top:6px;">${esc(c.subtitle)}</div>` : ""}
+    </div>
+    ${c.actions?.map((x) => `<span style="flex:none; padding:26px 44px; border-radius:999px; background:#fff; color:${tint}; font:600 44px/1 ${ui};">${esc(x.label)}</span>`).join("") ?? ""}
+  </div>`;
+  }
   return `
   <div data-linked style="position:absolute; z-index:5; left:${c.left ?? 90}px; right:${c.right ?? 90}px; top:${c.top}px; padding:52px 56px; background:#fff; border-radius:56px; ${linkedEdge(c.tint)}">
     ${head}${question}${chips}${artifact}${actions}${toggle}${rows}

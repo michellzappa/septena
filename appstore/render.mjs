@@ -119,6 +119,8 @@ const SURFACES = (() => {
   walk(file);
   return out;
 })();
+// The app's symbols per platform (registry/icons.json).
+const ICONS = (() => { const j = JSON.parse(readFileSync(join(ROOT, "..", "registry", "icons.json"), "utf8")); return j.icons ?? j; })();
 // "Pause all agents" and the like: labels the app shows, from registry/settings.json.
 const SETTINGS = JSON.parse(readFileSync(join(ROOT, "..", "registry", "settings.json"), "utf8"));
 const settingLabel = (key) => {
@@ -166,7 +168,12 @@ function resolveCard(device, panel) {
     if (!n) throw new Error(`${device.key}/${panel.id}: notice ${c.notice} is not in registry/surfaces.json`);
     const count = (m?.elements ?? []).filter((e) => e.id.startsWith("task-")).length;
     const title = typeof n.title === "string" ? n.title : (count === 1 ? n.title.one : n.title.other).replace("{count}", String(count));
-    return { ...base, face: null, title, subtitle: n.detail, actions: n.primaryTitle && c.actions !== false ? [{ label: n.primaryTitle, kind: "primary" }] : [] };
+    // style "accent": the panel's accent fills the card, with the notice's own
+    // symbol (registry/icons.json, Lucide column), so it reads as the app's
+    // notice and not as an agent's card (mz, 2026-11-24).
+    const icon = c.style === "accent" ? ICONS[n.icon]?.lucide : null;
+    if (c.style === "accent" && !icon) throw new Error(`${device.key}/${panel.id}: notice icon ${n.icon} has no lucide name in registry/icons.json`);
+    return { ...base, face: null, style: c.style, icon, title, subtitle: n.detail, actions: n.primaryTitle && c.actions !== false ? [{ label: n.primaryTitle, kind: "primary" }] : [] };
   }
   if (c.kind === "section") {
     // A settings section's own header and footer (registry/settings.json), not its rows.
@@ -220,11 +227,13 @@ for (const device of activeDevices()) {
     }
     if (panel.shot?.incoming) {
       const m = shotElements(device, panel.shot.src, panel.shot.appearance, panel.shot.accent);
-      panel.shot.incoming = { screenWidth: m.width, rows: panel.shot.incoming.map((id) => {
+      // An entry is a row id, or { id, icon } when the style draws a symbol.
+      panel.shot.incoming = { screenWidth: m.width, style: panel.shot.incomingStyle ?? "pill", rows: await Promise.all(panel.shot.incoming.map(async (entry) => {
+        const { id, icon } = typeof entry === "string" ? { id: entry } : entry;
         const el = m?.elements.find((e) => e.id === id);
         if (!el) throw new Error(`${device.key}/${panel.id}: incoming element "${id}" is not on screen ${panel.shot.src}`);
-        return { frame: el.frame, label: el.label.split("\n")[0] };
-      }) };
+        return { frame: el.frame, label: el.label.split("\n")[0], node: icon && await lucideNode(icon, `${device.key}/${panel.id}`) };
+      })) };
     }
     if (panel.shot?.callout) {
       const el = meta?.elements.find((e) => e.id === panel.shot.callout.element);
@@ -245,15 +254,11 @@ for (const device of activeDevices()) {
         // A small watch: its rows are the first task titles on the named scene's
         // screen (that screen's .elements.json), never typed by hand.
         // The card's words, from the screen's elements and the app registry.
-        card: panel.card && resolveCard(device, panel),
+        card: panel.card && await (async (c) => c.icon ? { ...c, iconNode: await lucideNode(c.icon, `${device.key}/${panel.id}`) } : c)(resolveCard(device, panel)),
         // Claims with a Lucide symbol each (the icon set the app's registry maps
         // to), drawn from the site's lucide-react package.
         claims: panel.claims && await Promise.all(panel.claims.map(async (c) => {
-          const file = join(SITE, "node_modules", "lucide-react", "dist", "esm", "icons", `${c.icon}.mjs`);
-          if (!existsSync(file)) throw new Error(`${device.key}/${panel.id}: Lucide icon ${c.icon} is not in ${SITE}/node_modules/lucide-react`);
-          const { __iconNode } = await import(pathToFileURL(file).href);
-          if (!__iconNode) throw new Error(`${device.key}/${panel.id}: ${c.icon} is an alias in lucide-react; use the icon it points to`);
-          return { ...c, node: __iconNode };
+          return { ...c, node: await lucideNode(c.icon, `${device.key}/${panel.id}`) };
         })),
         chat: panel.chat && (() => {
           return { ...panel.chat, face: agentFace(panel.chat.tint) };
@@ -294,3 +299,12 @@ for (const device of activeDevices()) {
 
 await chrome.close();
 if (!canFlatten) console.log("⚠ alpha not flattened (python3+Pillow unavailable) — validate.mjs will flag it");
+
+// A Lucide icon's drawing, from the site's lucide-react package.
+async function lucideNode(name, where) {
+  const file = join(SITE, "node_modules", "lucide-react", "dist", "esm", "icons", `${name}.mjs`);
+  if (!existsSync(file)) throw new Error(`${where}: Lucide icon ${name} is not in ${SITE}/node_modules/lucide-react`);
+  const { __iconNode } = await import(pathToFileURL(file).href);
+  if (!__iconNode) throw new Error(`${where}: ${name} is an alias in lucide-react; use the icon it points to`);
+  return __iconNode;
+}
