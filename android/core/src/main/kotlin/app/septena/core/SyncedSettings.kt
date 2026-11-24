@@ -10,9 +10,17 @@ class SyncedSettings(private val store: TaskStore, private val platform: String 
         val definition = RegistryCatalog.setting(key)
             ?: throw IllegalArgumentException("Unknown registry setting '$key'")
         require(definition.appliesTo(platform)) { "Setting '$key' is not available on $platform" }
+        return rawValue(key) ?: definition.defaultValue()
+    }
+
+    /** The persisted synced value for [key], or null when unset or explicitly null on the server. */
+    suspend fun rawValue(key: String): JsonValue? {
+        val definition = RegistryCatalog.setting(key)
+            ?: throw IllegalArgumentException("Unknown registry setting '$key'")
+        require(definition.appliesTo(platform)) { "Setting '$key' is not available on $platform" }
         val saved = store.record(RegistryEntityNames.SETTING, key)
             ?.fields?.get(RegistryEntityFields.Setting.VALUE)
-        return if (saved == null || saved === JsonValue.Null) definition.defaultValue() else saved
+        return if (saved == null || saved === JsonValue.Null) null else saved
     }
 
     suspend fun all(): Map<String, JsonValue> {

@@ -52,6 +52,8 @@ data class TaskListItem(
     val opacity: Float = 1f,
     /** A section heading shown above this row when it differs from the row before (Agent stages). */
     val groupTitle: String? = null,
+    /** Sort position in the current list, used by Magic Plus drag-and-drop insertion. */
+    val position: Double? = null,
 )
 
 /**
@@ -116,6 +118,9 @@ fun TaskHomeContent(
     onComplete: (String) -> Unit,
     onOpenTask: (String) -> Unit,
     onTaskAction: (String, String) -> Unit,
+    onDropInboxHeader: (() -> Unit)? = null,
+    onDropInboxRow: ((index: Int, before: Boolean) -> Unit)? = null,
+    onDropTaskRow: ((index: Int, before: Boolean) -> Unit)? = null,
 ) {
     Column(
         modifier = modifier.fillMaxSize().padding(vertical = 8.dp),
@@ -125,7 +130,7 @@ fun TaskHomeContent(
 
         LazyColumn(
             modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(bottom = 24.dp),
+            contentPadding = PaddingValues(bottom = 88.dp),
         ) {
             if (isToday && inboxTasks.isNotEmpty()) {
                 item(key = "inbox-band-title") {
@@ -133,7 +138,14 @@ fun TaskHomeContent(
                         text = inboxBandTitle,
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .magicPlusSectionDrop(
+                                id = "mp-inbox-header",
+                                enabled = onDropInboxHeader != null,
+                                onDrop = { onDropInboxHeader?.invoke() },
+                            )
+                            .padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
                     )
                 }
             }
@@ -152,6 +164,7 @@ fun TaskHomeContent(
                     rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                     selection = selection,
                     onTaskAction = onTaskAction,
+                    onDropRow = onDropInboxRow,
                 )
             }
             if (hasLoaded && !canQuickAdd && tasks.isEmpty() && inboxTasks.isEmpty() && emptyTitle.isNotBlank()) {
@@ -191,6 +204,7 @@ fun TaskHomeContent(
                 rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                 selection = selection,
                 onTaskAction = onTaskAction,
+                onDropRow = onDropTaskRow,
             )
         }
     }
@@ -210,6 +224,7 @@ private fun LazyListScope.taskRows(
     rowMenuAccessibilityLabel: String,
     selection: TaskSelection,
     onTaskAction: (String, String) -> Unit,
+    onDropRow: ((index: Int, before: Boolean) -> Unit)?,
 ) {
     itemsIndexed(tasks, key = { _, task -> "$keyPrefix:${task.id}" }) { index, task ->
         val group = task.groupTitle
@@ -234,6 +249,11 @@ private fun LazyListScope.taskRows(
             rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
             selection = selection,
             onTaskAction = onTaskAction,
+            dropModifier = Modifier.magicPlusRowDrop(
+                id = "mp-$keyPrefix-${task.id}",
+                enabled = onDropRow != null,
+                onDrop = { before -> onDropRow?.invoke(index, before) },
+            ),
         )
         if (index < tasks.lastIndex) {
             HorizontalDivider(
@@ -259,6 +279,7 @@ private fun TaskRow(
     rowMenuAccessibilityLabel: String,
     selection: TaskSelection,
     onTaskAction: (String, String) -> Unit,
+    dropModifier: Modifier = Modifier,
 ) {
     val showToday = showTodayIndicator && task.isOnToday && !task.isCompleted
     var menuExpanded by remember(task.id) { mutableStateOf(false) }
@@ -271,7 +292,7 @@ private fun TaskRow(
             // Transparent so the header texture shows behind the first rows, as on iPhone.
             ListItemDefaults.colors(containerColor = Color.Transparent)
         },
-        modifier = Modifier.fillMaxWidth().alpha(task.opacity).selectableTaskRow(
+        modifier = dropModifier.fillMaxWidth().alpha(task.opacity).selectableTaskRow(
             taskId = task.id,
             selection = selection,
             onOpen = onOpenTask,

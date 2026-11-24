@@ -37,7 +37,7 @@ sealed interface AreasProjectsDestination {
 }
 
 data class PlaceProjectRow(val id: String, val title: String)
-data class PlaceTaskRow(val id: String, val title: String, val isStarred: Boolean = false)
+data class PlaceTaskRow(val id: String, val title: String, val isStarred: Boolean = false, val position: Double? = null)
 data class PlaceSectionRow(val id: String, val title: String, val tasks: List<PlaceTaskRow>)
 
 data class AreasProjectsUiState(
@@ -318,7 +318,10 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     .toList()
                 val tasks = taskRows.asSequence()
                     .filter { (_, task) -> task.area == selected.id && task.project == null && !task.isHeading }
-                    .map { (record, task) -> PositionedPlaceTask(PlaceTaskRow(record.id, task.title, task.starred), record.fields[RegistryEntityFields.Task.POSITION].numberValue()) }
+                    .map { (record, task) ->
+                        val pos = record.fields[RegistryEntityFields.Task.POSITION].numberValue()
+                        PositionedPlaceTask(PlaceTaskRow(record.id, task.title, task.starred, pos), pos)
+                    }
                     .sortedWith(PLACE_TASK_ORDER)
                     .map { it.task }
                     .toList()
@@ -336,12 +339,13 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 val projectRows = taskRows.asSequence()
                     .filter { (_, task) -> task.project == selected.id }
                     .map { (record, task) ->
+                        val pos = record.fields[RegistryEntityFields.Task.POSITION].numberValue()
                         ProjectTask(
                             recordId = record.id,
-                            row = PlaceTaskRow(record.id, task.title, task.starred),
+                            row = PlaceTaskRow(record.id, task.title, task.starred, pos),
                             headingId = record.fields[RegistryEntityFields.Task.HEADING].stringValue(),
                             isHeading = task.isHeading,
-                            position = record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
+                            position = pos,
                         )
                     }
                     .toList()

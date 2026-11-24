@@ -16,7 +16,7 @@ class SeptenaAndroidThemeTest {
         for (fruit in FruitAccents.all) {
             for (dark in listOf(false, true)) {
                 val colors = registryThemeColors(dark, fruit.id)
-                for (color in listOf(colors.accent, colors.onAccent, colors.todayGlyph)) {
+                for (color in listOf(colors.accent, colors.onAccent, colors.todayGlyph, colors.magicPlus, colors.magicPlusInk)) {
                     assertEquals(1f, color.alpha)
                     assertEquals(0.4f, color.copy(alpha = 0.4f).alpha, 0.01f)
                     assertEquals("sRGB IEC61966-2.1", color.colorSpace.name)
@@ -32,8 +32,11 @@ class SeptenaAndroidThemeTest {
             val colors = registryThemeColors(darkTheme = false, accentId = fruit.id)
             if (fruit.multicolor) {
                 assertNotEquals(colors.accent, colors.todayGlyph)
+                val persimmon = FruitAccents.resolve("persimmon")
+                assertEquals(persimmon.color(dark = false), colors.magicPlus)
             } else {
                 assertEquals(colors.accent, colors.todayGlyph)
+                assertEquals(colors.accent, colors.magicPlus)
             }
         }
     }

@@ -4,13 +4,18 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
@@ -27,7 +32,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
@@ -35,25 +39,30 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -67,9 +76,12 @@ import app.septena.core.generated.RegistryCapabilityIds
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistrySurfaceIds
+import app.septena.ui.LocalMagicPlusDrag
+import app.septena.ui.MagicPlusDragState
 import app.septena.ui.TaskHomeContent
 import app.septena.ui.TaskRowMenuAction
 import app.septena.ui.TaskSelection
+import app.septena.ui.insertionPosition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -271,7 +283,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         sidebarActionTitle = sidebarActionTitle,
                         quickAddTitle = quickAddTitle,
                         quickFindTitle = quickFindTitle,
-                        pauseAgentsTitle = pauseAgentsTitle,
+                        settingsTitle = settingsTitle,
                         completeTitle = completeTitle,
                         emptyTitle = emptyTitle,
                         emptyDescription = emptyDescription,
@@ -286,8 +298,9 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         onOpenTask = { openTaskWithAttribute(it, null) },
                         onTaskAction = onTaskAction,
                         onQuickFind = { quickFindOpen = true },
-                        onToggleAgentsPaused = { homeViewModel.setAgentsPaused(!state.agentsPaused) },
+                        onOpenSettings = { settingsOpen = true },
                         onSelectHomeLocation = selectHomeLocation,
+                        snackbarVisible = undoSnackbarHostState.currentSnackbarData != null,
                     )
                 }
             }
@@ -336,7 +349,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         sidebarActionTitle = sidebarActionTitle,
                         quickAddTitle = quickAddTitle,
                         quickFindTitle = quickFindTitle,
-                        pauseAgentsTitle = pauseAgentsTitle,
+                        settingsTitle = settingsTitle,
                         completeTitle = completeTitle,
                         emptyTitle = emptyTitle,
                         emptyDescription = emptyDescription,
@@ -352,8 +365,9 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         onOpenTask = { openTaskWithAttribute(it, null) },
                         onTaskAction = onTaskAction,
                         onQuickFind = { quickFindOpen = true },
-                        onToggleAgentsPaused = { homeViewModel.setAgentsPaused(!state.agentsPaused) },
+                        onOpenSettings = { settingsOpen = true },
                         onSelectHomeLocation = selectHomeLocation,
+                        snackbarVisible = undoSnackbarHostState.currentSnackbarData != null,
                     )
                 }
             }
@@ -396,27 +410,39 @@ private fun TaskHomeNavigation(
             )
         }
 
-        if (areasTitle.isNotEmpty() || projectsTitle.isNotEmpty()) {
+        val areaIds = state.areas.mapNotNull { (it.location as? TaskHomeLocation.Area)?.id }.toSet()
+        val projectsByArea = state.projects.groupBy { it.parentAreaId }
+        val standaloneProjects = state.projects.filter { it.parentAreaId == null || it.parentAreaId !in areaIds }
+
+        if (areasTitle.isNotEmpty() || standaloneProjects.isNotEmpty()) {
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         }
-        if (areasTitle.isNotEmpty()) {
+        if (areasTitle.isNotEmpty() && state.areas.isNotEmpty()) {
             DrawerGroupTitle(areasTitle)
             state.areas.forEach { item ->
+                val area = item.location as TaskHomeLocation.Area
                 AreaNavigationDrawerItem(
                     item = item,
                     selected = state.location == item.location,
                     languageTag = languageTag,
                     onSelect = { onSelect(item.location) },
-                    onSetEmoji = { emoji ->
-                        val area = item.location as TaskHomeLocation.Area
-                        onSetAreaEmoji(area.id, emoji)
-                    },
+                    onSetEmoji = { emoji -> onSetAreaEmoji(area.id, emoji) },
                 )
+                projectsByArea[area.id].orEmpty().forEach { projectItem ->
+                    NavigationDrawerItem(
+                        label = { Text(projectItem.title.orEmpty()) },
+                        selected = state.location == projectItem.location,
+                        onClick = { onSelect(projectItem.location) },
+                        modifier = Modifier
+                            .padding(NavigationDrawerItemDefaults.ItemPadding)
+                            .padding(start = 20.dp),
+                    )
+                }
             }
         }
-        if (projectsTitle.isNotEmpty()) {
+        if (projectsTitle.isNotEmpty() && standaloneProjects.isNotEmpty()) {
             DrawerGroupTitle(projectsTitle)
-            state.projects.forEach { item ->
+            standaloneProjects.forEach { item ->
                 NavigationDrawerItem(
                     label = { Text(item.title.orEmpty()) },
                     selected = state.location == item.location,
@@ -520,7 +546,7 @@ private fun DrawerGroupTitle(title: String) {
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 private fun TaskHomeScaffold(
     graph: AndroidAppGraph,
     state: TaskHomeUiState,
@@ -528,7 +554,7 @@ private fun TaskHomeScaffold(
     sidebarActionTitle: String,
     quickAddTitle: String,
     quickFindTitle: String,
-    pauseAgentsTitle: String,
+    settingsTitle: String,
     completeTitle: String,
     emptyTitle: String,
     emptyDescription: String,
@@ -544,15 +570,20 @@ private fun TaskHomeScaffold(
     onOpenTask: (String) -> Unit,
     onTaskAction: (String, String) -> Unit,
     onQuickFind: () -> Unit,
-    onToggleAgentsPaused: () -> Unit,
+    onOpenSettings: () -> Unit,
     onSelectHomeLocation: (TaskHomeLocation) -> Unit,
+    snackbarVisible: Boolean = false,
 ) {
-    var quickAddOpen by rememberSaveable { mutableStateOf(false) }
+    var quickAddDraft by remember { mutableStateOf<QuickAddDraft?>(null) }
+    var newSectionTrigger by remember { mutableIntStateOf(0) }
     var selectionPicker by remember { mutableStateOf<SelectionPicker?>(null) }
     var allOnToday by remember { mutableStateOf(false) }
+    val magicPlusDrag = remember { MagicPlusDragState() }
     val context = LocalContext.current
     val selecting = state.selectedIds.isNotEmpty()
     val destinationId = (state.location as? TaskHomeLocation.SmartList)?.destinationId
+    val canCreateHere = state.location !is TaskHomeLocation.SmartList || state.canQuickAdd
+    val imeVisible = WindowInsets.isImeVisible
     val formLabels = remember(languageTag) { TaskFormLabels.fromRegistry(languageTag) }
     val selectToggleLabel = remember(languageTag) {
         RegistryCatalog.actionTitle(RegistryActionIds.TASK_SELECT, languageTag = languageTag).orEmpty()
@@ -569,17 +600,24 @@ private fun TaskHomeScaffold(
         onToggle = homeViewModel::toggleSelection,
     )
     LaunchedEffect(state.selectedIds) { allOnToday = homeViewModel.allOnToday(state.selectedIds) }
+    LaunchedEffect(state.location) { if (!magicPlusDrag.isDragging) magicPlusDrag.reset() }
     BackHandler(enabled = selecting) { homeViewModel.clearSelection() }
 
-    if (quickAddOpen) {
+    val openDefaultQuickAdd: () -> Unit = {
+        quickAddDraft = defaultQuickAddDraft(state.location)
+    }
+    magicPlusDrag.fallbackDrop = { if (canCreateHere) openDefaultQuickAdd() }
+
+    quickAddDraft?.let { initial ->
         QuickAddSheet(
             today = graph.clock.today(graph.clock.now()),
             errorMessage = state.errorMessage,
             areas = state.areas,
             projects = state.projects,
             languageTag = languageTag,
-            onDismiss = { quickAddOpen = false },
-            onAdd = { draft -> homeViewModel.quickAdd(draft) { quickAddOpen = false } },
+            initialDraft = initial,
+            onDismiss = { quickAddDraft = null },
+            onAdd = { draft -> homeViewModel.quickAdd(draft) { quickAddDraft = null } },
         )
     }
     when (selectionPicker) {
@@ -612,136 +650,247 @@ private fun TaskHomeScaffold(
 
     // The header texture sits behind the transparent app bar and the first
     // rows, on the page background (iPhone `HeaderWashView`).
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        HeaderWashBackdrop()
-        Scaffold(
-            containerColor = Color.Transparent,
-            bottomBar = if (selecting) {
-                {
-                    TaskSelectionBar(
-                        selectedCount = state.selectedIds.size,
-                        destinationId = destinationId,
-                        allOnToday = allOnToday,
-                        allSelected = remember(state.selectedIds, state.inboxTasks, state.tasks) {
-                            (state.inboxTasks + state.tasks).all { it.id in state.selectedIds }
-                        },
-                        canComplete = state.canComplete,
-                        languageTag = languageTag,
-                        onCommand = { command ->
-                            when (command) {
-                                is TaskSelectionCommand.Apply -> homeViewModel.applyToSelection(command.actionId)
-                                is TaskSelectionCommand.SetToday -> homeViewModel.applyToSelection(
-                                    RegistryActionIds.TASK_TOGGLE_TODAY,
-                                    todayEnabled = command.enabled,
-                                )
-                                TaskSelectionCommand.PickWhen -> { selectionPicker = SelectionPicker.When }
-                                TaskSelectionCommand.PickList -> { selectionPicker = SelectionPicker.List }
-                                TaskSelectionCommand.Copy -> homeViewModel.copySelection { text ->
-                                    context.getSystemService(ClipboardManager::class.java)
-                                        ?.setPrimaryClip(ClipData.newPlainText(null, text))
+    CompositionLocalProvider(LocalMagicPlusDrag provides magicPlusDrag) {
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            HeaderWashBackdrop()
+            Scaffold(
+                containerColor = Color.Transparent,
+                bottomBar = if (selecting) {
+                    {
+                        TaskSelectionBar(
+                            selectedCount = state.selectedIds.size,
+                            destinationId = destinationId,
+                            allOnToday = allOnToday,
+                            allSelected = remember(state.selectedIds, state.inboxTasks, state.tasks) {
+                                (state.inboxTasks + state.tasks).all { it.id in state.selectedIds }
+                            },
+                            canComplete = state.canComplete,
+                            languageTag = languageTag,
+                            onCommand = { command ->
+                                when (command) {
+                                    is TaskSelectionCommand.Apply -> homeViewModel.applyToSelection(command.actionId)
+                                    is TaskSelectionCommand.SetToday -> homeViewModel.applyToSelection(
+                                        RegistryActionIds.TASK_TOGGLE_TODAY,
+                                        todayEnabled = command.enabled,
+                                    )
+                                    TaskSelectionCommand.PickWhen -> { selectionPicker = SelectionPicker.When }
+                                    TaskSelectionCommand.PickList -> { selectionPicker = SelectionPicker.List }
+                                    TaskSelectionCommand.Copy -> homeViewModel.copySelection { text ->
+                                        context.getSystemService(ClipboardManager::class.java)
+                                            ?.setPrimaryClip(ClipData.newPlainText(null, text))
+                                    }
+                                    TaskSelectionCommand.ToggleSelectAll -> homeViewModel.toggleSelectAll()
+                                    TaskSelectionCommand.Done -> homeViewModel.clearSelection()
                                 }
-                                TaskSelectionCommand.ToggleSelectAll -> homeViewModel.toggleSelectAll()
-                                TaskSelectionCommand.Done -> homeViewModel.clearSelection()
+                            },
+                        )
+                    }
+                } else {
+                    {}
+                },
+                topBar = {
+                    TopAppBar(
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                            scrolledContainerColor = Color.Transparent,
+                        ),
+                        title = { Text(title) },
+                        navigationIcon = if (showNavigationAction) {
+                            {
+                                IconButton(
+                                    onClick = onOpenNavigation,
+                                    modifier = Modifier.semantics { contentDescription = sidebarActionTitle },
+                                ) {
+                                    SidebarMenuGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                                }
+                            }
+                        } else {
+                            {}
+                        },
+                        actions = {
+                            IconButton(
+                                onClick = onQuickFind,
+                                modifier = Modifier.semantics { contentDescription = quickFindTitle },
+                            ) {
+                                SearchGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                            }
+                            IconButton(
+                                onClick = onOpenSettings,
+                                modifier = Modifier.semantics { contentDescription = settingsTitle },
+                            ) {
+                                SettingsGearGlyph(tint = MaterialTheme.colorScheme.onSurface)
                             }
                         },
                     )
-                }
-            } else {
-                {}
-            },
-            floatingActionButton = if (!selecting && state.canQuickAdd && state.location is TaskHomeLocation.SmartList) {
-                {
-                    FloatingActionButton(
-                        onClick = { quickAddOpen = true },
-                        modifier = Modifier.semantics { contentDescription = quickAddTitle },
-                    ) {
-                        Text(
-                            text = "+",
-                            style = MaterialTheme.typography.headlineSmall,
-                            textAlign = TextAlign.Center,
+                },
+            ) { contentPadding ->
+                when (val location = state.location) {
+                    is TaskHomeLocation.Area -> AreasProjectsScreen(
+                        graph = graph,
+                        destination = AreasProjectsDestination.Area(location.id),
+                        modifier = Modifier.padding(contentPadding),
+                        rowMenuGroups = rowMenuGroups,
+                        rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                        onTaskAction = onTaskAction,
+                        selection = selection,
+                        onOpenProject = { projectId ->
+                            val project = state.projects.firstOrNull {
+                                (it.location as? TaskHomeLocation.Project)?.id == projectId
+                            }?.location ?: TaskHomeLocation.Project(projectId, "")
+                            onSelectHomeLocation(project)
+                        },
+                        onOpenTask = onOpenTask,
+                        onMagicPlusDrop = { draft -> quickAddDraft = draft },
+                    )
+                    is TaskHomeLocation.Project -> AreasProjectsScreen(
+                        graph = graph,
+                        destination = AreasProjectsDestination.Project(location.id),
+                        modifier = Modifier.padding(contentPadding),
+                        onOpenTask = onOpenTask,
+                        rowMenuGroups = rowMenuGroups,
+                        rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                        onTaskAction = onTaskAction,
+                        selection = selection,
+                        newSectionTrigger = newSectionTrigger,
+                        onMagicPlusDrop = { draft -> quickAddDraft = draft },
+                    )
+                    is TaskHomeLocation.SmartList -> {
+                        val isTodayList = location.destinationId == RegistryDestinationIds.TODAY
+                        val inboxPositions = state.inboxTasks.map { it.position }
+                        val taskPositions = state.tasks.map { it.position }
+                        TaskHomeContent(
+                            completeTitle = completeTitle,
+                            emptyTitle = emptyTitle,
+                            emptyDescription = emptyDescription,
+                            inboxBandTitle = inboxTitle,
+                            todayTitle = todayTitle,
+                            todayTint = MaterialTheme.colorScheme.secondary,
+                            hasLoaded = state.hasLoaded,
+                            isToday = isTodayList,
+                            inboxTasks = state.inboxTasks,
+                            tasks = state.tasks,
+                            canQuickAdd = state.canQuickAdd,
+                            canComplete = state.canComplete,
+                            errorMessage = state.errorMessage,
+                            rowMenuGroups = rowMenuGroups,
+                            rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                            modifier = Modifier.padding(contentPadding),
+                            selection = selection,
+                            onComplete = onComplete,
+                            onOpenTask = onOpenTask,
+                            onTaskAction = onTaskAction,
+                            onDropInboxHeader = if (isTodayList && state.canQuickAdd) {
+                                {
+                                    quickAddDraft = QuickAddDraft(
+                                        today = false,
+                                        position = inboxPositions.firstOrNull()?.let { it - 1.0 },
+                                    )
+                                }
+                            } else null,
+                            onDropInboxRow = if (isTodayList && state.canQuickAdd) {
+                                { index, before ->
+                                    quickAddDraft = QuickAddDraft(
+                                        today = false,
+                                        position = insertionPosition(inboxPositions, index, before),
+                                    )
+                                }
+                            } else null,
+                            onDropTaskRow = if (state.canQuickAdd) {
+                                { index, before ->
+                                    quickAddDraft = defaultQuickAddDraft(location).copy(
+                                        position = insertionPosition(taskPositions, index, before),
+                                        useTodayPosition = isTodayList,
+                                    )
+                                }
+                            } else null,
                         )
                     }
                 }
-            } else {
-                {}
-            },
-            topBar = {
-                TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        scrolledContainerColor = Color.Transparent,
-                    ),
-                    title = { Text(title) },
-                    navigationIcon = if (showNavigationAction) {
-                        {
-                            TextButton(onClick = onOpenNavigation) {
-                                Text(sidebarActionTitle)
-                            }
-                        }
-                    } else {
-                        {}
-                    },
-                    actions = {
-                        TextButton(onClick = onToggleAgentsPaused) {
-                            Text(pauseAgentsTitle)
-                        }
-                        TextButton(onClick = onQuickFind) {
-                            Text(quickFindTitle)
-                        }
-                    },
-                )
-            },
-        ) { contentPadding ->
-            when (val location = state.location) {
-                is TaskHomeLocation.Area -> AreasProjectsScreen(
-                    graph = graph,
-                    destination = AreasProjectsDestination.Area(location.id),
-                    modifier = Modifier.padding(contentPadding),
-                    rowMenuGroups = rowMenuGroups,
-                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                    onTaskAction = onTaskAction,
-                    selection = selection,
-                    onOpenProject = { projectId ->
-                        val project = state.projects.firstOrNull {
-                            (it.location as? TaskHomeLocation.Project)?.id == projectId
-                        }?.location ?: TaskHomeLocation.Project(projectId, "")
-                        onSelectHomeLocation(project)
-                    },
-                    onOpenTask = onOpenTask,
-                )
-                is TaskHomeLocation.Project -> AreasProjectsScreen(
-                    graph = graph,
-                    destination = AreasProjectsDestination.Project(location.id),
-                    modifier = Modifier.padding(contentPadding),
-                    onOpenTask = onOpenTask,
-                    rowMenuGroups = rowMenuGroups,
-                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                    onTaskAction = onTaskAction,
-                    selection = selection,
-                )
-                is TaskHomeLocation.SmartList -> TaskHomeContent(
-                    completeTitle = completeTitle,
-                    emptyTitle = emptyTitle,
-                    emptyDescription = emptyDescription,
-                    inboxBandTitle = inboxTitle,
-                    todayTitle = todayTitle,
-                    todayTint = MaterialTheme.colorScheme.secondary,
-                    hasLoaded = state.hasLoaded,
-                    isToday = location.destinationId == RegistryDestinationIds.TODAY,
-                    inboxTasks = state.inboxTasks,
-                    tasks = state.tasks,
-                    canQuickAdd = state.canQuickAdd,
-                    canComplete = state.canComplete,
-                    errorMessage = state.errorMessage,
-                    rowMenuGroups = rowMenuGroups,
-                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                    modifier = Modifier.padding(contentPadding),
-                    selection = selection,
-                    onComplete = onComplete,
-                    onOpenTask = onOpenTask,
-                    onTaskAction = onTaskAction,
+            }
+
+            // Round Magic Plus orb (matches iPhone `MagicPlusOrb`): visible on
+            // creatable smart lists, areas and projects; hides during multi-select,
+            // while a snackbar is up, or when the software keyboard is showing.
+            if (canCreateHere && !selecting && !snackbarVisible && !imeVisible) {
+                MagicPlusOrb(
+                    drag = magicPlusDrag,
+                    isViewingProject = state.location is TaskHomeLocation.Project,
+                    accessibilityLabel = quickAddTitle,
+                    languageTag = languageTag,
+                    onNewTask = openDefaultQuickAdd,
+                    onNewSection = { newSectionTrigger += 1 },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 16.dp),
                 )
             }
+        }
+    }
+}
+
+private fun defaultQuickAddDraft(location: TaskHomeLocation): QuickAddDraft = when (location) {
+    is TaskHomeLocation.Area -> QuickAddDraft(areaId = location.id)
+    is TaskHomeLocation.Project -> QuickAddDraft(projectId = location.id)
+    is TaskHomeLocation.SmartList -> when (location.destinationId) {
+        RegistryDestinationIds.TODAY -> QuickAddDraft(today = true)
+        RegistryDestinationIds.STARRED -> QuickAddDraft(starred = true)
+        else -> QuickAddDraft()
+    }
+}
+
+@Composable
+private fun SidebarMenuGlyph(tint: Color) {
+    Canvas(modifier = Modifier.size(22.dp)) {
+        val stroke = 2.dp.toPx()
+        val left = 2.dp.toPx()
+        val right = size.width - 2.dp.toPx()
+        val ys = listOf(size.height * 0.25f, size.height * 0.50f, size.height * 0.75f)
+        ys.forEach { y ->
+            drawLine(tint, Offset(left, y), Offset(right, y), strokeWidth = stroke, cap = StrokeCap.Round)
+        }
+    }
+}
+
+@Composable
+private fun SearchGlyph(tint: Color) {
+    Canvas(modifier = Modifier.size(22.dp)) {
+        val stroke = 2.dp.toPx()
+        val radius = size.minDimension * 0.30f
+        val center = Offset(size.width * 0.43f, size.height * 0.43f)
+        drawCircle(tint, radius = radius, center = center, style = Stroke(width = stroke))
+        val offset = radius * 0.72f
+        drawLine(
+            tint,
+            Offset(center.x + offset, center.y + offset),
+            Offset(size.width * 0.86f, size.height * 0.86f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round,
+        )
+    }
+}
+
+@Composable
+private fun SettingsGearGlyph(tint: Color) {
+    Canvas(modifier = Modifier.size(22.dp)) {
+        val stroke = 1.9.dp.toPx()
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val innerR = size.minDimension * 0.17f
+        val midR = size.minDimension * 0.31f
+        val outerR = size.minDimension * 0.44f
+        drawCircle(tint, radius = innerR, center = Offset(cx, cy), style = Stroke(width = stroke))
+        drawCircle(tint, radius = midR, center = Offset(cx, cy), style = Stroke(width = stroke))
+        for (i in 0 until 8) {
+            val angle = i * (Math.PI / 4.0)
+            val cosA = cos(angle).toFloat()
+            val sinA = sin(angle).toFloat()
+            drawLine(
+                tint,
+                Offset(cx + cosA * midR, cy + sinA * midR),
+                Offset(cx + cosA * outerR, cy + sinA * outerR),
+                strokeWidth = stroke * 1.15f,
+                cap = StrokeCap.Round,
+            )
         }
     }
 }

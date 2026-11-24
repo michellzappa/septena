@@ -29,6 +29,7 @@ import app.septena.core.RegistryCatalog
 import app.septena.core.booleanValue
 import app.septena.core.generated.RegistryIconIds
 import app.septena.core.stringValue
+import app.septena.ui.LocalMagicPlusColor
 
 /** The appearance store, for the Settings picker. Null outside [SeptenaAndroidTheme]. */
 val LocalAppearanceStore = staticCompositionLocalOf<AppearanceStore?> { null }
@@ -38,6 +39,11 @@ val LocalAppearance = staticCompositionLocalOf { AppearanceState.defaults() }
 
 /** True when the applied appearance is dark (after the user's mode choice). */
 val LocalSeptenaDarkTheme = staticCompositionLocalOf { false }
+
+/** Fill and glyph ink for the Magic Plus orb (Persimmon under Colorful, else the chosen accent). */
+data class MagicPlusColors(val fill: Color, val ink: Color)
+
+val LocalMagicPlusColors = staticCompositionLocalOf { MagicPlusColors(Color.Unspecified, Color.Unspecified) }
 
 /**
  * Material 3 shell theme driven by the user's appearance choices
@@ -53,7 +59,10 @@ fun SeptenaAndroidTheme(store: AppearanceStore, content: @Composable () -> Unit)
         AppearanceState.MODE_DARK -> true
         else -> isSystemInDarkTheme()
     }
-    val colors = remember(darkTheme, appearance.accentId) {
+    val themeColors = remember(darkTheme, appearance.accentId) {
+        registryThemeColors(darkTheme, appearance.accentId)
+    }
+    val colors = remember(darkTheme, themeColors) {
         val systemColors = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         } else if (darkTheme) {
@@ -61,7 +70,7 @@ fun SeptenaAndroidTheme(store: AppearanceStore, content: @Composable () -> Unit)
         } else {
             lightColorScheme()
         }
-        systemColors.withAccent(registryThemeColors(darkTheme, appearance.accentId))
+        systemColors.withAccent(themeColors)
     }
 
     // The status and navigation bar icons follow the chosen mode, not only the system's.
@@ -86,6 +95,8 @@ fun SeptenaAndroidTheme(store: AppearanceStore, content: @Composable () -> Unit)
         LocalAppearanceStore provides store,
         LocalAppearance provides appearance,
         LocalSeptenaDarkTheme provides darkTheme,
+        LocalMagicPlusColors provides MagicPlusColors(themeColors.magicPlus, themeColors.magicPlusInk),
+        LocalMagicPlusColor provides themeColors.magicPlus,
     ) {
         MaterialTheme(colorScheme = colors, content = content)
     }
@@ -99,6 +110,10 @@ internal data class RegistryThemeColors(
     val todayGlyph: Color,
     /** Accent wash behind a selected item (tokens.json `selection`). */
     val selectionAlpha: Float,
+    /** Fill for the Magic Plus orb: Persimmon under Colorful, else the chosen accent (iOS `magicPlusSwiftUIColor`). */
+    val magicPlus: Color,
+    /** Paired glyph ink on the Magic Plus orb (iOS `magicPlusInkSwiftUIColor`). */
+    val magicPlusInk: Color,
 )
 
 /** One accent from registry/tokens.json `fruitAccents`. */
@@ -154,7 +169,21 @@ internal fun registryThemeColors(darkTheme: Boolean, accentId: String): Registry
     val selection = tokens.fields["selection"] as? JsonValue.ObjectValue
     val alphaKey = if (darkTheme) "emphasizedAlphaDark" else "emphasizedAlphaLight"
     val alpha = (selection?.fields?.get(alphaKey) as? JsonValue.DecimalValue)?.value?.toFloat() ?: 0.22f
-    return RegistryThemeColors(accent, fruit.check(darkTheme), todayGlyph, alpha)
+    // Under Colorful, the Magic Plus orb wears brand Persimmon so it reads as Septena,
+    // not as a stock blue button (matches Apple `AppearancePreferences.brandFruit`).
+    val brandFruit = if (fruit.multicolor) {
+        FruitAccents.all.firstOrNull { it.id == "persimmon" } ?: fruit
+    } else {
+        fruit
+    }
+    return RegistryThemeColors(
+        accent = accent,
+        onAccent = fruit.check(darkTheme),
+        todayGlyph = todayGlyph,
+        selectionAlpha = alpha,
+        magicPlus = brandFruit.color(darkTheme),
+        magicPlusInk = brandFruit.check(darkTheme),
+    )
 }
 
 /** Text size factor for a step, from tokens.json `textScale`. */
