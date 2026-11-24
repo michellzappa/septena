@@ -833,12 +833,6 @@ final class CloudKitTasksBackend {
     return try? context.fetch(d).first
   }
 
-  /// Nil until the core release that mints ids is pinned (`TaskRefCore`).
-  private func mintTaskRefID(taskID: String, key: String) -> String? {
-    TaskRefCore.mintID(taskID: taskID, key: key,
-                       deletedCount: TaskSyncEngine.shared.deletedTaskRefCount(taskID: taskID, key: key))
-  }
-
   /// Adds a reference from a key, a web URL or a `message://` link.
   func addTaskRef(taskID: String, input: String, role: TaskRefRole,
                   snapshot: TaskRefSnapshot) -> TaskRefAddResult {
@@ -848,7 +842,7 @@ final class CloudKitTasksBackend {
     let existing = LocalCache.taskRefs(forTaskID: taskID, in: context)
     if let same = existing.first(where: { $0.key == parsed.key }) { return .existing(same) }
     guard existing.count < RegistryEntityLimits.maxRefsPerTask else { return .limitReached }
-    guard let id = mintTaskRefID(taskID: taskID, key: parsed.key), fetchTaskRef(id: id) == nil else { return .failed }
+    guard let id = TaskSyncEngine.shared.nextTaskRefID(taskID: taskID, key: parsed.key), fetchTaskRef(id: id) == nil else { return .failed }
     var snapshot = snapshot
     if snapshot.url == nil { snapshot.url = parsed.url }
     if snapshot.rawId == nil, parsed.rawId != parsed.id { snapshot.rawId = parsed.rawId }
@@ -904,7 +898,7 @@ final class CloudKitTasksBackend {
     if let same = existing.first(where: { $0.key == ref.key }) { return same }
     guard existing.count < RegistryEntityLimits.maxRefsPerTask else { return nil }
     let canKeepID = TaskSyncEngine.shared.canRevive(.taskRef, ref.id)
-    guard let id = canKeepID ? ref.id : mintTaskRefID(taskID: ref.taskId, key: ref.key) else { return nil }
+    guard let id = canKeepID ? ref.id : TaskSyncEngine.shared.nextTaskRefID(taskID: ref.taskId, key: ref.key) else { return nil }
     let entity = TaskRefEntity(
       id: id, taskID: ref.taskId, key: ref.key, kind: ref.kind, role: ref.role,
       snapshotJSON: ref.snapshotJSON, position: ref.position, createdAt: ref.createdAt ?? Date())
@@ -925,7 +919,7 @@ final class CloudKitTasksBackend {
       .filter { $0.role == TaskRefRole.about.rawValue }
     var createdIDs: [String] = []
     for ref in source {
-      guard let id = mintTaskRefID(taskID: destinationTaskID, key: ref.key),
+      guard let id = TaskSyncEngine.shared.nextTaskRefID(taskID: destinationTaskID, key: ref.key),
             fetchTaskRef(id: id) == nil else { continue }
       context.insert(TaskRefEntity(
         id: id, taskID: destinationTaskID, key: ref.key, kind: ref.kind, role: ref.role,

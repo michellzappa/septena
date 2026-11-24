@@ -300,21 +300,28 @@ final class TaskSyncEngine {
     #endif
   }
 
-  /// How many rows of this task and key the backend deleted: the `n` of the
-  /// next reference id (§4). A delete that still waits in the outbox does not
-  /// count, so adding the key again takes the same id back and cancels it.
-  func deletedTaskRefCount(taskID: String, key: String) -> Int {
+  /// The id of the task's next reference to this key (§4): `n` counts the rows
+  /// the backend deleted. A delete that still waits in the outbox does not
+  /// count, so adding the key again takes the same id back and cancels it. An
+  /// id that a deleted row holds moves on to the next, as on the backend
+  /// (purged tombstones lower the count). Nil until the core mints ids.
+  func nextTaskRefID(taskID: String, key: String) -> String? {
+    var deleted = 0
     #if SEPTASK
-    guard let store = store() else { return 0 }
-    let entity = BackendEntity.taskRef
-    return store.goneShadows(entity: entity.rawValue).filter { shadow in
-      let fields = TaskSyncJSON.decode(shadow.fields)
-      return fields["taskId"] == .string(taskID) && fields["key"] == .string(key)
-        && !canRevive(entity, String(shadow.key.dropFirst(entity.rawValue.count + 1)))
-    }.count
-    #else
-    return 0
+    if let store = store() {
+      let entity = BackendEntity.taskRef
+      deleted = store.goneShadows(entity: entity.rawValue).filter { shadow in
+        let fields = TaskSyncJSON.decode(shadow.fields)
+        return fields["taskId"] == .string(taskID) && fields["key"] == .string(key)
+          && !canRevive(entity, String(shadow.key.dropFirst(entity.rawValue.count + 1)))
+      }.count
+    }
     #endif
+    while let id = TaskRefCore.mintID(taskID: taskID, key: key, deletedCount: deleted) {
+      if canRevive(.taskRef, id) { return id }
+      deleted += 1
+    }
+    return nil
   }
 
   /// True when the backend has (or will get, from the outbox) this task, so
@@ -955,11 +962,14 @@ final class TaskSyncEngine {
             noteTaskRefsUnsupported(id: op.rowID, fields: fields, store: store)
             continue
           }
-          if reason.hasPrefix("immutable:") {
-            // Another client added the same key to the task first and minted
-            // the same id. Nothing is lost: take the backend's row.
-            store.remove(op)
-            needsRepairPull = true
+          if reason == "duplicate_ref" {
+            // The task has the key under another id, which the pull brings.
+            // This row never was on the backend, so it leaves no tombstone.
+            if let row = fetchTaskRef(op.rowID) { main.delete(row) }
+            _ = StoreHealth.save(main, op: "taskSync.duplicateRef")
+            for queued in store.ops(entity: op.opEntity, rowID: op.rowID) { store.remove(queued) }
+            store.removeShadow("taskRef:\(op.rowID)")
+            NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
             continue
           }
         }

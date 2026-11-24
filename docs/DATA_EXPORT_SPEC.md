@@ -28,7 +28,7 @@ Turn Septena's existing local JSON export (`Septask/SeptaskDataTransfer.swift`) 
 ## 3. Format contracts
 
 ### 3.1 Canonical JSON (`septena_export_version: 1`)
-- Keep `septena_export_version: 1` backward-compatible by adding optional keys and new tables (`checklist_item`, `task_ref`, `tag`, `task_tag`, `task_convo`, `change_log` when exported from server) — older readers ignore unknown keys/tables.
+- Keep `septena_export_version: 1` backward-compatible by adding optional keys and new tables (`checklist_item`, `tag`, `task_tag`, `task_convo`, `change_log` when exported from server) — older readers ignore unknown keys/tables.
 - Every task column defined in `registry/entities.json` MUST be serialized in `TaskJSONTransfer.taskDict` and restored in `upsertTask` (enforced by a unit test comparing exported keys against `registry/entities.json`).
 - Round-trip invariant: exporting a local store to JSON and importing into a fresh store via `TaskJSONTransfer.apply` (and later `#99`) produces an identical task dataset with zero lost fields.
 

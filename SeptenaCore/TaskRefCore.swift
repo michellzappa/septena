@@ -93,6 +93,7 @@ extension TaskRefSnapshot {
   /// The backend's rule for `url`: `http` or `https`, no white space.
   private static func isWebAddress(_ text: String) -> Bool {
     let lower = text.lowercased()
-    return (lower.hasPrefix("https://") || lower.hasPrefix("http://")) && !text.contains(where: \.isWhitespace)
+    return ["https://", "http://"].contains { lower.hasPrefix($0) && lower.count > $0.count }
+      && !text.contains(where: \.isWhitespace)
   }
 }

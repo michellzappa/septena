@@ -594,10 +594,7 @@ enum TaskJSONTransfer {
           try context.fetchCount(FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.id == taskID })) > 0,
           siblings.count < RegistryEntityLimits.maxRefsPerTask else { return nil }
     let sync = TaskSyncEngine.shared
-    let liveID = sync.canRevive(.taskRef, id)
-      ? id
-      : TaskRefCore.mintID(taskID: taskID, key: key,
-                           deletedCount: sync.deletedTaskRefCount(taskID: taskID, key: key))
+    let liveID = sync.canRevive(.taskRef, id) ? id : sync.nextTaskRefID(taskID: taskID, key: key)
     guard let liveID else { return nil }
     let entity = TaskRefEntity(
       id: liveID, taskID: taskID, key: key, kind: parsed?.kind ?? (r["kind"] as? String) ?? "",

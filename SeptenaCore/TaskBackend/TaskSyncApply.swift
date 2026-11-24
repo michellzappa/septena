@@ -283,7 +283,7 @@ extension TaskSyncEngine {
         if tombstone {
           if let ref = fetchTaskRef(id) { main.delete(ref) }
           // The task and key of a deleted row stay: they count towards the id
-          // of a reference that is added again (`deletedTaskRefCount`).
+          // of a reference that is added again (`nextTaskRefID`).
           markGone(.taskRef, id, shadow: shadows[key],
                    seed: change.row.filter { $0.key == "taskId" || $0.key == "key" }, store: store)
         } else if !pendingDelete.contains(key) {
