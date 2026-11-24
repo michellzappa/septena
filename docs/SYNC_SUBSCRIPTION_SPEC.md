@@ -270,8 +270,10 @@ revoked. A transaction the app posts never moves a `grace` or
   Nothing is refused, and reads show everything. A failed plan check lets
   the call through with no limits.
 - `"true"`: a call past a limit is refused (§6.3). A failed plan check
-  blocks (fail closed): 503 `plan_check_failed` on `/v1`, a tool error on
-  the connector.
+  logs `plan_check_failed`: sync paths fail open so a store hiccup never
+  stops sync, while writes that cost money (attachments, connector writes
+  and agent claims) fail closed (503 `plan_check_failed` on `/v1`, a tool
+  error on the connector).
 
 The live connector on mcp.septena.app (CloudKit) is not gated.
 
@@ -325,21 +327,43 @@ generated from `plans.json` `upsells`), so the words match the app.
 token carries the session id (`sid`), which survives refresh-token rotation.
 Table `devices` in the DO records each session that called a sync route and
 its `slotAt`. The slot holders are the `devices` count of live sessions with
-the newest `slotAt`.
+the newest `slotAt` within the last 14 days.
 
 - A device that may sync refreshes its `slotAt`. On Plus (no cap) every
   device does, so after a lapse the device used last keeps the slot (§7).
-- A device takes a free slot by itself on its first sync. It never pushes
-  out a holder: the second device stays local and gets the
-  `second_device` upsell. *(default 2026-11-22: §3.2's "the device works
-  locally; moving the slot is offered" wins over ADR 0023's "the new device
-  takes the slot". mz can overrule; then sign-in would call the claim.)*
+- A device takes a free slot by itself on its first sync. A slot holder
+  that has not synced for 14 days loses its slot to the next device that
+  syncs, with no prompt (reinstall, restored or new phone; §6.4 finding 1).
+  It never pushes out an active holder: the second device stays local and
+  gets the `second_device` upsell. *(default 2026-11-22: §3.2's "the device
+  works locally; moving the slot is offered" wins over ADR 0023's "the new
+  device takes the slot". mz can overrule; then sign-in would call the
+  claim.)*
 - `POST /v1/entitlement/device` moves the slot to the calling device; the
-  old device stops syncing and keeps its local data. Free on every plan.
+  old device stops syncing and keeps its local data. Free on every plan,
+  limited to one manual move per 24 hours on a capped plan (§6.4 finding 2).
+  A second manual move within 24 hours returns 402
+  `device_move_rate_limited` with the `second_device` upsell words. Taking
+  an open or 14-day-expired slot automatically does not count as a move.
 - Signing out (`/v1/auth/signout`) or an expired session frees its slot.
 - A device past the count gets 402 `device_not_syncing` on `/v1/sync/*`,
   `/v1/attachments/*` and `/v1/changes`. A token from before session ids
   (at most one hour after deploy) names no device and is let through.
+
+**Reverse trial.** First sign-in writes a 14-day `trial` row in
+`entitlements` (resolving to `plus`) and records a KV marker
+`trial-used:<userId>` in `TOKENS`. `DELETE /v1/account` does not remove
+this marker (and writes it first if the store held a `trial` row), so
+deleting and re-signing up with the same Apple id never starts a second
+trial (§6.4 finding 4).
+
+**Plan read failure.** Any failure reading the user's plan is logged as
+`plan_check_failed`. Sync paths (`/v1/sync/*`, `/v1/changes`, `/v1/tasks*`)
+and `POST /v1/entitlement/device` fail open so a Durable Object hiccup
+never stops sync for paying users (§6.4 finding 6). Writes that cost money
+(`/v1/attachments/*`, MCP connector writes and `tasks_claim`) stay fail
+closed in enforce mode (503 `plan_check_failed` on `/v1`, a tool error on
+the connector).
 
 **Other limits.**
 
@@ -451,7 +475,7 @@ refund revokes at once. History past the free window hides and comes back
 on upgrade. Downloads of stored files keep working on free. Counters use
 UTC days and months, and a renewal of a claim is not a new agent run.
 
-**Issues:** #262 (findings 1, 2, 4, 6), #263 (finding 3), #264 (402
+**Issues:** #262 (findings 1, 2, 4, 6 — built in `backend/`), #263 (finding 3), #264 (402
 bodies, findings 5 and 8), #265 (finding 7), #267 (turn enforcement on).
 
 **Order to turn enforcement on:** findings 1, 2, 4 and 6 in the backend;

@@ -161,6 +161,12 @@ function clipForLog(v: unknown): unknown {
 // the fields the push carried. A deleted row stays deleted (§6.4).
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+/// A device slot holder that has not synced this long loses the slot to the
+/// next device that syncs, with no prompt (spec §6.4 finding 1).
+export const DEVICE_SLOT_INACTIVE_MS = 14 * DAY_MS;
+/// Minimum interval between manual device slot moves (`POST /v1/entitlement/device`)
+/// on a capped plan (spec §6.4 finding 2).
+export const DEVICE_SLOT_MOVE_COOLDOWN_MS = DAY_MS;
 const TOMBSTONE_TTL_MS = DOMAIN_RULES.tombstoneTtlDays * DAY_MS;
 const CLIENT_OP_TTL_MS = DOMAIN_RULES.clientOpTtlDays * DAY_MS;
 /// A connection unused this long has an expired refresh token (src/shadow/tokens.ts).
@@ -1299,7 +1305,7 @@ export class TaskStore extends DurableObject<Env> {
   /// connections (agents). A connection unused for its refresh lifetime has
   /// expired and is left out.
   accessSummary(currentSid: string | null, cap: number | null, now = Date.now(), agentLimit: number | null = null): AccessSummary {
-    const devices = this.deviceSummary(cap);
+    const devices = this.deviceSummary(cap, now);
     const firstSeen = new Map(this.sql.exec<{ sid: string; firstSeen: number }>("SELECT sid, firstSeen FROM devices").toArray().map((r) => [r.sid, r.firstSeen]));
     const connections = this.sql.exec<{ familyId: string; name: string; clientName: string; scope: string; createdAt: number; lastUsed: number }>(
       "SELECT familyId, COALESCE(label, clientName) AS name, clientName, scope, createdAt, lastUsed FROM connections WHERE lastUsed > ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS,
@@ -1314,20 +1320,21 @@ export class TaskStore extends DurableObject<Env> {
     };
   }
 
-  // ---- device slot (docs/SYNC_SUBSCRIPTION_SPEC.md §3, ADR 0023) ----
+  // ---- device slot (docs/SYNC_SUBSCRIPTION_SPEC.md §3, §6.3–§6.4, ADR 0023) ----
   // A device is a session (`sid`). The slot holders are the `cap` live
-  // sessions with the newest `slotAt`. A device that is allowed to sync
-  // refreshes its `slotAt`, so with no cap (Plus) the order is "most recently
-  // used": a lapsed account keeps the device it used last.
+  // sessions with the newest `slotAt` within the last 14 days. A device that
+  // is allowed to sync refreshes its `slotAt`, so with no cap (Plus) the order
+  // is "most recently used": a lapsed account keeps the device it used last.
 
   /// Records one sync call from `sid` and says whether it holds a slot.
-  /// A device takes a free slot by itself; it never pushes out a holder
-  /// (that is `claimDeviceSlot`).
-  deviceAccess(sid: string, client: string | null, cap: number | null): { syncing: boolean } {
+  /// A device takes a free slot by itself — including when the previous holder
+  /// has not synced for 14 days (spec §6.4 finding 1). It never pushes out an
+  /// active holder (that is `claimDeviceSlot`), and an automatic take never
+  /// counts against the 24-hour manual move cooldown.
+  deviceAccess(sid: string, client: string | null, cap: number | null, now = Date.now()): { syncing: boolean } {
     return this.ctx.storage.transactionSync(() => {
-      const now = Date.now();
       this.touchDevice(sid, client, now);
-      const holders = cap === null ? null : this.slotHolders(cap);
+      const holders = cap === null ? null : this.slotHolders(cap, now);
       const syncing = holders === null || holders.includes(sid) || holders.length < cap!;
       if (syncing) this.sql.exec("UPDATE devices SET slotAt = ? WHERE sid = ?", this.nextSlotAt(now), sid);
       return { syncing };
@@ -1336,17 +1343,45 @@ export class TaskStore extends DurableObject<Env> {
 
   /// Moves a slot to `sid` ("sync this device instead"). With a cap of N the
   /// holder used least recently stops syncing; its local data stays.
-  claimDeviceSlot(sid: string, client: string | null): void {
-    const now = Date.now();
-    this.ctx.storage.transactionSync(() => {
+  /// On a capped plan, manual moves are limited to one per 24 hours (spec §6.4
+  /// finding 2). Re-claiming when already syncing or taking an open/expired
+  /// slot does not count as a move.
+  claimDeviceSlot(
+    sid: string,
+    client: string | null,
+    cap: number | null = null,
+    enforce = true,
+    now = Date.now(),
+  ): { ok: true; moved: boolean; wouldBlock?: boolean } | { ok: false; retryAfterMs: number } {
+    return this.ctx.storage.transactionSync(() => {
       this.touchDevice(sid, client, now);
+      if (cap !== null) {
+        const holders = this.slotHolders(cap, now);
+        if (holders.includes(sid) || holders.length < cap) {
+          this.sql.exec("UPDATE devices SET slotAt = ? WHERE sid = ?", this.nextSlotAt(now), sid);
+          return { ok: true, moved: false };
+        }
+        const lastMovedAt = this.meta("deviceSlotMovedAt");
+        const elapsed = now - lastMovedAt;
+        if (lastMovedAt > 0 && elapsed < DEVICE_SLOT_MOVE_COOLDOWN_MS) {
+          const retryAfterMs = DEVICE_SLOT_MOVE_COOLDOWN_MS - elapsed;
+          if (enforce) return { ok: false, retryAfterMs };
+          this.sql.exec("UPDATE devices SET slotAt = ? WHERE sid = ?", this.nextSlotAt(now), sid);
+          this.setMeta("deviceSlotMovedAt", now);
+          return { ok: true, moved: true, wouldBlock: true };
+        }
+        this.sql.exec("UPDATE devices SET slotAt = ? WHERE sid = ?", this.nextSlotAt(now), sid);
+        this.setMeta("deviceSlotMovedAt", now);
+        return { ok: true, moved: true };
+      }
       this.sql.exec("UPDATE devices SET slotAt = ? WHERE sid = ?", this.nextSlotAt(now), sid);
+      return { ok: true, moved: false };
     });
   }
 
   /// The devices that synced, newest first, and which of them hold a slot.
-  deviceSummary(cap: number | null): { client: string | null; sid: string; lastSeen: number; syncing: boolean }[] {
-    const holders = cap === null ? null : new Set(this.slotHolders(cap));
+  deviceSummary(cap: number | null, now = Date.now()): { client: string | null; sid: string; lastSeen: number; syncing: boolean }[] {
+    const holders = cap === null ? null : new Set(this.slotHolders(cap, now));
     return this.sql.exec<{ sid: string; client: string | null; lastSeen: number }>(
       "SELECT d.sid, d.client, d.lastSeen FROM devices d WHERE EXISTS (SELECT 1 FROM sessions s WHERE s.sid = d.sid) ORDER BY d.lastSeen DESC",
     ).toArray().map((r) => ({ ...r, syncing: holders === null || holders.has(r.sid) }));
@@ -1365,10 +1400,12 @@ export class TaskStore extends DurableObject<Env> {
     return top === null ? now : Math.max(now, top + 1);
   }
 
-  private slotHolders(cap: number): string[] {
+  private slotHolders(cap: number, now = Date.now()): string[] {
     if (cap <= 0) return [];
+    const cutoff = now - DEVICE_SLOT_INACTIVE_MS;
     return this.sql.exec<{ sid: string }>(
-      "SELECT d.sid FROM devices d WHERE d.slotAt IS NOT NULL AND EXISTS (SELECT 1 FROM sessions s WHERE s.sid = d.sid) ORDER BY d.slotAt DESC LIMIT ?",
+      "SELECT d.sid FROM devices d WHERE d.slotAt IS NOT NULL AND d.slotAt > ? AND EXISTS (SELECT 1 FROM sessions s WHERE s.sid = d.sid) ORDER BY d.slotAt DESC LIMIT ?",
+      cutoff,
       cap,
     ).toArray().map((r) => r.sid);
   }
