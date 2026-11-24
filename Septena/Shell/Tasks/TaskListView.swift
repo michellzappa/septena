@@ -4665,7 +4665,12 @@ struct TaskListView: View {
                           onDropIDs: (([String]) -> Bool)? = nil,
                           magicContext: String? = nil) -> some View {
     let rows = excludingQuickAddCapture(tasks)
-    let cardCount = rows.count + (appendQuickAdd ? 1 : 0)
+    let isEditingQuickAdd = appendQuickAdd
+      && quickAddShowsEditor
+      && quickAddCaptureTask.map { expandedEditId == $0.id } == true
+    let rendersQuickAdd = appendQuickAdd
+      && (!usesMagicPlusInsteadOfInboxTrigger || isEditingQuickAdd)
+    let cardCount = rows.count + (rendersQuickAdd ? 1 : 0)
     // Today rows reorder in Today's own order (#66). The row's reorder drop
     // also files a row dragged in from another group, so the row-level
     // group drop steps aside (the group headers keep theirs).
@@ -4684,9 +4689,10 @@ struct TaskListView: View {
       AnyView(taskRow(task, quickMenu: quickMenu?(task) ?? false)
         .taskCardChrome(position,
                         // An open inline editor keeps the clean card surface
-                        // instead of painting the whole editor in selection blue;
-                        // on iOS it lifts as a rounded focus card while siblings
-                        // fade back. Closed selected rows keep the selection fill.
+                        // and its grouped card corners instead of painting the
+                        // whole editor in selection blue; on iOS siblings fade
+                        // back while the editor stays crisp. Closed selected
+                        // rows keep the selection fill.
                         isSelected: isExpanded ? false : selection.contains(task.id),
                         isEditing: isExpanded)
         // After the chrome, so the iOS lift preview includes the card
@@ -4719,9 +4725,7 @@ struct TaskListView: View {
         .zIndex(isExpanded ? 1 : 0)
         .inlineEditDimmed(isInlineEditing && !isExpanded, onDismiss: collapseEdit))
     }
-    if appendQuickAdd {
-      let isEditingQuickAdd = quickAddShowsEditor
-        && quickAddCaptureTask.map { expandedEditId == $0.id } == true
+    if rendersQuickAdd {
       AnyView(quickAddLine(showsEditor: quickAddShowsEditor)
         .asListRow()
         // The quick-add trigger is a selectable row (it carries the sentinel id
