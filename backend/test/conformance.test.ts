@@ -23,7 +23,7 @@ const {
   matchesView,
   normalizeView,
 } = await import("../src/tools/taskShared.ts");
-const { applyDateAction, normalizeTaskDates, taskViewMembership } = await import("../src/core/index.ts");
+const { CoreInputError, applyDateAction, callCore, findIssueRefs, normalizeTaskDates, parseRef, taskRefId, taskViewMembership } = await import("../src/core/index.ts");
 const {
   ACTIONS_CATALOG,
   CAPABILITIES,
@@ -207,6 +207,25 @@ describe("Conformance: task-dates.json (core WASM in the Worker, D4 #291)", () =
   }
   for (const c of fixture.normalize) {
     check(`normalize: ${c.name}`, c.expected, () => normalizeTaskDates(c.task, fixture.today));
+  }
+});
+
+describe("Conformance: refs.json (core WASM in the Worker, #386)", () => {
+  const fixture = readJSON("conformance/refs.json");
+  for (const c of fixture.parseRef) {
+    it(`parseRef: ${c.name}`, () => {
+      if (c.expected.error === undefined) assert.deepEqual(parseRef(c.input), c.expected);
+      else assert.throws(() => parseRef(c.input), (e: unknown) => e instanceof CoreInputError && e.reason === c.expected.error);
+    });
+  }
+  for (const c of fixture.normalizeRefKey) {
+    if (typeof c.expected !== "string") continue;
+    it(`normalizeRefKey: ${c.name}`, () => assert.equal(callCore("normalizeRefKey", { key: c.input }), c.expected));
+  }
+  for (const c of fixture.findIssueRefs) it(`findIssueRefs: ${c.name}`, () => assert.deepEqual(findIssueRefs(c.input), c.expected));
+  for (const c of fixture.emailRefKeys) it(`emailRefKeys: ${c.name}`, () => assert.deepEqual(callCore("emailRefKeys", c.input), c.expected));
+  for (const c of fixture.taskRefId) {
+    it(`taskRefId: ${c.name}`, () => assert.equal(taskRefId(c.input.taskId, c.input.key, c.input.deletedCount), c.expected));
   }
 });
 

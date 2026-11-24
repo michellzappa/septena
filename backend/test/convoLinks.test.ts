@@ -4,35 +4,26 @@ import { createTestTaskStore, installWorkerTestHooks } from "./taskStoreHarness.
 
 installWorkerTestHooks();
 
-// `issue` and `endState` on MCP task rows (#310). The search order mirrors
-// SeptenaCore TaskConvo.linkedIssue (ConvoDerived.swift).
+// `issue`, `refCount` and `endState` on MCP task rows (#310, #386). `issue` is
+// the task's newest `issue` reference.
 
 const url = (n: number, kind = "issues") => `https://github.com/michellzappa/septena/${kind}/${n}`;
 
-describe("issueLink (mirrors TaskConvo.linkedIssue)", () => {
-  it("parses issues and pull requests", async () => {
-    const { parseIssueLink } = await import("../src/tools/taskShared.ts");
-    assert.deepEqual(parseIssueLink(`see ${url(310)} now`), {
-      url: url(310), repo: "michellzappa/septena", number: 310, kind: "issue",
+describe("issueLink", () => {
+  it("builds the link from the key and keeps the spelling of the name", async () => {
+    const { issueLink } = await import("../src/tools/taskShared.ts");
+    assert.deepEqual(issueLink("issue:acme/app#7", null), {
+      url: "https://github.com/acme/app/issues/7", repo: "acme/app", number: 7, kind: "issue",
     });
-    assert.equal(parseIssueLink(url(12, "pull"))?.kind, "pr");
-    assert.equal(parseIssueLink("github.com/x without a path"), undefined);
-    assert.equal(parseIssueLink(null), undefined);
+    assert.deepEqual(issueLink("issue:acme/app#8", { rawId: "Acme/App#8", url: "https://github.com/Acme/App/pull/8" }), {
+      url: "https://github.com/Acme/App/pull/8", repo: "Acme/App", number: 8, kind: "pr",
+    });
   });
 
-  it("takes artifact refs, body, title, handoff, end-state note, then the turn, in that order", async () => {
+  it("never takes the address from a snapshot that names something else", async () => {
     const { issueLink } = await import("../src/tools/taskShared.ts");
-    const all = {
-      artifact: { refs: ["no link", url(1)], body: url(2), title: url(3) },
-      handoffPayload: url(4), endStateNote: url(5), turnText: url(6),
-    };
-    assert.equal(issueLink(all)?.number, 1);
-    assert.equal(issueLink({ ...all, artifact: { ...all.artifact, refs: [] } })?.number, 2);
-    assert.equal(issueLink({ ...all, artifact: { title: url(3) } })?.number, 3);
-    assert.equal(issueLink({ ...all, artifact: null })?.number, 4);
-    assert.equal(issueLink({ endStateNote: url(5), turnText: url(6) })?.number, 5);
-    assert.equal(issueLink({ turnText: url(6) })?.number, 6);
-    assert.equal(issueLink({}), undefined);
+    const link = issueLink("issue:acme/app#8", { rawId: "Evil/Repo#8", url: "https://example.com/pull/1" });
+    assert.equal(link.url, "https://github.com/acme/app/pull/8");
   });
 });
 
@@ -45,7 +36,8 @@ describe("task rows carry the linked issue and end state", () => {
       readAreas: async (limit: number) => store.readAreas(limit),
       readProjects: async (status: "active" | "done" | "cancelled" | "all", limit: number) => store.readProjects(status, limit),
       readChecklistCounts: async () => store.readChecklistCounts(),
-      readConvoLinks: async () => store.readConvoLinks(),
+      readTaskLinks: async () => store.readTaskLinks(),
+      readTaskRefs: async (id: string) => store.readTaskRefs(id),
       readTags: async () => store.readTags(),
       readSetting: async (key: string) => store.readSetting(key),
       readOrderTop: async () => store.readOrderTop(),
@@ -64,9 +56,11 @@ describe("task rows carry the linked issue and end state", () => {
     const list = await listTasks(rpc as never, "UTC", "anytime", 100);
     const row = list.tasks.find((t) => t.id === linked.id)!;
     assert.equal(row.issue?.number, 310);
+    assert.equal(row.refCount, 1);
     assert.equal(row.endState, "decomposed");
     const other = list.tasks.find((t) => t.id === plain.id)!;
     assert.equal(other.issue, undefined);
+    assert.equal(other.refCount, undefined);
     assert.equal(other.endState, undefined);
 
     const found = await searchTasks(rpc as never, "UTC", { query: "linked idea" });

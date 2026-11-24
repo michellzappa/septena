@@ -83,6 +83,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [INBOX_ZERO_MOTION_SPEC.md](INBOX_ZERO_MOTION_SPEC.md) | accepted (#298) |
 | [PROJECT_NOTES_SPEC.md](PROJECT_NOTES_SPEC.md) | accepted (ADR 0012) |
 | [TASK_PAGE_SPEC.md](TASK_PAGE_SPEC.md) | accepted (ADR 0029, #300) |
+| [AGENT_PROMPT_SPEC.md](AGENT_PROMPT_SPEC.md) | building (#396; Android Review rows #412) |
 | [TIMED_REMINDERS_SPEC.md](TIMED_REMINDERS_SPEC.md) | proposal (#97) |
 | [RECURRENCE_V2_SPEC.md](RECURRENCE_V2_SPEC.md) | proposal (#126) |
 | [MOVING_IN_SPEC.md](MOVING_IN_SPEC.md) | building (#99, ADR 0021): one import engine, source adapters |

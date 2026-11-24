@@ -38,6 +38,19 @@ The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, 
 - `tasks_complete` on a **recurring** task also creates its next occurrence and returns it as `nextOccurrence` — say when the task comes back, don't send the user to the app. If the result carries a `recurrenceWarning`, the task was still completed but the series didn't advance; relay that rather than claiming the next one is scheduled.
 - Resolve `area`/`project` names → ids via `tasks_list_areas` / `tasks_list_projects` before creating/updating.
 
+#### References: what a task points at
+
+A task can point at up to 20 items: an email, a mail thread, a calendar event, a GitHub issue or pull request, a web page, another task. Septena stores a **key** and a small **snapshot** (title, subtitle, date, url) and never syncs with the item.
+
+- Pass `refs: [{key, role?, snapshot?}]` to `tasks_create` and `tasks_update`. `key` is a reference key (`email:<Message-ID>`, `thread:<root Message-ID>`, `event:<iCal UID>`, `issue:<owner>/<repo>#<n>`, `task:<task id>`, `url:<web URL>`), a web URL, or a `message://` link. Septena stores the normal form, so every spelling of one item is one key. An invalid key is an error.
+- `role`: `about` (default), `from` (the task was made from it), `blocked_by`, `follow_up`. The last two are labels.
+- Set `snapshot.title` when you know it. Septena never fetches a title. Never put message text in a snapshot.
+- `tasks_update`: `refs` adds, or updates by key; `refs_remove: [key]` removes. The other references stay.
+- **`tasks_find_by_ref(key)`** answers "which tasks point at this?", open tasks first. Call it before you create a task from an email, an issue or a page.
+- `tasks_get` returns `refs` and `backlinks` (the tasks that point at this one). List rows carry `refCount`, and `issue` from the newest GitHub issue or PR reference.
+- A GitHub issue or PR URL that you write into an artifact, a handoff, an end-state note or a turn becomes a reference on its own. A reference that the user removed does not come back this way.
+- A reference never completes a task.
+
 #### Task Conversations (agent-driven resolution)
 
 A task can hold a persisted **conversation** that drives it toward a solution. You are the

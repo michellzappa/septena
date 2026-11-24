@@ -1229,6 +1229,129 @@ public func FfiConverterTypeOrdinalWeekday_lower(_ value: OrdinalWeekday) -> Rus
 }
 
 
+/**
+ * One parsed reference.
+ */
+public struct ParsedRef {
+    /**
+     * `<kind>:<id>` in normal form. The lookup key.
+     */
+    public var key: String
+    public var kind: String
+    /**
+     * The part of `key` after the kind.
+     */
+    public var id: String
+    /**
+     * The id before normalisation, for the resolver (`snapshot.rawId`). A
+     * Message-ID has no angle brackets and no white space here.
+     */
+    public var rawId: String
+    /**
+     * The web address of the item, when the input was one.
+     */
+    public var url: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * `<kind>:<id>` in normal form. The lookup key.
+         */key: String, kind: String, 
+        /**
+         * The part of `key` after the kind.
+         */id: String, 
+        /**
+         * The id before normalisation, for the resolver (`snapshot.rawId`). A
+         * Message-ID has no angle brackets and no white space here.
+         */rawId: String, 
+        /**
+         * The web address of the item, when the input was one.
+         */url: String?) {
+        self.key = key
+        self.kind = kind
+        self.id = id
+        self.rawId = rawId
+        self.url = url
+    }
+}
+
+#if compiler(>=6)
+extension ParsedRef: Sendable {}
+#endif
+
+
+extension ParsedRef: Equatable, Hashable {
+    public static func ==(lhs: ParsedRef, rhs: ParsedRef) -> Bool {
+        if lhs.key != rhs.key {
+            return false
+        }
+        if lhs.kind != rhs.kind {
+            return false
+        }
+        if lhs.id != rhs.id {
+            return false
+        }
+        if lhs.rawId != rhs.rawId {
+            return false
+        }
+        if lhs.url != rhs.url {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(key)
+        hasher.combine(kind)
+        hasher.combine(id)
+        hasher.combine(rawId)
+        hasher.combine(url)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeParsedRef: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ParsedRef {
+        return
+            try ParsedRef(
+                key: FfiConverterString.read(from: &buf), 
+                kind: FfiConverterString.read(from: &buf), 
+                id: FfiConverterString.read(from: &buf), 
+                rawId: FfiConverterString.read(from: &buf), 
+                url: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ParsedRef, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.key, into: &buf)
+        FfiConverterString.write(value.kind, into: &buf)
+        FfiConverterString.write(value.id, into: &buf)
+        FfiConverterString.write(value.rawId, into: &buf)
+        FfiConverterOptionString.write(value.url, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeParsedRef_lift(_ buf: RustBuffer) throws -> ParsedRef {
+    return try FfiConverterTypeParsedRef.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeParsedRef_lower(_ value: ParsedRef) -> RustBuffer {
+    return FfiConverterTypeParsedRef.lower(value)
+}
+
+
 public struct PullPageHeader {
     public var resetRequired: Bool
     public var nextSince: Int64
@@ -3382,6 +3505,31 @@ fileprivate struct FfiConverterSequenceTypeConversationTurn: FfiConverterRustBuf
         return seq
     }
 }
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeParsedRef: FfiConverterRustBuffer {
+    typealias SwiftType = [ParsedRef]
+
+    public static func write(_ value: [ParsedRef], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeParsedRef.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ParsedRef] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [ParsedRef]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeParsedRef.read(from: &buf))
+        }
+        return seq
+    }
+}
 /**
  * Applies one date action to one task. A heading or a deleted task has no
  * dates to change: the patch is empty. Every action also clears the agent
@@ -3472,6 +3620,16 @@ public func fadeFill(input: FadeInput)throws  -> Double?  {
 })
 }
 /**
+ * Every GitHub issue or pull request URL in a text, in order, one per key.
+ */
+public func findIssueRefs(text: String) -> [ParsedRef]  {
+    return try!  FfiConverterSequenceTypeParsedRef.lift(try! rustCall() {
+    uniffi_septena_core_fn_func_find_issue_refs(
+        FfiConverterString.lower(text),$0
+    )
+})
+}
+/**
  * Calls one core function by name with a JSON object and returns its result
  * as JSON. A plan or decision comes back in the vectors' JSON shape; a core
  * error comes back as `{"error": "<message>"}` so hosts can log it as data.
@@ -3515,6 +3673,16 @@ public func nextScheduledDate(completedOn: String, scheduled: String?, logicalSc
 })
 }
 /**
+ * The normal form of a key. A URL is not a key: use `parse_ref`.
+ */
+public func normalizeRefKey(key: String)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+    uniffi_septena_core_fn_func_normalize_ref_key(
+        FfiConverterString.lower(key),$0
+    )
+})
+}
+/**
  * A12 and restore: the task's fields brought to invariants I1–I7. A pin
  * with a future When date loses the pin; a pin with an arrived When date
  * loses the date. An empty or invalid day becomes none.
@@ -3535,6 +3703,16 @@ public func occurrenceId(sourceTaskId: String, scheduled: String) -> String  {
     uniffi_septena_core_fn_func_occurrence_id(
         FfiConverterString.lower(sourceTaskId),
         FfiConverterString.lower(scheduled),$0
+    )
+})
+}
+/**
+ * Parses a key, a web URL or a `message://` link.
+ */
+public func parseRef(input: String)throws  -> ParsedRef  {
+    return try  FfiConverterTypeParsedRef_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+    uniffi_septena_core_fn_func_parse_ref(
+        FfiConverterString.lower(input),$0
     )
 })
 }
@@ -3646,6 +3824,20 @@ public func shouldFade(input: FadeInput)throws  -> Bool  {
 })
 }
 /**
+ * The id of a `taskRef` row: FNV-1a 64 over `"<task id>|<key>|<n>"`, where
+ * `n` is the number of deleted rows with the same task and key. Two offline
+ * devices that add the same reference mint the same id.
+ */
+public func taskRefId(taskId: String, key: String, deletedCount: UInt32) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_septena_core_fn_func_task_ref_id(
+        FfiConverterString.lower(taskId),
+        FfiConverterString.lower(key),
+        FfiConverterUInt32.lower(deletedCount),$0
+    )
+})
+}
+/**
  * List membership for one task. `today` is `YYYY-MM-DD` and `now` an
  * ISO-8601 instant, both from the host's day clock.
  */
@@ -3695,6 +3887,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_septena_core_checksum_func_fade_fill() != 48489) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_septena_core_checksum_func_find_issue_refs() != 62982) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_septena_core_checksum_func_invoke_json() != 29059) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -3704,10 +3899,16 @@ private let initializationResult: InitializationResult = {
     if (uniffi_septena_core_checksum_func_next_scheduled_date() != 10335) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_septena_core_checksum_func_normalize_ref_key() != 43412) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_septena_core_checksum_func_normalize_task_dates() != 27973) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_septena_core_checksum_func_occurrence_id() != 31912) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_septena_core_checksum_func_parse_ref() != 855) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_septena_core_checksum_func_plan_pull_row() != 54836) {
@@ -3735,6 +3936,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_septena_core_checksum_func_should_fade() != 20672) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_septena_core_checksum_func_task_ref_id() != 40151) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_septena_core_checksum_func_task_view_membership() != 3717) {
