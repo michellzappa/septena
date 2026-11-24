@@ -292,6 +292,22 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
         }
     }
 
+    /**
+     * Removes every local row, turn, outbox entry, shadow and the sync cursor: the account is gone
+     * (account deletion). Not part of [TaskStore]: only the app's account flow calls it.
+     */
+    fun wipeAllLocalData() {
+        database.transaction {
+            queries.deleteAllRecords()
+            queries.deleteAllShadows()
+            queries.deleteAllTurns()
+            queries.deleteAllLocalTurnRows()
+            queries.deleteAllOutboxRows()
+            queries.deleteAllRejectedRows()
+            queries.deleteAllMetadata()
+        }
+    }
+
     private fun enqueueUpsert(operation: SyncOperation.Upsert, notBefore: Instant) {
         val last = queries.selectLastRowOperation(operation.entity, operation.id).executeAsOneOrNull()
         if (last != null && last.kind == "upsert" && last.sent == 0L) {

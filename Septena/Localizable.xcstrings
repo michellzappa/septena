@@ -3549,6 +3549,10 @@
         }
       }
     },
+    "Close" : {
+      "comment" : "Generated from registry surfaces.firstRun.chrome.close.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Closing keeps the conversation but stops the user from replying. Internal notes are visible only to maintainers." : {
 
     },
@@ -4023,6 +4027,30 @@
         }
       }
     },
+    "Could not reach Septena." : {
+      "comment" : "Generated from registry surfaces.deviceSignIn.copy.unreachable.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível conectar ao Septena."
+          }
+        }
+      }
+    },
+    "Couldn’t delete your account. Nothing was deleted." : {
+      "comment" : "Generated from registry settings.copy.delete_account.failed.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível excluir sua conta. Nada foi excluído."
+          }
+        }
+      }
+    },
     "Couldn't load — tap to check the URL" : {
 
     },
@@ -4487,6 +4515,18 @@
         }
       }
     },
+    "Delete account" : {
+      "comment" : "Generated from registry settings.copy.delete_account.button.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir conta"
+          }
+        }
+      }
+    },
     "Delete Account" : {
       "comment" : "Generated from registry surfaces.prompts.items.deleteAccount.confirmTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -4593,6 +4633,18 @@
         }
       }
     },
+    "Delete your account?" : {
+      "comment" : "Generated from registry settings.copy.delete_account.title.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir sua conta?"
+          }
+        }
+      }
+    },
     "Deleted" : {
       "comment" : "Generated from registry destinations.destinations.recentlyDeleted.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -4618,6 +4670,18 @@
     "Deselect All" : {
       "comment" : "Generated from registry actions.actions.task.selectAll.activeTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
+    },
+    "Deletes your account and all your tasks on the Septena server." : {
+      "comment" : "Generated from registry settings.copy.delete_account.footer.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exclui sua conta e todas as suas tarefas no servidor do Septena."
+          }
+        }
+      }
     },
     "Despondent" : {
       "localizations" : {
@@ -5712,6 +5776,30 @@
         }
       }
     },
+    "Get a new code" : {
+      "comment" : "Generated from registry surfaces.deviceSignIn.copy.retry.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obter um novo código"
+          }
+        }
+      }
+    },
+    "Get a sign-in code" : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.accountDevice.primary.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obter um código de acesso"
+          }
+        }
+      }
+    },
     "Get Started" : {
 
     },
@@ -6728,6 +6816,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Irritado"
+          }
+        }
+      }
+    },
+    "It also removes your tasks from this device and signs you out. You can’t undo this." : {
+      "comment" : "Generated from registry settings.copy.delete_account.consequence.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Também remove suas tarefas deste dispositivo e encerra sua sessão. Não é possível desfazer."
           }
         }
       }
@@ -9122,6 +9222,10 @@
     },
     "On this device · Sign in to sync" : {
       "comment" : "Generated from registry settings.copy.account_profile_card.signInToSync.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:" : {
+      "comment" : "Generated from registry surfaces.deviceSignIn.copy.approve.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "On-device" : {
@@ -11680,6 +11784,18 @@
       "comment" : "Generated from registry plans.cards.free.footnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Sign in to Septena" : {
+      "comment" : "Generated from registry surfaces.deviceSignIn.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entrar no Septena"
+          }
+        }
+      }
+    },
     "Sign in to Septena sync to create a private calendar feed URL for Apple Calendar, Google Calendar, or Outlook." : {
       "comment" : "Generated from registry settings.copy.calendar_detail.feedSignIn.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -12864,6 +12980,22 @@
     "The briefs that teach a model how to use each section through the connection — tools, conventions, examples." : {
 
     },
+    "The code expired." : {
+      "comment" : "Generated from registry surfaces.deviceSignIn.copy.expired.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O código expirou."
+          }
+        }
+      }
+    },
+    "The code works for 10 minutes. After you approve it, this screen continues by itself." : {
+      "comment" : "Generated from registry surfaces.deviceSignIn.copy.lifetime.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "The copied text includes the connection preamble + this section's brief — paste it into an MCP client's system prompt or a Claude conversation to teach it how to use the section." : {
       "localizations" : {
         "pt-BR" : {
@@ -13067,6 +13199,18 @@
     },
     "This creates a goal you can track. Reduce and Quit also show a days-since-last streak." : {
 
+    },
+    "This deletes the following from the Septena server:" : {
+      "comment" : "Generated from registry settings.copy.delete_account.intro.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Isto exclui do servidor do Septena:"
+          }
+        }
+      }
     },
     "This device" : {
       "comment" : "Generated from registry plans.levels.device.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -13729,6 +13873,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dados de uso"
+          }
+        }
+      }
+    },
+    "Use a device where Septena is already signed in." : {
+      "comment" : "Generated from registry surfaces.deviceSignIn.copy.intro.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use um dispositivo em que o Septena já está conectado."
+          }
+        }
+      }
+    },
+    "Use a device where Septena is already signed in. It approves this one with a code, and your tasks sync here." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.accountDevice.body. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use um dispositivo em que o Septena já está conectado. Ele aprova este com um código, e suas tarefas sincronizam aqui."
           }
         }
       }
@@ -14583,6 +14751,18 @@
     "Your anonymous community identity. Useful when granting maintainer access from the server." : {
 
     },
+    "Your attachments" : {
+      "comment" : "Generated from registry settings.copy.delete_account.attachments.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seus anexos"
+          }
+        }
+      }
+    },
     "Your changes stay on this device until you sign in." : {
       "comment" : "Generated from registry surfaces.notices.items.signIn.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -14733,6 +14913,30 @@
         }
       }
     },
+    "Your synced settings" : {
+      "comment" : "Generated from registry settings.copy.delete_account.settings.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seus ajustes sincronizados"
+          }
+        }
+      }
+    },
+    "Your task conversations" : {
+      "comment" : "Generated from registry settings.copy.delete_account.conversations.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As conversas das suas tarefas"
+          }
+        }
+      }
+    },
     "Your task text and titles are never sent through analytics. This setting syncs across your devices." : {
       "comment" : "Generated from registry settings.pages.privacy.sections.telemetry.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -14759,6 +14963,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Suas tarefas ficam em sincronia no iPhone, iPad e Mac."
+          }
+        }
+      }
+    },
+    "Your tasks, areas and projects" : {
+      "comment" : "Generated from registry settings.copy.delete_account.tasks.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suas tarefas, áreas e projetos"
           }
         }
       }

@@ -863,51 +863,6 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Delete account",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Deletes your account and all your tasks on the Septena server.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Delete your account?",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "This deletes the following from the Septena server:",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Your tasks, areas and projects",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Your attachments",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Your task conversations",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Your synced settings",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "It also removes your tasks from this device and signs you out. You can’t undo this.",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septask/SeptaskWatchSettings.swift",
       "literal": "Never",
       "reasonId": "predates-rule"
@@ -945,36 +900,6 @@
     {
       "file": "Septask/TasksSkillPane.swift",
       "literal": "MCP Skills",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "android/app/src/main/kotlin/app/septena/android/ui/SignInScreen.kt",
-      "literal": "Sign in to Septena",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "android/app/src/main/kotlin/app/septena/android/ui/SignInScreen.kt",
-      "literal": "Use a device where Septena is already signed in.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "android/app/src/main/kotlin/app/septena/android/ui/SignInScreen.kt",
-      "literal": "Get a sign-in code",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "android/app/src/main/kotlin/app/septena/android/ui/SignInScreen.kt",
-      "literal": "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "android/app/src/main/kotlin/app/septena/android/ui/SignInScreen.kt",
-      "literal": "The code works for 10 minutes. After you approve it, this screen continues by itself.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "android/app/src/main/kotlin/app/septena/android/ui/SignInScreen.kt",
-      "literal": "Get a new code",
       "reasonId": "predates-rule"
     }
   ]

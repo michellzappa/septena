@@ -73,6 +73,7 @@ class AndroidAppGraph(application: Application) {
     val attachments = TaskAttachmentStore(application, taskStore, registryEntityMutator, clock, taskBackend)
     val sync = SyncController(TaskSyncEngine(taskStore, transport, clock), appScope, afterSync = ::afterSync)
     val appearance = AppearanceStore(deviceSettings, syncedSettings, syncedSettingsMutator, sync, clock, appScope)
+    val firstRun = FirstRunState(application, taskStore, syncedSettings, syncedSettingsMutator, clock)
 
     /** The app day the fade pass last ran in this process. */
     @Volatile private var lastFadePassDay: String? = null

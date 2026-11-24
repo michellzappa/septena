@@ -36,8 +36,8 @@ class TaskBackendHttpException(val statusCode: Int, val responseBody: String) : 
 )
 
 /**
- * The task backend's read and file routes that sync does not cover
- * (docs/SEPTASK_BACKEND.md §10): a task's change log and attachment bytes.
+ * The task backend's routes that sync does not cover (docs/SEPTASK_BACKEND.md §10):
+ * a task's change log, attachment bytes and account deletion.
  * Same bearer and refresh-on-401 rule as [UrlConnectionSyncTransport].
  */
 class SeptenaTaskBackendClient(
@@ -96,6 +96,14 @@ class SeptenaTaskBackendClient(
                 download = destination,
             )
         }
+    }
+
+    /**
+     * Deletes the account (`DELETE /v1/account`, docs/SEPTASK_BACKEND.md §10): the server empties the
+     * user's task store and attachment files. Throws when the server did not confirm.
+     */
+    suspend fun deleteAccount() {
+        authed { token -> JsonHttp.send(baseUrl, "/v1/account", "DELETE", null, clientVersion, bearer = token) }
     }
 
     private suspend fun authed(request: suspend (String) -> HttpResponse): String {

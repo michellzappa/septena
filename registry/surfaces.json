@@ -183,14 +183,6 @@
         "featureId": "lists.logbook"
       },
       {
-        "id": "deleteAccount",
-        "kind": "destructive",
-        "title": "Delete Account?",
-        "message": "Your tasks, areas, projects, and conversations are erased from the server and this device.",
-        "confirmTitle": "Delete Account",
-        "featureId": "account.delete"
-      },
-      {
         "id": "rescheduleFixedRepeat",
         "kind": "fork",
         "title": "Reschedule repeating task?",
@@ -284,6 +276,9 @@
   "firstRun": {
     "featureId": "onboarding.first-run",
     "completionSetting": "onboardedAt",
+    "chrome": [
+      { "id": "close", "label": "Close" }
+    ],
     "prompts": {
       "setup": "Set up Septena for me using https://septena.app/agents.md",
       "first": "Set up my Septena areas, projects, and tasks by following https://api.septena.app/onboard.md"
@@ -309,6 +304,7 @@
       {
         "id": "account",
         "kind": "account",
+        "platforms": ["ios", "ipados", "macos"],
         "icon": "onboarding.account",
         "title": "Sign in to sync",
         "body": "Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.",
@@ -318,8 +314,19 @@
         "secondary": { "title": "Not now", "action": "next" }
       },
       {
+        "id": "accountDevice",
+        "kind": "account",
+        "platforms": ["android"],
+        "icon": "onboarding.account",
+        "title": "Sign in to sync",
+        "body": "Use a device where Septena is already signed in. It approves this one with a code, and your tasks sync here.",
+        "skipWhen": "signedIn",
+        "primary": { "title": "Get a sign-in code", "action": "signIn" }
+      },
+      {
         "id": "connectClaude",
         "kind": "connectAgent",
+        "featureId": "agents.connector",
         "icon": "settings.claude",
         "title": "Connect Claude",
         "body": "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.",
@@ -345,6 +352,19 @@
         "returningBody": "This account is already set up. Your tasks are syncing to this device.",
         "primary": { "title": "Open Today", "action": "finish" }
       }
+    ]
+  },
+  "deviceSignIn": {
+    "featureId": "sync.backend",
+    "title": "Sign in to Septena",
+    "copy": [
+      { "id": "intro", "label": "Use a device where Septena is already signed in." },
+      { "id": "start", "label": "Get a sign-in code" },
+      { "id": "approve", "label": "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:" },
+      { "id": "lifetime", "label": "The code works for 10 minutes. After you approve it, this screen continues by itself." },
+      { "id": "expired", "label": "The code expired." },
+      { "id": "unreachable", "label": "Could not reach Septena." },
+      { "id": "retry", "label": "Get a new code" }
     ]
   },
   "taskAttributes": [

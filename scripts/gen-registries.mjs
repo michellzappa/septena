@@ -481,6 +481,10 @@ function validateFirstRun(surfaces, icons, caps, settings) {
     assert(FIRST_RUN_KINDS.has(st.kind), `surfaces.json: firstRun ${st.id} unknown kind "${st.kind}"`);
     assert(st.icon in icons.icons, `surfaces.json: firstRun ${st.id} unknown icon "${st.icon}"`);
     assert(typeof st.title === "string" && st.title.length > 0, `surfaces.json: firstRun ${st.id} missing title`);
+    // `platforms` limits a step to those platforms (absent: every platform);
+    // `featureId` skips it where that capability does not ship (ADR 0015).
+    for (const p of st.platforms ?? []) assert(platforms.has(p), `surfaces.json: firstRun ${st.id} unknown platform "${p}"`);
+    if (st.featureId !== undefined) assert(st.featureId in caps.capabilities, `surfaces.json: firstRun ${st.id} unknown featureId "${st.featureId}"`);
     for (const c of [st.skipWhen, st.requires]) {
       if (c !== undefined) assert(FIRST_RUN_CONDITIONS.has(c), `surfaces.json: firstRun ${st.id} unknown condition "${c}"`);
     }
@@ -1684,6 +1688,10 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let skipWhen: String?");
   lines.push("  let requires: String?");
   lines.push("  let completesGetStartedStep: String?");
+  lines.push("  /// The platforms this step shows on; empty means every platform.");
+  lines.push("  let platforms: [String]");
+  lines.push("  /// The step shows only where this capability ships (`RegistryCapabilities.isAvailable`).");
+  lines.push("  let featureId: String?");
   lines.push("  let points: [RegistryFirstRunPoint]");
   lines.push("  let choices: [RegistryFirstRunChoice]");
   lines.push("  let instructions: [String]");
@@ -1705,7 +1713,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     const points = (st.points ?? []).map((pt) => `RegistryFirstRunPoint(icon: ${swiftStr(pt.icon)}, title: ${L(pt.title, pt, "title")}, detail: ${L(pt.detail, pt, "detail")})`).join(", ");
     const choices = (st.choices ?? []).map((ch) => `RegistryFirstRunChoice(id: ${swiftStr(ch.id)}, icon: ${swiftStr(ch.icon)}, title: ${L(ch.title, ch, "title")}, detail: ${L(ch.detail, ch, "detail")}, action: ${swiftStr(ch.action)}, platforms: [${(ch.platforms ?? []).map(swiftStr).join(", ")}])`).join(", ");
     const instructions = (st.instructions ?? []).map((s) => L(s)).join(", ");
-    lines.push(`    RegistryFirstRunStep(id: ${swiftStr(st.id)}, kind: ${swiftStr(st.kind)}, icon: ${swiftStr(st.icon)}, title: ${L(st.title, st, "title")}, body: ${st.body === undefined ? '""' : L(st.body, st, "body")}, footnote: ${LOpt(st.footnote, st, "footnote")}, returningTitle: ${LOpt(st.returningTitle, st, "returningTitle")}, returningBody: ${LOpt(st.returningBody, st, "returningBody")}, skipWhen: ${swiftOptStr(st.skipWhen)}, requires: ${swiftOptStr(st.requires)}, completesGetStartedStep: ${swiftOptStr(st.completesGetStartedStep)}, points: [${points}], choices: [${choices}], instructions: [${instructions}], primary: ${frButton(st.primary)}, secondary: ${frButton(st.secondary)}, tertiary: ${frButton(st.tertiary)}, afterDone: ${frButton(st.afterDone)}),`);
+    lines.push(`    RegistryFirstRunStep(id: ${swiftStr(st.id)}, kind: ${swiftStr(st.kind)}, icon: ${swiftStr(st.icon)}, title: ${L(st.title, st, "title")}, body: ${st.body === undefined ? '""' : L(st.body, st, "body")}, footnote: ${LOpt(st.footnote, st, "footnote")}, returningTitle: ${LOpt(st.returningTitle, st, "returningTitle")}, returningBody: ${LOpt(st.returningBody, st, "returningBody")}, skipWhen: ${swiftOptStr(st.skipWhen)}, requires: ${swiftOptStr(st.requires)}, completesGetStartedStep: ${swiftOptStr(st.completesGetStartedStep)}, platforms: [${(st.platforms ?? []).map(swiftStr).join(", ")}], featureId: ${swiftOptStr(st.featureId)}, points: [${points}], choices: [${choices}], instructions: [${instructions}], primary: ${frButton(st.primary)}, secondary: ${frButton(st.secondary)}, tertiary: ${frButton(st.tertiary)}, afterDone: ${frButton(st.afterDone)}),`);
   }
   lines.push("  ]");
   lines.push("}");

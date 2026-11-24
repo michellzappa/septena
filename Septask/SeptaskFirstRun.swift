@@ -332,6 +332,12 @@ struct SeptaskFirstRunView: View {
   }
 
   private func applies(_ step: RegistryFirstRunStep) -> Bool {
+    let platform = SeptaskFirstRunGate.platform
+    if !step.platforms.isEmpty, !step.platforms.contains(platform) { return false }
+    if let featureId = step.featureId,
+       !RegistryCapabilities.isAvailable(featureId, on: platform) {
+      return false
+    }
     if step.skipWhen == "signedIn", sync.signedIn { return false }
     if step.requires == "signedIn", !sync.signedIn { return false }
     if step.kind == "choices",

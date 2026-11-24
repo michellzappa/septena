@@ -615,6 +615,12 @@
       "destinations.genericEmptyState.pointerDetail"
     ]
   },
+  "Close": {
+    "text": "Close",
+    "paths": [
+      "surfaces.firstRun.chrome.close.label"
+    ]
+  },
   "Colorful": {
     "text": "Colorful",
     "paths": [
@@ -728,6 +734,18 @@
       "surfaces.firstRun.steps.connectClaude.instructions.0"
     ]
   },
+  "Could not reach Septena.": {
+    "text": "Could not reach Septena.",
+    "paths": [
+      "surfaces.deviceSignIn.copy.unreachable.label"
+    ]
+  },
+  "Couldn’t delete your account. Nothing was deleted.": {
+    "text": "Couldn’t delete your account. Nothing was deleted.",
+    "paths": [
+      "settings.copy.delete_account.failed.label"
+    ]
+  },
   "Create": {
     "text": "Create",
     "paths": [
@@ -803,18 +821,6 @@
       "surfaces.prompts.items.deleteProject.confirmTitle"
     ]
   },
-  "Delete Account": {
-    "text": "Delete Account",
-    "paths": [
-      "surfaces.prompts.items.deleteAccount.confirmTitle"
-    ]
-  },
-  "Delete Account?": {
-    "text": "Delete Account?",
-    "paths": [
-      "surfaces.prompts.items.deleteAccount.title"
-    ]
-  },
   "Delete Area": {
     "text": "Delete Area",
     "paths": [
@@ -853,10 +859,22 @@
       "actions.actions.task.delete.pluralTitle"
     ]
   },
+  "Delete account": {
+    "text": "Delete account",
+    "paths": [
+      "settings.copy.delete_account.button.label"
+    ]
+  },
   "Delete this section?": {
     "text": "Delete this section?",
     "paths": [
       "surfaces.prompts.items.deleteSection.title"
+    ]
+  },
+  "Delete your account?": {
+    "text": "Delete your account?",
+    "paths": [
+      "settings.copy.delete_account.title.label"
     ]
   },
   "Delete {count} tasks permanently?": {
@@ -917,6 +935,12 @@
     "text": "Deleted",
     "paths": [
       "destinations.destinations.recentlyDeleted.title"
+    ]
+  },
+  "Deletes your account and all your tasks on the Septena server.": {
+    "text": "Deletes your account and all your tasks on the Septena server.",
+    "paths": [
+      "settings.copy.delete_account.footer.label"
     ]
   },
   "Deselect All": {
@@ -1178,6 +1202,19 @@
       "actions.shortcutsSheet.general.title"
     ]
   },
+  "Get a new code": {
+    "text": "Get a new code",
+    "paths": [
+      "surfaces.deviceSignIn.copy.retry.label"
+    ]
+  },
+  "Get a sign-in code": {
+    "text": "Get a sign-in code",
+    "paths": [
+      "surfaces.firstRun.steps.accountDevice.primary.title",
+      "surfaces.deviceSignIn.copy.start.label"
+    ]
+  },
   "Get started with Septena": {
     "text": "Get started with Septena",
     "paths": [
@@ -1369,6 +1406,12 @@
     "text": "Industrial",
     "paths": [
       "tokens.textures.fieldMatrix.tag"
+    ]
+  },
+  "It also removes your tasks from this device and signs you out. You can’t undo this.": {
+    "text": "It also removes your tasks from this device and signs you out. You can’t undo this.",
+    "paths": [
+      "settings.copy.delete_account.consequence.label"
     ]
   },
   "It lands in your Inbox until you schedule or file it": {
@@ -1996,6 +2039,12 @@
     "text": "On this device · Sign in to sync",
     "paths": [
       "settings.copy.account_profile_card.signInToSync.label"
+    ]
+  },
+  "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:": {
+    "text": "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:",
+    "paths": [
+      "surfaces.deviceSignIn.copy.approve.label"
     ]
   },
   "On-device": {
@@ -2850,6 +2899,12 @@
       "plans.cards.free.footnote"
     ]
   },
+  "Sign in to Septena": {
+    "text": "Sign in to Septena",
+    "paths": [
+      "surfaces.deviceSignIn.title"
+    ]
+  },
   "Sign in to Septena sync to create a private calendar feed URL for Apple Calendar, Google Calendar, or Outlook.": {
     "text": "Sign in to Septena sync to create a private calendar feed URL for Apple Calendar, Google Calendar, or Outlook.",
     "paths": [
@@ -2859,7 +2914,8 @@
   "Sign in to sync": {
     "text": "Sign in to sync",
     "paths": [
-      "surfaces.firstRun.steps.account.title"
+      "surfaces.firstRun.steps.account.title",
+      "surfaces.firstRun.steps.accountDevice.title"
     ]
   },
   "Sign in with Apple": {
@@ -3175,6 +3231,18 @@
       "settings.pages.claude_pairing.sections.agent_tools.footer"
     ]
   },
+  "The code expired.": {
+    "text": "The code expired.",
+    "paths": [
+      "surfaces.deviceSignIn.copy.expired.label"
+    ]
+  },
+  "The code works for 10 minutes. After you approve it, this screen continues by itself.": {
+    "text": "The code works for 10 minutes. After you approve it, this screen continues by itself.",
+    "paths": [
+      "surfaces.deviceSignIn.copy.lifetime.label"
+    ]
+  },
   "The full task app on one iPhone, iPad or Mac. You do not need an account.": {
     "text": "The full task app on one iPhone, iPad or Mac. You do not need an account.",
     "paths": [
@@ -3235,6 +3303,12 @@
     "text": "This account is already set up. Your tasks are syncing to this device.",
     "paths": [
       "surfaces.firstRun.steps.done.returningBody"
+    ]
+  },
+  "This deletes the following from the Septena server:": {
+    "text": "This deletes the following from the Septena server:",
+    "paths": [
+      "settings.copy.delete_account.intro.label"
     ]
   },
   "This device": {
@@ -3418,6 +3492,18 @@
     "text": "Usage data",
     "paths": [
       "settings.pages.privacy.sections.telemetry.items.0.label"
+    ]
+  },
+  "Use a device where Septena is already signed in.": {
+    "text": "Use a device where Septena is already signed in.",
+    "paths": [
+      "surfaces.deviceSignIn.copy.intro.label"
+    ]
+  },
+  "Use a device where Septena is already signed in. It approves this one with a code, and your tasks sync here.": {
+    "text": "Use a device where Septena is already signed in. It approves this one with a code, and your tasks sync here.",
+    "paths": [
+      "surfaces.firstRun.steps.accountDevice.body"
     ]
   },
   "Use my Claude": {
@@ -3685,6 +3771,12 @@
       "plans.cards.plus.points.3"
     ]
   },
+  "Your attachments": {
+    "text": "Your attachments",
+    "paths": [
+      "settings.copy.delete_account.attachments.label"
+    ]
+  },
   "Your changes stay on this Mac until you sign in.": {
     "text": "Your changes stay on this Mac until you sign in.",
     "paths": [
@@ -3745,6 +3837,18 @@
       "plans.labels.yourPlan"
     ]
   },
+  "Your synced settings": {
+    "text": "Your synced settings",
+    "paths": [
+      "settings.copy.delete_account.settings.label"
+    ]
+  },
+  "Your task conversations": {
+    "text": "Your task conversations",
+    "paths": [
+      "settings.copy.delete_account.conversations.label"
+    ]
+  },
   "Your task text and titles are never sent through analytics. This setting syncs across your devices.": {
     "text": "Your task text and titles are never sent through analytics. This setting syncs across your devices.",
     "paths": [
@@ -3757,10 +3861,10 @@
       "surfaces.firstRun.steps.welcome.points.0.detail"
     ]
   },
-  "Your tasks, areas, projects, and conversations are erased from the server and this device.": {
-    "text": "Your tasks, areas, projects, and conversations are erased from the server and this device.",
+  "Your tasks, areas and projects": {
+    "text": "Your tasks, areas and projects",
     "paths": [
-      "surfaces.prompts.items.deleteAccount.message"
+      "settings.copy.delete_account.tasks.label"
     ]
   },
   "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect Claude under AI & Agents.": {
