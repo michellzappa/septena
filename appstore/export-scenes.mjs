@@ -20,7 +20,7 @@ const { septaskPanels } = await import("./panels.septask.mjs");
 
 const jobs = new Map(); // accent ("" = scene colours) -> { scenes, layouts }
 for (const panel of septaskPanels.iphone69) {
-  for (const s of [panel.shot, ...(panel.shots ?? [])].filter(Boolean)) {
+  for (const s of [panel.shot, panel.photo?.screen, ...(panel.shots ?? [])].filter(Boolean)) {
     const key = s.accent ?? "";
     if (!jobs.has(key)) jobs.set(key, { scenes: new Set(), layouts: new Set() });
     jobs.get(key).scenes.add(String(s.src).split("/")[0]);

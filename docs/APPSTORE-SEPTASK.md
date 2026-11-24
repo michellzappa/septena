@@ -219,12 +219,16 @@ reads this table; `appstore/validate.mjs` checks it.
   varies the fill, light or dark screen, phone size and number of phones per
   slug. Phones never tilt. Each screen shows the app in the panel's own accent
   (decided 2026-11-23).
+- The `photo` panel's phone screen is not the one in `art/photo-today.png`.
+  `render.mjs` replaces it with the exported `today/0` scene through
+  `tools/3d-studio/replace_photo_screen.py`, which needs Blender. The script
+  holds the screen corners of that photo: measure them again for a new photo.
 
 ### iPhone
 
 | slug | scene | callout | title | sub |
 | --- | --- | --- | --- | --- |
-| photo | - | - | Tasks that think with you. Meet Septena, the task app for you and your agents. | |
+| photo | today/0 | - | Tasks that think with you. Meet Septena, the task app for you and your agents. | |
 | from-agent | today/0 | - | Septena is your agent’s memory. Plan out loud, and every task waits in your Inbox. | |
 | asks | agentPage/0 | - | Septena asks before it acts. Answer with a tap, and your agent does the work. | |
 | agent-result | review/0 | - | You decide when it’s done. Agent work waits in Septena’s Review until you accept it. | |
