@@ -303,6 +303,9 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Tab pressed while the list holds focus — the window owns moving focus
   /// to the sidebar (see `focusList()`'s sibling, `focusSidebar()`).
   var onFocusSidebar: (() -> Void)?
+  /// True while the split view's sidebar is visible on screen. When true, the
+  /// page title renders as plain static text without a navigation dropdown.
+  private var isSidebarVisible = true
 
   private var context: ModelContext { LocalStore.shared.container.mainContext }
 
@@ -844,6 +847,21 @@ final class SeptaskKitTaskListController: NSViewController {
     // Today clears the block, so a stale mirror can't ride along to a project
     // page.
     refreshReminders()
+  }
+
+  /// Update the page-title cell when the split view's sidebar collapses or
+  /// expands — showing the dropdown chevron/menu only when the sidebar is
+  /// hidden, without reloading the table or disturbing open edits.
+  func setSidebarVisible(_ visible: Bool) {
+    guard isSidebarVisible != visible else { return }
+    isSidebarVisible = visible
+    guard let row = rows.firstIndex(where: {
+      if case .screenTitle = $0 { return true }
+      return false
+    }),
+    let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false) as? KitScreenTitleCell
+    else { return }
+    cell.setShowsNavMenu(!isSidebarVisible)
   }
 
   /// Hide the window title while this page's own big title is on screen, show
@@ -5282,10 +5300,11 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let identifier = NSUserInterfaceItemIdentifier("screenTitleCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitScreenTitleCell
         ?? KitScreenTitleCell(identifier: identifier)
-      cell.configure(title: title, icon: icon)
-      // The title IS the navigation dropdown (Things-style) — same contract
-      // as SwiftUI's `TaskNavMenu`. Built fresh per click via the closure
-      // rather than once here, so it can never show a stale structure.
+      cell.configure(title: title, icon: icon, showsNavMenu: !isSidebarVisible)
+      // The title IS the navigation dropdown (Things-style) when the sidebar is
+      // collapsed — same contract as SwiftUI's `TaskNavMenu`. Built fresh per
+      // click via the closure rather than once here, so it can never show a
+      // stale structure.
       cell.onOpenNavMenu = { [weak self] in self?.buildNavMenu() }
       if case .area(let areaID) = filter {
         cell.onPickGlyph = { [weak self] anchor in
@@ -6411,29 +6430,36 @@ final class KitEventCell: NSTableCellView {
 // MARK: - Project/area screen title
 
 /// The page's own big title — an area's emoji/dot or a project's completion
-/// ring, plus its name at a larger rung than an in-list group header. The
-/// title IS the navigation dropdown (Things-style, matching SwiftUI's
-/// `TaskNavMenu`/`ScreenTitleMenuLabel`) — clicking it (or the trailing
-/// chevron) jumps anywhere without the sidebar.
+/// ring, plus its name at a larger rung than an in-list group header. When the
+/// sidebar is collapsed (`showsNavMenu == true`), the title IS the navigation
+/// dropdown (Things-style, matching SwiftUI's `TaskNavMenu`/
+/// `ScreenTitleMenuLabel`); when the sidebar is visible, it renders as a plain
+/// static heading without the chevron or menu popup.
 @MainActor
 final class KitScreenTitleCell: NSTableCellView {
   private let icon = NSImageView()
   private let emoji = NSTextField(labelWithString: "")
-  /// The title + chevron ARE the control — a real `NSButton`, not a label with
-  /// hand-tracked mouse handling. Three attempts to make a custom view receive
-  /// this click failed at the event layer (a click recognizer, then
-  /// mouseDown/mouseUp overrides, then a `hitTest` override); an `NSControl`
-  /// is what `NSTableView` is built to host in a cell, and it brings its own
-  /// tracking, highlight, accessibility, and keyboard activation. This is the
-  /// "use standard components, never get creative" rule in CLAUDE.md, arrived
-  /// at the hard way.
+  /// The title + chevron ARE the control when the sidebar is collapsed — a real
+  /// `NSButton`, not a label with hand-tracked mouse handling. Three attempts
+  /// to make a custom view receive this click failed at the event layer (a
+  /// click recognizer, then mouseDown/mouseUp overrides, then a `hitTest`
+  /// override); an `NSControl` is what `NSTableView` is built to host in a
+  /// cell, and it brings its own tracking, highlight, accessibility, and
+  /// keyboard activation. This is the "use standard components, never get
+  /// creative" rule in CLAUDE.md, arrived at the hard way.
   private let button = NSButton()
+  /// Plain static heading shown instead of `button` while the sidebar is
+  /// visible on screen — full-strength label ink, no chevron, no press
+  /// highlight, and static-text accessibility.
+  private let titleLabel = NSTextField(labelWithString: "")
+  private var showsNavMenu = false
   /// Glyph CENTER on the checkbox axis (`SeptaskKitLayout.leadingGlyphCenterX`).
   private var leadingConstraint: NSLayoutConstraint!
   /// Title button leading, pinned to the content inset — independent of the
   /// glyph, so re-centering the glyph never moves the title.
   private var buttonLeadingConstraint: NSLayoutConstraint!
   private var trailingConstraint: NSLayoutConstraint!
+  private var labelTrailingConstraint: NSLayoutConstraint!
   /// Builds the dropdown fresh on every click — see the call site's comment
   /// on why this isn't built once and cached. Optional-returning to match
   /// the `[weak self]` closure the controller wires it up with.
@@ -6474,6 +6500,14 @@ final class KitScreenTitleCell: NSTableCellView {
     // the same jumps are already on the menu bar. Matches the checkbox.
     button.refusesFirstResponder = true
     button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    button.isHidden = true
+
+    titleLabel.translatesAutoresizingMaskIntoConstraints = false
+    titleLabel.font = Self.font
+    titleLabel.textColor = .labelColor
+    titleLabel.lineBreakMode = .byTruncatingTail
+    titleLabel.maximumNumberOfLines = 1
+    titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
     glyphButton.translatesAutoresizingMaskIntoConstraints = false
     glyphButton.isBordered = false
@@ -6491,6 +6525,7 @@ final class KitScreenTitleCell: NSTableCellView {
     addSubview(icon)
     addSubview(emoji)
     addSubview(button)
+    addSubview(titleLabel)
     addSubview(glyphButton)
     leadingConstraint = icon.centerXAnchor.constraint(
       equalTo: leadingAnchor,
@@ -6499,6 +6534,8 @@ final class KitScreenTitleCell: NSTableCellView {
       equalTo: leadingAnchor,
       constant: KitCardRowView.horizontalInset + SeptaskKitLayout.screenTitleLeading)
     trailingConstraint = button.trailingAnchor.constraint(
+      lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    labelTrailingConstraint = titleLabel.trailingAnchor.constraint(
       lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
     NSLayoutConstraint.activate([
       leadingConstraint,
@@ -6513,6 +6550,9 @@ final class KitScreenTitleCell: NSTableCellView {
       glyphButton.heightAnchor.constraint(equalToConstant: 28),
       button.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
       trailingConstraint,
+      titleLabel.leadingAnchor.constraint(equalTo: button.leadingAnchor),
+      titleLabel.firstBaselineAnchor.constraint(equalTo: button.firstBaselineAnchor),
+      labelTrailingConstraint,
     ])
   }
 
@@ -6524,7 +6564,7 @@ final class KitScreenTitleCell: NSTableCellView {
 
   /// Fired by the button's own target/action — no hand-tracked mouse handling.
   @objc private func openNavMenu() {
-    guard let menu = onOpenNavMenu?() else { return }
+    guard showsNavMenu, let menu = onOpenNavMenu?() else { return }
     // Dropped from the button's own bottom-left, the standard pull-down
     // geometry. `popUp(positioning:at:in:)` takes the point in the anchor
     // view's coordinates; `NSButton` is unflipped, so its bottom edge is y=0.
@@ -6535,11 +6575,12 @@ final class KitScreenTitleCell: NSTableCellView {
 
   /// The pointing-hand cursor is the platform's "this is a link/button"
   /// signal — matches `KitGroupHeaderCell`'s navigable headers. Scoped to the
-  /// BUTTON's frame now, not the whole cell: the cursor should promise a click
-  /// only where one actually lands. (The old whole-cell rect was what made the
-  /// dead title look live for three rounds of debugging.)
+  /// BUTTON's frame now, not the whole cell, and only active while the nav
+  /// dropdown is enabled (sidebar collapsed).
   override func resetCursorRects() {
-    addCursorRect(button.frame, cursor: .pointingHand)
+    if showsNavMenu {
+      addCursorRect(button.frame, cursor: .pointingHand)
+    }
   }
 
   /// Same width-dependent centered-column margin as every other row.
@@ -6548,16 +6589,33 @@ final class KitScreenTitleCell: NSTableCellView {
     leadingConstraint.constant = inset + SeptaskKitLayout.leadingGlyphCenterX
     buttonLeadingConstraint.constant = inset + SeptaskKitLayout.screenTitleLeading
     trailingConstraint.constant = -(inset + 8)
+    labelTrailingConstraint.constant = -(inset + 8)
     super.layout()
   }
 
-  func configure(title titleText: String, icon iconKind: SeptaskKitTaskListController.GroupIcon) {
+  func setShowsNavMenu(_ shows: Bool) {
+    guard showsNavMenu != shows else { return }
+    showsNavMenu = shows
+    button.isHidden = !shows
+    titleLabel.isHidden = shows
+    window?.invalidateCursorRects(for: self)
+  }
+
+  func configure(title titleText: String,
+                 icon iconKind: SeptaskKitTaskListController.GroupIcon,
+                 showsNavMenu: Bool) {
     // `attributedTitle`, not `title`: a borderless NSButton otherwise paints
     // its label in the control's default color, which loses the page title's
-    // full-strength ink.
-    button.attributedTitle = NSAttributedString(
+    // full-strength ink. Populate both the button and the static label so
+    // their baselines always match with zero shift when toggling the sidebar.
+    let attributed = NSAttributedString(
       string: titleText,
       attributes: [.font: Self.font, .foregroundColor: NSColor.labelColor])
+    button.attributedTitle = attributed
+    titleLabel.attributedStringValue = attributed
+    self.showsNavMenu = showsNavMenu
+    button.isHidden = !showsNavMenu
+    titleLabel.isHidden = showsNavMenu
     emoji.isHidden = true
     icon.isHidden = false
     switch iconKind {
@@ -6574,8 +6632,8 @@ final class KitScreenTitleCell: NSTableCellView {
         .withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
       icon.contentTintColor = SeptaskKitTheme.inkSecondary
     }
-    // The BUTTON is the accessibility element now — it carries the press
-    // action natively, so the cell doesn't need to fake one.
+    // The visible control (`button` when the dropdown is active, `titleLabel`
+    // otherwise) is the accessibility element directly.
     setAccessibilityElement(false)
     button.setAccessibilityLabel(TaskA11y.navigationTitle(titleText))
     // A reused cell carries a stale cursor rect otherwise — matches

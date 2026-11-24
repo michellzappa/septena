@@ -310,6 +310,15 @@ extension NavigationState {
     case .filter, .next: return true
     }
   }
+
+  /// Whether the page title should show the navigation dropdown chevron/menu.
+  /// Shown only when no sidebar is visible alongside the detail pane: compact
+  /// stack layouts (`!usesPushNavigation` — iPhone, narrow iPad) or a collapsed
+  /// split-view sidebar (`sidebarVisibility == .detailOnly`). When the sidebar
+  /// is visible on screen, the page title renders as a plain static heading.
+  func showsTitleNavMenu(usesPushNavigation: Bool) -> Bool {
+    !usesPushNavigation || sidebarVisibility == .detailOnly
+  }
 }
 
 /// Every app-global modal sheet, as one value. Replaces the former bag of
