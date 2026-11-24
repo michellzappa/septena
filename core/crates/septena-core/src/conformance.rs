@@ -88,6 +88,14 @@ pub fn run_conformance(fixture: String, json: String) -> Result<ConformanceRepor
                 let input = json!({ "sourceTaskID": case["sourceTaskID"], "scheduled": case["scheduled"] });
                 run.check("occurrenceID", case, "occurrenceId", input, false);
             }
+            for case in cases(&doc, "checklistOccurrenceID") {
+                let input = json!({
+                    "newTaskID": case["newTaskID"],
+                    "index": case["index"],
+                    "sourceItemID": case["sourceItemID"],
+                });
+                run.check("checklistOccurrenceID", case, "checklistOccurrenceId", input, false);
+            }
         }
         "reminders" => {
             for section in [
