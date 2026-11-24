@@ -176,6 +176,7 @@ enum RegistryIcons {
     "settings.devices": "laptopcomputer.and.iphone",
     "settings.sign_in_approval": "person.badge.key",
     "auth.device": "laptopcomputer.and.iphone",
+    "auth.scan_code": "qrcode.viewfinder",
     "settings.general": "slider.horizontal.3",
     "settings.tasks": "checklist",
     "task.added_by_agent": "text.bubble.badge.sparkles",
@@ -1363,6 +1364,8 @@ enum RegistryPrompts {
     "deleteAccount": RegistryPromptCopy(id: "deleteAccount", title: RegistryL10n.t("Delete Account?"), message: RegistryL10n.t("Your tasks, areas, projects, and conversations are erased from the server and this device."), confirmTitle: RegistryL10n.t("Delete Account"), options: []),
     "rescheduleFixedRepeat": RegistryPromptCopy(id: "rescheduleFixedRepeat", title: RegistryL10n.t("Reschedule repeating task?"), message: RegistryL10n.t("Move only this task, or update the repeating schedule to the new date?"), confirmTitle: nil, options: [RegistryPromptOption(id: "exception", title: RegistryL10n.t("Only This Task")), RegistryPromptOption(id: "updateRule", title: RegistryL10n.t("Update Schedule"))]),
     "agentReplaces": RegistryPromptCopy(id: "agentReplaces", title: RegistryL10n.t("Replaces"), message: RegistryL10n.t("If this agent takes the place of one you connected before, pick it. That agent stops working."), confirmTitle: nil, options: [RegistryPromptOption(id: "none", title: RegistryL10n.t("Nothing, a new agent")), RegistryPromptOption(id: "agent", title: RegistryL10n.t("An agent below"))]),
+    "scanSignInCode": RegistryPromptCopy(id: "scanSignInCode", title: RegistryL10n.t("Scan a sign-in code"), message: RegistryL10n.t("Point the camera at the QR code on the other screen."), confirmTitle: RegistryL10n.t("Scan Code"), options: []),
+    "cameraUnavailable": RegistryPromptCopy(id: "cameraUnavailable", title: RegistryL10n.t("Septena can’t use the camera"), message: RegistryL10n.t("Allow camera access for Septena in Settings, or enter the code instead."), confirmTitle: nil, options: []),
   ]
   static let text: [String: RegistryTextPrompt] = [
     "newSection": RegistryTextPrompt(id: "newSection", title: RegistryL10n.t("New Section"), placeholder: RegistryL10n.t("Section name"), confirmTitle: RegistryL10n.t("Add")),

@@ -7,6 +7,7 @@ import { isValidTz } from "../tz.js";
 import { registerClient } from "../oauth/register.js";
 import { validateRedirectUri } from "../oauth/redirects.js";
 import { storeFor } from "../api/session.js";
+import { pairApproveUrl, pairQrMatrix, pairQrSvg } from "./pairQr.js";
 import { AGENT_NAME_MAX, MCP_CLIENT_PREFIX, MCP_GRANT_SCOPE, MCP_SCOPES, issueMcpTokens, redeemMcpRefresh, revokeMcpToken, settleNewAgent } from "./tokens.js";
 
 // OAuth 2.1 for the MCP task connector on api.septena.app (phase 2,
@@ -248,7 +249,15 @@ export const zDevicePollBody = z.object({
   pollSecret: z.string().regex(/^[A-Za-z0-9_-]{20,64}$/),
 }).strict();
 
-export type DeviceStartResult = { code: string; pollSecret: string; expiresIn: number; interval: number };
+/// `qr` is the sign-in QR (src/shadow/pairQr.ts) for clients that draw it;
+/// older clients ignore the field and show the code only.
+export type DeviceStartResult = {
+  code: string;
+  pollSecret: string;
+  expiresIn: number;
+  interval: number;
+  qr: { size: number; modules: string };
+};
 
 export async function startDevicePairing(
   env: Env,
@@ -270,7 +279,13 @@ export async function startDevicePairing(
     });
     if (created) {
       logEvent("device_pair_start", { ok: true, client: body.clientName });
-      return { code: candidate, pollSecret, expiresIn: PAIR_TTL_MS / 1000, interval: 3 };
+      return {
+        code: candidate,
+        pollSecret,
+        expiresIn: PAIR_TTL_MS / 1000,
+        interval: 3,
+        qr: pairQrMatrix(pairApproveUrl(env.API_PUBLIC_URL, candidate)),
+      };
     }
   }
   logEvent("device_pair_start", { ok: false });
@@ -472,6 +487,8 @@ const PAGE_CSS = `
   .code { font: 600 34px/1.2 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 0.12em;
     text-align: center; padding: 16px 0; margin: 8px 0 18px; border-radius: 10px; background: #f5f5f7; }
   .small { font-size: 13px; color: #777; }
+  .qr { width: 200px; margin: 4px auto 18px; border-radius: 10px; overflow: hidden; }
+  .qr svg { display: block; width: 100%; height: auto; }
   @media (prefers-color-scheme: dark) {
     body { background: #0a0a0a; color: #f5f5f5; }
     .card { background: #161616; border-color: #2a2a2a; }
@@ -500,7 +517,9 @@ function pairPage(
 <body>
   <main class="card">
     <h1>Connect ${escapeHtml(opts.clientName)} to your Septena tasks</h1>
-    <p>Open Septena &#9656; Settings &#9656; Connect Claude (on Mac: Settings &#9656; AI &amp; Agents), and enter this code:</p>
+    <p>On your iPhone or iPad, open Septena &#9656; Settings &#9656; Connect Claude, tap Scan Code and point the camera at this QR code:</p>
+    <div class="qr">${pairQrSvg(pairApproveUrl(c.env.API_PUBLIC_URL, opts.code), `Sign-in code ${shown}`)}</div>
+    <p>Or enter the code by hand (on Mac: Settings &#9656; AI &amp; Agents):</p>
     <div class="code">${escapeHtml(shown)}</div>
     <p>${escapeHtml(opts.clientName)} will be able to read and change your tasks.</p>
     <p class="small">The code works for 10 minutes. This page checks for your approval every few seconds.</p>
@@ -514,6 +533,32 @@ function pairPage(
   };
   if (opts.setCookie) headers["Set-Cookie"] = opts.setCookie;
   return new Response(html, { status: 200, headers });
+}
+
+/// GET /pair/:code — where a sign-in QR lands when a phone's system camera
+/// opens it (src/shadow/pairQr.ts). It approves nothing and looks nothing up:
+/// it only says where to scan, so a forwarded link cannot approve a sign-in.
+export function pairLanding(c: Context<{ Bindings: Env }>) {
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Septena sign-in code</title>
+<style>${PAGE_CSS}</style>
+</head>
+<body><main class="card">
+  <h1>Scan this code in Septena</h1>
+  <p>This QR code signs in a device or connects Claude. Septena only accepts it from inside the app, where you see who asks before you approve.</p>
+  <p>Open Septena on a device that is already signed in. Go to Settings &#9656; Account &#9656; Approve a sign-in, tap Scan Code, and scan the code again.</p>
+  <p class="small">If you did not start a sign-in, close this page.</p>
+</main></body>
+</html>`;
+  return new Response(html, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" },
+  });
 }
 
 function messagePage(c: Context<{ Bindings: Env }>, message: string, status: number, clearCookie = false) {

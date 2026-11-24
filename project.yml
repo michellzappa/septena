@@ -199,6 +199,7 @@ targets:
         NSRemindersUsageDescription: Septena moves reminders from your Reminders lists into the Inbox and deletes them from Reminders.
         NSCalendarsFullAccessUsageDescription: Septena shows today's calendar events above your task list.
         NSCalendarsUsageDescription: Septena shows today's calendar events above your task list.
+        NSCameraUsageDescription: Septena uses the camera to scan sign-in codes from your other devices.
         CFBundleURLTypes:
           - CFBundleURLName: com.septena.tasks
             CFBundleURLSchemes:
@@ -446,6 +447,7 @@ targets:
         NSRemindersUsageDescription: Septena moves reminders from your Reminders lists into the Inbox and deletes them from Reminders.
         NSCalendarsFullAccessUsageDescription: Septena shows today's calendar events above your task list.
         NSCalendarsUsageDescription: Septena shows today's calendar events above your task list.
+        NSCameraUsageDescription: Septena uses the camera to scan sign-in codes from your other devices.
         CFBundleURLTypes:
           - CFBundleURLName: com.septena.tasks
             CFBundleURLSchemes:

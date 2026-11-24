@@ -80,6 +80,11 @@ struct SeptaskApproveSignInFlow: View {
       Section {
         Button("Continue") { Task { await check() } }
           .disabled(Self.normalized(code) == nil)
+        // A scan fills the code and goes straight to the same confirmation.
+        SeptaskScanCodeButton { scanned in
+          code = scanned
+          Task { await check() }
+        }
       }
 
     case .checking:
@@ -306,7 +311,7 @@ struct SeptaskSignInApprovalSection: View {
           SeptaskApproveSignInFlow()
         }
       } footer: {
-        Text("To sign in on a new phone, tablet or computer, tap Get a sign-in code on it. Then enter that code here.")
+        Text("To sign in on a new phone, tablet or computer, tap Get a sign-in code on it. Then scan or enter that code here.")
       }
     }
   }

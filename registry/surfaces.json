@@ -213,6 +213,23 @@
         "message": "If this agent takes the place of one you connected before, pick it. That agent stops working.",
         "options": [{ "id": "none", "title": "Nothing, a new agent" }, { "id": "agent", "title": "An agent below" }],
         "featureId": "agents.connector"
+      },
+      {
+        "id": "scanSignInCode",
+        "kind": "fork",
+        "title": "Scan a sign-in code",
+        "message": "Point the camera at the QR code on the other screen.",
+        "confirmTitle": "Scan Code",
+        "options": [],
+        "featureId": "sync.backend"
+      },
+      {
+        "id": "cameraUnavailable",
+        "kind": "fork",
+        "title": "Septena can’t use the camera",
+        "message": "Allow camera access for Septena in Settings, or enter the code instead.",
+        "options": [],
+        "featureId": "sync.backend"
       }
     ],
     "countPhrases": [

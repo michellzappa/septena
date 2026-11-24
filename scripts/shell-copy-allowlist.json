@@ -859,7 +859,7 @@
     },
     {
       "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "To sign in on a new phone, tablet or computer, tap Get a sign-in code on it. Then enter that code here.",
+      "literal": "To sign in on a new phone, tablet or computer, tap Get a sign-in code on it. Then scan or enter that code here.",
       "reasonId": "predates-rule"
     },
     {
@@ -1169,7 +1169,7 @@
     },
     {
       "file": "android/app/src/main/kotlin/app/septena/android/ui/SignInScreen.kt",
-      "literal": "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Enter this code:",
+      "literal": "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:",
       "reasonId": "predates-rule"
     },
     {

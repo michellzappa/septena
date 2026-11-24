@@ -74,6 +74,7 @@
     "settings.devices": { "sfSymbol": "laptopcomputer.and.iphone", "material": "devices", "lucide": "monitor-smartphone" },
     "settings.sign_in_approval": { "sfSymbol": "person.badge.key", "material": "key", "lucide": "key-round" },
     "auth.device": { "sfSymbol": "laptopcomputer.and.iphone", "material": "devices", "lucide": "monitor-smartphone" },
+    "auth.scan_code": { "sfSymbol": "qrcode.viewfinder", "material": "qr_code_scanner", "lucide": "scan-qr-code" },
     "settings.general": { "sfSymbol": "slider.horizontal.3", "material": "tune", "lucide": "sliders-horizontal" },
     "settings.tasks": { "sfSymbol": "checklist", "material": "checklist", "lucide": "list-todo" },
     "task.added_by_agent": { "sfSymbol": "text.bubble.badge.sparkles", "material": "chat", "lucide": "message-square-text" },
