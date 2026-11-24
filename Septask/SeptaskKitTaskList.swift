@@ -3824,8 +3824,8 @@ final class SeptaskKitTaskListController: NSViewController {
     // Put the row and its neighbours in their CLOSED look before the shrink,
     // the mirror of `beginComposing`, which applies the open look before it
     // grows. Done at the end instead, the composing card style rode the whole
-    // shrink and then everything snapped at once (neighbours rejoining,
-    // corners squaring, selection wash back): the janky fold.
+    // shrink and then everything snapped at once (glass backdrop restored,
+    // selection wash back): the janky fold.
     refreshCardGeometry()
     foldingComposerIDs.insert(taskId)
     animateComposerHeight(ofRow: row, animated: animated, reveal: false) { [weak self] in
@@ -4790,39 +4790,20 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     rowView.isEditingTitle = taskId != nil && taskId == editingTaskId
     if rows[row].isCardRow {
       rowView.isCard = true
-      // The open composer is its own rounded slice (Things' elevated edit
-      // card) — it breaks the card run so neighbors round off against it
-      // instead of squaring into a mid-card join that no longer exists.
-      // `!isComposingRow(...)`, NOT `task?.id != composingTaskId`. That
-      // comparison is the same `Optional == Optional` trap the comment above
-      // describes, and it was still live here: a TASKLESS card row (the
-      // reminder rows, the "New task" line, calendar events, the bulk-import
-      // line) has `task?.id == nil`, so with nothing composing the test read
-      // `nil != nil` → false → "my neighbour isn't on the card" → both rows
-      // rounded off and the Inbox rendered as two stacked cards with a gap
-      // instead of one run. Any run containing a taskless row was segmented.
-      let previousOnCard = row > 0
-        && rows[row - 1].isCardRow
-        && !isComposingRow(row - 1)
-      let nextOnCard = row + 1 < rows.count
-        && rows[row + 1].isCardRow
-        && !isComposingRow(row + 1)
-      rowView.isFirstInGroup = composing || !previousOnCard
-      rowView.isLastInGroup = composing || !nextOnCard
+      // Every card row — including an open inline composer (create or edit) —
+      // rides inside its continuous card run and inherits the corner rounding
+      // of its group position (top / middle / bottom / solo), so neither the
+      // composer nor its adjacent closed rows round off mid-group (#204).
+      let previousOnCard = row > 0 && rows[row - 1].isCardRow
+      let nextOnCard = row + 1 < rows.count && rows[row + 1].isCardRow
+      rowView.isFirstInGroup = !previousOnCard
+      rowView.isLastInGroup = !nextOnCard
     } else {
       rowView.isCard = false
     }
     applySelectionJoins(rowView, atRow: row)
     applyDropLine(rowView, atRow: row)
     rowView.needsDisplay = true
-  }
-
-  /// Is the row at `index` the one currently expanded into the composer?
-  /// False for every taskless row, which is the point — see the note in
-  /// `applyCardGeometry`.
-  private func isComposingRow(_ index: Int) -> Bool {
-    guard let composingTaskId, let id = rows[index].task?.id else { return false }
-    return id == composingTaskId
   }
 
   /// Selection-run joins for contiguous multi-select rounding. Only joins

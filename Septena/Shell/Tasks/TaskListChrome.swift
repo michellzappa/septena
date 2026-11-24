@@ -142,12 +142,12 @@ private struct TaskCardChrome: ViewModifier {
   private let appearance = AppearancePreferences.shared
   #endif
 
+  /// Every row — including an open inline composer (create or edit) — inherits
+  /// its card position's corner rounding (top / middle / bottom / solo) so it
+  /// stays flush with adjacent closed rows instead of rounding all four corners
+  /// mid-group (#204).
   private var effectiveShape: UnevenRoundedRectangle {
-    #if os(iOS)
-    isEditing ? TaskCardPosition.solo.cardShape : position.cardShape
-    #else
     position.cardShape
-    #endif
   }
 
   private var useLiquidGlass: Bool {
