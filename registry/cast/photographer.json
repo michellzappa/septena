@@ -1,0 +1,61 @@
+{
+  "version": 1, "id": "photographer",
+  "who": "Photographs weddings from May to October and spends the winter editing, invoicing and catching up.",
+  "people": ["Paloma", "Yusuf"],
+  "look": { "accent": "pitaya", "texture": "washiPaper", "appearance": "light" },
+  "areas": [{ "title": "Couples", "emoji": "💐" }, { "title": "Gear", "emoji": "📷" }, { "title": "Money", "emoji": "🪙" }, { "title": "Life", "emoji": "🌊" }],
+  "projects": [{ "title": "Paloma and Yusuf", "area": "Couples" }, { "title": "New portfolio", "area": "Couples", "progress": 0.25 }, { "title": "Surf trip", "area": "Life", "progress": 0.4 }],
+  "moments": [{
+    "id": "gallery", "plot": "Paloma and Yusuf’s gallery goes out next week. Their album is the last one of the season.",
+    "project": "Paloma and Yusuf", "order": ["Paloma and Yusuf", "Gear", "Money"], "rolledIn": 1,
+    "tasks": [
+      { "id": "cull", "title": "Second pass on the dance floor", "group": "Paloma and Yusuf", "today": true, "notes": "Keep the blurry one of the aunt. It is the best picture of the night." },
+      { "id": "cover", "title": "Pick a cover with Paloma", "group": "Paloma and Yusuf", "today": true, "unread": true, "notes": "She liked the one on the stairs. The one in the rain is better and she knows it." },
+      { "id": "blacks", "title": "Fix the suits, they look blue", "group": "Paloma and Yusuf", "today": true },
+      { "id": "grandma", "title": "Print for Yusuf’s grandmother", "group": "Paloma and Yusuf", "today": true },
+      { "id": "backup", "title": "Copy the cards twice", "group": "Paloma and Yusuf", "done": true },
+      { "id": "song", "title": "Ask which song for the slideshow", "group": "Inbox", "today": true, "proposal": true },
+      { "id": "lighthouse", "title": "that lighthouse at 7am", "group": "Inbox", "today": true, "muted": true },
+      { "id": "sensor", "title": "Dust on the second body", "group": "Gear", "today": true },
+      { "id": "strap", "title": "Sew the strap", "group": "Gear", "today": true, "muted": true },
+      { "id": "invoice", "title": "Last invoice of the season", "group": "Money", "today": true }
+    ],
+    "capture": { "title": "Send Paloma the rain picture", "group": "Paloma and Yusuf" },
+    "anytime": ["cull", "blacks", "grandma", "sensor", "invoice"], "picked": ["cull", "invoice"],
+    "open": ["cull", "cover"],
+    "file": { "title": "Album paper: matte or silk?", "notes": "Samples are in the blue drawer. Matte hides fingers.", "with": ["song", "cull", "invoice"] },
+    "dated": { "title": "Send the gallery", "notes": "Upload on {weekday+4} night so the link is warm in the morning.", "when": 4, "due": 5 },
+    "repeating": { "title": "Copy the week to the drive at home", "group": "Gear", "notes": "Both drives. Then put one in the other room.", "repeat": "Every {weekday}", "with": ["cull", "invoice"] },
+    "attachments": { "task": "grandma", "notes": "The one where she laughs with her eyes shut. Yusuf says no glass in the frame. A4, on the heavy paper.", "files": ["grandma-laughing.jpg", "frame-size.jpg"] },
+    "upcoming": [
+      { "in": 1, "tasks": [{ "id": "swell", "title": "Dawn surf if the wind drops", "group": "Life" }] },
+      { "in": 3, "tasks": ["grandma", { "id": "lens", "title": "Collect the long lens from repair", "group": "Gear" }] },
+      { "in": 4, "tasks": [{ "id": "vat", "title": "VAT return", "group": "Money", "files": ["receipts-autumn.pdf"] }] },
+      { "in": 5, "tasks": [{ "ref": "strap", "due": 12 }, { "id": "meet", "title": "Coffee with a couple for June", "group": "Couples" }] },
+      { "in": 6, "tasks": [{ "id": "board", "title": "Wax, and the crack in the board", "group": "Surf trip" }] },
+      { "in": 7, "tasks": ["repeating", { "id": "studio-rent", "title": "Desk rent", "group": "Money", "repeat": "Every month" }] }
+    ],
+    "agent": {
+      "title": "Write the gallery email", "notes": "Link, password, how long it stays up, and how to order prints. Last year’s was too long.", "due": 4,
+      "question": "How should it sound?", "options": ["Short and warm", "Every step explained"],
+      "artifact": "Gallery email",
+      "bodies": ["Dear Paloma and Yusuf, here they are. The gallery stays up for a year and the password is on your card. I hope you find the aunt.", "Dear Paloma and Yusuf, here is your gallery. 1. Open the link and type the password from your card. 2. Tap the heart on your favourites. 3. Order prints from the same page."],
+      "otherBody": "Dear Paloma and Yusuf, your gallery is ready and stays up for a year. {answer}",
+      "handoff": "Read the email", "acceptance": "The email is ready to send with the link."
+    },
+    "discuss": {
+      "title": "Answer the couple with the smaller budget", "group": "Money", "notes": "They want all day. Their number covers about five hours.",
+      "question": "What would you rather offer?", "options": ["Five hours", "All day on a weekday"],
+      "artifact": "Reply to the couple",
+      "bodies": ["Thank you for telling me your budget. It covers five hours, which is the ceremony, the portraits and the first dance.", "Thank you for telling me your budget. If you can marry on a weekday, I can be there all day for that price."],
+      "otherBody": "Thank you for telling me your budget. Here is what I can offer: {answer}",
+      "draftHandoff": "Read the reply", "handoff": "Your next step: send it", "acceptance": "The couple has an offer.",
+      "with": ["cull", "cover", "sensor", "invoice"]
+    },
+    "review": [
+      { "title": "Write the gallery email", "group": "Paloma and Yusuf", "note": "Six lines. The password is not in it, as you asked.", "artifact": "Gallery email" },
+      { "title": "Match the season’s invoices to payments", "group": "Money", "note": "Twenty-two of 23 are paid. The July one is half paid.", "artifact": "Season invoices" }
+    ],
+    "faded": ["Learn film, properly", "Shoot the fish market", "New business cards", "Sort 2019", "Sell the old flash", "Call the florist back", "Try video once", "Make a zine", "Photograph Dad’s workshop", "Fix the website footer", "Ask about the rooftop", "Learn to read the tide table", "Print the dog series", "Clean the camera bag", "Draw a better logo"]
+  }]
+}

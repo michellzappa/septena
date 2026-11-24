@@ -1,0 +1,62 @@
+{
+  "version": 1, "id": "vetnurse",
+  "who": "A veterinary nurse on shifts. Plays bass in a band that has one gig booked, and is moving flat.",
+  "people": ["Dev", "Siobhan"],
+  "look": { "accent": "yuzu", "texture": "stippleDrift", "appearance": "light" },
+  "areas": [{ "title": "Clinic", "emoji": "🐾" }, { "title": "Band", "emoji": "🎸" }, { "title": "Home", "emoji": "📦" }],
+  "projects": [{ "title": "Moving", "area": "Home" }, { "title": "Gig at the Anchor", "area": "Band", "progress": 0.5 }, { "title": "Night shift handover", "area": "Clinic", "progress": 0.75 }],
+  "moments": [{
+    "id": "move", "plot": "The move is in eight days and the gig is the night before.",
+    "project": "Moving", "order": ["Moving", "Clinic", "Gig at the Anchor"], "rolledIn": 2,
+    "tasks": [
+      { "id": "boxes", "title": "Collect banana boxes from the market", "group": "Moving", "today": true, "notes": "After two, when they close. Ask for the ones with lids." },
+      { "id": "van", "title": "Ask Dev about the van again", "group": "Moving", "today": true, "unread": true, "notes": "It is the band van, so it smells of the band van. Bring blankets." },
+      { "id": "oldkeys", "title": "Photograph the meter and the walls", "group": "Moving", "today": true },
+      { "id": "kitchen", "title": "Kitchen: keep, give, why", "group": "Moving", "today": true },
+      { "id": "notice", "title": "Give notice on the flat", "group": "Moving", "done": true },
+      { "id": "post", "title": "Forward the post from the old address", "group": "Inbox", "today": true, "proposal": true },
+      { "id": "tortoise", "title": "tortoise diet sheet", "group": "Inbox", "today": true, "muted": true },
+      { "id": "rota", "title": "Swap {weekday+2} with Siobhan", "group": "Clinic", "today": true },
+      { "id": "gloves", "title": "Order small gloves", "group": "Clinic", "today": true, "muted": true },
+      { "id": "setlist", "title": "Argue about the set list", "group": "Gig at the Anchor", "today": true }
+    ],
+    "capture": { "title": "Ask Siobhan for her tape gun", "group": "Moving" },
+    "anytime": ["boxes", "kitchen", "rota", "gloves", "setlist"], "picked": ["boxes", "setlist"],
+    "open": ["boxes", "van"],
+    "file": { "title": "Does the sofa fit round the stairs?", "notes": "Measure the landing, not the door. The door is not the problem.", "with": ["post", "boxes", "rota"] },
+    "dated": { "title": "Pack the records", "notes": "Small boxes. Dev carried the last lot and still mentions it.", "when": 5, "due": 7 },
+    "repeating": { "title": "Feed the clinic fish", "group": "Clinic", "notes": "One pinch. The blue one pretends.", "repeat": "Every {weekday}", "with": ["boxes", "rota"] },
+    "attachments": { "task": "oldkeys", "notes": "Every wall, with the date. The mark behind the sofa was there before us. Siobhan says take one of the oven too.", "files": ["meter.jpg", "wall-sofa.jpg", "inventory.pdf"] },
+    "upcoming": [
+      { "in": 1, "tasks": [{ "id": "practice", "title": "Practice at Dev’s, bring the pedal", "group": "Gig at the Anchor" }] },
+      { "in": 2, "tasks": ["rota"] },
+      { "in": 3, "tasks": [{ "ref": "gloves", "due": 6 }, { "id": "puppies", "title": "Puppy class, six of them", "group": "Clinic", "repeat": "Every {weekday}" }] },
+      { "in": 4, "tasks": [{ "id": "internet", "title": "Move the internet", "group": "Moving", "files": ["contract.pdf"] }] },
+      { "in": 5, "tasks": [{ "id": "bubble", "title": "Bubble wrap for the lamps", "group": "Moving" }] },
+      { "in": 6, "tasks": [{ "id": "strings", "title": "New strings, let them settle", "group": "Gig at the Anchor" }] },
+      { "in": 7, "tasks": ["repeating", { "id": "gig", "title": "Gig. Load in at five", "group": "Gig at the Anchor" }] }
+    ],
+    "agent": {
+      "title": "List everyone who needs the new address", "notes": "Start from the folder of letters. Leave out the ones that are only adverts.", "due": 5,
+      "question": "Should I write the messages as well?", "options": ["Only the list", "List and messages"],
+      "artifact": "Address list",
+      "bodies": ["Fourteen places need the new address. Five want it before you move: the bank, the insurance, the register, the clinic and the bass insurance.", "Fourteen places need the new address. Nine can get the same short message, drafted below. Five have their own form."],
+      "otherBody": "Fourteen places need the new address, and five want it before you move. Your direction: {answer}",
+      "handoff": "Read the list", "acceptance": "Everyone who needs the address is on the list."
+    },
+    "discuss": {
+      "title": "Tell the landlady about the shelf", "group": "Moving", "notes": "We put it up without asking. It is a good shelf.",
+      "question": "What would you like to suggest?", "options": ["Leave it for the next person", "Take it and fill the holes"],
+      "artifact": "Message about the shelf",
+      "bodies": ["Hello, we put up a shelf in the kitchen and should have asked first. It is solid and level, and we would be happy to leave it.", "Hello, we put up a shelf in the kitchen and should have asked first. We will take it with us, fill the holes and paint over them."],
+      "otherBody": "Hello, we put up a shelf in the kitchen and should have asked first. {answer}",
+      "draftHandoff": "Read the message", "handoff": "Your next step: send it", "acceptance": "She knows about the shelf.",
+      "with": ["boxes", "van", "rota", "setlist"]
+    },
+    "review": [
+      { "title": "List everyone who needs the new address", "group": "Moving", "note": "Fourteen places. Two letters had no name on them, so I left them out.", "artifact": "Address list" },
+      { "title": "Type up the handover sheet", "group": "Night shift handover", "note": "One side of A4. I could not read the dose for the cat in bay 3.", "artifact": "Handover sheet" }
+    ],
+    "faded": ["Learn the new X-ray software", "Band T-shirts", "Frame the tour poster", "Try the pottery place", "Fix the bass jack", "Write a second verse", "Read the parrot book", "Bike lights", "Learn to solder", "Plant the windowsill", "Answer the old drummer", "Sort the cable drawer", "Record Nan’s stories", "Cancel the pool card", "Sell the small amp"]
+  }]
+}
