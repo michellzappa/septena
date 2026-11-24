@@ -35,6 +35,36 @@ data class AccountAccess(
     val agentCount: Int,
 )
 
+/** One row of `GET /v1/entitlement` `entitlements` (ADR 0026). */
+data class EntitlementRow(
+    /** `apple` / `stripe` / `google` / `grant` / `trial`. */
+    val source: String,
+    /** ms since 1970; null means no expiry (a grant). */
+    val expiresAtMs: Long?,
+    val active: Boolean,
+)
+
+/**
+ * The account's plan as the server reports it (`GET /v1/entitlement`). The server owns
+ * the plan; the app only reads it to say which plan the account is on.
+ */
+data class AccountEntitlement(
+    val active: Boolean,
+    val rows: List<EntitlementRow>,
+    /** ms since 1970: the reverse trial's end while it is the only active row. */
+    val trialEndsAtMs: Long?,
+    val enforced: Boolean,
+    /** This device holds a sync slot; null when an older server does not say. */
+    val deviceSyncing: Boolean?,
+)
+
+/** The private calendar feed (`GET /v1/ical/settings`). [scope] is `all` or `timed`. */
+data class IcalFeed(
+    val enabled: Boolean,
+    val scope: String,
+    val webcalUrl: String?,
+)
+
 class AccessHttpException(val statusCode: Int, val responseBody: String) : IOException(
     "Septena access returned HTTP $statusCode",
 )
@@ -98,6 +128,55 @@ class SeptenaAccessClient(
         val trimmed = name?.trim()?.take(MAX_AGENT_NAME)?.takeIf(String::isNotEmpty)
         val body = JsonValue.ObjectValue(mapOf("name" to JsonValue.stringOrNull(trimmed))).canonicalJson()
         request("/v1/access/connections/${connectionId.pathSegment()}", "PATCH", body)
+    }
+
+    suspend fun entitlement(): AccountEntitlement {
+        val json = JsonValue.parse(request("/v1/entitlement", "GET", body = null)) as? JsonValue.ObjectValue
+            ?: error("Expected a JSON object")
+        val rows = json.array("entitlements").mapNotNull { raw ->
+            val row = raw as? JsonValue.ObjectValue ?: return@mapNotNull null
+            EntitlementRow(
+                source = row.fields["source"].stringValue() ?: return@mapNotNull null,
+                expiresAtMs = row.fields["expiresAt"].longValue(),
+                active = row.fields["active"].booleanValue() ?: false,
+            )
+        }
+        val device = json.fields["device"] as? JsonValue.ObjectValue
+        return AccountEntitlement(
+            active = json.fields["active"].booleanValue() ?: false,
+            rows = rows,
+            trialEndsAtMs = json.fields["trialEndsAt"].longValue(),
+            enforced = json.fields["enforced"].booleanValue() ?: false,
+            deviceSyncing = device?.fields?.get("syncing").booleanValue(),
+        )
+    }
+
+    suspend fun icalFeed(): IcalFeed = parseIcal(request("/v1/ical/settings", "GET", body = null))
+
+    /** Turns the feed on or off, changes its scope, or rotates its link. Null fields stay as they are. */
+    suspend fun updateIcalFeed(enabled: Boolean? = null, scope: String? = null, rotate: Boolean? = null): IcalFeed {
+        val fields = buildMap<String, JsonValue> {
+            enabled?.let { put("enabled", JsonValue.BooleanValue(it)) }
+            scope?.let { put("scope", JsonValue.StringValue(it)) }
+            rotate?.let { put("rotate", JsonValue.BooleanValue(it)) }
+        }
+        return parseIcal(request("/v1/ical/settings", "POST", JsonValue.ObjectValue(fields).canonicalJson()))
+    }
+
+    /** The agent brief for the task tools (`GET /skill.md`, public, markdown). */
+    suspend fun skillBrief(): String {
+        val response = JsonHttp.send(baseUrl, "/skill.md", "GET", body = null, clientVersion = clientVersion)
+        if (response.statusCode !in 200..299) throw AccessHttpException(response.statusCode, response.body)
+        return response.body
+    }
+
+    private fun parseIcal(body: String): IcalFeed {
+        val json = JsonValue.parse(body) as? JsonValue.ObjectValue ?: error("Expected a JSON object")
+        return IcalFeed(
+            enabled = json.fields["enabled"].booleanValue() ?: false,
+            scope = json.fields["scope"].stringValue() ?: "all",
+            webcalUrl = json.fields["webcalUrl"].stringValue(),
+        )
     }
 
     private suspend fun request(path: String, method: String, body: String?): String {

@@ -16,7 +16,7 @@ struct SeptaskAdvancedPane: View {
       // Sync & storage diagnostics
       Section {
         if sync.issues.isEmpty {
-          LabeledContent("Sync issues", value: "None")
+          LabeledContent(RegistrySettings.copy("sync_diagnostics", "issues"), value: "None")
         } else {
           ForEach(sync.issues.suffix(20).reversed(), id: \.key) { issue in
             VStack(alignment: .leading, spacing: 2) {
@@ -27,7 +27,7 @@ struct SeptaskAdvancedPane: View {
                 .foregroundStyle(.secondary)
             }
           }
-          Button("Clear sync issues") { sync.clearIssues() }
+          Button(RegistrySettings.copy("sync_diagnostics", "clear")) { sync.clearIssues() }
         }
       } header: {
         Text(Self.syncDiagnostics?.label ?? "")

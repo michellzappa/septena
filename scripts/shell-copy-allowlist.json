@@ -148,46 +148,6 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septena/Shell/Settings/ConnectedAppsDetails.swift",
-      "literal": "Rotate Link",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Settings/ConnectedAppsDetails.swift",
-      "literal": "Rotating replaces your private feed link immediately. Existing calendar subscriptions will stop updating until you re-subscribe with the new URL.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Settings/ConnectedAppsDetails.swift",
-      "literal": "Sign in to Septena sync to create a private calendar feed URL for Apple Calendar, Google Calendar, or Outlook.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Settings/ConnectedAppsDetails.swift",
-      "literal": "Private iCal feed",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Settings/ConnectedAppsDetails.swift",
-      "literal": "All dated tasks",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Settings/ConnectedAppsDetails.swift",
-      "literal": "Timed tasks only",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Settings/ConnectedAppsDetails.swift",
-      "literal": "Calendar Feed (iCal)",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Settings/ConnectedAppsDetails.swift",
-      "literal": "Read-only subscription feed for your scheduled tasks and deadlines. Anyone with the private URL can read titles and notes in the feed; rotate or disable it anytime.",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septena/Shell/Sidebar/AreasProjectsView.swift",
       "literal": "Projects",
       "reasonId": "predates-rule"
@@ -285,46 +245,6 @@
     {
       "file": "Septena/Shell/Tasks/ConversationCard.swift",
       "literal": "Reply…",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Some tasks need thinking before you can act. Tap Discuss and talk them through, right on the task.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "How a task conversation moves",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "On Automatic, every step runs on your device first. It reaches further only for steps your device can’t do (↗).",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Whose turn?",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Some help is always on your device",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Your AI, never our servers",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Nothing important happens on its own. AI can fill in small, reversible details; any real decision or action that can’t be undone waits for your confirmation.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "How AI helps",
       "reasonId": "predates-rule"
     },
     {
@@ -808,11 +728,6 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septask/SeptaskAdvancedPane.swift",
-      "literal": "Clear sync issues",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septask/SeptaskApproveSignIn.swift",
       "literal": "Approve a sign-in",
       "reasonId": "predates-rule"
@@ -959,17 +874,7 @@
     },
     {
       "file": "Septask/SeptaskDevicesAccessPane.swift",
-      "literal": "That device stops syncing within the hour. Its tasks stay on it until you sign in there again.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskDevicesAccessPane.swift",
       "literal": "No devices",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskDevicesAccessPane.swift",
-      "literal": "Current device",
       "reasonId": "predates-rule"
     },
     {
@@ -1009,37 +914,12 @@
     },
     {
       "file": "Septask/SeptaskSettingsView.swift",
-      "literal": "On this device · Sign in to sync",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSettingsView.swift",
       "literal": "On this device",
       "reasonId": "predates-rule"
     },
     {
       "file": "Septask/SeptaskSettingsView.swift",
-      "literal": "Reset to Defaults",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSettingsView.swift",
       "literal": "Smart Lists",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSettingsView.swift",
-      "literal": "No smart lists in this section",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSettingsView.swift",
-      "literal": "Always shown",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSettingsView.swift",
-      "literal": "Shown when non-empty",
       "reasonId": "predates-rule"
     },
     {
@@ -1104,11 +984,6 @@
     },
     {
       "file": "Septask/SeptaskWatchSettings.swift",
-      "literal": "Apple Watch",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskWatchSettings.swift",
       "literal": "Never",
       "reasonId": "predates-rule"
     },
@@ -1140,11 +1015,6 @@
     {
       "file": "Septask/TasksSkillPane.swift",
       "literal": "Conventions",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/TasksSkillPane.swift",
-      "literal": "Paste into a model's context to teach it the task tools without connecting MCP.",
       "reasonId": "predates-rule"
     },
     {
