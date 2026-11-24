@@ -67,6 +67,8 @@ export interface ClientTask {
   daysOnToday?: number;
   checklistCount?: number;
   checklistDoneCount?: number;
+  /// What the agent said when it handed the task over (the review view).
+  reviewNote?: string;
 }
 
 /// The user's synced accent with its hexes, so a thin client that has no
@@ -94,6 +96,7 @@ export function clientTask(t: TaskOut, names: Map<string, string>): ClientTask {
   if (t.recurrence) out.repeats = true;
   if (t.starred) out.starred = true;
   if (t.completedAt) out.completedAt = t.completedAt;
+  if (t.reviewNote) out.reviewNote = t.reviewNote;
   if (t.daysOnToday) out.daysOnToday = t.daysOnToday;
   if (t.checklistCount) {
     out.checklistCount = t.checklistCount;

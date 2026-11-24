@@ -128,5 +128,6 @@ private fun SignInQrImage(qr: SignInQr) {
 /** Shown to the approving app; must match the backend's client-name pattern `[\w .()-]{1,40}`. */
 private fun deviceName(): String {
     val raw = "Android ${Build.MODEL}".replace(Regex("[^\\w .()-]"), " ").trim()
-    return raw.take(40).ifBlank { "Android" }
+    // A wire value the server matches, not UI copy: it stays English.
+    return raw.take(40).ifBlank { "Android" } // septena-lint:allow registry-owned-literal
 }

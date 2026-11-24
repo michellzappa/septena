@@ -240,7 +240,9 @@ Allowed values for `visibility`: `"always"` *(default)*, `"signedIn"`, `"signedO
 | **iOS / iPadOS (compact sheet)** | `NavigationStack` + grouped `Form` | Renders `rootGroups` in order (`card` / `inline`); `pageLink` rows push `pages[id]` with live status subtitle; `about` pushes `advanced` (`depth: 2`) |
 | **macOS (Settings window, ⌘,)** | `NavigationSplitView` (sidebar + `NavigationStack` detail) | Sidebar renders `desktopTabs` (6 items); detail renders groups/pages mapped to that `desktopTab` (expanding `desktopInline: true` pages directly into the detail `Form` so Connect Claude is immediately visible in `AI & Agents`) |
 | **Web (`#21`) / Windows (`#136`) / iPad wide** | Split sidebar + detail panel | Same `desktopTabs` projection as macOS; automatically omits Apple-only items via `platforms` |
-| **Android mobile (`#20`)** | Compose `LazyColumn` + navigation stack | Same `rootGroups` projection as iOS; automatically includes `tasksTitleLines` (`platforms` includes `"android"`) and omits EventKit/Apple Intelligence/Things SQLite |
+| **Android mobile (`#20`)** | Compose `LazyColumn` + navigation stack | Same `rootGroups` projection as iOS; automatically includes `tasksTitleLines` (`platforms` includes `"android"`) and omits EventKit/Apple Intelligence/Things SQLite. Each `customSurface` has a Compose renderer in `android/app/.../ui/` (`SettingsSurfaces.kt`, `PlanSettings.kt`, `SmartListsSettings.kt`, `CalendarFeedSettings.kt`, `AccessSettings.kt`). Android differences: Smart Lists reorder with arrow buttons (no drag), Calendar shows only the private iCal feed (`calendar.events` is planned on Android), Septena Plus shows the plan but sells nothing (Play billing is #176), and Import & Export is not built yet |
+
+**Surface copy.** The words a custom surface spells out (status words, device names, the AI explainer, the iCal feed, the Smart Lists editor) live in `settings.json` `copy`, keyed by surface id (or `statusKey`) and copy id. Swift reads plain entries with `RegistrySettings.copy(surface, id)`; Kotlin reads all entries, templates included, with `settingsCopy(surface, id, languageTag, "name" to value)`.
 
 ---
 

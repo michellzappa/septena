@@ -25,25 +25,35 @@ extension TaskSyncEngine {
   // MARK: - Pull
 
   func pull(store: TaskSyncStore) async throws {
+    try await pull(store: store, resetsSoFar: 0)
+  }
+
+  /// Each page's fate (apply, continue, reset once, fail) is the shared
+  /// core's decision (`TaskSyncDecisions.pullStep`, sync-engine.json).
+  private func pull(store: TaskSyncStore, resetsSoFar: Int) async throws {
     var cursor = since
     var pages = 0
     while isRunning {
       let page = try await client.pull(since: cursor)
-      if page.resetRequired == true {
-        try await resetAndRepull(store: store)
+      let step = TaskSyncDecisions.pullStep(
+        cursor: cursor, resetRequired: page.resetRequired == true,
+        nextSince: page.nextSince, hasMore: page.hasMore, resetsSoFar: resetsSoFar)
+      switch step {
+      case .reset:
+        try await resetAndRepull(store: store, resetsSoFar: resetsSoFar + 1)
         return
+      case .fail(let reason):
+        throw TaskBackendError.badResponse(reason)
+      case .apply, .applyAndContinue:
+        guard applyPulled(page.changes, store: store) else {
+          // The local save failed and rolled back: keep `since`, read the page again.
+          throw TaskBackendError.badResponse("the local store could not save pulled rows")
+        }
+        cursor = page.nextSince
+        since = cursor   // only after the page was saved
+        pages += 1
       }
-      guard applyPulled(page.changes, store: store) else {
-        // The local save failed and rolled back: keep `since`, read the page again.
-        throw TaskBackendError.badResponse("the local store could not save pulled rows")
-      }
-      if page.hasMore, page.nextSince <= cursor {
-        throw TaskBackendError.badResponse("pull did not advance")
-      }
-      cursor = page.nextSince
-      since = cursor   // only after the page was saved
-      pages += 1
-      if !page.hasMore { break }
+      if step == .apply { break }
       guard pages < 10_000 else { throw TaskBackendError.badResponse("pull did not finish") }
     }
     lastPull = Date()
@@ -52,7 +62,7 @@ extension TaskSyncEngine {
   /// `resetRequired`: this device's `since` is older than the backend's
   /// tombstone purge. Capture local edits not yet queued, wipe the task
   /// types here, pull from 0, then lay the queued ops back on top.
-  private func resetAndRepull(store: TaskSyncStore) async throws {
+  private func resetAndRepull(store: TaskSyncStore, resetsSoFar: Int) async throws {
     SeptenaLog.info("[TaskSync] resetRequired: wiping local task data and pulling from 0")
     reconcile(store: store)
     let context = main
@@ -65,7 +75,7 @@ extension TaskSyncEngine {
     _ = StoreHealth.save(context, op: "taskSync.reset")
     store.deleteAllShadows()
     since = 0
-    try await pull(store: store)   // from 0 the backend never asks for a reset
+    try await pull(store: store, resetsSoFar: resetsSoFar)   // a second reset in one sync fails
     overlayPendingOps(store: store)
     reconcile(store: store)
     NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)

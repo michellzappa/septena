@@ -848,6 +848,14 @@ final class TaskSyncEngine {
 
       switch try await client.push(batch.map(wireOp)) {
       case .ok(let response):
+        // The core checks the answer covers the batch one for one, in
+        // order; zip would pair results with the wrong ops otherwise.
+        if let problem = TaskSyncDecisions.pushResponseProblem(
+          sentIDs: batch.map(\.clientOpId), resultIDs: response.results.map(\.clientOpId)) {
+          for op in batch { op.sent = false }
+          store.saveNow()
+          throw TaskBackendError.badResponse(problem)
+        }
         handleResults(Array(zip(batch, response.results)), store: store)
       case .refused(let body):
         try await handleRefused(batch, body: body, store: store)

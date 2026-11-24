@@ -74,7 +74,9 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | Doc | Status |
 |---|---|
 | [SEPTASK.md](SEPTASK.md) | current (P0–P4 landed) |
-| [LINKED_PROJECTS_SPEC.md](LINKED_PROJECTS_SPEC.md) | accepted |
+| [LINKED_PROJECTS_SPEC.md](LINKED_PROJECTS_SPEC.md) | accepted (GitHub parts replaced, ADR 0032) |
+| [GITHUB_SPEC.md](GITHUB_SPEC.md) | accepted (ADR 0032) |
+| [TASK_REFERENCES_SPEC.md](TASK_REFERENCES_SPEC.md) | accepted (ADR 0031, #296) |
 | [PROJECT_SHARING_SPEC.md](PROJECT_SHARING_SPEC.md) | accepted |
 | [TASK_FACTORY_SPEC.md](TASK_FACTORY_SPEC.md) | accepted |
 | [TASK_FADE_SPEC.md](TASK_FADE_SPEC.md) | accepted (§6 amended by ADR 0014) |
@@ -138,6 +140,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | Doc | Status |
 |---|---|
 | [DesignSpec.md](DesignSpec.md) | canonical |
+| [FEATURE_MAP.md](FEATURE_MAP.md) | generated: feature status per platform |
 | [PAGE_CHROME_SPEC.md](PAGE_CHROME_SPEC.md), [DRAWER_MODES_SPEC.md](DRAWER_MODES_SPEC.md), [GLASS_DOTS_SPEC.md](GLASS_DOTS_SPEC.md), [WAKING_DAY_WHEEL.md](WAKING_DAY_WHEEL.md) | mixed: see each status line |
 | [SETTINGS_UX_SPEC.md](SETTINGS_UX_SPEC.md) | proposal (task app Settings IA + `registry/settings.json` v2, S0–S3) |
 | [CUSTOMIZATION_SPEC.md](CUSTOMIZATION_SPEC.md) | building (#196, ADR 0019; procedural Header Wash textures + exotic-fruit accents, C0–C4) |

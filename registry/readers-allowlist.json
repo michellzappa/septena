@@ -165,10 +165,6 @@
       "reason": "Task conversations are not on Android yet.",
       "issue": "#242"
     },
-    "RegistryEntityFields.Attachment.*": {
-      "reason": "Attachments are not on Android yet.",
-      "issue": "#174"
-    },
     "RegistryEntityFields.Tag.*": {
       "reason": "Quick Find indexes task tag names; tag editing is not on Android yet.",
       "issue": "#174"
@@ -184,22 +180,6 @@
     "RegistryEntityFields.Task.*": {
       "reason": "Reminder fields: reminders are not on Android yet.",
       "issue": "#174"
-    },
-    "RegistryEntityNames.ATTACHMENT": {
-      "reason": "Attachments are not on Android yet.",
-      "issue": "#174"
-    },
-    "RegistryDestinationIds.REVIEW": {
-      "reason": "Review is planned on Android.",
-      "issue": "#174"
-    },
-    "RegistryDestinationIds.AGENT": {
-      "reason": "The Agent list is planned on Android.",
-      "issue": "#242"
-    },
-    "RegistryDestinationIds.FADED": {
-      "reason": "Fade is not on Android yet.",
-      "issue": "#247"
     },
     "RegistryRules.CUE_DECAY_DAYS": {
       "reason": "The shared core holds the agent-cue window (views.rs); Android calls it.",

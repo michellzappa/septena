@@ -806,7 +806,9 @@ struct TaskRow: View {
         .foregroundStyle(Theme.todayAccent)
         .accessibilityLabel(TaskFilter.starred.title)
     }
-    if hasNotes { TaskNotesGlyph.view }
+    // An agent-authored row carries its notes as the agent's write-up, so the
+    // agent glyph already says "there is more here". One glyph, not two.
+    if hasNotes, !task.isAgentAuthored { TaskNotesGlyph.view }
     if task.isAgentAuthored { AgentAuthoredGlyph(task: task) }
     agentSignal
   }

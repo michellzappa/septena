@@ -1,6 +1,6 @@
 # 0003. External links run on the server; the remote owns mapped fields
 
-- Status: accepted (2026-11-19)
+- Status: accepted (2026-11-19); amended by [0032](0032-github-issues-are-followed-not-mirrored.md) for GitHub
 - Date: 2026-11-19
 - Deciders: mz
 

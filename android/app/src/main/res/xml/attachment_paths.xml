@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Task attachment files that an open intent may read (TaskAttachmentStore). -->
+<paths>
+    <files-path name="attachments" path="attachments/" />
+</paths>

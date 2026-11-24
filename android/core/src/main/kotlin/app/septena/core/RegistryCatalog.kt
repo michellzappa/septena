@@ -81,6 +81,7 @@ object RegistryCatalog {
             "destinations" to RegistryDocuments.destinationsJson,
             "actions" to RegistryDocuments.actionsJson,
             "surfaces" to RegistryDocuments.surfacesJson,
+            "plans" to RegistryDocuments.plansJson,
             "conformance" to RegistryDocuments.conformanceJson,
             "localizations" to RegistryDocuments.localizationsJson,
         ).mapValues { (_, json) ->

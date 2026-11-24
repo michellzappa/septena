@@ -129,6 +129,7 @@ fun TaskDetailScreen(
     }
     val attributes = remember(languageTag) { RegistryCatalog.taskAttributes(languageTag) }
     val dataVersion by graph.sync.dataVersion.collectAsStateWithLifecycle()
+    val signedIn by graph.credentials.signedIn.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val checklistDrafts = remember(taskId) { mutableStateMapOf<String, String>() }
     var focusedChecklistId by remember(taskId) { mutableStateOf<String?>(null) }
@@ -883,8 +884,15 @@ fun TaskDetailScreen(
                                 heading = heading,
                             )
                         }
-                        // Android has no attachment store yet (task.attachments is planned): skip.
-                        TaskPageBlockKinds.ATTACHMENTS -> Unit
+                        TaskPageBlockKinds.ATTACHMENTS -> if (savedTask != null) {
+                            TaskAttachmentsSection(
+                                graph = graph,
+                                taskId = taskId,
+                                heading = heading,
+                                canEdit = canEdit,
+                                control = labels::control,
+                            )
+                        }
                         // Who added the task and when: permanent, read-only metadata.
                         TaskPageBlockKinds.PROVENANCE -> {
                             val source = taskFields[RegistryEntityFields.Task.SOURCE].stringValue()
@@ -905,8 +913,25 @@ fun TaskDetailScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
-                        // Android does not read the task change log yet (task.history is planned): skip.
-                        TaskPageBlockKinds.HISTORY -> Unit
+                        // The change log lives on the server only, so the row shows with a
+                        // session. It folds open like an attribute row and loads on open.
+                        TaskPageBlockKinds.HISTORY -> if (savedTask != null && signedIn) {
+                            HorizontalDivider()
+                            AttributeFoldRow(
+                                label = heading.orEmpty(),
+                                value = null,
+                                expanded = openPicker == RegistryTaskAttributeIds.HISTORY,
+                                enabled = canEdit,
+                                onToggle = { openAttribute(RegistryTaskAttributeIds.HISTORY) },
+                            ) {
+                                TaskHistoryList(
+                                    graph = graph,
+                                    taskId = taskId,
+                                    languageTag = languageTag,
+                                    control = labels::control,
+                                )
+                            }
+                        }
                         // A kind that a newer registry adds has no Android renderer yet: skip.
                         else -> Unit
                     }
@@ -1408,7 +1433,7 @@ private fun formatAddedOn(createdAt: String?, created: String?, languageTag: Str
     return created?.let { formatDay(it, languageTag) }
 }
 
-private fun formatDay(day: String, languageTag: String): String = runCatching {
+internal fun formatDay(day: String, languageTag: String): String = runCatching {
     DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
         .withLocale(Locale.forLanguageTag(languageTag))
         .format(LocalDate.parse(day.take(10)))

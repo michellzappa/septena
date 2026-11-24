@@ -221,16 +221,16 @@ struct CalendarDetail: View {
       }
     }
     .confirmationDialog(
-      "Rotate Calendar Feed Link?",
+      RegistrySettings.copy("calendar_detail", "rotateTitle"),
       isPresented: $confirmRotateIcal,
       titleVisibility: .visible
     ) {
-      Button("Rotate Link", role: .destructive) {
+      Button(RegistrySettings.copy("calendar_detail", "rotate"), role: .destructive) {
         Task { await rotateIcalFeed() }
       }
       Button("Cancel", role: .cancel) {}
     } message: {
-      Text("Rotating replaces your private feed link immediately. Existing calendar subscriptions will stop updating until you re-subscribe with the new URL.")
+      Text(RegistrySettings.copy("calendar_detail", "rotateMessage"))
     }
   }
 
@@ -238,23 +238,23 @@ struct CalendarDetail: View {
   private var icalFeedSection: some View {
     Section {
       if !TaskBackendClient.hasSession {
-        Text("Sign in to Septena sync to create a private calendar feed URL for Apple Calendar, Google Calendar, or Outlook.")
+        Text(RegistrySettings.copy("calendar_detail", "feedSignIn"))
           .font(.callout)
           .foregroundStyle(.secondary)
       } else {
-        Toggle("Private iCal feed", isOn: Binding(
+        Toggle(RegistrySettings.copy("calendar_detail", "feedToggle"), isOn: Binding(
           get: { icalSettings?.enabled ?? false },
           set: { next in Task { await setIcalEnabled(next) } }
         ))
         .disabled(icalLoading || icalBusy)
 
         if let settings = icalSettings, settings.enabled {
-          Picker("Include", selection: Binding(
+          Picker(RegistrySettings.copy("calendar_detail", "include"), selection: Binding(
             get: { settings.scope },
             set: { next in Task { await setIcalScope(next) } }
           )) {
-            Text("All dated tasks").tag(BackendIcalScope.all)
-            Text("Timed tasks only").tag(BackendIcalScope.timed)
+            Text(RegistrySettings.copy("calendar_detail", "scopeAll")).tag(BackendIcalScope.all)
+            Text(RegistrySettings.copy("calendar_detail", "scopeTimed")).tag(BackendIcalScope.timed)
           }
           .disabled(icalBusy)
 
@@ -268,7 +268,7 @@ struct CalendarDetail: View {
                 .textSelection(.enabled)
 
               HStack(spacing: 12) {
-                Button(icalCopied ? "Copied" : "Copy URL") {
+                Button(icalCopied ? "Copied" : RegistrySettings.copy("calendar_detail", "copyUrl")) {
                   copyToPasteboard(webcal)
                   icalCopied = true
                   Task {
@@ -279,12 +279,12 @@ struct CalendarDetail: View {
                 .disabled(icalBusy)
 
                 if let url = URL(string: webcal) {
-                  Link("Open in Calendar", destination: url)
+                  Link(RegistrySettings.copy("calendar_detail", "openInCalendar"), destination: url)
                 }
 
                 Spacer()
 
-                Button("Rotate Link", role: .destructive) {
+                Button(RegistrySettings.copy("calendar_detail", "rotate"), role: .destructive) {
                   confirmRotateIcal = true
                 }
                 .disabled(icalBusy)
@@ -301,10 +301,10 @@ struct CalendarDetail: View {
         }
       }
     } header: {
-      Text("Calendar Feed (iCal)")
+      Text(RegistrySettings.copy("calendar_detail", "feedHeader"))
     } footer: {
       if TaskBackendClient.hasSession {
-        Text("Read-only subscription feed for your scheduled tasks and deadlines. Anyone with the private URL can read titles and notes in the feed; rotate or disable it anytime.")
+        Text(RegistrySettings.copy("calendar_detail", "feedFooter"))
       }
     }
   }

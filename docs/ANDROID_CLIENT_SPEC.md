@@ -90,6 +90,12 @@ same rules:
    verified by conformance vectors).
 9. **Attachments.** Push the metadata row first, then `PUT
    /v1/attachments/:id`. Download with `GET`. Respect the 25 MB limit.
+   Shipped (#364): `TaskAttachmentStore` copies a picked file into the app,
+   adds the row, and uploads after the next sync that puts the row on the
+   server. A free plan refuses the upload (402), so the file stays on the
+   device that added it. Open downloads once and hands the file to another
+   app through a `FileProvider`. The task page also shows the change history
+   (`GET /v1/changes`), loaded when its row folds open.
 10. **Conversations** are entity `convo` (upsert keyed by task id) plus
     `appendTurn` ops, pulled as entity `turn`.
 
@@ -103,7 +109,7 @@ The same scope as Windows W2, so both clients ship one tested set:
 - Conversations with option pills; Stop on a task and Pause all agents.
 - Share target into the Inbox. Phone and tablet layouts.
 
-Not in the first release: attachments upload (download works), calendar
+Not in the first release: calendar
 events, imports, widgets, Wear OS, on-device AI. Each gets an issue when the
 first release ships. Agents need no client code: the agent loop runs in the
 store (ADR 0008).
@@ -148,5 +154,5 @@ tests remain part of the A0 acceptance criteria and will be added separately.
 | Local store | SQLDelight, shared with Windows *(default)* |
 | Shared UI | Compose Multiplatform, so Windows reuses screens *(default)* |
 | Minimum Android version | Android 10 (API 29) *(default)* |
-| First release attachments | Download only *(default)* |
+| First release attachments | Add, open and remove, as iOS (#364) |
 | Tablet layout | List-detail pane on wide screens in the first release *(default)* |
