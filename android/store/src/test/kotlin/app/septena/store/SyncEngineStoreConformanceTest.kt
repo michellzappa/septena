@@ -240,9 +240,10 @@ class SyncEngineStoreConformanceTest {
                     "position" to JsonValue.DecimalValue(0.0),
                     "createdAt" to JsonValue.StringValue("2026-11-24T11:00:00Z"),
                 )
+                val att2Update = mapOf("filename" to JsonValue.StringValue("renamed.pdf"))
                 store.writeLocalAndEnqueue(
-                    SyncRecord(RegistryEntityNames.ATTACHMENT, "att-2", att2Fields),
-                    SyncOperation.Upsert("op-att-2", RegistryEntityNames.ATTACHMENT, "att-2", att2Fields),
+                    SyncRecord(RegistryEntityNames.ATTACHMENT, "att-2", att2Fields + att2Update),
+                    SyncOperation.Upsert("op-att-2", RegistryEntityNames.ATTACHMENT, "att-2", att2Update),
                 )
                 store.applyPushResults(
                     listOf(SyncOperationResult("op-att-2", SyncResultStatus.DROPPED, revision = 3)),
