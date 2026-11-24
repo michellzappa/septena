@@ -98,6 +98,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [ATTACHMENTS_MAC_PARITY_SPEC.md](ATTACHMENTS_MAC_PARITY_SPEC.md) | proposal (#131) |
 | [TASK_TIMES_AND_ICAL_SPEC.md](TASK_TIMES_AND_ICAL_SPEC.md) | proposal (#128) |
 | [INLINE_CAPTURE_PARSING_SPEC.md](INLINE_CAPTURE_PARSING_SPEC.md) | proposal (#133) |
+| [RAMBLE_MODE_SPEC.md](RAMBLE_MODE_SPEC.md) | proposal (#211, ADR 0035): on-device voice capture and task-notes enrichment with shared confirm step |
 | [EMAIL_TO_TASK_SPEC.md](EMAIL_TO_TASK_SPEC.md) | proposal (#134) |
 | [NATIVE_PROJECT_SHARING_SPEC.md](NATIVE_PROJECT_SHARING_SPEC.md) | superseded by PROJECT_SHARING_SPEC |
 | [COMPANION_DEVICES_SPEC.md](COMPANION_DEVICES_SPEC.md) | proposal (ADR 0034, ADR 0035): needs-you feed, limited session, live nudge, voice for the watch and the desk orb |

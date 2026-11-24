@@ -673,7 +673,7 @@ function validatePlans(plans, icons, caps) {
   assert(plans.prices.filter((x) => x.highlighted).length === 1, "plans.json: exactly one price must be highlighted");
 
   assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
-  assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(["free", "plus"]), "plans.json: cards must be free, plus");
+  assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(["free", "account", "plus"]), "plans.json: cards must be free, account, plus");
   assert(plans.cards.filter((c) => c.highlighted).length === 1, "plans.json: exactly one card must be highlighted");
   for (const k of ["seePlus", "startTrial", "trialStarted", "trialBilling", "success", "pending", "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "done"]) {
     assert(typeof plans.paywall?.[k] === "string" && plans.paywall[k].length > 0, `plans.json: paywall.${k} missing`);

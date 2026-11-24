@@ -17,9 +17,9 @@ repo (`septena-site/docs/PRODUCT_DIRECTION.md`), not here.
 ## 1. Goal
 
 Septena (the task app) is free and complete on one device. A free account
-adds the server with limits for that one device (ADR 0023). One subscription lifts the limits: live sync on
-every device, full history, synced files, agents, links and sharing
-(ADR 0010). The rule in one line: **the device is free, the server is free
+adds the server with limits for that one device and one agent (ADR 0023,
+ADR 0036). One subscription lifts the limits: live sync on every device, 3
+agents, a longer history, synced files and sharing (ADR 0010). The rule in one line: **the device is free, the server is free
 with limits, paid lifts the limits.**
 
 ## 2. What exists and what is missing
@@ -53,7 +53,8 @@ with limits, paid lifts the limits.**
 
 ## 3. Free and paid
 
-Three levels (ADR 0010, ADR 0023). The earlier rule "the server is paid" is
+Three levels at launch, Pro later (ADR 0010, ADR 0023, ADR 0036). An account
+adds the server; Plus adds more than one. The earlier rule "the server is paid" is
 replaced. The public rule: **free on one device, Plus on all of them.** The
 paid plan is named **Septena Plus** on every surface.
 
@@ -61,12 +62,11 @@ paid plan is named **Septena Plus** on every surface.
 |---|---|---|
 | Every task feature: lists, projects, areas, Today, Next, recurrence, fade, the composer, quick entry, widgets | Everything in the left column | Everything in the left column |
 | Watch app paired to the phone (syncs through the phone) | Server sync for 1 device (backup; moving to a new device is free, the old one stops syncing) | Server sync on all devices, including the watch through the server |
-| The local MCP server on the Mac | Sync every few minutes (no live socket) | Live sync (socket) |
+| | Live sync of that device | Live sync on every device |
 | Import and export (plain JSON) | Change history: 30 days | Full change history, account restore *(pending a Cloudflare check)* |
-| Attachments on the device that added them | Recently Deleted: 30 days | Recently Deleted: 90 days |
+| Attachments on the device that added them | Recently Deleted: 30 days | Recently Deleted: 90 days *(planned; the app uses 30)* |
 | | Attachments stay on the device that added them (no R2) | Attachments synced, 10 GB |
-| | Claude connector: read, plus a few writes a day | Claude connector without daily caps |
-| | Agents: a few runs a month | Agents within the run budget (ADR 0008) |
+| | 1 connected agent | 3 connected agents |
 | | Join shared projects | Create shared projects and invite |
 
 GitHub is in no plan (ADR 0033). `linkedProjects` stays in the plan
@@ -97,7 +97,7 @@ Rules:
 | History | Free account | Paid | How the limit works |
 |---|---|---|---|
 | Change log (`changes`, who changed what) | 30 days | 365 days | Pruned per plan by the daily alarm. A device offline past the window gets a full resync (exists). |
-| Logbook (completed tasks) | Last 90 days shown | All | Rows are kept on every level; reads page only within the window. |
+| Logbook (completed tasks) | All | All | No limit on any level (ADR 0036). |
 | Recently Deleted | 30 days | 90 days | User-facing restore window only. Plus matches the 90-day tombstone window (decided 2026-11-22). |
 | Deleted rows for sync (tombstones) | 90 days | 90 days | Same on every level: it protects sync, not a feature. |
 | Conversation turns | Kept | Kept | Not limited. |
@@ -115,9 +115,9 @@ it names what the user gets. All copy goes through the humanizer skill.
 | Second device signs in | The device works locally; one line says Plus syncs every device. Moving the slot to this device is offered too. |
 | History reaches the window edge | A count of older changes, with one tap to Plus. |
 | A task with a file opens on another device | "1 file on your iPhone." Plus syncs files to all devices. |
-| An agent runs out of runs | The task says the agent resumes on the 1st, or now with Plus. The work waits. |
+| An agent past the count pairs | Replace an agent, or Plus *(not built: ADR 0036, the count only logs)*. |
 | A free member shares a project | Joining is free; creating a share is the upsell. |
-| Connector write over the daily cap | The tool returns one line with the upgrade link. No nagging inside a conversation. |
+| Connector write over the abuse cap (500 a day) | The tool returns one line. No nagging inside a conversation. |
 | Reverse trial ends | One notice listing what changes. No countdown screens. |
 
 Banned: timed nags, badges on paid features, blocked export, modals on
@@ -192,9 +192,9 @@ party. No per-user tracking, no SDKs.
   else `free`. `trial` (the reverse trial) is not built yet; it will resolve
   to the Plus limits.
 - **Plan table (ADR 0010).** One table in `backend/` maps each plan to its
-  limits: device count, sync mode (live / poll), change-log window, Logbook
+  limits: device count, sync mode (live / poll), connected agents, change-log
   window, Recently Deleted window, R2 attachments on/off and quota, connector
-  writes per day, agent runs per month, shared-project create, linked-project
+  writes per day (abuse cap), shared-project create, linked-project
   count. There is no hosted AI (decided 2026-11-22: users bring their own). The alarm's pruning, every history read and every
   gate read this table. Apps fetch their limits from the server and never
   hardcode them.
@@ -373,9 +373,8 @@ the connector).
 | `changeLogDays` | `GET /v1/changes`, `tasks_history`, `tasks_activity` | Older rows are not shown. `/v1/changes` adds `windowDays` and `hiddenOlder` (count, or null while more pages follow) for the `history_edge` upsell |
 | `attachmentsGB` | `PUT /v1/attachments/:id` | 402 `attachments_not_in_plan` (free: 0) or `attachment_quota` (Plus: 10 GB of live uploaded bytes). Downloads of bytes already stored still work |
 | `connectorWritesPerDay` | connector write tools and notes writes | Tool error with the `connector_cap` words. Reads always work |
-| `agentRunsPerMonth` | `tasks_claim` (a new claim; a renewal is not a run) | Claim refused with the `agent_runs` words. `tasks_release` always works |
 | `connectedAgents` | OAuth code exchange (a new agent pairs) | **Log-only, in both modes.** Logs `agent_limit_over` with the count and the limit; the pairing still works. `GET /v1/access` returns `agents: {count, limit}`. An agent is one MCP connection used in the last 30 days |
-| `logbookDays`, `recentlyDeletedDays`, `createShares`, `linkedProjects` | Apps (read from `GET /v1/entitlement`) | The server has no Logbook, Recently Deleted, sharing or linked-project surface yet |
+| `recentlyDeletedDays`, `createShares`, `linkedProjects` | Apps (read from `GET /v1/entitlement`) | The server has no Recently Deleted, sharing or linked-project surface yet |
 
 Every 402 body is `{error, limit, upsell, message}`: `upsell` is the
 moment id from `plans.json` (null for live sync), `message` its words.
@@ -466,8 +465,7 @@ transaction whose `appAccountToken` is not this account's.
 **8. Live sync on one device.** With one syncing device, `liveSync: false`
 mostly delays agent and connector edits reaching the app, which is the
 moment the free account should feel agents work.
-*Default:* keep poll-only on free, with the poll at most 2 minutes while
-the app is in front.
+*Decided 2026-11-24 (ADR 0036):* live sync on every account.
 
 **9. What already holds.** The trial and a lapse leave the device used
 last syncing (newest `slotAt`). Grace and billing retry stay active. A
@@ -645,7 +643,7 @@ free plan with hidden rows). The sheet adds "Sync This Device" for
 Plus keeps that line after the notice is gone. "Once per account" is the
 synced setting `upsellsSeen`. Not built: `file_elsewhere` (the app drops
 `uploadedAt` on attachments, so it cannot tell bytes elsewhere from bytes
-not yet downloaded), `agent_runs` and `connector_cap` (#269),
+not yet downloaded), the agent count and `connector_cap` (#269),
 `share_create` (no sharing yet). The App Store Connect products do
 not exist yet; `checkout.open` stays false until they do. The Mac sells
 once its release moves to the Mac App Store (ADR 0026).
@@ -674,4 +672,4 @@ before any public release that uses the backend.
 | Attachments on the free account | Decided 2026-11-20: none on the server; files stay on the device that added them |
 | Recently Deleted on Plus vs the 90-day tombstone window (§3.1) | Decided 2026-11-22: Plus keeps Recently Deleted 90 days |
 | A free account's second device: take the slot at sign-in (ADR 0023) or stay local and offer the move (§3.2) | Default 2026-11-22: stay local, offer the move (§6.3) |
-| Limit values ("a few" connector writes, agent runs, hosted-AI allowance) | Decided 2026-11-22: free account gets connector reads plus 25 writes a day and 10 agent runs a month. No hosted AI (decided 2026-11-22: users bring their own Claude). The values live in `registry/plans.json` `limits` (generated to `PLAN_LIMITS` for the backend) |
+| Limit values ("a few" connector writes, agent runs, hosted-AI allowance) | Decided 2026-11-24 (ADR 0036): 1 connected agent on a free account, 3 on Plus, and a 500-writes-a-day abuse cap on a free account. No hosted AI (decided 2026-11-22: users bring their own Claude). The values live in `registry/plans.json` `limits` (generated to `PLAN_LIMITS` for the backend) |
