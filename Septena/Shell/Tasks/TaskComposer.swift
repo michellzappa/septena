@@ -378,6 +378,17 @@ struct TaskComposerCard: View {
     return .page
   }
 
+  /// "Area › Project", the area, or the Inbox, for the review depth.
+  private var reviewListLabel: String {
+    if let pid = draft.projectId, let project = projects.first(where: { $0.id == pid }) {
+      if let aid = project.area, let area = areas.first(where: { $0.id == aid }) {
+        return "\(area.title) › \(project.title)"
+      }
+      return project.title
+    }
+    return draft.listLabel(areas: areas, projects: projects)
+  }
+
   /// The blocks to render, in registry order. A create, or an inline create
   /// held as a placeholder row, has no saved task, so `editOnly` blocks drop.
   private var pageBlocks: [RegistryTaskPageBlock] {
@@ -494,6 +505,12 @@ struct TaskComposerCard: View {
     let kinds = Set(blocks.map(\.kind))
     return VStack(alignment: .leading, spacing: inline ? 10 : 14) {
       if kinds.contains(.header) { titleNotesCard }
+      // The review depth has no List row: name where the task lives, read-only.
+      if pageDepth == .review {
+        Label(reviewListLabel, systemImage: RegistrySurfaces.taskAttribute("list").sfSymbol)
+          .font(.septenaMeta)
+          .foregroundStyle(Theme.inkSecondary)
+      }
 
       VStack(alignment: .leading, spacing: inline ? 10 : 14) {
         // Header draws above this column; checklist and attachments draw

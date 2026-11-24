@@ -16,12 +16,8 @@ struct ConversationCard: View {
   @State private var convo: TaskConvo
   @State private var isTaskOpen: Bool = true
   @State private var showOther = false
-  @State private var otherText = ""
   @State private var showSendBack = false
-  @State private var sendBackNote = ""
   @State private var showReply = false
-  @State private var replyText = ""
-  @State private var showInfo = false
 
   /// Seed `convo` from the already-loaded task so the card paints on the FIRST
   /// frame (no fetch-on-open lag); `onAppear`/`.septenaTasksChanged` then refresh
@@ -78,9 +74,15 @@ struct ConversationCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
-    .onAppear(perform: reload)
+    .onAppear {
+      reload()
+      // The Review row's Send back opens this page with the field open.
+      if AgentPromptRequests.shared.sendBackTaskID == taskID {
+        AgentPromptRequests.shared.sendBackTaskID = nil
+        showSendBack = true
+      }
+    }
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in reload() }
-    .sheet(isPresented: $showInfo) { AIExplainerView() }
   }
 
   /// Everything except the current open question (which renders as the title).
@@ -116,67 +118,26 @@ struct ConversationCard: View {
 
   // MARK: Open question — the prominent title + option pills
 
+  /// The open question as an agent prompt (docs/AGENT_PROMPT_SPEC.md): the
+  /// question in full, its options as a vertical list, Other… last.
   @ViewBuilder private func questionBlock(_ q: ConvoTurn) -> some View {
-    VStack(alignment: .leading, spacing: 10) {
-      // The question IS the title: chat glyph beside it, ⓘ explainer trailing.
-      HStack(alignment: .top, spacing: 8) {
-        Image(systemName: "bubble.left.and.bubble.right.fill")
-          .font(.subheadline).foregroundStyle(accent)
-        Text(q.question ?? "").font(.headline).foregroundStyle(.primary)
-        Spacer(minLength: 6)
-        Button { showInfo = true } label: { Image(systemName: "info.circle").font(.subheadline) }
-          .buttonStyle(.borderless).foregroundStyle(.secondary)
-          .help("How AI helps with your tasks")
-      }
-
+    VStack(alignment: .leading, spacing: 8) {
+      AgentPromptCard(
+        kicker: String(localized: "Your agent asks", comment: "Agent prompt: kicker over an open question"),
+        question: q.question ?? "",
+        choices: (q.options ?? []).map { option in
+          AgentPromptChoice(id: option, title: option) { choose(option, replyTo: q.seq, step: q.step) }
+        },
+        freeText: RegistryPrompts.text["conversationOther"].map { prompt in
+          AgentPromptFreeText(buttonTitle: prompt.title, prompt: prompt) { text in
+            submitOther(text, replyTo: q.seq, step: q.step)
+          }
+        },
+        freeTextOpen: $showOther
+      )
       // Beta diagnostic: which model raised this question (hidden when off).
       if q.provider != nil {
         AIModelTagBadge(tag: AIModelTag(q.provider))
-      }
-
-      // Short choices flow as compact capsule chips; longer options stack as
-      // full-width wrapped rounded cards so text never clips off-screen.
-      let options = q.options ?? []
-      if options.contains(where: { $0.count > 22 }) {
-        VStack(alignment: .leading, spacing: 8) {
-          ForEach(options, id: \.self) { option in
-            Button { choose(option, replyTo: q.seq, step: q.step) } label: {
-              Text(option)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.roundedRectangle(radius: 12))
-            .tint(accent)
-          }
-          Button { a11yAnimate { showOther.toggle() } } label: { Text("Other…") }
-            .buttonStyle(.bordered).buttonBorderShape(.capsule)
-        }
-      } else {
-        FlowLayout(spacing: 8) {
-          ForEach(options, id: \.self) { option in
-            Button { choose(option, replyTo: q.seq, step: q.step) } label: {
-              Text(option)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            .buttonStyle(.bordered).buttonBorderShape(.capsule).tint(accent)
-          }
-          Button { a11yAnimate { showOther.toggle() } } label: { Text("Other…") }
-            .buttonStyle(.bordered).buttonBorderShape(.capsule)
-        }
-      }
-
-      if showOther {
-        HStack {
-          TextField("Type your answer", text: $otherText)
-            .textFieldStyle(.roundedBorder)
-            .onSubmit { submitOther(replyTo: q.seq, step: q.step) }
-          Button("Send") { submitOther(replyTo: q.seq, step: q.step) }
-            .buttonStyle(.borderedProminent)
-            .disabled(otherText.trimmingCharacters(in: .whitespaces).isEmpty)
-        }
       }
     }
   }
@@ -202,66 +163,57 @@ struct ConversationCard: View {
     }
   }
 
-  /// Agent finished and asked the human to verify (`needs_verify`, #87).
+  /// Agent finished and asked the human to verify (`needs_verify`, #87), as an
+  /// agent prompt: what to check in full, Accept, then Send back with a note.
   @ViewBuilder private var reviewBlock: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    if isTaskOpen {
+      AgentPromptCard(
+        kicker: convo.reviewKicker(now: DayClock.appNow),
+        question: reviewQuestion,
+        choices: [
+          AgentPromptChoice(id: "accept", title: RegistryActions.title("task.acceptReview"),
+                            isPrimary: true, action: acceptReview),
+        ],
+        freeText: RegistryPrompts.text["sendBackReview"].map { prompt in
+          AgentPromptFreeText(buttonTitle: RegistryActions.title("task.sendBackReview"),
+                              prompt: prompt, onSend: submitSendBack)
+        },
+        freeTextOpen: $showSendBack
+      )
+    } else {
       HStack(alignment: .top, spacing: 6) {
-        Image(systemName: isTaskOpen ? "eye" : "checkmark.seal.fill")
+        Image(systemName: "checkmark.seal.fill")
           .font(.septenaCaption)
-          .foregroundStyle(isTaskOpen ? Color.yellow : Color.green)
+          .foregroundStyle(Color.green)
+          .accessibilityHidden(true)
         VStack(alignment: .leading, spacing: 2) {
-          Text(isTaskOpen ? "Needs review" : "Accepted")
-            .font(.septenaLabel)
+          Text("Accepted").font(.septenaLabel)
           if let note = convo.endStateNote, !note.isEmpty {
-            // The review question shows in full, never truncated.
             Text(note).font(.septenaMeta).foregroundStyle(.secondary)
               .fixedSize(horizontal: false, vertical: true)
-          }
-        }
-      }
-      if isTaskOpen {
-        // Same order as the Review row: Send back, then Accept (primary last).
-        HStack(spacing: 8) {
-          Button("Send back") { a11yAnimate { showSendBack.toggle() } }
-            .buttonStyle(.bordered)
-            .controlSize(.taskAction)
-          Button(RegistryActions.title("task.acceptReview")) { acceptReview() }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.taskAction)
-        }
-        if showSendBack {
-          HStack(spacing: 6) {
-            TextField("What needs another pass?", text: $sendBackNote)
-              .textFieldStyle(.roundedBorder)
-              .onSubmit { submitSendBack() }
-            Button("Send") { submitSendBack() }
-              .buttonStyle(.borderedProminent)
-              .controlSize(.taskAction)
-              .disabled(sendBackNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
           }
         }
       }
     }
   }
 
+  private var reviewQuestion: String {
+    if let note = convo.endStateNote?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+      return note
+    }
+    return String(localized: "Ready for review", comment: "Review stage: fallback check note")
+  }
+
   @ViewBuilder private var followUpBlock: some View {
-    if showReply {
-      HStack(spacing: 6) {
-        TextField("Reply to thread", text: $replyText)
-          .textFieldStyle(.roundedBorder)
-          .onSubmit(submitReply)
-        Button("Send", action: submitReply)
-          .buttonStyle(.borderedProminent)
-          .controlSize(.taskAction)
-          .disabled(replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-      }
+    if showReply, let prompt = RegistryPrompts.text["conversationReply"] {
+      AgentReplyField(prompt: prompt, onSend: submitReply,
+                      onCancel: { a11yAnimate { showReply = false } })
     } else {
       Button { a11yAnimate { showReply = true } } label: {
-        Label("Reply…", systemImage: "arrowshape.turn.up.left")
-          .font(.septenaCaption)
+        Label(RegistryPrompts.text["conversationReply"]?.title ?? "", systemImage: "arrowshape.turn.up.left")
       }
-      .buttonStyle(.borderless)
-      .foregroundStyle(.secondary)
+      .buttonStyle(.bordered)
+      .controlSize(.taskAction)
     }
   }
 
@@ -394,16 +346,13 @@ struct ConversationCard: View {
     reload()
   }
 
-  private func submitSendBack() {
-    let text = sendBackNote.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !text.isEmpty else { return }
+  private func submitSendBack(_ text: String) {
     let mutator = SeptenaServices.shared.taskMutator
     let before = convo
     mutator.sendBackConvo(id: taskID, note: text)
     let after = mutator.conversation(id: taskID) ?? before
     TaskUndo.recordSendBack(id: taskID, before: before, after: after, mutator: mutator)
     Haptics.commit()
-    sendBackNote = ""
     showSendBack = false
     reload()
   }
@@ -412,20 +361,14 @@ struct ConversationCard: View {
     append(ConvoTurn(seq: 0, role: .user, step: step, chosen: label, inReplyTo: replyTo, ts: Date()))
   }
 
-  private func submitOther(replyTo: Int, step: ConvoTurn.Step) {
-    let text = otherText.trimmingCharacters(in: .whitespaces)
-    guard !text.isEmpty else { return }
+  private func submitOther(_ text: String, replyTo: Int, step: ConvoTurn.Step) {
     append(ConvoTurn(seq: 0, role: .user, step: step, otherText: text, inReplyTo: replyTo, ts: Date()))
-    otherText = ""
     showOther = false
   }
 
-  private func submitReply() {
-    let text = replyText.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !text.isEmpty else { return }
+  private func submitReply(_ text: String) {
     append(ConvoTurn(seq: 0, role: .user, step: .work, note: text, ts: Date()))
     Haptics.commit()
-    replyText = ""
     showReply = false
   }
 

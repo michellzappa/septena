@@ -26,7 +26,8 @@ instead.
 One **agent prompt** has four parts, top to bottom:
 
 1. **Kicker**: one small line, secondary ink. Who asks and when:
-   "Claude asks you to review · 2h ago" or "Claude asks". No icon.
+   "Review requested · 2h ago" or "Your agent asks". No icon. No agent name:
+   several agents can hand off.
 2. **Question**: the thing to answer, at body size or larger, primary ink,
    never truncated. For Review this is the agent's `endStateNote` (what to
    check). For an open question it is the turn's `question`.
@@ -46,8 +47,8 @@ The free-text copy comes from `registry/surfaces.json` `prompts.text`:
 
 | Use | Kicker | Question | Choices | Free text |
 | --- | --- | --- | --- | --- |
-| Review (`needs_verify`) | "Claude asks you to review · {ago}" | `endStateNote`, or "Ready for review" | Accept (primary) | `sendBackReview` ("Send back…") |
-| Open question | "Claude asks" | turn `question` | each option | `conversationOther` ("Other…") |
+| Review (`needs_verify`) | "Review requested · {ago}" | `endStateNote`, or "Ready for review" | Accept (primary) | `sendBackReview` ("Send back…") |
+| Open question | "Your agent asks" | turn `question` | each option | `conversationOther` ("Other…") |
 | Follow-up | none | none | none | `conversationReply` ("Reply…"), field only |
 
 Order is the same on every surface: **Accept first, Send back second**, on the

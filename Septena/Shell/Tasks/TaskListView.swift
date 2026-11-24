@@ -495,7 +495,6 @@ struct TaskListView: View {
   @State private var reminderTargetId: String?
   @State private var tagsTargetIds: [String] = []
   /// Review row whose Send Back… alert is open (row menu).
-  @State private var sendBackTargetId: String?
   @State private var starredOnlyFilter = false
   @State private var selectedTagIDs: Set<String> = []
   @State private var tagsByID: [String: TaskTag] = [:]
@@ -641,11 +640,6 @@ struct TaskListView: View {
         repeatTargetId: $repeatTargetId,
         reminderTargetId: $reminderTargetId,
         tagsTargetIds: $tagsTargetIds,
-        sendBackTargetId: $sendBackTargetId,
-        applySendBack: { id, note in
-          guard let task = currentTask(id: id) else { return }
-          sendBackReview(task, note: note)
-        },
         areas: areas,
         projects: projects,
         currentTask: currentTask,
@@ -2581,9 +2575,14 @@ struct TaskListView: View {
       ReviewTaskRow(
         task: task,
         isSelected: selection.contains(task.id),
+        listLabel: reviewListLabel(task),
         onOpen: { openPage(task) },
         onAccept: { acceptReview(task) },
-        onSendBack: { note in sendBackReview(task, note: note) }
+        onSendBack: {
+          // Send back needs a note: open the page with its field ready.
+          AgentPromptRequests.shared.sendBackTaskID = task.id
+          openPage(task)
+        }
       )
       .asListRow()
       .taskCardChrome(position, isSelected: selection.contains(task.id))
@@ -2602,14 +2601,16 @@ struct TaskListView: View {
     Task { await load() }
   }
 
-  /// Send a Review row back to the agent with a note (with undo).
-  private func sendBackReview(_ task: SeptenaTask, note: String) {
-    Haptics.commit()
-    let before = task.conversation
-    mutator.sendBackConvo(id: task.id, note: note)
-    let after = mutator.conversation(id: task.id) ?? before
-    TaskUndo.recordSendBack(id: task.id, before: before, after: after, mutator: mutator)
-    Task { await load() }
+  /// Where a Review task lives: "Area › Project", the area, or the Inbox.
+  private func reviewListLabel(_ task: SeptenaTask) -> String {
+    if let pid = task.project, let project = projects.first(where: { $0.id == pid }) {
+      if let aid = project.area, let area = areas.first(where: { $0.id == aid }) {
+        return "\(area.title) › \(project.title)"
+      }
+      return project.title
+    }
+    if let aid = task.area, let area = areas.first(where: { $0.id == aid }) { return area.title }
+    return TaskFilter.triage.title
   }
 
   /// Agent smart list (docs/TASK_FACTORY_SPEC.md §3): one section per
@@ -4262,7 +4263,11 @@ struct TaskListView: View {
         },
         onShare: { target in TaskSharePresenter.present(target.tasks) },
         onAcceptReview: { task in acceptReview(task) },
-        onSendBackReview: { task in sendBackTargetId = task.id }
+        onSendBackReview: { task in
+          // Send back needs a note: open the page with its field ready.
+          AgentPromptRequests.shared.sendBackTaskID = task.id
+          openPage(task)
+        }
       )
     }
   }
