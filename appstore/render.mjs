@@ -262,6 +262,9 @@ for (const device of activeDevices()) {
             if (!existsSync(file)) throw new Error(`${device.key}/${panel.id}: photo ${panel.photo.src} is missing`);
             return `data:image/png;base64,${readFileSync(file).toString("base64")}`;
           })(),
+          // The photo's aspect (height / width) from the PNG header, so a
+          // width-fitted photo knows where its bottom edge falls.
+          aspect: (() => { const b = readFileSync(join(ROOT, panel.photo.src)); return b.readUInt32BE(20) / b.readUInt32BE(16); })(),
         },
         // A small watch: its rows are the first task titles on the named scene's
         // screen (that screen's .elements.json), never typed by hand.
@@ -269,6 +272,7 @@ for (const device of activeDevices()) {
         card: panel.card && await (async (c) => c.icon ? { ...c, iconNode: await lucideNode(c.icon, `${device.key}/${panel.id}`) } : c)(resolveCard(device, panel)),
         // Claims with a Lucide symbol each (the icon set the app's registry maps
         // to), drawn from the site's lucide-react package.
+        badges: panel.badges && await Promise.all(panel.badges.map(async (b) => ({ ...b, node: await lucideNode(b.icon, `${device.key}/${panel.id}`) }))),
         claims: panel.claims && await Promise.all(panel.claims.map(async (c) => {
           return { ...c, node: await lucideNode(c.icon, `${device.key}/${panel.id}`) };
         })),

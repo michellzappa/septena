@@ -218,6 +218,18 @@ function linkedEdge(tint) {
     : "box-shadow:0 50px 100px rgb(0 0 0 / .28);";
 }
 
+// ------------------------------------------------------------------ badges
+// A row of device symbols with their names at the foot of a panel (the
+// devices panel): which devices Septena runs on.
+function badges(list) {
+  if (!list?.length) return "";
+  const ui = String(theme.fonts.ui).replace(/"/g, "'");
+  const svg = (node) => `<svg width="104" height="104" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${node.map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).filter(([a]) => a !== "key").map(([a, v]) => `${a}="${esc(String(v))}"`).join(" ")}/>`).join("")}</svg>`;
+  return `<div style="position:absolute; z-index:6; left:0; right:0; bottom:${list.bottom ?? 170}px; display:flex; justify-content:center; gap:96px;">
+    ${list.map((b) => `<div style="display:flex; flex-direction:column; align-items:center; gap:22px; opacity:.9;">${svg(b.node)}<span style="font:500 38px/1 ${ui}; color:#fff; letter-spacing:.01em;">${esc(b.label)}</span></div>`).join("")}
+  </div>`;
+}
+
 // ------------------------------------------------------------------ claims
 // A grid of short claims, each with a symbol, for a panel that states facts
 // instead of showing a screen (the "open" panel). Two columns of white tiles.
@@ -606,7 +618,14 @@ function portrait(panel, device, tint) {
     .shot-zone { position:absolute; left:0; right:0; display:flex; justify-content:center; }
     .founder { position:absolute; left:50%; top:46%; transform:translateX(-50%); width:1020px; }
   </style>
-  ${panel.photo ? `<div class="photo" style="position:absolute; inset:0; background:url(${panel.photo.img}) ${panel.photo.focus ?? "50% 40%"}/auto ${Math.round((panel.photo.zoom ?? 1.15) * 100)}% no-repeat;"></div>
+  ${panel.photo?.fit === "width" ? (() => {
+    // Full panel width, top at offsetY; its bottom edge fades into the fill.
+    const top = panel.photo.offsetY ?? 0, h = Math.round(device.designWidth * panel.photo.aspect), fade = panel.photo.bottomFade ?? 420;
+    return `<div class="photo" style="position:absolute; left:0; right:0; top:${top}px; height:${h}px; background:url(${panel.photo.img}) 0 0/100% 100% no-repeat;"></div>
+  <div style="position:absolute; left:0; right:0; top:${top + h - fade}px; height:${fade + 2}px; background:linear-gradient(to bottom, rgb(11 11 12 / 0), rgb(11 11 12 / 1));"></div>`;
+  })() : ""}
+  ${panel.photo && panel.photo.fit !== "width" ? `<div class="photo" style="position:absolute; inset:0; background:url(${panel.photo.img}) ${panel.photo.focus ?? "50% 40%"}/auto ${Math.round((panel.photo.zoom ?? 1.15) * 100)}% no-repeat;"></div>` : ""}
+  ${panel.photo ? `
   <div style="position:absolute; inset:0; background:linear-gradient(to bottom, rgb(11 11 12 / ${panel.photo.shade ?? 0.9}) 0, rgb(11 11 12 / 0) ${panel.photo.fade ?? 1100}px, rgb(11 11 12 / 0) calc(100% - ${panel.photo.fade ?? 1100}px), rgb(11 11 12 / ${panel.photo.shade ?? 0.9}) 100%);"></div>` : ""}
   ${(panel.shots ?? []).map((s) => shot(s, device, tint)).join("")}
   ${shot(panel.shot, device, tint)}
@@ -614,6 +633,7 @@ function portrait(panel, device, tint) {
   ${chat(panel.chat)}
   ${card(panel.card)}
   ${claims(panel.claims, tint)}
+  ${badges(panel.badges)}
   ${chips(panel.chips)}
   ${founder(panel.founder)}
   ${overlays(panel.overlays)}

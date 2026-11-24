@@ -47,7 +47,16 @@ const VISUAL = {
   // Every device: a render of the Mac, iPad, iPhone and Apple Watch on a desk
   // (mz, 2026-11-24, tools/3d-studio iso_vertical_4dev). Its dark top holds the title.
   // The focus keeps the iPhone whole at the right edge; the Mac runs off the left.
-  devices:        { photo: { src: "art/photo-devices.png", zoom: 1, focus: "92% 100%", shade: 0.55, fade: 700 }, background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" } },
+  // The render at the panel's full width, from the top; under it, on the
+  // dark fill, the four devices by symbol and name (mz, 2026-11-24).
+  devices:        {
+    photo: { src: "art/photo-devices.png", fit: "width", offsetY: 90, bottomFade: 460, shade: 0.55, fade: 700 },
+    background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" },
+    badges: [
+      { icon: "smartphone", label: "iPhone" }, { icon: "tablet", label: "iPad" },
+      { icon: "laptop", label: "Mac" }, { icon: "watch", label: "Apple Watch" },
+    ],
+  },
   // Slides 3 and 4 in one (mz, 2026-11-24): the task page (ADR 0029). The
   // Discuss card holds both moments: the question you answered with a tap,
   // and the agent at work with Stop.
@@ -178,6 +187,7 @@ const iphone = rows.map((row, i) => {
     },
     shots: v.shots,
     claims: v.claims,
+    badges: v.badges,
     // The watch title in the fruit's dark-appearance colour (a watch face is dark).
     watch: v.watch && { ...v.watch, accent: tokens.fruitAccents.find((f) => f.id === v.watch.accentFruit)?.dark ?? (() => { throw new Error(`panels.septask.mjs: watch fruit ${v.watch.accentFruit} is not in registry/tokens.json`); })() },
     // Cards, chat and rings take the panel's fruit accent (registry), never a hand-typed hex.
