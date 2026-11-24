@@ -8,9 +8,9 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 48 | 49 | 49 | 0 | 23 | 0 | 1 |
+| ships | 48 | 49 | 49 | 0 | 25 | 0 | 1 |
 | partial | 1 | 1 | 1 | 0 | 1 | 0 | 3 |
-| planned | 0 | 0 | 0 | 46 | 24 | 49 | 1 |
+| planned | 0 | 0 | 0 | 46 | 22 | 49 | 1 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 48 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
@@ -32,8 +32,8 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `task.when-deadline` | When and Deadline as separate dates | ships | ships | ships | planned | ships | planned | - |
 | `task.repeat` | Repeat from schedule or after completion, pause | ships | ships | ships | planned | ships | planned | - |
 | `task.notes` | Notes | ships | ships | ships | planned | ships | planned | - |
-| `task.attachments` | Attachments | ships | ships | ships | planned | planned | planned | - |
-| `task.history` | Per-task change history | ships | ships | ships | planned | planned | planned | - |
+| `task.attachments` | Attachments | ships | ships | ships | planned | ships | planned | - |
+| `task.history` | Per-task change history | ships | ships | ships | planned | ships | planned | - |
 | `task.provenance` | Who added a task: you or a named agent, on the row and the task page | ships | ships | ships | planned | ships | planned | - |
 | `task.aging` | Aging fade across open lists | ships | ships | ships | planned | planned | planned | - |
 | `task.checklists` | Checklists inside a task | ships | ships | ships | planned | ships | planned | - |
