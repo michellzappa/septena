@@ -15,7 +15,7 @@ import {
 } from "../rpc.js";
 import { TURN_FIELDS } from "../generated/registries.js";
 import { zId } from "../store/columns.js";
-import type { Row } from "../store/TaskStore.js";
+import type { Row, TaskLinkRow } from "../store/TaskStore.js";
 import { isValidTz, todayYMD } from "../tz.js";
 import { TASK_TOOLS } from "../tools/taskTools.js";
 import {
@@ -30,13 +30,11 @@ import {
   type PlanState,
 } from "../entitlement/entitlement.js";
 import {
-  type ConvoLinkSource,
   type ConvoTurn,
   type TaskConvo,
   type TaskOut,
   annotate,
-  parseIssueLink,
-  withConvoLink,
+  withTaskLinks,
   notesRev,
   searchMatch,
   awaitsReasoning,
@@ -47,6 +45,7 @@ import {
 } from "../tools/taskShared.js";
 import { MCP_CLIENT_PREFIX, MCP_READ_SCOPE, MCP_WRITE_SCOPE, hasScope, verifyMcpAccess, type McpGrant } from "./tokens.js";
 import { getClient } from "../storage.js";
+import { MAX_REF_INPUT, findByRef, refsOut } from "./refs.js";
 import { type StoreRpc, type WriteToolName, WRITE_TOOL_NAMES, mcpActorFor, rpcStoreFor, runWriteTool, zWriteArgs } from "./writes.js";
 import { AGENT_TOOLS, type AgentToolName, agentStage, runAgentTool, zAgentArgs } from "./agent.js";
 import { NOTES_READ_TOOLS, NOTES_TOOLS, type NotesToolName, notesForTask, runNotesTool, zNotesArgs } from "./notes.js";
@@ -73,7 +72,8 @@ const INSTRUCTIONS =
   "task conversations in the Septena task backend, and create, change and complete " +
   "tasks and their conversations. It is the same data the user's Septena app shows, " +
   "and changes reach the app within seconds.\n\n" +
-  "Before you create a task, call tasks_search to check that it does not exist yet.\n\n" +
+  "Before you create a task, call tasks_search to check that it does not exist yet. When the task comes from an " +
+  "email, an issue or a web page, call tasks_find_by_ref with its link first, and pass the link in `refs`.\n\n" +
   "Septena sets no limit on parallel calls. Some agent hosts refuse calls beyond their own limit (for example " +
   "\"too many calls already running\"): create many tasks one after another or in small groups, and call " +
   "tasks_search before you retry a refused create, so it does not land twice.\n\n" +
@@ -157,6 +157,7 @@ const zArgs = {
     status: z.enum(["open", "completed", "all"]).optional(),
     limit: zLimit(100).optional(),
   }),
+  tasks_find_by_ref: z.object({ key: z.string().min(1).max(MAX_REF_INPUT), limit: zLimit(200).optional() }),
   tasks_pending_reasoning: z.object({ limit: zLimit(500).optional() }),
 };
 type ReadToolName = keyof typeof zArgs;
@@ -331,9 +332,12 @@ async function callTool(
       const r = await store.readTask(a.id as string);
       if (!r || r.task.kind === "heading") throw new Error(`Task not found: ${a.id}`);
       const tagMap = tagNameMap(await store.readTags());
-      const t = annotate(withConvoLink(taskOut(r.task, tagMap), convoLinkSource(convoOut(r.convo, r.turns))),
-        todayYMD(timeZone), Date.now());
-      const checklistRows = await store.readChecklistItems(t.id);
+      const t = annotate(taskOut(r.task, tagMap), todayYMD(timeZone), Date.now());
+      const [checklistRows, refRows, backlinks] = await Promise.all([
+        store.readChecklistItems(t.id),
+        store.readTaskRefs(t.id),
+        store.findByRef(`task:${t.id}`, 50),
+      ]);
       const checklist = checklistRows.map((c) => ({
         id: c.id as string,
         title: str(c.title) ?? "",
@@ -352,6 +356,10 @@ async function callTool(
         deadline: t.deadline, area: t.area, project: t.project,
         completedAt: t.completedAt, source: t.source, notes: t.notes, notesRev: notesRev(t.notes),
         ...(checklist.length > 0 ? { checklist } : {}),
+        ...(refRows.length > 0 ? { refs: refsOut(refRows) } : {}),
+        ...(backlinks.tasks.length > 0
+          ? { backlinks: backlinks.tasks.map(({ id: taskId, title, status }) => ({ id: taskId, title, status })) }
+          : {}),
         inbox: t.inbox, daysOnToday: t.daysOnToday,
         // Fade fields, read-only (the app is the only writer).
         ...(str(r.task.touchedAt) ? { touchedAt: str(r.task.touchedAt) } : {}),
@@ -425,6 +433,9 @@ async function callTool(
       };
       break;
     }
+    case "tasks_find_by_ref":
+      result = await findByRef(store, a.key as string, a.limit as number | undefined);
+      break;
     case "tasks_pending_reasoning": {
       const limit = (a.limit as number | undefined) ?? 50;
       // Paused: the queue reads as empty, and says why.
@@ -511,13 +522,13 @@ export async function listTasks(
   const [counts, tagRows, links] = await Promise.all([
     store.readChecklistCounts(),
     store.readTags(),
-    convoLinkMap(store),
+    taskLinkMap(store),
   ]);
   const tagMap = tagNameMap(tagRows);
-  // Checklist counts, then the conversation's `issue` and `endState`.
+  // Checklist counts, then the references, `issue` and `endState`.
   const withChecklist = (t: TaskOut): TaskOut => {
     const c = counts[t.id];
-    const out = withConvoLink(t, links.get(t.id));
+    const out = withTaskLinks(t, links.get(t.id));
     if (!c || c.total <= 0) return out;
     return { ...out, checklistCount: c.total, checklistDoneCount: c.done };
   };
@@ -600,7 +611,7 @@ interface SearchArgs { query: string; area?: string; project?: string; status?: 
 export async function searchTasks(store: StoreRpc, timeZone: string, a: SearchArgs) {
   const status = a.status ?? "open";
   const limit = a.limit ?? 20;
-  const [tagRows, links] = await Promise.all([store.readTags(), convoLinkMap(store)]);
+  const [tagRows, links] = await Promise.all([store.readTags(), taskLinkMap(store)]);
   const tagMap = tagNameMap(tagRows);
   const rows: Row[] = [];
   if (status !== "completed") rows.push(...(await store.readTasks("open", 500)).rows);
@@ -610,7 +621,7 @@ export async function searchTasks(store: StoreRpc, timeZone: string, a: SearchAr
   const today = todayYMD(timeZone);
   const nowMs = Date.now();
   const hits = rows
-    .map((row) => withConvoLink(taskOut(row, tagMap), links.get(row.id as string)))
+    .map((row) => withTaskLinks(taskOut(row, tagMap), links.get(row.id as string)))
     .filter((t) => same(t.area, a.area) && same(t.project, a.project))
     .map((t, i) => ({ t, i, m: searchMatch(t, a.query) }))
     .filter((x): x is { t: TaskOut; i: number; m: NonNullable<ReturnType<typeof searchMatch>> } => x.m !== null)
@@ -675,23 +686,9 @@ function taskOut(r: Row, tagMap?: Map<string, string>): TaskOut {
   };
 }
 
-/// Task id → the conversation text `withConvoLink` reads, for list rows.
-async function convoLinkMap(store: StoreRpc): Promise<Map<string, ConvoLinkSource>> {
-  return new Map((await store.readConvoLinks()).map((r) => [r.id, r]));
-}
-
-/// The same source from a whole conversation (`tasks_get`): the newest
-/// provider turn that names a link stands in for `readConvoLinks`' turnText.
-function convoLinkSource(c: TaskConvo): ConvoLinkSource {
-  const turn = [...c.thread].reverse().find((t) =>
-    t.role === "provider" && (parseIssueLink(t.note) !== undefined || parseIssueLink(t.question) !== undefined));
-  return {
-    endState: c.endState,
-    endStateNote: c.endStateNote,
-    artifact: c.artifact,
-    handoffPayload: c.handoff?.payload,
-    turnText: turn ? `${turn.note ?? ""} ${turn.question ?? ""}` : null,
-  };
+/// Task id → what `withTaskLinks` reads, for list rows.
+async function taskLinkMap(store: StoreRpc): Promise<Map<string, TaskLinkRow>> {
+  return new Map((await store.readTaskLinks()).map((r) => [r.id, r]));
 }
 
 /// A convo row plus its turns, in the live TaskConvo shape (absent fields

@@ -57,18 +57,18 @@ const zAttachmentPointer = z.record(z.unknown()).refine(
 // What a reference shows when its target is gone or cannot be opened here
 // (docs/TASK_REFERENCES_SPEC.md §4.1). No body, no excerpt. The cap counts
 // the bytes of the stored JSON.
-export const zRefSnapshot = z.object({
+export const zRefSnapshotFields = z.object({
   title: z.string(),
   subtitle: z.string(),
   date: z.string(),
   url: z.string().regex(/^https?:\/\/\S+$/i, "expected an http or https URL"),
   rawId: z.string(),
   account: z.string(),
-}).partial().strict().refine(
-  (v) => new TextEncoder().encode(JSON.stringify(v)).length <= ENTITY_LIMITS.refSnapshotMax,
-  "snapshot too large",
-);
-export type RefSnapshot = z.infer<typeof zRefSnapshot>;
+}).partial().strict();
+export type RefSnapshot = z.infer<typeof zRefSnapshotFields>;
+export const snapshotFits = (v: RefSnapshot) =>
+  new TextEncoder().encode(JSON.stringify(v)).length <= ENTITY_LIMITS.refSnapshotMax;
+export const zRefSnapshot = zRefSnapshotFields.refine(snapshotFits, "snapshot too large");
 
 // Synced app settings (Septask), one row per key in the `settings` table:
 // `id` = the key, `value` = its JSON value (null = not set). Only these keys

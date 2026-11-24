@@ -87,7 +87,7 @@ const byName = new Map(allTools.map((t) => [t.name, t]));
 
 test("every api.septena.app tool has unique name, title, and explicit MCP ToolAnnotations", () => {
   assert.equal(byName.size, allTools.length, "duplicate tool names detected");
-  assert.equal(taskTools.length, 23, `expected 23 task tools, got ${taskTools.length}`);
+  assert.equal(taskTools.length, 24, `expected 24 task tools, got ${taskTools.length}`);
   assert.equal(agentTools.length, 5, "expected 5 agent tools");
   assert.equal(notesTools.length, 7, "expected 7 project notes tools (docs/PROJECT_NOTES_SPEC.md §5)");
 
@@ -126,6 +126,7 @@ test("api.septena.app connector tools match issue #85 read-only and destructive 
     "tasks_list_projects",
     "tasks_list_tags",
     "tasks_search",
+    "tasks_find_by_ref",
     "tasks_orientation",
     "tasks_pending_reasoning",
     "tasks_project_get",
