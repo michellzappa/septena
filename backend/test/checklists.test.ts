@@ -1,9 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createTestTaskStore, installWorkerTestHooks } from "./taskStoreHarness.ts";
-import { checklistOccurrenceID } from "../src/recurrence.ts";
-
 installWorkerTestHooks();
+
+// Dynamic: recurrence.ts imports the core bridge as ./core/index.js, which
+// resolves only after the hooks above are installed.
+const { checklistOccurrenceID } = await import("../src/recurrence.ts");
 
 const HUMAN_ACTOR = "app:mac-test";
 const AGENT_ACTOR = "mcp:claude";

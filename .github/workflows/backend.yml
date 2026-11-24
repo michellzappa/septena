@@ -1,0 +1,59 @@
+name: Backend
+
+# The task backend and MCP connector (backend/, Cloudflare Worker). Type
+# check and tests on every change that can affect it (F1, #342,
+# docs/ENGINEERING_PLAN.md). The core's WASM package and the conformance
+# vectors live outside backend/, so their paths count too.
+
+on:
+  push:
+    branches: [main, "wt/**"]
+    paths:
+      - "backend/**"
+      - "registry/**"
+      - "scripts/gen-registries.mjs"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "registry/**"
+      - "scripts/gen-registries.mjs"
+      - ".github/workflows/backend.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Backend type check and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm run typecheck
+
+      - name: Tests
+        run: pnpm test
