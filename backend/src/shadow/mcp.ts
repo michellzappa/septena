@@ -251,9 +251,11 @@ async function callTool(
     if (!args.success) return invalidArgs(id, args.error, era);
     const refused = await gateConnectorWrite(env, grant.userId, "mcp_write");
     if (refused) return rpcResult(id, { isError: true, content: [{ type: "text", text: refused }] }, era);
-    // The connection's registered client name is the author a created task
-    // names ("Added by Claude Code"). One KV read per write call.
-    const agentName = (await getClient(env, grant.clientId, MCP_CLIENT_PREFIX))?.name;
+    // The agent's name is the author a created task names ("Added by
+    // Claude Code") and the history actor: the name the user gave it, else
+    // the client's registered name. One store read per write call.
+    const agentName = (grant.familyId ? await store.connectionName(grant.familyId) : null)
+      ?? (await getClient(env, grant.clientId, MCP_CLIENT_PREFIX))?.name;
     const result = await runWriteTool(
       { store, timeZone, agentName, actor: mcpActorFor(agentName) },
       name as WriteToolName,

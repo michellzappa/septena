@@ -17,6 +17,12 @@ struct SeptaskApproveSignInFlow: View {
   @Environment(\.dismiss) private var dismiss
   @State private var code = ""
   @State private var step: Step = .enter
+  /// Connector codes: the name the user gives the agent, and the agent it
+  /// replaces (a connection id; nil = a new agent).
+  @State private var agentName = ""
+  @State private var replaces: String?
+  private static let namePrompt = RegistryPrompts.text["nameAgent"]
+  private static let replacesPrompt = RegistryPrompts.fixed["agentReplaces"]
 
   private enum Step: Equatable {
     case enter
@@ -90,6 +96,9 @@ struct SeptaskApproveSignInFlow: View {
       } footer: {
         Text("Only approve a code you started yourself. Septena never asks for a code by email, text or phone call.")
       }
+      if request.kind == .connector {
+        agentSection(approving: approving)
+      }
       Section {
         if approving {
           HStack(spacing: 10) {
@@ -129,6 +138,34 @@ struct SeptaskApproveSignInFlow: View {
     }
   }
 
+  /// The agent's name, and the agent it replaces. Devices and agents are
+  /// separate lists; only an agent gets a name here.
+  @ViewBuilder
+  private func agentSection(approving: Bool) -> some View {
+    Section {
+      TextField(Self.namePrompt?.placeholder ?? "", text: $agentName)
+        .disabled(approving)
+      let agents = AgentRoster.shared.agents
+      if !agents.isEmpty {
+        Picker(selection: $replaces) {
+          Text(Self.replacesPrompt?.options.first?.title ?? "").tag(String?.none)
+          ForEach(agents) { agent in
+            Text(agent.displayName).tag(String?.some(agent.id))
+          }
+        } label: {
+          Text(Self.replacesPrompt?.title ?? "")
+        }
+        .disabled(approving)
+      }
+    } header: {
+      Text(Self.namePrompt?.title ?? "")
+    } footer: {
+      if !AgentRoster.shared.agents.isEmpty, let message = Self.replacesPrompt?.message {
+        Text(message)
+      }
+    }
+  }
+
   // MARK: - Actions
 
   private func check() async {
@@ -137,6 +174,11 @@ struct SeptaskApproveSignInFlow: View {
     do {
       let request = try await TaskBackendClient.shared.inspectPairing(code: normalized)
       code = normalized
+      if request.kind == .connector {
+        agentName = request.client
+        replaces = nil
+        await AgentRoster.shared.refresh()
+      }
       step = .confirm(request, approving: false)
     } catch {
       step = .failed(Self.message(for: error))
@@ -146,8 +188,16 @@ struct SeptaskApproveSignInFlow: View {
   private func approve(_ request: BackendPairingRequest) async {
     step = .confirm(request, approving: true)
     do {
-      try await TaskBackendClient.shared.approvePairing(code: code, kind: request.kind)
-      if request.kind == .connector { TaskNotices.completeStep(.connectAI) }
+      try await TaskBackendClient.shared.approvePairing(
+        code: code,
+        kind: request.kind,
+        agentName: request.kind == .connector ? agentName : nil,
+        replaces: request.kind == .connector ? replaces : nil
+      )
+      if request.kind == .connector {
+        TaskNotices.completeStep(.connectAI)
+        await AgentRoster.shared.refresh()
+      }
       step = .done(request)
       onApproved?(request.kind)
     } catch {

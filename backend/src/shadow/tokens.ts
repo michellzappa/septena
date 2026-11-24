@@ -2,6 +2,7 @@ import type { Env } from "../env.js";
 import { logEvent, randomId, sha256Base64Url } from "../util.js";
 import { getClient } from "../storage.js";
 import { storeFor } from "../api/session.js";
+import { planFor } from "../entitlement/entitlement.js";
 
 // OAuth tokens for the task connector on api.septena.app.
 //
@@ -43,6 +44,11 @@ export interface McpGrant {
   scope: string;
   /// IANA zone the app sent at pairing; decides what "today" means.
   timeZone?: string;
+  /// The token family: one connected agent. Set by `verifyMcpAccess`.
+  familyId?: string;
+  /// The name the user gave the agent at pairing. Only the first issue of a
+  /// family carries it; the store keeps it through refresh rotation.
+  label?: string;
 }
 
 interface AccessRecord extends McpGrant {
@@ -88,7 +94,7 @@ export async function issueMcpTokens(env: Env, grant: McpGrant, familyId = rando
     env.TOKENS.put(rKey, JSON.stringify(refreshRec), { expirationTtl: REFRESH_TTL_S }),
     env.TOKENS.put(familyKey(familyId), JSON.stringify(fam), { expirationTtl: REFRESH_TTL_S }),
   ]);
-  await noteConnection(env, base, familyId);
+  await noteConnection(env, { ...base, label: grant.label }, familyId);
   return { access_token: access, refresh_token: refresh, token_type: "Bearer", expires_in: ACCESS_TTL_S, scope: grant.scope };
 }
 
@@ -101,21 +107,52 @@ export async function verifyMcpAccess(env: Env, raw: string): Promise<McpGrant |
   try {
     const a = JSON.parse(rec) as AccessRecord;
     if (typeof a.userId !== "string" || Date.now() > a.expiresAt) return null;
-    return { userId: a.userId, clientId: a.clientId, scope: a.scope, timeZone: a.timeZone };
+    return { userId: a.userId, clientId: a.clientId, scope: a.scope, timeZone: a.timeZone, familyId: a.familyId };
   } catch {
     return null;
   }
 }
 
-/// Lists the family in Settings > Devices & Access. The index never blocks a
-/// token: a failure here only logs.
+/// Lists the family in Settings > AI & Agents > Agents. The index never
+/// blocks a token: a failure here only logs.
 async function noteConnection(env: Env, grant: McpGrant, familyId: string): Promise<void> {
   try {
     const client = await getClient(env, grant.clientId, MCP_CLIENT_PREFIX);
     const name = client?.name?.trim().slice(0, 60) || "Claude";
-    await storeFor(env, grant.userId).recordConnection(familyId, grant.clientId, name, grant.scope);
+    const label = grant.label?.trim().slice(0, AGENT_NAME_MAX) || null;
+    await storeFor(env, grant.userId).recordConnection(familyId, grant.clientId, name, grant.scope, Date.now(), label);
   } catch (e) {
     logEvent("mcp_connection_index_failed", { error: String(e) });
+  }
+}
+
+/// Longest agent name the user can give (pairing and Settings rename).
+export const AGENT_NAME_MAX = 40;
+
+/// After a new agent pairs (an authorization-code exchange, not a refresh):
+/// the client's older families and the agent the user said it replaces stop
+/// working, so one agent is one row. Then the agent count is checked against
+/// the plan's `connectedAgents` limit. That check only logs: it never blocks
+/// a pairing. Never throws: the tokens are already issued.
+export async function settleNewAgent(
+  env: Env,
+  grant: { userId: string; clientId: string; familyId: string; replaces?: string },
+): Promise<void> {
+  try {
+    const store = storeFor(env, grant.userId);
+    const old = await store.otherFamiliesOfClient(grant.clientId, grant.familyId);
+    const targets = new Set(old);
+    if (grant.replaces && grant.replaces !== grant.familyId) targets.add(grant.replaces);
+    for (const familyId of targets) await disconnectFamily(env, grant.userId, familyId);
+    if (targets.size) logEvent("mcp_agent_replaced", { replaced: targets.size });
+
+    const count = await store.connectedAgentCount();
+    const limit = (await planFor(env, grant.userId)).limits.connectedAgents;
+    if (limit !== null && count > limit) {
+      logEvent("agent_limit_over", { userId: grant.userId, count, limit, enforced: false });
+    }
+  } catch (e) {
+    logEvent("mcp_agent_settle_failed", { error: String(e) });
   }
 }
 

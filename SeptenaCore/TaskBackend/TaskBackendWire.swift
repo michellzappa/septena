@@ -197,7 +197,7 @@ struct BackendErrorBody: Decodable, Sendable {
   let issues: [Issue]?
 }
 
-// MARK: - Devices & Access
+// MARK: - Devices and agents
 
 /// Wire shape of `GET /v1/access` (backend/src/store/TaskStore.ts
 /// `AccessSummary`). Times are ms since 1970.
@@ -213,14 +213,31 @@ struct BackendAccess: Decodable, Sendable, Equatable {
     let syncing: Bool
     var id: String { sid }
   }
+  /// One agent: an MCP connection (one token family), such as Claude or
+  /// Claude Code on one machine.
   struct Connection: Decodable, Sendable, Equatable, Identifiable {
     let id: String
+    /// The name the user gave the agent, else `clientName`. Optional so an
+    /// older server answer still decodes.
+    let name: String?
     /// The name the app registered with (Claude, ChatGPT, …).
     let clientName: String
     let scope: String
     let createdAt: Double
     let lastUsed: Double
+    /// What every surface shows for this agent.
+    var displayName: String { name ?? clientName }
+  }
+  /// The agent count and the plan's `connectedAgents` limit (nil = no cap).
+  /// The server only logs past the limit. Optional for an older server.
+  struct AgentCount: Decodable, Sendable, Equatable {
+    let count: Int
+    let limit: Int?
   }
   let devices: [Device]
+  /// The agents. The wire keeps the name `connections`.
   let connections: [Connection]
+  let agents: AgentCount?
+  /// The agent count: the server's, else the list length.
+  var agentCount: Int { agents?.count ?? connections.count }
 }

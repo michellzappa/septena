@@ -78,6 +78,7 @@
     "settings.tasks": { "sfSymbol": "checklist", "material": "checklist", "lucide": "list-todo" },
     "task.added_by_agent": { "sfSymbol": "text.bubble.badge.sparkles", "material": "chat", "lucide": "message-square-text" },
     "settings.ai_agents": { "sfSymbol": "cpu", "material": "memory", "lucide": "cpu" },
+    "settings.agents": { "sfSymbol": "person.2", "material": "group", "lucide": "users" },
     "settings.claude": { "sfSymbol": "bubble.left.and.text.bubble.right", "material": "smart_toy", "lucide": "bot" },
     "settings.connections_ai": { "sfSymbol": "brain.head.profile", "material": "psychology", "lucide": "brain" },
     "settings.connections": { "sfSymbol": "link", "material": "link", "lucide": "link" },

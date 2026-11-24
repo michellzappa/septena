@@ -5,6 +5,34 @@
       "comment" : "Generated from registry plans.outcomes.agents.rows.links.cells.account. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "%@ can no longer read or change your tasks. To use it again, connect it again." : {
+      "comment" : "Generated from registry surfaces.prompts.items.disconnectAgent.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "%lld agents" : {
+      "comment" : "Generated from registry surfaces.prompts.countPhrases.agents.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "1 agent"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld agents"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "€5 a month. You save €24 against paying monthly." : {
       "comment" : "Generated from registry plans.prices.annual.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -2033,6 +2061,10 @@
       "comment" : "Generated from registry destinations.destinations.agent.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Agent name" : {
+      "comment" : "Generated from registry surfaces.prompts.text.renameAgent.placeholder. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Agent runs" : {
       "comment" : "Generated from registry plans.outcomes.agents.rows.runs.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -2052,6 +2084,10 @@
           }
         }
       }
+    },
+    "Agents" : {
+      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Aging starts the day after a task lands on Today and deepens over a week — a quiet signal that you keep deferring it. Resets when you move it off Today or check it off. A flat Today list keeps the same area and project order, under a single divider, with each task's list shown as a subtitle instead of a heading." : {
 
@@ -2112,7 +2148,7 @@
       }
     },
     "AI Preferences" : {
-      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -2215,6 +2251,10 @@
           }
         }
       }
+    },
+    "An agent below" : {
+      "comment" : "Generated from registry surfaces.prompts.items.agentReplaces.options.agent.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "An exercise with this ID already exists." : {
       "localizations" : {
@@ -2380,6 +2420,10 @@
     },
     "Apple Watch through the server" : {
       "comment" : "Generated from registry plans.outcomes.everywhere.rows.watch.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Approve" : {
+      "comment" : "Generated from registry surfaces.prompts.text.nameAgent.confirmTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Archiving hides a medication from new dose logs but keeps its dose history and exports intact." : {
@@ -3636,6 +3680,10 @@
     "Connected" : {
 
     },
+    "Connected agents" : {
+      "comment" : "Generated from registry settings.pages.agents.sections.agents.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Connected apps" : {
       "comment" : "Generated from registry settings.pages.devices_access.sections.connections.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -4456,7 +4504,7 @@
 
     },
     "Devices" : {
-      "comment" : "Generated from registry settings.pages.devices_access.sections.devices.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.devices_access.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Devices & Access" : {
@@ -4528,6 +4576,14 @@
           }
         }
       }
+    },
+    "Disconnect" : {
+      "comment" : "Generated from registry surfaces.prompts.items.disconnectAgent.confirmTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Disconnect %@?" : {
+      "comment" : "Generated from registry surfaces.prompts.items.disconnectAgent.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Discouraged" : {
       "localizations" : {
@@ -4713,6 +4769,10 @@
           }
         }
       }
+    },
+    "Each agent you connected to your tasks, with the name you gave it. An agent counts while it was used in the last 30 days. Your phones, tablets and computers are under Account, Devices." : {
+      "comment" : "Generated from registry settings.pages.agents.sections.agents.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Each app keeps its own welcome, view preferences, and window setup, so you can use either one without rearranging the other." : {
 
@@ -6167,6 +6227,10 @@
           }
         }
       }
+    },
+    "If this agent takes the place of one you connected before, pick it. That agent stops working." : {
+      "comment" : "Generated from registry surfaces.prompts.items.agentReplaces.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "If you skip this, your tasks stay on this device until you sign in." : {
       "comment" : "Generated from registry surfaces.firstRun.steps.account.footnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -7821,6 +7885,10 @@
     "Name matches" : {
 
     },
+    "Name this agent" : {
+      "comment" : "Generated from registry surfaces.prompts.text.nameAgent.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Needs Apple Intelligence" : {
 
     },
@@ -8706,6 +8774,10 @@
         }
       }
     },
+    "Nothing, a new agent" : {
+      "comment" : "Generated from registry surfaces.prompts.items.agentReplaces.options.none.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Notice how your mood shifts through the day" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9193,7 +9265,7 @@
       }
     },
     "Pause all agents" : {
-      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -10012,6 +10084,10 @@
         }
       }
     },
+    "Rename Agent" : {
+      "comment" : "Generated from registry surfaces.prompts.text.renameAgent.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Rename Area" : {
       "comment" : "SeptaskKit localization pass 2026-08-09",
       "localizations" : {
@@ -10133,6 +10209,10 @@
           }
         }
       }
+    },
+    "Replaces" : {
+      "comment" : "Generated from registry surfaces.prompts.items.agentReplaces.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Reply to thread" : {
       "comment" : "Generated from registry surfaces.prompts.text.conversationReply.placeholder. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -13727,7 +13807,7 @@
 
     },
     "While paused, no agent can start or work on a task." : {
-      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.1.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.2.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {

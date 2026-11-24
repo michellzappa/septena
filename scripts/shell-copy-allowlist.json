@@ -964,17 +964,7 @@
     },
     {
       "file": "Septask/SeptaskDevicesAccessPane.swift",
-      "literal": "Disconnect",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskDevicesAccessPane.swift",
       "literal": "No devices",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskDevicesAccessPane.swift",
-      "literal": "No connected apps",
       "reasonId": "predates-rule"
     },
     {

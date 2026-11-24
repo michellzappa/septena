@@ -7,7 +7,7 @@ import { isValidTz } from "../tz.js";
 import { registerClient } from "../oauth/register.js";
 import { validateRedirectUri } from "../oauth/redirects.js";
 import { storeFor } from "../api/session.js";
-import { MCP_CLIENT_PREFIX, MCP_GRANT_SCOPE, MCP_SCOPES, issueMcpTokens, redeemMcpRefresh, revokeMcpToken } from "./tokens.js";
+import { AGENT_NAME_MAX, MCP_CLIENT_PREFIX, MCP_GRANT_SCOPE, MCP_SCOPES, issueMcpTokens, redeemMcpRefresh, revokeMcpToken, settleNewAgent } from "./tokens.js";
 
 // OAuth 2.1 for the MCP task connector on api.septena.app (phase 2,
 // "shadow", of docs/SEPTASK_BACKEND.md in the app repo; read-write since
@@ -195,6 +195,8 @@ export async function pairContinue(c: Context<{ Bindings: Env }>) {
     JSON.stringify({
       userId: approval.userId,
       timeZone: approval.timeZone,
+      label: approval.label,
+      replaces: approval.replaces,
       clientId: pending.clientId,
       redirectUri: pending.redirectUri,
       codeChallenge: pending.codeChallenge,
@@ -220,6 +222,9 @@ export async function pairContinue(c: Context<{ Bindings: Env }>) {
 interface StoredCode {
   userId: string;
   timeZone?: string;
+  /// The agent's name and the agent it replaces, from the approval.
+  label?: string;
+  replaces?: string;
   clientId: string;
   redirectUri: string;
   codeChallenge: string;
@@ -294,12 +299,21 @@ export async function pollDevicePairing(env: Env, body: z.infer<typeof zDevicePo
 
 export const zPairKind = z.enum(["connector", "device"]);
 
+/// An agent's name, as the user types it at pairing or in Settings.
+export const zAgentName = z.string().trim().min(1).max(AGENT_NAME_MAX).regex(/^[^\u0000-\u001f\u007f]+$/);
+
 export const zPairApproveBody = z.object({
   code: z.string().min(1).max(32),
   timeZone: z.string().max(64).optional(),
   /// The kind the user confirmed after /v1/pair/inspect. Optional: app builds
   /// from before 2026-11-22 approve without the confirm step.
   kind: zPairKind.optional(),
+  /// Connector codes: the name the user gives the agent. Absent = the
+  /// client's registered name.
+  name: zAgentName.optional(),
+  /// Connector codes: the agent (connection id) this one replaces. Its
+  /// tokens stop working when the new agent finishes pairing.
+  replaces: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/).optional(),
 }).strict();
 
 export const zPairInspectBody = z.object({
@@ -359,8 +373,11 @@ export async function approvePairing(
   }
   const code = normalizePairCode(body.code);
   const timeZone = body.timeZone && isValidTz(body.timeZone) ? body.timeZone : undefined;
+  // The name and replacement only mean something for an agent; a device
+  // code ignores them (it never reaches the token exchange).
+  const agent = body.kind === "device" ? {} : { label: body.name, replaces: body.replaces };
   const res = code
-    ? await pairingFor(env, code).approve({ userId, timeZone }, body.kind)
+    ? await pairingFor(env, code).approve({ userId, timeZone, ...agent }, body.kind)
     : { outcome: "not_found" as const, clientName: undefined, purpose: undefined };
   if (res.outcome === "ok") {
     const kind = res.purpose ?? "connector";
@@ -417,12 +434,15 @@ export async function token(c: Context<{ Bindings: Env }>) {
     return c.json({ error: "invalid_grant" }, 400);
   }
 
+  const familyId = randomId(16);
   const tokens = await issueMcpTokens(c.env, {
     userId: stored.userId,
     clientId,
     scope: MCP_GRANT_SCOPE,
     timeZone: stored.timeZone,
-  });
+    label: stored.label,
+  }, familyId);
+  await settleNewAgent(c.env, { userId: stored.userId, clientId, familyId, replaces: stored.replaces });
   logEvent("preview_oauth_token", { ok: true, grantType, clientId });
   return c.json(tokens, 200, { "Cache-Control": "no-store" });
 }
