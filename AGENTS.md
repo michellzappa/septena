@@ -535,7 +535,9 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   `appstore/devices.mjs`. `appstore/capture.sh <device>` shoots raw screens
   (iPhone/iPad via `SeptenaUITests`, Mac via `SeptenaMacUITests`), `npm run all`
   renders + validates, and the website's `/about/brand#app-store` is the review
-  page (no viewer in this repo), `fastlane deliver` uploads.
+  page (no viewer in this repo), and `appstore/upload.sh` uploads through
+  fastlane deliver. It is outward-facing: run it only when mz asks; never a
+  binary, never a review submission (docs/APPSTORE-SEPTASK.md "Uploading").
   Mac is a separate ASC app (own deliver run). See `docs/APPSTORE.md`.
   For generated Photo Studio lifestyle images and device variants, use
   `docs/photo-studio/SKILL.md`.

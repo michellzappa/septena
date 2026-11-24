@@ -3,9 +3,10 @@
 # appstore/panels.config.mjs (visuals), then `cd appstore && npm run all`,
 # verify with `npm run viz`, then `fastlane deliver` from the repo root.
 #
-# Auth: prefer an App Store Connect API key —
-#   api_key_path("fastlane/asc_api_key.json")   # gitignored; {key_id, issuer_id, key (p8 contents)}
-# or sign in interactively with FASTLANE_USER / app-specific password.
+# Run it through appstore/upload.sh (docs/APPSTORE-SEPTASK.md "Uploading"):
+# it picks the app, platform and paths and passes the API key from
+# ~/.appstoreconnect/septena.json (outside the repo; appstore/asc-key.sh
+# writes it). Never commit a key.
 #
 # macOS is a second platform on the same ASC record (com.septena.cloud, ADR
 # 0007): when it goes live, run deliver with `--platform osx

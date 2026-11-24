@@ -255,10 +255,27 @@ cd ../septena/appstore && node export-scenes.mjs     # 2. export phone screens a
 cd ../septena/appstore && npm run all:septask        # 3. metadata + render + validate
 cd ../../_/septena-site && node scripts/sync-appstore.mjs && npm run dev
                                                      # 4. review at localhost:3000/about/brand#app-store
-fastlane deliver --app_identifier com.septena.tasks --platform ios \
-  --metadata_path appstore/metadata-septask \
-  --screenshots_path appstore/screenshots-septask    # 5. upload (from the repo root)
+appstore/upload.sh septask ios --screenshots-only    # 5. upload (from the repo root)
 ```
+
+### Uploading (agents do this, not mz)
+
+`appstore/upload.sh` wraps `fastlane deliver` (fastlane is installed with
+Homebrew on the laptop since 2026-11-22). An agent runs it when mz asks for an
+upload; mz never drags screenshots into App Store Connect by hand.
+
+- `appstore/upload.sh septask ios --screenshots-only` replaces the iPhone
+  screenshots and leaves the listing text alone. Drop `--screenshots-only`
+  to upload the text from `appstore/metadata-septask/` too.
+- It never uploads a binary and never submits for review
+  (`fastlane/Deliverfile`). Review and submit stay in App Store Connect.
+- Screenshots replace the current ones for each device class in the set
+  (`overwrite_screenshots`).
+- Auth: an App Store Connect API key in `~/.appstoreconnect/septena.json`,
+  outside the repo so every worktree finds it. Create it once with
+  `appstore/asc-key.sh <key id> <issuer id>`; it reads the .p8 from
+  `~/.appstoreconnect/private_keys/`. Never commit the key or print it.
+- Upload is outward-facing: run it only when mz asked for it in the session.
 
 - `appstore/scenes/` is gitignored. Its `manifest.json` records the site
   revision and fixture the screens came from; the brand page shows them.
