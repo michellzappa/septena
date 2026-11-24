@@ -111,10 +111,22 @@
       "settings.pages.ai_preferences.title"
     ]
   },
+  "AI asks what you mean. Nothing happens until you answer.": {
+    "text": "AI asks what you mean. Nothing happens until you answer.",
+    "paths": [
+      "settings.copy.ai_explainer.confirmDetail.label"
+    ]
+  },
   "AI on this device": {
     "text": "AI on this device",
     "paths": [
       "settings.pages.ai_preferences.sections.on_device.header"
+    ]
+  },
+  "AI’s turn: it’s working": {
+    "text": "AI’s turn: it’s working",
+    "paths": [
+      "settings.copy.ai_explainer.turnAI.label"
     ]
   },
   "About": {
@@ -123,6 +135,12 @@
       "settings.desktopTabs.about.title",
       "settings.rootGroups.meta_root.items.1.label",
       "settings.pages.about.title"
+    ]
+  },
+  "Above Areas & Projects": {
+    "text": "Above Areas & Projects",
+    "paths": [
+      "settings.copy.smart_lists_editor.topHeader.label"
     ]
   },
   "Accent": {
@@ -143,6 +161,24 @@
       "settings.desktopTabs.account.title",
       "settings.rootGroups.account_root.items.0.label",
       "settings.pages.account.title"
+    ]
+  },
+  "Active {time}": {
+    "text": "Active {time}",
+    "placeholders": [
+      "time"
+    ],
+    "paths": [
+      "settings.copy.access_devices.active.label"
+    ]
+  },
+  "Active {time} · not syncing": {
+    "text": "Active {time} · not syncing",
+    "placeholders": [
+      "time"
+    ],
+    "paths": [
+      "settings.copy.access_devices.activeNotSyncing.label"
     ]
   },
   "Add": {
@@ -168,6 +204,12 @@
     "text": "Add a task or move one here when you want to work on it today.",
     "paths": [
       "destinations.destinations.today.emptyState.detail"
+    ]
+  },
+  "Add time": {
+    "text": "Add time",
+    "paths": [
+      "surfaces.taskDateBoard.rows.dateBoard.time.label"
     ]
   },
   "Add your first task": {
@@ -234,6 +276,12 @@
       "plans.outcomes.nothing_lost.rows.logbook.cells.plus"
     ]
   },
+  "All dated tasks": {
+    "text": "All dated tasks",
+    "paths": [
+      "settings.copy.calendar_detail.scopeAll.label"
+    ]
+  },
   "All your devices": {
     "text": "All your devices",
     "paths": [
@@ -246,10 +294,22 @@
       "surfaces.prompts.items.cameraUnavailable.message"
     ]
   },
+  "Always shown": {
+    "text": "Always shown",
+    "paths": [
+      "settings.copy.smart_lists_editor.alwaysShown.label"
+    ]
+  },
   "An agent below": {
     "text": "An agent below",
     "paths": [
       "surfaces.prompts.items.agentReplaces.options.agent.title"
+    ]
+  },
+  "Android": {
+    "text": "Android",
+    "paths": [
+      "settings.copy.access_devices.deviceAndroid.label"
     ]
   },
   "Anonymous usage data": {
@@ -262,6 +322,12 @@
     "text": "Anyone can join a shared project for free. Plus lets you create one and invite people.",
     "paths": [
       "plans.upsells.share_create.detail"
+    ]
+  },
+  "Anything only you can do (pay, send) becomes one clear button.": {
+    "text": "Anything only you can do (pay, send) becomes one clear button.",
+    "paths": [
+      "settings.copy.ai_explainer.handOffDetail.label"
     ]
   },
   "Anytime": {
@@ -283,10 +349,28 @@
       "settings.pages.ai_preferences.sections.on_device.items.0.label"
     ]
   },
+  "Apple Watch": {
+    "text": "Apple Watch",
+    "paths": [
+      "settings.copy.access_devices.deviceWatch.label"
+    ]
+  },
   "Apple Watch through the server": {
     "text": "Apple Watch through the server",
     "paths": [
       "plans.outcomes.everywhere.rows.watch.label"
+    ]
+  },
+  "Archive and utility lists shown below your areas and projects. Drag to reorder within a section, or use the arrow button to move a list above or below. Changes sync across all your devices.": {
+    "text": "Archive and utility lists shown below your areas and projects. Drag to reorder within a section, or use the arrow button to move a list above or below. Changes sync across all your devices.",
+    "paths": [
+      "settings.copy.smart_lists_editor.bottomFooter.label"
+    ]
+  },
+  "Archive and utility lists shown below your areas and projects. Use the arrows to reorder a list or to move it above or below. Changes sync across all your devices.": {
+    "text": "Archive and utility lists shown below your areas and projects. Use the arrows to reorder a list or to move it above or below. Changes sync across all your devices.",
+    "paths": [
+      "settings.copy.smart_lists_editor.bottomFooterButtons.label"
     ]
   },
   "Area": {
@@ -338,10 +422,31 @@
       "tokens.textures.none.tag"
     ]
   },
+  "Below Areas & Projects": {
+    "text": "Below Areas & Projects",
+    "paths": [
+      "settings.copy.smart_lists_editor.bottomHeader.label"
+    ]
+  },
+  "Beyond conversations, {app} learns small patterns locally, like the “Move to…” suggestion that predicts where a task belongs from your own history. That model trains on your device and never leaves it.": {
+    "text": "Beyond conversations, {app} learns small patterns locally, like the “Move to…” suggestion that predicts where a task belongs from your own history. That model trains on your device and never leaves it.",
+    "placeholders": [
+      "app"
+    ],
+    "paths": [
+      "settings.copy.ai_explainer.localBody.label"
+    ]
+  },
   "Bring in your tasks": {
     "text": "Bring in your tasks",
     "paths": [
       "surfaces.notices.items.getStarted.steps.importTasks.title"
+    ]
+  },
+  "Browser": {
+    "text": "Browser",
+    "paths": [
+      "settings.copy.access_devices.deviceBrowser.label"
     ]
   },
   "Calendar": {
@@ -349,6 +454,12 @@
     "paths": [
       "settings.rootGroups.connections_data_root.items.0.label",
       "settings.pages.calendar.title"
+    ]
+  },
+  "Calendar Feed (iCal)": {
+    "text": "Calendar Feed (iCal)",
+    "paths": [
+      "settings.copy.calendar_detail.feedHeader.label"
     ]
   },
   "Cancel": {
@@ -385,6 +496,12 @@
     "text": "Cancel at any time.",
     "paths": [
       "plans.prices.monthly.detail"
+    ]
+  },
+  "Capture": {
+    "text": "Capture",
+    "paths": [
+      "settings.copy.ai_explainer.captureTitle.label"
     ]
   },
   "Carambola": {
@@ -447,6 +564,12 @@
       "surfaces.prompts.items.clearLogged.confirmTitle"
     ]
   },
+  "Clear (Anytime)": {
+    "text": "Clear (Anytime)",
+    "paths": [
+      "surfaces.taskDateBoard.rows.dateBoard.clear.label"
+    ]
+  },
   "Clear Logged…": {
     "text": "Clear Logged…",
     "paths": [
@@ -457,6 +580,12 @@
     "text": "Clear When",
     "paths": [
       "actions.actions.task.clearSchedule.title"
+    ]
+  },
+  "Clear sync issues": {
+    "text": "Clear sync issues",
+    "paths": [
+      "settings.copy.sync_diagnostics.clear.label"
     ]
   },
   "Clear {count} logged items from “{name}”?": {
@@ -500,6 +629,12 @@
     "text": "Completion animations",
     "paths": [
       "settings.pages.appearance.sections.appearance.items.3.label"
+    ]
+  },
+  "Confirm": {
+    "text": "Confirm",
+    "paths": [
+      "settings.copy.ai_explainer.confirmTitle.label"
     ]
   },
   "Connect Claude": {
@@ -555,6 +690,18 @@
       "actions.actions.task.copy.title"
     ]
   },
+  "Copy Skill": {
+    "text": "Copy Skill",
+    "paths": [
+      "settings.copy.mcp_skills.copySkill.label"
+    ]
+  },
+  "Copy URL": {
+    "text": "Copy URL",
+    "paths": [
+      "settings.copy.calendar_detail.copyUrl.label"
+    ]
+  },
   "Copy first prompt": {
     "text": "Copy first prompt",
     "paths": [
@@ -592,6 +739,12 @@
       "plans.outcomes.agents.rows.share.cells.plus"
     ]
   },
+  "Current device": {
+    "text": "Current device",
+    "paths": [
+      "settings.copy.access_devices.currentDevice.label"
+    ]
+  },
   "Daily change limit reached": {
     "text": "Daily change limit reached",
     "paths": [
@@ -614,6 +767,12 @@
     "text": "Deadline…",
     "paths": [
       "actions.actions.task.deadline.title"
+    ]
+  },
+  "Decide": {
+    "text": "Decide",
+    "paths": [
+      "settings.copy.ai_explainer.decideTitle.label"
     ]
   },
   "Decrease Text Size": {
@@ -788,9 +947,16 @@
       "surfaces.notices.dismissTitle"
     ]
   },
+  "Does what it can: a draft, a comparison. Uses the web or your Claude only when needed.": {
+    "text": "Does what it can: a draft, a comparison. Uses the web or your Claude only when needed.",
+    "paths": [
+      "settings.copy.ai_explainer.workDetail.label"
+    ]
+  },
   "Done": {
     "text": "Done",
     "paths": [
+      "settings.copy.ai_explainer.turnDone.label",
       "destinations.destinations.agent.groups.done.title",
       "plans.paywall.done"
     ]
@@ -1015,6 +1181,12 @@
       "settings.rootGroups.lists_root.items.1.label"
     ]
   },
+  "Hand off": {
+    "text": "Hand off",
+    "paths": [
+      "settings.copy.ai_explainer.handOffTitle.label"
+    ]
+  },
   "Haskap": {
     "text": "Haskap",
     "paths": [
@@ -1069,10 +1241,22 @@
       "surfaces.taskAttributes.history.label"
     ]
   },
+  "How AI helps": {
+    "text": "How AI helps",
+    "paths": [
+      "settings.copy.ai_explainer.title.label"
+    ]
+  },
   "How AI helps with your tasks": {
     "text": "How AI helps with your tasks",
     "paths": [
       "settings.pages.ai_preferences.sections.explainer.items.0.label"
+    ]
+  },
+  "How a task conversation moves": {
+    "text": "How a task conversation moves",
+    "paths": [
+      "settings.copy.ai_explainer.flowHeader.label"
     ]
   },
   "If this agent takes the place of one you connected before, pick it. That agent stops working.": {
@@ -1136,6 +1320,12 @@
       "destinations.destinations.inbox.emptyState.title"
     ]
   },
+  "Include": {
+    "text": "Include",
+    "paths": [
+      "settings.copy.calendar_detail.include.label"
+    ]
+  },
   "Included": {
     "text": "Included",
     "paths": [
@@ -1178,6 +1368,12 @@
       "plans.outcomes.agents.rows.share.cells.account"
     ]
   },
+  "Jot down the task. A few words are enough.": {
+    "text": "Jot down the task. A few words are enough.",
+    "paths": [
+      "settings.copy.ai_explainer.captureDetail.label"
+    ]
+  },
   "Keep": {
     "text": "Keep",
     "paths": [
@@ -1212,6 +1408,15 @@
     "text": "Last 90 days",
     "paths": [
       "plans.outcomes.nothing_lost.rows.logbook.cells.account"
+    ]
+  },
+  "Last used {time}": {
+    "text": "Last used {time}",
+    "placeholders": [
+      "time"
+    ],
+    "paths": [
+      "settings.copy.access_agents.lastUsed.label"
     ]
   },
   "Later": {
@@ -1274,12 +1479,6 @@
       "plans.cards.plus.points.0"
     ]
   },
-  "Local server on the Mac": {
-    "text": "Local server on the Mac",
-    "paths": [
-      "plans.outcomes.agents.rows.connector.cells.device"
-    ]
-  },
   "Logbook": {
     "text": "Logbook",
     "paths": [
@@ -1293,10 +1492,22 @@
       "destinations.destinations.logbook.emptyState.title"
     ]
   },
+  "Look up": {
+    "text": "Look up",
+    "paths": [
+      "settings.copy.ai_explainer.lookUpTitle.label"
+    ]
+  },
   "MCP Skills": {
     "text": "MCP Skills",
     "paths": [
       "settings.pages.claude_pairing.sections.agent_tools.items.0.label"
+    ]
+  },
+  "Mac": {
+    "text": "Mac",
+    "paths": [
+      "settings.copy.access_devices.deviceMac.label"
     ]
   },
   "Manage Subscription": {
@@ -1375,6 +1586,24 @@
       "actions.actions.project.moveUp.title"
     ]
   },
+  "Move above Areas & Projects": {
+    "text": "Move above Areas & Projects",
+    "paths": [
+      "settings.copy.smart_lists_editor.moveAbove.label"
+    ]
+  },
+  "Move below Areas & Projects": {
+    "text": "Move below Areas & Projects",
+    "paths": [
+      "settings.copy.smart_lists_editor.moveBelow.label"
+    ]
+  },
+  "Move down": {
+    "text": "Move down",
+    "paths": [
+      "settings.copy.smart_lists_editor.moveDown.label"
+    ]
+  },
   "Move from another app": {
     "text": "Move from another app",
     "paths": [
@@ -1409,6 +1638,12 @@
     "text": "Move to a new device",
     "paths": [
       "plans.outcomes.everywhere.rows.new_device.label"
+    ]
+  },
+  "Move up": {
+    "text": "Move up",
+    "paths": [
+      "settings.copy.smart_lists_editor.moveUp.label"
     ]
   },
   "Moved to {date} (When)": {
@@ -1499,6 +1734,12 @@
       "destinations.destinations.inbox.emptyState.detail"
     ]
   },
+  "No Deadline": {
+    "text": "No Deadline",
+    "paths": [
+      "surfaces.taskDateBoard.rows.dateBoard.clear.attributeLabels.0.label"
+    ]
+  },
   "No Deleted Tasks": {
     "text": "No Deleted Tasks",
     "paths": [
@@ -1583,6 +1824,12 @@
       "surfaces.prompts.placesScreen.emptyStates.emptyProjectSections.title"
     ]
   },
+  "No smart lists in this section": {
+    "text": "No smart lists in this section",
+    "paths": [
+      "settings.copy.smart_lists_editor.empty.label"
+    ]
+  },
   "No tasks, projects, or areas match your search.": {
     "text": "No tasks, projects, or areas match your search.",
     "paths": [
@@ -1631,6 +1878,12 @@
       "destinations.genericEmptyState.title"
     ]
   },
+  "Nothing important happens on its own. AI can fill in small, reversible details; any real decision or action that can’t be undone waits for your confirmation.": {
+    "text": "Nothing important happens on its own. AI can fill in small, reversible details; any real decision or action that can’t be undone waits for your confirmation.",
+    "paths": [
+      "settings.copy.ai_explainer.closing.label"
+    ]
+  },
   "Nothing in Anytime": {
     "text": "Nothing in Anytime",
     "paths": [
@@ -1673,10 +1926,28 @@
       "surfaces.prompts.error.confirmTitle"
     ]
   },
+  "Offers a few options for you to pick. A harder call may use the cloud.": {
+    "text": "Offers a few options for you to pick. A harder call may use the cloud.",
+    "paths": [
+      "settings.copy.ai_explainer.decideDetail.label"
+    ]
+  },
+  "Offline": {
+    "text": "Offline",
+    "paths": [
+      "settings.copy.syncStatus.offline.label"
+    ]
+  },
   "Older changes are hidden": {
     "text": "Older changes are hidden",
     "paths": [
       "plans.upsells.history_edge.title"
+    ]
+  },
+  "On Automatic, every step runs on your device first. It reaches further only for steps your device can’t do (↗).": {
+    "text": "On Automatic, every step runs on your device first. It reaches further only for steps your device can’t do (↗).",
+    "paths": [
+      "settings.copy.ai_explainer.flowFooter.label"
     ]
   },
   "On day": {
@@ -1705,10 +1976,28 @@
       "plans.status.device"
     ]
   },
+  "On this device · Sign in to sync": {
+    "text": "On this device · Sign in to sync",
+    "paths": [
+      "settings.copy.account_profile_card.signInToSync.label"
+    ]
+  },
+  "On-device": {
+    "text": "On-device",
+    "paths": [
+      "settings.copy.ai_explainer.runsOnDevice.label"
+    ]
+  },
   "On-device only": {
     "text": "On-device only",
     "paths": [
       "settings.keys.aiMode.options.0.title"
+    ]
+  },
+  "On-device ↗": {
+    "text": "On-device ↗",
+    "paths": [
+      "settings.copy.ai_explainer.runsReaches.label"
     ]
   },
   "One": {
@@ -1748,6 +2037,12 @@
       "surfaces.notices.items.fadedPile.detail"
     ]
   },
+  "Open in Calendar": {
+    "text": "Open in Calendar",
+    "paths": [
+      "settings.copy.calendar_detail.openInCalendar.label"
+    ]
+  },
   "Open tasks without a date live here.": {
     "text": "Open tasks without a date live here.",
     "paths": [
@@ -1785,6 +2080,12 @@
       "surfaces.taskAttributes.paste.label"
     ]
   },
+  "Paste into a model's context to teach it the task tools without connecting MCP.": {
+    "text": "Paste into a model's context to teach it the task tools without connecting MCP.",
+    "paths": [
+      "settings.copy.mcp_skills.copyFooter.label"
+    ]
+  },
   "Paste the first prompt. Claude sets up your areas and projects with you.": {
     "text": "Paste the first prompt. Claude sets up your areas and projects with you.",
     "paths": [
@@ -1808,6 +2109,21 @@
     "text": "Persimmon",
     "paths": [
       "tokens.fruitAccents.persimmon.name"
+    ]
+  },
+  "Pick another date": {
+    "text": "Pick another date",
+    "paths": [
+      "surfaces.taskDateBoard.rows.dateBoard.calendar.label"
+    ]
+  },
+  "Pick another date ({date})": {
+    "text": "Pick another date ({date})",
+    "placeholders": [
+      "date"
+    ],
+    "paths": [
+      "surfaces.taskDateBoard.rows.dateBoard.calendar.valueLabel"
     ]
   },
   "Pitaya": {
@@ -1913,6 +2229,12 @@
       "settings.pages.privacy.title"
     ]
   },
+  "Private iCal feed": {
+    "text": "Private iCal feed",
+    "paths": [
+      "settings.copy.calendar_detail.feedToggle.label"
+    ]
+  },
   "Project": {
     "text": "Project",
     "paths": [
@@ -1930,6 +2252,12 @@
     "text": "Projects",
     "paths": [
       "surfaces.prompts.placesScreen.labels.areaProjectsHeading.label"
+    ]
+  },
+  "Pulls relevant context from your own data.": {
+    "text": "Pulls relevant context from your own data.",
+    "paths": [
+      "settings.copy.ai_explainer.lookUpDetail.label"
     ]
   },
   "Purchase received. Plus turns on when Septena reaches the server.": {
@@ -1966,6 +2294,12 @@
     "text": "Quick Find…",
     "paths": [
       "actions.actions.app.quickFind.title"
+    ]
+  },
+  "Read-only subscription feed for your scheduled tasks and deadlines. Anyone with the private URL can read titles and notes in the feed; rotate or disable it anytime.": {
+    "text": "Read-only subscription feed for your scheduled tasks and deadlines. Anyone with the private URL can read titles and notes in the feed; rotate or disable it anytime.",
+    "paths": [
+      "settings.copy.calendar_detail.feedFooter.label"
     ]
   },
   "Reads, and 25 changes a day": {
@@ -2091,6 +2425,12 @@
       "actions.actions.app.textSizeReset.title"
     ]
   },
+  "Reset to Defaults": {
+    "text": "Reset to Defaults",
+    "paths": [
+      "settings.copy.smart_lists_editor.reset.label"
+    ]
+  },
   "Restore": {
     "text": "Restore",
     "paths": [
@@ -2139,6 +2479,24 @@
     "text": "Ridge Lines",
     "paths": [
       "tokens.textures.ridges.name"
+    ]
+  },
+  "Rotate Calendar Feed Link?": {
+    "text": "Rotate Calendar Feed Link?",
+    "paths": [
+      "settings.copy.calendar_detail.rotateTitle.label"
+    ]
+  },
+  "Rotate Link": {
+    "text": "Rotate Link",
+    "paths": [
+      "settings.copy.calendar_detail.rotate.label"
+    ]
+  },
+  "Rotating replaces your private feed link immediately. Existing calendar subscriptions will stop updating until you re-subscribe with the new URL.": {
+    "text": "Rotating replaces your private feed link immediately. Existing calendar subscriptions will stop updating until you re-subscribe with the new URL.",
+    "paths": [
+      "settings.copy.calendar_detail.rotateMessage.label"
     ]
   },
   "Same day": {
@@ -2428,10 +2786,28 @@
       "settings.rootGroups.lists_root.items.4.detail"
     ]
   },
+  "Shown when non-empty": {
+    "text": "Shown when non-empty",
+    "paths": [
+      "settings.copy.smart_lists_editor.whenNonEmpty.label"
+    ]
+  },
+  "Sign in": {
+    "text": "Sign in",
+    "paths": [
+      "settings.copy.syncStatus.needsSignIn.label"
+    ]
+  },
   "Sign in for a free account. The server then keeps a backup of that device, and you can try agents on real tasks.": {
     "text": "Sign in for a free account. The server then keeps a backup of that device, and you can try agents on real tasks.",
     "paths": [
       "plans.cards.free.footnote"
+    ]
+  },
+  "Sign in to Septena sync to create a private calendar feed URL for Apple Calendar, Google Calendar, or Outlook.": {
+    "text": "Sign in to Septena sync to create a private calendar feed URL for Apple Calendar, Google Calendar, or Outlook.",
+    "paths": [
+      "settings.copy.calendar_detail.feedSignIn.label"
     ]
   },
   "Sign in to sync": {
@@ -2465,6 +2841,15 @@
       "actions.actions.account.signOut.title"
     ]
   },
+  "Sign out {name}?": {
+    "text": "Sign out {name}?",
+    "placeholders": [
+      "name"
+    ],
+    "paths": [
+      "settings.copy.access_devices.signOutTitle.label"
+    ]
+  },
   "Small": {
     "text": "Small",
     "paths": [
@@ -2482,6 +2867,18 @@
     "paths": [
       "settings.rootGroups.lists_root.items.0.label",
       "settings.pages.smart_lists.title"
+    ]
+  },
+  "Some help is always on your device": {
+    "text": "Some help is always on your device",
+    "paths": [
+      "settings.copy.ai_explainer.localHeader.label"
+    ]
+  },
+  "Some tasks need thinking before you can act. Tap Discuss and talk them through, right on the task.": {
+    "text": "Some tasks need thinking before you can act. Tap Discuss and talk them through, right on the task.",
+    "paths": [
+      "settings.copy.ai_explainer.intro.label"
     ]
   },
   "Still want any of them?": {
@@ -2545,16 +2942,34 @@
       "plans.actions.syncThisDevice"
     ]
   },
+  "Sync issues": {
+    "text": "Sync issues",
+    "paths": [
+      "settings.copy.sync_diagnostics.issues.label"
+    ]
+  },
   "Sync speed": {
     "text": "Sync speed",
     "paths": [
       "plans.outcomes.everywhere.rows.live.label"
     ]
   },
+  "Synced": {
+    "text": "Synced",
+    "paths": [
+      "settings.copy.syncStatus.synced.label"
+    ]
+  },
   "Synced, up to 10 GB": {
     "text": "Synced, up to 10 GB",
     "paths": [
       "plans.outcomes.nothing_lost.rows.files.cells.plus"
+    ]
+  },
+  "Syncing": {
+    "text": "Syncing",
+    "paths": [
+      "settings.copy.syncStatus.syncing.label"
     ]
   },
   "Syncing…": {
@@ -2684,6 +3099,18 @@
       "actions.menuBar.view.items.textSize.title"
     ]
   },
+  "That device stops syncing within the hour. Its tasks stay on it until you sign in there again.": {
+    "text": "That device stops syncing within the hour. Its tasks stay on it until you sign in there again.",
+    "paths": [
+      "settings.copy.access_devices.signOutMessage.label"
+    ]
+  },
+  "The brief did not load. Check your connection and open this page again.": {
+    "text": "The brief did not load. Check your connection and open this page again.",
+    "paths": [
+      "settings.copy.mcp_skills.loadFailed.label"
+    ]
+  },
   "The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples).": {
     "text": "The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples).",
     "paths": [
@@ -2789,6 +3216,12 @@
       "surfaces.taskDetail.calendarWeekdays.4.title"
     ]
   },
+  "Timed tasks only": {
+    "text": "Timed tasks only",
+    "paths": [
+      "settings.copy.calendar_detail.scopeTimed.label"
+    ]
+  },
   "Title": {
     "text": "Title",
     "paths": [
@@ -2836,6 +3269,12 @@
     "text": "Toggle Today",
     "paths": [
       "actions.actions.task.toggleToday.title"
+    ]
+  },
+  "Tomorrow": {
+    "text": "Tomorrow",
+    "paths": [
+      "surfaces.taskDateBoard.rows.dateBoard.tomorrow.label"
     ]
   },
   "Topography": {
@@ -2897,6 +3336,12 @@
     "text": "Unfavorite",
     "paths": [
       "actions.actions.task.toggleStar.removeTitle"
+    ]
+  },
+  "Unknown device": {
+    "text": "Unknown device",
+    "paths": [
+      "settings.copy.access_devices.deviceUnknown.label"
     ]
   },
   "Upcoming": {
@@ -3030,10 +3475,22 @@
       "settings.rootGroups.ai_agents_root.items.2.detail"
     ]
   },
+  "Whose turn?": {
+    "text": "Whose turn?",
+    "paths": [
+      "settings.copy.ai_explainer.turnHeader.label"
+    ]
+  },
   "Within a monthly run budget": {
     "text": "Within a monthly run budget",
     "paths": [
       "plans.outcomes.agents.rows.runs.cells.plus"
+    ]
+  },
+  "Work": {
+    "text": "Work",
+    "paths": [
+      "settings.copy.ai_explainer.workTitle.label"
     ]
   },
   "Work an agent finished appears here so you can check and accept it.": {
@@ -3046,6 +3503,12 @@
     "text": "Working",
     "paths": [
       "destinations.destinations.agent.groups.working.title"
+    ]
+  },
+  "Working lists shown at the top of the sidebar.": {
+    "text": "Working lists shown at the top of the sidebar.",
+    "paths": [
+      "settings.copy.smart_lists_editor.topFooter.label"
     ]
   },
   "Year": {
@@ -3120,6 +3583,18 @@
     "text": "Your 14 days of Plus have ended",
     "paths": [
       "plans.upsells.trial_end.title"
+    ]
+  },
+  "Your AI, never our servers": {
+    "text": "Your AI, never our servers",
+    "paths": [
+      "settings.copy.ai_explainer.privateHeader.label"
+    ]
+  },
+  "Your Profile": {
+    "text": "Your Profile",
+    "paths": [
+      "settings.copy.account_profile_card.yourProfile.label"
     ]
   },
   "Your account becomes a free account. Every device keeps its tasks, and the server keeps your synced copy for 12 months.": {
@@ -3236,6 +3711,12 @@
       "destinations.destinations.agent.groups.yourTurn.title"
     ]
   },
+  "Your turn: a question is waiting": {
+    "text": "Your turn: a question is waiting",
+    "paths": [
+      "settings.copy.ai_explainer.turnYours.label"
+    ]
+  },
   "You’re all set": {
     "text": "You’re all set",
     "paths": [
@@ -3246,6 +3727,21 @@
     "text": "Yuzu",
     "paths": [
       "tokens.fruitAccents.yuzu.name"
+    ]
+  },
+  "iPhone or iPad": {
+    "text": "iPhone or iPad",
+    "paths": [
+      "settings.copy.access_devices.deviceApplePhone.label"
+    ]
+  },
+  "{app}’s servers never run AI on your tasks. AI runs on your device, or in your own Claude when you connect it. Turn AI off and the app works the same, without conversations.": {
+    "text": "{app}’s servers never run AI on your tasks. AI runs on your device, or in your own Claude when you connect it. Turn AI off and the app works the same, without conversations.",
+    "placeholders": [
+      "app"
+    ],
+    "paths": [
+      "settings.copy.ai_explainer.privateBody.label"
     ]
   },
   "{count} agents": {

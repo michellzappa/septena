@@ -40,6 +40,13 @@ data class TaskConversation(
     val awaitsHuman: Boolean get() = state().awaitsHuman
     val hasStarted: Boolean get() = state().hasStarted
 
+    /** The Agent list stage (queued, working, yourTurn, review, done), or null when not agent work. */
+    fun agentStage(now: Instant = Instant.now()): String? = state(now).agentStage
+
+    /** The agent holds the turn (the row shows "working"): it does not fade. */
+    fun isAgentTurn(now: Instant = Instant.now()): Boolean =
+        deriveConversation(toCore(), now.toString()).badge == "working"
+
     fun isPendingReasoning(now: Instant = Instant.now()): Boolean =
         deriveConversation(toCore(), now.toString()).pendingReasoning
 

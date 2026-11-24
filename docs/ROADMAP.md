@@ -19,8 +19,7 @@ on a listed issue without the label). Feature IDs: Starlings Docs
 | Track | Spec | Label |
 |---|---|---|
 | Backend — leave iCloud | `docs/SEPTASK_BACKEND.md`, ADR 0002, ADR 0011 | `track:backend` |
-| Linked projects (Starlings, Linear) | `docs/LINKED_PROJECTS_SPEC.md`, ADR 0003 | `track:links` |
-| GitHub | `docs/GITHUB_SPEC.md`, ADR 0032 | `track:links` |
+| Linked projects (Starlings) | `docs/LINKED_PROJECTS_SPEC.md`, ADR 0003 | `track:links` |
 | Task references | `docs/TASK_REFERENCES_SPEC.md`, ADR 0031 | `track:links` |
 | Task factory | `docs/TASK_FACTORY_SPEC.md`, ADR 0005, ADR 0008 | `track:factory` |
 | Project sharing | `docs/PROJECT_SHARING_SPEC.md`, ADR 0004 | `track:sharing` |
@@ -132,6 +131,8 @@ Alongside the features:
 - #71 Connected agents and last activity in Settings
 - F0 claims/stop/pause (built 2026-11-19) + Agent smart list UI
 - #5 F1 scheduled runner, push questions, wake on answer
+- Task references, first release (`docs/TASK_REFERENCES_SPEC.md`, ADR 0031, ADR
+  0033): #386 R0 core, store, MCP, old issue links → #387 R1 Mac, iPhone, iPad
 - Project notes as agent context (`docs/PROJECT_NOTES_SPEC.md`, ADR 0012):
   #120 N0 store rules and history → #121 N1 MCP tools and claim payload ·
   #122 N2 notes first in the app → #123 N3 proposals and history UI ·
@@ -146,9 +147,7 @@ accepts the result with no device awake in between.
 GitHub milestone: `"M3 Factory ships code"`.
 
 - F2 work profiles, approval cards, `errand`, kill switch
-- GitHub (`docs/GITHUB_SPEC.md`, ADR 0032): #6 G0 follow (needs #386) → #7 G1
-  browse and pull → #393 G2 send
-- F3 `code` workflow on a project's repo, run log (needs #6)
+- F3 `code` workflow on a project's repo, run log
 - Shared cross-platform registries ([ADR 0015](adr/0015-shared-registries-for-cross-platform-clients.md),
   accepted; prerequisites to `#21`, `#20`, `#136`): `#141`–`#145` done (`registry/`
   with 9 JSON registries, Swift/TS codegen, `lint-design.sh` drift gate, and
@@ -166,8 +165,7 @@ GitHub milestone: `"M3 Factory ships code"`.
 - #21 Web client on `api.septena.app` (`docs/WEB_CLIENT_SPEC.md`, phases WB0 to WB5) (Rank 4 first wave — reaches Windows,
   Linux and browsers first; #43 Stripe billing pairs here)
 - #133 natural-language capture in titles · #134 email-to-task address
-- Task references (`docs/TASK_REFERENCES_SPEC.md`, ADR 0031): #386 R0 core, store
-  and MCP → #387 R1 Apple apps · #388 R2 forwarded mail, no duplicates (after
+- Task references, later phases: #388 R2 forwarded mail, no duplicates (after
   #134) → #389 R3 new-reply mark · #390 R4 back-links, drag, Android, web
 - #137 Sign in with Google, Microsoft or an email link (decided 2026-11-21):
   the web client, Android, Windows and self-hosting all need a way in that is
@@ -203,8 +201,8 @@ GitHub milestone: `"M5 Breadth"`.
   W0 shared Kotlin core → W1 Cloud PC spike → W2 first release scope →
   W3 signed installer and Store → W4 parity ledger. Starts after the #20 spike.
 - L3 notes / deadline sync, "Send to Starlings" · L4 moves across lists (not
-  GitHub, ADR 0032)
-- #15 L5 capture feeds (Gmail first) · #16 L6 Linear
+  GitHub, ADR 0033)
+- #15 L5 capture feeds (Gmail first)
 - S2 viewer role, activity, assignment push · S3 agents on shared projects
 - F4 `factory-day` routes questions to Septena; daily digest
 - #28, #53–#56 Task fade (T1–T4: touch/defer, weekly sweep, carry-over, stuck

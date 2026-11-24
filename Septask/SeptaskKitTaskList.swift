@@ -5931,7 +5931,9 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     title.attributedStringValue = composed
 
     let hasNotes = !(task.notes ?? "").isEmpty
-    notesGlyph.isHidden = !hasNotes
+    // The agent glyph already says "there is more here" (same rule as the
+    // SwiftUI row): an agent-authored row never also wears the notes glyph.
+    notesGlyph.isHidden = !hasNotes || task.isAgentAuthored
     agentGlyph.isHidden = !task.isAgentAuthored
     // The chip and the inline title suffix answer the SAME question — "which
     // list is this in" — so a row never wears both. The suffix wins where it
@@ -7182,7 +7184,7 @@ final class KitReminderCell: NSTableCellView {
       return TaskFilter.today.title
     }
     if cal.isDateInTomorrow(date) {
-      return String(localized: "Tomorrow", comment: "Relative day label")
+      return RegistrySurfaces.tomorrowLabel
     }
     return SeptenaDate.monthDay(date)
   }
@@ -7494,7 +7496,7 @@ enum KitDayFormat {
     let calendar = Calendar.current
     if calendar.isDate(date, inSameDayAs: today) { return "Today" }
     if let tomorrow = calendar.date(byAdding: .day, value: 1, to: today),
-       calendar.isDate(date, inSameDayAs: tomorrow) { return "Tomorrow" }
+       calendar.isDate(date, inSameDayAs: tomorrow) { return RegistrySurfaces.tomorrowLabel }
     return render.string(from: date)
   }
 

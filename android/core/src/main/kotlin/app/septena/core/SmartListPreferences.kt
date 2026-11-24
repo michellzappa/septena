@@ -101,3 +101,69 @@ object SmartListResolver {
         return visible(order, hidden, placement, nonEmptyIds, section)
     }
 }
+
+/**
+ * One account's smart-list layout: order, hidden lists and top/bottom placement
+ * (`smartListOrder`, `smartListHidden`, `smartListPlacement`). The edits mirror Swift
+ * `SmartListPreferences` (setHidden, setSection, moveInSection, resetToDefaults); each
+ * returns the new layout, and the caller writes the changed keys through the mutator.
+ */
+data class SmartListLayout(
+    val order: List<String> = emptyList(),
+    val hidden: Set<String> = emptySet(),
+    val placement: Map<String, String> = emptyMap(),
+) {
+    fun ordered(): List<SmartListDescriptor> = SmartListResolver.ordered(order)
+
+    fun sectionOf(dest: SmartListDescriptor): SmartListSection = SmartListResolver.sectionFor(dest, placement)
+
+    fun inSection(section: SmartListSection): List<SmartListDescriptor> = ordered().filter { sectionOf(it) == section }
+
+    fun isHidden(dest: SmartListDescriptor): Boolean = SmartListResolver.isHidden(dest, hidden)
+
+    /** Visibility, placement or order differs from the registry defaults. */
+    val isCustomized: Boolean
+        get() = hidden.isNotEmpty() || placement.isNotEmpty() ||
+            ordered().map(SmartListDescriptor::id) != SmartListResolver.sidebarDestinations().map(SmartListDescriptor::id)
+
+    fun setHidden(dest: SmartListDescriptor, hide: Boolean): SmartListLayout {
+        if (!dest.canHide) return this
+        return copy(hidden = if (hide) hidden + dest.id else hidden - dest.id)
+    }
+
+    fun setSection(dest: SmartListDescriptor, target: SmartListSection): SmartListLayout {
+        if (!dest.canMoveSection) return this
+        return copy(
+            placement = if (target == dest.defaultSection) placement - dest.id else placement + (dest.id to target.wireValue),
+        )
+    }
+
+    /** Moves the list at [from] to [to] inside [section]; the other section keeps its slots. */
+    fun moveInSection(section: SmartListSection, from: Int, to: Int): SmartListLayout {
+        val ids = inSection(section).map(SmartListDescriptor::id).toMutableList()
+        if (from !in ids.indices || to !in ids.indices || from == to) return this
+        ids.add(to, ids.removeAt(from))
+        val iterator = ids.iterator()
+        val rebuilt = ordered().map { dest ->
+            if (sectionOf(dest) == section && iterator.hasNext()) iterator.next() else dest.id
+        }
+        return copy(order = rebuilt)
+    }
+
+    fun orderJson(): JsonValue = JsonValue.ArrayValue(order.map(JsonValue::StringValue))
+
+    fun hiddenJson(): JsonValue = JsonValue.ArrayValue(hidden.sorted().map(JsonValue::StringValue))
+
+    fun placementJson(): JsonValue = JsonValue.ObjectValue(placement.mapValues { JsonValue.StringValue(it.value) })
+
+    companion object {
+        val DEFAULT = SmartListLayout()
+
+        fun from(order: JsonValue?, hidden: JsonValue?, placement: JsonValue?): SmartListLayout = SmartListLayout(
+            order = (order as? JsonValue.ArrayValue)?.values?.mapNotNull { it.stringValue() }.orEmpty(),
+            hidden = (hidden as? JsonValue.ArrayValue)?.values?.mapNotNull { it.stringValue() }?.toSet().orEmpty(),
+            placement = (placement as? JsonValue.ObjectValue)?.fields
+                ?.mapNotNull { (k, v) -> v.stringValue()?.let { k to it } }?.toMap().orEmpty(),
+        )
+    }
+}

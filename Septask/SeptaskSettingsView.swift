@@ -350,7 +350,7 @@ struct SeptaskSettingsView: View {
       ProfileAvatar(name: welcomeName, isPlus: PlanStatus.shared.isPlus, size: 54)
       #endif
       VStack(alignment: .leading, spacing: 3) {
-        Text(welcomeName.isEmpty ? "Your Profile" : welcomeName)
+        Text(welcomeName.isEmpty ? RegistrySettings.copy("account_profile_card", "yourProfile") : welcomeName)
           .font(.title3.weight(.semibold))
           .foregroundStyle(.primary)
         HStack(spacing: 6) {
@@ -363,7 +363,7 @@ struct SeptaskSettingsView: View {
               .font(.caption)
               .foregroundStyle(.secondary)
           } else {
-            Text("On this device · Sign in to sync")
+            Text(RegistrySettings.copy("account_profile_card", "signInToSync"))
               .font(.caption)
               .foregroundStyle(.secondary)
           }
@@ -563,9 +563,9 @@ struct SeptaskSettingsView: View {
 
   private var liveSyncSummary: String {
     let sync = TaskSyncEngine.shared
-    if sync.isSyncing { return "Syncing" }
+    if sync.isSyncing { return RegistrySettings.copy("syncStatus", "syncing") }
     if sync.pendingOps > 0 { return "\(sync.pendingOps) to send" }
-    return sync.wsConnected ? "Live" : "Offline"
+    return sync.wsConnected ? "Live" : RegistrySettings.copy("syncStatus", "offline")
   }
 
   private func statusText(for statusKey: String?) -> String? {
@@ -576,7 +576,7 @@ struct SeptaskSettingsView: View {
     case "planStatus":
       return PlanStatus.shared.statusLine
     case "claudeStatus":
-      guard TaskSyncEngine.shared.signedIn else { return "Sign in" }
+      guard TaskSyncEngine.shared.signedIn else { return RegistrySettings.copy("syncStatus", "needsSignIn") }
       let paired = SeptaskSyncedSettings.current().getStartedSteps?.contains(TaskNoticeStep.ID.connectAI.rawValue) == true
       return paired ? "Connected" : "Set up"
     case "agentsStatus":
@@ -980,15 +980,15 @@ private struct SeptaskSmartListsPane: View {
   var body: some View {
     List {
       sectionBlock(.top,
-                   header: "Above Areas & Projects",
-                   footer: "Working lists shown at the top of the sidebar.")
+                   header: RegistrySettings.copy("smart_lists_editor", "topHeader"),
+                   footer: RegistrySettings.copy("smart_lists_editor", "topFooter"))
       sectionBlock(.bottom,
-                   header: "Below Areas & Projects",
-                   footer: "Archive and utility lists shown below your areas and projects. Drag to reorder within a section, or use the arrow button to move a list above or below. Changes sync across all your devices.")
+                   header: RegistrySettings.copy("smart_lists_editor", "bottomHeader"),
+                   footer: RegistrySettings.copy("smart_lists_editor", "bottomFooter"))
 
       if prefs.isCustomized {
         Section {
-          Button("Reset to Defaults") {
+          Button(RegistrySettings.copy("smart_lists_editor", "reset")) {
             prefs.resetToDefaults()
           }
         }
@@ -1008,7 +1008,7 @@ private struct SeptaskSmartListsPane: View {
     let items = prefs.orderedDestinations(in: section)
     Section {
       if items.isEmpty {
-        Text("No smart lists in this section")
+        Text(RegistrySettings.copy("smart_lists_editor", "empty"))
           .foregroundStyle(.secondary)
       } else {
         ForEach(items) { dest in
@@ -1035,11 +1035,11 @@ private struct SeptaskSmartListsPane: View {
       VStack(alignment: .leading, spacing: 2) {
         Text(dest.title)
         if !dest.canHide {
-          Text("Always shown")
+          Text(RegistrySettings.copy("smart_lists_editor", "alwaysShown"))
             .font(.caption)
             .foregroundStyle(.secondary)
         } else if dest.visibility == "whenNonEmpty" {
-          Text("Shown when non-empty")
+          Text(RegistrySettings.copy("smart_lists_editor", "whenNonEmpty"))
             .font(.caption)
             .foregroundStyle(.secondary)
         }
@@ -1056,7 +1056,7 @@ private struct SeptaskSmartListsPane: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(target == .bottom ? "Move below Areas & Projects" : "Move above Areas & Projects")
+        .help(target == .bottom ? RegistrySettings.copy("smart_lists_editor", "moveBelow") : RegistrySettings.copy("smart_lists_editor", "moveAbove"))
         .accessibilityLabel(target == .bottom
                             ? "Move \(dest.title) below Areas & Projects"
                             : "Move \(dest.title) above Areas & Projects")

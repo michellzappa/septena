@@ -47,6 +47,7 @@ import app.septena.core.RegistryCatalog
 import app.septena.core.booleanValue
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryPlatformIds
+import app.septena.core.generated.RegistrySettingKeys
 import app.septena.core.generated.RegistryTaskDetail
 import app.septena.core.stringValue
 import kotlinx.coroutines.Dispatchers
@@ -98,6 +99,8 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
     var saveFailed by remember { mutableStateOf(false) }
     var signingOut by remember { mutableStateOf(false) }
     val accessModel = remember(graph) { AccessSettingsModel(graph, scope) }
+    val syncState by graph.sync.state.collectAsStateWithLifecycle()
+    val plans = remember(graph) { PlanSettingsModel(graph) }
 
     LaunchedEffect(graph, dataVersion) {
         loading = true
@@ -133,6 +136,8 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
             accessModel.refresh(signedIn)
         }
     }
+    // The account card and the Account page show the plan (`planStatus`).
+    LaunchedEffect(signedIn) { plans.refresh(signedIn) }
     val currentTitle = currentPageId?.let(::titleFor)?.takeIf(String::isNotEmpty)
         ?: RegistryCatalog.actionTitle(RegistryActionIds.APP_SETTINGS, languageTag = languageTag).orEmpty()
     val backTitle = RegistryCatalog.surface(RegistryTaskDetail.ID)
@@ -180,6 +185,8 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
             onBack()
         }
     }
+
+    val surfaceEnv = SettingsSurfaceEnv(graph, plans, syncState, signedIn, values, ::saveSetting)
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -231,6 +238,7 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
                                     signedIn = signedIn,
                                     signingOut = signingOut,
                                     accessModel = accessModel,
+                                    surfaceEnv = surfaceEnv,
                                     onPage = { target -> if (target in pages) pageStack.add(target) },
                                     onValueChange = ::saveSetting,
                                     onSignOut = ::signOut,
@@ -263,6 +271,7 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
                                         signedIn = signedIn,
                                         signingOut = signingOut,
                                         accessModel = accessModel,
+                                        surfaceEnv = surfaceEnv,
                                         onPage = { target -> if (target in pages) pageStack.add(target) },
                                         onValueChange = ::saveSetting,
                                         onSignOut = ::signOut,
@@ -299,6 +308,7 @@ private fun SettingsRegistryRow(
     signedIn: Boolean,
     signingOut: Boolean,
     accessModel: AccessSettingsModel,
+    surfaceEnv: SettingsSurfaceEnv,
     onPage: (String) -> Unit,
     onValueChange: (String, JsonValue) -> Unit,
     onSignOut: () -> Unit,
@@ -308,8 +318,22 @@ private fun SettingsRegistryRow(
             val target = item.page ?: return
             val page = pages[target]
             val title = item.label ?: page?.title ?: return
+            if (item.surface == ACCOUNT_PROFILE_CARD) {
+                AccountProfileCard(
+                    name = values[RegistrySettingKeys.WELCOME_NAME].stringValue().orEmpty(),
+                    signedIn = signedIn,
+                    plans = surfaceEnv.plans,
+                    syncState = surfaceEnv.syncState,
+                    languageTag = languageTag,
+                    onClick = { onPage(target) },
+                )
+                return
+            }
             val status = when (item.statusKey) {
                 AccessSettingsModel.AGENTS_STATUS_KEY -> accessModel.agentsStatus(languageTag)
+                PlanSettingsModel.PLAN_STATUS_KEY -> surfaceEnv.plans.statusLine(languageTag)
+                SYNC_STATUS_KEY -> syncStatusLine(signedIn, surfaceEnv.syncState, languageTag)
+                AI_MODE_STATUS_KEY -> optionTitle(definitions[RegistrySettingKeys.AI_MODE], values[RegistrySettingKeys.AI_MODE], languageTag)
                 else -> null
             }
             ListItem(
@@ -366,7 +390,9 @@ private fun SettingsRegistryRow(
                         onValueChange = { onValueChange(key, it) },
                     )
                 }
-                else -> {
+                else -> if (item.surface != null && item.surface in SETTINGS_SURFACES) {
+                    SettingsCustomSurface(item.surface, item.label, item.detail, surfaceEnv, languageTag)
+                } else {
                     if (item.label != null || item.detail != null) {
                         ListItem(
                             headlineContent = { item.label?.let { Text(it) } },
@@ -519,6 +545,18 @@ private fun RegistrySettingPicker(
     )
 }
 
+/** The title of a setting's current option (`statusKey: aiMode`), or null. */
+private fun optionTitle(definition: JsonValue.ObjectValue?, value: JsonValue?, languageTag: String): String? {
+    val selected = (value ?: definition?.fields?.get("default")).stringValue() ?: return null
+    val option = definition?.array("options")?.firstOrNull {
+        (it as? JsonValue.ObjectValue)?.string("value") == selected
+    } as? JsonValue.ObjectValue
+    return option?.string("title")?.localized(languageTag)
+}
+
+private const val ACCOUNT_PROFILE_CARD = "account_profile_card"
+private const val AI_MODE_STATUS_KEY = "aiMode"
+
 private fun registrySettingDefinitions(): Map<String, JsonValue.ObjectValue> =
     RegistryCatalog.document("settings").objectAt("keys")?.fields.orEmpty()
         .mapNotNull { (key, value) -> (value as? JsonValue.ObjectValue)?.let { key to it } }
@@ -581,35 +619,6 @@ private fun RegistrySettingRow.isVisible(signedIn: Boolean): Boolean = when (vis
     "debugOnly" -> false
     else -> true
 } && (platforms.isEmpty() || RegistryPlatformIds.ANDROID in platforms)
-
-private class AndroidDeviceSettings(context: Context) {
-    private val preferences = context.getSharedPreferences("septena-device-settings", Context.MODE_PRIVATE)
-
-    fun read(key: String, definition: JsonValue.ObjectValue): JsonValue {
-        val storageKey = definition.string("storageKey") ?: key
-        if (!preferences.contains(storageKey)) return definition.fields["default"] ?: JsonValue.Null
-        return when (definition.string("type")) {
-            "bool" -> JsonValue.BooleanValue(preferences.getBoolean(storageKey, false))
-            "int" -> JsonValue.IntegerValue(preferences.getInt(storageKey, 0).toLong())
-            "string", "enum" -> JsonValue.StringValue(preferences.getString(storageKey, "").orEmpty())
-            else -> definition.fields["default"] ?: JsonValue.Null
-        }
-    }
-
-    fun write(key: String, definition: JsonValue.ObjectValue, value: JsonValue) {
-        val storageKey = definition.string("storageKey") ?: key
-        val editor = preferences.edit()
-        when (value) {
-            is JsonValue.BooleanValue -> editor.putBoolean(storageKey, value.value)
-            is JsonValue.IntegerValue -> editor.putInt(storageKey, value.value.toInt())
-            is JsonValue.DecimalValue -> editor.putInt(storageKey, value.value.toInt())
-            is JsonValue.StringValue -> editor.putString(storageKey, value.value)
-            JsonValue.Null -> editor.remove(storageKey)
-            else -> error("Unsupported device setting type for '$key'")
-        }
-        check(editor.commit()) { "Could not save device setting '$key'" }
-    }
-}
 
 private fun String.localized(languageTag: String): String =
     RegistryCatalog.localizedString(this, languageTag) ?: this

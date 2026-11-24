@@ -314,6 +314,25 @@ function validateSettings(settings, entities, icons, caps) {
     if (def.ui === false) continue;
     assert(seenSettingKeys.has(key), `settings.json: UI setting "${key}" is never referenced in rootGroups or pages`);
   }
+
+  // `copy`: the words a custom surface or a status line spells out, keyed by
+  // the surface id (or statusKey) and then by a copy id (#260, #370).
+  const statusKeys = new Set(
+    [...settings.rootGroups.flatMap((g) => g.items), ...settings.pages.flatMap((pg) => pg.sections.flatMap((s) => s.items))]
+      .map((i) => i.statusKey).filter(Boolean),
+  );
+  for (const [owner, entries] of Object.entries(settings.copy ?? {})) {
+    assert(seenSurfaces.has(owner) || statusKeys.has(owner), `settings.json: copy "${owner}" names no surface or statusKey`);
+    assert(Array.isArray(entries) && entries.length > 0, `settings.json: copy "${owner}" must be a non-empty array`);
+    const ids = new Set();
+    for (const e of entries) {
+      assert(typeof e.id === "string" && /^[a-zA-Z][a-zA-Z0-9]*$/.test(e.id), `settings.json: copy "${owner}" has an invalid id "${e.id}"`);
+      assert(!ids.has(e.id), `settings.json: copy "${owner}" duplicate id "${e.id}"`);
+      ids.add(e.id);
+      assert(typeof e.label === "string" && e.label.trim().length > 0, `settings.json: copy ${owner}.${e.id} needs a label`);
+      assert(!/[–—]/.test(e.label), `settings.json: copy ${owner}.${e.id} contains an em or en dash`);
+    }
+  }
 }
 
 function validateDestinations(dests, icons, caps) {
@@ -544,6 +563,28 @@ function validateSurfaces(surfaces, icons, caps, plans) {
     assert(page.blocks.filter((b) => b.kind === kind).length === 1, `surfaces.json: taskPage needs exactly one "${kind}" block`);
   }
 }
+
+// The date board (docs/TASK_ROW_MENU_SPEC.md): the rows under the day strip of
+// the When and Deadline pickers, from a closed set of kinds in one order.
+function checkTaskDateBoard({ surfaces, icons, caps, actions }) {
+  const rows = surfaces.taskDateBoard?.rows ?? [];
+  const attrIds = new Set(surfaces.taskAttributes.map((a) => a.id));
+  for (const kind of DATE_BOARD_ROW_KINDS) {
+    assert(rows.filter((r) => r.kind === kind).length === 1, `surfaces.json: taskDateBoard needs exactly one "${kind}" row`);
+  }
+  for (const r of rows) {
+    assert(DATE_BOARD_ROW_KINDS.has(r.kind), `surfaces.json: taskDateBoard row ${r.id} unknown kind "${r.kind}"`);
+    assert(r.icon in icons.icons, `surfaces.json: taskDateBoard row ${r.id} unknown icon "${r.icon}"`);
+    assert(r.featureId in caps.capabilities, `surfaces.json: taskDateBoard row ${r.id} unknown featureId "${r.featureId}"`);
+    assert((typeof r.label === "string") !== (r.action in actions.actions), `surfaces.json: taskDateBoard row ${r.id} needs a label or a known action`);
+    assert(Array.isArray(r.attributes) && r.attributes.length > 0, `surfaces.json: taskDateBoard row ${r.id} needs attributes`);
+    for (const a of [...r.attributes, ...(r.attributeLabels ?? []).map((l) => l.attribute)]) {
+      assert(DATE_BOARD_ATTRIBUTES.has(a) && attrIds.has(a), `surfaces.json: taskDateBoard row ${r.id} unknown attribute "${a}"`);
+    }
+  }
+}
+const DATE_BOARD_ROW_KINDS = new Set(["tomorrow", "calendar", "clear", "repeatRule", "time"]);
+const DATE_BOARD_ATTRIBUTES = new Set(["when", "deadline"]);
 
 // One picker per attribute (ADR 0029): every popover attribute is opened by
 // exactly one action, so the pill, the page row, the context menu, the menu
@@ -1038,6 +1079,18 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  /// Label of a setting item; the key when the registry has none.");
   lines.push("  static func label(key: String) -> String { itemByKey[key]?.label ?? key }");
   for (const fn of settingsTemplates) lines.push(fn);
+  // Plain surface copy (`copy` in settings.json). Templates (`{name}`) are
+  // read by the runtime-JSON clients; Swift spells those with interpolation.
+  lines.push("  /// Plain copy of a settings surface (`copy` in settings.json); the copy id when the registry has none.");
+  lines.push("  static func copy(_ surface: String, _ id: String) -> String { copyTable[surface + \".\" + id] ?? id }");
+  lines.push("  private static let copyTable: [String: String] = [");
+  for (const [owner, entries] of Object.entries(settings.copy ?? {})) {
+    for (const e of entries) {
+      if (L10N.placeholdersOf(e.label).length > 0) continue;
+      lines.push(`    ${swiftStr(`${owner}.${e.id}`)}: ${L(e.label, e, "label")},`);
+    }
+  }
+  lines.push("  ]");
   lines.push("}");
   lines.push("");
 
@@ -1498,6 +1551,24 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static func taskPageBlocks(_ depth: RegistryTaskPageDepth, on platform: String, isEditing: Bool = true) -> [RegistryTaskPageBlock] {");
   lines.push("    taskPageBlocks.filter { $0.depths.contains(depth) && $0.applies(to: platform) && (isEditing || !$0.editOnly) }");
   lines.push("  }");
+  lines.push("  /// The rows under the date board's day strip, in order (`surfaces.json` `taskDateBoard`).");
+  lines.push("  static let dateBoardRows: [RegistryDateBoardRow] = [");
+  for (const r of surfaces.taskDateBoard.rows) {
+    const action = actions.actions[r.action];
+    const label = action ? L(action.title, action, "title") : L(r.label, r, "label");
+    const own = (r.attributeLabels ?? []).map((l) => `.${l.attribute}: ${L(l.label, l, "label")}`).join(", ");
+    lines.push(`    RegistryDateBoardRow(id: ${swiftStr(r.id)}, kind: .${r.kind}, label: ${label}, attributeLabels: [${own || ":"}], sfSymbol: ${swiftStr(icons.icons[r.icon].sfSymbol)}, attributes: [${r.attributes.map((a) => "." + a).join(", ")}], featureId: ${swiftStr(r.featureId)}),`);
+  }
+  lines.push("  ]");
+  lines.push("  static func dateBoardRows(for attribute: RegistryDateBoardAttribute, on platform: String) -> [RegistryDateBoardRow] {");
+  lines.push("    dateBoardRows.filter { $0.applies(to: attribute, on: platform) }");
+  lines.push("  }");
+  const cal = surfaces.taskDateBoard.rows.find((r) => r.kind === "calendar");
+  lines.push("  /// The calendar row when the task has a date past the day strip.");
+  lines.push(tmplFn("dateBoardCalendarLabel", tmplKey(cal.valueLabel, cal, "valueLabel")));
+  const tmrw = surfaces.taskDateBoard.rows.find((r) => r.kind === "tomorrow");
+  lines.push("  /// The word for the day after today, in the date board and in date labels.");
+  lines.push(`  static let tomorrowLabel: String = ${L(tmrw.label, tmrw, "label")}`);
   const prov = surfaces.taskPage.blocks.find((b) => b.kind === "provenance");
   lines.push("  /// Provenance block (`taskPage.provenance`): the name a task you added shows as,");
   lines.push("  /// the name for an agent row with no `sourceClient`, and the agent glyph.");
@@ -1508,6 +1579,33 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static func taskPageBlock(_ kind: RegistryTaskPageBlockKind) -> RegistryTaskPageBlock {");
   lines.push("    guard let b = taskPageBlocks.first(where: { $0.kind == kind }) else { preconditionFailure(\"no task page block \\(kind)\") }");
   lines.push("    return b");
+  lines.push("  }");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// The attributes that the date board edits.");
+  lines.push("enum RegistryDateBoardAttribute: String, Sendable, Hashable {");
+  for (const a of DATE_BOARD_ATTRIBUTES) lines.push(`  case ${a}`);
+  lines.push("}");
+  lines.push("");
+  lines.push("/// The closed set of date board rows. Each platform writes one handler per kind.");
+  lines.push("enum RegistryDateBoardRowKind: String, Sendable, Hashable {");
+  for (const k of DATE_BOARD_ROW_KINDS) lines.push(`  case ${k}`);
+  lines.push("}");
+  lines.push("");
+  lines.push("/// One row under the date board's day strip (`surfaces.json` `taskDateBoard.rows`).");
+  lines.push("struct RegistryDateBoardRow: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let kind: RegistryDateBoardRowKind");
+  lines.push("  let label: String");
+  lines.push("  /// Attribute → label that replaces `label` in that attribute's picker.");
+  lines.push("  let attributeLabels: [RegistryDateBoardAttribute: String]");
+  lines.push("  let sfSymbol: String");
+  lines.push("  let attributes: [RegistryDateBoardAttribute]");
+  lines.push("  let featureId: String");
+  lines.push("  func label(for attribute: RegistryDateBoardAttribute) -> String { attributeLabels[attribute] ?? label }");
+  lines.push("  /// The row shows in `attribute`'s picker on `platform` when its capability ships there (ADR 0015).");
+  lines.push("  func applies(to attribute: RegistryDateBoardAttribute, on platform: String) -> Bool {");
+  lines.push("    attributes.contains(attribute) && RegistryCapabilities.isAvailable(featureId, on: platform)");
   lines.push("  }");
   lines.push("}");
   lines.push("");
@@ -2055,6 +2153,7 @@ function generateKotlinCore(bundle) {
     destinations: bundle.dests,
     actions: bundle.actions,
     surfaces: bundle.surfaces,
+    plans: bundle.plans,
     conformance: bundle.conformance,
     localizations: bundle.translations,
   })) {
@@ -2192,6 +2291,7 @@ const destIds = validateDestinations(dests, icons, caps);
 validateActions(actions, icons, caps, destIds);
 validateSurfaces(surfaces, icons, caps, plans);
 checkOpensAttribute({ actions, surfaces });
+checkTaskDateBoard({ surfaces, icons, caps, actions });
 validateFirstRun(surfaces, icons, caps, settings);
 validatePlans(plans, icons, caps);
 validateConformance();
@@ -2222,11 +2322,44 @@ const bundle = {
   entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans, conformance,
   translations: { en: JSON.parse(L10N.englishFile(BY_KEY)), ...TRANSLATIONS },
 };
+/**
+ * docs/FEATURE_MAP.md: the capability ledger as a table. The prose feature map
+ * lives in Starlings Docs (/product/feature-map-septena-task-app) and joins to
+ * this table by Feature ID. No date or commit inside, so the file changes only
+ * when the ledger changes.
+ */
+function generateFeatureMap({ caps }) {
+  const LABELS = { ios: "iPhone", ipados: "iPad", macos: "Mac", web: "Web", android: "Android", windows: "Windows", watchos: "Watch" };
+  const CODES = { ships: "ships", partial: "partial", planned: "planned", not_applicable: "-" };
+  const rows = Object.entries(caps.capabilities);
+  const cell = (text) => String(text).replaceAll("|", "/");
+  const lines = [
+    "# Feature map: status per platform",
+    "",
+    "Generated by `scripts/gen-registries.mjs` from `registry/capabilities.json`. Do not edit: change the JSON and run the generator. `--check` fails when this file is out of date.",
+    "",
+    "The ledger says what is in the code on `main`, not what a store has released. How the features connect, and the words the app uses, are in Starlings Docs `/product/feature-map-septena-task-app`.",
+    "",
+    "**ships** is built, **partial** has known holes, **planned** is not built, **-** does not apply.",
+    "",
+    `| Status | ${caps.platforms.map((p) => LABELS[p] ?? p).join(" | ")} |`,
+    `|---|${caps.platforms.map(() => "---").join("|")}|`,
+    ...caps.statuses.map((st) => `| ${CODES[st] ?? st} | ${caps.platforms.map((p) => rows.filter(([, c]) => c[p] === st).length).join(" | ")} |`),
+    "",
+    `| ID | Feature | ${caps.platforms.map((p) => LABELS[p] ?? p).join(" | ")} |`,
+    `|---|---|${caps.platforms.map(() => "---").join("|")}|`,
+    ...rows.map(([id, c]) => `| \`${id}\` | ${cell(c.title)} | ${caps.platforms.map((p) => CODES[c[p]] ?? c[p]).join(" | ")} |`),
+    "",
+  ];
+  return lines.join("\n");
+}
+
 const outputs = [
   ["SeptenaCore/Generated/RegistryConstants.swift", generateSwift(bundle)],
   ["backend/src/generated/registries.ts", generateTS(bundle)],
   ["android/core/src/main/kotlin/app/septena/core/generated/RegistryConstants.kt", generateKotlinCore(bundle)],
   ["core/crates/septena-core/src/generated/registry.rs", generateRustCore(bundle)],
+  ["docs/FEATURE_MAP.md", generateFeatureMap(bundle)],
   ["registry/l10n/en.json", L10N.englishFile(BY_KEY)],
 ];
 // The catalog is shared with Xcode, which rewrites extraction state and

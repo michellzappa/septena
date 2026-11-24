@@ -19,7 +19,7 @@ struct SeptaskWatchSettingsSection: View {
           LabeledContent {
             Text(statusText).foregroundStyle(.secondary)
           } label: {
-            Label("Apple Watch", systemImage: "applewatch")
+            Label(RegistrySettings.copy("access_devices", "deviceWatch"), systemImage: "applewatch")
           }
         }
       }
@@ -90,7 +90,7 @@ struct SeptaskWatchSettingsPage: View {
         }
       }
     }
-    .navigationTitle("Apple Watch")
+    .navigationTitle(RegistrySettings.copy("access_devices", "deviceWatch"))
     .onAppear { bridge.refreshState() }
   }
 

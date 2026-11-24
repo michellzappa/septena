@@ -181,14 +181,6 @@
       "reason": "Reminder fields: reminders are not on Android yet.",
       "issue": "#174"
     },
-    "RegistryDestinationIds.AGENT": {
-      "reason": "The Agent list is planned on Android.",
-      "issue": "#242"
-    },
-    "RegistryDestinationIds.FADED": {
-      "reason": "Fade is not on Android yet.",
-      "issue": "#247"
-    },
     "RegistryRules.CUE_DECAY_DAYS": {
       "reason": "The shared core holds the agent-cue window (views.rs); Android calls it.",
       "issue": "#247"

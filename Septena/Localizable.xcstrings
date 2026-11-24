@@ -5,6 +5,10 @@
       "comment" : "Generated from registry plans.outcomes.agents.rows.links.cells.account. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "%@’s servers never run AI on your tasks. AI runs on your device, or in your own Claude when you connect it. Turn AI off and the app works the same, without conversations." : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.privateBody.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "%@ can no longer read or change your tasks. To use it again, connect it again." : {
       "comment" : "Generated from registry surfaces.prompts.items.disconnectAgent.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -1471,6 +1475,10 @@
       "comment" : "Generated from registry plans.prices.annual.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Above Areas & Projects" : {
+      "comment" : "Generated from registry settings.copy.smart_lists_editor.topHeader.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Açaí" : {
       "comment" : "Generated from registry tokens.fruitAccents.acai.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -1542,6 +1550,14 @@
           }
         }
       }
+    },
+    "Active %@" : {
+      "comment" : "Generated from registry settings.copy.access_devices.active.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Active %@ · not syncing" : {
+      "comment" : "Generated from registry settings.copy.access_devices.activeNotSyncing.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Activities, topics, and moments that consistently pull you in." : {
       "localizations" : {
@@ -1936,6 +1952,18 @@
         }
       }
     },
+    "Add time" : {
+      "comment" : "Generated from registry surfaces.taskDateBoard.rows.dateBoard.time.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar horário"
+          }
+        }
+      }
+    },
     "Add to Claude" : {
       "localizations" : {
         "pt-BR" : {
@@ -2111,6 +2139,10 @@
       "comment" : "Generated from registry settings.pages.devices_access.sections.connections.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "AI asks what you mean. Nothing happens until you answer." : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.confirmDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "AI diagnostics" : {
       "comment" : "Generated from registry settings.pages.advanced.sections.beta_ai.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -2162,6 +2194,10 @@
     "AI provider override" : {
 
     },
+    "AI’s turn: it’s working" : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.turnAI.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Aim %@" : {
 
     },
@@ -2199,6 +2235,10 @@
       "comment" : "Generated from registry plans.outcomes.nothing_lost.rows.logbook.cells.device. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "All dated tasks" : {
+      "comment" : "Generated from registry settings.copy.calendar_detail.scopeAll.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "All day" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
@@ -2232,6 +2272,10 @@
           }
         }
       }
+    },
+    "Always shown" : {
+      "comment" : "Generated from registry settings.copy.smart_lists_editor.alwaysShown.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Always your choice" : {
 
@@ -2299,6 +2343,10 @@
     "and" : {
 
     },
+    "Android" : {
+      "comment" : "Generated from registry settings.copy.access_devices.deviceAndroid.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Angry" : {
       "localizations" : {
         "pt-BR" : {
@@ -2341,6 +2389,10 @@
     },
     "Anyone can join a shared project for free. Plus lets you create one and invite people." : {
       "comment" : "Generated from registry plans.upsells.share_create.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Anything only you can do (pay, send) becomes one clear button." : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.handOffDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Anytime" : {
@@ -2419,7 +2471,7 @@
       }
     },
     "Apple Watch" : {
-      "comment" : "Generated from registry settings.pages.devices_access.sections.watch.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.copy.access_devices.deviceWatch.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Apple Watch through the server" : {
@@ -2428,6 +2480,14 @@
     },
     "Approve" : {
       "comment" : "Generated from registry surfaces.prompts.text.nameAgent.confirmTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Archive and utility lists shown below your areas and projects. Drag to reorder within a section, or use the arrow button to move a list above or below. Changes sync across all your devices." : {
+      "comment" : "Generated from registry settings.copy.smart_lists_editor.bottomFooter.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Archive and utility lists shown below your areas and projects. Use the arrows to reorder a list or to move it above or below. Changes sync across all your devices." : {
+      "comment" : "Generated from registry settings.copy.smart_lists_editor.bottomFooterButtons.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Archiving hides a medication from new dose logs but keeps its dose history and exports intact." : {
@@ -2749,6 +2809,10 @@
         }
       }
     },
+    "Below Areas & Projects" : {
+      "comment" : "Generated from registry settings.copy.smart_lists_editor.bottomHeader.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Between" : {
       "localizations" : {
         "pt-BR" : {
@@ -2758,6 +2822,10 @@
           }
         }
       }
+    },
+    "Beyond conversations, %@ learns small patterns locally, like the “Move to…” suggestion that predicts where a task belongs from your own history. That model trains on your device and never leaves it." : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.localBody.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Beyond conversations, %@ learns small things locally — like the “Move to…” suggestion that figures out where a task belongs from your own history. That model trains on your device and never leaves it." : {
 
@@ -2887,6 +2955,10 @@
         }
       }
     },
+    "Browser" : {
+      "comment" : "Generated from registry settings.copy.access_devices.deviceBrowser.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Buckets (tertiles, sorted by x)" : {
       "localizations" : {
         "pt-BR" : {
@@ -2943,6 +3015,10 @@
           }
         }
       }
+    },
+    "Calendar Feed (iCal)" : {
+      "comment" : "Generated from registry settings.copy.calendar_detail.feedHeader.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Calm" : {
       "localizations" : {
@@ -3027,6 +3103,10 @@
           }
         }
       }
+    },
+    "Capture" : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.captureTitle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Carambola" : {
       "comment" : "Generated from registry tokens.fruitAccents.carambola.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -3346,7 +3426,15 @@
       }
     },
     "Clear (Anytime)" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpar (A qualquer momento)"
+          }
+        }
+      }
     },
     "Clear %lld logged items from “%@”?" : {
       "comment" : "Generated from registry surfaces.prompts.items.clearLogged.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -3412,6 +3500,10 @@
           }
         }
       }
+    },
+    "Clear sync issues" : {
+      "comment" : "Generated from registry settings.copy.sync_diagnostics.clear.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Clear When" : {
       "comment" : "Generated from registry actions.actions.task.clearSchedule.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -3584,6 +3676,10 @@
           }
         }
       }
+    },
+    "Confirm" : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.confirmTitle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Connect an assistant to your tasks" : {
       "comment" : "Generated from registry surfaces.notices.items.getStarted.steps.connectAI.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -3867,6 +3963,10 @@
         }
       }
     },
+    "Copy Skill" : {
+      "comment" : "Generated from registry settings.copy.mcp_skills.copySkill.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Copy the setup prompt and paste it into Claude." : {
       "comment" : "Generated from registry surfaces.firstRun.steps.connectClaude.instructions.0. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -3878,6 +3978,10 @@
           }
         }
       }
+    },
+    "Copy URL" : {
+      "comment" : "Generated from registry settings.copy.calendar_detail.copyUrl.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Core" : {
       "localizations" : {
@@ -4013,6 +4117,10 @@
           }
         }
       }
+    },
+    "Current device" : {
+      "comment" : "Generated from registry settings.copy.access_devices.currentDevice.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Current Icon" : {
       "localizations" : {
@@ -4202,6 +4310,10 @@
           }
         }
       }
+    },
+    "Decide" : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.decideTitle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Decrease Text Size" : {
       "comment" : "Generated from registry actions.actions.app.textSizeDecrease.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -4636,6 +4748,10 @@
     },
     "Display & Behavior" : {
 
+    },
+    "Does what it can: a draft, a comparison. Uses the web or your Claude only when needed." : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.workDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Doing the hard thing" : {
       "localizations" : {
@@ -5873,6 +5989,10 @@
         }
       }
     },
+    "Hand off" : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.handOffTitle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Has notes" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
@@ -6145,6 +6265,10 @@
     },
     "How a task conversation moves" : {
 
+    },
+    "How AI helps" : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.title.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "How AI helps with your tasks" : {
       "comment" : "Generated from registry settings.pages.ai_preferences.sections.explainer.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -6437,6 +6561,10 @@
     "Inbox, Today, areas, and projects" : {
 
     },
+    "Include" : {
+      "comment" : "Generated from registry settings.copy.calendar_detail.include.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Include related goals" : {
 
     },
@@ -6570,6 +6698,10 @@
         }
       }
     },
+    "iPhone or iPad" : {
+      "comment" : "Generated from registry settings.copy.access_devices.deviceApplePhone.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Irritated" : {
       "localizations" : {
         "pt-BR" : {
@@ -6617,6 +6749,10 @@
     },
     "Join" : {
       "comment" : "Generated from registry plans.outcomes.agents.rows.share.cells.account. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Jot down the task. A few words are enough." : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.captureDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Joyful" : {
@@ -6851,6 +6987,10 @@
     },
     "Last 90 days" : {
       "comment" : "Generated from registry plans.outcomes.nothing_lost.rows.logbook.cells.account. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Last used %@" : {
+      "comment" : "Generated from registry settings.copy.access_agents.lastUsed.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Later" : {
@@ -7192,6 +7332,10 @@
         }
       }
     },
+    "Look up" : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.lookUpTitle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Loved" : {
       "localizations" : {
         "pt-BR" : {
@@ -7232,6 +7376,10 @@
           }
         }
       }
+    },
+    "Mac" : {
+      "comment" : "Generated from registry settings.copy.access_devices.deviceMac.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Macro tiles" : {
       "localizations" : {
@@ -7672,6 +7820,18 @@
     "Move %lld Tasks" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
+    "Move above Areas & Projects" : {
+      "comment" : "Generated from registry settings.copy.smart_lists_editor.moveAbove.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Move below Areas & Projects" : {
+      "comment" : "Generated from registry settings.copy.smart_lists_editor.moveBelow.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Move down" : {
+      "comment" : "Generated from registry settings.copy.smart_lists_editor.moveDown.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Move Down" : {
       "comment" : "Generated from registry actions.actions.area.moveDown.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -7776,6 +7936,10 @@
           }
         }
       }
+    },
+    "Move up" : {
+      "comment" : "Generated from registry settings.copy.smart_lists_editor.moveUp.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Move Up" : {
       "comment" : "Generated from registry actions.actions.area.moveUp.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -8175,7 +8339,15 @@
       }
     },
     "No Deadline" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem prazo"
+          }
+        }
+      }
     },
     "No Deleted Tasks" : {
       "comment" : "Generated from registry destinations.destinations.recentlyDeleted.emptyState.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -8485,6 +8657,10 @@
         }
       }
     },
+    "No smart lists in this section" : {
+      "comment" : "Generated from registry settings.copy.smart_lists_editor.empty.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "No Starred Tasks" : {
       "comment" : "Generated from registry destinations.destinations.starred.emptyState.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -8685,6 +8861,10 @@
         }
       }
     },
+    "Nothing important happens on its own. AI can fill in small, reversible details; any real decision or action that can’t be undone waits for your confirmation." : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.closing.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Nothing important happens on its own. The AI fills in small, reversible stuff; anything that's a real decision or can't be undone always waits for your tap." : {
 
     },
@@ -8861,6 +9041,14 @@
     "Off shows one flat list under Inbox, in the same order, with each task's list as a subtitle." : {
 
     },
+    "Offers a few options for you to pick. A harder call may use the cloud." : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.decideDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Offline" : {
+      "comment" : "Generated from registry settings.copy.syncStatus.offline.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "OK" : {
       "localizations" : {
         "pt-BR" : {
@@ -8878,6 +9066,10 @@
     },
     "On Automatic, every step runs on your device first — it leaves only for the steps on-device can't do (↗), never wholesale." : {
 
+    },
+    "On Automatic, every step runs on your device first. It reaches further only for steps your device can’t do (↗)." : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.flowFooter.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "On day" : {
       "comment" : "Generated from registry surfaces.taskDetail.monthlyRules.1.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -8910,6 +9102,18 @@
     },
     "On this device" : {
       "comment" : "Generated from registry plans.outcomes.nothing_lost.rows.history.cells.device. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "On this device · Sign in to sync" : {
+      "comment" : "Generated from registry settings.copy.account_profile_card.signInToSync.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "On-device" : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.runsOnDevice.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "On-device ↗" : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.runsReaches.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "On-device coaches that reflect your logged data back to you." : {
@@ -9036,6 +9240,10 @@
     },
     "Open a task or choose Keep to bring it back, or sweep the list to let the rest go." : {
       "comment" : "Generated from registry surfaces.notices.items.fadedPile.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Open in Calendar" : {
+      "comment" : "Generated from registry settings.copy.calendar_detail.openInCalendar.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Open Septena Life" : {
@@ -9414,7 +9622,26 @@
 
     },
     "Pick another date" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher outra data"
+          }
+        }
+      }
+    },
+    "Pick another date (%@)" : {
+      "comment" : "Generated from registry surfaces.taskDateBoard.rows.dateBoard.calendar.valueLabel. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher outra data (%@)"
+          }
+        }
+      }
     },
     "Pick up to %@ sections. Each one becomes a shortcut in the Home Screen long-press menu, opening directly into that section." : {
       "localizations" : {
@@ -9613,6 +9840,10 @@
         }
       }
     },
+    "Private iCal feed" : {
+      "comment" : "Generated from registry settings.copy.calendar_detail.feedToggle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "PROGRESS" : {
       "localizations" : {
         "pt-BR" : {
@@ -9683,6 +9914,10 @@
           }
         }
       }
+    },
+    "Pulls relevant context from your own data." : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.lookUpDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Pulls your highlights into the daily-message rotation. The token is kept in your Keychain, syncs to your other devices via iCloud Keychain, and is never sent to any Septena server." : {
 
@@ -9894,6 +10129,10 @@
           }
         }
       }
+    },
+    "Read-only subscription feed for your scheduled tasks and deadlines. Anyone with the private URL can read titles and notes in the feed; rotate or disable it anytime." : {
+      "comment" : "Generated from registry settings.copy.calendar_detail.feedFooter.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Reading the photo…" : {
 
@@ -10279,6 +10518,10 @@
         }
       }
     },
+    "Reset to Defaults" : {
+      "comment" : "Generated from registry settings.copy.smart_lists_editor.reset.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Restless" : {
       "localizations" : {
         "pt-BR" : {
@@ -10401,6 +10644,18 @@
           }
         }
       }
+    },
+    "Rotate Calendar Feed Link?" : {
+      "comment" : "Generated from registry settings.copy.calendar_detail.rotateTitle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Rotate Link" : {
+      "comment" : "Generated from registry settings.copy.calendar_detail.rotate.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Rotating replaces your private feed link immediately. Existing calendar subscriptions will stop updating until you re-subscribe with the new URL." : {
+      "comment" : "Generated from registry settings.copy.calendar_detail.rotateMessage.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Rows" : {
 
@@ -11359,6 +11614,10 @@
     "Shown next to your contributions. Up to 80 characters." : {
 
     },
+    "Shown when non-empty" : {
+      "comment" : "Generated from registry settings.copy.smart_lists_editor.whenNonEmpty.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Shows a one-tap chip on inbox rows and a suggested list while you type. The model trains locally on your history and never leaves your device." : {
 
     },
@@ -11373,12 +11632,20 @@
         }
       }
     },
+    "Sign in" : {
+      "comment" : "Generated from registry settings.copy.syncStatus.needsSignIn.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Sign in for a free account. The server then keeps a backup of that device, and you can try agents on real tasks." : {
       "comment" : "Generated from registry plans.cards.free.footnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Sign in for a free account. The server then keeps a backup of that device, you can join shared projects, and you can try agents." : {
       "comment" : "Generated from registry plans.cards.free.footnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Sign in to Septena sync to create a private calendar feed URL for Apple Calendar, Google Calendar, or Outlook." : {
+      "comment" : "Generated from registry settings.copy.calendar_detail.feedSignIn.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Sign in to sync" : {
@@ -11429,6 +11696,10 @@
     },
     "Sign out" : {
       "comment" : "Generated from registry actions.actions.account.signOut.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Sign out %@?" : {
+      "comment" : "Generated from registry settings.copy.access_devices.signOutTitle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Signing in…" : {
@@ -11579,6 +11850,14 @@
           }
         }
       }
+    },
+    "Some help is always on your device" : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.localHeader.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Some tasks need thinking before you can act. Tap Discuss and talk them through, right on the task." : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.intro.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Someday" : {
       "extractionState" : "stale",
@@ -12036,6 +12315,10 @@
         }
       }
     },
+    "Sync issues" : {
+      "comment" : "Generated from registry settings.copy.sync_diagnostics.issues.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Sync speed" : {
       "comment" : "Generated from registry plans.outcomes.everywhere.rows.live.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -12044,8 +12327,16 @@
       "comment" : "Generated from registry plans.actions.syncThisDevice. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Synced" : {
+      "comment" : "Generated from registry settings.copy.syncStatus.synced.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Synced, up to 10 GB" : {
       "comment" : "Generated from registry plans.outcomes.nothing_lost.rows.files.cells.plus. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Syncing" : {
+      "comment" : "Generated from registry settings.copy.syncStatus.syncing.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Syncing…" : {
@@ -12487,6 +12778,10 @@
         }
       }
     },
+    "That device stops syncing within the hour. Its tasks stay on it until you sign in there again." : {
+      "comment" : "Generated from registry settings.copy.access_devices.signOutMessage.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "The accent is shared with Septena — changing it here recolors Tasks there too." : {
 
     },
@@ -12502,6 +12797,10 @@
     },
     "The board ties suggestions to your Apple ID — sign in to iCloud, then come back." : {
 
+    },
+    "The brief did not load. Check your connection and open this page again." : {
+      "comment" : "Generated from registry settings.copy.mcp_skills.loadFailed.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "The brief that teaches a model how to use your tasks through the connection — tools, conventions, examples." : {
 
@@ -12866,6 +13165,10 @@
         }
       }
     },
+    "Timed tasks only" : {
+      "comment" : "Generated from registry settings.copy.calendar_detail.scopeTimed.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Tingling" : {
 
     },
@@ -13011,7 +13314,15 @@
       }
     },
     "Tomorrow" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
+      "comment" : "SeptaskKit localization pass 2026-08-09",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amanhã"
+          }
+        }
+      }
     },
     "Tomorrow · Health" : {
 
@@ -13277,6 +13588,10 @@
           }
         }
       }
+    },
+    "Unknown device" : {
+      "comment" : "Generated from registry settings.copy.access_devices.deviceUnknown.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Unlock %@" : {
       "extractionState" : "stale",
@@ -13916,6 +14231,10 @@
     "Withings sign-in expires periodically. Disconnect and connect again to re-authorize — the weigh-ins backfill on the next refresh." : {
 
     },
+    "Work" : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.workTitle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Work an agent finished appears here so you can check and accept it." : {
       "comment" : "Generated from registry destinations.destinations.review.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -13942,6 +14261,10 @@
     },
     "Working" : {
       "comment" : "Generated from registry destinations.destinations.agent.groups.working.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Working lists shown at the top of the sidebar." : {
+      "comment" : "Generated from registry settings.copy.smart_lists_editor.topFooter.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Working…" : {
@@ -14205,6 +14528,10 @@
       "comment" : "Generated from registry plans.cards.plus.points.3. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Your AI, never our servers" : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.privateHeader.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Your anonymous community identity. Useful when granting maintainer access from the server." : {
 
     },
@@ -14327,6 +14654,10 @@
       "comment" : "Generated from registry plans.labels.yourPlan. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Your Profile" : {
+      "comment" : "Generated from registry settings.copy.account_profile_card.yourProfile.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Your profile is tied to your Apple ID — sign in to iCloud, then come back to set one up." : {
 
     },
@@ -14432,6 +14763,10 @@
     },
     "Your turn" : {
       "comment" : "Generated from registry destinations.destinations.agent.groups.yourTurn.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Your turn: a question is waiting" : {
+      "comment" : "Generated from registry settings.copy.ai_explainer.turnYours.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Your unique handle on feature requests and comments. Leave blank to stay unnamed." : {

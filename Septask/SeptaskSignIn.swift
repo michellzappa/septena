@@ -129,7 +129,7 @@ struct SeptaskSyncAccountSection: View {
 
   private var statusLine: String {
     var parts: [String] = []
-    parts.append(sync.isSyncing ? "Syncing" : (sync.wsConnected ? "Live" : "Waiting for connection"))
+    parts.append(sync.isSyncing ? RegistrySettings.copy("syncStatus", "syncing") : (sync.wsConnected ? "Live" : "Waiting for connection"))
     if sync.pendingOps > 0 { parts.append("\(sync.pendingOps) to send") }
     if let last = sync.lastPull {
       parts.append("updated \(last.formatted(.relative(presentation: .named)))")

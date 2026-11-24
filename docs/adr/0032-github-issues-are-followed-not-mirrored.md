@@ -1,6 +1,6 @@
 # 0032. Follow GitHub issues, do not mirror them
 
-- Status: accepted (2026-11-24)
+- Status: superseded by [0033](0033-no-github-integration-issue-links-are-references.md)
 - Date: 2026-11-24
 - Deciders: mz
 - Amends: [ADR 0003](0003-external-links-run-server-side.md), for GitHub only

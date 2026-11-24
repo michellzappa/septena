@@ -376,6 +376,24 @@
       { "id": "taskPage.history", "kind": "history", "attribute": "history", "depths": ["page"], "featureId": "task.history", "editOnly": true }
     ]
   },
+  "taskDateBoard": {
+    "id": "taskDateBoard",
+    "rows": [
+      { "id": "dateBoard.tomorrow", "kind": "tomorrow", "label": "Tomorrow", "icon": "date.tomorrow", "attributes": ["when", "deadline"], "featureId": "task.when-deadline" },
+      { "id": "dateBoard.calendar", "kind": "calendar", "label": "Pick another date", "valueLabel": "Pick another date ({date})", "icon": "action.when", "attributes": ["when", "deadline"], "featureId": "task.when-deadline" },
+      {
+        "id": "dateBoard.clear",
+        "kind": "clear",
+        "label": "Clear (Anytime)",
+        "attributeLabels": [{ "attribute": "deadline", "label": "No Deadline" }],
+        "icon": "date.clear",
+        "attributes": ["when", "deadline"],
+        "featureId": "task.when-deadline"
+      },
+      { "id": "dateBoard.repeatRule", "kind": "repeatRule", "action": "task.repeat", "icon": "action.repeat", "attributes": ["when"], "featureId": "task.repeat" },
+      { "id": "dateBoard.time", "kind": "time", "label": "Add time", "icon": "date.time", "attributes": ["when"], "featureId": "task.when-deadline" }
+    ]
+  },
   "taskTagsPicker": {
     "id": "taskTagsPicker",
     "filterPlaceholder": "Filter or create tag…",
@@ -407,7 +425,6 @@
       "back": "Back",
       "selectDate": "Select",
       "noDate": "No date",
-      "clear": "Clear",
       "cancel": "Cancel",
       "noArea": "No area",
       "noProject": "No project",
