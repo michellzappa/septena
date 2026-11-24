@@ -1,4 +1,4 @@
-// Settings-root chrome shared by both shells (docs/SEPTASK.md): the disc
+// Settings-root chrome shared by both shells (docs/SEPTASK.md): the icon
 // tile for About rows and the top luminance wash — extracted from
 // SettingsView.swift so Septask's Settings can mirror the full app's look
 // without compiling its destination graph.
@@ -8,7 +8,7 @@ import SwiftUI
 /// The Settings-row and About-pane icon: renders the user's active Septena
 /// Upright Compass app icon (`AppearancePreferences.shared`) at any size,
 /// adapting to Light/Dark appearance.
-struct SeptenaDiscTile: View {
+struct SeptenaIconTile: View {
   var size: CGFloat = 29
   private let appearance = AppearancePreferences.shared
   @Environment(\.colorScheme) private var colorScheme

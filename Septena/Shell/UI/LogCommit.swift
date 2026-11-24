@@ -36,21 +36,6 @@ enum LogCommitStyle: Equatable {
   /// headline + caption instead of a streak count. Fired for training PRs
   /// and goal target/held rungs (see MilestonePresenter).
   case milestone(accent: Color, headline: String, caption: String)
-  /// The Septena mark "opening" — the seven logo discs burst outward from
-  /// center along their heptagonal vectors. `.spectrum` wears the canonical
-  /// rainbow (the everyday in-app celebration); `.gold` wears the foil and is
-  /// reserved for premium Septena+ moments (see `SeptenaPlusPaywall`).
-  case septenaOpen(headline: String, caption: String, palette: SeptenaMarkPalette)
-}
-
-/// Which coloring the seven-disc "open" flourish wears. The split is a brand
-/// rule, not a style knob: gold is reserved for premium (Septena+) moments;
-/// the spectrum is the everyday mark used anywhere in the app.
-enum SeptenaMarkPalette: Equatable {
-  /// The canonical seven-color spectrum (red → purple). Everyday, in-app.
-  case spectrum
-  /// The Septena+ foil. Reserved for premium moments only.
-  case gold
 }
 
 // MARK: - Center (the fire API)
@@ -137,9 +122,6 @@ struct LogCommitStyleView: View {
     case .milestone(let accent, let headline, let caption):
       IgnitionView(accent: accent, headline: headline, caption: caption,
                    trigger: trigger)
-    case .septenaOpen(let headline, let caption, let palette):
-      SeptenaOpenView(headline: headline, caption: caption,
-                      palette: palette, trigger: trigger)
     }
   }
 }
@@ -238,123 +220,6 @@ struct IgnitionView: View {
       withAnimation(.easeOut(duration: 0.4)) {
         numberScale = 1.15
         numberOpacity = 0
-      }
-    }
-  }
-}
-
-// MARK: - Septena open (the compass mark unfurling)
-
-/// Minimal upright North pointer shape for the 0° bearing of the celebration burst.
-private struct CompassNorthBurstPointer: Shape {
-  func path(in rect: CGRect) -> Path {
-    var p = Path()
-    let w = rect.width
-    let h = rect.height
-    p.move(to: CGPoint(x: w * 0.5, y: 0))
-    p.addLine(to: CGPoint(x: w, y: h))
-    p.addLine(to: CGPoint(x: w * 0.5, y: h * 0.78))
-    p.addLine(to: CGPoint(x: 0, y: h))
-    p.closeSubpath()
-    return p
-  }
-}
-
-/// The Septena Compass mark unfurling: the upright North pointer and six
-/// machined dial ticks start clustered tight at the center, then radiate
-/// outward along their 7-way compass bearings — growing as they expand before
-/// fading at the edges. The headline + caption spring in over the center.
-/// Honors Reduce Motion the same way (never rendered under it).
-struct SeptenaOpenView: View {
-  let headline: String
-  let caption: String
-  let palette: SeptenaMarkPalette
-  let trigger: Int
-
-  /// Radial distance traveled at `spread == 1`.
-  private let travel: CGFloat = 104
-
-  private func bearingColor(_ index: Int) -> Color {
-    switch palette {
-    case .spectrum: return SeptenaPlus.discColors[index % SeptenaPlus.discColors.count]
-    case .gold:     return SeptenaPlus.foil
-    }
-  }
-
-  /// Headline + caption color. Gold matches the foil; the spectrum's text
-  /// stays neutral so it doesn't compete with the seven bearings.
-  private var textColor: Color {
-    switch palette {
-    case .spectrum: return .primary
-    case .gold:     return SeptenaPlus.foil
-    }
-  }
-
-  @State private var spread: CGFloat = 0.0
-  @State private var dotScale: CGFloat = 0.12
-  @State private var dotOpacity: Double = 0
-  @State private var textScale: CGFloat = 0.5
-  @State private var textOpacity: Double = 0
-
-  var body: some View {
-    ZStack {
-      ForEach(0..<7, id: \.self) { index in
-        let deg = -90.0 + Double(index) * (360.0 / 7.0)
-        let rad = deg * .pi / 180.0
-        let dx = CGFloat(cos(rad))
-        let dy = CGFloat(sin(rad))
-        Group {
-          if index == 0 {
-            CompassNorthBurstPointer()
-              .fill(bearingColor(index))
-              .frame(width: 14, height: 18)
-          } else {
-            Capsule()
-              .fill(bearingColor(index))
-              .frame(width: 6, height: 16)
-              .rotationEffect(.degrees(deg + 90.0))
-          }
-        }
-        .scaleEffect(dotScale)
-        .opacity(dotOpacity)
-        .offset(x: dx * travel * spread, y: dy * travel * spread)
-      }
-      VStack(spacing: 2) {
-        Text(headline)
-          .scaledFont(size: 64, weight: .bold, relativeTo: .largeTitle)
-          .foregroundStyle(textColor)
-        Text(caption)
-          .font(.septenaBadge)
-          .foregroundStyle(textColor)
-      }
-      .scaleEffect(textScale)
-      .opacity(textOpacity)
-    }
-    // Gating happens at the call site (LogCommitOverlay / the paywall's own
-    // Reduce-Motion branch), so bare `withAnimation` here is safe.
-    .task(id: trigger) {
-      guard trigger > 0 else { return }
-      spread = 0.0; dotScale = 0.12; dotOpacity = 0
-      textScale = 0.5; textOpacity = 0
-      // Open: the discs radiate outward from a tight center cluster, growing
-      // the whole way out in one continuous motion.
-      withAnimation(.easeIn(duration: 0.12)) { dotOpacity = 0.95 }
-      withAnimation(.easeOut(duration: 1.1)) {
-        spread = 2.6
-        dotScale = 2.8
-      }
-      // Fade them out near the edges, after they've grown and traveled.
-      withAnimation(.easeOut(duration: 0.45).delay(0.7)) {
-        dotOpacity = 0
-      }
-      withAnimation(.spring(response: 0.45, dampingFraction: 0.6)) {
-        textScale = 1.0
-        textOpacity = 1.0
-      }
-      try? await Task.sleep(nanoseconds: 1_150_000_000)
-      withAnimation(.easeOut(duration: 0.4)) {
-        textScale = 1.15
-        textOpacity = 0
       }
     }
   }

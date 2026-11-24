@@ -2,8 +2,8 @@
 
 **Status:** P0–P4 landed, plus the app icon. Septask ships on iOS/iPad +
 native macOS with the real task UI, its own welcome and Settings, the
-same-device Darwin nudge, and its own icon — Septena's exact disc geometry,
-white discs on dark gray (#2C2C2E). Remaining before shipping: localization
+same-device Darwin nudge, and its own icon (the Compass,
+`docs/APP_ICON_DECISIONS.md`). Remaining before shipping: localization
 of new strings, on-device signed convergence test, App Store packaging.
 Web project links (P5) follow the native-sharing work per
 `docs/NATIVE_PROJECT_SHARING_SPEC.md`. Internal codename: **Septask**.
@@ -208,18 +208,12 @@ gap list; git holds the full narrative.
   subview's `convert(bounds, to: nil)`): a probe with hand-set frames will
   happily test empty space and report nonsense.
 
-## Icon Notes (2026-07-02)
+## Icon Notes
 
-Septask's icon is generated, not designed by hand — regenerate rather than
-retouch. Source of truth for geometry is `Septena/AppIcon.icon/Assets/
-discs.svg`, and every shipped Septena asset rasterizes the SVG's raw
-`cx`/`cy`/`r` **as 1024-canvas pixels, ignoring the viewBox transform** —
-match that convention or the discs land ~11px off. The Septask set
-(`Septask/AppIcon.icon` bundle with dark-gray fill + white discs,
-`Septask/Assets.xcassets` appiconset light/dark, `Septask/AppIcon.icns`)
-reuses Septena's own alpha channels for the light PNG and icns, so corner
-rounding and margins are bit-identical; the dark variant is transparent-bg
-white discs, self-masking, same as Septena's.
+The icon is generated, not designed by hand: regenerate rather than retouch.
+`tools/logo-builder/dial-svg.mjs` holds the geometry and
+`scripts/generate-app-icons.mjs` writes every icon set. Decisions:
+`docs/APP_ICON_DECISIONS.md`.
 
 ## P4 Findings (2026-07-02)
 
