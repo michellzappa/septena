@@ -168,6 +168,11 @@ final class KitSurfacePanel: NSPanel {
 /// (`.transient`), material and radius match everywhere, and the content's
 /// first responder is claimed on appear — without that the popover routes keys
 /// nowhere and the surface is mouse-only.
+///
+/// An anchor that sits in a pane with room for the surface (an inspector
+/// attribute row, `KitInlineSurfaceAnchor`) gets the surface folded open in
+/// the pane under it instead. The content, its keys and its commit contract
+/// do not change: only the container does (ADR 0029). The result is nil then.
 @MainActor
 enum KitPopover {
   @discardableResult
@@ -178,7 +183,12 @@ enum KitPopover {
                       preferredEdge: NSRectEdge = .maxY,
                       focus: NSView? = nil,
                       handle: KitPopoverHandle? = nil,
-                      onClose: (() -> Void)? = nil) -> NSPopover {
+                      onClose: (() -> Void)? = nil) -> NSPopover? {
+    if let inline = view as? KitInlineSurfaceAnchor, let host = inline.inlineHost {
+      let fold = host.foldOpen(content, size: size, under: view, focus: focus, onClose: onClose)
+      handle?.fold = fold
+      return nil
+    }
     let controller = KitPopoverController(content: content, focus: focus, onClose: onClose)
     if let size { controller.preferredContentSize = size }
     let popover = NSPopover()
@@ -200,7 +210,80 @@ enum KitPopover {
 @MainActor
 final class KitPopoverHandle {
   fileprivate weak var popover: NSPopover?
-  func close() { popover?.performClose(nil) }
+  /// Set instead of `popover` when the surface folded open in a pane.
+  fileprivate weak var fold: KitInlineFold?
+  func close() {
+    popover?.performClose(nil)
+    fold?.close()
+  }
+}
+
+// MARK: - Inline fold
+
+/// A control whose Tier 1 surface folds open in its own pane, under the
+/// control, instead of floating in a popover. The inspector's attribute rows
+/// are these (SeptaskKitInspector.swift): the pane has the room, so the
+/// picker sits under its row, as it does in its card on the iOS task page.
+@MainActor
+protocol KitInlineSurfaceAnchor: NSView {
+  /// The pane that holds the fold. Nil falls back to a popover.
+  var inlineHost: KitInlineSurfaceHost? { get }
+}
+
+/// The pane that places a fold. It owns where the fold goes and keeps only
+/// one fold open at a time.
+@MainActor
+protocol KitInlineSurfaceHost: AnyObject {
+  /// Put `content` in the pane under `anchor` and give `focus` the keyboard.
+  /// `size` is the size the content asked a popover for.
+  func foldOpen(_ content: NSView, size: NSSize?, under anchor: NSView,
+                focus: NSView?, onClose: (() -> Void)?) -> KitInlineFold
+  /// The anchor of another attribute's row in the same pane, for a surface
+  /// that hands off to the next one (When's Repeat row opens Repeat).
+  func inlineAnchor(forAttribute attributeId: String) -> KitSurfaceAnchor?
+}
+
+/// One open fold. The host holds it; a `KitPopoverHandle` holds it weakly,
+/// like a popover. `close()` is the popover's close: it runs `onClose`, so a
+/// close-commits surface (Repeat) commits its draft. `cancel()` folds it away
+/// WITHOUT `onClose`: a second click on the row is Cancel.
+@MainActor
+final class KitInlineFold {
+  let container: NSView
+  private let onClose: (() -> Void)?
+  private let onRemove: (KitInlineFold) -> Void
+  private var didEnd = false
+
+  init(container: NSView, onClose: (() -> Void)?,
+       onRemove: @escaping (KitInlineFold) -> Void) {
+    self.container = container
+    self.onClose = onClose
+    self.onRemove = onRemove
+  }
+
+  func close() { end(runOnClose: true) }
+
+  func cancel() { end(runOnClose: false) }
+
+  private func end(runOnClose: Bool) {
+    guard !didEnd else { return }
+    didEnd = true
+    // The commit first, while the content is still in the window: Repeat's
+    // pending draft ends field editing through it.
+    if runOnClose { onClose?() }
+    onRemove(self)
+  }
+}
+
+extension KitSurfaceAnchor {
+  /// The row for `attributeId` in the same pane, when this anchor is a row
+  /// that folds its surface open in a pane. Nil otherwise.
+  func inlineSibling(attribute attributeId: String) -> KitSurfaceAnchor? {
+    guard case .rect(_, let view) = self,
+          let inline = view as? KitInlineSurfaceAnchor,
+          let host = inline.inlineHost else { return nil }
+    return host.inlineAnchor(forAttribute: attributeId)
+  }
 }
 
 /// Hosts a popover's content in the shell's backdrop and reports its close
@@ -274,7 +357,8 @@ final class KitFilterSurface: NSObject, NSSearchFieldDelegate, NSTableViewDataSo
   private let panelSize: NSSize
   private let a11yTitle: String
   private var panel: KitSurfacePanel?
-  private weak var popover: NSPopover?
+  /// Closes the anchored surface: a popover, or a fold in a pane.
+  private let anchored = KitPopoverHandle()
   private var bodyConstraints: [NSLayoutConstraint] = []
 
   /// `size` is the centered panel's size; an anchored popover uses the same
@@ -336,14 +420,14 @@ final class KitFilterSurface: NSObject, NSSearchFieldDelegate, NSTableViewDataSo
     case .rect(let rect, let view):
       // Close whatever is already showing before the body moves — otherwise a
       // still-open popover is left holding nothing.
-      popover?.performClose(nil)
+      anchored.close()
       dismissPanel()
       detachBody()
       let size = NSSize(width: min(panelSize.width, 340), height: panelSize.height)
-      popover = KitPopover.present(body, size: size, relativeTo: rect, of: view,
-                                   focus: field)
+      KitPopover.present(body, size: size, relativeTo: rect, of: view,
+                         focus: field, handle: anchored)
     case .window:
-      popover?.performClose(nil)
+      anchored.close()
       detachBody()
       let panel = ensurePanel()
       panel.centerOverKeyWindow()
@@ -353,7 +437,7 @@ final class KitFilterSurface: NSObject, NSSearchFieldDelegate, NSTableViewDataSo
   }
 
   func dismiss() {
-    popover?.performClose(nil)
+    anchored.close()
     dismissPanel()
   }
 
