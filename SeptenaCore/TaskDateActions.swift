@@ -42,14 +42,14 @@ extension TaskMutator {
   /// (every date action is engagement). `mode` answers the fixed-repeat
   /// question for A1 / A2; callers that show the prompt pass the user's
   /// answer.
-  @discardableResult
+  /// Returns nothing: shells call it from `() -> Void` closures.
   func apply(_ action: TaskDateAction, to id: String,
-             mode: RecurrenceRescheduleMode = .makeException) -> Bool {
+             mode: RecurrenceRescheduleMode = .makeException) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] apply(date action) called before CK bound — dropping", nil)
-      return false
+      return
     }
-    return cloudBackend.applyDateAction(id: id, action: action, mode: mode)
+    cloudBackend.applyDateAction(id: id, action: action, mode: mode)
   }
 
   /// A4. Toggle Today for a selection. If every task is on Today (by pin OR
