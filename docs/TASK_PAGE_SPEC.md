@@ -12,7 +12,7 @@ the structure; each platform renders it in its standard toolkit (ADR 0028).
 | Field | Meaning |
 |---|---|
 | `blocks[]` | Ordered. Each block: `id`, `kind`, `depths`, `featureId`, optional `editOnly`. |
-| `kind` | Closed set: `header`, `notes`, `attributes`, `checklist`, `attachments`, `conversation`, `history`. Each platform writes one renderer per kind. |
+| `kind` | Closed set: `header`, `notes`, `attributes`, `checklist`, `attachments`, `conversation`, `provenance`, `history`. Each platform writes one renderer per kind. |
 | `depths` | `["inline", "page"]` or `["page"]`. |
 | `attributes` block | Renders the `taskAttributes` entries in their registry order. It holds no list of its own. |
 
@@ -26,6 +26,7 @@ First cut:
 | checklist | checklist | yes (from its pill) | yes |
 | attachments | attachments | yes (from its pill) | yes |
 | conversation | conversation | no | yes |
+| provenance | provenance ("Added by": the agent's name or "You", and when) | no | yes |
 | history | history | no | yes |
 
 The generator checks:

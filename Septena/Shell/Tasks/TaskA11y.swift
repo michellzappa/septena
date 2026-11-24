@@ -81,7 +81,9 @@ enum TaskA11y {
   // MARK: Row
 
   /// Combined row announce: title, optional notes, heading vs task.
-  static func rowLabel(title: String, hasNotes: Bool, isHeading: Bool) -> String {
+  /// `addedBy` is the row's provenance phrase ("Added by Claude") for a task
+  /// an agent added; the row glyph is silent, so the row label speaks it.
+  static func rowLabel(title: String, hasNotes: Bool, isHeading: Bool, addedBy: String? = nil) -> String {
     let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
     let base = trimmed.isEmpty
       ? (isHeading
@@ -91,8 +93,10 @@ enum TaskA11y {
                   comment: "A11y: task with empty title"))
       : trimmed
     if isHeading { return base }
-    if hasNotes { return "\(base), \(Self.hasNotes)" }
-    return base
+    var parts = [base]
+    if hasNotes { parts.append(Self.hasNotes) }
+    if let addedBy { parts.append(addedBy) }
+    return parts.joined(separator: ", ")
   }
 
   // MARK: Sidebar / headers

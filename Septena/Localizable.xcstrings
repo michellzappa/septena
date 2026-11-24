@@ -1936,6 +1936,18 @@
     "Add your own" : {
 
     },
+    "Added by" : {
+      "comment" : "Generated from registry surfaces.taskPage.blocks.taskPage.provenance.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionado por"
+          }
+        }
+      }
+    },
     "Added by Claude, not yet seen" : {
       "localizations" : {
         "pt-BR" : {
@@ -13832,6 +13844,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ontem"
+          }
+        }
+      }
+    },
+    "You" : {
+      "comment" : "Generated from registry surfaces.taskPage.blocks.taskPage.provenance.selfLabel. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você"
           }
         }
       }

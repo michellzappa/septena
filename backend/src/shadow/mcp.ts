@@ -45,7 +45,8 @@ import {
   matchesView,
   normalizeView,
 } from "../tools/taskShared.js";
-import { MCP_READ_SCOPE, MCP_WRITE_SCOPE, hasScope, verifyMcpAccess, type McpGrant } from "./tokens.js";
+import { MCP_CLIENT_PREFIX, MCP_READ_SCOPE, MCP_WRITE_SCOPE, hasScope, verifyMcpAccess, type McpGrant } from "./tokens.js";
+import { getClient } from "../storage.js";
 import { type StoreRpc, type WriteToolName, WRITE_TOOL_NAMES, rpcStoreFor, runWriteTool, zWriteArgs } from "./writes.js";
 import { AGENT_TOOLS, type AgentToolName, agentStage, runAgentTool, zAgentArgs } from "./agent.js";
 import { NOTES_READ_TOOLS, NOTES_TOOLS, type NotesToolName, notesForTask, runNotesTool, zNotesArgs } from "./notes.js";
@@ -250,8 +251,11 @@ async function callTool(
     if (!args.success) return invalidArgs(id, args.error, era);
     const refused = await gateConnectorWrite(env, grant.userId, "mcp_write");
     if (refused) return rpcResult(id, { isError: true, content: [{ type: "text", text: refused }] }, era);
+    // The connection's registered client name is the author a created task
+    // names ("Added by Claude Code"). One KV read per write call.
+    const agentName = (await getClient(env, grant.clientId, MCP_CLIENT_PREFIX))?.name;
     const result = await runWriteTool(
-      { store, timeZone },
+      { store, timeZone, agentName },
       name as WriteToolName,
       args.data as Record<string, unknown>,
     );

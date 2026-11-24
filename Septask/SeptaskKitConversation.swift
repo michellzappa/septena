@@ -252,7 +252,7 @@ final class KitConversationView: NSView {
     }
     if let assignee = convo.assignee {
       let who = switch assignee {
-      case .me: String(localized: "You", comment: "SeptaskKit: conversation assignee")
+      case .me: RegistrySurfaces.provenanceSelfLabel
       case .local: String(localized: "On-device AI", comment: "SeptaskKit: conversation assignee")
       case .claude: String(localized: "Claude", comment: "SeptaskKit: conversation assignee")
       }

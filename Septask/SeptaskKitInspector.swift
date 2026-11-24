@@ -50,6 +50,11 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// Who changed the task and what (SeptaskKitHistory.swift). Loads only
   /// while open.
   private let historyView = KitHistoryView()
+  /// Who added the task and when (`taskPage.provenance`): permanent,
+  /// read-only metadata. The glyph shows only for an agent author.
+  private let provenanceLabel = NSTextField(labelWithString: "")
+  private let provenanceGlyph = NSImageView()
+  private let provenanceValue = NSTextField(labelWithString: "")
   /// The pane's own close control — the VISIBLE twin of `cancelOperation`'s
   /// Escape handling. The inspector is a plain split-view item with no title
   /// bar of its own, so without this the only ways out are Escape and ⌥⌘I,
@@ -163,6 +168,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       case .checklist: last = addChecklistBlock(block)
       case .attachments: last = addAttachmentsBlock(block)
       case .conversation: last = addConversationBlock(block)
+      case .provenance: last = addProvenanceBlock(block)
       case .history: last = addHistoryBlock()
       }
       if let last { form.setCustomSpacing(14, after: last) }
@@ -345,6 +351,27 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     return conversationView
   }
 
+  /// Provenance: the "Added by" heading and one line under it — the agent
+  /// glyph (agent rows only) and "Claude · 24 Nov 2026 at 09:03" or "You · …".
+  private func addProvenanceBlock(_ block: RegistryTaskPageBlock) -> NSView {
+    styleHeading(provenanceLabel, block)
+    provenanceGlyph.image = NSImage(systemSymbolName: RegistrySurfaces.provenanceAgentSymbol,
+                                    accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 11, weight: .regular))
+    provenanceGlyph.contentTintColor = SeptaskKitTheme.inkSecondary
+    provenanceGlyph.kitA11yIgnore()
+    provenanceValue.font = SeptaskKitTheme.meta
+    provenanceValue.textColor = .labelColor
+    provenanceValue.isSelectable = true
+    let line = NSStackView(views: [provenanceGlyph, provenanceValue])
+    line.orientation = .horizontal
+    line.alignment = .centerY
+    line.spacing = 5
+    form.addArrangedSubview(provenanceLabel)
+    form.addArrangedSubview(line)
+    return line
+  }
+
   /// History: the registry `history` attribute as a button (the SwiftUI rail
   /// shows it as a pill), and the panel it opens. The log loads only while
   /// the panel is open (`KitHistoryView`).
@@ -518,6 +545,8 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// The dates/list/repeat controls — safe to resync on every re-show,
   /// same-task or not, since nothing here is a live text edit in progress.
   private func refreshReadOnlyFields(_ next: SeptenaTask) {
+    provenanceGlyph.isHidden = !next.isAgentAuthored
+    provenanceValue.stringValue = next.addedByDetail
     let whenBase: String = if next.today {
       TaskFilter.today.title
     } else if let scheduled = next.scheduled {

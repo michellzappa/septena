@@ -429,6 +429,10 @@ struct TaskComposerCard: View {
     case .conversation:
       guard let task = editingTask else { return AnyView(EmptyView()) }
       return AnyView(ConversationSection(task: task, accent: accent))
+    case .provenance:
+      // Who added the task and when: permanent metadata, read-only.
+      guard let task = editingTask else { return AnyView(EmptyView()) }
+      return AnyView(TaskProvenanceSection(task: task, label: block.label ?? ""))
     }
   }
 
