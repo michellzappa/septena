@@ -136,6 +136,16 @@ test("api.septena.app connector tools match issue #85 read-only and destructive 
     "tasks_history",
   ]);
   const expectedDestructive = new Set(["tasks_complete", "tasks_update", "tasks_checklist_delete"]);
+  const expectedNonIdempotent = new Set([
+    "tasks_create",
+    "tasks_update",
+    "tasks_thread_append",
+    "tasks_checklist_add",
+    "tasks_claim",
+    "tasks_notes_log",
+    "tasks_area_create",
+    "tasks_project_create",
+  ]);
 
   assert.equal(apiConnectorNames.size, allTools.length, "tool definitions and handlers must match 1:1");
 
@@ -145,12 +155,18 @@ test("api.septena.app connector tools match issue #85 read-only and destructive 
     if (expectedReadOnly.has(name)) {
       assert.equal(tool.annotations.readOnlyHint, true, `${name} must be readOnlyHint: true`);
       assert.equal(tool.annotations.destructiveHint, false, `${name} must be destructiveHint: false`);
+      assert.equal(tool.annotations.idempotentHint, true, `${name} must be idempotentHint: true`);
     } else {
       assert.equal(tool.annotations.readOnlyHint, false, `${name} must be readOnlyHint: false`);
       assert.equal(
         tool.annotations.destructiveHint,
         expectedDestructive.has(name),
         `${name} destructiveHint mismatch`,
+      );
+      assert.equal(
+        tool.annotations.idempotentHint,
+        !expectedNonIdempotent.has(name),
+        `${name} idempotentHint mismatch`,
       );
     }
   }

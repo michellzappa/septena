@@ -133,6 +133,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 
 | Doc | Status |
 |---|---|
+| [CONNECTOR_DIRECTORY_SUBMISSION.md](CONNECTOR_DIRECTORY_SUBMISSION.md) | ready for mz to submit (#85): Claude & ChatGPT directory packet |
 | [agent-provenance-spec.md](agent-provenance-spec.md) | superseded in part (permanent provenance shipped 2026-11-24) |
 | [agent-provenance-gateway-handoff.md](agent-provenance-gateway-handoff.md) | landed — historical |
 | [CORE_AI_iOS27_PREP.md](CORE_AI_iOS27_PREP.md) | research, pre-implementation |

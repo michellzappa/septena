@@ -170,7 +170,7 @@ export const TASK_TOOLS: Tool[] = [
     title: "Update task",
     description: "Update fields on an existing task. Any subset of title, today, scheduled, deadline, area, project, status (cancelled), notes, refs (add or update by key) and refs_remove. To add to the notes, prefer notes_append (one new line at the end) or notes_section (replace the text under one heading) over resending the whole body, and pass notes_rev from tasks_get so an edit made since your read is refused, not overwritten.",
     inputSchema: updateTaskJsonSchema,
-    annotations: { title: "Update task", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { title: "Update task", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   },
   {
     name: "tasks_defer",
