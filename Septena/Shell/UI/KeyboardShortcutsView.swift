@@ -24,12 +24,14 @@ struct KeyboardShortcutGroup: Identifiable {
 
 enum KeyboardShortcutsCatalogue {
   // Navigation differs per shell: Septena's tab hops + smart-list jumps vs
-  // Septask's plain ⌘1–4 smart lists (its Go menu — see SeptaskApp).
-  private static var navigation: KeyboardShortcutGroup {
+  // Septask's plain ⌘-digit smart lists (its Go menu), numbered by the
+  // user's sidebar.
+  @MainActor private static var navigation: KeyboardShortcutGroup {
     #if SEPTASK
-    let items: [KeyboardShortcut2] = RegistryDestinations.all.compactMap { dest in
-      guard let caps = dest.shortcutKeycaps, dest.applies(to: RegistryPlatform.current) else { return nil }
-      return KeyboardShortcut2(keys: caps, label: dest.title)
+    let prefs = SmartListPreferences.shared
+    let digits = prefs.digitShortcuts
+    let items: [KeyboardShortcut2] = prefs.enabledDestinations.compactMap { dest in
+      digits[dest.id].map { KeyboardShortcut2(keys: $0.keycaps, label: dest.title) }
     }
     return KeyboardShortcutGroup(title: "Navigation", shortcuts: items)
     #else
@@ -100,7 +102,7 @@ enum KeyboardShortcutsCatalogue {
     #endif
   }
 
-  static let groups: [KeyboardShortcutGroup] = [
+  @MainActor static var groups: [KeyboardShortcutGroup] { [
     navigation,
     generalGroup,
     taskList,
@@ -111,7 +113,7 @@ enum KeyboardShortcutsCatalogue {
       KeyboardShortcut2(keys: ["return"], label: "Save the open edit form"),
       KeyboardShortcut2(keys: ["esc"], label: "Cancel the open edit form"),
     ]),
-  ]
+  ] }
 }
 
 struct KeyboardShortcutsView: View {
