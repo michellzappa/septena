@@ -24,55 +24,40 @@ struct ReviewTaskRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      HStack(alignment: .top, spacing: Theme.iconTextGap) {
-        Image(systemName: "eye")
-          .font(.septenaCaption)
-          .foregroundStyle(Color.yellow)
-          .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
-          .accessibilityHidden(true)
-
-        VStack(alignment: .leading, spacing: 3) {
-          Text(task.title)
-            .font(.septenaTaskTitle)
-            .foregroundStyle(.primary)
-            .lineLimit(2)
-          Text(checkNote)
-            .font(.septenaMeta)
+      VStack(alignment: .leading, spacing: 3) {
+        Text(task.title)
+          .font(.septenaTaskTitle)
+          .foregroundStyle(.primary)
+          .lineLimit(2)
+        Text(checkNote)
+          .font(.septenaMeta)
+          .foregroundStyle(Theme.inkSecondary)
+          .lineLimit(3)
+        if let artifact = task.conversation.artifact, !artifact.title.isEmpty {
+          Label(artifact.title, systemImage: "doc.text")
+            .font(.septenaCaption)
             .foregroundStyle(Theme.inkSecondary)
-            .lineLimit(3)
-          if task.linkedIssue != nil || task.conversation.artifact != nil {
-            HStack(spacing: 8) {
-              if let issue = task.linkedIssue {
-                Label(issue.shortLabel, systemImage: issue.symbolName)
-                  .font(.septenaCaption)
-                  .foregroundStyle(Theme.inkSecondary)
-              }
-              if let artifact = task.conversation.artifact, !artifact.title.isEmpty {
-                Label(artifact.title, systemImage: "doc.text")
-                  .font(.septenaCaption)
-                  .foregroundStyle(Theme.inkSecondary)
-                  .lineLimit(1)
-              }
-            }
-          }
+            .lineLimit(1)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
-        .onTapGesture(perform: onOpen)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .contentShape(Rectangle())
+      .onTapGesture(perform: onOpen)
 
-        HStack(spacing: 6) {
-          Button("Send back") {
-            a11yAnimate { showingSendBack.toggle() }
-          }
-          .buttonStyle(.bordered)
-          .controlSize(.small)
-
-          Button(RegistryActions.title("task.acceptReview")) {
-            onAccept()
-          }
-          .buttonStyle(.borderedProminent)
-          .controlSize(.small)
+      // Actions sit on their own row under the text, so a long title or
+      // note never fights the buttons for width.
+      HStack(spacing: 8) {
+        Button("Send back") {
+          a11yAnimate { showingSendBack.toggle() }
         }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+
+        Button(RegistryActions.title("task.acceptReview")) {
+          onAccept()
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.small)
       }
 
       if showingSendBack {
@@ -85,7 +70,6 @@ struct ReviewTaskRow: View {
             .controlSize(.small)
             .disabled(noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
-        .padding(.leading, Theme.checkboxTap + Theme.iconTextGap)
       }
     }
     .padding(.horizontal, TaskCardMetrics.headerLeading)

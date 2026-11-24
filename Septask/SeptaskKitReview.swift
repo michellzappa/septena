@@ -11,7 +11,6 @@ import AppKit
 
 @MainActor
 final class KitReviewTaskCell: NSTableCellView {
-  private let glyph = NSImageView()
   private let titleLabel = NSTextField(labelWithString: "")
   private let noteLabel = NSTextField(wrappingLabelWithString: "")
   private let metaLabel = NSTextField(labelWithString: "")
@@ -28,12 +27,6 @@ final class KitReviewTaskCell: NSTableCellView {
   init(identifier: NSUserInterfaceItemIdentifier) {
     super.init(frame: .zero)
     self.identifier = identifier
-
-    glyph.translatesAutoresizingMaskIntoConstraints = false
-    glyph.image = NSImage(systemSymbolName: "eye", accessibilityDescription: nil)?
-      .withSymbolConfiguration(.init(pointSize: SeptenaTypeScale.size(.footnote), weight: .medium))
-    glyph.contentTintColor = .systemYellow
-    glyph.kitA11yIgnore()
 
     titleLabel.font = SeptaskKitTheme.taskTitle
     titleLabel.lineBreakMode = .byTruncatingTail
@@ -81,30 +74,27 @@ final class KitReviewTaskCell: NSTableCellView {
     buttons.setContentHuggingPriority(.required, for: .horizontal)
     buttons.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-    addSubview(glyph)
     addSubview(textStack)
     addSubview(buttons)
 
-    leadingConstraint = glyph.leadingAnchor.constraint(
+    // Actions sit on their own row under the text, so a long title or note
+    // never fights the buttons for width.
+    leadingConstraint = textStack.leadingAnchor.constraint(
       equalTo: leadingAnchor,
       constant: KitCardRowView.horizontalInset + SeptaskKitLayout.rowLeadingPad)
-    trailingConstraint = buttons.trailingAnchor.constraint(
+    trailingConstraint = textStack.trailingAnchor.constraint(
       equalTo: trailingAnchor,
       constant: -(KitCardRowView.horizontalInset + 10))
 
     NSLayoutConstraint.activate([
       leadingConstraint,
-      glyph.topAnchor.constraint(equalTo: topAnchor, constant: 10),
-      glyph.widthAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
-      glyph.heightAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
-
-      textStack.leadingAnchor.constraint(equalTo: glyph.trailingAnchor, constant: 7),
-      textStack.topAnchor.constraint(equalTo: topAnchor, constant: 10),
-      textStack.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -10),
-      textStack.trailingAnchor.constraint(equalTo: buttons.leadingAnchor, constant: -12),
-
       trailingConstraint,
-      buttons.centerYAnchor.constraint(equalTo: centerYAnchor),
+      textStack.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+
+      buttons.leadingAnchor.constraint(equalTo: textStack.leadingAnchor),
+      buttons.topAnchor.constraint(equalTo: textStack.bottomAnchor, constant: Self.buttonGap),
+      buttons.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -10),
+      buttons.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -10),
     ])
   }
 
@@ -172,20 +162,18 @@ final class KitReviewTaskCell: NSTableCellView {
   }
 
   static func metaSummary(for task: SeptenaTask) -> String? {
-    var parts: [String] = []
-    if let issue = task.linkedIssue {
-      parts.append(issue.fullLabel)
-    }
     if let artifact = task.conversation.artifact, !artifact.title.isEmpty {
-      parts.append(artifact.title)
+      return artifact.title
     }
-    return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    return nil
   }
+
+  private static let buttonGap: CGFloat = 8
+  private static let buttonRowHeight: CGFloat = 22
 
   static func height(for task: SeptenaTask, width: CGFloat) -> CGFloat {
     let inset = SeptaskKitLayout.inset(for: max(width, 360))
-    // Reserve leading glyph + padding + trailing buttons (~170pt).
-    let textWidth = max(140, width - inset * 2 - SeptaskKitLayout.rowLeadingPad - KitCheckboxView.tapSize - 195)
+    let textWidth = max(140, width - inset * 2 - SeptaskKitLayout.rowLeadingPad - 10)
     let note = noteText(for: task) as NSString
     let noteRect = note.boundingRect(
       with: NSSize(width: textWidth, height: 60),
@@ -196,7 +184,7 @@ final class KitReviewTaskCell: NSTableCellView {
     let metaHeight: CGFloat = metaSummary(for: task) == nil
       ? 0
       : 3 + ceil(SeptaskKitTheme.chip.ascender - SeptaskKitTheme.chip.descender) + 2
-    return max(58, 10 + titleHeight + 3 + noteHeight + metaHeight + 10)
+    return 10 + titleHeight + 3 + noteHeight + metaHeight + buttonGap + buttonRowHeight + 10
   }
 }
 
