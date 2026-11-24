@@ -18,6 +18,7 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -272,6 +273,8 @@ private fun TaskRow(
             onClick = { onOpenTask(task.id) },
             onLongClick = { menuExpanded = true },
         ),
+        // Transparent so the header texture shows behind the first rows, as on iPhone.
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = {
             Text(
                 text = task.title,

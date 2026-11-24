@@ -4226,6 +4226,10 @@
         }
       }
     },
+    "Dark" : {
+      "comment" : "Generated from registry settings.keys.appearanceMode.options.2.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Dashboard" : {
       "localizations" : {
         "pt-BR" : {
@@ -6012,6 +6016,10 @@
         }
       }
     },
+    "Header Texture" : {
+      "comment" : "Generated from registry settings.pages.appearance.sections.appearance.items.0.parts.texture.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Health access denied" : {
       "localizations" : {
         "pt-BR" : {
@@ -7106,7 +7114,7 @@
       }
     },
     "Light" : {
-      "comment" : "Generated from registry settings.keys.pccReasoning.options.0.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.keys.appearanceMode.options.1.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -10210,6 +10218,14 @@
         }
       }
     },
+    "Refreshes daily · pauses under Reduce Motion and Low Power." : {
+      "comment" : "Generated from registry settings.pages.appearance.sections.appearance.items.0.parts.motion.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Refreshes daily · pauses when animations are off or Battery Saver is on." : {
+      "comment" : "Generated from registry settings.pages.appearance.sections.appearance.items.0.parts.motion.platformDetails.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Register a Withings dev app at developer.withings.com (Public Health Data API), then add your client_id and client_secret to Config/Secrets.xcconfig (copy it from Config/Secrets.example.xcconfig) and rebuild. The redirect URI should be septena://withings/callback." : {
       "localizations" : {
         "pt-BR" : {
@@ -11801,6 +11817,10 @@
         }
       }
     },
+    "Slow drift" : {
+      "comment" : "Generated from registry settings.pages.appearance.sections.appearance.items.0.parts.motion.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Small" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12366,6 +12386,10 @@
           }
         }
       }
+    },
+    "System" : {
+      "comment" : "Generated from registry settings.keys.appearanceMode.options.0.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Tactile" : {
       "comment" : "Generated from registry tokens.textures.washiPaper.tag. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

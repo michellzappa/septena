@@ -56,6 +56,10 @@
     "watch.app": { "title": "Apple Watch app", "ios": "not_applicable", "ipados": "not_applicable", "macos": "not_applicable", "web": "not_applicable", "android": "not_applicable", "windows": "not_applicable", "watchos": "ships" },
     "data.import-export": { "title": "Export as JSON, Markdown or CSV; import JSON with a preview", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
     "agents.list": { "title": "Connected agents: list, name, disconnect", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "settings.display": { "title": "Display, badge and privacy preferences", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" }
+    "settings.display": { "title": "Display, badge and privacy preferences", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
+    "appearance.accents": { "title": "Accent colors (Colorful and the fruit accents)", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
+    "appearance.textures": { "title": "Header textures with intensity and slow drift", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
+    "appearance.mode": { "title": "Light, dark or system appearance", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
+    "appearance.text-size": { "title": "Text size", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" }
   }
 }

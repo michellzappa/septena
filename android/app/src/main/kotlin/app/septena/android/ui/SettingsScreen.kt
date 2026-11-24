@@ -354,6 +354,10 @@ private fun SettingsRegistryRow(
             val key = item.key ?: return
             val definition = definitions[key] ?: return
             val label = item.label ?: return
+            if (key == RegistrySettingKeys.TEXT_SIZE_STEP) {
+                TextSizeSettingRow(label, languageTag)
+                return
+            }
             RegistrySettingControl(
                 key = key,
                 label = label,
@@ -376,6 +380,7 @@ private fun SettingsRegistryRow(
                 }
                 "access_devices" -> AccessDevicesList(accessModel, signedIn, languageTag)
                 "access_agents" -> AccessAgentsList(accessModel, signedIn, languageTag)
+                APPEARANCE_PICKER_SURFACE -> AppearancePicker(languageTag)
                 "account_profile_editor" -> {
                     val key = item.ownsKeys.firstOrNull() ?: return
                     val definition = definitions[key] ?: return

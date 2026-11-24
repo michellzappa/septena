@@ -278,6 +278,24 @@
       "issue": "#260"
     },
     {
+      "file": "Septena/Shell/UI/AppearancePickerView.swift",
+      "literal": "Header Texture",
+      "reason": "The accent_color item parts in settings.json own this copy since #371 (Android reads them); the Apple picker still spells it out.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/AppearancePickerView.swift",
+      "literal": "Slow drift",
+      "reason": "The accent_color item parts in settings.json own this copy since #371 (Android reads them); the Apple picker still spells it out.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/AppearancePickerView.swift",
+      "literal": "Refreshes daily · pauses under Reduce Motion and Low Power.",
+      "reason": "The accent_color item parts in settings.json own this copy since #371 (Android reads them); the Apple picker still spells it out.",
+      "issue": "#260"
+    },
+    {
       "file": "Septena/Shell/UI/KeyboardShortcutsView.swift",
       "literal": "General",
       "reason": "Placeholder, section title or label with no registry field yet.",

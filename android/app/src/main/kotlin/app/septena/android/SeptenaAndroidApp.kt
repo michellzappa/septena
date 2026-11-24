@@ -5,6 +5,7 @@ import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import app.septena.android.auth.AppCredentials
 import app.septena.android.auth.SessionStore
 import app.septena.android.sync.SyncController
+import app.septena.android.ui.AppearanceStore
 import app.septena.core.ConversationMutator
 import app.septena.core.ConversationRules
 import app.septena.core.RecurrenceRules
@@ -64,6 +65,7 @@ class AndroidAppGraph(application: Application) {
     val taskBackend = SeptenaTaskBackendClient(credentials, clientVersion)
     val attachments = TaskAttachmentStore(application, taskStore, registryEntityMutator, clock, taskBackend)
     val sync = SyncController(TaskSyncEngine(taskStore, transport, clock), appScope, afterSync = ::afterSync)
+    val appearance = AppearanceStore(deviceSettings, syncedSettings, syncedSettingsMutator, sync, clock, appScope)
 
     /** The app day the fade pass last ran in this process. */
     @Volatile private var lastFadePassDay: String? = null

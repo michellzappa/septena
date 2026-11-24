@@ -340,7 +340,8 @@
     "text": "Appearance",
     "paths": [
       "settings.rootGroups.appearance_root.items.0.label",
-      "settings.pages.appearance.title"
+      "settings.pages.appearance.title",
+      "settings.pages.appearance.sections.appearance.items.0.parts.mode.label"
     ]
   },
   "Apple Intelligence": {
@@ -749,6 +750,12 @@
     "text": "Daily change limit reached",
     "paths": [
       "plans.upsells.connector_cap.title"
+    ]
+  },
+  "Dark": {
+    "text": "Dark",
+    "paths": [
+      "settings.keys.appearanceMode.options.2.title"
     ]
   },
   "Day": {
@@ -1193,6 +1200,12 @@
       "tokens.fruitAccents.haskap.name"
     ]
   },
+  "Header Texture": {
+    "text": "Header Texture",
+    "paths": [
+      "settings.pages.appearance.sections.appearance.items.0.parts.texture.label"
+    ]
+  },
   "Height Map": {
     "text": "Height Map",
     "paths": [
@@ -1446,6 +1459,7 @@
   "Light": {
     "text": "Light",
     "paths": [
+      "settings.keys.appearanceMode.options.1.title",
       "settings.keys.pccReasoning.options.0.title"
     ]
   },
@@ -2308,6 +2322,18 @@
       "plans.outcomes.nothing_lost.rows.deleted.label"
     ]
   },
+  "Refreshes daily · pauses under Reduce Motion and Low Power.": {
+    "text": "Refreshes daily · pauses under Reduce Motion and Low Power.",
+    "paths": [
+      "settings.pages.appearance.sections.appearance.items.0.parts.motion.detail"
+    ]
+  },
+  "Refreshes daily · pauses when animations are off or Battery Saver is on.": {
+    "text": "Refreshes daily · pauses when animations are off or Battery Saver is on.",
+    "paths": [
+      "settings.pages.appearance.sections.appearance.items.0.parts.motion.platformDetails.0.detail"
+    ]
+  },
   "Remind": {
     "text": "Remind",
     "paths": [
@@ -2850,6 +2876,12 @@
       "settings.copy.access_devices.signOutTitle.label"
     ]
   },
+  "Slow drift": {
+    "text": "Slow drift",
+    "paths": [
+      "settings.pages.appearance.sections.appearance.items.0.parts.motion.label"
+    ]
+  },
   "Small": {
     "text": "Small",
     "paths": [
@@ -2976,6 +3008,12 @@
     "text": "Syncing…",
     "paths": [
       "destinations.genericEmptyState.syncingTitle"
+    ]
+  },
+  "System": {
+    "text": "System",
+    "paths": [
+      "settings.keys.appearanceMode.options.0.title"
     ]
   },
   "Tactile": {
