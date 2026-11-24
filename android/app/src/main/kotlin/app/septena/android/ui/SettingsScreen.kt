@@ -582,35 +582,6 @@ private fun RegistrySettingRow.isVisible(signedIn: Boolean): Boolean = when (vis
     else -> true
 } && (platforms.isEmpty() || RegistryPlatformIds.ANDROID in platforms)
 
-private class AndroidDeviceSettings(context: Context) {
-    private val preferences = context.getSharedPreferences("septena-device-settings", Context.MODE_PRIVATE)
-
-    fun read(key: String, definition: JsonValue.ObjectValue): JsonValue {
-        val storageKey = definition.string("storageKey") ?: key
-        if (!preferences.contains(storageKey)) return definition.fields["default"] ?: JsonValue.Null
-        return when (definition.string("type")) {
-            "bool" -> JsonValue.BooleanValue(preferences.getBoolean(storageKey, false))
-            "int" -> JsonValue.IntegerValue(preferences.getInt(storageKey, 0).toLong())
-            "string", "enum" -> JsonValue.StringValue(preferences.getString(storageKey, "").orEmpty())
-            else -> definition.fields["default"] ?: JsonValue.Null
-        }
-    }
-
-    fun write(key: String, definition: JsonValue.ObjectValue, value: JsonValue) {
-        val storageKey = definition.string("storageKey") ?: key
-        val editor = preferences.edit()
-        when (value) {
-            is JsonValue.BooleanValue -> editor.putBoolean(storageKey, value.value)
-            is JsonValue.IntegerValue -> editor.putInt(storageKey, value.value.toInt())
-            is JsonValue.DecimalValue -> editor.putInt(storageKey, value.value.toInt())
-            is JsonValue.StringValue -> editor.putString(storageKey, value.value)
-            JsonValue.Null -> editor.remove(storageKey)
-            else -> error("Unsupported device setting type for '$key'")
-        }
-        check(editor.commit()) { "Could not save device setting '$key'" }
-    }
-}
-
 private fun String.localized(languageTag: String): String =
     RegistryCatalog.localizedString(this, languageTag) ?: this
 

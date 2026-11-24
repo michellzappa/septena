@@ -8,23 +8,23 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 48 | 49 | 49 | 0 | 25 | 0 | 1 |
-| partial | 1 | 1 | 1 | 0 | 1 | 0 | 3 |
-| planned | 0 | 0 | 0 | 46 | 22 | 49 | 1 |
+| ships | 48 | 49 | 49 | 0 | 29 | 0 | 1 |
+| partial | 1 | 1 | 1 | 0 | 3 | 0 | 3 |
+| planned | 0 | 0 | 0 | 46 | 16 | 49 | 1 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 48 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|---|
 | `lists.inbox` | Inbox band on Today | ships | ships | ships | planned | ships | planned | partial |
 | `lists.today` | Today | ships | ships | ships | planned | ships | planned | partial |
-| `lists.review` | Review (needs_verify) | ships | ships | ships | planned | planned | planned | - |
-| `lists.agent` | Agent (claimed and assigned work by stage) | ships | ships | ships | planned | planned | planned | - |
+| `lists.review` | Review (needs_verify) | ships | ships | ships | planned | partial | planned | - |
+| `lists.agent` | Agent (claimed and assigned work by stage) | ships | ships | ships | planned | ships | planned | - |
 | `lists.upcoming` | Upcoming | ships | ships | ships | planned | ships | planned | - |
 | `lists.anytime` | Anytime | ships | ships | ships | planned | ships | planned | - |
 | `lists.repeating` | Repeating | ships | ships | ships | planned | ships | planned | - |
 | `lists.logbook` | Logbook | ships | ships | ships | planned | ships | planned | - |
-| `lists.faded` | Faded pile | ships | ships | ships | planned | planned | planned | - |
-| `lists.starred` | Favorites list | ships | ships | ships | planned | planned | planned | - |
+| `lists.faded` | Faded pile | ships | ships | ships | planned | partial | planned | - |
+| `lists.starred` | Favorites list | ships | ships | ships | planned | ships | planned | - |
 | `lists.recently-deleted` | Recently Deleted (30 days) | ships | ships | ships | planned | ships | planned | - |
 | `places.areas` | Areas | ships | ships | ships | planned | ships | planned | - |
 | `places.projects` | Projects | ships | ships | ships | planned | ships | planned | - |
@@ -35,7 +35,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `task.attachments` | Attachments | ships | ships | ships | planned | ships | planned | - |
 | `task.history` | Per-task change history | ships | ships | ships | planned | ships | planned | - |
 | `task.provenance` | Who added a task: you or a named agent, on the row and the task page | ships | ships | ships | planned | ships | planned | - |
-| `task.aging` | Aging fade across open lists | ships | ships | ships | planned | planned | planned | - |
+| `task.aging` | Aging fade across open lists | ships | ships | ships | planned | ships | planned | - |
 | `task.checklists` | Checklists inside a task | ships | ships | ships | planned | ships | planned | - |
 | `task.tags` | Tags | ships | ships | ships | planned | ships | planned | - |
 | `task.share` | Share a task (title and notes) through the system share sheet | ships | ships | ships | planned | ships | planned | - |
@@ -59,7 +59,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `agents.connector` | Official MCP connector at api.septena.app/mcp | ships | ships | ships | planned | planned | planned | - |
 | `onboarding.first-run` | First run: welcome, account, move in, connect Claude | ships | ships | ships | planned | planned | planned | - |
 | `agents.stop-pause` | Stop one task, pause all agents | ships | ships | ships | planned | ships | planned | - |
-| `sync.backend` | Sync through api.septena.app | ships | ships | ships | planned | planned | planned | planned |
+| `sync.backend` | Sync through api.septena.app | ships | ships | ships | planned | ships | planned | planned |
 | `account.delete` | Delete account | ships | ships | ships | planned | planned | planned | - |
 | `task.times` | Start time and duration on a task | ships | ships | ships | planned | planned | planned | - |
 | `calendar.feed` | Private read-only calendar feed (.ics) | ships | ships | ships | planned | planned | planned | - |
