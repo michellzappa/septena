@@ -183,3 +183,39 @@ export async function createTestTaskStore(existing?: DatabaseSync) {
   const store = new TaskStore(ctx as never, {} as never);
   return { store, db };
 }
+
+/// Creates a real `AccountStore` instance backed by an in-memory SQLite
+/// database. Pass `existing` to simulate a Durable Object restart on stored data.
+export async function createTestAccountStore(existing?: DatabaseSync) {
+  installWorkerTestHooks();
+  const { AccountStore } = await import("../src/store/AccountStore.ts");
+  const db = existing ?? new DatabaseSync(":memory:");
+  let inTx = false;
+
+  const ctx = {
+    storage: {
+      sql: makeSqlStorage(db),
+      transactionSync<T>(fn: () => T): T {
+        if (inTx) return fn();
+        inTx = true;
+        db.exec("BEGIN");
+        try {
+          const out = fn();
+          db.exec("COMMIT");
+          return out;
+        } catch (err) {
+          db.exec("ROLLBACK");
+          throw err;
+        } finally {
+          inTx = false;
+        }
+      },
+    },
+    blockConcurrencyWhile<T>(fn: () => Promise<T>): Promise<T> {
+      return fn();
+    },
+  };
+
+  const store = new AccountStore(ctx as never, {} as never);
+  return { store, db };
+}

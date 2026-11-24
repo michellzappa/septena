@@ -79,6 +79,16 @@ class_name = "PairingStore"
 tag = "v2-pairing-store"
 new_sqlite_classes = ["PairingStore"]
 
+# Global identity table mapping `provider:subject` (apple:<sub>,
+# email:<normalized>, …) to `userId` (ADR 0016, issue #168).
+[[durable_objects.bindings]]
+name = "ACCOUNT_STORE"
+class_name = "AccountStore"
+
+[[migrations]]
+tag = "v3-account-store"
+new_sqlite_classes = ["AccountStore"]
+
 # Attachment bytes. Create once: wrangler r2 bucket create septena-attachments
 [[r2_buckets]]
 binding = "ATTACHMENTS"
