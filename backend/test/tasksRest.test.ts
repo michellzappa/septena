@@ -73,3 +73,18 @@ describe("tasks REST surface (watch)", () => {
     assert.equal(out[0].repeats, true);
   });
 });
+
+describe("tasks REST surface (desk orb)", () => {
+  it("sends the synced accent with its hexes, Colorful as fallback", async () => {
+    const { accentFor } = await import("../src/api/tasksRest.ts");
+    assert.deepEqual(accentFor("persimmon"), { id: "persimmon", light: "#E05212", dark: "#FF7738" });
+    assert.equal(accentFor(undefined).id, "colorful");
+    assert.equal(accentFor("not-a-fruit").id, "colorful");
+  });
+
+  it("carries completedAt for the completed view", async () => {
+    const { clientTask } = await import("../src/api/tasksRest.ts");
+    const out = clientTask({ id: "t1", title: "Done thing", completedAt: "2026-11-24T09:15:00" } as never, new Map());
+    assert.equal(out.completedAt, "2026-11-24T09:15:00");
+  });
+});
