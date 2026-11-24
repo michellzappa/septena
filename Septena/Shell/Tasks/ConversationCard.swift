@@ -463,35 +463,35 @@ struct AIExplainerView: View {
     NavigationStack {
       ScrollView {
         VStack(alignment: .leading, spacing: 18) {
-          Text("Some tasks need thinking before you can act. Tap Discuss and talk them through, right on the task.")
+          Text(RegistrySettings.copy("ai_explainer", "intro"))
             .font(.headline)
 
           VStack(alignment: .leading, spacing: 0) {
-            Text("How a task conversation moves")
+            Text(RegistrySettings.copy("ai_explainer", "flowHeader"))
               .font(.subheadline).fontWeight(.semibold).padding(.bottom, 10)
             ForEach(Array(steps.enumerated()), id: \.offset) { i, s in
               stepRow(s, isLast: i == steps.count - 1)
             }
-            Text("On Automatic, every step runs on your device first. It reaches further only for steps your device can’t do (↗).")
+            Text(RegistrySettings.copy("ai_explainer", "flowFooter"))
               .font(.caption2).foregroundStyle(.secondary).padding(.top, 6)
           }
 
           VStack(alignment: .leading, spacing: 6) {
-            Text("Whose turn?").font(.subheadline).fontWeight(.semibold)
-            legend(.yellow, "Your turn: a question is waiting")
-            legend(.blue, "AI’s turn: it’s working")
-            legend(.green, "Done")
+            Text(RegistrySettings.copy("ai_explainer", "turnHeader")).font(.subheadline).fontWeight(.semibold)
+            legend(.yellow, RegistrySettings.copy("ai_explainer", "turnYours"))
+            legend(.blue, RegistrySettings.copy("ai_explainer", "turnAI"))
+            legend(.green, RegistrySettings.copy("ai_explainer", "turnDone"))
           }
 
           VStack(alignment: .leading, spacing: 6) {
-            Label("Some help is always on your device", systemImage: "iphone")
+            Label(RegistrySettings.copy("ai_explainer", "localHeader"), systemImage: "iphone")
               .font(.subheadline).fontWeight(.semibold)
             Text("Beyond conversations, \(AppDisplayName.current) learns small patterns locally, like the “Move to…” suggestion that predicts where a task belongs from your own history. That model trains on your device and never leaves it.")
               .font(.callout).foregroundStyle(.secondary)
           }
 
           VStack(alignment: .leading, spacing: 6) {
-            Label("Your AI, never our servers", systemImage: "lock.fill")
+            Label(RegistrySettings.copy("ai_explainer", "privateHeader"), systemImage: "lock.fill")
               .font(.subheadline).fontWeight(.semibold)
             Text("\(AppDisplayName.current)’s servers never run AI on your tasks. AI runs on your device, or in your own Claude when you connect it. Turn AI off and the app works the same, without conversations.")
               .font(.callout).foregroundStyle(.secondary)
@@ -500,12 +500,12 @@ struct AIExplainerView: View {
           .frame(maxWidth: .infinity, alignment: .leading)
           .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-          Text("Nothing important happens on its own. AI can fill in small, reversible details; any real decision or action that can’t be undone waits for your confirmation.")
+          Text(RegistrySettings.copy("ai_explainer", "closing"))
             .font(.callout).foregroundStyle(.secondary)
         }
         .padding(20)
       }
-      .navigationTitle("How AI helps")
+      .navigationTitle(RegistrySettings.copy("ai_explainer", "title"))
       .septenaInlineTitle()
       .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
     }
@@ -514,12 +514,12 @@ struct AIExplainerView: View {
   private struct Step { let icon: String; let title: String; let desc: String; let runs: String; let tint: Color }
   private var steps: [Step] {
     [
-      Step(icon: "square.and.pencil", title: "Capture", desc: "Jot down the task. A few words are enough.", runs: RegistrySurfaces.provenanceSelfLabel, tint: .gray),
-      Step(icon: "questionmark.bubble", title: "Confirm", desc: "AI asks what you mean. Nothing happens until you answer.", runs: "On-device", tint: .green),
-      Step(icon: "doc.text.magnifyingglass", title: "Look up", desc: "Pulls relevant context from your own data.", runs: "On-device", tint: .green),
-      Step(icon: "checklist", title: "Decide", desc: "Offers a few options for you to pick. A harder call may use the cloud.", runs: "On-device ↗", tint: .blue),
-      Step(icon: "hammer", title: "Work", desc: "Does what it can: a draft, a comparison. Uses the web or your Claude only when needed.", runs: "On-device ↗", tint: .blue),
-      Step(icon: "hand.point.right", title: "Hand off", desc: "Anything only you can do (pay, send) becomes one clear button.", runs: RegistrySurfaces.provenanceSelfLabel, tint: .gray),
+      Step(icon: "square.and.pencil", title: RegistrySettings.copy("ai_explainer", "captureTitle"), desc: RegistrySettings.copy("ai_explainer", "captureDetail"), runs: RegistrySurfaces.provenanceSelfLabel, tint: .gray),
+      Step(icon: "questionmark.bubble", title: RegistrySettings.copy("ai_explainer", "confirmTitle"), desc: RegistrySettings.copy("ai_explainer", "confirmDetail"), runs: RegistrySettings.copy("ai_explainer", "runsOnDevice"), tint: .green),
+      Step(icon: "doc.text.magnifyingglass", title: RegistrySettings.copy("ai_explainer", "lookUpTitle"), desc: RegistrySettings.copy("ai_explainer", "lookUpDetail"), runs: RegistrySettings.copy("ai_explainer", "runsOnDevice"), tint: .green),
+      Step(icon: "checklist", title: RegistrySettings.copy("ai_explainer", "decideTitle"), desc: RegistrySettings.copy("ai_explainer", "decideDetail"), runs: RegistrySettings.copy("ai_explainer", "runsReaches"), tint: .blue),
+      Step(icon: "hammer", title: RegistrySettings.copy("ai_explainer", "workTitle"), desc: RegistrySettings.copy("ai_explainer", "workDetail"), runs: RegistrySettings.copy("ai_explainer", "runsReaches"), tint: .blue),
+      Step(icon: "hand.point.right", title: RegistrySettings.copy("ai_explainer", "handOffTitle"), desc: RegistrySettings.copy("ai_explainer", "handOffDetail"), runs: RegistrySurfaces.provenanceSelfLabel, tint: .gray),
     ]
   }
 

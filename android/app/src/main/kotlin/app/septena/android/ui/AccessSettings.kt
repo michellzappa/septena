@@ -114,11 +114,11 @@ internal fun AccessDevicesList(model: AccessSettingsModel, signedIn: Boolean, la
     } else {
         devices.forEach { device ->
             ListItem(
-                headlineContent = { Text(AccessCopyPending.deviceName(device.client)) },
-                supportingContent = { Text(AccessCopyPending.activeLine(device)) },
+                headlineContent = { Text(deviceName(device.client, languageTag)) },
+                supportingContent = { Text(activeLine(device, languageTag)) },
                 trailingContent = {
                     if (device.current) {
-                        Text(AccessCopyPending.CURRENT_DEVICE, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(settingsCopy(DEVICES_COPY, "currentDevice", languageTag), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         TextButton(onClick = { pending = device }) {
                             Text(signOutTitle, color = MaterialTheme.colorScheme.error)
@@ -133,8 +133,10 @@ internal fun AccessDevicesList(model: AccessSettingsModel, signedIn: Boolean, la
     pending?.let { device ->
         AlertDialog(
             onDismissRequest = { pending = null },
-            title = { Text(AccessCopyPending.signOutDeviceTitle(AccessCopyPending.deviceName(device.client))) },
-            text = { Text(AccessCopyPending.SIGN_OUT_DEVICE_MESSAGE) },
+            title = {
+                Text(settingsCopy(DEVICES_COPY, "signOutTitle", languageTag, "name" to deviceName(device.client, languageTag)))
+            },
+            text = { Text(settingsCopy(DEVICES_COPY, "signOutMessage", languageTag)) },
             confirmButton = {
                 TextButton(onClick = {
                     pending = null
@@ -175,7 +177,7 @@ internal fun AccessAgentsList(model: AccessSettingsModel, signedIn: Boolean, lan
     access?.connections.orEmpty().forEach { agent ->
         ListItem(
             headlineContent = { Text(agent.name) },
-            supportingContent = { Text(AccessCopyPending.agentDetailLine(agent)) },
+            supportingContent = { Text(agentDetailLine(agent, languageTag)) },
             trailingContent = {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     TextButton(onClick = {
@@ -246,39 +248,32 @@ private fun AccessError(model: AccessSettingsModel) {
     }
 }
 
-/**
- * Copy that has no registry entry yet (issue #260): the device list and the agent
- * detail line. iOS spells the same words inline in `SeptaskDevicesAccessPane` and
- * `SeptaskAgentsPane`. Move each into `registry/` when #260 lands.
- */
-private object AccessCopyPending {
-    const val CURRENT_DEVICE = "Current device"
-    const val SIGN_OUT_DEVICE_MESSAGE =
-        "That device stops syncing within the hour. Its tasks stay on it until you sign in there again."
-
-    fun signOutDeviceTitle(name: String) = "Sign out $name?"
-
-    /** A device's `X-Septena-Client` name, in words (same mapping as iOS `deviceName`). */
-    fun deviceName(client: String?): String = when {
-        client == "septask-ios" -> "iPhone or iPad"
-        client == "septask-mac" -> "Mac"
-        client == "septask-watch" -> "Apple Watch"
-        client != null && client.contains("android") -> "Android"
-        client != null && client.contains("web") -> "Browser"
-        !client.isNullOrEmpty() -> client
-        else -> "Unknown device"
+/** A device's `X-Septena-Client` name, in words (same mapping as iOS `deviceName`). */
+private fun deviceName(client: String?, languageTag: String): String {
+    val id = when {
+        client == "septask-ios" -> "deviceApplePhone"
+        client == "septask-mac" -> "deviceMac"
+        client == "septask-watch" -> "deviceWatch"
+        client != null && client.contains("android") -> "deviceAndroid"
+        client != null && client.contains("web") -> "deviceBrowser"
+        !client.isNullOrEmpty() -> return client
+        else -> "deviceUnknown"
     }
+    return settingsCopy(DEVICES_COPY, id, languageTag)
+}
 
-    fun activeLine(device: AccessDevice): String {
-        val seen = relativeTime(device.lastSeenMs)
-        return if (device.syncing) "Active $seen" else "Active $seen · not syncing"
-    }
+private fun activeLine(device: AccessDevice, languageTag: String): String =
+    settingsCopy(
+        DEVICES_COPY,
+        if (device.syncing) "active" else "activeNotSyncing",
+        languageTag,
+        "time" to relativeTime(device.lastSeenMs),
+    )
 
-    /** "Claude Code · Last used 2 hours ago"; only "Last used …" when the agent keeps its client's name. */
-    fun agentDetailLine(agent: AgentConnection): String {
-        val used = "Last used ${relativeTime(agent.lastUsedMs)}"
-        return if (agent.name == agent.clientName) used else "${agent.clientName} · $used"
-    }
+/** "Claude Code · Last used 2 hours ago"; only "Last used ..." when the agent keeps its client's name. */
+private fun agentDetailLine(agent: AgentConnection, languageTag: String): String {
+    val used = settingsCopy(AGENTS_COPY, "lastUsed", languageTag, "time" to relativeTime(agent.lastUsedMs))
+    return if (agent.name == agent.clientName) used else "${agent.clientName} · $used"
 }
 
 private fun relativeTime(ms: Long): String =
@@ -345,4 +340,6 @@ private fun String?.accessLocalized(languageTag: String): String =
     this?.let { RegistryCatalog.localizedString(it, languageTag) ?: it }.orEmpty()
 
 private const val AGENTS_SECTION = "agents"
+private const val DEVICES_COPY = "access_devices"
+private const val AGENTS_COPY = "access_agents"
 private const val MAX_AGENT_NAME = 40
