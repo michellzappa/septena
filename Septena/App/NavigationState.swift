@@ -153,7 +153,7 @@ final class NavigationState {
   /// One-shot trigger: when set to true, the currently-visible
   /// TaskListView starts a new inline task (same flow as Command-N) on its
   /// next render. TaskListView resets it to false after consuming. Used
-  /// by toolbar `+` actions and the sidebar Menu's New To-Do entry, so
+  /// by toolbar `+` actions and the sidebar Menu's New Task entry, so
   /// 'new task' never opens a modal sheet — always inline, like Things.
   var shouldStartCreating = false
 

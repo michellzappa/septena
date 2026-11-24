@@ -9,9 +9,9 @@ import UIKit
 // handling and life-OS wiring the tasks-only build deliberately omits —
 // so per docs/SEPTASK.md this app-level chrome lives in `Septask/` and
 // reuses only the SHARED pieces that already compile: the `ShortcutAction`
-// enum and `NavigationState.pendingShortcut`. The one static item Septask
-// ships is "New To-Do" (declared in Info.plist); tapping it lands the
-// quick-add composer.
+// enum and `NavigationState.pendingShortcut`. Septask ships two static
+// items, "Quick Add" and "Today" (declared in project.yml); Quick Add
+// lands the quick-add composer.
 //
 // Two delivery paths, both funneling into `dispatch(_:)`:
 //   • cold launch → the scene delegate's `scene(_:willConnectTo:options:)`

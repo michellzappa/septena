@@ -893,7 +893,7 @@ export class TaskStore extends DurableObject<Env> {
   // never returned. Formatting into tool output happens in the Worker.
 
   /// Open tasks (every one: the view filters need the whole open set), or
-  /// done tasks newest first, capped. Headings are never to-dos and are left
+  /// done tasks newest first, capped. Headings are never tasks and are left
   /// out. `total` counts every matching row, not only the returned ones.
   readTasks(status: "open" | "done", limit: number): { rows: Row[]; total: number } {
     const spec: EntitySpec = ENTITIES.task;

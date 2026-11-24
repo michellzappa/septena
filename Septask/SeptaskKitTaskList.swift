@@ -3609,7 +3609,7 @@ final class SeptaskKitTaskListController: NSViewController {
 
   /// ⌘K or the composer's own checkbox with the row open: save the typed
   /// text, close the row, then complete it through the ordinary path (undo,
-  /// settle beat) — Things' "complete from the open to-do".
+  /// settle beat) — Things' "complete from the open task".
   private func completeComposingTask() {
     guard let id = composingTaskId else { return }
     collapseComposer(commit: true, animated: false)

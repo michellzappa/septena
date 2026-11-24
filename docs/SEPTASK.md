@@ -273,7 +273,7 @@ white discs, self-masking, same as Septena's.
   `Septask/Info-Mac.plist`.
 - **Menu commands**: SeptaskApp mounts the task-scoped subset of App.swift's
   commands — Go (⌘1–4 smart lists, no tab hop needed), the Task menu
-  (focused-scene row actions), ⌘/ sidebar, ⌘N New To-Do. Quick Find /
+  (focused-scene row actions), ⌘/ sidebar, ⌘N New Task. Quick Find /
   Add Info / Settings / cheat-sheet are deliberately absent until P3 mounts
   their sheet hosts.
 - **Platform-conditional seams hide from the other platform's compiler**:

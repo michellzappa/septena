@@ -1,6 +1,6 @@
 import Foundation
 
-/// One route for every "new to-do" entry point — Control Center, ⌘N, menu
+/// One route for every "new task" entry point — Control Center, ⌘N, menu
 /// bar, deep links. Lands on Tasks ▸ Today with the composer open.
 @MainActor
 enum OpenNewTaskRouting {

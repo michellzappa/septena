@@ -1195,7 +1195,7 @@ struct TaskListView: View {
     AddInfoSection.tasks.notifyTilesChanged()
   }
 
-  /// ⌘N / + / sidebar "New To-Do" — open the list's contextual "New task"
+  /// ⌘N / + / sidebar "New Task" — open the list's contextual "New task"
   /// capture row (Inbox on Today, foot line on project/area/unscheduled, composer
   /// on Upcoming). Re-tapping while a capture is already open scrolls back to it.
   private func openContextualQuickAdd() {
@@ -5028,7 +5028,7 @@ struct TaskListView: View {
       // Things-style mapping:
       //   • "Today" → pin to today (today=true), clear any scheduled date.
       //     A pinned task is one the user placed here deliberately, so it
-      //     never counts toward the "new to-dos" rolled-in banner.
+      //     never counts toward the "new tasks" rolled-in banner.
       //   • Future date → today=false + scheduled=date. Server auto-
       //     surfaces the task on Today when that date arrives.
       //   • Nil ("No Date") → clear both flags.

@@ -272,7 +272,7 @@ final class TaskEntity {
     self.todayPosition = todayPosition
   }
 
-  /// True when this row is a project section divider, not a to-do. The single
+  /// True when this row is a project section divider, not a task. The single
   /// read point — every feed/count/list gates on this so headings never leak
   /// out of a project's detail view (see `TaskKind`).
   var isHeading: Bool { kind == TaskKind.heading }
@@ -1142,7 +1142,7 @@ enum LocalCache {
   }
 
   /// Every non-trashed task as a wire DTO — sidebar roll-ups, aggregates.
-  /// Headings are dividers, not to-dos: excluded so they never inflate any
+  /// Headings are dividers, not tasks: excluded so they never inflate any
   /// count or aggregate (see `TaskEntity.isHeading`).
   @MainActor
   static func liveTasks(in context: ModelContext) -> [SeptenaTask] {
@@ -1431,7 +1431,7 @@ enum LocalCache {
     // either confirm the deletion (row removed) or resurrect them if
     // the server rejects.
     if e.pendingDeletion { return nil }
-    // Headings are project section dividers, not to-dos — they must never
+    // Headings are project section dividers, not tasks — they must never
     // surface in ANY task list, count, feed, or badge (only in a project's
     // grouped detail view, which reads them via `headings(inProject:)`). This
     // is the single shared exclusion the plan calls for; every filter funnels

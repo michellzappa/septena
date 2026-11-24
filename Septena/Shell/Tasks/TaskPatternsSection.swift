@@ -2,7 +2,7 @@ import SwiftUI
 
 // Tasks "Patterns" view — the throughput counterpart to the checklist sections'
 // `CompletionPatternsSection`. Tasks have no fixed daily "total" to express as a
-// done/total adherence percent (a habit stack does; a to-do list doesn't), so the
+// done/total adherence percent (a habit stack does; a task list doesn't), so the
 // honest pattern is *throughput*: how many tasks you finished each day, rendered
 // as the same GitHub-style `ConsistencyHeatmap` every other section uses, plus a
 // compact stat header (last-30-day total + current daily-completion streak).

@@ -46,7 +46,7 @@ struct GroupHeaderLabel: View {
 /// bool: a hidden list consumed it, and when NO list was on screen it lingered
 /// and fired on whichever list appeared minutes later. TaskListView now only
 /// consumes while on screen; this makes an unanswered request expire. The
-/// window covers "navigate, then create" (the sidebar's New To-Do switches to
+/// window covers "navigate, then create" (the sidebar's New Task switches to
 /// Today and then sets the flag): the new list appears well inside it.
 @MainActor
 enum TaskCreateRequest {

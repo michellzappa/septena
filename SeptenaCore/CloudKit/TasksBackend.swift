@@ -370,7 +370,7 @@ final class CloudKitTasksBackend {
     )
     context.insert(entity)
     // deferPush is used for inline-editor drafts: skip the engine push
-    // here so other devices don't briefly see "New To-Do" before the
+    // here so other devices don't briefly see "New Task" before the
     // user commits the real title. The first push happens via the
     // update() path when the user commits.
     if deferPush {

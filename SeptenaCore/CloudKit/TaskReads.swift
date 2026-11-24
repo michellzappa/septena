@@ -181,7 +181,7 @@ enum TaskReads {
 
     let dead = DeletedContainerLedger.snapshot()
     for e in LocalCache.liveEntities(in: context) {
-      // Headings are dividers, not to-dos — never count toward openCount, the
+      // Headings are dividers, not tasks — never count toward openCount, the
       // smart-list badges, or the made/done histogram (see `TaskEntity.isHeading`).
       if e.isHeading { continue }
       // Orphaned, awaiting delete (its area / project is gone): counts nowhere.

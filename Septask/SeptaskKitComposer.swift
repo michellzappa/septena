@@ -150,7 +150,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// The pill rail's height: the 30pt pills plus room for the focus ring.
   fileprivate static let pillRowHeight: CGFloat = 34
   /// Empty / short notes — two lines of room before the field grows. Things'
-  /// open to-do shows about this much under the title.
+  /// open task shows about this much under the title.
   private static var notesMinHeight: CGFloat {
     ceil(NSLayoutManager().defaultLineHeight(
       for: .systemFont(ofSize: SeptaskKitTheme.notesFontSize)) * 2 + notesInset.height * 2)

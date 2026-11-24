@@ -1559,9 +1559,6 @@
         }
       }
     },
-    "Add **Add Task** in Settings → Control Center to open a new to-do." : {
-
-    },
     "Add %lld categories" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -7972,18 +7969,6 @@
         }
       }
     },
-    "New To-Do" : {
-      "comment" : "Generated from registry actions.actions.app.newTask.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nova tarefa"
-          }
-        }
-      }
-    },
     "Next" : {
       "localizations" : {
         "pt-BR" : {
@@ -11486,9 +11471,6 @@
           }
         }
       }
-    },
-    "Some to-dos need a moment of thinking before you can act. %@ can talk that through with AI — right on the task." : {
-
     },
     "Someday" : {
       "extractionState" : "stale",

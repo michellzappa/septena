@@ -114,6 +114,16 @@ scan whole-store-id-lookup error \
   '(allTasks|liveTasks)\(in: [^)]*\)[[:space:]]*\.(first\(where: \{ *\$0\.id ==|filter \{ *(\$0\.id ==|[A-Za-z_.]+\.contains\(\$0\.id\)))' \
   'Building every task to pick some by id scans the whole store. Use LocalCache.liveTasks(ids:in:).'
 
+# ── Vocabulary (docs/DesignSpec.md §6.6) ────────────────────────────────────
+# The thing a person or an agent does is a "task", on every surface. "To-do"
+# came from the early Things 3 copy and left the same action with two names
+# (the menu said New Task, the shortcuts sheet said New to-do). "To-do" stays
+# only in App Store and site search keywords, which this rule does not scan.
+scan vocab-task-not-todo error \
+  '"[^"]*[Tt]o-?[Dd]os?\b[^"]*"' \
+  'Say "task", never "to-do", in user-facing copy and prompts (DesignSpec §6.6).' \
+  'Microsoft To Do|[Tt]odoist|TODO|newTodos'
+
 # ── AppKit transient surfaces (docs/SEPTASK_APPKIT_SURFACES.md) ─────────────
 # Every popover, floating panel and filter list in the Septask AppKit shell is
 # built in Septask/SeptaskKitSurface.swift, so material, corner radius, field

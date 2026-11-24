@@ -30,7 +30,7 @@ extension Notification.Name {
   ///   • unscoped — no userInfo; "anything may have changed". Reserved for
   ///     CloudKit batch arrival, section seeding, and settings-level changes.
   static let septenaDataChanged = Notification.Name("septena.dataChanged")
-  /// Posted by the macOS menu bar's "New To-Do" item. ContentView
+  /// Posted by the macOS menu bar's "New Task" item. ContentView
   /// listens and starts an inline draft on Inbox — same flow as ⌘N.
   static let septenaOpenQuickAdd = Notification.Name("septena.openQuickAdd")
   /// Posted when a task *view* option flips (currently only

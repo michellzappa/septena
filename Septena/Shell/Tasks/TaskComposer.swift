@@ -237,7 +237,7 @@ struct TaskComposerCard: View {
     return nil
   }
 
-  private var headerTitle: String { isEditing ? "Edit To-Do" : RegistryActions.title("app.newTask") }
+  private var headerTitle: String { isEditing ? "Edit Task" : RegistryActions.title("app.newTask") }
   private var saveTitle: String { isEditing ? "Save" : "Add" }
 
   /// Close: fold the inline editor (`onClose`) when hosted inline, else go
