@@ -93,7 +93,7 @@ class TaskSyncEngine(
                 pushValidatedOperations(operations.subList(split, operations.size))
             }
             is PushPlan.Propagate -> throw failure ?: SyncHttpFailure(plan.status.toInt(), "")
-            is PushPlan.Fail -> throw IllegalStateException(plan.reason)
+            is PushPlan.Fail -> throw IllegalArgumentException(plan.reason)
         }
     }
 
