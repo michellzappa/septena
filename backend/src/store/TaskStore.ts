@@ -23,6 +23,12 @@ import type { IcalTask } from "../ical.js";
 import { DOMAIN_RULES, ENTITY_LIMITS, TURN_FIELDS } from "../generated/registries.js";
 import { MCP_REFRESH_TTL_S } from "../shadow/tokens.js";
 import { logEvent } from "../util.js";
+import {
+  sendAgentQuestionPushes,
+  type AgentQuestionPush,
+  type PushPlatform,
+  type PushTokenRow,
+} from "../api/apns.js";
 
 /// Task fields only the app writes (docs/TASK_FADE_SPEC.md §3): the fade
 /// clock and its outcome. An agent cannot keep a task alive by touching it.
@@ -433,6 +439,14 @@ export class TaskStore extends DurableObject<Env> {
         familyId TEXT PRIMARY KEY, clientId TEXT NOT NULL, clientName TEXT NOT NULL,
         scope TEXT NOT NULL, createdAt INTEGER NOT NULL, lastUsed INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS push_tokens (
+        token TEXT PRIMARY KEY,
+        deviceId TEXT,
+        platform TEXT NOT NULL,
+        sandbox INTEGER NOT NULL DEFAULT 0,
+        updatedAt TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS push_tokens_device ON push_tokens(deviceId);
     `);
     // A session's stable id (one per sign-in on one install). It survives
     // refresh-token rotation, so it names the device for the sync slot.
@@ -529,13 +543,14 @@ export class TaskStore extends DurableObject<Env> {
 
   push(ops: Op[], actor: string, reason: string | null = null): PushOutcome {
     const purgedAttachmentIds: string[] = [];
+    const agentQuestions: AgentQuestionPush[] = [];
     this.reason = reason;
     let results: OpResult[];
     try {
       results = this.ctx.storage.transactionSync(() => ops.map((op) => {
         const seen = this.sql.exec<{ result: string }>("SELECT result FROM client_ops WHERE clientOpId = ?", op.clientOpId).toArray()[0];
         if (seen) return JSON.parse(seen.result) as OpResult;
-        const result = this.apply(op, actor, purgedAttachmentIds);
+        const result = this.apply(op, actor, purgedAttachmentIds, agentQuestions);
         this.sql.exec("INSERT INTO client_ops (clientOpId, result, at) VALUES (?, ?, ?)", op.clientOpId, JSON.stringify(result), Date.now());
         return result;
       }));
@@ -544,10 +559,26 @@ export class TaskStore extends DurableObject<Env> {
     }
     const appliedThrough = this.meta("rev");
     if (results.some((r) => r.status === "applied")) this.broadcast(appliedThrough);
+    if (agentQuestions.length > 0) {
+      const tokens = this.listPushTokens();
+      if (tokens.length > 0) {
+        const delivery = this.dispatchAgentQuestionPushes(agentQuestions, tokens);
+        if (typeof this.ctx.waitUntil === "function") {
+          this.ctx.waitUntil(delivery);
+        } else {
+          void delivery;
+        }
+      }
+    }
     return { result: { appliedThrough, results }, purgedAttachmentIds };
   }
 
-  private apply(op: Op, actor: string, purgedAttachmentIds: string[]): OpResult {
+  private apply(
+    op: Op,
+    actor: string,
+    purgedAttachmentIds: string[],
+    agentQuestions: AgentQuestionPush[],
+  ): OpResult {
     const now = new Date().toISOString();
     if (isAgentActor(actor)) {
       const refusal = this.agentRefusal(op);
@@ -558,7 +589,7 @@ export class TaskStore extends DurableObject<Env> {
           : { clientOpId: op.clientOpId, status: "rejected", reason: refusal };
       }
     }
-    if (op.op === "appendTurn") return this.appendTurn(op.clientOpId, op.taskId, op.turn, actor, now);
+    if (op.op === "appendTurn") return this.appendTurn(op.clientOpId, op.taskId, op.turn, actor, now, agentQuestions);
 
     const spec: EntitySpec = ENTITIES[op.entity];
     const row = this.sql.exec(`SELECT * FROM ${spec.table} WHERE id = ?`, op.id).toArray()[0];
@@ -935,8 +966,18 @@ export class TaskStore extends DurableObject<Env> {
     return used + byteCount > MAX_USER_ATTACHMENT_BYTES ? "quota_exceeded" : null;
   }
 
-  private appendTurn(clientOpId: string, taskId: string, turn: Turn, actor: string, now: string): OpResult {
-    const task = this.sql.exec<{ deletedAt: string | null }>("SELECT deletedAt FROM tasks WHERE id = ?", taskId).toArray()[0];
+  private appendTurn(
+    clientOpId: string,
+    taskId: string,
+    turn: Turn,
+    actor: string,
+    now: string,
+    agentQuestions: AgentQuestionPush[],
+  ): OpResult {
+    const task = this.sql.exec<{ title: string | null; deletedAt: string | null }>(
+      "SELECT title, deletedAt FROM tasks WHERE id = ?",
+      taskId,
+    ).toArray()[0];
     if (!task) return { clientOpId, status: "rejected", reason: "unknown_task" };
     if (task.deletedAt) {
       const rev = this.nextRev();
@@ -960,8 +1001,18 @@ export class TaskStore extends DurableObject<Env> {
       // The human spoke: the run budget starts over.
       this.writeConvoServerFields(taskId, { runsSinceUser: 0 }, "budget", actor, now, true);
     } else if (isAgentActor(actor) && turn.role === "provider" && turn.options?.length) {
-      // The agent asked: the ball is in the human's court, so the claim ends.
+      // The agent asked: the ball is in the human's court, so the claim ends
+      // and we alert the user's Apple devices via APNs (F1b #213).
       this.writeConvoServerFields(taskId, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
+      agentQuestions.push({
+        taskId,
+        taskTitle: task.title ?? "",
+        turnSeq: seq,
+        step: turn.step,
+        question: turn.question ?? null,
+        note: turn.note ?? null,
+        options: turn.options,
+      });
     }
     return { clientOpId, status: "applied", rev, seq };
   }
@@ -1476,8 +1527,102 @@ export class TaskStore extends DurableObject<Env> {
       const hashes = this.sql.exec<{ hash: string }>("SELECT hash FROM sessions WHERE sid = ?", sid).toArray().map((r) => r.hash);
       this.sql.exec("DELETE FROM sessions WHERE sid = ?", sid);
       this.sql.exec("DELETE FROM devices WHERE sid = ?", sid);
+      this.sql.exec("DELETE FROM push_tokens WHERE deviceId = ?", sid);
       return hashes;
     });
+  }
+
+  // ---- APNs push tokens (F1b #213, docs/TASK_FACTORY_SPEC.md §8) ----
+
+  upsertPushToken(entry: {
+    token: string;
+    deviceId?: string | null;
+    platform: PushPlatform;
+    sandbox: boolean;
+  }): PushTokenRow {
+    const token = entry.token.trim().toLowerCase();
+    const deviceId = entry.deviceId?.trim() || null;
+    const platform: PushPlatform = entry.platform === "watchos" ? "watchos" : "ios";
+    const sandbox = !!entry.sandbox;
+    const now = new Date().toISOString();
+    this.ctx.storage.transactionSync(() => {
+      // If this device rotated its APNs token on the same platform, drop its
+      // superseded token so one device does not receive duplicate alerts.
+      if (deviceId) {
+        this.sql.exec(
+          "DELETE FROM push_tokens WHERE deviceId = ? AND platform = ? AND token != ?",
+          deviceId, platform, token,
+        );
+      }
+      this.sql.exec(
+        `INSERT INTO push_tokens (token, deviceId, platform, sandbox, updatedAt)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(token) DO UPDATE SET
+           deviceId = COALESCE(excluded.deviceId, push_tokens.deviceId),
+           platform = excluded.platform,
+           sandbox = excluded.sandbox,
+           updatedAt = excluded.updatedAt`,
+        token, deviceId, platform, sandbox ? 1 : 0, now,
+      );
+    });
+    return { token, deviceId, platform, sandbox, updatedAt: now };
+  }
+
+  deletePushToken(token: string): boolean {
+    const clean = token.trim().toLowerCase();
+    return this.sql.exec("DELETE FROM push_tokens WHERE token = ?", clean).rowsWritten > 0;
+  }
+
+  listPushTokens(): PushTokenRow[] {
+    return this.sql.exec<{
+      token: string;
+      deviceId: string | null;
+      platform: string;
+      sandbox: number;
+      updatedAt: string;
+    }>("SELECT token, deviceId, platform, sandbox, updatedAt FROM push_tokens ORDER BY updatedAt DESC")
+      .toArray()
+      .map((r) => ({
+        token: r.token,
+        deviceId: r.deviceId,
+        platform: r.platform === "watchos" ? "watchos" : "ios",
+        sandbox: r.sandbox !== 0,
+        updatedAt: r.updatedAt,
+      }));
+  }
+
+  prunePushTokens(tokens: string[]): number {
+    if (tokens.length === 0) return 0;
+    return this.ctx.storage.transactionSync(() => {
+      let removed = 0;
+      for (const t of tokens) {
+        removed += this.sql.exec("DELETE FROM push_tokens WHERE token = ?", t.trim().toLowerCase()).rowsWritten;
+      }
+      return removed;
+    });
+  }
+
+  private async dispatchAgentQuestionPushes(
+    questions: AgentQuestionPush[],
+    initialTokens: PushTokenRow[],
+  ): Promise<void> {
+    let activeTokens = initialTokens;
+    for (const q of questions) {
+      if (activeTokens.length === 0) break;
+      try {
+        const res = await sendAgentQuestionPushes(this.env, q, activeTokens);
+        if (res.pruned.length > 0) {
+          this.prunePushTokens(res.pruned);
+          const dead = new Set(res.pruned);
+          activeTokens = activeTokens.filter((t) => !dead.has(t.token));
+        }
+      } catch (err) {
+        logEvent("apns_dispatch_error", {
+          taskId: q.taskId,
+          error: err instanceof Error ? err.message.slice(0, 120) : "unexpected",
+        });
+      }
+    }
   }
 
   /// Notes an MCP token family (a connected app such as Claude). Called on

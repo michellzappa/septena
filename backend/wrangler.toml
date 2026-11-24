@@ -89,3 +89,8 @@ bucket_name = "septena-attachments"
 #                   task backend's access tokens.
 # ADMIN_TOKEN     — optional, 32-byte base64. Enables POST/DELETE
 #                   /v1/admin/grants (entitlement grant rows). Unset = 404.
+# APNS_KEY        — optional, contents of Apple Push Notifications .p8 key file.
+# APNS_KEY_ID     — optional, 10-character APNs Key ID from Apple Developer.
+# APNS_TEAM_ID    — optional, 10-character Apple Developer Team ID.
+# APNS_BUNDLE_ID  — optional, defaults to "com.septena.tasks".
+# APNS_SANDBOX    — optional, "true" forces sandbox host; unset uses per-token flag.

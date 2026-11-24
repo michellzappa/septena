@@ -142,12 +142,13 @@ function makeSqlStorage(db: DatabaseSync) {
 /// Creates a real `TaskStore` instance backed by an in-memory SQLite database.
 /// Pass `existing` to open a second store on the same database, the way a
 /// Durable Object restarts on its stored data (runs migrations again).
-export async function createTestTaskStore(existing?: DatabaseSync) {
+export async function createTestTaskStore(existing?: DatabaseSync, envOverrides: Record<string, unknown> = {}) {
   installWorkerTestHooks();
   const { TaskStore } = await import("../src/store/TaskStore.ts");
   const db = existing ?? new DatabaseSync(":memory:");
   let alarm: number | null = null;
   let inTx = false;
+  const pendingWaitUntil: Promise<unknown>[] = [];
 
   const ctx = {
     storage: {
@@ -175,11 +176,20 @@ export async function createTestTaskStore(existing?: DatabaseSync) {
     blockConcurrencyWhile<T>(fn: () => Promise<T>): Promise<T> {
       return fn();
     },
+    waitUntil(p: Promise<unknown>) {
+      pendingWaitUntil.push(Promise.resolve(p));
+    },
     setWebSocketAutoResponse() {},
     getWebSockets() { return []; },
   };
 
   // Expose an RPC-like async proxy matching `StoreRpc` as well as direct calls.
-  const store = new TaskStore(ctx as never, {} as never);
-  return { store, db };
+  const store = new TaskStore(ctx as never, envOverrides as never);
+  const flushWaitUntil = async () => {
+    while (pendingWaitUntil.length > 0) {
+      const batch = pendingWaitUntil.splice(0, pendingWaitUntil.length);
+      await Promise.all(batch);
+    }
+  };
+  return { store, db, flushWaitUntil };
 }

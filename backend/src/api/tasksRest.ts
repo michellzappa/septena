@@ -300,6 +300,28 @@ tasksRest.post("/", async (c) => {
 
 const zVerb = z.enum(["complete", "today", "untoday", "tomorrow", "defer", "cancel"]);
 
+/// Answers an open agent question turn from a thin client (Apple Watch
+/// interactive notification action, F1b #213). Runs `tasks_thread_append` as
+/// the human app actor so the run budget resets and the turn syncs everywhere.
+tasksRest.post("/:id/answer", async (c) => {
+  const id = zId.safeParse(c.req.param("id"));
+  if (!id.success) return c.json({ error: "invalid_request" }, 400);
+  const body = await json(c, z.object({
+    chosen: z.string().trim().min(1).max(200),
+    inReplyTo: z.number().int().min(1).optional(),
+    step: z.enum(["confirm", "ground", "scope", "decide", "work"]).default("decide"),
+  }).strict());
+  if (body instanceof Response) return body;
+  const ctx = await writeContext(c);
+  const turn: Record<string, unknown> = {
+    role: "user",
+    step: body.step,
+    chosen: body.chosen,
+  };
+  if (body.inReplyTo !== undefined) turn.inReplyTo = body.inReplyTo;
+  return run(c, ctx, "tasks_thread_append", { id: id.data, turn });
+});
+
 tasksRest.post("/:id/:verb", async (c) => {
   const id = zId.safeParse(c.req.param("id"));
   const verb = zVerb.safeParse(c.req.param("verb"));

@@ -46,6 +46,15 @@ final class TaskReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
   private var started = false
   private var reconcileTask: Task<Void, Never>?
 
+  /// Optional delegate hook for non-reminder notifications (such as remote
+  /// APNs agent question actions in `SeptaskPushNotifications`), keeping a
+  /// single `UNUserNotificationCenterDelegate` owner without clobbering.
+  static var externalResponseHandler: (@Sendable (UNNotificationResponse) async -> Bool)?
+
+  /// Optional hook invoked whenever notification authorization is confirmed or
+  /// newly granted, so remote APNs registration can arm automatically.
+  static var onAuthorizationGranted: (@MainActor () -> Void)?
+
   private override init() { super.init() }
 
   /// Idempotent startup called from `SeptaskLaunch.run(settings:)`.
@@ -85,16 +94,21 @@ final class TaskReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
     let settings = await center.notificationSettings()
     switch settings.authorizationStatus {
     case .authorized, .provisional:
+      Self.onAuthorizationGranted?()
       return true
     #if os(iOS)
     case .ephemeral:
+      Self.onAuthorizationGranted?()
       return true
     #endif
     case .denied:
       return false
     case .notDetermined:
       let granted = (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
-      if granted { scheduleReconcile() }
+      if granted {
+        scheduleReconcile()
+        Self.onAuthorizationGranted?()
+      }
       return granted
     @unknown default:
       return false
@@ -274,6 +288,11 @@ final class TaskReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
     _ center: UNUserNotificationCenter,
     didReceive response: UNNotificationResponse
   ) async {
+    if let handler = await MainActor.run(body: { Self.externalResponseHandler }),
+       await handler(response) {
+      return
+    }
+
     let actionID = response.actionIdentifier
     let taskID = response.notification.request.content.userInfo[UserInfoKey.taskID] as? String
     guard let taskID, !taskID.isEmpty else { return }

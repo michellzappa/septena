@@ -105,7 +105,12 @@ final class TaskSyncEngine {
   static let taskRefsReadyKey = "septena.taskSync.taskRefsReady"
   /// Backend user id of the last sign-in, compared on the next sign-in.
   static let lastUserKey = "septena.taskSync.lastUserID"
-  private static let issueCap = 200
+  @ObservationIgnored private static let issueCap = 200
+
+  /// Optional lifecycle hooks for remote push token registration/cleanup
+  /// (`SeptaskPushNotifications`), keeping `SeptenaCore` decoupled from app targets.
+  static var onSignInHook: (@MainActor () -> Void)?
+  static var beforeSignOutHook: (@MainActor () async -> Void)?
 
   private init() {}
 
@@ -1187,12 +1192,14 @@ final class TaskSyncEngine {
     lastError = nil
     // Today's upsell notices read the plan (spec §3.2).
     Task { @MainActor in await PlanStatus.shared.refresh() }
+    Self.onSignInHook?()
   }
 
   /// Ends the session on this device. Local tasks and the outbox stay: edits
   /// made while signed out are sent after the next sign-in, when the same
   /// account signs in again (`signIn` wipes them for another account).
   func signOut() async {
+    await Self.beforeSignOutHook?()
     syncTimer?.cancel()
     syncTimer = nil
     syncTimerDeadline = nil

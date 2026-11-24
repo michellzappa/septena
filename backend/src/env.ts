@@ -21,6 +21,15 @@ export interface Env {
   SESSION_SIGNING_KEY: string; // 32-byte base64; signs task-backend access tokens
   /// Optional. Unset = the /v1/admin routes answer 404. Grants entitlements.
   ADMIN_TOKEN?: string;
+  /// Optional APNs provider key (.p8 PEM) and identifiers for agent question pushes (F1b #213).
+  /// When any of APNS_KEY / APNS_KEY_ID / APNS_TEAM_ID is unset, pushes no-op cleanly.
+  APNS_KEY?: string;
+  APNS_KEY_ID?: string;
+  APNS_TEAM_ID?: string;
+  /// Optional bundle id override for `apns-topic` (defaults to `com.septena.tasks`).
+  APNS_BUNDLE_ID?: string;
+  /// Optional global APNs host override ("true" = sandbox, "false" = prod; unset = per-token).
+  APNS_SANDBOX?: string;
 
   // KV namespaces
   STATE: KVNamespace;    // short-lived OAuth state (src/shadow/oauth.ts)

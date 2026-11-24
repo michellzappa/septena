@@ -79,6 +79,24 @@ final class SeptaskAppDelegate: UIResponder, UIApplicationDelegate {
     config.delegateClass = SeptaskSceneDelegate.self
     return config
   }
+
+  func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+  ) {
+    Task { @MainActor in
+      SeptaskPushNotifications.shared.didRegisterForRemoteNotifications(deviceToken: deviceToken)
+    }
+  }
+
+  func application(
+    _ application: UIApplication,
+    didFailToRegisterForRemoteNotificationsWithError error: Error
+  ) {
+    Task { @MainActor in
+      SeptaskPushNotifications.shared.didFailToRegisterForRemoteNotifications(error: error)
+    }
+  }
 }
 
 final class SeptaskSceneDelegate: NSObject, UIWindowSceneDelegate {

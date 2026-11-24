@@ -160,6 +160,25 @@ actor WatchAPI {
     }
   }
 
+  /// Submits a user choice for an open agent question turn from an interactive
+  /// watch notification action (`POST /v1/tasks/:id/answer`, F1b #213).
+  func answerAgentQuestion(
+    taskID: String,
+    turnSeq: Int?,
+    step: String?,
+    chosen: String
+  ) async throws {
+    struct Body: Encodable {
+      let chosen: String
+      let inReplyTo: Int?
+      let step: String?
+    }
+    let encoded = taskID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? taskID
+    let body = try JSONEncoder().encode(Body(chosen: chosen, inReplyTo: turnSeq, step: step))
+    let (data, status) = try await authed(path: "/v1/tasks/\(encoded)/answer", method: "POST", body: body)
+    try Self.check(status, data)
+  }
+
   private static func check(_ status: Int, _ data: Data) throws {
     switch status {
     case 200, 201: return
