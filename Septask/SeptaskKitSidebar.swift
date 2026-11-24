@@ -1114,7 +1114,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       cell.textField?.font = SeptaskKitTheme.sidebarTitle
       cell.textField?.stringValue = area.title
       cell.textField?.textColor = SeptaskKitTheme.inkPrimary
-      if let emoji = area.emoji {
+      if let emoji = area.emoji, !emoji.isEmpty {
         cell.emoji.isHidden = false
         cell.emoji.stringValue = emoji
         cell.imageView?.image = nil
@@ -1487,13 +1487,16 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       RegistryMenuEntry.slot(
         id: "area.none",
         title: String(localized: "No Area", comment: "SeptaskKit: sidebar context menu"),
+        sfSymbol: "tray",
         isOn: project.area == nil,
         perform: project.area == nil ? nil : { [weak self] in self?.moveProject(project, toArea: nil) }),
     ]
     if !areas.isEmpty { nodes.append(.divider(id: "areas.divider")) }
     for area in areas {
       nodes.append(RegistryMenuEntry.slot(
-        id: "area.\(area.id)", title: area.title, isOn: project.area == area.id,
+        id: "area.\(area.id)", title: area.title,
+        listIcon: .area(emoji: area.emoji),
+        isOn: project.area == area.id,
         perform: project.area == area.id ? nil : { [weak self] in self?.moveProject(project, toArea: area.id) }))
     }
     return nodes

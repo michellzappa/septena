@@ -639,6 +639,23 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     whenPill.isOn = task.scheduled != nil || task.today || task.startTime != nil
     deadlinePill.show(value: task.deadline.map(KitDayFormat.display))
     deadlinePill.isOn = task.deadline != nil
+    let ctx = LocalStore.shared.container.mainContext
+    let snapshot = StructureCache.snapshot(in: ctx)
+    if let projectID = task.project,
+       snapshot.projects.contains(where: { $0.id == projectID }) {
+      let progress = LocalCache.projectCompletionRatios(in: ctx)[projectID] ?? 0
+      listPill.iconProvider = { ink in
+        KitGlyph.progress(progress, tint: ink, diameter: 12)
+      }
+    } else if let areaID = task.area,
+              let area = snapshot.areas.first(where: { $0.id == areaID }) {
+      let emoji = area.emoji
+      listPill.iconProvider = { _ in
+        KitGlyph.area(emoji: emoji, diameter: 14)
+      }
+    } else {
+      listPill.iconProvider = nil
+    }
     listPill.show(value: listName)
     listPill.isOn = listName != nil
     repeatPill.show(value: task.recurrence?.shortLabel)
@@ -650,7 +667,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     starPill.isOn = task.starred
     let resolvedTags = LocalCache.resolvedTags(
       for: task,
-      tagsByID: LocalCache.tagsByID(in: LocalStore.shared.container.mainContext)
+      tagsByID: LocalCache.tagsByID(in: ctx)
     )
     tagPill.show(value: resolvedTags.isEmpty ? nil
       : resolvedTags.count == 1 ? resolvedTags[0].name
@@ -1144,6 +1161,16 @@ final class KitPillButton: NSButton {
     }
   }
 
+  /// Optional dynamic icon override (e.g. area emoji/dot or project progress
+  /// ring on the List pill). Called on every `restyle()` so appearance switches
+  /// pick up the right ink color.
+  var iconProvider: (@MainActor (NSColor) -> NSImage?)? {
+    didSet {
+      restyle()
+      invalidateIntrinsicContentSize()
+    }
+  }
+
   /// The attribute's value (`nil` falls back to the registry label). The full
   /// "label: value" goes to the tooltip and VoiceOver.
   func show(value: String?) {
@@ -1253,8 +1280,14 @@ final class KitPillButton: NSButton {
         .foregroundColor: isOn ? SeptaskKitTheme.inkPrimary : SeptaskKitTheme.inkSecondary,
       ])
     contentTintColor = isOn ? SeptaskKitTheme.inkPrimary : SeptaskKitTheme.inkSecondary
-    // A pill that is on draws its filled symbol (DesignSpec: on = filled).
-    if let attribute { image = symbolImage(attribute.sfSymbol(on: isOn), ink: contentTintColor ?? .labelColor) }
+    // A pill that is on draws its filled symbol (DesignSpec: on = filled),
+    // unless a dynamic icon override (such as an area emoji or project ring)
+    // supplies the pill's leading glyph.
+    if let iconProvider {
+      image = iconProvider(contentTintColor ?? .labelColor)
+    } else if let attribute {
+      image = symbolImage(attribute.sfSymbol(on: isOn), ink: contentTintColor ?? .labelColor)
+    }
     isRestyling = false
     applyCapsule()
   }
