@@ -52,6 +52,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 ### Planning
 
 - [ROADMAP.md](ROADMAP.md) — tracks, milestones, order.
+- [ENGINEERING_PLAN.md](ENGINEERING_PLAN.md) — engineering order of work, the code audit, who owns what.
 - [adr/](adr/README.md) — architecture decision records.
 - [agents/factory.md](agents/factory.md) — the unattended factory playbook (`factory-day` skill, target `septena`).
 

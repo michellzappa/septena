@@ -26,8 +26,16 @@ on a listed issue without the label). Feature IDs: Starlings Docs
 | Task fade | `docs/TASK_FADE_SPEC.md`, ADR 0006 | `track:fade` |
 | Project notes as agent context | `docs/PROJECT_NOTES_SPEC.md`, ADR 0012 | `track:factory` |
 | Launch — Septena name, free tier, paid sync, rate lock | `docs/SYNC_SUBSCRIPTION_SPEC.md`, ADR 0007, ADR 0010 | `track:launch` |
+| Engineering foundation — CI as the gate, the shared core, deploys | `docs/ENGINEERING_PLAN.md`, ADR 0025, ADR 0027 | `track:foundation` |
 
 ## Milestones
+
+### F — Foundation: CI is the gate (`Now`, engineering)
+
+GitHub milestone "F Foundation: CI is the gate". Order and reasons:
+`docs/ENGINEERING_PLAN.md`. #342 backend CI, #343 deploy from CI (mz: API
+token), #344 Android conformance and launch guard, #345 protected `main`
+(mz: yes). Runs before new feature work lands on the core.
 
 Everything after M1 depends on M1. Inside a milestone, items can run in
 parallel unless an arrow says otherwise.
