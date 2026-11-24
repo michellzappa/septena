@@ -65,7 +65,10 @@ Add `checklistItem` to `entities`:
 - **Keyboard-fast editing (Things-like):**
   - `Return` on a checklist row creates the next checklist item immediately below and focuses it.
   - `Backspace` on an empty checklist row removes it and focuses the previous item (or title/notes).
-  - `Tab` / `↑` / `↓` navigate items; `Space` (when row selected, not editing text) toggles checked.
+  - `Tab` / `⇧Tab` / `↑` / `↓` move between items. Focus order in the open task: title → notes → steps → pills.
+  - `↓` on the last line of notes enters the first step; `↑` on the first step returns to the end of notes; moving past the last step goes to the first pill. Shipped on Mac (composer and inspector). iOS/iPadOS: Tab works, `↓` from notes not yet (UIKit notes field).
+  - `⌘K` toggles the focused step instead of completing the task (Mac and iOS/iPadOS).
+  - Each row has a trailing delete button and a context menu: Move Up, Move Down, Delete Step.
   - Drag handle / drag-and-drop reorders items within the checklist.
   - Paste multi-line text inside a checklist row splits into one checklist item per line *(default)*.
 - **Undo:** Add, edit, check/uncheck, reorder, and delete checklist items all register on the single shared `TaskUndo` stack at the user gesture (never inside mutators or sync applies).
