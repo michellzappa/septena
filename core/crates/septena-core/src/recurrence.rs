@@ -133,12 +133,24 @@ pub fn next_scheduled_date(
 /// The stable record id of one occurrence: FNV-1a 64 over `"<id>|<date>"`.
 #[cfg_attr(feature = "ffi", uniffi::export)]
 pub fn occurrence_id(source_task_id: String, scheduled: String) -> String {
+    format!("recur-{}", fnv1a64(&format!("{source_task_id}|{scheduled}")))
+}
+
+/// The stable id of a checklist item copied onto a new occurrence: FNV-1a 64
+/// over `"<new task id>|chk|<index>|<source item id>"`. A phone and an agent
+/// completing the same task copy the same items to the same ids.
+#[cfg_attr(feature = "ffi", uniffi::export)]
+pub fn checklist_occurrence_id(new_task_id: String, index: u32, source_item_id: String) -> String {
+    format!("chk-{}", fnv1a64(&format!("{new_task_id}|chk|{index}|{source_item_id}")))
+}
+
+fn fnv1a64(input: &str) -> String {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
-    for byte in format!("{source_task_id}|{scheduled}").bytes() {
+    for byte in input.bytes() {
         hash ^= u64::from(byte);
         hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
     }
-    format!("recur-{hash:016x}")
+    format!("{hash:016x}")
 }
 
 /// Days after Monday for an Apple weekday (1 = Sunday).

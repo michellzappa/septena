@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Golden conformance vectors for recurrence arithmetic (nextScheduledDate, occurrenceID) across Swift, TypeScript, and Kotlin (docs/RECURRENCE_V2_SPEC.md).",
+  "description": "Golden conformance vectors for recurrence arithmetic (nextScheduledDate, occurrenceID, checklistOccurrenceID) across Swift, TypeScript, and Kotlin (docs/RECURRENCE_V2_SPEC.md).",
   "nextScheduledDate": [
     {
       "name": "daily after completion advances from completedOn",
@@ -187,5 +187,10 @@
     { "sourceTaskID": "task-1", "scheduled": "2026-11-22", "expected": "recur-27f6e5d56dadf4cc" },
     { "sourceTaskID": "abc123", "scheduled": "2026-02-28", "expected": "recur-12eaeca9871bdc73" },
     { "sourceTaskID": "uuid:550e8400-e29b-41d4-a716-446655440000", "scheduled": "2028-02-29", "expected": "recur-ce4e773f079b1d92" }
+  ],
+  "checklistOccurrenceID": [
+    { "newTaskID": "recur-27f6e5d56dadf4cc", "index": 0, "sourceItemID": "chk-a1", "expected": "chk-27c2c61e703cf279" },
+    { "newTaskID": "recur-27f6e5d56dadf4cc", "index": 3, "sourceItemID": "chk-b2", "expected": "chk-f86ec4d1793f78f8" },
+    { "newTaskID": "task-1", "index": 12, "sourceItemID": "uuid:550e8400-e29b-41d4-a716-446655440000", "expected": "chk-87d8cb3f16a7a12b" }
   ]
 }
