@@ -71,7 +71,7 @@ final class CloudKitTasksBackend {
 
   // MARK: Local helpers
 
-  private func fetch(id: String) -> TaskEntity? {
+  func fetch(id: String) -> TaskEntity? {
     var descriptor = FetchDescriptor<TaskEntity>(
       predicate: #Predicate { $0.id == id }
     )
@@ -104,7 +104,7 @@ final class CloudKitTasksBackend {
   /// "it sometimes just doesn't save" report. Most callers are plain field
   /// writes with nothing to undo, hence `@discardableResult`.
   @discardableResult
-  private func commitAndPush(_ entity: TaskEntity, op: String, deletion: Bool = false) -> Bool {
+  func commitAndPush(_ entity: TaskEntity, op: String, deletion: Bool = false) -> Bool {
     let id = entity.id
     let title = entity.title
     // An open task that left Today gives up its Today slot (#66), whichever
@@ -1026,6 +1026,17 @@ final class CloudKitTasksBackend {
   private func updateFixedSeries(from entity: TaskEntity,
                                  rule: Recurrence,
                                  newDisplayedDate: String?) {
+    rebaseFixedSeries(from: entity, rule: rule,
+                      anchor: newDisplayedDate ?? DayClock.appToday,
+                      displayed: newDisplayedDate)
+  }
+
+  /// Rebase a fixed series from `entity`: it gets slot `anchor` and When
+  /// date `displayed`; each other open copy gets the next slot after it.
+  /// The date actions (`TasksBackend+DateActions.swift`) call this after the
+  /// core moved the series ("update the rule").
+  func rebaseFixedSeries(from entity: TaskEntity, rule: Recurrence,
+                         anchor newAnchor: String, displayed newDisplayedDate: String?) {
     let seriesID = entity.recurrenceSeriesID ?? entity.id
     let openMembers = seriesMembers(seriesID: seriesID)
       .filter { $0.status == .open }
@@ -1035,7 +1046,6 @@ final class CloudKitTasksBackend {
         return a != b ? a < b : $0.id < $1.id
       }
 
-    let newAnchor = newDisplayedDate ?? DayClock.appToday
     var ordered = openMembers.filter { $0.id != entity.id }
     ordered.insert(entity, at: 0)
 

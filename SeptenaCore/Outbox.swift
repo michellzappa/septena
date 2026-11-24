@@ -26,7 +26,7 @@ final class TaskMutator {
 
   /// The CloudKit backend, lazily constructed once the engine is bound.
   /// Every mutation method below routes through this.
-  private var cloudBackend: CloudKitTasksBackend? {
+  var cloudBackend: CloudKitTasksBackend? {
     guard let engine = ckEngine else { return nil }
     if _cloudBackend == nil {
       _cloudBackend = CloudKitTasksBackend(engine: engine, context: context)

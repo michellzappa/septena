@@ -72,6 +72,15 @@ scan haptics-direct-generator error \
   'Call a Haptics verb (press/selection/commit/threshold/success/warning/play), or .sensoryFeedback for local view state.' \
   'SeptenaCore/Haptics\.swift'
 
+# ── Date actions (docs/TASK_DATES_SPEC.md §4, ADR 0027) ─────────────────────
+# A shell changes date fields only through one `mutator.apply(_:to:)` action,
+# whose fields the shared core decides. Chaining the raw setters is how iOS
+# and Mac drifted apart (spec §7). SeptenaCore keeps them for undo restore.
+scan date-setter-in-shell error \
+  '\.(schedule|reschedule|setDeadline|moveToToday|removeFromToday|setTimeSlot)\(id:' \
+  'Call mutator.apply(<TaskDateAction>, to:) (TaskDateActions.swift) instead of a raw date setter.' \
+  '^SeptenaCore/'
+
 # ── Selection language (DesignSpec §4, SelectionLanguage.swift) ──────────────
 # The app accent is adaptive ink — WHITE in dark mode. A solid-accent fill with
 # white text is invisible there. Selected chips use a tint wash + tint ink.
