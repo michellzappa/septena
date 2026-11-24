@@ -644,7 +644,7 @@ def build_ipad(ipad_screen_path, preset="iso-vertical", finish="silver"):
 
 
 def remove_iphone_island(phone_obj, screen_mat_name):
-    """Remove front-facing Dynamic Island / selfie cutout faces sitting in front of the iPhone screen."""
+    """Remove front-facing Dynamic Island / selfie cutout faces in the top-center zone without touching corners or rails."""
     scr_idx = next((i for i, m in enumerate(phone_obj.data.materials) if m and m.name == screen_mat_name), None)
     if scr_idx is None:
         return
@@ -657,23 +657,27 @@ def remove_iphone_island(phone_obj, screen_mat_name):
     xs = [v.co.x for f in scr_faces for v in f.verts]
     ys = [v.co.y for f in scr_faces for v in f.verts]
     zs = [v.co.z for f in scr_faces for v in f.verts]
-    xmin, xmax = min(xs) + 0.002, max(xs) - 0.002
-    ymin, ymax = min(ys) + 0.002, max(ys) - 0.0005
+    cx_scr = 0.5 * (min(xs) + max(xs))
+    ymax = max(ys)
     z_scr = sum(zs) / len(zs)
     to_del = []
     for f in bm.faces:
         if f.material_index == scr_idx:
             continue
         mat = phone_obj.data.materials[f.material_index] if f.material_index < len(phone_obj.data.materials) else None
+        mname = mat.name if mat else ""
+        # Never touch titanium chassis rails or outer front glass
+        if "color" in mname.lower() or "glass" in mname.lower():
+            continue
         c = f.calc_center_median()
-        in_xy = xmin < c.x < xmax and ymin < c.y < ymax
-        if in_xy and (c.z < z_scr + 0.0025 or (mat and ("Lens2" in mat.name or "2112" in mat.name))):
+        in_top_center = abs(c.x - cx_scr) < 0.015 and (ymax - 0.013) < c.y < (ymax - 0.0002)
+        if in_top_center and (c.z < z_scr + 0.0008 or "Lens2" in mname or "2112" in mname):
             to_del.append(f)
     if to_del:
         bmesh.ops.delete(bm, geom=to_del, context='FACES')
         bm.to_mesh(phone_obj.data)
         phone_obj.data.update()
-        print(f"Removed iPhone Dynamic Island ({len(to_del)} cutout faces)")
+        print(f"Removed iPhone Dynamic Island ({len(to_del)} top-center cutout faces)")
     bm.free()
 
 
