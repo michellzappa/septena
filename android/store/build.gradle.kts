@@ -12,7 +12,14 @@ kotlin {
 dependencies {
     implementation(project(":core"))
     implementation(libs.sqldelight.runtime)
+    // The shared core's bindings (pull merge); the host brings JNA (see :core).
+    compileOnly(libs.jna)
     testImplementation(libs.sqldelight.jvm.driver)
+    testImplementation(libs.jna)
+    testRuntimeOnly(
+        files(project(":core").layout.buildDirectory.file("core-natives/septena-core-jvm-natives.jar"))
+            .builtBy(":core:fetchCoreJvmNatives"),
+    )
 }
 
 val runConformanceVectors = tasks.register<JavaExec>("runConformanceVectors") {
