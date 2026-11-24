@@ -247,7 +247,8 @@
       { "id": "renameAgent", "title": "Rename Agent", "placeholder": "Agent name", "confirmTitle": "Rename", "featureId": "agents.connector" },
       { "id": "nameAgent", "title": "Name this agent", "placeholder": "Agent name", "confirmTitle": "Save", "featureId": "agents.connector" },
       { "id": "conversationOther", "title": "Other…", "placeholder": "Type your answer", "confirmTitle": "Send", "featureId": "ai.discuss" },
-      { "id": "conversationReply", "title": "Reply…", "placeholder": "Reply to thread", "confirmTitle": "Send", "featureId": "ai.discuss" }
+      { "id": "conversationReply", "title": "Reply…", "placeholder": "Reply to thread", "confirmTitle": "Send", "featureId": "ai.discuss" },
+      { "id": "sendBackReview", "title": "Send back for another pass", "placeholder": "What needs another pass?", "confirmTitle": "Send back", "featureId": "lists.review" }
     ],
     "placesScreen": {
       "id": "placesScreen",

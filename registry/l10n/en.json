@@ -2251,6 +2251,18 @@
       "actions.actions.task.sendBackReview.title"
     ]
   },
+  "Send back": {
+    "text": "Send back",
+    "paths": [
+      "surfaces.prompts.text.sendBackReview.confirmTitle"
+    ]
+  },
+  "Send back for another pass": {
+    "text": "Send back for another pass",
+    "paths": [
+      "surfaces.prompts.text.sendBackReview.title"
+    ]
+  },
   "Send feedback": {
     "text": "Send feedback",
     "paths": [
@@ -2968,6 +2980,12 @@
     "text": "Welcome to Septena",
     "paths": [
       "surfaces.firstRun.steps.welcome.title"
+    ]
+  },
+  "What needs another pass?": {
+    "text": "What needs another pass?",
+    "paths": [
+      "surfaces.prompts.text.sendBackReview.placeholder"
     ]
   },
   "When": {

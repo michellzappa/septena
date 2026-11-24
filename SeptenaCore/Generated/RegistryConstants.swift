@@ -1378,6 +1378,7 @@ enum RegistryPrompts {
     "nameAgent": RegistryTextPrompt(id: "nameAgent", title: RegistryL10n.t("Name this agent"), placeholder: RegistryL10n.t("Agent name"), confirmTitle: RegistryL10n.t("Save")),
     "conversationOther": RegistryTextPrompt(id: "conversationOther", title: RegistryL10n.t("Other…"), placeholder: RegistryL10n.t("Type your answer"), confirmTitle: RegistryL10n.t("Send")),
     "conversationReply": RegistryTextPrompt(id: "conversationReply", title: RegistryL10n.t("Reply…"), placeholder: RegistryL10n.t("Reply to thread"), confirmTitle: RegistryL10n.t("Send")),
+    "sendBackReview": RegistryTextPrompt(id: "sendBackReview", title: RegistryL10n.t("Send back for another pass"), placeholder: RegistryL10n.t("What needs another pass?"), confirmTitle: RegistryL10n.t("Send back")),
   ]
   static func tasksPhrase(count: Int) -> String { RegistryL10n.plural("%lld tasks", count: count, one: "1 task", other: "%lld tasks", args: [count]) }
   static func projectsPhrase(count: Int) -> String { RegistryL10n.plural("%lld projects", count: count, one: "1 project", other: "%lld projects", args: [count]) }
