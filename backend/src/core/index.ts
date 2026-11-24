@@ -121,6 +121,10 @@ export function occurrenceId(sourceTaskID: string, scheduled: string): string {
   return callCore("occurrenceId", { sourceTaskID, scheduled });
 }
 
+export function checklistOccurrenceId(newTaskID: string, index: number, sourceItemID: string): string {
+  return callCore("checklistOccurrenceId", { newTaskID, index, sourceItemID });
+}
+
 export function shiftReminderForRecurrence(input: {
   sourceReminderAt: string | null | undefined;
   sourceScheduled: string | null | undefined;

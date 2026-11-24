@@ -7,7 +7,7 @@ import { installWorkerTestHooks } from "./taskStoreHarness.ts";
 
 installWorkerTestHooks();
 
-const { nextScheduledDate, occurrenceID } = await import("../src/recurrence.ts");
+const { checklistOccurrenceID, nextScheduledDate, occurrenceID } = await import("../src/recurrence.ts");
 const {
   shiftReminderForRecurrence,
   shiftReminderOnReschedule,
@@ -128,6 +128,12 @@ describe("Conformance: recurrence.json", () => {
   for (const c of fixture.occurrenceID) {
     it(`occurrenceID: ${c.sourceTaskID} | ${c.scheduled}`, () => {
       assert.equal(occurrenceID(c.sourceTaskID, c.scheduled), c.expected);
+    });
+  }
+
+  for (const c of fixture.checklistOccurrenceID) {
+    it(`checklistOccurrenceID: ${c.newTaskID} | ${c.index} | ${c.sourceItemID}`, () => {
+      assert.equal(checklistOccurrenceID(c.newTaskID, c.index, c.sourceItemID), c.expected);
     });
   }
 });
