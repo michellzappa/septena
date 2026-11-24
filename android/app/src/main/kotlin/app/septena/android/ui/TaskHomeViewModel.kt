@@ -601,10 +601,11 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     } else {
                         if (snapshot.starred) starredCount += 1
                         val projId = snapshot.project
+                        val areaId = snapshot.area
                         if (projId != null) {
                             projectOpenCounts[projId] = (projectOpenCounts[projId] ?: 0) + 1
-                        } else if (snapshot.area != null) {
-                            areaDirectOpenCounts[snapshot.area] = (areaDirectOpenCounts[snapshot.area] ?: 0) + 1
+                        } else if (areaId != null) {
+                            areaDirectOpenCounts[areaId] = (areaDirectOpenCounts[areaId] ?: 0) + 1
                         }
                     }
                 }

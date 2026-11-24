@@ -48,6 +48,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -479,10 +480,12 @@ private fun SmartListPillTile(
             if (count != null) {
                 Text(
                     text = count.toString(),
-                    fontSize = 24.sp,
-                    lineHeight = 26.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFeatureSettings = "tnum",
+                    style = TextStyle(
+                        fontSize = 24.sp,
+                        lineHeight = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFeatureSettings = "tnum",
+                    ),
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                 )
@@ -699,9 +702,11 @@ private fun SidebarCountText(count: Int?) {
     if (count == null || count <= 0) return
     Text(
         text = count.toString(),
-        fontSize = 14.sp,
-        lineHeight = 18.sp,
-        fontFeatureSettings = "tnum",
+        style = TextStyle(
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
+            fontFeatureSettings = "tnum",
+        ),
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
         maxLines = 1,
     )
