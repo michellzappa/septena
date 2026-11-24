@@ -593,6 +593,7 @@ targets:
       - path: SeptenaCore/TaskFade.swift
       - path: SeptenaCore/SharedCoreBridge.swift
       - path: SeptenaCore/TasksWidgetWire.swift
+      - path: SeptenaCore/TaskBackend/TaskBackendLimits.swift
       - path: SeptenaCore/Generated/RegistryConstants.swift
     dependencies:
       - package: SeptenaSharedCore

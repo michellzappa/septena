@@ -243,6 +243,7 @@ extension TaskSyncEngine {
             if let url = TaskAttachmentFiles.url(for: a) { try? FileManager.default.removeItem(at: url) }
             main.delete(a)
           }
+          clearAttachmentLimitState(id: id)
           markGone(.attachment, id, shadow: shadows[key], store: store)
         } else if !pendingDelete.contains(key) {
           let a = fetchAttachment(id) ?? {
@@ -260,8 +261,10 @@ extension TaskSyncEngine {
               a.localFilename = name
             }
           }
+          let uploaded = change.row["uploadedAt"]?.stringValue != nil
           let mapped = (try? TaskBackendMapping.attachment(a).get())?.row.fields ?? [:]
           recordApplied(key, applied: applied, mapped: mapped, raw: change.row, shadow: shadows[key], store: store)
+          recordAttachmentUploadState(id: id, uploaded: uploaded, hasLocalFile: a.localFilename != nil, store: store)
         }
         touchedTasks = true
       case .checklistItem:

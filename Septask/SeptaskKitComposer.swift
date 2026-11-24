@@ -1870,6 +1870,7 @@ enum KitAttachmentPasteHelper {
 @MainActor
 final class KitAttachmentsView: NSView {
   static let chipHeight: CGFloat = 24
+  private static let upsellHeight: CGFloat = 20
   private static let rowSpacing: CGFloat = 4
 
   var onChanged: (() -> Void)?
@@ -1877,16 +1878,35 @@ final class KitAttachmentsView: NSView {
   private let stack = NSStackView()
   private var taskID: String?
   private var items: [TaskAttachmentEntity] = []
+  private var explicitUpsell: RegistryPlanNote?
 
   private var store: TaskAttachmentStore { SeptenaServices.shared.taskAttachmentStore }
   private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
 
   var attachmentCount: Int { items.count }
 
+  private var hasLocalOnlyItems: Bool {
+    items.contains { TaskSyncEngine.shared.isAttachmentLocalOnly($0.id) }
+  }
+
+  private var hasElsewhereItems: Bool {
+    items.contains { TaskSyncEngine.shared.isAttachmentElsewhere($0) }
+  }
+
+  private var activeUpsell: RegistryPlanNote? {
+    if let explicitUpsell { return explicitUpsell }
+    if hasElsewhereItems || hasLocalOnlyItems { return RegistryPlans.upsell("file_elsewhere") }
+    return nil
+  }
+
   var preferredHeight: CGFloat {
     guard !items.isEmpty else { return 0 }
-    return CGFloat(items.count) * Self.chipHeight
+    var h = CGFloat(items.count) * Self.chipHeight
       + CGFloat(max(0, items.count - 1)) * Self.rowSpacing
+    if activeUpsell != nil {
+      h += Self.rowSpacing + Self.upsellHeight
+    }
+    return h
   }
 
   override init(frame frameRect: NSRect) {
@@ -1911,6 +1931,7 @@ final class KitAttachmentsView: NSView {
   required init?(coder: NSCoder) { fatalError("KitAttachmentsView is code-only") }
 
   func configure(taskID: String) {
+    if self.taskID != taskID { explicitUpsell = nil }
     self.taskID = taskID
     reload()
   }
@@ -1955,9 +1976,12 @@ final class KitAttachmentsView: NSView {
       v.removeFromSuperview()
     }
     for (idx, item) in items.enumerated() {
+      let baseSize = ByteCountFormatter.string(fromByteCount: item.byteCount, countStyle: .file)
+      let localOnly = TaskSyncEngine.shared.isAttachmentLocalOnly(item.id)
+      let sizeText = localOnly ? "\(baseSize) · \(RegistryPlans.Status.device)" : baseSize
       let chip = KitAttachmentChipView(
         filename: item.filename,
-        sizeText: ByteCountFormatter.string(fromByteCount: item.byteCount, countStyle: .file),
+        sizeText: sizeText,
         hasLocalFile: TaskAttachmentFiles.url(for: item).map { FileManager.default.fileExists(atPath: $0.path) } ?? false
       )
       chip.onQuickLook = { [weak self] in self?.quickLook(at: idx) }
@@ -1968,18 +1992,81 @@ final class KitAttachmentsView: NSView {
       chip.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor).isActive = true
       chip.heightAnchor.constraint(equalToConstant: Self.chipHeight).isActive = true
     }
+    if let moment = activeUpsell {
+      let row = upsellRowView(moment)
+      stack.addArrangedSubview(row)
+      row.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor).isActive = true
+      row.heightAnchor.constraint(equalToConstant: Self.upsellHeight).isActive = true
+    }
+  }
+
+  private func upsellRowView(_ moment: RegistryPlanNote) -> NSView {
+    let row = NSStackView()
+    row.orientation = .horizontal
+    row.alignment = .centerY
+    row.spacing = 6
+    let showElsewhereTitle = explicitUpsell != nil || hasElsewhereItems
+    let label = NSTextField(labelWithString: showElsewhereTitle ? moment.title : moment.detail)
+    label.font = SeptaskKitTheme.meta
+    label.textColor = SeptaskKitTheme.inkSecondary
+    label.lineBreakMode = .byTruncatingTail
+    label.maximumNumberOfLines = 1
+    let button = NSButton(title: RegistryPlans.Paywall.seePlus, target: self, action: #selector(seePlus))
+    button.bezelStyle = .inline
+    button.font = SeptaskKitTheme.meta
+    button.refusesFirstResponder = true
+    button.setContentCompressionResistancePriority(.required, for: .horizontal)
+    row.addArrangedSubview(label)
+    row.addArrangedSubview(button)
+    return row
+  }
+
+  @objc private func seePlus() {
+    guard let presenter = window?.contentViewController else { return }
+    SeptaskPlusSheet.present(upsellID: activeUpsell?.id ?? "file_elsewhere", from: presenter)
   }
 
   private func quickLook(at index: Int) {
-    let urls = items.compactMap { entity -> URL? in
-      guard let url = TaskAttachmentFiles.url(for: entity),
-            FileManager.default.fileExists(atPath: url.path) else { return nil }
-      return url
+    guard items.indices.contains(index) else { return }
+    let target = items[index]
+    if let url = TaskAttachmentFiles.url(for: target), FileManager.default.fileExists(atPath: url.path) {
+      let urls = items.compactMap { entity -> URL? in
+        guard let u = TaskAttachmentFiles.url(for: entity),
+              FileManager.default.fileExists(atPath: u.path) else { return nil }
+        return u
+      }
+      let startIdx = urls.firstIndex(of: url) ?? 0
+      KitQuickLookCoordinator.shared.preview(urls: urls, startingAt: startIdx)
+      return
     }
-    guard !urls.isEmpty else { return }
-    let targetURL = items.indices.contains(index) ? TaskAttachmentFiles.url(for: items[index]) : nil
-    let startIdx = targetURL.flatMap { urls.firstIndex(of: $0) } ?? 0
-    KitQuickLookCoordinator.shared.preview(urls: urls, startingAt: startIdx)
+    Task { @MainActor [weak self] in
+      guard let self else { return }
+      do {
+        if let downloaded = try await self.store.localFile(for: target) {
+          self.reload()
+          KitQuickLookCoordinator.shared.preview(urls: [downloaded], startingAt: 0)
+        } else if TaskSyncEngine.shared.isAttachmentElsewhere(target),
+                  let moment = RegistryPlans.upsell("file_elsewhere") {
+          self.explicitUpsell = moment
+          self.rebuild()
+          self.onChanged?()
+        }
+      } catch TaskBackendError.limitReached(let limit) {
+        PlanStatus.shared.noteLimitReached(limit)
+        self.explicitUpsell = limit.upsellNote ?? RegistryPlans.upsell("file_elsewhere")
+        self.rebuild()
+        self.onChanged?()
+      } catch TaskBackendError.http(let status, _) where status == 404 {
+        if !PlanStatus.shared.attachmentsAllowed || TaskSyncEngine.shared.isAttachmentElsewhere(target),
+           let moment = RegistryPlans.upsell("file_elsewhere") {
+          self.explicitUpsell = moment
+          self.rebuild()
+          self.onChanged?()
+        }
+      } catch {
+        KitAttachmentPasteHelper.presentError(error, in: self.window)
+      }
+    }
   }
 
   private func reveal(_ entity: TaskAttachmentEntity) {

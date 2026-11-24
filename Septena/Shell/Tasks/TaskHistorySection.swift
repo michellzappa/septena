@@ -82,6 +82,17 @@ struct TaskHistoryPanel: View {
       failed = false
     } catch is CancellationError {
       return
+    } catch TaskBackendError.limitReached(let limit) {
+      PlanStatus.shared.noteLimitReached(limit)
+      rows = []
+      if let note = limit.upsellNote {
+        edge = note
+        edgeSeen = SettingsMirror.upsellsSeen(context: modelContext).contains(note.id)
+        failed = false
+      } else {
+        edge = nil
+        failed = true
+      }
     } catch {
       rows = []
       edge = nil
