@@ -2285,18 +2285,25 @@ struct TaskListView: View {
   @ViewBuilder
   private var titleRow: some View {
     if !embedded {
-      // The title IS the navigation dropdown (Things-style): tapping it opens
-      // the full destination menu so you can jump anywhere without the sidebar.
-      // The menu trigger is intrinsic-width; the Spacer fills the row so the
-      // title stays left-aligned without widening the dropdown to full width.
-      HStack(spacing: 0) {
-        TaskNavMenu {
-          ScreenTitleMenuLabel(icon: titleIcon, iconTint: titleTint, title: filter.title)
+      // The title is a navigation dropdown (Things-style) only when no sidebar
+      // is visible (compact stack or collapsed split sidebar). When the sidebar
+      // is already on screen, render the plain static `ScreenTitle`.
+      if nav.showsTitleNavMenu(usesPushNavigation: usesPushNavigation) {
+        // The menu trigger is intrinsic-width; the Spacer fills the row so the
+        // title stays left-aligned without widening the dropdown to full width.
+        HStack(spacing: 0) {
+          TaskNavMenu {
+            ScreenTitleMenuLabel(icon: titleIcon, iconTint: titleTint, title: filter.title)
+          }
+          Spacer(minLength: 0)
         }
-        Spacer(minLength: 0)
+        .plainListChrome()
+        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
+      } else {
+        ScreenTitle(icon: titleIcon, iconTint: titleTint, title: filter.title)
+          .plainListChrome()
+          .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
       }
-      .plainListChrome()
-      .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     } else {
       embeddedHeader()
         .plainListChrome()

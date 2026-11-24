@@ -336,7 +336,9 @@ struct AreaDetailView: View {
             }
             ClickToEditTitle(placeholder: "Area", text: $draftName,
                              onCommit: { commitName($0) }) {
-              TaskNavMenu { NavMenuChevron() }
+              if nav.showsTitleNavMenu(usesPushNavigation: usesPushNavigation) {
+                TaskNavMenu { NavMenuChevron() }
+              }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
           }
@@ -574,6 +576,7 @@ struct AreaDetailView: View {
 struct ProjectDetailView: View {
   let project: Project
   @Environment(DayClock.self) private var clock
+  @Environment(NavigationState.self) private var nav
   @Environment(ProjectsMutator.self) private var projectsMutator
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
@@ -643,7 +646,9 @@ struct ProjectDetailView: View {
               .offset(x: -Theme.checkboxLeadingNudge)
             ClickToEditTitle(placeholder: "Project", text: $draftName,
                              onCommit: { commitNameTo($0) }) {
-              TaskNavMenu { NavMenuChevron() }
+              if nav.showsTitleNavMenu(usesPushNavigation: usesPushNavigation) {
+                TaskNavMenu { NavMenuChevron() }
+              }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
           }

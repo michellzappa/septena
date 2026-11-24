@@ -961,16 +961,24 @@ struct ScreenTitle: View {
   let title: String
 
   var body: some View {
-    HStack(spacing: 12) {
+    // Shares the list's leading grid with `ScreenTitleMenuLabel`: the icon
+    // rides the same `checkboxTap` column (parked at `headerLeading`, nudged
+    // like every row checkbox and section-header glyph) and the title lands
+    // one `iconTextGap` past it, so toggling the sidebar never shifts the
+    // title horizontally.
+    HStack(spacing: Theme.iconTextGap) {
       Image(systemName: icon)
         .font(.title2)
         .foregroundStyle(iconTint)
+        .frame(width: Theme.checkboxTap, alignment: .center)
+        .offset(x: -Theme.checkboxLeadingNudge)
       Text(title)
         .font(.septenaScreenTitle)
         .foregroundStyle(.primary)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.horizontal, Theme.hPadding)
+    .padding(.leading, TaskCardMetrics.headerLeading)
+    .padding(.trailing, TaskCardMetrics.margin)
     .padding(.top, 12)
     .padding(.bottom, 18)
   }
