@@ -74,4 +74,12 @@ class AndroidAppGraph(application: Application) {
         val after = taskStore.record(RegistryEntityNames.TASK, taskId)
         taskUndoHistory.recordEdit(before, after)
     }
+
+    init {
+        // Remote attachment deletes drop the local row when sync applies them
+        // (plan_pull_row drops non-task rows), so free the cached file here.
+        taskStore.onRemoteDelete = { entity, id ->
+            if (entity == RegistryEntityNames.ATTACHMENT) attachments.deleteLocalCopy(id)
+        }
+    }
 }
