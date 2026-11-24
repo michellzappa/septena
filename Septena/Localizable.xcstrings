@@ -5,6 +5,10 @@
       "comment" : "Generated from registry plans.outcomes.agents.rows.links.cells.account. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "%lld selected" : {
+      "comment" : "Generated from registry surfaces.taskSelection.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "%@’s servers never run AI on your tasks. AI runs on your device, or in your own Claude when you connect it. Turn AI off and the app works the same, without conversations." : {
       "comment" : "Generated from registry settings.copy.ai_explainer.privateBody.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -4610,6 +4614,10 @@
           }
         }
       }
+    },
+    "Deselect All" : {
+      "comment" : "Generated from registry actions.actions.task.selectAll.activeTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Despondent" : {
       "localizations" : {
@@ -10950,6 +10958,10 @@
     },
     "Select" : {
       "comment" : "Generated from registry actions.actions.task.select.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Select All" : {
+      "comment" : "Generated from registry actions.actions.task.selectAll.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Select main.sqlite or a Things Database.thingsdatabase bundle exported from Things." : {

@@ -184,6 +184,7 @@
   "Add": {
     "text": "Add",
     "paths": [
+      "actions.actions.app.quickAdd.addTitle",
       "actions.actions.app.shareCapture.add.title",
       "surfaces.prompts.text.newSection.confirmTitle"
     ]
@@ -620,6 +621,12 @@
       "tokens.fruitAccents.colorful.name"
     ]
   },
+  "Complete": {
+    "text": "Complete",
+    "paths": [
+      "actions.actions.task.toggleComplete.shortTitle"
+    ]
+  },
   "Completed": {
     "text": "Completed",
     "paths": [
@@ -912,6 +919,12 @@
       "destinations.destinations.recentlyDeleted.title"
     ]
   },
+  "Deselect All": {
+    "text": "Deselect All",
+    "paths": [
+      "actions.actions.task.selectAll.activeTitle"
+    ]
+  },
   "Devices": {
     "text": "Devices",
     "paths": [
@@ -965,6 +978,7 @@
     "paths": [
       "settings.copy.ai_explainer.turnDone.label",
       "destinations.destinations.agent.groups.done.title",
+      "actions.actions.task.select.activeTitle",
       "plans.paywall.done"
     ]
   },
@@ -2621,6 +2635,12 @@
       "actions.actions.task.select.title"
     ]
   },
+  "Select All": {
+    "text": "Select All",
+    "paths": [
+      "actions.actions.task.selectAll.title"
+    ]
+  },
   "Send": {
     "text": "Send",
     "paths": [
@@ -3822,6 +3842,15 @@
     ],
     "paths": [
       "surfaces.prompts.countPhrases.projects.label"
+    ]
+  },
+  "{count} selected": {
+    "text": "{count} selected",
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.taskSelection.format"
     ]
   },
   "{count} tags": {

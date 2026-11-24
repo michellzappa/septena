@@ -8,9 +8,9 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 52 | 53 | 53 | 0 | 35 | 0 | 1 |
+| ships | 52 | 53 | 53 | 0 | 37 | 0 | 1 |
 | partial | 1 | 1 | 1 | 0 | 2 | 0 | 3 |
-| planned | 0 | 0 | 0 | 50 | 15 | 53 | 1 |
+| planned | 0 | 0 | 0 | 50 | 13 | 53 | 1 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 52 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
@@ -41,12 +41,12 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `task.share` | Share a task (title and notes) through the system share sheet | ships | ships | ships | planned | ships | planned | - |
 | `task.alerts` | Timed reminders | ships | ships | ships | planned | ships | planned | - |
 | `fade.sweep` | Fade pass, Faded pile and weekly sweep | ships | ships | ships | planned | planned | planned | - |
-| `capture.quick-add` | Quick Add sheet | ships | ships | - | planned | planned | - | - |
+| `capture.quick-add` | Quick Add sheet | ships | ships | - | planned | ships | - | - |
 | `capture.share-target` | Share into Inbox | ships | ships | - | planned | ships | planned | - |
 | `capture.quick-entry` | Quick Entry global panel | - | - | ships | - | - | planned | - |
 | `edit.filing-suggestion` | On-device filing suggestion | ships | ships | ships | - | planned | planned | - |
 | `edit.undo` | Shared undo history | ships | ships | ships | planned | ships | planned | - |
-| `edit.multi-select` | Select multiple tasks | ships | ships | ships | planned | planned | planned | - |
+| `edit.multi-select` | Select multiple tasks | ships | ships | ships | planned | ships | planned | - |
 | `find.quick-find` | Quick Find | ships | ships | ships | planned | ships | planned | - |
 | `task.page` | Task page (ADR 0029) | partial | partial | partial | planned | partial | planned | partial |
 | `mac.keyboard` | Keyboard-first shortcuts | - | ships | ships | planned | planned | planned | - |

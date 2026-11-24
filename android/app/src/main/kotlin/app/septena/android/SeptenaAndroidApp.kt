@@ -11,6 +11,7 @@ import app.septena.core.ConversationMutator
 import app.septena.core.ConversationRules
 import app.septena.core.RecurrenceRules
 import app.septena.core.RegistryEntityMutator
+import app.septena.core.SyncRecord
 import app.septena.core.SyncedSettings
 import app.septena.core.SyncedSettingsMutator
 import app.septena.core.SystemDayClock
@@ -27,10 +28,12 @@ import app.septena.transport.SeptenaTaskBackendClient
 import app.septena.transport.UrlConnectionSyncTransport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SeptenaAndroidApp : Application() {
     val graph: AndroidAppGraph by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
@@ -123,6 +126,24 @@ class AndroidAppGraph(application: Application) {
         // (plan_pull_row drops non-task rows), so free the cached file here.
         taskStore.onRemoteDelete = { entity, id ->
             if (entity == RegistryEntityNames.ATTACHMENT) attachments.deleteLocalCopy(id)
+        }
+    }
+
+    /**
+     * Runs one gesture's write on each of [taskIds] and records the lot as one
+     * undo step. A write that throws stops the batch; the tasks already
+     * written stay recorded, so Undo still reverts them.
+     */
+    suspend fun captureTaskEdits(taskIds: Collection<String>, mutation: suspend (String) -> Unit) {
+        val edits = mutableListOf<Pair<SyncRecord?, SyncRecord?>>()
+        try {
+            for (taskId in taskIds) {
+                val before = taskStore.record(RegistryEntityNames.TASK, taskId)
+                mutation(taskId)
+                edits += before to taskStore.record(RegistryEntityNames.TASK, taskId)
+            }
+        } finally {
+            withContext(NonCancellable) { taskUndoHistory.recordEdits(edits) }
         }
     }
 }

@@ -230,6 +230,27 @@ class TaskMutator(
         )
     }
 
+    /**
+     * Files a task in an area, a project, or (both null) the Inbox. A new home
+     * drops the section: a heading only means something inside its project. A
+     * move to the list the task is already in writes nothing.
+     */
+    suspend fun moveToList(id: String, area: String?, project: String?): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        val targetArea = if (project == null) area else null
+        if (existing.fields[RegistryEntityFields.Task.AREA].stringValue() == targetArea &&
+            existing.fields[RegistryEntityFields.Task.PROJECT].stringValue() == project
+        ) return existing
+        return updateFields(
+            id,
+            mapOf(
+                RegistryEntityFields.Task.AREA to JsonValue.stringOrNull(targetArea),
+                RegistryEntityFields.Task.PROJECT to JsonValue.stringOrNull(project),
+                RegistryEntityFields.Task.HEADING to JsonValue.Null,
+            ),
+        )
+    }
+
     suspend fun setNotes(id: String, notes: String?): TaskRecord? = updateFields(
         id,
         mapOf(RegistryEntityFields.Task.NOTES to JsonValue.stringOrNull(notes)),

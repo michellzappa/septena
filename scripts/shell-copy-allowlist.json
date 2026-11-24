@@ -394,11 +394,6 @@
     },
     {
       "file": "Septena/Shell/Tasks/TaskListView.swift",
-      "literal": "Complete",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/TaskListView.swift",
       "literal": "More",
       "reasonId": "predates-rule"
     },

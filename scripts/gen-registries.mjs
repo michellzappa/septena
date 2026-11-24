@@ -2103,6 +2103,10 @@ function generateKotlinCore(bundle) {
     RegistryFirstRunStepIds: surfaces.firstRun.steps.map((s) => s.id),
     RegistryTaskAttributeIds: surfaces.taskAttributes.map((a) => a.id),
     RegistryTaskPageBlockIds: surfaces.taskPage.blocks.map((b) => b.id),
+    // Top-level surfaces looked up by id (taskRowMenu, taskSelection, ...).
+    RegistrySurfaceIds: Object.values(surfaces)
+      .filter((v) => v && typeof v === "object" && !Array.isArray(v) && typeof v.id === "string")
+      .map((v) => v.id),
   };
   const idCounts = new Map();
   (function countIds(v) {
