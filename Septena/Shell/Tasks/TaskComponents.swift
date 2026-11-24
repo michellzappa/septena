@@ -550,6 +550,47 @@ enum TaskNotesGlyph {
   }
 }
 
+/// Permanent "an agent added this" marker for the row's trailing cluster
+/// (`taskPage.provenance`, feature `task.provenance`). Unlike `AgentCueMarker`
+/// it never clears: provenance is a fact about the task, not an unread state.
+/// Muted ink like the notes glyph, so a list an agent filled stays calm.
+struct AgentAuthoredGlyph: View {
+  let task: SeptenaTask
+  var body: some View {
+    Image(systemName: RegistrySurfaces.provenanceAgentSymbol)
+      .font(.system(size: 10))
+      .foregroundStyle(Theme.inkSecondary)
+      .accessibilityLabel(Text(task.addedByPhrase))
+  }
+}
+
+/// The task page's "Added by" section (`taskPage.provenance`): who added the
+/// task (an agent's name, or "You") and when. Read-only metadata.
+struct TaskProvenanceSection: View {
+  let task: SeptenaTask
+  let label: String
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text(label)
+        .font(.septenaLabel)
+        .foregroundStyle(Theme.inkSecondary)
+      HStack(spacing: 6) {
+        if task.isAgentAuthored {
+          Image(systemName: RegistrySurfaces.provenanceAgentSymbol)
+            .font(.system(size: 12))
+            .foregroundStyle(Theme.inkSecondary)
+            .accessibilityHidden(true)
+        }
+        Text(task.addedByDetail)
+          .font(.septenaMeta)
+          .foregroundStyle(Theme.inkPrimary)
+          .textSelection(.enabled)
+      }
+    }
+    .accessibilityElement(children: .combine)
+  }
+}
+
 // MARK: - Task row
 //
 // The single closed (non-editing) task row used by every task surface — the
@@ -766,6 +807,7 @@ struct TaskRow: View {
         .accessibilityLabel(TaskFilter.starred.title)
     }
     if hasNotes { TaskNotesGlyph.view }
+    if task.isAgentAuthored { AgentAuthoredGlyph(task: task) }
     agentSignal
   }
 

@@ -182,6 +182,12 @@
       "surfaces.notices.items.getStarted.steps.addTask.title"
     ]
   },
+  "Added by": {
+    "text": "Added by",
+    "paths": [
+      "surfaces.taskPage.blocks.taskPage.provenance.label"
+    ]
+  },
   "Advanced": {
     "text": "Advanced",
     "paths": [
@@ -2936,6 +2942,12 @@
     "text": "Year",
     "paths": [
       "surfaces.taskDetail.repeatUnits.3.title"
+    ]
+  },
+  "You": {
+    "text": "You",
+    "paths": [
+      "surfaces.taskPage.blocks.taskPage.provenance.selfLabel"
     ]
   },
   "You can cancel at any time in Settings.": {

@@ -56,6 +56,7 @@ import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.SyncRecord
 import app.septena.core.TaskPageBlockKinds
+import app.septena.core.TaskProvenance
 import app.septena.core.TaskPageDepths
 import app.septena.core.WireTimestamp
 import app.septena.core.booleanValue
@@ -74,6 +75,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -681,6 +683,26 @@ fun TaskDetailScreen(
                         )
                         // Android has no attachment store yet (task.attachments is planned): skip.
                         TaskPageBlockKinds.ATTACHMENTS -> Unit
+                        // Who added the task and when: permanent, read-only metadata.
+                        TaskPageBlockKinds.PROVENANCE -> {
+                            val source = taskFields[RegistryEntityFields.Task.SOURCE].stringValue()
+                            val name = TaskProvenance.addedByName(
+                                source,
+                                taskFields[RegistryEntityFields.Task.SOURCE_CLIENT].stringValue(),
+                                languageTag,
+                            )
+                            val on = formatAddedOn(
+                                taskFields[RegistryEntityFields.Task.CREATED_AT].stringValue(),
+                                taskFields[RegistryEntityFields.Task.CREATED].stringValue(),
+                                languageTag,
+                            )
+                            HorizontalDivider()
+                            heading?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
+                            Text(
+                                if (on == null) name else "$name · $on",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                         // Android does not read the task change log yet (task.history is planned): skip.
                         TaskPageBlockKinds.HISTORY -> Unit
                         // A kind that a newer registry adds has no Android renderer yet: skip.
@@ -1217,6 +1239,19 @@ private suspend fun loadTaskDetail(graph: AndroidAppGraph, taskId: String): Task
         .sortedBy(ChecklistLine::position)
         .toList()
     return TaskDetailData(task, areas, projects, checklist)
+}
+
+/** When the task was added: the creation instant in the device zone, else its creation day. */
+private fun formatAddedOn(createdAt: String?, created: String?, languageTag: String): String? {
+    val locale = Locale.forLanguageTag(languageTag)
+    createdAt?.let { stamp ->
+        runCatching {
+            DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
+                .withLocale(locale)
+                .format(Instant.parse(stamp).atZone(ZoneId.systemDefault()))
+        }.getOrNull()?.let { return it }
+    }
+    return created?.let { formatDay(it, languageTag) }
 }
 
 private fun formatDay(day: String, languageTag: String): String = runCatching {

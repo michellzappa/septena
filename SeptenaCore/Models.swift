@@ -180,6 +180,45 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// NO second fetch-by-id per row. `TaskConvo()` (empty) for tasks without one.
   var conversation: TaskConvo = TaskConvo()
 
+  /// True when an agent added this task over MCP. Permanent: unlike
+  /// `showsAgentCue()` it never clears, so the row glyph and the task page's
+  /// "Added by" line (`taskPage.provenance`) always say who added the task.
+  var isAgentAuthored: Bool { source == TaskSource.mcp }
+
+  /// Who added the task, as the task page and the row's accessibility label
+  /// name it: the agent's connector name (`sourceClient`, which the backend
+  /// stamps from the connection), or the registry's "You" for every task a
+  /// person added (app, watch, share, import, legacy rows with no source).
+  var addedByName: String {
+    guard isAgentAuthored else { return RegistrySurfaces.provenanceSelfLabel }
+    let name = sourceClient?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return name.isEmpty ? RegistrySurfaces.provenanceAgentFallbackName : name
+  }
+
+  /// When the task was added: the creation instant, else its creation day for
+  /// rows that predate `createdAt`. nil when neither is known.
+  var addedOn: Date? {
+    if createdAt != .distantPast { return createdAt }
+    return SeptenaDate.parse(created)
+  }
+
+  /// The task page's provenance value: "Claude · 24 Nov 2026 at 09:03", or
+  /// the name alone when the date is unknown. Same words on every shell.
+  var addedByDetail: String {
+    guard let on = addedOn else { return addedByName }
+    return "\(addedByName) · \(on.formatted(date: .abbreviated, time: .shortened))"
+  }
+
+  /// "Added by Claude" / "Added by You": the provenance label and the name,
+  /// for the row glyph's accessibility label and tooltip.
+  var addedByPhrase: String {
+    let label = RegistrySurfaces.taskPageBlocks.first { $0.id == Self.provenanceBlockID }?.label ?? ""
+    return "\(label) \(addedByName)"
+  }
+
+  /// The task page block that owns the provenance copy (`surfaces.json`).
+  private static let provenanceBlockID = "taskPage.provenance"
+
   /// True while this row should glow as a freshly agent-created item the
   /// user hasn't engaged yet. Provenance (`source`) is permanent; this cue
   /// is transient — it clears on `acknowledgedAt` and auto-decays after

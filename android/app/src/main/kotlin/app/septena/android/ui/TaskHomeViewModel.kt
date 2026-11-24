@@ -9,6 +9,7 @@ import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
 import app.septena.core.SmartListResolver
 import app.septena.core.TaskFadeRules
+import app.septena.core.TaskProvenance
 import app.septena.core.TaskSnapshot
 import app.septena.core.TaskViewRules
 import app.septena.core.booleanValue
@@ -235,7 +236,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 is TaskHomeLocation.SmartList -> {
                     if (!TaskViewRules.matchesView(snapshot, resolvedLocation.destinationId, today, now)) continue
                     val positioned = PositionedTask(
-                        TaskListItem(record.id, snapshot.title),
+                        TaskListItem(record.id, snapshot.title, agentName(snapshot)),
                         record.fields[positionField(resolvedLocation.destinationId)].numberValue()
                             ?: record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                         archiveDate = when (resolvedLocation.destinationId) {
@@ -254,14 +255,14 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 is TaskHomeLocation.Area -> {
                     if (snapshot.area != resolvedLocation.id || !isOpenVisible(snapshot)) continue
                     visible += PositionedTask(
-                        TaskListItem(record.id, snapshot.title),
+                        TaskListItem(record.id, snapshot.title, agentName(snapshot)),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
                 }
                 is TaskHomeLocation.Project -> {
                     if (snapshot.project != resolvedLocation.id || !isOpenVisible(snapshot)) continue
                     visible += PositionedTask(
-                        TaskListItem(record.id, snapshot.title),
+                        TaskListItem(record.id, snapshot.title, agentName(snapshot)),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
                 }
@@ -350,3 +351,11 @@ private fun JsonValue?.numberValue(): Double? = when (this) {
     is JsonValue.DecimalValue -> value
     else -> null
 }
+
+/** The agent's name for a row an agent added (`task.provenance`), else null. */
+private fun agentName(snapshot: TaskSnapshot): String? =
+    if (TaskProvenance.isAgentAuthored(snapshot.source)) {
+        TaskProvenance.addedByName(snapshot.source, snapshot.sourceClient)
+    } else {
+        null
+    }

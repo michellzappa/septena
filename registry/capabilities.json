@@ -23,6 +23,7 @@
     "task.notes": { "title": "Notes", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "task.attachments": { "title": "Attachments", "ios": "ships", "ipados": "ships", "macos": "partial", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
     "task.history": { "title": "Per-task change history", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
+    "task.provenance": { "title": "Who added a task: you or a named agent, on the row and the task page", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "task.aging": { "title": "Aging fade across open lists", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
     "task.checklists": { "title": "Checklists inside a task", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "task.tags": { "title": "Tags", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },

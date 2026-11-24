@@ -514,12 +514,12 @@ struct AIExplainerView: View {
   private struct Step { let icon: String; let title: String; let desc: String; let runs: String; let tint: Color }
   private var steps: [Step] {
     [
-      Step(icon: "square.and.pencil", title: "Capture", desc: "Jot down the task. A few words are enough.", runs: "You", tint: .gray),
+      Step(icon: "square.and.pencil", title: "Capture", desc: "Jot down the task. A few words are enough.", runs: RegistrySurfaces.provenanceSelfLabel, tint: .gray),
       Step(icon: "questionmark.bubble", title: "Confirm", desc: "AI asks what you mean. Nothing happens until you answer.", runs: "On-device", tint: .green),
       Step(icon: "doc.text.magnifyingglass", title: "Look up", desc: "Pulls relevant context from your own data.", runs: "On-device", tint: .green),
       Step(icon: "checklist", title: "Decide", desc: "Offers a few options for you to pick. A harder call may use the cloud.", runs: "On-device ↗", tint: .blue),
       Step(icon: "hammer", title: "Work", desc: "Does what it can: a draft, a comparison. Uses the web or your Claude only when needed.", runs: "On-device ↗", tint: .blue),
-      Step(icon: "hand.point.right", title: "Hand off", desc: "Anything only you can do (pay, send) becomes one clear button.", runs: "You", tint: .gray),
+      Step(icon: "hand.point.right", title: "Hand off", desc: "Anything only you can do (pay, send) becomes one clear button.", runs: RegistrySurfaces.provenanceSelfLabel, tint: .gray),
     ]
   }
 

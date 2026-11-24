@@ -22,7 +22,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
-data class TaskListItem(val id: String, val title: String)
+/** [agentName] is set when an agent added the task (`task.provenance`); the row names it. */
+data class TaskListItem(val id: String, val title: String, val agentName: String? = null)
 
 /** Portable task-list surface. Platform hosts provide registry copy and bind actions to their mutators. */
 @Composable
@@ -128,6 +129,18 @@ private fun TaskRow(
     ListItem(
         modifier = Modifier.fillMaxWidth().clickable { onOpenTask(task.id) },
         headlineContent = { Text(task.title, style = MaterialTheme.typography.bodyLarge) },
+        // Permanent provenance marker. Apple rows show the registry glyph
+        // (`task.added_by_agent`); Android has no icon set yet (no Material
+        // icons dependency), so the row shows the agent's name as quiet text.
+        trailingContent = task.agentName?.let { name ->
+            {
+                Text(
+                    name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
         leadingContent = if (canComplete) {
             {
                 Checkbox(

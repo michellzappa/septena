@@ -23,6 +23,7 @@ import {
   updateNeedsStoredSchedule,
 } from "../tools/writeTasks.js";
 import { type ConvoTurn, appendNotes, notesRev, replaceNotesSection } from "../tools/taskShared.js";
+import { SURFACES_CATALOG } from "../generated/registries.js";
 
 // Task WRITE tools for the connector on api.septena.app (src/shadow/mcp.ts),
 // executed as TaskStore pushes. Same names, arguments, result shapes and error
@@ -218,6 +219,23 @@ export interface WriteContext {
   actor?: string;
   /// Provenance stamped on a created task. Absent = the MCP connector.
   source?: { source: string; sourceClient: string };
+  /// The connector's registered client name ("Claude", "Claude Code",
+  /// "Codex"): the agent a task created over MCP names as its author
+  /// (`sourceClient`). Absent or blank = the registry fallback name.
+  agentName?: string;
+}
+
+/// The registry's name for an agent author when the connection has no
+/// client name (`surfaces.json` `taskPage.provenance.agentFallbackName`).
+const PROVENANCE_BLOCK = SURFACES_CATALOG.taskPage.blocks.find((b) => b.kind === "provenance");
+const AGENT_FALLBACK_NAME: string =
+  PROVENANCE_BLOCK && "agentFallbackName" in PROVENANCE_BLOCK ? PROVENANCE_BLOCK.agentFallbackName : "Claude";
+
+/// The `sourceClient` an MCP-created task carries: the connector's client
+/// name, without control characters, cut to the column's 64 characters.
+export function agentSourceClient(name: string | undefined): string {
+  const clean = (name ?? "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 64);
+  return clean || AGENT_FALLBACK_NAME;
 }
 
 /// Runs one validated write tool. Throws a plain Error (the tool error the
@@ -406,7 +424,7 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     created: today,
     createdAt: now,
     source: ctx.source?.source ?? "mcp",
-    sourceClient: ctx.source?.sourceClient ?? "Claude",
+    sourceClient: ctx.source?.sourceClient ?? agentSourceClient(ctx.agentName),
     today: input.today === true,
     starred: input.starred === true,
     position,

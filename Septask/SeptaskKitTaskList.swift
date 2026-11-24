@@ -5521,6 +5521,9 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let checkbox = KitCheckboxView()
   private let title = NSTextField(labelWithString: "")
   private let notesGlyph = NSImageView()
+  /// Permanent "an agent added this" glyph (`taskPage.provenance`). Unlike
+  /// the checkbox's agent cue it never clears.
+  private let agentGlyph = NSImageView()
   private let chip = KitChipView()
   private let statusChip = KitChipView()
   private let issueChip = KitChipView()
@@ -5589,6 +5592,17 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     notesGlyph.setContentHuggingPriority(.required, for: .horizontal)
     notesGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
     notesGlyph.kitA11yIgnore()
+
+    agentGlyph.translatesAutoresizingMaskIntoConstraints = false
+    agentGlyph.contentTintColor = SeptaskKitTheme.iconMuted
+    agentGlyph.image = NSImage(systemSymbolName: RegistrySurfaces.provenanceAgentSymbol,
+                               accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+    agentGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    agentGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
+    // The row's accessibility label speaks the provenance (`TaskA11y.rowLabel`).
+    agentGlyph.kitA11yIgnore()
+    agentGlyph.isHidden = true
 
     detail.lineBreakMode = .byClipping
     detail.isEditable = false
@@ -5695,7 +5709,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     let trailing = NSStackView(views: [trailingShove, suggestionChip, issueChip, chip, statusChip,
                                       tagStack, attachmentGlyph, attachmentLabel,
                                       checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
-                                      scheduleGlyph, detail, repeatGlyph, starGlyph, notesGlyph])
+                                      scheduleGlyph, detail, repeatGlyph, starGlyph, notesGlyph, agentGlyph])
     trailing.orientation = .horizontal
     trailing.alignment = .centerY
     trailing.distribution = .fill
@@ -5812,6 +5826,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       checkbox.isHidden = true
       checkbox.kitA11yIgnore()
       notesGlyph.isHidden = true
+      agentGlyph.isHidden = true
       chip.isHidden = true
       statusChip.isHidden = true
       issueChip.isHidden = true
@@ -5868,7 +5883,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     }
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
-    for view in [checkbox, title, notesGlyph, chip, statusChip, issueChip, suggestionChip,
+    for view in [checkbox, title, notesGlyph, agentGlyph, chip, statusChip, issueChip, suggestionChip,
                  tagStack, attachmentGlyph, attachmentLabel, checklistGlyph, checklistLabel,
                  reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, starGlyph] as [NSView] {
       view.alphaValue = fade
@@ -5905,6 +5920,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
 
     let hasNotes = !(task.notes ?? "").isEmpty
     notesGlyph.isHidden = !hasNotes
+    agentGlyph.isHidden = !task.isAgentAuthored
     // The chip and the inline title suffix answer the SAME question — "which
     // list is this in" — so a row never wears both. The suffix wins where it
     // is shown (flat Today): it sits on the title line where the eye already
@@ -5987,7 +6003,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     setAccessibilityRole(.group)
     setAccessibilityLabel(TaskA11y.rowLabel(title: task.title,
                                             hasNotes: hasNotes,
-                                            isHeading: false))
+                                            isHeading: false,
+                                            addedBy: task.isAgentAuthored ? task.addedByPhrase : nil))
     setAccessibilityRoleDescription(nil)
   }
 

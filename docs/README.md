@@ -126,7 +126,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 
 | Doc | Status |
 |---|---|
-| [agent-provenance-spec.md](agent-provenance-spec.md) | draft |
+| [agent-provenance-spec.md](agent-provenance-spec.md) | superseded in part (permanent provenance shipped 2026-11-24) |
 | [agent-provenance-gateway-handoff.md](agent-provenance-gateway-handoff.md) | landed — historical |
 | [CORE_AI_iOS27_PREP.md](CORE_AI_iOS27_PREP.md) | research, pre-implementation |
 | [SPOTLIGHT_READABILITY_PLAN.md](SPOTLIGHT_READABILITY_PLAN.md) | phases 0–2 built |

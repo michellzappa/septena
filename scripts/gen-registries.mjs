@@ -508,6 +508,15 @@ function validateSurfaces(surfaces, icons, caps, plans) {
     if (["checklist", "attachments", "conversation", "history"].includes(b.kind)) {
       assert(typeof b.label === "string" || b.attribute !== undefined, `surfaces.json: taskPage block ${b.id} needs a label or an attribute`);
     }
+    // Provenance (who added the task) is permanent metadata: the label, the
+    // name a human author shows as, the name for an agent row that carries
+    // no `sourceClient`, and the agent glyph the row and the page share.
+    if (b.kind === "provenance") {
+      for (const k of ["label", "selfLabel", "agentFallbackName"]) {
+        assert(typeof b[k] === "string" && b[k].length > 0, `surfaces.json: taskPage block ${b.id} needs ${k}`);
+      }
+      assert(b.icon in icons.icons, `surfaces.json: taskPage block ${b.id} unknown icon "${b.icon}"`);
+    }
   }
   for (const kind of TASK_PAGE_BLOCK_KINDS) {
     assert(page.blocks.filter((b) => b.kind === kind).length === 1, `surfaces.json: taskPage needs exactly one "${kind}" block`);
@@ -531,7 +540,7 @@ function checkOpensAttribute({ actions, surfaces }) {
     assert(openers.has(attr.id), `actions.json: popover attribute "${attr.id}" has no action with opensAttribute (ADR 0029: one picker per attribute)`);
   }
 }
-const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checklist", "attachments", "conversation", "history"]);
+const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checklist", "attachments", "conversation", "provenance", "history"]);
 const TASK_PAGE_DEPTHS = new Set(["inline", "page"]);
 
 // ---- plans.json (ADR 0010, ADR 0023) ----
@@ -1443,6 +1452,12 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static func taskPageBlocks(_ depth: RegistryTaskPageDepth, on platform: String, isEditing: Bool = true) -> [RegistryTaskPageBlock] {");
   lines.push("    taskPageBlocks.filter { $0.depths.contains(depth) && $0.applies(to: platform) && (isEditing || !$0.editOnly) }");
   lines.push("  }");
+  const prov = surfaces.taskPage.blocks.find((b) => b.kind === "provenance");
+  lines.push("  /// Provenance block (`taskPage.provenance`): the name a task you added shows as,");
+  lines.push("  /// the name for an agent row with no `sourceClient`, and the agent glyph.");
+  lines.push(`  static let provenanceSelfLabel: String = ${L(prov.selfLabel, prov, "selfLabel")}`);
+  lines.push(`  static let provenanceAgentFallbackName: String = ${swiftStr(prov.agentFallbackName)}`);
+  lines.push(`  static let provenanceAgentSymbol: String = ${swiftStr(icons.icons[prov.icon].sfSymbol)}`);
   lines.push("  /// The block of `kind`. Each kind appears exactly once (the generator checks it).");
   lines.push("  static func taskPageBlock(_ kind: RegistryTaskPageBlockKind) -> RegistryTaskPageBlock {");
   lines.push("    guard let b = taskPageBlocks.first(where: { $0.kind == kind }) else { preconditionFailure(\"no task page block \\(kind)\") }");

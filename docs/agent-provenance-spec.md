@@ -1,6 +1,12 @@
 # Agent Provenance & Freshness Cue — Spec + Plan
 
-**Status:** Draft · 2026-06-02
+**Status:** Superseded in part · 2026-11-24. This spec describes the CloudKit gateway era.
+Provenance is now permanent and always visible, not only a freshness cue: a task an agent added
+carries a row glyph (registry icon `task.added_by_agent`) on every platform, and the task page shows
+an "Added by" block (`taskPage.provenance`, feature `task.provenance`) with the agent's name and the
+date. The backend stamps `sourceClient` from the connector's registered client name
+(`backend/src/shadow/writes.ts` `agentSourceClient`). The freshness cue below still exists.
+Originally: Draft · 2026-06-02
 **Goal:** Items created (later: edited/completed) by the MCP gateway ("Claude") are visibly marked in the Septena UX, with a calm freshness cue that clears when the user engages and decays on its own.
 
 ---
