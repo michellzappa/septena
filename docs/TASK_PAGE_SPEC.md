@@ -81,6 +81,16 @@ In `registry/actions.json` an action gets `opensAttribute: "<attribute id>"`
 The presentation container may differ by platform (a popover on a wide
 screen, a sheet on iPhone, a dialog on Android). The content is the same view.
 
+**On the page, a picker is embedded, never modal** (decided 2026-11-24). A
+tap on an attribute row folds that row's card open and draws the picker in
+it. A second tap on the row folds it closed and is Cancel. A commit (a day,
+Save, OK, a list) writes the draft and folds the card. The picker view is the
+same one the sheet shows; embedded, it drops its navigation bar, its Cancel
+and its own vertical scroll. Pickers that open a further level (When's month
+calendar, When's Repeat row) open it in the page too. The inline depth's pills
+keep the sheet. The conversation runs inside the Discuss card on the page,
+not as a separate block below the attributes.
+
 Per shell on 2026-11-23:
 
 - **AppKit:** already one picker per attribute (`SeptaskKitDatePopover`,

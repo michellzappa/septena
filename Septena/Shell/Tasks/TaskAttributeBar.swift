@@ -3,7 +3,9 @@ import SwiftUI
 // The composer's elective-pill rail — a single row of icon + label capsules
 // under the title & notes, in the registry's `taskAttributes` order. A picker
 // pill opens the same sheet the row menu opens (TaskPickerSheets.swift, ADR
-// 0029); the checklist and attachments render in the composer. Split out of
+// 0029); the checklist and attachments render in the composer. On the task
+// page (`.rows`) the same picker opens embedded in its attribute's card, not
+// as a sheet, and the conversation runs inside the Discuss card. Split out of
 // TaskComposer.swift.
 
 // MARK: - Attribute pill bar
@@ -41,6 +43,9 @@ struct TaskAttributeBar: View {
   var showsAttachments: Bool = true
   /// The task page's `history` block is on at this depth (page only).
   var showsHistory: Bool = false
+  /// The task page's `conversation` block is on at this depth (page only).
+  /// On the page the conversation draws inside the Discuss card.
+  var showsConversation: Bool = false
   /// A chip drawn at the front of the rail, before the pills: the Paste chip
   /// on a blank new task. The composer owns it (it reads the clipboard).
   var leading: AnyView? = nil
@@ -101,7 +106,8 @@ struct TaskAttributeBar: View {
     }
   }
 
-  /// The currently expanded inline pill (never a picker pill, which presents a sheet).
+  /// The currently expanded inline pill. On the rail never a picker pill (that
+  /// presents a sheet); on the page, the picker open in its card.
   @State private var expanded: Attribute?
   /// The picker sheet that shows, if any.
   @State private var picker: Attribute?
@@ -125,7 +131,8 @@ struct TaskAttributeBar: View {
        discussVisible: Binding<Bool> = .constant(false),
        moveFocus: ((Bool) -> Void)? = nil,
        showsChecklist: Bool = true, showsAttachments: Bool = true,
-       showsHistory: Bool = false, leading: AnyView? = nil, layout: Layout = .rail) {
+       showsHistory: Bool = false, showsConversation: Bool = false,
+       leading: AnyView? = nil, layout: Layout = .rail) {
     _draft = draft
     self.areas = areas
     self.projects = projects
@@ -139,6 +146,7 @@ struct TaskAttributeBar: View {
     self.showsChecklist = showsChecklist
     self.showsAttachments = showsAttachments
     self.showsHistory = showsHistory
+    self.showsConversation = showsConversation
     self.leading = leading
     self.layout = layout
     _discussStarted = State(initialValue: discussTask?.conversation.hasStarted ?? true)
@@ -189,15 +197,7 @@ struct TaskAttributeBar: View {
       // on the page rather than a line in a list.
       VStack(spacing: 10) {
         ForEach(rowAttributes) { attr in
-          AttributeRow(icon: attr.icon, label: attr.label,
-                       value: value(for: attr, edit: edit), isSet: isSet(attr, edit: edit),
-                       opensPicker: attr.presentsSheet,
-                       isLoading: attr == .discuss && discussWorking,
-                       accent: accent) { select(attr) }
-            .background(Theme.secondaryGroupedBackground,
-                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .focused($focus, equals: .pill(attr))
-            .disabled(attr == .discuss && discussWorking)
+          rowCard(attr, edit: edit)
         }
       }
 
@@ -219,6 +219,48 @@ struct TaskAttributeBar: View {
         pageSection(.attachments) { TaskAttachmentsPanel(taskID: task.id) }
       }
     }
+  }
+
+  /// One attribute card on the page. A picker attribute folds its picker open
+  /// inside the card (no sheet); Discuss holds the conversation once it starts.
+  private func rowCard(_ attr: Attribute, edit: EditOnlyState?) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      AttributeRow(icon: attr.icon, label: attr.label,
+                   value: value(for: attr, edit: edit), isSet: isSet(attr, edit: edit),
+                   opensPicker: attr.presentsSheet,
+                   isExpanded: expanded == attr,
+                   isLoading: attr == .discuss && discussWorking,
+                   accent: accent) { select(attr) }
+        .focused($focus, equals: .pill(attr))
+        .disabled(attr == .discuss && discussWorking)
+
+      if attr.presentsSheet && expanded == attr {
+        Divider()
+          .padding(.horizontal, 12)
+        pickerView(attr, embedded: true)
+          .environment(\.taskPickerEmbedding, TaskPickerEmbedding { collapse(attr) })
+          .padding(.vertical, 12)
+          .transition(.opacity.combined(with: .move(edge: .top)))
+      }
+
+      if attr == .discuss, showsConversation, let task = discussTask, discussStarted {
+        Divider()
+          .padding(.horizontal, 12)
+        ConversationSection(task: task, accent: accent)
+          .padding(12)
+          .transition(.opacity.combined(with: .move(edge: .top)))
+      }
+    }
+    .background(Theme.secondaryGroupedBackground,
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+  }
+
+  /// Closes the picker open in `attr`'s card. A picker that hands off to
+  /// another (When's Repeat row) has already moved `expanded`, so leave it.
+  private func collapse(_ attr: Attribute) {
+    editRevision += 1
+    guard expanded == attr else { return }
+    a11yAnimate(.snappy(duration: 0.22)) { expanded = nil }
   }
 
   /// A page section: the block's registry heading over its content.
@@ -282,7 +324,11 @@ struct TaskAttributeBar: View {
   /// Whether a pill is on the rail: edit-only pills need a saved task, and
   /// Discuss only shows before a conversation exists.
   private func shows(_ attr: Attribute) -> Bool {
-    if attr == .discuss { return showsDiscuss }
+    if attr == .discuss {
+      // On the page the Discuss card stays once a thread exists: it holds it.
+      if layout == .rows && showsConversation && discussTask != nil && discussStarted { return true }
+      return showsDiscuss
+    }
     if attr == .checklist && !showsChecklist { return false }
     if attr == .attachments && !showsAttachments { return false }
     if attr == .history && !(showsHistory && TaskHistory.isAvailable) { return false }
@@ -367,12 +413,29 @@ struct TaskAttributeBar: View {
     }
   }
 
-  /// The picker for a `popover` attribute. These are the same sheets, with the
-  /// same detents, that `TaskListModalPresenter` opens from the row menu, so a
-  /// pill and a menu row can never show different editors (ADR 0029). The pill
-  /// writes the draft; the composer commits it.
-  @ViewBuilder
+  /// The sheet for a `popover` attribute: the picker with the same detents
+  /// that `TaskListModalPresenter` uses from the row menu.
   private func pickerSheet(_ attr: Attribute) -> some View {
+    pickerView(attr, embedded: false)
+      .taskPickerChrome(pickerDetents(attr))
+  }
+
+  private func pickerDetents(_ attr: Attribute) -> Set<PresentationDetent> {
+    switch attr {
+    case .when: DatePickerSheet.detents(showsRepeat: true, showsTime: true)
+    case .deadline: DatePickerSheet.detents(showsRepeat: false, showsTime: false)
+    case .list: TaskPickerDetents.move
+    default: TaskPickerDetents.standard
+    }
+  }
+
+  /// The picker for a `popover` attribute. These are the same pickers the row
+  /// menu opens, so a pill, a page row and a menu row can never show different
+  /// editors (ADR 0029). The pill writes the draft; the composer commits it.
+  /// `embedded` is the task page's card: When's Repeat row then opens Repeat
+  /// in its own card instead of queueing a second sheet.
+  @ViewBuilder
+  private func pickerView(_ attr: Attribute, embedded: Bool) -> some View {
     switch attr {
     case .when:
       DatePickerSheet(
@@ -390,22 +453,25 @@ struct TaskAttributeBar: View {
         },
         // The same Repeat row the row menu's When picker shows (#300).
         repeatLabel: TaskRepeatLabel.title(draft.recurrence),
-        onRepeat: { pendingPicker = .repeatRule }
+        onRepeat: {
+          if embedded {
+            a11yAnimate(.snappy(duration: 0.22)) { expanded = .repeatRule }
+          } else {
+            pendingPicker = .repeatRule
+          }
+        }
       ) { date in
         if let date { draft.setScheduled(date) } else { draft.clearWhen() }
       }
-      .taskPickerChrome(DatePickerSheet.detents(showsRepeat: true, showsTime: true))
     case .deadline:
       DatePickerSheet(title: attr.label, initialDate: draft.deadline,
                       clearLabel: "Remove Deadline") { date in
         draft.deadline = date
       }
-      .taskPickerChrome(DatePickerSheet.detents(showsRepeat: false, showsTime: false))
     case .reminder:
       ReminderPickerSheet(initial: draft.reminder) { reminder in
         draft.reminder = reminder
       }
-      .taskPickerChrome(TaskPickerDetents.standard)
     case .repeatRule:
       RecurrencePickerSheet(
         initial: draft.recurrence,
@@ -420,25 +486,23 @@ struct TaskAttributeBar: View {
             SeptenaServices.shared.taskMutator.setRecurrencePaused(id: task.id, paused: paused)
           }
         })
-      .taskPickerChrome(TaskPickerDetents.standard)
     case .list:
       MovePickerSheet(areas: areas, projects: projects,
                       currentAreaId: draft.areaId, currentProjectId: draft.projectId) { a, p in
         draft.areaId = a; draft.projectId = p
       }
-      .taskPickerChrome(TaskPickerDetents.move)
     case .tags:
       if let task = discussTask {
         TagPickerSheet(taskIDs: [task.id])
-          .taskPickerChrome(TaskPickerDetents.standard)
       }
     case .star, .checklist, .attachments, .discuss, .history:
       EmptyView()
     }
   }
 
-  /// The single dispatch for every pill: sheet-backed pills open their sheet,
-  /// inline pills toggle the expanded panel. Per-attribute setup (Repeat seeding
+  /// The single dispatch for every pill: on the rail sheet-backed pills open
+  /// their sheet, on the page they fold open in their card; inline pills
+  /// toggle the expanded panel. Per-attribute setup (Repeat seeding
   /// a default) lives in each panel's `onAppear`, so this stays uniform.
   private func select(_ attr: Attribute) {
     if attr == .discuss {
@@ -466,7 +530,7 @@ struct TaskAttributeBar: View {
     // keyboard before a calendar opens — what `onInteractStart` used to do).
     focus = .pill(attr)
     a11yAnimate(.snappy(duration: 0.22)) {
-      if attr.presentsSheet {
+      if attr.presentsSheet && layout == .rail {
         expanded = nil
         picker = attr
       } else {
@@ -508,13 +572,16 @@ struct TaskAttributeBar: View {
 // MARK: - Page row
 
 /// One attribute on the task page: icon, label, current value. A picker
-/// attribute shows a chevron and opens the same sheet as its pill.
+/// attribute shows a chevron and folds the same picker as its pill's sheet
+/// open in the card under the row.
 private struct AttributeRow: View {
   let icon: String
   let label: String
   let value: String?
   let isSet: Bool
   let opensPicker: Bool
+  /// The picker is open in this row's card: the chevron points down.
+  var isExpanded: Bool = false
   let isLoading: Bool
   let accent: Color
   let action: () -> Void
@@ -542,6 +609,7 @@ private struct AttributeRow: View {
           Image(systemName: "chevron.right")
             .font(.septenaBadge)
             .foregroundStyle(Theme.inkSecondary)
+            .rotationEffect(.degrees(isExpanded ? 90 : 0))
         }
       }
       .padding(.horizontal, 12)
