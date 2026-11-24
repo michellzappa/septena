@@ -48,7 +48,7 @@ class SeptenaAndroidThemeTest {
 
 /**
  * The Header Wash must draw the same terrain as iPhone on the same day. These
- * values come from the Swift rules (FNV-1a, Mulberry32 on UInt32).
+ * values come from running the Swift code (AppearancePreferences, HeaderWashEngine).
  */
 class HeaderWashNoiseTest {
     @Test
@@ -63,5 +63,12 @@ class HeaderWashNoiseTest {
         assertEquals(0.07329497812315822, rng.next(), 1e-15)
         assertEquals(0.7034119898453355, rng.next(), 1e-15)
         assertEquals(0.9028560190927237, rng.next(), 1e-15)
+    }
+
+    @Test
+    fun noiseVolumeMatchesApple() {
+        val volume = NoiseVolume(4866)
+        assertEquals(0.5447052758302734, volume.fbm(1.37, 2.81, 0.0, 4), 1e-12)
+        assertEquals(0.5050099439151439, volume.fbm(300.2, 0.45, 0.72, 3), 1e-12)
     }
 }

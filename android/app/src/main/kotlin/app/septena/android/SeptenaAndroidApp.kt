@@ -64,7 +64,7 @@ class AndroidAppGraph(application: Application) {
     val taskBackend = SeptenaTaskBackendClient(credentials, clientVersion)
     val attachments = TaskAttachmentStore(application, taskStore, registryEntityMutator, clock, taskBackend)
     val sync = SyncController(TaskSyncEngine(taskStore, transport, clock), appScope, afterSync = attachments::afterSync)
-    val appearance = AppearanceStore(application, syncedSettings, syncedSettingsMutator, sync, clock, appScope)
+    val appearance = AppearanceStore(deviceSettings, syncedSettings, syncedSettingsMutator, sync, clock, appScope)
 
     /**
      * Wraps a user gesture's task write so undo captures only that local edit.

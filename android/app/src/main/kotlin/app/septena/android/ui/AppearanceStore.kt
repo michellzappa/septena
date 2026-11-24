@@ -1,6 +1,5 @@
 package app.septena.android.ui
 
-import android.content.Context
 import android.content.SharedPreferences
 import app.septena.android.sync.SyncController
 import app.septena.core.DayClock
@@ -76,15 +75,13 @@ data class AppearanceState(
  * device keeps its own look. Mode, sync theme and text size are device-only.
  */
 class AppearanceStore(
-    context: Context,
+    private val deviceSettings: AndroidDeviceSettings,
     private val syncedSettings: SyncedSettings,
     private val syncedSettingsMutator: SyncedSettingsMutator,
     private val sync: SyncController,
     private val clock: DayClock,
     private val scope: CoroutineScope,
 ) {
-    private val preferences: SharedPreferences =
-        context.getSharedPreferences(DEVICE_PREFERENCES, Context.MODE_PRIVATE)
     private val lock = Mutex()
     private val _state = MutableStateFlow(readState())
     val state: StateFlow<AppearanceState> = _state.asStateFlow()
@@ -97,7 +94,7 @@ class AppearanceStore(
     }
 
     init {
-        preferences.registerOnSharedPreferenceChangeListener(preferenceListener)
+        deviceSettings.preferences.registerOnSharedPreferenceChangeListener(preferenceListener)
         scope.launch {
             sync.dataVersion.collect { adoptSynced() }
         }
@@ -190,33 +187,12 @@ class AppearanceStore(
     private fun readEnum(key: String): String? =
         readLocal(key).stringValue()?.takeIf { it in enumValues(key) }
 
-    private fun readLocal(key: String): JsonValue {
-        val storageKey = storageKey(key)
-        if (!preferences.contains(storageKey)) return JsonValue.Null
-        return when (RegistryCatalog.setting(key)?.fields?.get("type").stringValue()) {
-            "bool" -> JsonValue.BooleanValue(preferences.getBoolean(storageKey, false))
-            "int" -> JsonValue.IntegerValue(preferences.getInt(storageKey, 0).toLong())
-            else -> preferences.getString(storageKey, null)?.let(JsonValue::StringValue) ?: JsonValue.Null
-        }
-    }
+    /** The device copy, or the registry default when the device has none. */
+    private fun readLocal(key: String): JsonValue = deviceSettings.read(key, definition(key))
 
-    private fun writeLocal(key: String, value: JsonValue) {
-        val editor = preferences.edit()
-        val storageKey = storageKey(key)
-        when (value) {
-            is JsonValue.BooleanValue -> editor.putBoolean(storageKey, value.value)
-            is JsonValue.IntegerValue -> editor.putInt(storageKey, value.value.toInt())
-            is JsonValue.DecimalValue -> editor.putInt(storageKey, value.value.toInt())
-            is JsonValue.StringValue -> editor.putString(storageKey, value.value)
-            else -> editor.remove(storageKey)
-        }
-        check(editor.commit()) { "Could not save appearance setting '$key'" }
-    }
+    private fun writeLocal(key: String, value: JsonValue) = deviceSettings.write(key, definition(key), value)
 
     private companion object {
-        /** The file the Settings screen writes device settings to (SettingsScreen.kt). */
-        const val DEVICE_PREFERENCES = "septena-device-settings"
-
         val SYNCED_KEYS = listOf(
             RegistrySettingKeys.ACCENT_COLOR,
             RegistrySettingKeys.CANVAS_TEXTURE,
@@ -230,8 +206,10 @@ class AppearanceStore(
             RegistrySettingKeys.TEXT_SIZE_STEP,
         )
 
-        fun storageKey(key: String): String =
-            RegistryCatalog.setting(key)?.fields?.get("storageKey").stringValue() ?: key
+        fun definition(key: String): JsonValue.ObjectValue =
+            requireNotNull(RegistryCatalog.setting(key)) { "Unknown registry setting '$key'" }
+
+        fun storageKey(key: String): String = definition(key).fields["storageKey"].stringValue() ?: key
 
         fun enumValues(key: String): List<String> {
             val enumName = RegistryCatalog.setting(key)?.fields?.get("enum").stringValue() ?: return emptyList()
