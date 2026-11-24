@@ -284,6 +284,8 @@ func noteTaskAttachmentChange(id: String) { if routeToTaskBackend(.attachment, i
 func noteTaskAttachmentDeletion(id: String) { if routeToTaskBackend(.attachment, id) { return }; noteDeletion(recordName: TaskAttachmentCloudKitSchema.recordName(for: id), kind: "taskAttachment") }
 func noteChecklistItemChange(id: String) { _ = routeToTaskBackend(.checklistItem, id) }
 func noteChecklistItemDeletion(id: String) { _ = routeToTaskBackend(.checklistItem, id) }
+func noteTaskRefChange(id: String) { _ = routeToTaskBackend(.taskRef, id) }
+func noteTaskRefDeletion(id: String) { _ = routeToTaskBackend(.taskRef, id) }
 func noteTagChange(id: String) { _ = routeToTaskBackend(.tag, id) }
 func noteTagDeletion(id: String) { _ = routeToTaskBackend(.tag, id) }
 

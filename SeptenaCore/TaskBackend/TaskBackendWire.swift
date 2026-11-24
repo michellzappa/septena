@@ -74,7 +74,7 @@ enum BackendJSON: Codable, Hashable, Sendable {
 // MARK: - Entities
 
 enum BackendEntity: String, Codable, Sendable, CaseIterable {
-  case task, area, project, attachment, checklistItem, tag, convo, turn
+  case task, area, project, attachment, checklistItem, taskRef, tag, convo, turn
   /// Septask's synced settings, one row per key (TaskSyncSettings.swift).
   case setting
 }

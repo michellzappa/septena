@@ -72,6 +72,11 @@ extension TaskSyncEngine {
     // Attachment FILES stay on disk: re-pulled rows relink to them by id.
     for a in (try? context.fetch(FetchDescriptor<TaskAttachmentEntity>())) ?? [] { context.delete(a) }
     for c in (try? context.fetch(FetchDescriptor<TaskChecklistItemEntity>())) ?? [] { context.delete(c) }
+    // A reference without a shadow never reached the backend (it was refused,
+    // see `taskRefsRefused`), so a pull cannot bring it back. Keep it.
+    for r in (try? context.fetch(FetchDescriptor<TaskRefEntity>())) ?? [] where store.shadow("taskRef:\(r.id)") != nil {
+      context.delete(r)
+    }
     _ = StoreHealth.save(context, op: "taskSync.reset")
     store.deleteAllShadows()
     since = 0
@@ -114,6 +119,14 @@ extension TaskSyncEngine {
           let n = TaskChecklistItemEntity(id: op.rowID, taskID: taskID, title: "")
           main.insert(n)
           applyChecklistItemFields(n, fields, skip: [])
+        }
+      case (TaskSyncOpKind.upsert, .taskRef?):
+        if let ref = fetchTaskRef(op.rowID) { applyTaskRefFields(ref, fields, skip: []) }
+        else if let taskID = fields["taskId"]?.stringValue, let key = fields["key"]?.stringValue {
+          let n = TaskRefEntity(id: op.rowID, taskID: taskID, key: key,
+                                kind: TaskRefCore.parse(key)?.kind ?? "")
+          main.insert(n)
+          applyTaskRefFields(n, fields, skip: [])
         }
       case (TaskSyncOpKind.upsert, .tag?):
         if let tag = fetchTag(op.rowID) { applyTagFields(tag, fields, skip: []) }
@@ -266,6 +279,26 @@ extension TaskSyncEngine {
           recordApplied(key, applied: applied, mapped: mapped, raw: change.row, shadow: shadows[key], store: store)
         }
         touchedTasks = true
+      case .taskRef:
+        if tombstone {
+          if let ref = fetchTaskRef(id) { main.delete(ref) }
+          // The task and key of a deleted row stay: they count towards the id
+          // of a reference that is added again (`deletedTaskRefCount`).
+          markGone(.taskRef, id, shadow: shadows[key],
+                   seed: change.row.filter { $0.key == "taskId" || $0.key == "key" }, store: store)
+        } else if !pendingDelete.contains(key) {
+          let ref = fetchTaskRef(id) ?? {
+            let n = TaskRefEntity(id: id, taskID: change.row["taskId"]?.stringValue ?? "",
+                                  key: change.row["key"]?.stringValue ?? "",
+                                  kind: change.row["kind"]?.stringValue ?? "")
+            main.insert(n)
+            return n
+          }()
+          let applied = applyTaskRefFields(ref, change.row, skip: skip)
+          let mapped = (try? TaskBackendMapping.taskRef(ref).get())?.fields ?? [:]
+          recordApplied(key, applied: applied, mapped: mapped, raw: change.row, shadow: shadows[key], store: store)
+        }
+        touchedTasks = true
       case .tag:
         if tombstone {
           if let tag = fetchTag(id) { main.delete(tag) }
@@ -355,7 +388,8 @@ extension TaskSyncEngine {
     writeShadow(shadow, key, old: old, new: new, gone: false, store: store)
   }
 
-  private func markGone(_ entity: BackendEntity, _ id: String, shadow: TaskSyncShadow?, store: TaskSyncStore) {
+  private func markGone(_ entity: BackendEntity, _ id: String, shadow: TaskSyncShadow?,
+                        seed: [String: BackendJSON] = [:], store: TaskSyncStore) {
     for op in store.ops(entity: entity.rawValue, rowID: id) {
       store.remove(op)
       if op.kind != TaskSyncOpKind.delete {
@@ -363,7 +397,8 @@ extension TaskSyncEngine {
       }
     }
     let old = shadow.map { TaskSyncJSON.decode($0.fields) } ?? [:]
-    writeShadow(shadow, "\(entity.rawValue):\(id)", old: old, new: old, gone: true, store: store)
+    writeShadow(shadow, "\(entity.rawValue):\(id)", old: old, new: old.merging(seed) { kept, _ in kept },
+                gone: true, store: store)
   }
 
   /// Removes every queued op of a task, its conversation and its turns, and
@@ -420,6 +455,11 @@ extension TaskSyncEngine {
       if let item = fetchChecklistItem(id) { main.delete(item) }
       markGone(.checklistItem, id, shadow: store.shadow("checklistItem:\(id)"), store: store)
       addIssue(.checklistItem, id, "change refused: the checklist item is deleted on the backend")
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    case .taskRef:
+      if let ref = fetchTaskRef(id) { main.delete(ref) }
+      markGone(.taskRef, id, shadow: store.shadow("taskRef:\(id)"), store: store)
+      addIssue(.taskRef, id, "change refused: the reference is deleted on the backend")
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     case .tag:
       if let tag = fetchTag(id) { main.delete(tag) }
@@ -709,6 +749,29 @@ extension TaskSyncEngine {
     take("position") { item.position = Self.double($0) ?? 0 }
     take("createdAt") { item.createdAt = Self.parseStamp($0.stringValue) ?? item.createdAt }
     item.updatedAt = Date()
+    return applied
+  }
+
+  @discardableResult
+  func applyTaskRefFields(_ ref: TaskRefEntity, _ fields: [String: BackendJSON], skip: Set<String>) -> [String] {
+    var applied: [String] = []
+    func take(_ name: String, _ write: (BackendJSON) -> Void) {
+      guard !skip.contains(name), let v = fields[name] else { return }
+      write(v)
+      applied.append(name)
+    }
+    take("taskId") { ref.taskID = $0.stringValue ?? ref.taskID }
+    take("key") { ref.key = $0.stringValue ?? ref.key }
+    take("kind") { ref.kind = $0.stringValue ?? ref.kind }
+    take("role") { ref.role = $0.stringValue ?? ref.role }
+    take("snapshot") { v in
+      if case .object = v { ref.snapshotJSON = TaskRefSnapshot.json(v) } else { ref.snapshotJSON = nil }
+    }
+    take("position") { ref.position = Self.double($0) }
+    take("createdBy") { ref.createdBy = $0.stringValue }
+    take("lastSeenAt") { ref.lastSeenAt = $0.stringValue }
+    take("createdAt") { ref.createdAt = Self.parseStamp($0.stringValue) ?? ref.createdAt }
+    ref.updatedAt = Date()
     return applied
   }
 

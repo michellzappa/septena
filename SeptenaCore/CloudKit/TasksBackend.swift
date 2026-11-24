@@ -199,6 +199,7 @@ final class CloudKitTasksBackend {
     spawnedPositions[id] = next.position
     commitAndPush(next, op: "recurrence.create")
     copyChecklistItems(from: entity.id, to: id, deterministic: true)
+    copyAboutRefs(from: entity.id, to: id)
     return true
   }
 
@@ -637,6 +638,7 @@ final class CloudKitTasksBackend {
     guard let entity = fetch(id: id) else { return }
     purgeAttachments(taskID: id)
     purgeChecklistItems(taskID: id)
+    purgeTaskRefs(taskID: id)
     let neverPushed = engine.taskNeverSynced(id: id, systemFields: entity.cloudKitSystemFields)
     let staged = entity     // capture before we tell SwiftData to remove
     context.delete(entity)
@@ -666,6 +668,13 @@ final class CloudKitTasksBackend {
     for item in rows {
       context.delete(item)
       engine.noteChecklistItemDeletion(id: item.id)
+    }
+  }
+
+  private func purgeTaskRefs(taskID: String) {
+    for ref in taskRefRows(taskID: taskID) {
+      context.delete(ref)
+      engine.noteTaskRefDeletion(id: ref.id)
     }
   }
 
@@ -809,6 +818,122 @@ final class CloudKitTasksBackend {
     guard !createdIDs.isEmpty else { return }
     guard StoreHealth.save(context, op: "checklist.copy") else { return }
     for id in createdIDs { engine.noteChecklistItemChange(id: id) }
+    TaskChange.post(destinationTaskID)
+  }
+
+  // MARK: - References (docs/TASK_REFERENCES_SPEC.md)
+
+  private func taskRefRows(taskID: String) -> [TaskRefEntity] {
+    (try? context.fetch(FetchDescriptor<TaskRefEntity>(predicate: #Predicate { $0.taskID == taskID }))) ?? []
+  }
+
+  private func fetchTaskRef(id: String) -> TaskRefEntity? {
+    var d = FetchDescriptor<TaskRefEntity>(predicate: #Predicate { $0.id == id })
+    d.fetchLimit = 1
+    return try? context.fetch(d).first
+  }
+
+  /// Nil until the core release that mints ids is pinned (`TaskRefCore`).
+  private func mintTaskRefID(taskID: String, key: String) -> String? {
+    TaskRefCore.mintID(taskID: taskID, key: key,
+                       deletedCount: TaskSyncEngine.shared.deletedTaskRefCount(taskID: taskID, key: key))
+  }
+
+  /// Adds a reference from a key, a web URL or a `message://` link.
+  func addTaskRef(taskID: String, input: String, role: TaskRefRole,
+                  snapshot: TaskRefSnapshot) -> TaskRefAddResult {
+    guard TaskRefCore.isAvailable else { return .unavailable }
+    guard let parsed = TaskRefCore.parse(input) else { return .invalid }
+    guard let task = fetch(id: taskID), task.deletedAt == nil else { return .failed }
+    let existing = LocalCache.taskRefs(forTaskID: taskID, in: context)
+    if let same = existing.first(where: { $0.key == parsed.key }) { return .existing(same) }
+    guard existing.count < RegistryEntityLimits.maxRefsPerTask else { return .limitReached }
+    guard let id = mintTaskRefID(taskID: taskID, key: parsed.key), fetchTaskRef(id: id) == nil else { return .failed }
+    var snapshot = snapshot
+    if snapshot.url == nil { snapshot.url = parsed.url }
+    if snapshot.rawId == nil, parsed.rawId != parsed.id { snapshot.rawId = parsed.rawId }
+    let entity = TaskRefEntity(
+      id: id, taskID: taskID, key: parsed.key, kind: parsed.kind, role: role.rawValue,
+      snapshotJSON: snapshot.storedJSON(),
+      position: (existing.compactMap(\.position).max() ?? 0) + TaskOrder.gap)
+    context.insert(entity)
+    guard StoreHealth.save(context, op: "taskRef.add") else { return .failed }
+    // The store refuses a reference to a task it does not have, so a draft
+    // that is still local goes first. No op for a task already sent.
+    engine.noteTaskChange(id: taskID)
+    engine.noteTaskRefChange(id: id)
+    TaskChange.post(taskID)
+    return .added(TaskRef(entity))
+  }
+
+  /// Only `role`, `snapshot` and `position` change after insert.
+  @discardableResult
+  func updateTaskRef(id: String, role: TaskRefRole?, snapshot: TaskRefSnapshot?, position: Double?) -> Bool {
+    guard let entity = fetchTaskRef(id: id) else { return false }
+    if let role { entity.role = role.rawValue }
+    if let snapshot { entity.snapshotJSON = snapshot.storedJSON() }
+    if let position { entity.position = position }
+    entity.updatedAt = Date()
+    guard StoreHealth.save(context, op: "taskRef.update") else { return false }
+    engine.noteTaskRefChange(id: id)
+    TaskChange.post(entity.taskID)
+    return true
+  }
+
+  /// Removes the reference, and any second row with the same key
+  /// (`LocalCache.taskRefs` shows one of them).
+  @discardableResult
+  func removeTaskRef(id: String) -> Bool {
+    guard let entity = fetchTaskRef(id: id) else { return false }
+    let taskID = entity.taskID
+    let rows = taskRefRows(taskID: taskID).filter { $0.key == entity.key }
+    let ids = rows.map(\.id)
+    for row in rows { context.delete(row) }
+    guard StoreHealth.save(context, op: "taskRef.remove") else { return false }
+    for id in ids { engine.noteTaskRefDeletion(id: id) }
+    TaskChange.post(taskID)
+    return true
+  }
+
+  /// Restores a removed reference (used by `TaskUndo`). Keeps the id while its
+  /// delete has not reached the store, else mints the next one.
+  @discardableResult
+  func restoreTaskRef(_ ref: TaskRef) -> TaskRef? {
+    guard let task = fetch(id: ref.taskId), task.deletedAt == nil else { return nil }
+    let existing = LocalCache.taskRefs(forTaskID: ref.taskId, in: context)
+    if let same = existing.first(where: { $0.key == ref.key }) { return same }
+    guard existing.count < RegistryEntityLimits.maxRefsPerTask else { return nil }
+    let canKeepID = TaskSyncEngine.shared.canRevive(.taskRef, ref.id)
+    guard let id = canKeepID ? ref.id : mintTaskRefID(taskID: ref.taskId, key: ref.key) else { return nil }
+    let entity = TaskRefEntity(
+      id: id, taskID: ref.taskId, key: ref.key, kind: ref.kind, role: ref.role,
+      snapshotJSON: ref.snapshotJSON, position: ref.position, createdAt: ref.createdAt ?? Date())
+    entity.createdBy = ref.createdBy
+    entity.lastSeenAt = ref.lastSeenAt
+    context.insert(entity)
+    guard StoreHealth.save(context, op: "taskRef.restore") else { return nil }
+    engine.noteTaskRefChange(id: id)
+    TaskChange.post(ref.taskId)
+    return TaskRef(entity)
+  }
+
+  /// The next occurrence of a repeat and a duplicated task copy the `about`
+  /// references only (§4.2). The id is a function of task and key, so phone
+  /// and agent completions converge.
+  func copyAboutRefs(from sourceTaskID: String, to destinationTaskID: String) {
+    let source = LocalCache.taskRefs(forTaskID: sourceTaskID, in: context)
+      .filter { $0.role == TaskRefRole.about.rawValue }
+    var createdIDs: [String] = []
+    for ref in source {
+      guard let id = mintTaskRefID(taskID: destinationTaskID, key: ref.key),
+            fetchTaskRef(id: id) == nil else { continue }
+      context.insert(TaskRefEntity(
+        id: id, taskID: destinationTaskID, key: ref.key, kind: ref.kind, role: ref.role,
+        snapshotJSON: ref.snapshotJSON, position: ref.position))
+      createdIDs.append(id)
+    }
+    guard !createdIDs.isEmpty, StoreHealth.save(context, op: "taskRef.copy") else { return }
+    for id in createdIDs { engine.noteTaskRefChange(id: id) }
     TaskChange.post(destinationTaskID)
   }
 

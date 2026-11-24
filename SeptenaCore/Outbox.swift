@@ -319,6 +319,50 @@ final class TaskMutator {
     return cloudBackend.restoreChecklistItem(item)
   }
 
+  // MARK: References (docs/TASK_REFERENCES_SPEC.md)
+
+  /// `input` is a key, a web URL or a `message://` link. The caller records
+  /// the undo for `.added` (`TaskUndo.recordTaskRefAdd`).
+  @discardableResult
+  func addTaskRef(taskID: String, input: String, role: TaskRefRole = .about,
+                  snapshot: TaskRefSnapshot = TaskRefSnapshot()) -> TaskRefAddResult {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] addTaskRef called before CK bound — dropping", nil)
+      return .failed
+    }
+    return cloudBackend.addTaskRef(taskID: taskID, input: input, role: role, snapshot: snapshot)
+  }
+
+  @discardableResult
+  func updateTaskRef(id: String, role: TaskRefRole? = nil, snapshot: TaskRefSnapshot? = nil,
+                     position: Double? = nil) -> Bool {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] updateTaskRef called before CK bound — dropping", nil)
+      return false
+    }
+    return cloudBackend.updateTaskRef(id: id, role: role, snapshot: snapshot, position: position)
+  }
+
+  /// False when the row is gone or the save rolled back. Record the undo only
+  /// on true.
+  @discardableResult
+  func removeTaskRef(id: String) -> Bool {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] removeTaskRef called before CK bound — dropping", nil)
+      return false
+    }
+    return cloudBackend.removeTaskRef(id: id)
+  }
+
+  @discardableResult
+  func restoreTaskRef(_ ref: TaskRef) -> TaskRef? {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] restoreTaskRef called before CK bound — dropping", nil)
+      return nil
+    }
+    return cloudBackend.restoreTaskRef(ref)
+  }
+
   func setTaskTags(id: String, tagIDs: [String]) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] setTaskTags called before CK bound — dropping", nil)
@@ -540,6 +584,7 @@ final class TaskMutator {
       if task.recurrencePaused { setRecurrencePaused(id: copy.id, paused: true) }
     }
     cloudBackend?.copyChecklistItems(from: task.id, to: copy.id, deterministic: false)
+    cloudBackend?.copyAboutRefs(from: task.id, to: copy.id)
     return copy
   }
 

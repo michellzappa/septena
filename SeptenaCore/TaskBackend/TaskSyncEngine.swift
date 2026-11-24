@@ -87,6 +87,10 @@ final class TaskSyncEngine {
   /// the `setting` entity). Settings then stop being sent until the next
   /// launch, so the refusal does not repeat on every sync.
   @ObservationIgnored private var settingsRefused = false
+  /// The backend does not take reference writes yet (an older server, or one
+  /// whose core cannot check a key). References then stay on this device and
+  /// wait for the next launch, so the refusal does not repeat on every sync.
+  @ObservationIgnored private var taskRefsRefused = false
 
   /// Soft-delete grace: a delete waits this long in the outbox, so ⌘Z (which
   /// restores the row) cancels it before the backend sees it. The backend
@@ -97,6 +101,8 @@ final class TaskSyncEngine {
   /// True once a pull that asked for settings finished. Until then a local
   /// setting is not sent, so a value another device already pushed wins.
   static let settingsReadyKey = "septena.taskSync.settingsReady"
+  /// True once a pull that asked for references finished.
+  static let taskRefsReadyKey = "septena.taskSync.taskRefsReady"
   /// Backend user id of the last sign-in, compared on the next sign-in.
   static let lastUserKey = "septena.taskSync.lastUserID"
   private static let issueCap = 200
@@ -136,9 +142,10 @@ final class TaskSyncEngine {
     #if SEPTASK
     guard !isRunning, !DemoSeedMode.isOn else { return }
     guard store() != nil else { return }
-    if !settingsReady {
-      // Pulls before this build skipped setting rows, and `since` moved past
-      // them. Read everything once, so settings another device pushed arrive.
+    if !settingsReady || !taskRefsReady {
+      // Pulls before this build skipped setting and reference rows, and
+      // `since` moved past them. Read everything once, so the rows another
+      // device or an agent wrote arrive.
       since = 0
     }
     isRunning = true
@@ -267,6 +274,7 @@ final class TaskSyncEngine {
     case .project: captureProject(id, row: fetchProject(id), store: store, lookup: lookup)
     case .attachment: captureAttachment(id, row: fetchAttachment(id), store: store, lookup: lookup)
     case .checklistItem: captureChecklistItem(id, row: fetchChecklistItem(id), store: store, lookup: lookup)
+    case .taskRef: captureTaskRef(id, row: fetchTaskRef(id), store: store, lookup: lookup)
     case .tag: captureTag(id, row: fetchTag(id), store: store, lookup: lookup)
     case .convo, .turn, .setting: break
     }
@@ -289,6 +297,23 @@ final class TaskSyncEngine {
     return last.kind == TaskSyncOpKind.delete && !last.sent
     #else
     return true
+    #endif
+  }
+
+  /// How many rows of this task and key the backend deleted: the `n` of the
+  /// next reference id (§4). A delete that still waits in the outbox does not
+  /// count, so adding the key again takes the same id back and cancels it.
+  func deletedTaskRefCount(taskID: String, key: String) -> Int {
+    #if SEPTASK
+    guard let store = store() else { return 0 }
+    let entity = BackendEntity.taskRef
+    return store.goneShadows(entity: entity.rawValue).filter { shadow in
+      let fields = TaskSyncJSON.decode(shadow.fields)
+      return fields["taskId"] == .string(taskID) && fields["key"] == .string(key)
+        && !canRevive(entity, String(shadow.key.dropFirst(entity.rawValue.count + 1)))
+    }.count
+    #else
+    return 0
     #endif
   }
 
@@ -315,6 +340,7 @@ final class TaskSyncEngine {
     let projects = (try? main.fetch(FetchDescriptor<ProjectEntity>())) ?? []
     let attachments = (try? main.fetch(FetchDescriptor<TaskAttachmentEntity>())) ?? []
     let checklistItems = (try? main.fetch(FetchDescriptor<TaskChecklistItemEntity>())) ?? []
+    let taskRefs = (try? main.fetch(FetchDescriptor<TaskRefEntity>())) ?? []
     let tags = (try? main.fetch(FetchDescriptor<TagEntity>())) ?? []
     for a in areas { captureArea(a.id, row: a, store: store, lookup: lookup) }
     for p in projects { captureProject(p.id, row: p, store: store, lookup: lookup) }
@@ -325,12 +351,14 @@ final class TaskSyncEngine {
     }
     for a in attachments { captureAttachment(a.id, row: a, store: store, lookup: lookup) }
     for item in checklistItems { captureChecklistItem(item.id, row: item, store: store, lookup: lookup) }
+    for ref in taskRefs { captureTaskRef(ref.id, row: ref, store: store, lookup: lookup) }
 
     // Rows the backend has that are gone here: hard-deleted without a capture.
     let present: [String: Set<String>] = [
       "task": Set(tasks.map(\.id)), "area": Set(areas.map(\.id)),
       "project": Set(projects.map(\.id)), "attachment": Set(attachments.map(\.id)),
-      "checklistItem": Set(checklistItems.map(\.id)), "tag": Set(tags.map(\.id)),
+      "checklistItem": Set(checklistItems.map(\.id)), "taskRef": Set(taskRefs.map(\.id)),
+      "tag": Set(tags.map(\.id)),
     ]
     for (key, shadow) in shadows where !shadow.gone {
       guard let colon = key.firstIndex(of: ":") else { continue }
@@ -343,6 +371,7 @@ final class TaskSyncEngine {
       case "project": captureProject(id, row: nil, store: store, lookup: lookup)
       case "attachment": captureAttachment(id, row: nil, store: store, lookup: lookup)
       case "checklistItem": captureChecklistItem(id, row: nil, store: store, lookup: lookup)
+      case "taskRef": captureTaskRef(id, row: nil, store: store, lookup: lookup)
       case "tag": captureTag(id, row: nil, store: store, lookup: lookup)
       default: break
       }
@@ -497,6 +526,14 @@ final class TaskSyncEngine {
                   store: store, lookup: lookup)
   }
 
+  private func captureTaskRef(_ id: String, row: TaskRefEntity?, store: TaskSyncStore,
+                              lookup: (String) -> TaskSyncShadow?) {
+    // Refused this launch: keep the row, except where it takes back a delete.
+    if taskRefsRefused, row != nil, lookup("taskRef:\(id)")?.gone != true { return }
+    captureSimple(.taskRef, id, plan: row.map { TaskBackendMapping.taskRef($0) },
+                  store: store, lookup: lookup)
+  }
+
   private func captureTag(_ id: String, row: TagEntity?, store: TaskSyncStore,
                           lookup: (String) -> TaskSyncShadow?) {
     captureSimple(.tag, id, plan: row.map { TaskBackendMapping.tag($0) },
@@ -518,7 +555,7 @@ final class TaskSyncEngine {
     guard let plan else {
       if let shadow, !shadow.gone {
         queueDeleteIfNeeded(entity, id,
-                            hold: entity == .project || entity == .area || entity == .checklistItem || entity == .tag || entity == .attachment,
+                            hold: entity == .project || entity == .area || entity == .checklistItem || entity == .taskRef || entity == .tag || entity == .attachment,
                             store: store)
         shadow.gone = true
         store.saveSoon()
@@ -535,7 +572,7 @@ final class TaskSyncEngine {
 
     // Re-created inside the grace period (undo): the backend never saw the
     // delete. Drop it and send only what differs from the last synced row.
-    if entity == .project || entity == .area, shadow?.gone == true,
+    if entity == .project || entity == .area || entity == .taskRef, shadow?.gone == true,
        let last = store.lastRowOp(entity: entity.rawValue, rowID: id),
        last.kind == TaskSyncOpKind.delete, !last.sent {
       store.remove(last)
@@ -566,6 +603,10 @@ final class TaskSyncEngine {
         SeptenaLog.info("[TaskSync] attachment \(id) changed locked fields \(locked.sorted()); not sent")
       }
       patch = patch.filter { $0.key == "filename" || $0.key == "position" }
+    }
+    if entity == .taskRef {
+      // Task and key are fixed at insert (registry/entities.json, `updatable`).
+      patch = patch.filter { $0.key == "role" || $0.key == "snapshot" || $0.key == "position" }
     }
     if !patch.isEmpty { enqueueUpsert(entity, id, patch, store: store) }
     writeShadow(shadow, key, old: old, new: mapped, store: store)
@@ -661,6 +702,12 @@ final class TaskSyncEngine {
     return try? main.fetch(d).first
   }
 
+  func fetchTaskRef(_ id: String) -> TaskRefEntity? {
+    var d = FetchDescriptor<TaskRefEntity>(predicate: #Predicate { $0.id == id })
+    d.fetchLimit = 1
+    return try? main.fetch(d).first
+  }
+
   func fetchTag(_ id: String) -> TagEntity? {
     var d = FetchDescriptor<TagEntity>(predicate: #Predicate { $0.id == id })
     d.fetchLimit = 1
@@ -736,6 +783,7 @@ final class TaskSyncEngine {
           try await LaunchTrace.span("sync.firstPull") { try await pull(store: store) }
         }
         if !settingsReady { settingsReady = true }
+        if !taskRefsReady { taskRefsReady = true }
         if reconcileSettings(store: store) { syncAgain = true }
         if reconcileFirst, Date().timeIntervalSince(lastReconcile) > 60 {
           reconcile(store: store)
@@ -785,6 +833,23 @@ final class TaskSyncEngine {
       store.removeShadow("setting:\(id)")
     } else {
       needsRepairPull = true
+    }
+  }
+
+  /// Keeps the rows of a refused reference write. The shadow forgets what the
+  /// op carried, so the next launch finds the difference and sends it again.
+  private func noteTaskRefsUnsupported(id: String, fields: [String: BackendJSON], store: TaskSyncStore) {
+    if !taskRefsRefused {
+      SeptenaLog.info("[TaskSync] the backend does not take references yet; they stay on this device")
+    }
+    taskRefsRefused = true
+    let key = "taskRef:\(id)"
+    guard let shadow = store.shadow(key) else { return }
+    if fields["key"] != nil {
+      store.removeShadow(key)   // an insert: the backend never had the row
+    } else {
+      let old = TaskSyncJSON.decode(shadow.fields)
+      writeShadow(shadow, key, old: old, new: old.filter { fields[$0.key] == nil }, store: store)
     }
   }
 
@@ -883,6 +948,21 @@ final class TaskSyncEngine {
         store.remove(op)
         dropped.append((entity, op.rowID))
       case .rejected:
+        if entity == .taskRef, op.kind == TaskSyncOpKind.upsert, let reason = result.reason {
+          if reason.hasPrefix("not_supported") {
+            let fields = TaskSyncJSON.decode(op.payload)
+            store.remove(op)
+            noteTaskRefsUnsupported(id: op.rowID, fields: fields, store: store)
+            continue
+          }
+          if reason.hasPrefix("immutable:") {
+            // Another client added the same key to the task first and minted
+            // the same id. Nothing is lost: take the backend's row.
+            store.remove(op)
+            needsRepairPull = true
+            continue
+          }
+        }
         store.remove(op)
         addIssue(entity, op.rowID, "rejected by the backend: \(result.reason ?? "no reason")")
         if entity == .attachment, op.kind == TaskSyncOpKind.upsert {
@@ -907,8 +987,15 @@ final class TaskSyncEngine {
       return nil
     })
     func reject(_ op: TaskSyncOp, _ why: String) {
-      store.remove(op)
       let entity = BackendEntity(rawValue: op.opEntity) ?? .task
+      let fields = TaskSyncJSON.decode(op.payload)
+      store.remove(op)
+      if entity == .taskRef {
+        // A server that predates the entity refuses the op's shape. The answer
+        // does not tell that from a bad field, and the row stays either way.
+        noteTaskRefsUnsupported(id: op.rowID, fields: fields, store: store)
+        return
+      }
       addIssue(entity, op.rowID, "refused by the backend: \(why)")
       noteRejected(entity, id: op.rowID, store: store)
     }
@@ -1165,6 +1252,7 @@ final class TaskSyncEngine {
       context.delete(a)
     }
     for c in (try? context.fetch(FetchDescriptor<TaskChecklistItemEntity>())) ?? [] { context.delete(c) }
+    for r in (try? context.fetch(FetchDescriptor<TaskRefEntity>())) ?? [] { context.delete(r) }
     for t in (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? [] { context.delete(t) }
     for p in (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? [] { context.delete(p) }
     for a in (try? context.fetch(FetchDescriptor<AreaEntity>())) ?? [] { context.delete(a) }
@@ -1197,6 +1285,11 @@ final class TaskSyncEngine {
   var settingsReady: Bool {
     get { UserDefaults.standard.bool(forKey: Self.settingsReadyKey) }
     set { UserDefaults.standard.set(newValue, forKey: Self.settingsReadyKey) }
+  }
+
+  var taskRefsReady: Bool {
+    get { UserDefaults.standard.bool(forKey: Self.taskRefsReadyKey) }
+    set { UserDefaults.standard.set(newValue, forKey: Self.taskRefsReadyKey) }
   }
 
   /// `SettingsMirror.upsert` changed a synced setting. Queues it when the
