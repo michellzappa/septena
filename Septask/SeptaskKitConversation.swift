@@ -339,7 +339,8 @@ final class KitConversationView: NSView {
       sendBack.controlSize = .small
       sendBack.refusesFirstResponder = true
 
-      let actions = NSStackView(views: [accept, sendBack])
+      // Same order as the Review row: Send back, then Accept (primary last).
+      let actions = NSStackView(views: [sendBack, accept])
       actions.orientation = .horizontal
       actions.alignment = .centerY
       actions.spacing = 8

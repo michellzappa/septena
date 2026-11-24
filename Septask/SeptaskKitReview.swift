@@ -34,8 +34,9 @@ final class KitReviewTaskCell: NSTableCellView {
 
     noteLabel.font = SeptaskKitTheme.meta
     noteLabel.textColor = SeptaskKitTheme.inkSecondary
-    noteLabel.maximumNumberOfLines = 3
-    noteLabel.lineBreakMode = .byTruncatingTail
+    // The review question shows in full, never truncated.
+    noteLabel.maximumNumberOfLines = 0
+    noteLabel.lineBreakMode = .byWordWrapping
     noteLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
     metaLabel.font = SeptaskKitTheme.chip
@@ -104,6 +105,8 @@ final class KitReviewTaskCell: NSTableCellView {
     let inset = SeptaskKitLayout.inset(for: bounds.width)
     leadingConstraint.constant = inset + SeptaskKitLayout.rowLeadingPad
     trailingConstraint.constant = -(inset + 10)
+    // A wrapping label needs its width to report a multi-line height.
+    noteLabel.preferredMaxLayoutWidth = max(140, bounds.width - inset * 2 - SeptaskKitLayout.rowLeadingPad - 10)
     super.layout()
   }
 
@@ -176,11 +179,11 @@ final class KitReviewTaskCell: NSTableCellView {
     let textWidth = max(140, width - inset * 2 - SeptaskKitLayout.rowLeadingPad - 10)
     let note = noteText(for: task) as NSString
     let noteRect = note.boundingRect(
-      with: NSSize(width: textWidth, height: 60),
+      with: NSSize(width: textWidth, height: .greatestFiniteMagnitude),
       options: [.usesLineFragmentOrigin, .usesFontLeading],
       attributes: [.font: SeptaskKitTheme.meta])
     let titleHeight = ceil(SeptaskKitTheme.taskTitle.ascender - SeptaskKitTheme.taskTitle.descender) + 2
-    let noteHeight = min(ceil(noteRect.height) + 2, ceil(SeptaskKitTheme.meta.pointSize * 1.4 * 3))
+    let noteHeight = ceil(noteRect.height) + 2
     let metaHeight: CGFloat = metaSummary(for: task) == nil
       ? 0
       : 3 + ceil(SeptaskKitTheme.chip.ascender - SeptaskKitTheme.chip.descender) + 2

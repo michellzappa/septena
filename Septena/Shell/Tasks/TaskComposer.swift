@@ -369,7 +369,14 @@ struct TaskComposerCard: View {
 
   /// The task page depth this host shows (ADR 0029): the row editor is the
   /// quick edit, the drawer and the pushed page are the full page.
-  private var pageDepth: RegistryTaskPageDepth { presentation == .inline ? .inline : .page }
+  /// A task waiting for the user to accept it opens at the review depth: the
+  /// title, notes, the conversation (with Accept and Send back) and who added
+  /// it, without the edit rows.
+  private var pageDepth: RegistryTaskPageDepth {
+    if presentation == .inline { return .inline }
+    if editingTask?.conversation.needsHumanReview == true { return .review }
+    return .page
+  }
 
   /// The blocks to render, in registry order. A create, or an inline create
   /// held as a placeholder row, has no saved task, so `editOnly` blocks drop.
@@ -637,12 +644,12 @@ struct TaskComposerCard: View {
       onDone: presentation == .inline ? { saveAndCloseFromKeyboard() } : nil,
       // The page shows notes as a visible text area: a taller box the whole
       // of which takes a tap. The quick edit keeps the one-line field.
-      minHeight: pageDepth == .page ? 120 : 28
+      minHeight: pageDepth != .inline ? 120 : 28
     )
       .onKeyPress(keys: [.tab]) { press in
         moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
       }
-    if pageDepth == .page {
+    if pageDepth != .inline {
       editor
         .padding(.horizontal, 14)
         .padding(.vertical, 12)

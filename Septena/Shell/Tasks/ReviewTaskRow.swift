@@ -29,10 +29,11 @@ struct ReviewTaskRow: View {
           .font(.septenaTaskTitle)
           .foregroundStyle(.primary)
           .lineLimit(2)
+        // The review question shows in full, never truncated.
         Text(checkNote)
           .font(.septenaMeta)
           .foregroundStyle(Theme.inkSecondary)
-          .lineLimit(3)
+          .fixedSize(horizontal: false, vertical: true)
         if let artifact = task.conversation.artifact, !artifact.title.isEmpty {
           Label(artifact.title, systemImage: "doc.text")
             .font(.septenaCaption)
@@ -51,13 +52,13 @@ struct ReviewTaskRow: View {
           a11yAnimate { showingSendBack.toggle() }
         }
         .buttonStyle(.bordered)
-        .controlSize(.small)
+        .controlSize(.taskAction)
 
         Button(RegistryActions.title("task.acceptReview")) {
           onAccept()
         }
         .buttonStyle(.borderedProminent)
-        .controlSize(.small)
+        .controlSize(.taskAction)
       }
 
       if showingSendBack {
@@ -67,7 +68,7 @@ struct ReviewTaskRow: View {
             .onSubmit { submitSendBack() }
           Button("Send") { submitSendBack() }
             .buttonStyle(.borderedProminent)
-            .controlSize(.small)
+            .controlSize(.taskAction)
             .disabled(noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
       }

@@ -24,10 +24,11 @@ object TaskPageBlockKinds {
     const val HISTORY: String = "history"
 }
 
-/** The two depths of the task page (ADR 0029). */
+/** The depths of the task page (ADR 0029). REVIEW is the page of a task waiting for the user to accept it. */
 object TaskPageDepths {
     const val INLINE: String = "inline"
     const val PAGE: String = "page"
+    const val REVIEW: String = "review"
 }
 
 /** One block of the task page, in registry order. [status] is the capability status of [featureId] on the platform. */

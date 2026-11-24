@@ -50,6 +50,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let placeholder = NSTextField(labelWithString: String(localized: "No Selection",
                                                                  comment: "SeptaskKit: inspector empty"))
   private let form = NSStackView()
+  /// Views of the blocks the review depth leaves out, keyed by block kind.
+  /// A task waiting for the user to accept it hides them (ADR 0029 `review`).
+  private var pageOnlyViews: [RegistryTaskPageBlockKind: [NSView]] = [:]
+  private var showsReviewDepth = false
   /// Task Conversations — the agent's work log for this row. Shown only when
   /// a conversation exists; a task with no agent history gets no header and no
   /// empty box (docs/SEPTASK_CONVERSATIONS_PLAN.md).
@@ -213,6 +217,16 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       case .history: last = addHistoryBlock()
       }
       if let last { form.setCustomSpacing(14, after: last) }
+    }
+    let reviewKinds = Set(RegistrySurfaces.taskPageBlocks(.review, on: RegistryPlatform.current).map(\.kind))
+    for block in blocks where !reviewKinds.contains(block.kind) {
+      switch block.kind {
+      case .attributes: pageOnlyViews[.attributes] = orderedAttributeButtons
+      case .checklist: pageOnlyViews[.checklist] = [checklistLabel, addChecklistButton, checklistView]
+      case .attachments: pageOnlyViews[.attachments] = [attachmentsLabel, attachmentsView, attachFileButton]
+      case .history: pageOnlyViews[.history] = [historyButton, historyView]
+      case .header, .notes, .conversation, .provenance: break
+      }
     }
 
     placeholder.textColor = SeptaskKitTheme.iconMuted
@@ -509,6 +523,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
         refreshReadOnlyFields(next)
         refreshConversation(next)
         historyButton.isHidden = !historyView.configure(taskID: next.id)
+        applyDepth(for: next)
       }
       return
     }
@@ -545,7 +560,24 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     refreshReadOnlyFields(next)
     refreshConversation(next)
     historyButton.isHidden = !historyView.configure(taskID: next.id)
+    applyDepth(for: next)
     formScroll?.contentView.scroll(to: .zero)
+  }
+
+  /// A task waiting for the user to accept it shows the review depth: title,
+  /// notes, the conversation (with Accept and Send back) and who added it.
+  /// Same rule as the SwiftUI task page.
+  private func applyDepth(for task: SeptenaTask) {
+    let review = task.conversation.needsHumanReview
+    if review {
+      for views in pageOnlyViews.values { views.forEach { $0.isHidden = true } }
+    } else if showsReviewDepth {
+      for views in pageOnlyViews.values { views.forEach { $0.isHidden = false } }
+      updateChecklistVisibility()
+      updateAttachmentsVisibility()
+      historyButton.isHidden = !historyView.configure(taskID: task.id)
+    }
+    showsReviewDepth = review
   }
 
   /// Called when the inspector opens from collapsed state; keeps the loaded

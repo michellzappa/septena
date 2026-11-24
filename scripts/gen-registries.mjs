@@ -555,7 +555,7 @@ function checkOpensAttribute({ actions, surfaces }) {
   }
 }
 const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checklist", "attachments", "conversation", "provenance", "history"]);
-const TASK_PAGE_DEPTHS = new Set(["inline", "page"]);
+const TASK_PAGE_DEPTHS = new Set(["inline", "page", "review"]);
 
 // ---- plans.json (ADR 0010, ADR 0023) ----
 const PLAN_LEVELS = ["device", "account", "plus"];
@@ -1499,7 +1499,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const k of TASK_PAGE_BLOCK_KINDS) lines.push(`  case ${k}`);
   lines.push("}");
   lines.push("");
-  lines.push("/// Where a task page block shows: `inline` (the quick edit in the row) or `page` (the full task page).");
+  lines.push("/// Where a task page block shows: `inline` (the quick edit in the row), `page` (the full task page), or `review` (the page of a task waiting for the user to accept it).");
   lines.push("enum RegistryTaskPageDepth: String, Sendable, Hashable {");
   for (const d of TASK_PAGE_DEPTHS) lines.push(`  case ${d}`);
   lines.push("}");

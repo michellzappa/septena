@@ -1477,13 +1477,13 @@ enum RegistrySurfaces {
   }
   /// The task page (`surfaces.json` `taskPage`, ADR 0029) in block order.
   static let taskPageBlocks: [RegistryTaskPageBlock] = [
-    RegistryTaskPageBlock(id: "taskPage.header", kind: .header, depths: [.inline, .page], label: nil, attributeId: nil, featureId: "lists.today", editOnly: false),
-    RegistryTaskPageBlock(id: "taskPage.notes", kind: .notes, depths: [.inline, .page], label: RegistryL10n.t("Notes"), attributeId: "notes", featureId: "task.notes", editOnly: false),
+    RegistryTaskPageBlock(id: "taskPage.header", kind: .header, depths: [.inline, .page, .review], label: nil, attributeId: nil, featureId: "lists.today", editOnly: false),
+    RegistryTaskPageBlock(id: "taskPage.notes", kind: .notes, depths: [.inline, .page, .review], label: RegistryL10n.t("Notes"), attributeId: "notes", featureId: "task.notes", editOnly: false),
     RegistryTaskPageBlock(id: "taskPage.attributes", kind: .attributes, depths: [.inline, .page], label: nil, attributeId: nil, featureId: "lists.today", editOnly: false),
     RegistryTaskPageBlock(id: "taskPage.checklist", kind: .checklist, depths: [.inline, .page], label: RegistryL10n.t("Checklist"), attributeId: "checklist", featureId: "task.checklists", editOnly: true),
     RegistryTaskPageBlock(id: "taskPage.attachments", kind: .attachments, depths: [.inline, .page], label: RegistryL10n.t("Attachments"), attributeId: "attachments", featureId: "task.attachments", editOnly: true),
-    RegistryTaskPageBlock(id: "taskPage.conversation", kind: .conversation, depths: [.page], label: RegistryL10n.t("Conversation"), attributeId: nil, featureId: "ai.discuss", editOnly: true),
-    RegistryTaskPageBlock(id: "taskPage.provenance", kind: .provenance, depths: [.page], label: RegistryL10n.t("Added by"), attributeId: nil, featureId: "task.provenance", editOnly: true),
+    RegistryTaskPageBlock(id: "taskPage.conversation", kind: .conversation, depths: [.page, .review], label: RegistryL10n.t("Conversation"), attributeId: nil, featureId: "ai.discuss", editOnly: true),
+    RegistryTaskPageBlock(id: "taskPage.provenance", kind: .provenance, depths: [.page, .review], label: RegistryL10n.t("Added by"), attributeId: nil, featureId: "task.provenance", editOnly: true),
     RegistryTaskPageBlock(id: "taskPage.history", kind: .history, depths: [.page], label: RegistryL10n.t("History"), attributeId: "history", featureId: "task.history", editOnly: true),
   ]
   /// The blocks a host renders at `depth` on `platform`, in order. A create
@@ -1515,10 +1515,11 @@ enum RegistryTaskPageBlockKind: String, Sendable, Hashable, CaseIterable {
   case history
 }
 
-/// Where a task page block shows: `inline` (the quick edit in the row) or `page` (the full task page).
+/// Where a task page block shows: `inline` (the quick edit in the row), `page` (the full task page), or `review` (the page of a task waiting for the user to accept it).
 enum RegistryTaskPageDepth: String, Sendable, Hashable {
   case inline
   case page
+  case review
 }
 
 /// One block of the task page (`surfaces.json` `taskPage.blocks`). `label` is the

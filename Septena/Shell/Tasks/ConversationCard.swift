@@ -213,18 +213,21 @@ struct ConversationCard: View {
           Text(isTaskOpen ? "Needs review" : "Accepted")
             .font(.septenaLabel)
           if let note = convo.endStateNote, !note.isEmpty {
+            // The review question shows in full, never truncated.
             Text(note).font(.septenaMeta).foregroundStyle(.secondary)
+              .fixedSize(horizontal: false, vertical: true)
           }
         }
       }
       if isTaskOpen {
+        // Same order as the Review row: Send back, then Accept (primary last).
         HStack(spacing: 8) {
-          Button(RegistryActions.title("task.acceptReview")) { acceptReview() }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
           Button("Send back") { a11yAnimate { showSendBack.toggle() } }
             .buttonStyle(.bordered)
-            .controlSize(.small)
+            .controlSize(.taskAction)
+          Button(RegistryActions.title("task.acceptReview")) { acceptReview() }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.taskAction)
         }
         if showSendBack {
           HStack(spacing: 6) {
@@ -233,7 +236,7 @@ struct ConversationCard: View {
               .onSubmit { submitSendBack() }
             Button("Send") { submitSendBack() }
               .buttonStyle(.borderedProminent)
-              .controlSize(.small)
+              .controlSize(.taskAction)
               .disabled(sendBackNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
           }
         }
@@ -249,7 +252,7 @@ struct ConversationCard: View {
           .onSubmit(submitReply)
         Button("Send", action: submitReply)
           .buttonStyle(.borderedProminent)
-          .controlSize(.small)
+          .controlSize(.taskAction)
           .disabled(replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
       }
     } else {
