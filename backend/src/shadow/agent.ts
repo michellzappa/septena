@@ -3,7 +3,7 @@ import type { Tool } from "../rpc.js";
 import { zId } from "../store/columns.js";
 import type { ChangeEntry, ConvoCandidate } from "../store/TaskStore.js";
 import { AGENT_RUN_BUDGET, CLAIM_TTL_DEFAULT_MS, isAgentActor } from "../store/TaskStore.js";
-import type { StoreRpc } from "./writes.js";
+import { type StoreRpc, agentNameFromActor } from "./writes.js";
 import { notesForTask } from "./notes.js";
 
 // The agent loop on the api.septena.app connector (docs/TASK_FACTORY_SPEC.md
@@ -224,7 +224,7 @@ export async function runAgentTool(
 
 /// One change log row for tasks_history: who, what, and before/after values.
 function historyEntry(e: ChangeEntry) {
-  const actor = isAgentActor(e.actor) ? "Claude" : e.actor.startsWith("app:") ? "you" : e.actor;
+  const actor = isAgentActor(e.actor) ? agentNameFromActor(e.actor) : e.actor.startsWith("app:") ? "you" : e.actor;
   return {
     at: e.at,
     actor,

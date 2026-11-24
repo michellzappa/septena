@@ -6,7 +6,8 @@ import Foundation
 // SwiftUI composer both render `TaskHistoryRow`s.
 //
 // Who: the server logs app writes as `app:<X-Septena-Client>` and connector
-// writes as `mcp:<holder>`. Every `mcp:` writer is Claude for the user.
+// writes as `mcp:<agent name>` (`mcp:<agent>@<client>` for the agent loop).
+// History names the agent (`agentName`), so the user sees which agent changed what.
 
 // MARK: - Wire
 
@@ -80,12 +81,21 @@ enum TaskHistory {
   }
 
   static func who(_ actor: String) -> String {
-    if actor.hasPrefix("mcp:") { return String(localized: "Claude", comment: "Task history: who") }
+    if actor.hasPrefix("mcp:") { return agentName(actor) }
     switch actor {
     case "app:septask-mac": return String(localized: "You on Mac", comment: "Task history: who")
     case "app:septask-ios": return String(localized: "You on iPhone", comment: "Task history: who")
     default: return String(localized: "You", comment: "Task history: who")
     }
+  }
+
+  /// The agent's name in an `mcp:` actor. The backend logs MCP writes as
+  /// `mcp:<connection name>` and agent-loop writes as `mcp:<agent>@<client>`;
+  /// the legacy `mcp:claude` reads as the registry fallback name.
+  static func agentName(_ actor: String) -> String {
+    let name = String(actor.dropFirst("mcp:".count)).split(separator: "@").first
+      .map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+    return name.isEmpty || name == "claude" ? RegistrySurfaces.provenanceAgentFallbackName : name
   }
 
   static func describe(_ change: BackendChange, listTitle: (String) -> String?) -> [String] {
