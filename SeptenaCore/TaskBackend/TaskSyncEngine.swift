@@ -921,7 +921,7 @@ final class TaskSyncEngine {
         disconnectSocket()
         SeptenaLog.info("[TaskSync] live sync not in plan (402 \(limit.error)); using 2-minute poll")
       case .attachmentsNotInPlan, .attachmentQuota, .historyEdge,
-           .agentRuns, .connectorCap, .shareCreate, .other:
+           .connectorCap, .shareCreate, .other:
         SeptenaLog.info("[TaskSync] plan limit reached (402 \(limit.error))")
       }
       PlanStatus.shared.noteLimitReached(limit)
