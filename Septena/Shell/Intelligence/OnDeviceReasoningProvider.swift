@@ -29,7 +29,7 @@ struct OnDeviceReasoningProvider: ReasoningProvider {
     let session = LanguageModelSession()
     let ctx = request.context.isEmpty ? "" : "\nContext: \(request.context.joined(separator: "; "))."
     let prompt = """
-    A user wrote this to-do: "\(request.title)".\(ctx)
+    A user wrote this task: "\(request.title)".\(ctx)
     It may be ambiguous. Offer 2–3 short, distinct readings of what they most likely \
     mean — each a tappable option, max ~6 words. Don't pick one; surface the plausible few.
     """
@@ -107,7 +107,7 @@ struct PCCReasoningProvider: ReasoningProvider {
         return "\(turn.role == .user ? "them" : "assistant"): \(text)"
       }.joined(separator: "\n")
       let prompt = """
-      A user's to-do: "\(request.title)".\(intent)\(ctx)
+      A user's task: "\(request.title)".\(intent)\(ctx)
       \(history.isEmpty ? "" : "Conversation so far:\n\(history)\n")
       Propose how to proceed. Give ONE one-sentence recommendation and 2–3 short \
       tappable options (max ~6 words each), the recommended move first. The user \
@@ -131,7 +131,7 @@ struct PCCReasoningProvider: ReasoningProvider {
     default:
       // confirm — same contract as the on-device provider.
       let prompt = """
-      A user wrote this to-do: "\(request.title)".\(ctx)
+      A user wrote this task: "\(request.title)".\(ctx)
       It may be ambiguous. Offer 2–3 short, distinct readings of what they most likely \
       mean — each a tappable option, max ~6 words. Don't pick one; surface the plausible few.
       """

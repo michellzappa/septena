@@ -86,7 +86,7 @@ enum KeyboardShortcutsCatalogue {
       KeyboardShortcut2(keys: ["return"], label: "Open / edit"),
       KeyboardShortcut2(keys: ["esc"], label: "Clear selection"),
       KeyboardShortcut2(keys: ["esc"], label: "Save and close the open task"),
-      KeyboardShortcut2(keys: ["⌘", "N"], label: "New to-do"),
+      KeyboardShortcut2(keys: ["⌘", "N"], label: "New task"),
     ]
     shortcuts += fromRegistry(RegistryActions.shortcutsTaskList)
     return KeyboardShortcutGroup(title: "Task list", shortcuts: shortcuts)
@@ -94,7 +94,7 @@ enum KeyboardShortcutsCatalogue {
 
   private static var quickCaptureLabel: String {
     #if SEPTASK
-    "New to-do — quick capture"
+    "Quick add: new task"
     #else
     "Add Info — quick capture"
     #endif

@@ -348,6 +348,7 @@ the newest `slotAt`.
 | `attachmentsGB` | `PUT /v1/attachments/:id` | 402 `attachments_not_in_plan` (free: 0) or `attachment_quota` (Plus: 10 GB of live uploaded bytes). Downloads of bytes already stored still work |
 | `connectorWritesPerDay` | connector write tools and notes writes | Tool error with the `connector_cap` words. Reads always work |
 | `agentRunsPerMonth` | `tasks_claim` (a new claim; a renewal is not a run) | Claim refused with the `agent_runs` words. `tasks_release` always works |
+| `connectedAgents` | OAuth code exchange (a new agent pairs) | **Log-only, in both modes.** Logs `agent_limit_over` with the count and the limit; the pairing still works. `GET /v1/access` returns `agents: {count, limit}`. An agent is one MCP connection used in the last 30 days |
 | `logbookDays`, `recentlyDeletedDays`, `createShares`, `linkedProjects` | Apps (read from `GET /v1/entitlement`) | The server has no Logbook, Recently Deleted, sharing or linked-project surface yet |
 
 Every 402 body is `{error, limit, upsell, message}`: `upsell` is the

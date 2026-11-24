@@ -153,7 +153,7 @@ final class NavigationState {
   /// One-shot trigger: when set to true, the currently-visible
   /// TaskListView starts a new inline task (same flow as Command-N) on its
   /// next render. TaskListView resets it to false after consuming. Used
-  /// by toolbar `+` actions and the sidebar Menu's New To-Do entry, so
+  /// by toolbar `+` actions and the sidebar Menu's New Task entry, so
   /// 'new task' never opens a modal sheet — always inline, like Things.
   var shouldStartCreating = false
 
@@ -172,6 +172,12 @@ final class NavigationState {
   /// (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §5.2). Used by `SeptaskRootView`
   /// to hide the floating Magic Plus orb while the bottom selection bar is up.
   var isTaskMultiSelectActive = false
+
+  /// True while the on-screen iOS task list has a task open: the inline
+  /// editor in a row, the new-task draft, or the pushed task page. Used by
+  /// `SeptaskRootView` to fade the Magic Plus orb out, which otherwise shows
+  /// through the open task.
+  var isTaskEditorOpen = false
 
   /// One-shot trigger from a Home Screen Quick Action (long-press app
   /// icon). ContentView dispatches the route change + `shouldStartCreating`

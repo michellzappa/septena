@@ -1,10 +1,12 @@
 package app.septena.android.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,7 +19,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,6 +27,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -137,8 +139,8 @@ fun TaskDetailScreen(
     var textIsDirty by remember(taskId) { mutableStateOf(false) }
     var saving by remember(taskId) { mutableStateOf(false) }
     var saveFailed by remember(taskId) { mutableStateOf(false) }
-    var showWhenPicker by remember(taskId) { mutableStateOf(false) }
-    var showDeadlinePicker by remember(taskId) { mutableStateOf(false) }
+    // The attribute whose picker is folded open in its row on the page. One at a time.
+    var openPicker by remember(taskId) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(graph, taskId, dataVersion) {
         val loaded = withContext(Dispatchers.IO) { loadTaskDetail(graph, taskId) }
@@ -258,6 +260,22 @@ fun TaskDetailScreen(
     ).orEmpty()
     val savedTask = data?.task
     val canEdit = savedTask != null && !deleted && !saving
+    val isTaskOpen = taskFields[RegistryEntityFields.Task.STATUS].stringValue() == RegistryEntityEnums.TaskStatus.OPEN && !deleted
+    val repeatSummary = labels.repeatUnits.firstOrNull { it.value == repeatUnit }?.title?.let { unitTitle ->
+        if (repeatInterval > 1L) "$repeatInterval × $unitTitle" else unitTitle
+    }
+    val listValue = listOfNotNull(selectedArea?.title, selectedProject?.title)
+        .joinToString(" · ")
+        .ifEmpty { labels.noArea }
+    // On the page the conversation runs with the attributes, as on iOS, where it
+    // sits inside the Discuss card. Android has no Discuss row (it cannot start
+    // a discussion), so the conversation shows directly under the attribute rows,
+    // headed with the Discuss label. Without an attributes block it keeps its own block.
+    val conversationBlock = pageBlocks.firstOrNull { it.kind == TaskPageBlockKinds.CONVERSATION }
+    val conversationInAttributes = conversationBlock != null &&
+        pageBlocks.any { it.kind == TaskPageBlockKinds.ATTRIBUTES }
+    val discussHeading = attributes.firstOrNull { it.id == RegistryTaskAttributeIds.DISCUSS }?.label
+        ?: conversationBlock?.let { RegistryCatalog.taskPageBlockHeading(it, languageTag) }
 
     fun write(block: suspend () -> Unit) {
         if (!canEdit) return
@@ -290,24 +308,19 @@ fun TaskDetailScreen(
         write { check(graph.taskMutator.setDeadline(taskId, day) != null) }
     }
 
-    fun openWhenPicker() {
-        if (canEdit) showWhenPicker = true
-    }
-
-    fun openDeadlinePicker() {
-        if (canEdit) showDeadlinePicker = true
-    }
-
     /**
      * Opens the picker for a task attribute (actions.json `opensAttribute`).
-     * Repeat and list edit in place on this page, through [setRepeat],
-     * [moveToArea] and [moveToProject]. The other attributes have no Android
-     * editor yet.
+     * On the page a picker is embedded, never modal (docs/TASK_PAGE_SPEC.md §3):
+     * the picker folds open in the attribute's row, and a second tap on the row
+     * folds it closed, which is Cancel. A commit writes through the attribute's
+     * setter and folds the row. One row is open at a time. Reminder, star and
+     * tags have no Android editor yet.
      */
     fun openAttribute(attributeId: String) {
-        when (attributeId) {
-            RegistryTaskAttributeIds.WHEN -> openWhenPicker()
-            RegistryTaskAttributeIds.DEADLINE -> openDeadlinePicker()
+        if (openPicker == attributeId) {
+            openPicker = null
+        } else if (canEdit) {
+            openPicker = attributeId
         }
     }
 
@@ -397,6 +410,19 @@ fun TaskDetailScreen(
                 ) != null,
             )
         }
+    }
+
+    // Opening Repeat on a task without a rule seeds the default rule, as the iOS
+    // picker does when it appears. Turning Repeat off folds its row closed.
+    fun startRepeat() {
+        if (!canEdit) return
+        setRepeat(repeatUnit ?: RegistryEntityEnums.RecurrenceUnit.WEEK)
+        openPicker = RegistryTaskAttributeIds.REPEAT
+    }
+
+    fun stopRepeat() {
+        if (openPicker == RegistryTaskAttributeIds.REPEAT) openPicker = null
+        setRepeat(null)
     }
 
     fun moveToProject(projectId: String?) {
@@ -522,49 +548,105 @@ fun TaskDetailScreen(
                         TaskPageBlockKinds.ATTRIBUTES -> {
                             HorizontalDivider()
                             // The attributes block holds no list of its own: it renders the
-                            // registry task attributes in their order. Notes, checklist,
-                            // attachments and discuss have their own blocks. Reminder, star,
-                            // tags and paste have no editor on Android yet.
+                            // registry task attributes in their order. Notes, checklist and
+                            // attachments have their own blocks. Reminder, star, tags and
+                            // paste have no editor on Android yet. Each picker folds open in
+                            // its own row through [openAttribute], never in a dialog.
                             attributes.forEach { attribute ->
                                 when (attribute.id) {
-                                    RegistryTaskAttributeIds.WHEN -> DateValueRow(
+                                    RegistryTaskAttributeIds.WHEN -> AttributeFoldRow(
                                         label = labels.field(RegistryTaskDetail.Fields.WHEN),
                                         value = whenValue,
-                                        selectLabel = labels.selectDate,
-                                        clearLabel = labels.clear,
+                                        expanded = openPicker == RegistryTaskAttributeIds.WHEN,
                                         enabled = canEdit,
-                                        onSelect = { openAttribute(RegistryTaskAttributeIds.WHEN) },
-                                        onClear = { setWhen(null) },
-                                    )
-                                    RegistryTaskAttributeIds.DEADLINE -> DateValueRow(
-                                        label = labels.field(RegistryTaskDetail.Fields.DEADLINE),
-                                        value = deadline?.let { formatDay(it, languageTag) } ?: labels.noDate,
-                                        selectLabel = labels.selectDate,
-                                        clearLabel = labels.clear,
-                                        enabled = canEdit,
-                                        onSelect = { openAttribute(RegistryTaskAttributeIds.DEADLINE) },
-                                        onClear = { setDeadline(null) },
-                                    )
-                                    RegistryTaskAttributeIds.LIST -> {
-                                        SelectorRow(
-                                            label = labels.field(RegistryTaskDetail.Fields.AREA),
-                                            value = selectedArea?.title ?: labels.noArea,
-                                            noneTitle = labels.noArea,
-                                            choices = data?.areas.orEmpty(),
+                                        onToggle = { openAttribute(RegistryTaskAttributeIds.WHEN) },
+                                    ) {
+                                        EmbeddedDatePicker(
+                                            initialDay = scheduled ?: if (isToday) graph.clock.today(graph.clock.now()).toString() else null,
+                                            clearLabel = labels.clear,
                                             enabled = canEdit,
-                                            onSelect = ::moveToArea,
-                                        )
-                                        SelectorRow(
-                                            label = labels.field(RegistryTaskDetail.Fields.PROJECT),
-                                            value = selectedProject?.title ?: labels.noProject,
-                                            noneTitle = labels.noProject,
-                                            choices = data?.projects.orEmpty(),
-                                            enabled = canEdit,
-                                            onSelect = ::moveToProject,
+                                            onSelect = { day -> openPicker = null; setWhen(day) },
+                                            onClear = { openPicker = null; setWhen(null) },
                                         )
                                     }
-                                    RegistryTaskAttributeIds.REPEAT -> {
-                                        HorizontalDivider()
+                                    RegistryTaskAttributeIds.DEADLINE -> AttributeFoldRow(
+                                        label = labels.field(RegistryTaskDetail.Fields.DEADLINE),
+                                        value = deadline?.let { formatDay(it, languageTag) } ?: labels.noDate,
+                                        expanded = openPicker == RegistryTaskAttributeIds.DEADLINE,
+                                        enabled = canEdit,
+                                        onToggle = { openAttribute(RegistryTaskAttributeIds.DEADLINE) },
+                                    ) {
+                                        EmbeddedDatePicker(
+                                            initialDay = deadline,
+                                            clearLabel = labels.clear,
+                                            enabled = canEdit,
+                                            onSelect = { day -> openPicker = null; setDeadline(day) },
+                                            onClear = { openPicker = null; setDeadline(null) },
+                                        )
+                                    }
+                                    RegistryTaskAttributeIds.LIST -> AttributeFoldRow(
+                                        label = attribute.label,
+                                        value = listValue,
+                                        expanded = openPicker == RegistryTaskAttributeIds.LIST,
+                                        enabled = canEdit,
+                                        onToggle = { openAttribute(RegistryTaskAttributeIds.LIST) },
+                                    ) {
+                                        Text(
+                                            labels.field(RegistryTaskDetail.Fields.AREA),
+                                            style = MaterialTheme.typography.titleSmall,
+                                            modifier = Modifier.padding(horizontal = 16.dp),
+                                        )
+                                        ChoiceRow(
+                                            title = labels.noArea,
+                                            selected = selectedAreaId == null,
+                                            enabled = canEdit,
+                                            onClick = { openPicker = null; moveToArea(null) },
+                                        )
+                                        data?.areas.orEmpty().forEach { area ->
+                                            ChoiceRow(
+                                                title = area.title,
+                                                selected = area.id == selectedAreaId,
+                                                enabled = canEdit,
+                                                onClick = { openPicker = null; moveToArea(area.id) },
+                                            )
+                                        }
+                                        Text(
+                                            labels.field(RegistryTaskDetail.Fields.PROJECT),
+                                            style = MaterialTheme.typography.titleSmall,
+                                            modifier = Modifier.padding(horizontal = 16.dp),
+                                        )
+                                        ChoiceRow(
+                                            title = labels.noProject,
+                                            selected = selectedProjectId == null,
+                                            enabled = canEdit,
+                                            onClick = { openPicker = null; moveToProject(null) },
+                                        )
+                                        data?.projects.orEmpty().forEach { project ->
+                                            ChoiceRow(
+                                                title = project.title,
+                                                selected = project.id == selectedProjectId,
+                                                enabled = canEdit,
+                                                onClick = { openPicker = null; moveToProject(project.id) },
+                                            )
+                                        }
+                                    }
+                                    RegistryTaskAttributeIds.REPEAT -> AttributeFoldRow(
+                                        label = labels.field(RegistryTaskDetail.Fields.REPEAT),
+                                        value = repeatSummary,
+                                        expanded = openPicker == RegistryTaskAttributeIds.REPEAT && repeatUnit != null,
+                                        enabled = canEdit,
+                                        onToggle = {
+                                            if (repeatUnit == null) startRepeat()
+                                            else openAttribute(RegistryTaskAttributeIds.REPEAT)
+                                        },
+                                        trailing = {
+                                            Switch(
+                                                checked = repeatUnit != null,
+                                                onCheckedChange = { on -> if (on) startRepeat() else stopRepeat() },
+                                                enabled = canEdit,
+                                            )
+                                        },
+                                    ) {
                                         RepeatEditor(
                                             labels = labels,
                                             units = labels.repeatUnits,
@@ -582,10 +664,6 @@ fun TaskDetailScreen(
                                             ordinalWeekday = recurrenceOrdinal,
                                             hasScheduledDate = scheduled != null,
                                             enabled = canEdit,
-                                            onToggle = { enabled ->
-                                                if (enabled) setRepeat(repeatUnit ?: RegistryEntityEnums.RecurrenceUnit.WEEK)
-                                                else setRepeat(null)
-                                            },
                                             onUnitChange = { setRepeat(it) },
                                             onIntervalChange = { setRepeat(repeatUnit, it) },
                                             onAfterCompletionChange = { setRepeat(repeatUnit, repeatInterval, it) },
@@ -614,6 +692,15 @@ fun TaskDetailScreen(
                                         )
                                     }
                                 }
+                            }
+                            if (conversationInAttributes) {
+                                TaskConversationSection(
+                                    graph = graph,
+                                    taskId = taskId,
+                                    isTaskOpen = isTaskOpen,
+                                    canWrite = canEdit,
+                                    heading = discussHeading,
+                                )
                             }
                         }
                         TaskPageBlockKinds.CHECKLIST -> {
@@ -674,13 +761,16 @@ fun TaskDetailScreen(
                                 modifier = Modifier.align(Alignment.Start),
                             ) { Text(addChecklistAction) }
                         }
-                        TaskPageBlockKinds.CONVERSATION -> TaskConversationSection(
-                            graph = graph,
-                            taskId = taskId,
-                            isTaskOpen = taskFields[RegistryEntityFields.Task.STATUS].stringValue() == RegistryEntityEnums.TaskStatus.OPEN && !deleted,
-                            canWrite = canEdit,
-                            heading = heading,
-                        )
+                        // With an attributes block the conversation renders there (see above).
+                        TaskPageBlockKinds.CONVERSATION -> if (!conversationInAttributes) {
+                            TaskConversationSection(
+                                graph = graph,
+                                taskId = taskId,
+                                isTaskOpen = isTaskOpen,
+                                canWrite = canEdit,
+                                heading = heading,
+                            )
+                        }
                         // Android has no attachment store yet (task.attachments is planned): skip.
                         TaskPageBlockKinds.ATTACHMENTS -> Unit
                         // Who added the task and when: permanent, read-only metadata.
@@ -714,85 +804,92 @@ fun TaskDetailScreen(
         }
     }
 
-    if (showWhenPicker) {
-        TaskDatePickerDialog(
-            label = labels.field(RegistryTaskDetail.Fields.WHEN),
-            selectLabel = labels.selectDate,
-            clearLabel = labels.clear,
-            initialDay = scheduled ?: if (isToday) graph.clock.today(graph.clock.now()).toString() else null,
-            cancelLabel = labels.cancel,
-            onDismiss = { showWhenPicker = false },
-            onSelect = { day -> showWhenPicker = false; setWhen(day) },
-            onClear = { showWhenPicker = false; setWhen(null) },
+}
+
+/**
+ * One attribute row on the task page. A tap folds the attribute's picker open
+ * under the row, in the same row; a second tap folds it closed (Cancel). The
+ * picker never opens in a dialog or a sheet (docs/TASK_PAGE_SPEC.md §3).
+ */
+@Composable
+private fun AttributeFoldRow(
+    label: String,
+    value: String?,
+    expanded: Boolean,
+    enabled: Boolean,
+    onToggle: () -> Unit,
+    trailing: (@Composable () -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            headlineContent = { Text(label) },
+            supportingContent = if (value != null) {
+                { Text(value) }
+            } else {
+                null
+            },
+            trailingContent = trailing,
+            // A row that is open can always fold closed, also while a write runs.
+            modifier = Modifier.fillMaxWidth().clickable(enabled = enabled || expanded, onClick = onToggle),
         )
-    }
-    if (showDeadlinePicker) {
-        TaskDatePickerDialog(
-            label = labels.field(RegistryTaskDetail.Fields.DEADLINE),
-            selectLabel = labels.selectDate,
-            clearLabel = labels.clear,
-            initialDay = deadline,
-            cancelLabel = labels.cancel,
-            onDismiss = { showDeadlinePicker = false },
-            onSelect = { day -> showDeadlinePicker = false; setDeadline(day) },
-            onClear = { showDeadlinePicker = false; setDeadline(null) },
-        )
+        if (expanded) {
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                content = content,
+            )
+        }
     }
 }
 
+/** One choice in an embedded list picker. A tap commits it. */
 @Composable
-private fun DateValueRow(
-    label: String,
-    value: String,
-    selectLabel: String,
+private fun ChoiceRow(
+    title: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    ListItem(
+        headlineContent = { Text(title) },
+        leadingContent = { RadioButton(selected = selected, onClick = null, enabled = enabled) },
+        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick),
+    )
+}
+
+/**
+ * The month calendar, embedded in its attribute row. A pick of a day commits
+ * it; Clear removes the date. Both fold the row through the caller.
+ */
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun EmbeddedDatePicker(
+    initialDay: String?,
     clearLabel: String,
     enabled: Boolean,
-    onSelect: () -> Unit,
+    onSelect: (String) -> Unit,
     onClear: () -> Unit,
 ) {
-    ListItem(
-        headlineContent = { Text(label) },
-        supportingContent = { Text(value) },
-        trailingContent = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onSelect, enabled = enabled) { Text(selectLabel) }
-                TextButton(onClick = onClear, enabled = enabled) { Text(clearLabel) }
-            }
-        },
+    val initialMillis = remember(initialDay) { initialDay?.let(::dayToEpochMillis) }
+    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+    val selectedMillis = datePickerState.selectedDateMillis
+    LaunchedEffect(selectedMillis) {
+        if (enabled && selectedMillis != null && selectedMillis != initialMillis) {
+            onSelect(Instant.ofEpochMilli(selectedMillis).atZone(ZoneOffset.UTC).toLocalDate().toString())
+        }
+    }
+    DatePicker(
+        state = datePickerState,
+        title = null,
+        showModeToggle = false,
     )
-}
-
-@Composable
-private fun SelectorRow(
-    label: String,
-    value: String,
-    noneTitle: String,
-    choices: List<DetailListItem>,
-    enabled: Boolean,
-    onSelect: (String?) -> Unit,
-) {
-    var expanded by remember(label) { mutableStateOf(false) }
-    ListItem(
-        headlineContent = { Text(label) },
-        supportingContent = { Text(value) },
-        trailingContent = {
-            Box {
-                TextButton(onClick = { expanded = true }, enabled = enabled) { Text(value) }
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    DropdownMenuItem(
-                        text = { Text(noneTitle) },
-                        onClick = { expanded = false; onSelect(null) },
-                    )
-                    choices.forEach { choice ->
-                        DropdownMenuItem(
-                            text = { Text(choice.title) },
-                            onClick = { expanded = false; onSelect(choice.id) },
-                        )
-                    }
-                }
-            }
-        },
-    )
+    TextButton(
+        onClick = onClear,
+        enabled = enabled,
+        modifier = Modifier.padding(horizontal = 8.dp),
+    ) { Text(clearLabel) }
 }
 
 @Composable
@@ -813,7 +910,6 @@ private fun RepeatEditor(
     ordinalWeekday: Pair<Int, Int>?,
     hasScheduledDate: Boolean,
     enabled: Boolean,
-    onToggle: (Boolean) -> Unit,
     onUnitChange: (String) -> Unit,
     onIntervalChange: (Long) -> Unit,
     onAfterCompletionChange: (Boolean) -> Unit,
@@ -855,17 +951,8 @@ private fun RepeatEditor(
         else intervalDraft = interval.toString()
     }
 
+    // The Repeat row above holds the on/off switch; this is the rule, folded open under it.
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        ListItem(
-            headlineContent = { Text(labels.field(RegistryTaskDetail.Fields.REPEAT)) },
-            trailingContent = {
-                Switch(
-                    checked = selectedUnit != null,
-                    onCheckedChange = onToggle,
-                    enabled = enabled,
-                )
-            },
-        )
         if (selectedUnit != null) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -1077,43 +1164,6 @@ private fun ChecklistRow(
         TextButton(onClick = onDelete, enabled = enabled, modifier = Modifier.align(Alignment.End)) {
             Text(deleteLabel)
         }
-    }
-}
-
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun TaskDatePickerDialog(
-    label: String,
-    selectLabel: String,
-    clearLabel: String,
-    initialDay: String?,
-    cancelLabel: String,
-    onDismiss: () -> Unit,
-    onSelect: (String) -> Unit,
-    onClear: () -> Unit,
-) {
-    val initialMillis = initialDay?.let(::dayToEpochMillis)
-    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
-    DatePickerDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        onSelect(Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toString())
-                    }
-                },
-                enabled = datePickerState.selectedDateMillis != null,
-            ) { Text(selectLabel) }
-        },
-        dismissButton = {
-            Row {
-                TextButton(onClick = onClear) { Text(clearLabel) }
-                TextButton(onClick = onDismiss) { Text(cancelLabel) }
-            }
-        },
-    ) {
-        DatePicker(state = datePickerState, title = { Text(label) })
     }
 }
 

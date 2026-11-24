@@ -11,23 +11,31 @@ import SwiftData
 // follow `RegistrySurfaces.taskPageBlocks(.page, …)`, one builder per block
 // kind, and its attribute rows follow `RegistrySurfaces.taskAttributes`. An
 // attribute row opens the same picker as the row menu and the composer pill
-// (`onOpenPicker` → `SeptaskKitTaskListController.openPicker`).
+// (`onOpenPicker` → `SeptaskKitTaskListController.openPicker`). Here the
+// picker folds open in the pane, directly under its row, not in a popover:
+// the rows are `KitInlineSurfaceAnchor`s and this pane is their
+// `KitInlineSurfaceHost` (SeptaskKitSurface.swift). Only the container
+// changes; the picker is the same one. A second click on the row folds it
+// closed and is Cancel. The conversation sits directly under the attribute
+// rows, under the Discuss heading, the way the iOS task page draws it in the
+// Discuss card (docs/TASK_PAGE_SPEC.md).
 //
 // Writes go through TaskMutator like every other surface. Edits commit on
 // blur and on selection change (`flushPendingEdits`), never on every
 // keystroke — a per-keystroke write would push a CloudKit change per letter.
 @MainActor
-final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate, NSTextFieldDelegate {
+final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate, NSTextFieldDelegate,
+                                           KitInlineSurfaceHost {
 
   private let titleField = NSTextField()
   private let notesView = NSTextView()
-  private let whenButton = NSButton()
-  private let deadlineButton = NSButton()
-  private let reminderButton = NSButton()
-  private let repeatButton = NSButton()
-  private let starButton = NSButton()
-  private let tagsButton = NSButton()
-  private let listButton = NSButton()
+  private let whenButton = KitInspectorAttributeButton()
+  private let deadlineButton = KitInspectorAttributeButton()
+  private let reminderButton = KitInspectorAttributeButton()
+  private let repeatButton = KitInspectorAttributeButton()
+  private let starButton = KitInspectorAttributeButton()
+  private let tagsButton = KitInspectorAttributeButton()
+  private let listButton = KitInspectorAttributeButton()
   private let notesLabel = NSTextField(labelWithString: "")
   private let notesScroll = NSScrollView()
   private let addChecklistButton = NSButton()
@@ -76,7 +84,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
 
   /// The attribute rows the inspector shows, by registry attribute id. The
   /// form places them in `RegistrySurfaces.taskAttributes` order.
-  private lazy var attributeButtons: [String: NSButton] = [
+  private lazy var attributeButtons: [String: KitInspectorAttributeButton] = [
     "when": whenButton, "deadline": deadlineButton, "reminder": reminderButton,
     "repeat": repeatButton, "star": starButton, "list": listButton, "tags": tagsButton,
   ]
@@ -85,6 +93,17 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// Width constraints of the views the blocks placed in the form. A block
   /// the registry leaves out has no view in the form, so it gets none.
   private var blockConstraints: [NSLayoutConstraint] = []
+
+  /// The picker folded open under an attribute row, if any. One at a time.
+  private var fold: KitInlineFold?
+  /// The row the open fold hangs under — a second click on it is Cancel.
+  private weak var foldAnchor: NSView?
+  /// Where the keyboard enters the open fold (the picker's focus view).
+  private weak var foldKeyView: NSView?
+  /// The pane's minimum width before a fold widened it, restored on close.
+  private var thicknessBeforeFold: CGFloat?
+  /// The conversation sits directly under the attribute rows (`loadView`).
+  private var conversationUnderRows = false
 
   private var task: SeptenaTask?
   /// What was loaded into the fields, so a commit can tell "the user changed
@@ -130,6 +149,8 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     notesScroll.documentView = notesView
 
     for (id, button) in attributeButtons {
+      // The row's picker folds open in this pane, under the row.
+      button.inlineHost = self
       button.bezelStyle = .rounded
       button.target = self
       button.action = #selector(attributeRowClicked(_:))
@@ -159,15 +180,35 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     form.translatesAutoresizingMaskIntoConstraints = false
     // The registry owns which sections show and their order. No section
     // order is written here.
-    for block in RegistrySurfaces.taskPageBlocks(.page, on: RegistryPlatform.current) {
+    let blocks = RegistrySurfaces.taskPageBlocks(.page, on: RegistryPlatform.current)
+    // Discuss holds the conversation (docs/TASK_PAGE_SPEC.md): when the
+    // registry shows a conversation block, it sits directly under the
+    // attribute rows, not as a separate section further down.
+    let conversationBlock = blocks.first { $0.kind == .conversation }
+    var conversationPlaced = false
+    for block in blocks {
       let last: NSView?
       switch block.kind {
       case .header: last = addHeaderBlock()
       case .notes: last = addNotesBlock(block)
-      case .attributes: last = addAttributesBlock()
+      case .attributes:
+        let rows = addAttributesBlock()
+        if let conversationBlock {
+          conversationPlaced = true
+          conversationUnderRows = true
+          last = addConversationBlock(conversationBlock)
+        } else {
+          last = rows
+        }
       case .checklist: last = addChecklistBlock(block)
       case .attachments: last = addAttachmentsBlock(block)
-      case .conversation: last = addConversationBlock(block)
+      case .conversation:
+        if conversationPlaced {
+          last = nil
+        } else {
+          conversationPlaced = true
+          last = addConversationBlock(block)
+        }
       case .provenance: last = addProvenanceBlock(block)
       case .history: last = addHistoryBlock()
       }
@@ -246,15 +287,23 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     ] + blockConstraints)
     view = root
 
-    // Explicit keyboard order through the pane: title → notes → the
-    // attribute rows in registry order → back to the title. (The buttons
-    // join the loop only with Full Keyboard Access on — AppKit skips them
-    // otherwise.)
-    let loop: [NSView] = [titleField, notesView] + orderedAttributeButtons
+    rebuildKeyLoop()
+    show(nil)
+  }
+
+  /// Explicit keyboard order through the pane: title → notes → the
+  /// attribute rows in registry order → back to the title. An open fold
+  /// joins the loop right after its row. (The buttons join the loop only
+  /// with Full Keyboard Access on — AppKit skips them otherwise.)
+  private func rebuildKeyLoop() {
+    var loop: [NSView] = [titleField, notesView]
+    for button in orderedAttributeButtons {
+      loop.append(button)
+      if button === foldAnchor, let entry = foldKeyView { loop.append(entry) }
+    }
     for (index, view) in loop.enumerated() {
       view.nextKeyView = loop[(index + 1) % loop.count]
     }
-    show(nil)
   }
 
   // MARK: - Blocks (one builder per `RegistryTaskPageBlockKind`)
@@ -339,8 +388,13 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     return attachFileButton
   }
 
+  /// The conversation, under the Discuss heading: the pane has no Discuss
+  /// row, so the heading carries the Discuss attribute's registry label and
+  /// the block sits directly under the attribute rows (see `loadView`), the
+  /// way the iOS task page draws it inside the Discuss card.
   private func addConversationBlock(_ block: RegistryTaskPageBlock) -> NSView {
     styleHeading(conversationLabel, block)
+    conversationLabel.stringValue = RegistrySurfaces.taskAttribute("discuss").label
     conversationView.translatesAutoresizingMaskIntoConstraints = false
     // A reply appends a turn, which posts a task change; re-read so the new
     // turn lands in the transcript the same way an agent turn would.
@@ -459,6 +513,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       return
     }
     flushPendingEdits()
+    // A fold belongs to the task it opened on. Switching rows cancels it
+    // (no draft is written to the row being left).
+    fold?.cancel()
     task = next
 
     guard let next, !next.isHeading else {
@@ -605,6 +662,11 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
                                            convo: next.conversation,
                                            isTaskOpen: next.status == .open)
     conversationLabel.isHidden = !shown
+    // Rows and conversation read as one unit: the normal gap between them,
+    // the section gap after the rows when there is no conversation.
+    if conversationUnderRows, let lastRow = orderedAttributeButtons.last {
+      form.setCustomSpacing(shown ? form.spacing : 14, after: lastRow)
+    }
   }
 
   /// Re-read the shown task from the store — used when a refresh lands while
@@ -768,14 +830,112 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
 
   /// An attribute row: Star toggles in place; every other row opens its
   /// picker through the task list, the same path as the row menu and the
-  /// composer pill (ADR 0029).
+  /// composer pill (ADR 0029). The picker folds open under the row
+  /// (`foldOpen`). A second click on the row folds it closed: Cancel.
   @objc private func attributeRowClicked(_ sender: NSButton) {
     guard task != nil, let id = sender.identifier?.rawValue else { return }
+    if let fold, foldAnchor === sender {
+      fold.cancel()
+      return
+    }
+    // One fold at a time.
+    fold?.cancel()
     if id == "star" {
       toggleStar()
       return
     }
     onOpenPicker?(id, .rect(sender.bounds, sender))
+  }
+
+  // MARK: - Folds (KitInlineSurfaceHost)
+
+  /// Put a picker in the pane directly under `anchor`, in place of the
+  /// popover the same picker opens from the row menu. The picker keeps its
+  /// own keys and commit contract; this owns only the place it sits.
+  func foldOpen(_ content: NSView, size: NSSize?, under anchor: NSView,
+                focus: NSView?, onClose: (() -> Void)?) -> KitInlineFold {
+    fold?.cancel()
+
+    let container = NSView()
+    container.translatesAutoresizingMaskIntoConstraints = false
+    content.translatesAutoresizingMaskIntoConstraints = false
+    container.addSubview(content)
+    var constraints = [
+      content.topAnchor.constraint(equalTo: container.topAnchor),
+      content.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+      content.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+      container.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
+    ]
+    // A picker with no width of its own (Move) fills the row's width. A
+    // picker with a fixed width (the date board) keeps it.
+    let fill = content.trailingAnchor.constraint(equalTo: container.trailingAnchor)
+    fill.priority = .defaultHigh
+    constraints.append(fill)
+    // A popover gave this content its height (Move): keep that height here.
+    if let size {
+      constraints.append(content.heightAnchor.constraint(equalToConstant: size.height))
+    }
+    let index = form.arrangedSubviews.firstIndex(of: anchor).map { $0 + 1 }
+      ?? form.arrangedSubviews.count
+    form.insertArrangedSubview(container, at: index)
+    NSLayoutConstraint.activate(constraints)
+    widenPaneToFit(content)
+
+    let made = KitInlineFold(container: container, onClose: onClose) { [weak self] ended in
+      self?.removeFold(ended, content: content)
+    }
+    fold = made
+    foldAnchor = anchor
+    foldKeyView = focus ?? content
+    rebuildKeyLoop()
+
+    view.layoutSubtreeIfNeeded()
+    container.scrollToVisible(container.bounds)
+    view.window?.makeFirstResponder(focus ?? content)
+    return made
+  }
+
+  func inlineAnchor(forAttribute attributeId: String) -> KitSurfaceAnchor? {
+    guard let button = attributeButtons[attributeId],
+          orderedAttributeButtons.contains(where: { $0 === button }) else { return nil }
+    return .rect(button.bounds, button)
+  }
+
+  private func removeFold(_ ended: KitInlineFold, content: NSView) {
+    let container = ended.container
+    let hadKeyboard = (view.window?.firstResponder as? NSView)?.isDescendant(of: container) ?? false
+    let anchor = foldAnchor
+    container.removeFromSuperview()
+    content.removeFromSuperview()
+    // A later fold may already be open (When's Repeat row hands off to the
+    // Repeat row): only the current one clears the state.
+    guard fold === ended else { return }
+    fold = nil
+    foldAnchor = nil
+    foldKeyView = nil
+    restorePaneWidth()
+    rebuildKeyLoop()
+    // Keyboard back to the row that opened the picker, when the row can take
+    // it (Full Keyboard Access).
+    if hadKeyboard, let anchor { view.window?.makeFirstResponder(anchor) }
+  }
+
+  /// A picker has a fixed width (the date board's week strip). While it is
+  /// open, the pane is at least that wide, up to the pane's maximum, so the
+  /// strip is not cut off. Restored when the fold closes.
+  private func widenPaneToFit(_ content: NSView) {
+    guard let item = (parent as? NSSplitViewController)?.splitViewItem(for: self) else { return }
+    let needed = min(content.fittingSize.width + 28, item.maximumThickness)
+    guard needed > item.minimumThickness else { return }
+    if thicknessBeforeFold == nil { thicknessBeforeFold = item.minimumThickness }
+    item.minimumThickness = needed
+  }
+
+  private func restorePaneWidth() {
+    guard let before = thicknessBeforeFold,
+          let item = (parent as? NSSplitViewController)?.splitViewItem(for: self) else { return }
+    item.minimumThickness = before
+    thicknessBeforeFold = nil
   }
 
   private func toggleStar() {
@@ -815,6 +975,13 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       ? String(localized: "Attach File…", comment: "SeptaskKit: inspector attach file")
       : String(localized: "Attach Another File…", comment: "SeptaskKit: inspector attach another file")
   }
+}
+
+/// An inspector attribute row. Its picker folds open in the pane under it
+/// (`KitInlineSurfaceAnchor`) instead of in a popover.
+@MainActor
+private final class KitInspectorAttributeButton: NSButton, KitInlineSurfaceAnchor {
+  weak var inlineHost: KitInlineSurfaceHost?
 }
 
 /// Document view for the inspector's scrolling form: flipped, so the form

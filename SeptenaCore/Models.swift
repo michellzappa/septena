@@ -32,7 +32,7 @@ public enum TaskSource {
 /// task feed, list, count, or badge (see `TaskEntity.isHeading` and the
 /// exclusion filters). Absent/`""` = an ordinary task.
 public enum TaskKind {
-  /// An ordinary to-do. The default; stored as `""`/absent.
+  /// An ordinary task. The default; stored as `""`/absent.
   public static let task = ""
   /// A section divider inside a project. Members point back via `heading`.
   public static let heading = "heading"
@@ -142,7 +142,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// Rides alongside the entity, not the wire.
   var heading: String? = nil
 
-  /// True when this DTO is a project section divider, not a to-do — the mirror
+  /// True when this DTO is a project section divider, not a task — the mirror
   /// of `TaskEntity.isHeading`. Headings are excluded from every feed/count.
   var isHeading: Bool { kind == TaskKind.heading }
 

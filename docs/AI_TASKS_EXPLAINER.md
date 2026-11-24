@@ -7,7 +7,7 @@ concrete, and jargon-free.
 ---
 
 ## Headline
-**Some to-dos need a moment of thinking before you can act. Septena can talk that
+**Some tasks need a moment of thinking before you can act. Septena can talk that
 through with AI — right on the task.**
 
 ## The short version
@@ -75,5 +75,5 @@ can't be undone, **always waits for your tap.** You're in control of every step.
 ---
 
 ### One-line version (for tooltips / app store)
-*Turn a vague to-do into a clear next step — your AI asks, you tap, it's done. Your
+*Turn a vague task into a clear next step — your AI asks, you tap, it's done. Your
 data never leaves your iCloud.*

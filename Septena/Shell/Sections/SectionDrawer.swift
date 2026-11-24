@@ -1091,7 +1091,6 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
   let title: String
   /// Confirmation label. Defaults to "Save"; pass "Add", "Done", etc.
   var saveTitle: String = "Save"
-  var cancelTitle: String = "Cancel"
   /// Hides the confirmation control entirely. Use when the close control already
   /// persists (autosave-on-close) so a separate Save would be redundant — the
   /// left control alone ("Done") both saves and closes.
@@ -1149,7 +1148,6 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
           .safeAreaInset(edge: .top, spacing: 0) {
             AdaptiveEditHeader(
               title: title,
-              cancelTitle: cancelTitle,
               saveTitle: saveTitle,
               showsSave: showsSave,
               canSave: canSave,
@@ -1173,9 +1171,8 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
             #endif
             .toolbar {
               ToolbarItem(placement: .cancellationAction) {
-                Button(cancelTitle, action: requestCancel)
+                DrawerCloseButton(action: requestCancel)
                   .tint(accent)
-                  .keyboardShortcut(.cancelAction) // Esc
               }
               if showsSave {
                 ToolbarItem(placement: .confirmationAction) {
@@ -1235,11 +1232,24 @@ extension View {
 }
 
 /// The inline header used by `AdaptiveEditScaffold` in its docked-inspector
-/// mode: Cancel · title · Save, on a material bar. Kept private — forms only
+/// mode: Close (x) · title · Save, on a material bar. Kept private — forms only
 /// ever go through the scaffold.
+/// The leading close control of every drawer and sheet: the system close
+/// button (an x), never a "Cancel" text button. The edit to-do drawer set the
+/// pattern; every sheet uses this one control so they cannot drift. The x only
+/// leaves: a form with unsaved work still asks before it discards (the caller
+/// routes the action through its own guard). Escape triggers it.
+struct DrawerCloseButton: View {
+  let action: () -> Void
+
+  var body: some View {
+    Button(role: .close, action: action)
+      .keyboardShortcut(.cancelAction) // Esc
+  }
+}
+
 private struct AdaptiveEditHeader: View {
   let title: String
-  let cancelTitle: String
   let saveTitle: String
   var showsSave: Bool = true
   let canSave: Bool
@@ -1250,8 +1260,7 @@ private struct AdaptiveEditHeader: View {
 
   var body: some View {
     HStack(spacing: 12) {
-      Button(cancelTitle, action: onCancel)
-        .keyboardShortcut(.cancelAction) // Esc
+      DrawerCloseButton(action: onCancel)
       Spacer()
       Text(title).font(.headline)
       Spacer()

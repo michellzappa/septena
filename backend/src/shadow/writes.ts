@@ -62,7 +62,7 @@ type StoreMethod =
   | "readChecklistItems" | "readChecklistItem" | "readChecklistCounts"
   | "readTags" | "readTagByName"
   | "readOrderTop" | "readSetting" | "push" | "claim" | "release" | "agentEvents" | "history" | "head"
-  | "addUsage"
+  | "addUsage" | "connectionName"
   | "readNote" | "noteRevisions" | "readContainer" | "readContainerTasks";
 export type StoreRpc = {
   [K in StoreMethod]: (...a: Parameters<TaskStore[K]>) => Promise<ReturnType<TaskStore[K]>>;

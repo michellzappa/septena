@@ -32,6 +32,10 @@ export interface PendingAuth {
 export interface PairApproval {
   userId: string;
   timeZone?: string;
+  /// Connector codes only: the name the user gave the agent, and the agent
+  /// (token family id) it replaces. Both land at the token exchange.
+  label?: string;
+  replaces?: string;
 }
 
 export type ApproveOutcome = "ok" | "not_found" | "already_used";

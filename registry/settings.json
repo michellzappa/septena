@@ -430,6 +430,16 @@
           "featureId": "agents.connector"
         },
         {
+          "kind": "pageLink",
+          "page": "agents",
+          "label": "Agents",
+          "icon": "settings.agents",
+          "statusKey": "agentsStatus",
+          "desktopInline": true,
+          "visibility": "signedIn",
+          "featureId": "agents.connector"
+        },
+        {
           "kind": "setting",
           "key": "agentsPaused",
           "label": "Pause all agents",
@@ -561,7 +571,7 @@
   "pages": [
     {
       "id": "devices_access",
-      "title": "Devices & Access",
+      "title": "Devices",
       "icon": "settings.devices",
       "depth": 2,
       "featureId": "sync.backend",
@@ -572,14 +582,6 @@
           "footer": "Each app you signed in to. A device you sign out stops syncing within the hour.",
           "items": [
             { "kind": "customSurface", "surface": "access_devices", "featureId": "sync.backend" }
-          ]
-        },
-        {
-          "id": "connections",
-          "header": "Connected apps",
-          "footer": "AI apps and agents that reach your tasks through the Septena connector.",
-          "items": [
-            { "kind": "customSurface", "surface": "access_connections", "featureId": "agents.connector" }
           ]
         },
         {
@@ -651,7 +653,7 @@
         {
           "id": "devices_access",
           "items": [
-            { "kind": "pageLink", "page": "devices_access", "label": "Devices & Access", "icon": "settings.devices", "featureId": "sync.backend" }
+            { "kind": "pageLink", "page": "devices_access", "label": "Devices", "icon": "settings.devices", "featureId": "sync.backend" }
           ]
         },
         {
@@ -686,6 +688,23 @@
           "id": "offer",
           "items": [
             { "kind": "customSurface", "surface": "plus_offer" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "agents",
+      "title": "Agents",
+      "icon": "settings.agents",
+      "depth": 1,
+      "featureId": "agents.connector",
+      "sections": [
+        {
+          "id": "agents",
+          "header": "Connected agents",
+          "footer": "Each agent you connected to your tasks, with the name you gave it. An agent counts while it was used in the last 30 days. Your phones, tablets and computers are under Account, Devices.",
+          "items": [
+            { "kind": "customSurface", "surface": "access_agents", "featureId": "agents.connector" }
           ]
         }
       ]

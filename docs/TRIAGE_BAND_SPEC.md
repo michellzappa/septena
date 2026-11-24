@@ -53,7 +53,7 @@ retired — one Today, no parallel inbox. iOS + macOS + 39 core tests green.
     `applyWhen`, and the context-menu `onMoveToToday`. The bespoke
     `TriageBandView` was **deleted**.
 - **Separate Inbox *page* retired.** Removed the Inbox sidebar smart-list row;
-  "New To-Do" now lands on Today (`SidebarView`). Dashboard Tasks tile + headline
+  "New Task" now lands on Today (`SidebarView`). Dashboard Tasks tile + headline
   stat changed to **"Inbox"** backed by `triageCount` (so it counts the to-sort
   pile, not the old loose-only inbox), and the quick-add menu dropped "Go to
   Inbox" (`WeekTasksTile`, `tasksTile`, `tasksDomainData`, `TasksQuickAddMenu`).

@@ -253,7 +253,7 @@ private struct InlineEditDimmedModifier: ViewModifier {
             .onTapGesture { onDismiss() }
         }
       }
-      .a11yAnimation(.easeOut(duration: 0.18), value: isDimmed)
+      .a11yAnimation(Theme.Motion.inlineEdit, value: isDimmed)
     #else
     content
     #endif

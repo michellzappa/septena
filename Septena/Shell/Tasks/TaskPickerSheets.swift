@@ -140,7 +140,7 @@ struct DatePickerSheet: View {
           .septenaInlineTitle()
           .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-              Button("Cancel") { dismiss() }
+              DrawerCloseButton { dismiss() }
             }
           }
       }
@@ -896,9 +896,9 @@ struct MovePickerSheet: View {
           .septenaInlineTitle()
           .toolbar {
             // Picking a row is the commit; the only other choice is to leave
-            // without moving, so the toolbar offers Cancel, not a no-op Done.
+            // without moving, so the toolbar offers Close, not a no-op Done.
             ToolbarItem(placement: .cancellationAction) {
-              Button("Cancel") { dismiss() }
+              DrawerCloseButton { dismiss() }
             }
           }
       }

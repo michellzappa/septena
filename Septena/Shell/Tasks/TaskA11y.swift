@@ -37,7 +37,7 @@ enum TaskA11y {
   static func checkboxLabel(isHeading: Bool = false) -> String {
     if isHeading {
       return String(localized: "Section",
-                    comment: "A11y: project heading row (not a to-do)")
+                    comment: "A11y: project heading row (not a task)")
     }
     return String(localized: "Task",
                   comment: "A11y: task checkbox label")

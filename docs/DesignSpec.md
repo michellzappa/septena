@@ -165,6 +165,18 @@ Two channels tell the user something. Never a modal for an explanation.
 - **A lost write is neither** (`StoreHealthNotice`): it is an alert, because it is not confirmable or undoable.
 - Copy for notices and toasts goes through the humanizer pass like all human-facing copy.
 
+## 6.6 Words
+
+The unit of work is a **task**, on every platform and surface: UI copy,
+accessibility labels, shortcut labels, notices, LLM prompts and docs. Never
+"to-do" or "todo". "Task" covers both a person's errand and an agent's job
+(assign, claim, hand off, review), and it matches the MCP tools (`tasks_*`),
+the data model and Android. One noun per thing (ADR 0028), so a second name
+for the same object is a bug. The one exception is search keywords (App Store
+keyword field, site `keywords` metadata), where "to-do" and "todo" stay
+because people search for them. Enforced by the `vocab-task-not-todo` lint
+rule.
+
 ## 7. Edit sheets
 
 Every create/edit form goes through `AdaptiveEditScaffold` ([SectionDrawer.swift](../Septena/Shell/Sections/SectionDrawer.swift)), presented by `.adaptiveDetail(item:)` / `.adaptiveDetail(isPresented:)`. The scaffold absorbs the cross-surface chrome so no form repeats it:

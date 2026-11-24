@@ -126,6 +126,7 @@
       "attachmentsGB": 0,
       "connectorWritesPerDay": 25,
       "agentRunsPerMonth": 10,
+      "connectedAgents": 1,
       "createShares": false,
       "linkedProjects": 1
     },
@@ -138,6 +139,7 @@
       "attachmentsGB": 10,
       "connectorWritesPerDay": null,
       "agentRunsPerMonth": null,
+      "connectedAgents": null,
       "createShares": true,
       "linkedProjects": null
     }

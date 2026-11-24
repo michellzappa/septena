@@ -10,6 +10,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -25,7 +27,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import app.septena.android.R
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryActionIds
@@ -56,7 +60,11 @@ internal fun ShareCaptureScreen(
             TopAppBar(
                 title = { Text(labels.title) },
                 navigationIcon = {
-                    TextButton(onClick = onCancel, enabled = !saving) { Text(labels.cancel) }
+                    // A close (x), not a "Cancel" text button: the same leading
+                    // control as every sheet on iOS and Mac.
+                    IconButton(onClick = onCancel, enabled = !saving) {
+                        Icon(painterResource(R.drawable.ic_close), contentDescription = labels.cancel)
+                    }
                 },
                 actions = {
                     TextButton(

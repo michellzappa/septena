@@ -2980,8 +2980,12 @@ final class SeptaskKitTaskListController: NSViewController {
       repeatTitle: kind == .when
         ? TaskRepeatLabel.title(Set(selection.map(\.recurrence)).count == 1 ? selection.first?.recurrence : nil)
         : nil,
-      // The Repeat editor hangs off the same control as this picker.
-      onRepeat: kind == .when ? { [weak self] in self?.presentRecurrencePanel(anchor: anchor) } : nil
+      // The Repeat editor hangs off the same control as this picker. In the
+      // inspector, where When folds open under its row, Repeat folds open
+      // under the Repeat row instead (the iOS task page does the same).
+      onRepeat: kind == .when ? { [weak self] in
+        self?.presentRecurrencePanel(anchor: anchor?.inlineSibling(attribute: "repeat") ?? anchor)
+      } : nil
     ) { [weak self] date, today in
       guard let self else { return }
       // Read the rows again from the store: a time-slot change in the same
@@ -3609,7 +3613,7 @@ final class SeptaskKitTaskListController: NSViewController {
 
   /// ⌘K or the composer's own checkbox with the row open: save the typed
   /// text, close the row, then complete it through the ordinary path (undo,
-  /// settle beat) — Things' "complete from the open to-do".
+  /// settle beat) — Things' "complete from the open task".
   private func completeComposingTask() {
     guard let id = composingTaskId else { return }
     collapseComposer(commit: true, animated: false)
@@ -3766,6 +3770,12 @@ final class SeptaskKitTaskListController: NSViewController {
     // sits in the closed-row band, so the glyphs stay put as pills clip away.
     // Swapping to the task cell *before* the shrink would center the title
     // in the still-tall frame (a visible jump).
+    // Put the row and its neighbours in their CLOSED look before the shrink,
+    // the mirror of `beginComposing`, which applies the open look before it
+    // grows. Done at the end instead, the composing card style rode the whole
+    // shrink and then everything snapped at once (neighbours rejoining,
+    // corners squaring, selection wash back): the janky fold.
+    refreshCardGeometry()
     foldingComposerIDs.insert(taskId)
     animateComposerHeight(ofRow: row, animated: animated, reveal: false) { [weak self] in
       guard let self else { return }

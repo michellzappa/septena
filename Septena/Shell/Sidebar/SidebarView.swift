@@ -1942,7 +1942,7 @@ struct NewProjectSheet: View {
       .septenaInlineTitle()
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button(RegistryPrompts.cancelTitle) { dismiss() }
+          DrawerCloseButton { dismiss() }
         }
         ToolbarItem(placement: .confirmationAction) {
           Button(RegistryPrompts.textPrompt("newProject").confirmTitle) {

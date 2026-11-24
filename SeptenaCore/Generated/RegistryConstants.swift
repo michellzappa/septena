@@ -180,6 +180,7 @@ enum RegistryIcons {
     "settings.tasks": "checklist",
     "task.added_by_agent": "text.bubble.badge.sparkles",
     "settings.ai_agents": "cpu",
+    "settings.agents": "person.2",
     "settings.claude": "bubble.left.and.text.bubble.right",
     "settings.connections_ai": "brain.head.profile",
     "settings.connections": "link",
@@ -467,6 +468,7 @@ enum RegistrySettings {
     static let appearance = "appearance"
     static let account = "account"
     static let plus = "plus"
+    static let agents = "agents"
     static let claudePairing = "claude_pairing"
     static let aiPreferences = "ai_preferences"
     static let calendar = "calendar"
@@ -499,6 +501,7 @@ enum RegistrySettings {
     ]),
     RegistrySettingsGroup(id: "ai_agents_root", header: RegistryL10n.t("AI & Agents"), mobilePresentation: "inline", desktopTab: "ai_agents", items: [
       RegistrySettingsItem(kind: "pageLink", key: nil, page: "claude_pairing", surface: nil, label: RegistryL10n.t("Connect Claude"), detail: nil, iconId: "settings.claude", sfSymbol: "bubble.left.and.text.bubble.right", statusKey: "claudeStatus", desktopInline: true, visibility: "always", platforms: nil, featureId: "agents.connector"),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "agents", surface: nil, label: RegistryL10n.t("Agents"), detail: nil, iconId: "settings.agents", sfSymbol: "person.2", statusKey: "agentsStatus", desktopInline: true, visibility: "signedIn", platforms: nil, featureId: "agents.connector"),
       RegistrySettingsItem(kind: "setting", key: "agentsPaused", page: nil, surface: nil, label: RegistryL10n.t("Pause all agents"), detail: RegistryL10n.t("While paused, no agent can start or work on a task."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "signedIn", platforms: nil, featureId: "agents.stop-pause"),
       RegistrySettingsItem(kind: "pageLink", key: nil, page: "ai_preferences", surface: nil, label: RegistryL10n.t("AI Preferences"), detail: nil, iconId: "settings.ai_agents", sfSymbol: "cpu", statusKey: "aiMode", desktopInline: true, visibility: "always", platforms: nil, featureId: "ai.reach-dial"),
     ]),
@@ -525,12 +528,9 @@ enum RegistrySettings {
   ]
 
   static let pages: [RegistrySettingsPage] = [
-    RegistrySettingsPage(id: "devices_access", title: RegistryL10n.t("Devices & Access"), iconId: "settings.devices", sfSymbol: "laptopcomputer.and.iphone", depth: 2, platforms: nil, featureId: "sync.backend", sections: [
+    RegistrySettingsPage(id: "devices_access", title: RegistryL10n.t("Devices"), iconId: "settings.devices", sfSymbol: "laptopcomputer.and.iphone", depth: 2, platforms: nil, featureId: "sync.backend", sections: [
       RegistrySettingsSection(id: "devices", header: RegistryL10n.t("Devices"), footer: RegistryL10n.t("Each app you signed in to. A device you sign out stops syncing within the hour."), platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "access_devices", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
-      ]),
-      RegistrySettingsSection(id: "connections", header: RegistryL10n.t("Connected apps"), footer: RegistryL10n.t("AI apps and agents that reach your tasks through the Septena connector."), platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "access_connections", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "agents.connector"),
       ]),
       RegistrySettingsSection(id: "watch", header: nil, footer: nil, platforms: ["ios"], items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "apple_watch", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios"], featureId: "sync.backend"),
@@ -552,7 +552,7 @@ enum RegistrySettings {
         RegistrySettingsItem(kind: "pageLink", key: nil, page: "plus", surface: nil, label: RegistryL10n.t("Septena Plus"), detail: nil, iconId: "settings.plus", sfSymbol: "plus.circle.fill", statusKey: "planStatus", desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
       RegistrySettingsSection(id: "devices_access", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "pageLink", key: nil, page: "devices_access", surface: nil, label: RegistryL10n.t("Devices & Access"), detail: nil, iconId: "settings.devices", sfSymbol: "laptopcomputer.and.iphone", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
+        RegistrySettingsItem(kind: "pageLink", key: nil, page: "devices_access", surface: nil, label: RegistryL10n.t("Devices"), detail: nil, iconId: "settings.devices", sfSymbol: "laptopcomputer.and.iphone", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
       RegistrySettingsSection(id: "sync", header: RegistryL10n.t("Sync"), footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sync_account_status", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
@@ -567,6 +567,11 @@ enum RegistrySettings {
     RegistrySettingsPage(id: "plus", title: RegistryL10n.t("Septena Plus"), iconId: "settings.plus", sfSymbol: "plus.circle.fill", depth: 2, platforms: nil, featureId: "sync.backend", sections: [
       RegistrySettingsSection(id: "offer", header: nil, footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "plus_offer", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
+      ]),
+    ]),
+    RegistrySettingsPage(id: "agents", title: RegistryL10n.t("Agents"), iconId: "settings.agents", sfSymbol: "person.2", depth: 1, platforms: nil, featureId: "agents.connector", sections: [
+      RegistrySettingsSection(id: "agents", header: RegistryL10n.t("Connected agents"), footer: RegistryL10n.t("Each agent you connected to your tasks, with the name you gave it. An agent counts while it was used in the last 30 days. Your phones, tablets and computers are under Account, Devices."), platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "access_agents", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "agents.connector"),
       ]),
     ]),
     RegistrySettingsPage(id: "claude_pairing", title: RegistryL10n.t("Connect Claude"), iconId: "settings.claude", sfSymbol: "bubble.left.and.text.bubble.right", depth: 1, platforms: nil, featureId: "agents.connector", sections: [
@@ -1357,6 +1362,7 @@ enum RegistryPrompts {
     "deleteSection": RegistryPromptCopy(id: "deleteSection", title: RegistryL10n.t("Delete this section?"), message: RegistryL10n.t("Its tasks stay in the project."), confirmTitle: RegistryL10n.t("Delete Section"), options: []),
     "deleteAccount": RegistryPromptCopy(id: "deleteAccount", title: RegistryL10n.t("Delete Account?"), message: RegistryL10n.t("Your tasks, areas, projects, and conversations are erased from the server and this device."), confirmTitle: RegistryL10n.t("Delete Account"), options: []),
     "rescheduleFixedRepeat": RegistryPromptCopy(id: "rescheduleFixedRepeat", title: RegistryL10n.t("Reschedule repeating task?"), message: RegistryL10n.t("Move only this task, or update the repeating schedule to the new date?"), confirmTitle: nil, options: [RegistryPromptOption(id: "exception", title: RegistryL10n.t("Only This Task")), RegistryPromptOption(id: "updateRule", title: RegistryL10n.t("Update Schedule"))]),
+    "agentReplaces": RegistryPromptCopy(id: "agentReplaces", title: RegistryL10n.t("Replaces"), message: RegistryL10n.t("If this agent takes the place of one you connected before, pick it. That agent stops working."), confirmTitle: nil, options: [RegistryPromptOption(id: "none", title: RegistryL10n.t("Nothing, a new agent")), RegistryPromptOption(id: "agent", title: RegistryL10n.t("An agent below"))]),
   ]
   static let text: [String: RegistryTextPrompt] = [
     "newSection": RegistryTextPrompt(id: "newSection", title: RegistryL10n.t("New Section"), placeholder: RegistryL10n.t("Section name"), confirmTitle: RegistryL10n.t("Add")),
@@ -1365,11 +1371,14 @@ enum RegistryPrompts {
     "renameArea": RegistryTextPrompt(id: "renameArea", title: RegistryL10n.t("Rename Area"), placeholder: RegistryL10n.t("Area name"), confirmTitle: RegistryL10n.t("Rename")),
     "newProject": RegistryTextPrompt(id: "newProject", title: RegistryL10n.t("New Project"), placeholder: RegistryL10n.t("Project name"), confirmTitle: RegistryL10n.t("Create")),
     "renameProject": RegistryTextPrompt(id: "renameProject", title: RegistryL10n.t("Rename Project"), placeholder: RegistryL10n.t("Project name"), confirmTitle: RegistryL10n.t("Rename")),
+    "renameAgent": RegistryTextPrompt(id: "renameAgent", title: RegistryL10n.t("Rename Agent"), placeholder: RegistryL10n.t("Agent name"), confirmTitle: RegistryL10n.t("Rename")),
+    "nameAgent": RegistryTextPrompt(id: "nameAgent", title: RegistryL10n.t("Name this agent"), placeholder: RegistryL10n.t("Agent name"), confirmTitle: RegistryL10n.t("Save")),
     "conversationOther": RegistryTextPrompt(id: "conversationOther", title: RegistryL10n.t("Other…"), placeholder: RegistryL10n.t("Type your answer"), confirmTitle: RegistryL10n.t("Send")),
     "conversationReply": RegistryTextPrompt(id: "conversationReply", title: RegistryL10n.t("Reply…"), placeholder: RegistryL10n.t("Reply to thread"), confirmTitle: RegistryL10n.t("Send")),
   ]
   static func tasksPhrase(count: Int) -> String { RegistryL10n.plural("%lld tasks", count: count, one: "1 task", other: "%lld tasks", args: [count]) }
   static func projectsPhrase(count: Int) -> String { RegistryL10n.plural("%lld projects", count: count, one: "1 project", other: "%lld projects", args: [count]) }
+  static func agentsPhrase(count: Int) -> String { RegistryL10n.plural("%lld agents", count: count, one: "1 agent", other: "%lld agents", args: [count]) }
   static func deletePermanently(count: Int) -> RegistryPromptCopy {
     RegistryPromptCopy(id: "deletePermanently", title: RegistryL10n.plural("Delete %lld tasks permanently?", count: count, one: "Delete this task permanently?", other: "Delete %lld tasks permanently?", args: [count]), message: RegistryL10n.t("You can’t undo this."), confirmTitle: RegistryL10n.t("Delete Permanently"), options: [])
   }
@@ -1390,6 +1399,9 @@ enum RegistryPrompts {
   }
   static func clearLogged(count: Int, name: String) -> RegistryPromptCopy {
     RegistryPromptCopy(id: "clearLogged", title: RegistryL10n.plural("Clear %lld logged items from “%@”?", count: count, one: "Clear 1 logged item from “%2$@”?", other: "Clear %lld logged items from “%@”?", args: [count, name]), message: RegistryL10n.t("Cleared items move to Recently Deleted. You can undo this."), confirmTitle: RegistryL10n.t("Clear"), options: [])
+  }
+  static func disconnectAgent(name: String) -> RegistryPromptCopy {
+    RegistryPromptCopy(id: "disconnectAgent", title: RegistryL10n.format("Disconnect %@?", english: "Disconnect %@?", args: [name]), message: RegistryL10n.format("%@ can no longer read or change your tasks. To use it again, connect it again.", english: "%@ can no longer read or change your tasks. To use it again, connect it again.", args: [name]), confirmTitle: RegistryL10n.t("Disconnect"), options: [])
   }
 }
 

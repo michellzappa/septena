@@ -9,7 +9,7 @@ struct CaptureButton: View {
   private var store: WatchStore { .shared }
 
   var body: some View {
-    TextFieldLink(prompt: Text("New To-Do")) {
+    TextFieldLink(prompt: Text("New Task")) {
       Image(systemName: "plus")
         .foregroundStyle(store.accentInkColor)
     } onSubmit: { text in
@@ -19,7 +19,7 @@ struct CaptureButton: View {
     .buttonStyle(.glassProminent)
     .buttonBorderShape(.circle)
     .tint(store.accentColor)
-    .accessibilityLabel("New To-Do")
+    .accessibilityLabel("New Task")
   }
 }
 

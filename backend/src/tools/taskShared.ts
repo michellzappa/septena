@@ -34,7 +34,7 @@ export interface TaskOut {
   source?: string;
   acknowledgedAt?: number; // ms epoch; present once the user has engaged the row
   createdAt?: number;      // ms epoch
-  // Row shape: "heading" = a project section divider, not a to-do. Filtered out
+  // Row shape: "heading" = a project section divider, not a task. Filtered out
   // of every view (mirrors iOS TaskEntity.isHeading). Absent = task.
   kind?: string;
   // Emitted in the SAME shape tasks_create/tasks_update accept, so a read

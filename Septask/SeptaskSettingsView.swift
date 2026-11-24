@@ -108,7 +108,10 @@ struct SeptaskSettingsView: View {
       .navigationTitle("Settings")
       .navigationBarTitleDisplayMode(.inline)
       .navigationDestination(for: String.self) { page($0) }
-      .task(id: TaskSyncEngine.shared.signedIn) { await PlanStatus.shared.refresh() }
+      .task(id: TaskSyncEngine.shared.signedIn) {
+        await PlanStatus.shared.refresh()
+        await AgentRoster.shared.refresh()
+      }
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") { dismiss() }
@@ -185,7 +188,7 @@ struct SeptaskSettingsView: View {
         }
       }
     }
-    // Apple Watch moved to Account ▸ Devices & Access (2026-11-22).
+    // Apple Watch moved to Account ▸ Devices (2026-11-22).
   }
   #endif
 
@@ -259,7 +262,7 @@ struct SeptaskSettingsView: View {
                 registryItemRow(item, expandDesktopInline: true)
               } header: {
                 if item.key == "agentsPaused" {
-                  Text("Agents")
+                  Text(RegistrySettings.pageById[RegistrySettings.PageID.agents]?.title ?? "")
                 }
               } footer: {
                 if item.key == "agentsPaused" {
@@ -311,6 +314,8 @@ struct SeptaskSettingsView: View {
       SeptaskClaudePairingSections()
     case RegistrySettings.PageID.aiPreferences:
       SeptaskAIPreferencesSections()
+    case RegistrySettings.PageID.agents:
+      SeptaskAgentsSections()
     default:
       registryPageSections(pageID, titleAsHeader: true)
     }
@@ -574,6 +579,8 @@ struct SeptaskSettingsView: View {
       guard TaskSyncEngine.shared.signedIn else { return "Sign in" }
       let paired = SeptaskSyncedSettings.current().getStartedSteps?.contains(TaskNoticeStep.ID.connectAI.rawValue) == true
       return paired ? "Connected" : "Set up"
+    case "agentsStatus":
+      return AgentRoster.shared.statusLine
     case "aiMode":
       return (AIMode(rawValue: aiModeRaw) ?? .auto).title
     case "calendarStatus":
@@ -655,6 +662,8 @@ struct SeptaskSettingsView: View {
       SeptaskPlusPane()
     case RegistrySettings.PageID.devicesAccess:
       SeptaskDevicesAccessPane()
+    case RegistrySettings.PageID.agents:
+      SeptaskAgentsPane()
     case RegistrySettings.PageID.appearance:
       Form {
         registryPageSections(pageID, titleAsHeader: false)

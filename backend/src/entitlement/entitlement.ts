@@ -116,6 +116,10 @@ export interface PlanLimits {
   /// New agent claims per UTC month; null = no cap (the per-task run budget
   /// of ADR 0008 still applies).
   agentRunsPerMonth: number | null;
+  /// Connected agents (MCP connections used in the last 30 days); null = no
+  /// cap. Log-only: a pairing past the limit logs `agent_limit_over` and
+  /// still works.
+  connectedAgents: number | null;
   createShares: boolean;
   linkedProjects: number | null;
 }
