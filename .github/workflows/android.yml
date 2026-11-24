@@ -19,8 +19,10 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: android-${{ github.ref }}
-  cancel-in-progress: true
+  # Every commit on main gets its own finished run (F4, #345); a branch or PR
+  # run is replaced by its next push.
+  group: android-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
