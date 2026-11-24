@@ -24,7 +24,7 @@ public enum CommunityAccess: Sendable, Equatable {
 /// share a token. The token is the App-Attest substitute on macOS: present it
 /// in `X-Septena-Session` and the Worker accepts the write.
 ///
-/// Same Keychain pattern as `GitHubProvider` / `OuraProvider`.
+/// Same Keychain pattern as `OuraProvider`.
 public enum CommunitySession {
   private static func account(forHost host: String) -> String {
     "septena.community.session.\(host)"

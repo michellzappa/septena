@@ -47,6 +47,8 @@
 	<string>Septena shows today's calendar events above your task list.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Septena shows today's calendar events above your task list.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Septena uses the camera to scan sign-in codes from your other devices.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Septena moves reminders from your Reminders lists into the Inbox and deletes them from Reminders.</string>
 	<key>NSRemindersUsageDescription</key>

@@ -7139,10 +7139,6 @@
         }
       }
     },
-    "Linked projects (GitHub, Linear)" : {
-      "comment" : "Generated from registry plans.outcomes.agents.rows.links.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual"
-    },
     "List" : {
       "comment" : "SeptaskKit localization pass 2026-08-09",
       "localizations" : {
