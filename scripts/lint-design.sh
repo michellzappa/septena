@@ -163,6 +163,22 @@ if [ -n "$registry_literals" ]; then
   printf '%s\n' "$OFF"
 fi
 
+# ── Shell copy outside the registry (ADR 0028, #284) ───────────────────────
+# A new user-facing label in a shell (Text, Button, Label, NSMenuItem title,
+# Compose Text, ...) is copy every other platform types again by hand. Put it
+# in the registry and read the generated value. Copy that predates the rule
+# lives in scripts/shell-copy-allowlist.json, which only shrinks.
+shell_copy=$(python3 scripts/lint-shell-copy.py)
+if [ -n "$shell_copy" ]; then
+  count=$(printf '%s\n' "$shell_copy" | wc -l | tr -d ' ')
+  printf '%s✗ %s%s  (%s)\n' "$RED" "shell-copy-literal" "$OFF" "$count"
+  errors=$((errors + 1))
+  printf '  %s\n' 'This label is hard-coded in a shell. Add it to registry/*.json and read the generated value, or allowlist it with a reason and issue.'
+  printf '%s' "$DIM"; printf '%s\n' "$shell_copy" | head -8 | sed 's/^/    /'
+  [ "$count" -gt 8 ] && printf '    … and %s more\n' "$((count - 8))"
+  printf '%s\n' "$OFF"
+fi
+
 # ── Space must never complete a task ────────────────────────────────────────
 # On macOS, Space activates the first button in a selected row — the checkbox —
 # so a bare Space silently completed the task the user was only looking at. It
