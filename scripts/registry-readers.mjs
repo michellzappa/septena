@@ -17,6 +17,19 @@
 // `Object.*`: Android implements a subset of the registry, so an ID catalog
 // (`RegistryActionIds.*`) is read member by member as features ship. A
 // wildcard entry fails once every member under it has a reader.
+//
+// Ships claims (ADR 0028, #285): for each feature that `registry/capabilities.json`
+// marks `ships` or `partial` on ios, ipados, macos (Swift) or android
+// (Kotlin), the platform's app sources must read at least one registry entry
+// that carries that `featureId` (actions, destinations, settings, surfaces,
+// plans). An entry counts as read when the sources name its ID as a string
+// (`"task.share"`), as a Swift case or member (`.weeklySweep`), or through a
+// read generated Kotlin constant whose value is the ID. An entry with its own
+// `platforms` (or `availability.platforms`) counts only on those platforms.
+// A feature with no entry for a platform is not checked: there is nothing to
+// read. Exceptions go in the allowlist's `ships` lane, keyed
+// `<platform>:<featureId>`; they shrink like the other lanes. `web` waits for
+// the web client (#21).
 
 import fs from "node:fs";
 import path from "node:path";
@@ -184,7 +197,70 @@ export function checkReaders(repo) {
       if (!e?.reason || !e?.issue) problems.push(`${lane}: registry/readers-allowlist.json entry ${id} needs "reason" and "issue"`);
     }
   }
+  problems.push(...checkShipsClaims(repo, allow.ships ?? {}));
   return { problems, unread };
+}
+
+const REGISTRIES_WITH_FEATURES = ["actions", "destinations", "settings", "surfaces", "plans"];
+const SWIFT_PLATFORMS = ["ios", "ipados", "macos"];
+
+/** featureId → [{ id, platforms }] for every registry entry that carries one. */
+function featureEntries(repo) {
+  const out = {};
+  const visit = (node, key) => {
+    if (Array.isArray(node)) return node.forEach((v) => visit(v));
+    if (!node || typeof node !== "object") return;
+    const id = node.id ?? node.key ?? key;
+    if (typeof node.featureId === "string" && typeof id === "string") {
+      const platforms = node.platforms ?? node.availability?.platforms ?? [];
+      (out[node.featureId] ??= []).push({ id, platforms });
+    }
+    for (const [k, v] of Object.entries(node)) visit(v, k);
+  };
+  for (const name of REGISTRIES_WITH_FEATURES) {
+    visit(JSON.parse(fs.readFileSync(path.join(repo, `registry/${name}.json`), "utf8")));
+  }
+  return out;
+}
+
+function checkShipsClaims(repo, allowed) {
+  const problems = [];
+  const capabilities = JSON.parse(fs.readFileSync(path.join(repo, "registry/capabilities.json"), "utf8")).capabilities;
+  const entries = featureEntries(repo);
+  // App sources only: a test that names an ID does not make the feature ship.
+  const swiftApp = readAll(["Septena", "Septask", "SeptenaCore", "ShareExtension"]
+    .flatMap((d) => walk(path.join(repo, d), [".swift"])));
+  const ktApp = readAll(walk(path.join(repo, "android"), [".kt"]).filter((f) => !f.includes(`${path.sep}test${path.sep}`)));
+  const ktGen = fs.readFileSync(path.join(repo, "android/core/src/main/kotlin/app/septena/core/generated/RegistryConstants.kt"), "utf8");
+  const ktConstants = {};
+  for (const m of ktGen.matchAll(/val (\w+)(?::[^=]+)? = "([^"]+)"/g)) (ktConstants[m[2]] ??= []).push(m[1]);
+  const quoted = (src, id) => src.includes(`"${id}"`);
+  const readers = {
+    swift: (id) => quoted(swiftApp, id) || (/^\w+$/.test(id) && new RegExp(`(?:\\bcase |\\.)${id}\\b`).test(swiftApp)),
+    kotlin: (id) => quoted(ktApp, id) || (ktConstants[id] ?? []).some((n) => new RegExp(`\\.${esc(n)}\\b`).test(ktApp)),
+  };
+  const seen = new Set();
+  for (const [featureId, claim] of Object.entries(capabilities)) {
+    for (const platform of [...SWIFT_PLATFORMS, "android"]) {
+      if (claim[platform] !== "ships" && claim[platform] !== "partial") continue;
+      const ids = (entries[featureId] ?? [])
+        .filter((e) => e.platforms.length === 0 || e.platforms.includes(platform))
+        .map((e) => e.id);
+      if (ids.length === 0) continue;
+      const key = `${platform}:${featureId}`;
+      seen.add(key);
+      const read = ids.some(platform === "android" ? readers.kotlin : readers.swift);
+      if (!read && !(key in allowed)) {
+        problems.push(`ships: ${featureId} is "${claim[platform]}" on ${platform}, but no ${platform} source reads any of its registry entries (${ids.slice(0, 5).join(", ")}${ids.length > 5 ? ", …" : ""}). Read one, change the claim in registry/capabilities.json, or allowlist ${key} with a reason and issue`);
+      }
+      if (read && key in allowed) problems.push(`ships: ${key} has a reader now; remove it from registry/readers-allowlist.json`);
+    }
+  }
+  for (const [key, e] of Object.entries(allowed)) {
+    if (!seen.has(key)) problems.push(`ships: registry/readers-allowlist.json lists ${key}, which is no longer a ships or partial claim with registry entries; remove it`);
+    if (!e?.reason || !e?.issue) problems.push(`ships: registry/readers-allowlist.json entry ${key} needs "reason" and "issue"`);
+  }
+  return problems;
 }
 
 // `node scripts/registry-readers.mjs` prints the unread members (for triage).

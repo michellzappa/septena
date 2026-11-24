@@ -1,5 +1,5 @@
 {
-  "description": "Generated registry members with no reader yet (scripts/registry-readers.mjs, run by gen-registries --check). Each entry names why and the issue that removes it. An entry that gains a reader fails the check, so this list only shrinks. The kotlin lane also accepts `Object.*` for a catalog that Android reads member by member as features ship.",
+  "description": "Generated registry members with no reader yet (scripts/registry-readers.mjs, run by gen-registries --check). Each entry names why and the issue that removes it. An entry that gains a reader fails the check, so this list only shrinks. The kotlin lane also accepts `Object.*` for a catalog that Android reads member by member as features ship. An optional `ships` lane, keyed `<platform>:<featureId>`, excuses a capabilities.json ships or partial claim whose registry entries no source on that platform reads (#285).",
   "swift": {
     "RegistryEntityEnums.taskStatus": {
       "reason": "Swift model enums (TaskStatus, ...) are hand-written; nothing compares them with the registry yet.",
