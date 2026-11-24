@@ -4,6 +4,7 @@ import android.app.Application
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import app.septena.android.auth.AppCredentials
 import app.septena.android.auth.SessionStore
+import app.septena.android.reminders.TaskReminderScheduler
 import app.septena.android.sync.SyncController
 import app.septena.core.ConversationMutator
 import app.septena.core.ConversationRules
@@ -25,6 +26,9 @@ import app.septena.transport.UrlConnectionSyncTransport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 class SeptenaAndroidApp : Application() {
     val graph: AndroidAppGraph by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
@@ -63,6 +67,19 @@ class AndroidAppGraph(application: Application) {
     val taskBackend = SeptenaTaskBackendClient(credentials, clientVersion)
     val attachments = TaskAttachmentStore(application, taskStore, registryEntityMutator, clock, taskBackend)
     val sync = SyncController(TaskSyncEngine(taskStore, transport, clock), appScope, afterSync = attachments::afterSync)
+    val reminders = TaskReminderScheduler(application, taskStore)
+
+    init {
+        // Timed reminders follow the store: every sync and every local write
+        // bumps dataVersion, and the alarms are armed again (#362). A burst of
+        // bumps runs one reconcile.
+        appScope.launch {
+            sync.dataVersion.collectLatest {
+                delay(150)
+                runCatching { reminders.reconcile() }
+            }
+        }
+    }
 
     /**
      * Wraps a user gesture's task write so undo captures only that local edit.

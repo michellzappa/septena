@@ -8,9 +8,9 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 48 | 49 | 49 | 0 | 29 | 0 | 1 |
+| ships | 48 | 49 | 49 | 0 | 30 | 0 | 1 |
 | partial | 1 | 1 | 1 | 0 | 3 | 0 | 3 |
-| planned | 0 | 0 | 0 | 46 | 16 | 49 | 1 |
+| planned | 0 | 0 | 0 | 46 | 15 | 49 | 1 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 48 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
@@ -39,7 +39,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `task.checklists` | Checklists inside a task | ships | ships | ships | planned | ships | planned | - |
 | `task.tags` | Tags | ships | ships | ships | planned | ships | planned | - |
 | `task.share` | Share a task (title and notes) through the system share sheet | ships | ships | ships | planned | ships | planned | - |
-| `task.alerts` | Timed reminders | ships | ships | ships | planned | planned | planned | - |
+| `task.alerts` | Timed reminders | ships | ships | ships | planned | ships | planned | - |
 | `fade.sweep` | Fade pass, Faded pile and weekly sweep | ships | ships | ships | planned | planned | planned | - |
 | `capture.quick-add` | Quick Add sheet | ships | ships | - | planned | planned | - | - |
 | `capture.share-target` | Share into Inbox | ships | ships | - | planned | ships | planned | - |

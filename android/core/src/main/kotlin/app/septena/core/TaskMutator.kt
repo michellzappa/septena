@@ -188,6 +188,48 @@ class TaskMutator(
         return updateFields(id, changes)
     }
 
+    /**
+     * Sets or clears the timed reminder, as Apple's `setReminder`: a new
+     * reminder starts with no snooze and no dismissal. [reminderAt] is wall
+     * clock `YYYY-MM-DDTHH:MM` for a floating reminder or a UTC instant for a
+     * fixed one.
+     */
+    suspend fun setReminder(id: String, reminderAt: String?, mode: String?): TaskRecord? = updateFields(
+        id,
+        linkedMapOf(
+            RegistryEntityFields.Task.REMINDER_AT to JsonValue.stringOrNull(reminderAt),
+            RegistryEntityFields.Task.REMINDER_MODE to JsonValue.stringOrNull(if (reminderAt == null) null else mode),
+            RegistryEntityFields.Task.REMINDER_SNOOZED_UNTIL to JsonValue.Null,
+            RegistryEntityFields.Task.REMINDER_DISMISSED_AT to JsonValue.Null,
+        ),
+    )
+
+    /** Moves the alert to [until] and clears a dismissal. A task with no reminder is left as is. */
+    suspend fun snoozeReminder(id: String, until: java.time.Instant): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.fields[RegistryEntityFields.Task.REMINDER_AT].stringValue() == null) return existing
+        return updateFields(
+            id,
+            linkedMapOf(
+                RegistryEntityFields.Task.REMINDER_SNOOZED_UNTIL to JsonValue.StringValue(WireTimestamp.format(until)),
+                RegistryEntityFields.Task.REMINDER_DISMISSED_AT to JsonValue.Null,
+            ),
+        )
+    }
+
+    /** Marks the alert as seen on every device and clears a snooze. A task with no reminder is left as is. */
+    suspend fun dismissReminder(id: String): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.fields[RegistryEntityFields.Task.REMINDER_AT].stringValue() == null) return existing
+        return updateFields(
+            id,
+            linkedMapOf(
+                RegistryEntityFields.Task.REMINDER_DISMISSED_AT to JsonValue.StringValue(WireTimestamp.format(clock.now())),
+                RegistryEntityFields.Task.REMINDER_SNOOZED_UNTIL to JsonValue.Null,
+            ),
+        )
+    }
+
     suspend fun setNotes(id: String, notes: String?): TaskRecord? = updateFields(
         id,
         mapOf(RegistryEntityFields.Task.NOTES to JsonValue.stringOrNull(notes)),
