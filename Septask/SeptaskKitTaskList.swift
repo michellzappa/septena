@@ -3766,6 +3766,12 @@ final class SeptaskKitTaskListController: NSViewController {
     // sits in the closed-row band, so the glyphs stay put as pills clip away.
     // Swapping to the task cell *before* the shrink would center the title
     // in the still-tall frame (a visible jump).
+    // Put the row and its neighbours in their CLOSED look before the shrink,
+    // the mirror of `beginComposing`, which applies the open look before it
+    // grows. Done at the end instead, the composing card style rode the whole
+    // shrink and then everything snapped at once (neighbours rejoining,
+    // corners squaring, selection wash back): the janky fold.
+    refreshCardGeometry()
     foldingComposerIDs.insert(taskId)
     animateComposerHeight(ofRow: row, animated: animated, reveal: false) { [weak self] in
       guard let self else { return }

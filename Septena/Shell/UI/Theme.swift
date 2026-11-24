@@ -480,6 +480,11 @@ enum Theme {
     /// soft enough to read as an expand rather than a snap. Symmetric on
     /// insert and dismiss.
     static let expand: Animation = .spring(response: 0.32, dampingFraction: 0.84)
+    /// Inline task editor: the other rows dimming and sliding when a row
+    /// opens or folds, and the folding card's height. One curve for both,
+    /// so the card and the rows below it move together.
+    static let inlineEditDuration: Double = 0.18
+    static let inlineEdit: Animation = .easeOut(duration: inlineEditDuration)
     /// Settle: a checked item fades out of the open list after lingering
     /// (see `SettleStore`). Gentle enough to read as "drifting away", not a
     /// snap. Paired with `.transition(.opacity)` on the open-list rows.
