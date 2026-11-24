@@ -27,6 +27,11 @@ sealed interface SyncState {
 class SyncController(
     private val engine: TaskSyncEngine,
     private val scope: CoroutineScope,
+    /**
+     * Work that needs the rows on the server first (attachment uploads). Runs after
+     * each successful sync; true asks for one more sync to pull what it changed.
+     */
+    private val afterSync: suspend () -> Boolean = { false },
 ) {
     private val running = AtomicBoolean(false)
     private val again = AtomicBoolean(false)
@@ -61,6 +66,8 @@ class SyncController(
         _state.value = SyncState.Syncing
         _state.value = try {
             engine.sync()
+            // A failed follow-up never marks the sync itself as failed: it retries next sync.
+            if (runCatching { afterSync() }.getOrDefault(false)) again.set(true)
             SyncState.Synced(Instant.now())
         } catch (error: SyncAuthenticationException) {
             SyncState.NeedsSignIn
