@@ -250,8 +250,8 @@ When unpins) and W8 (`todaySetOn` is stamped only on false → true). An agent
 date edit does not clear the agent cue; a human surface (REST, the watch)
 does. REST `untoday` is plain A3, so an arrived deadline goes too (Q2).
 `backend/test/conformance.test.ts` runs `task-dates.json` through the
-Worker's WASM. Left: iCal reads (no writes) and the recurrence spawn's date
-fields (`nextOccurrenceDates`).
+Worker's WASM. The recurrence spawn takes its date fields from
+`nextOccurrenceDates` (A10). Left: iCal reads use their own window rules.
 
 MCP tool changes in D4 land in both MCP servers and their skills in the same
 change (AGENTS.md, "Two MCP servers").

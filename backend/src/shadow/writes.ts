@@ -3,8 +3,7 @@ import type { Env } from "../env.js";
 import { randomId } from "../util.js";
 import { localServerTimestamp, todayYMD } from "../tz.js";
 import { checklistOccurrenceID, nextScheduledDate, occurrenceID } from "../recurrence.js";
-import { shiftReminderForRecurrence } from "../reminders.js";
-import { applyDateAction, normalizeTaskDates, taskViewMembership, type CoreDateAction, type CoreTask } from "../core/index.js";
+import { applyDateAction, nextOccurrenceDates, normalizeTaskDates, taskViewMembership, type CoreDateAction, type CoreTask } from "../core/index.js";
 import { storeFor } from "../api/session.js";
 import { MAX_TAGS_PER_TASK, TAG_NAME_MAX, zId } from "../store/columns.js";
 import { zPushBody, type Op, type OpResult } from "../store/ops.js";
@@ -733,35 +732,22 @@ async function completeTask(ctx: WriteContext, id: string) {
           title: str(src.title) ?? "",
           status: "open",
           created: today,
-          scheduled: next,
-          // A deadline belonged to the completed occurrence.
-          today: false,
           starred: src.starred === true,
           ...(Array.isArray(src.tags) && src.tags.length > 0 ? { tags: src.tags } : {}),
           ...recurrenceColumns({ unit, interval, afterCompletion, weekdays, monthDay, ordinalWeekday }),
           recurrenceSeriesID: str(src.recurrenceSeriesID) ?? id,
-          recurrenceAnchorDate: afterCompletion ? null : next,
           position,
           createdAt: now,
         };
-        for (const k of ["area", "project", "heading", "kind", "notes", "sourceClient", "startTime", "timeZone"] as const) {
+        for (const k of ["area", "project", "heading", "kind", "notes", "sourceClient", "source"] as const) {
           if (str(src[k])) fields[k] = src[k];
         }
-        if (typeof src.durationMinutes === "number") fields.durationMinutes = src.durationMinutes;
-        const shiftedReminder = shiftReminderForRecurrence({
-          sourceReminderAt: str(src.reminderAt),
-          sourceScheduled: str(src.recurrenceAnchorDate) ?? str(src.scheduled),
-          nextScheduled: next,
-        });
-        if (shiftedReminder) {
-          fields.reminderAt = shiftedReminder;
-          fields.reminderMode = str(src.reminderMode) ?? "floating";
-        }
-        if (str(src.source)) fields.source = src.source;
-        // Completing an agent-authored row is engagement with the series, so
-        // the next occurrence does not show a fresh "unseen" cue.
-        if (src.source === "mcp") fields.acknowledgedAt = now;
-        else if (str(src.acknowledgedAt)) fields.acknowledgedAt = src.acknowledgedAt;
+        // The next row's date fields are the core's (spec A10): the new day,
+        // no deadline, no pin, the same time slot, the reminder moved with
+        // the day, the slot of a fixed repeat, and an agent row arriving
+        // acknowledged (completing it was engagement with the series).
+        Object.assign(fields, nextOccurrenceDates(coreRow(src), next, now));
+        if (fields.reminderAt) fields.reminderMode = str(src.reminderMode) ?? "floating";
         if (onToday(fields, today)) fields.todayPosition = position;
         occurrenceOp = ops.length;
         ops.push({ op: "upsert", entity: "task", id: occId, fields });

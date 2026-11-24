@@ -197,3 +197,9 @@ export function applyDateAction(
 export function normalizeTaskDates(task: CoreTask, today: string): Record<string, unknown> {
   return callCore("normalizeTaskDates", { task, today });
 }
+
+/// A10: the date fields of the next occurrence of a repeating task, due on
+/// `nextScheduled`, as columns (every date field, nulls included).
+export function nextOccurrenceDates(task: CoreTask, nextScheduled: string, now: string): Record<string, unknown> {
+  return callCore("nextOccurrenceDates", { task, nextScheduled, now });
+}
