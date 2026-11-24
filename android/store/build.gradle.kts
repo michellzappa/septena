@@ -17,7 +17,7 @@ dependencies {
     testImplementation(libs.sqldelight.jvm.driver)
     testImplementation(libs.jna)
     testRuntimeOnly(
-        files(project(":core").layout.buildDirectory.file("core-natives/septena-core-jvm-natives.jar"))
+        files(rootProject.file("core/build/core-natives/septena-core-jvm-natives.jar"))
             .builtBy(":core:fetchCoreJvmNatives"),
     )
 }
