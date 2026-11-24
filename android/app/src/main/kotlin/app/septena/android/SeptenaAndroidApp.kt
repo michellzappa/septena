@@ -12,6 +12,7 @@ import app.septena.core.RegistryEntityMutator
 import app.septena.core.SyncedSettings
 import app.septena.core.SyncedSettingsMutator
 import app.septena.core.SystemDayClock
+import app.septena.core.TaskConversation
 import app.septena.core.TaskMutator
 import app.septena.core.TaskSyncEngine
 import app.septena.core.UuidTaskIdGenerator
@@ -62,7 +63,29 @@ class AndroidAppGraph(application: Application) {
     val access = SeptenaAccessClient(credentials, clientVersion)
     val taskBackend = SeptenaTaskBackendClient(credentials, clientVersion)
     val attachments = TaskAttachmentStore(application, taskStore, registryEntityMutator, clock, taskBackend)
-    val sync = SyncController(TaskSyncEngine(taskStore, transport, clock), appScope, afterSync = attachments::afterSync)
+    val sync = SyncController(TaskSyncEngine(taskStore, transport, clock), appScope, afterSync = ::afterSync)
+
+    /** The app day the fade pass last ran in this process. */
+    @Volatile private var lastFadePassDay: String? = null
+
+    /**
+     * After each sync: attachment uploads, then the daily fade pass once per
+     * app day (docs/TASK_FADE_SPEC.md §4, as iOS runFadePassIfDue). The pass
+     * runs after a pull, so it sees other devices' touches first. True asks
+     * for one more sync, which pushes what the pass or the uploads changed.
+     */
+    private suspend fun afterSync(): Boolean {
+        val uploads = attachments.afterSync()
+        val day = clock.today(clock.now()).toString()
+        if (lastFadePassDay == day) return uploads
+        lastFadePassDay = day
+        val conversations = taskStore.records(RegistryEntityNames.CONVO)
+            .filter { it.deletedAt == null }
+            .mapNotNull { r -> runCatching { r.id to TaskConversation.from(r, taskStore.turns(r.id)) }.getOrNull() }
+            .toMap()
+        val faded = taskMutator.runFadePass(conversations)
+        return uploads || faded > 0
+    }
 
     /**
      * Wraps a user gesture's task write so undo captures only that local edit.

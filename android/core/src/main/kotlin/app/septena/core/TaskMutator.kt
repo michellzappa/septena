@@ -407,6 +407,48 @@ class TaskMutator(
         )
     }
 
+    /**
+     * The daily fade pass (docs/TASK_FADE_SPEC.md §4), as iOS
+     * TasksBackend.runFadePass: stamps fadedAt on every open task the core's
+     * shouldFade says has gone untouched for the fade window. Never touches
+     * touchedAt. [conversations] maps a task id to its conversation, so agent
+     * work and waiting threads stay. Returns how many tasks faded.
+     */
+    suspend fun runFadePass(conversations: Map<String, TaskConversation>): Int {
+        val now = clock.now()
+        val today = clock.today(now).toString()
+        var faded = 0
+        for (record in store.records(RegistryEntityNames.TASK)) {
+            if (record.deletedAt != null) continue
+            val task = runCatching { TaskSnapshot.from(record) }.getOrNull() ?: continue
+            if (task.status != app.septena.core.generated.RegistryEntityEnums.TaskStatus.OPEN || task.fadedAt != null) continue
+            val convo = conversations[task.id]
+            val fades = runCatching {
+                TaskFadeRules.shouldFade(
+                    isOpen = true,
+                    isHeading = task.isHeading,
+                    isDeleted = false,
+                    isFaded = false,
+                    deadline = task.deadline,
+                    scheduled = task.scheduled,
+                    hasRecurrence = task.recurrenceUnit != null,
+                    isAgentTurn = convo?.isAgentTurn(now) == true,
+                    isAssignedToClaude = convo?.assignee == app.septena.core.generated.RegistryEntityEnums.ConvoAssignee.CLAUDE,
+                    touchedAt = task.touchedAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() },
+                    createdAt = task.createdAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() },
+                    created = task.created,
+                    now = now,
+                    today = today,
+                    isAwaitingHuman = convo?.awaitsHuman == true,
+                )
+            }.getOrDefault(false)
+            if (!fades) continue
+            updateFields(task.id, mapOf(RegistryEntityFields.Task.FADED_AT to JsonValue.StringValue(WireTimestamp.format(now))))
+            faded++
+        }
+        return faded
+    }
+
     suspend fun cancel(id: String): TaskRecord? = updateFields(
         id,
         linkedMapOf(
