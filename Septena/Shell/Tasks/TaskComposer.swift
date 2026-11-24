@@ -441,16 +441,15 @@ struct TaskComposerCard: View {
   }
 
   /// The standard adaptive edit drawer: a grouped sheet on iPhone, a docked
-  /// inspector on iPad/macOS, Cancel/Save chrome owned by the scaffold.
+  /// inspector on iPad/macOS, Close/Save chrome owned by the scaffold.
   private var drawerBody: some View {
     AdaptiveEditScaffold(
       title: headerTitle,
-      // Standard two-control chrome: an explicit commit (Add / Save) and a real
-      // Cancel. Cancel discards — but only through a confirmation when the form
-      // is dirty, and the scaffold blocks swipe-to-dismiss while dirty, so the
-      // ONLY way to lose a task is an explicit Cancel → Discard.
+      // Standard two-control chrome: an explicit commit (Add / Save) and a
+      // close (x). Close discards, but only through a confirmation when the
+      // form is dirty, and the scaffold blocks swipe-to-dismiss while dirty, so
+      // the ONLY way to lose a task is an explicit Close → Discard.
       saveTitle: saveTitle,
-      cancelTitle: "Cancel",
       showsSave: true,
       accent: accent,
       canSave: canSave,
