@@ -20,5 +20,3 @@ ffi = ["dep:uniffi"]
 serde = { version = "1", default-features = false, features = ["std", "derive"] }
 serde_json = { version = "1", default-features = false, features = ["std"] }
 uniffi = { version = "0.29", default-features = false, optional = true }
-# NFC for the iCloud path of a `file:` reference (docs/TASK_REFERENCES_SPEC.md §3).
-unicode-normalization = "0.1"

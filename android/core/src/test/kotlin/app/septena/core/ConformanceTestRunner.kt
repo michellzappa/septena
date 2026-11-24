@@ -1,5 +1,6 @@
 package app.septena.core
 
+import app.septena.sharedcore.CoreException
 import app.septena.sharedcore.runConformance
 import java.io.File
 
@@ -24,7 +25,15 @@ object ConformanceTestRunner {
         val failures = File("../../registry/conformance").listFiles { f -> f.extension == "json" }!!
             .sortedBy { it.name }
             .flatMap { file ->
-                val report = runConformance(file.nameWithoutExtension, file.readText())
+                // A fixture lands before the release that runs it
+                // (core/release/README.md); core.yml runs it in every artifact.
+                val report = try {
+                    runConformance(file.nameWithoutExtension, file.readText())
+                } catch (e: CoreException.InvalidInput) {
+                    if (!e.reason.startsWith("The core has no runner for")) throw e
+                    println("core ${file.nameWithoutExtension}: the pinned core is older than this fixture, skipped")
+                    return@flatMap emptyList()
+                }
                 println("core ${report.fixture}: ${report.cases} cases, ${report.failures.size} failed")
                 report.failures
             }

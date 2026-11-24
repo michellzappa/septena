@@ -7,10 +7,10 @@
 //! key is user content (§10).
 
 use serde::{Deserialize, Serialize};
-use unicode_normalization::UnicodeNormalization;
 
 use crate::date::Day;
 use crate::error::CoreError;
+use crate::nfc::nfc;
 use crate::recurrence::fnv1a64;
 use crate::registry::limits;
 
@@ -466,7 +466,7 @@ fn file_key_ref(id: &str) -> Result<ParsedRef, CoreError> {
     match id.split_once('/').ok_or_else(bad)? {
         ("attachment", row) if valid_row_id(row) => build(FILE, id.to_string(), id, None),
         ("icloud", path) => {
-            let path: String = path.trim_matches('/').nfc().collect();
+            let path = nfc(path.trim_matches('/'));
             // A path that leaves the user's iCloud Drive is not a reference.
             if path
                 .split('/')

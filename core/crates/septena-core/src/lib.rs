@@ -20,6 +20,8 @@ mod date;
 mod error;
 mod fade;
 mod json;
+mod nfc;
+mod nfc_table;
 mod recurrence;
 mod refs;
 mod reminders;
