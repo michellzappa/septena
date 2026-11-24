@@ -31,8 +31,10 @@ import { parseScreenshots } from "./metadata.mjs";
 // of phones (docs/APPSTORE-SEPTASK.md).
 const VISUAL = {
   // A photo panel (experiment 2026-11-23): the title over a dark top band,
-  // the photo filling the rest. art/: committed images, no screen capture.
-  photo:          { photo: { src: "art/photo-today.png" }, background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" }, leadSize: 124, splitTitle: true },
+  // the photo filling the rest. `screen` replaces the generated phone screen
+  // in art/photo-today.png with the real Persimmon Today scene via
+  // tools/3d-studio/replace_photo_screen.py.
+  photo:          { photo: { src: "art/photo-today.png", screen: { src: "today/0", appearance: "light", accent: "persimmon" } }, background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" }, leadSize: 124, splitTitle: true },
   // Slide 2: a task arrives from your agent. A message card (your words, the
   // agent's reply by its face) above the phone; the new task, an agent
   // proposal in the Inbox, has a ring. Message text stays here: it is panel
@@ -50,7 +52,7 @@ const VISUAL = {
   // The render at the panel's full width, from the top; under it, on the
   // dark fill, the four devices by symbol and name (mz, 2026-11-24).
   devices:        {
-    photo: { src: "art/photo-devices.png", fit: "width", offsetY: 90, bottomFade: 460, shade: 0.55, fade: 700 },
+    photo: { src: "art/photo-devices.png", rendered: true, fit: "width", offsetY: 90, bottomFade: 460, shade: 0.55, fade: 700 },
     background: { style: "solid", tint: "#0B0B0C", fill: "#0B0B0C" },
     badges: [
       { icon: "smartphone", label: "iPhone" }, { icon: "tablet", label: "iPad" },

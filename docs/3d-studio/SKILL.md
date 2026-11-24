@@ -7,6 +7,8 @@ description: Render repeatable, pixel-accurate 3D Apple device marketing scenes 
 
 Use this repo-local skill when creating or iterating on 3D device hero renders (MacBook Pro 14", iPad Mini, iPhone 17 Pro Max / Air, Apple Watch) for Septena marketing, App Store panels, or launch visuals.
 
+For a screenshot on a device in a photo, use `docs/photo-composite/SKILL.md`.
+
 All scripts live in `tools/3d-studio/`:
 - `tools/3d-studio/render.py` — headless Cycles/Metal studio builder & renderer
 - `tools/3d-studio/fetch_models.py` — reproducible fetcher for the pinned free Royalty-Free BlenderKit `.blend` models

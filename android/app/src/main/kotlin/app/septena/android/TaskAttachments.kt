@@ -170,12 +170,12 @@ class TaskAttachmentStore(
         return landed
     }
 
-    /** Deletes every attachment file on this device (account deletion). */
-    fun wipeLocalFiles() {
+    /** Deletes every attachment file on this device (account deletion); false when a file stays. */
+    fun wipeLocalFiles(): Boolean {
         uploaded.clear()
         refused.clear()
-        root.deleteRecursively()
-        incoming.deleteRecursively()
+        val filesGone = root.deleteRecursively()
+        return incoming.deleteRecursively() && filesGone
     }
 
     private fun localFile(record: SyncRecord): File {

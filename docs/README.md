@@ -100,6 +100,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [INLINE_CAPTURE_PARSING_SPEC.md](INLINE_CAPTURE_PARSING_SPEC.md) | proposal (#133) |
 | [EMAIL_TO_TASK_SPEC.md](EMAIL_TO_TASK_SPEC.md) | proposal (#134) |
 | [NATIVE_PROJECT_SHARING_SPEC.md](NATIVE_PROJECT_SHARING_SPEC.md) | superseded by PROJECT_SHARING_SPEC |
+| [COMPANION_DEVICES_SPEC.md](COMPANION_DEVICES_SPEC.md) | proposal (ADR 0034, ADR 0035): needs-you feed, limited session, live nudge, voice for the watch and the desk orb |
 | [WEB_CLIENT_SPEC.md](WEB_CLIENT_SPEC.md) | proposal (#21); WB2 uses the Rust core's WASM (ADR 0025) |
 | [CLOUDFLARE_ACCOUNT_MOVE.md](CLOUDFLARE_ACCOUNT_MOVE.md) | accepted; ADR 0018 |
 | [ANDROID_CLIENT_SPEC.md](ANDROID_CLIENT_SPEC.md) | accepted (#20); shared Kotlin core for Windows; rules move to the Rust core in C1 (ADR 0025) |
@@ -116,6 +117,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [RECENTLY_DELETED_SPEC.md](RECENTLY_DELETED_SPEC.md), [TASK_LIST_OBSERVATION_PLAN.md](TASK_LIST_OBSERVATION_PLAN.md) | proposal |
 | [SEPTASK_APPKIT_PARITY.md](SEPTASK_APPKIT_PARITY.md), [SEPTASK_APPKIT_SURFACES.md](SEPTASK_APPKIT_SURFACES.md), [SEPTASK_APPKIT_LOCALIZATION_HANDOFF.md](SEPTASK_APPKIT_LOCALIZATION_HANDOFF.md) | AppKit shell notes |
 | [APPSTORE-SEPTASK.md](APPSTORE-SEPTASK.md), [RELEASING-MAC.md](RELEASING-MAC.md) | current |
+| [photo-composite/SKILL.md](photo-composite/SKILL.md), [photo-studio/SKILL.md](photo-studio/SKILL.md), [3d-studio/SKILL.md](3d-studio/SKILL.md) | current: marketing image skills |
 | [NATIVE_SCENES_SPEC.md](NATIVE_SCENES_SPEC.md) | superseded (ADR 0022 rejected): website scenes draw from the registries |
 | [PLATFORM_CHROME.md](PLATFORM_CHROME.md) | draft spec: what each OS draws on a marketing screen (iOS 27, iPadOS 27, macOS 27, Android 17, Windows 11) |
 

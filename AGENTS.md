@@ -312,8 +312,8 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
 - Septask runs `RuntimeProfile.tasksOnly` (task/area/project mutators only,
   no provider stores) but still mirrors the WHOLE zone locally — CKSyncEngine
   fetches per-zone; non-task records are applied and invisible.
-- The Septask icon is generated, not drawn — regeneration recipe and the
-  raw-pixel-coordinate trap are in `docs/SEPTASK.md` ("Icon Notes").
+- The Septask icon is generated, not drawn: recipe in `docs/SEPTASK.md`
+  ("Icon Notes").
 
 ## Known traps (from prior sessions)
 
@@ -535,10 +535,13 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   `appstore/devices.mjs`. `appstore/capture.sh <device>` shoots raw screens
   (iPhone/iPad via `SeptenaUITests`, Mac via `SeptenaMacUITests`), `npm run all`
   renders + validates, and the website's `/about/brand#app-store` is the review
-  page (no viewer in this repo), `fastlane deliver` uploads.
+  page (no viewer in this repo), and `appstore/upload.sh` uploads through
+  fastlane deliver. It is outward-facing: run it only when mz asks; never a
+  binary, never a review submission (docs/APPSTORE-SEPTASK.md "Uploading").
   Mac is a separate ASC app (own deliver run). See `docs/APPSTORE.md`.
   For generated Photo Studio lifestyle images and device variants, use
-  `docs/photo-studio/SKILL.md`.
+  `docs/photo-studio/SKILL.md`. A device screen in a photo is always a composed
+  PNG, never a generated screen: `docs/photo-composite/SKILL.md`.
 
 ## Conventions
 

@@ -30,6 +30,11 @@ const onlyDevice = arg("device", null);
 const onlyPanel = arg("only", null);
 
 const firstExisting = (paths) => paths.find((p) => existsSync(p));
+const blenderBin = process.env.BLENDER || firstExisting([
+  "/opt/homebrew/bin/blender",
+  "/Applications/Blender.app/Contents/MacOS/Blender",
+]) || "blender";
+const photoScreenScript = join(ROOT, "../tools/3d-studio/replace_photo_screen.py");
 const fontDataUrl = (file) => `url(data:font/otf;base64,${readFileSync(file).toString("base64")}) format("opentype")`;
 const newYorkRegular = firstExisting([
   "/Library/Fonts/NewYorkLarge-Semibold.otf",
@@ -260,7 +265,16 @@ for (const device of activeDevices()) {
           img: (() => {
             const file = join(ROOT, panel.photo.src);
             if (!existsSync(file)) throw new Error(`${device.key}/${panel.id}: photo ${panel.photo.src} is missing`);
-            return `data:image/png;base64,${readFileSync(file).toString("base64")}`;
+            // A photo never shows a generated screen (docs/photo-composite/SKILL.md):
+            // it names the scene that goes on the device, or declares that its
+            // screens were rendered from PNGs (3D Studio).
+            if (!panel.photo.screen && !panel.photo.rendered) throw new Error(`${device.key}/${panel.id}: photo ${panel.photo.src} needs a "screen" scene, or "rendered: true" for a 3D Studio render`);
+            if (!panel.photo.screen) return `data:image/png;base64,${readFileSync(file).toString("base64")}`;
+            const { png: screenFile } = shotPaths(device, panel.photo.screen.src, panel.photo.screen.appearance ?? appearance, panel.photo.screen.accent ?? null, panel.photo.screen.layout ?? null);
+            if (!existsSync(screenFile)) throw new Error(`${device.key}/${panel.id}: photo screen ${panel.photo.screen.src} is missing (${screenFile}; run node export-scenes.mjs)`);
+            const composited = join(buildDir, `${i}_${panel.id}_photo.png`);
+            execFileSync(blenderBin, ["-b", "--python-exit-code", "1", "--python", photoScreenScript, "--", "--photo", file, "--ios", screenFile, "--out", composited], { stdio: "pipe" });
+            return `data:image/png;base64,${readFileSync(composited).toString("base64")}`;
           })(),
           // The photo's aspect (height / width) from the PNG header, so a
           // width-fitted photo knows where its bottom edge falls.

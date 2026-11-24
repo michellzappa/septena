@@ -7,3 +7,4 @@ screens/
 *.gltf
 *.png
 *.jpg
+__pycache__/

@@ -72,6 +72,8 @@ private data class FirstRunStep(
     val primary: FirstRunButton?,
     val secondary: FirstRunButton?,
     val tertiary: FirstRunButton?,
+    /** Replaces [secondary] once the step's work is done (Claude is paired). */
+    val afterDone: FirstRunButton?,
 )
 
 /**
@@ -119,6 +121,7 @@ private fun firstRunSteps(languageTag: String): List<FirstRunStep> {
             primary = button(f["primary"]),
             secondary = button(f["secondary"]),
             tertiary = button(f["tertiary"]),
+            afterDone = button(f["afterDone"]),
         )
     }
 }
@@ -160,6 +163,10 @@ fun FirstRunScreen(graph: AndroidAppGraph) {
     /** Sign-in found an account that already finished its first run. */
     var returning by rememberSaveable { mutableStateOf(false) }
     var checkingAccount by remember { mutableStateOf(false) }
+    /** Steps whose work is done: they show `afterDone`. */
+    val doneSteps = remember { mutableStateListOf<String>() }
+    /** The copy action that ran last on this step; its button reads "Copied", as on iOS. */
+    var copiedAction by remember(currentId) { mutableStateOf<String?>(null) }
     val step = steps.firstOrNull { it.id == currentId } ?: return
 
     val backTitle = RegistryCatalog.surface(RegistryTaskDetail.ID)
@@ -183,8 +190,14 @@ fun FirstRunScreen(graph: AndroidAppGraph) {
         when (action) {
             "next" -> advance()
             "finish" -> finish()
-            "copySetupPrompt" -> copyToClipboard(context, step.title, firstRunPrompt("setup", languageTag))
-            "copyFirstPrompt" -> copyToClipboard(context, step.title, firstRunPrompt("first", languageTag))
+            "copySetupPrompt" -> {
+                copyToClipboard(context, step.title, firstRunPrompt("setup", languageTag))
+                copiedAction = action
+            }
+            "copyFirstPrompt" -> {
+                copyToClipboard(context, step.title, firstRunPrompt("first", languageTag))
+                copiedAction = action
+            }
         }
     }
 
@@ -207,6 +220,8 @@ fun FirstRunScreen(graph: AndroidAppGraph) {
 
     // Back skips a step that no longer applies: the account step once signed in would only advance again.
     fun previousIndex(): Int = history.indexOfLast { id -> steps.firstOrNull { it.id == id }?.applies(signedIn) == true }
+    val copiedTitle = settingsCopy(CLAUDE_CONNECTOR, "copied", languageTag)
+    fun buttonTitle(button: FirstRunButton): String = if (button.action == copiedAction) copiedTitle else button.title
     val canGoBack = step.kind != "finish" && previousIndex() >= 0
     fun goBack() {
         val index = previousIndex()
@@ -256,9 +271,18 @@ fun FirstRunScreen(graph: AndroidAppGraph) {
                     textAlign = TextAlign.Center,
                 )
             }
-            StepContent(step, graph, languageTag, checkingAccount, ::perform)
+            StepContent(
+                step = step,
+                graph = graph,
+                languageTag = languageTag,
+                signedIn = signedIn,
+                checkingAccount = checkingAccount,
+                buttonTitle = ::buttonTitle,
+                perform = ::perform,
+                onDone = { if (step.id !in doneSteps) doneSteps.add(step.id) },
+            )
         }
-        StepButtons(step, checkingAccount, ::perform)
+        StepButtons(step, done = step.id in doneSteps, checkingAccount, ::buttonTitle, ::perform)
     }
 }
 
@@ -267,8 +291,11 @@ private fun StepContent(
     step: FirstRunStep,
     graph: AndroidAppGraph,
     languageTag: String,
+    signedIn: Boolean,
     checkingAccount: Boolean,
+    buttonTitle: (FirstRunButton) -> String,
     perform: (String) -> Unit,
+    onDone: () -> Unit,
 ) {
     when (step.kind) {
         "intro" -> Column(
@@ -291,9 +318,8 @@ private fun StepContent(
                 startTitle = step.primary?.title ?: deviceSignInCopy("start", languageTag),
             )
         }
-        // Pairing Claude by code (iOS `SeptaskPairingCodeField`) is not on Android yet; the registry skips
-        // this step on Android while `agents.connector` is planned there. When pairing ships (#365), its
-        // code field goes below the instructions.
+        // The code field is the one on Settings ▸ Connect Claude. Its approval dialog ticks the Get started
+        // step itself (`completeConnectAgentStep`), so this step only marks itself done.
         "connectAgent" -> Column(
             modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -305,14 +331,21 @@ private fun StepContent(
                 }
             }
             step.tertiary?.takeIf { it.action in SUPPORTED_ACTIONS }?.let { tertiary ->
-                OutlinedButton(onClick = { perform(tertiary.action) }) { Text(tertiary.title) }
+                OutlinedButton(onClick = { perform(tertiary.action) }) { Text(buttonTitle(tertiary)) }
             }
+            PairingCodeField(graph, signedIn, languageTag, onApproved = onDone)
         }
     }
 }
 
 @Composable
-private fun StepButtons(step: FirstRunStep, checkingAccount: Boolean, perform: (String) -> Unit) {
+private fun StepButtons(
+    step: FirstRunStep,
+    done: Boolean,
+    checkingAccount: Boolean,
+    buttonTitle: (FirstRunButton) -> String,
+    perform: (String) -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -324,10 +357,11 @@ private fun StepButtons(step: FirstRunStep, checkingAccount: Boolean, perform: (
                 Button(
                     onClick = { perform(primary.action) },
                     modifier = Modifier.widthIn(max = 400.dp).fillMaxWidth(),
-                ) { Text(primary.title) }
+                ) { Text(buttonTitle(primary)) }
             }
         }
-        step.secondary?.takeIf { it.action in SUPPORTED_ACTIONS }?.let { secondary ->
+        val secondaryButton = if (done) step.afterDone ?: step.secondary else step.secondary
+        secondaryButton?.takeIf { it.action in SUPPORTED_ACTIONS }?.let { secondary ->
             TextButton(onClick = { perform(secondary.action) }, enabled = !checkingAccount) { Text(secondary.title) }
         }
         step.footnote?.let {

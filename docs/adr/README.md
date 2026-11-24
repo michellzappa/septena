@@ -38,6 +38,8 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0031](0031-references-are-keyed-pointers.md) | A task reference is a keyed pointer, separate from a link | accepted |
 | [0032](0032-github-issues-are-followed-not-mirrored.md) | Follow GitHub issues, do not mirror them | superseded by 0033 |
 | [0033](0033-no-github-integration-issue-links-are-references.md) | Drop the GitHub integration; issue links are references | accepted |
+| [0034](0034-companion-devices-get-a-limited-session.md) | Give companion devices a limited session and a small verb set | proposed |
+| [0035](0035-companion-voice-is-push-to-talk-and-confirmed.md) | Make companion voice push-to-talk, unstored and confirmed | proposed |
 
 ## Template
 

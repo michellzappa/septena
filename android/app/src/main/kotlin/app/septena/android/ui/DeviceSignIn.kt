@@ -28,7 +28,10 @@ import app.septena.core.stringValue
 import app.septena.transport.DeviceCode
 import app.septena.transport.DevicePollResult
 import app.septena.transport.SignInQr
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 private sealed interface SignInStep {
     data object Start : SignInStep
@@ -82,8 +85,16 @@ internal fun DeviceSignInPanel(
                         DevicePollResult.Pending -> Unit
                         DevicePollResult.Expired -> break
                         is DevicePollResult.Approved -> {
-                            graph.credentials.adopt(result.tokens)
-                            graph.sync.requestSync()
+                            runCatching {
+                                withContext(Dispatchers.IO) {
+                                    graph.credentials.adopt(result.tokens)
+                                    // In here: signing in removes this panel, which cancels what follows.
+                                    graph.sync.requestSync()
+                                }
+                            }.onFailure {
+                                if (it is CancellationException) throw it
+                                step = SignInStep.Failed(it.message ?: unreachable)
+                            }
                             return@LaunchedEffect
                         }
                     }

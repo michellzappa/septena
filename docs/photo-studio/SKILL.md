@@ -12,7 +12,7 @@ Use this repo-local skill when creating Septena marketing images that show the t
 - Read `docs/APPSTORE-SEPTASK.md` for the current task-app story and panel copy, `appstore/panels.septask.mjs` for panel direction, and `registry/tokens.json` for the current accent. The current Persimmon light accent is `#E05212`.
 - Use a current Septena task-app screen as the display reference. Do not reuse the older all-in-one life-tracking screen. Check the active checkout for the scene or capture path before assuming where the current screen lives.
 - Use synthetic example content only. Do not include real names, personal tasks, or private user data.
-- Generated device screens are visual concepts: image generation can redraw small UI text. For release-ready screenshots, use the native app capture and the App Store rendering workflow.
+- Generated device screens are visual concepts: image generation can redraw small UI text. A generated screen never ships: the screen of a photo is always a composed PNG (`docs/photo-composite/SKILL.md`).
 
 ## User's established visual direction
 

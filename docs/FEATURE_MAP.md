@@ -8,8 +8,8 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 53 | 54 | 54 | 0 | 40 | 0 | 1 |
-| partial | 1 | 1 | 1 | 0 | 4 | 0 | 3 |
+| ships | 53 | 54 | 54 | 0 | 41 | 0 | 1 |
+| partial | 1 | 1 | 1 | 0 | 3 | 0 | 3 |
 | planned | 0 | 0 | 0 | 51 | 9 | 54 | 1 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 53 |
 
@@ -58,7 +58,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `ai.discuss` | Discuss: conversation on one task | ships | ships | ships | planned | partial | planned | - |
 | `ai.reach-dial` | Where AI runs | ships | ships | ships | planned | ships | planned | - |
 | `agents.connector` | Official MCP connector at api.septena.app/mcp | ships | ships | ships | planned | ships | planned | - |
-| `onboarding.first-run` | First run: welcome, account, move in, connect Claude | ships | ships | ships | planned | partial | planned | - |
+| `onboarding.first-run` | First run: welcome, account, move in, connect Claude | ships | ships | ships | planned | ships | planned | - |
 | `agents.stop-pause` | Stop one task, pause all agents | ships | ships | ships | planned | ships | planned | - |
 | `sync.backend` | Sync through api.septena.app | ships | ships | ships | planned | ships | planned | planned |
 | `account.delete` | Delete account | ships | ships | ships | planned | ships | planned | - |
