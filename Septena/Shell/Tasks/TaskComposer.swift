@@ -214,6 +214,14 @@ struct TaskComposerCard: View {
     self.showsTodayIndicator = showsTodayIndicator
     self.onDone = onDone
     self.onVanish = onVanish
+    if case .edit(let task) = mode {
+      // Seed the initial draft synchronously before the first render pass so
+      // inline editing never flashes an empty 1-line title before `.onAppear`
+      // populates it (which caused a 2-frame vertical jump on open).
+      let initial = TaskDraft(task: task)
+      _draft = State(initialValue: initial)
+      _seededDraft = State(initialValue: initial)
+    }
     #if os(iOS)
     // Seed the iPhone sheet height before first presentation so editing opens
     // directly at half height instead of flashing full then snapping down.
@@ -593,7 +601,42 @@ struct TaskComposerCard: View {
     }
   }
 
+  @ViewBuilder
   private var titleField: some View {
+    #if os(iOS)
+    if presentation == .inline {
+      // Non-scrolling UIKit text view with zero `textContainerInset` and zero
+      // `lineFragmentPadding` using the exact Dynamic Type `.body` font.
+      // SwiftUI's `TextField(..., axis: .vertical)` wraps an opaque scrolling
+      // `UITextView` that adds internal vertical insets and shifts its
+      // `contentOffset` up then down as first responder settles — replacing it
+      // here keeps the closed `Text` and open editor on the exact same line.
+      InlineTitleTextView(
+        text: $draft.title,
+        isFocused: Binding(
+          get: { focus == .title },
+          set: { focused in
+            if focused { focus = .title }
+            else if focus == .title { focus = nil }
+          }
+        ),
+        onSubmit: {
+          if canSave { commit() } else if isCreating { close() }
+        },
+        onDone: { saveAndCloseFromKeyboard() },
+        onTab: { forward in moveFocus(from: .title, forward: forward) },
+        onEscape: { saveAndCloseFromKeyboard() }
+      )
+      .frame(minHeight: Theme.checkboxTap, alignment: .center)
+    } else {
+      swiftUITitleField
+    }
+    #else
+    swiftUITitleField
+    #endif
+  }
+
+  private var swiftUITitleField: some View {
     // ONE field identity, one lineLimit. A ClosedRange (`1...2`) reserves two
     // lines even when empty, and flipping `1...1` ↔ `1...2` from wrap-detection
     // rebuilt the focused field mid-keystroke — SwiftUI then drops the caret
@@ -608,18 +651,13 @@ struct TaskComposerCard: View {
       // same place: `.fixedSize` gives the field the same tight vertical box a
       // `Text` has, and the shared band (`Theme.checkboxTap`, centered) makes the
       // closed `Text` and this `TextField` occupy an identical box on the same
-      // checkbox line. This is the closest reliable match (a plain `TextField`
-      // still differs from `Text` sub-pixel; baseline alignment was worse because
-      // SwiftUI mis-reports a vertical-axis field's baseline). Inline only.
+      // checkbox line. Inline only.
       .fixedSize(horizontal: false, vertical: true)
       .frame(minHeight: presentation == .inline ? Theme.checkboxTap : 0,
              alignment: .center)
-      // Edit mode renders the title a few points HIGHER than the closed row's
-      // `Text` — the UITextView text-container inset. Since open/close is now
-      // instant (no animation to smear it), a fixed downward shift plants the
-      // editing glyphs back on the closed-row line. Visual-only. Tune the one
-      // constant until it sits still. Inline only.
-      .offset(y: presentation == .inline ? Self.editModeTitleDrop : 0)
+      #if os(macOS)
+      .focusEffectDisabled(presentation == .inline)
+      #endif
       .focused($focus, equals: .title)
       // macOS: a vertical-axis field fires onSubmit on plain Return (the iOS
       // newline-as-save trick never triggers there) — commit here instead.
@@ -635,19 +673,6 @@ struct TaskComposerCard: View {
       // handler sees it. `saveAndCloseFromKeyboard` is idempotent, so the overlap
       // with the container binding is harmless.
       .septenaOnEscape(saveAndCloseFromKeyboard)
-  }
-
-  /// How far to drop the inline edit-mode title so its glyphs land on the closed
-  /// row's text line (counters the UITextView text-container inset). The single
-  /// tuning knob for the view↔edit jump — raise if the title still sits high in
-  /// edit mode, lower if it now sits low. Points, positive = down. iOS only for
-  /// now (macOS's field editor has a different inset and hasn't shown the jump).
-  private static var editModeTitleDrop: CGFloat {
-    #if os(iOS)
-    return 1
-    #else
-    return 0
-    #endif
   }
 
   /// Notes — a multi-line field sitting directly under the title (Things-style),
@@ -1000,13 +1025,14 @@ struct TaskComposerCard: View {
       // field joins the responder chain, so the keyboard wouldn't come up.
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focusTitle() }
     case .edit(let task):
-      draft = TaskDraft(task: task)
+      let initial = TaskDraft(task: task)
+      if draft != initial { draft = initial }
       // Snapshot the seeded draft as the dirty baseline — the SAME approach as
       // create mode. Comparing the whole struct against its own seed is immune to
       // the per-field normalization subtleties of `differs(from:)` (computed
       // `storedScheduled`/`pinToday`, trimmed-vs-raw title) that were leaving an
       // untouched peek reading "dirty" and wrongly prompting "Discard changes?".
-      seededDraft = draft
+      seededDraft = initial
       // Note: opening the editor must NOT acknowledge. The agent cue == triage-
       // band membership for agent rows, so acknowledging here would silently
       // ratify an unclassified proposal the moment you peek at it — it would
@@ -1041,11 +1067,22 @@ struct TaskComposerCard: View {
       // Return, type at once" focus.
       #if os(macOS)
       if useInspector || presentation == .inline {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focusTitle() }
+        if presentation == .inline {
+          // Inline opens instantly with no sheet animation to wait for.
+          DispatchQueue.main.async { focusTitle() }
+        } else {
+          DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focusTitle() }
+        }
       }
       #else
       if deferredCreate {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focusTitle() }
+        if presentation == .inline {
+          // Inline opens instantly — focus on the next runloop turn rather
+          // than letting the row sit unfocused for 0.4s and then settle.
+          DispatchQueue.main.async { focusTitle() }
+        } else {
+          DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focusTitle() }
+        }
       }
       #endif
     }
@@ -1216,9 +1253,9 @@ struct TaskComposerCard: View {
   }
 
   /// Advance / retreat the keyboard cursor, wrapping at the ends.
-  private func moveFocus(forward: Bool) {
+  private func moveFocus(from origin: TaskEditFocus? = nil, forward: Bool) {
     let order = focusOrder
-    guard let current = focus, let i = order.firstIndex(of: current) else {
+    guard let current = origin ?? focus, let i = order.firstIndex(of: current) else {
       focus = order.first
       return
     }
@@ -1253,3 +1290,220 @@ extension View {
     adaptiveDetail(isPresented: isPresented) { card() }
   }
 }
+
+#if os(iOS)
+// MARK: - Inline iOS title editor
+
+/// Non-scrolling `UITextView` subclass for the inline task title.
+///
+/// SwiftUI's `TextField(..., axis: .vertical)` backs itself with a scrollable
+/// `UITextView` whose internal text-container insets and first-responder
+/// scroll-to-caret pass visibly shift the title up then down when editing
+/// begins. Pinning `isScrollEnabled = false`, `textContainerInset = .zero`,
+/// `lineFragmentPadding = 0`, and locking `contentOffset` to `.zero` keeps the
+/// editing glyphs on the exact same line as `CheckableRow`'s static `Text`.
+private final class InlineTitleUITextView: UITextView {
+  var onTab: ((Bool) -> Void)?
+  var onEscape: (() -> Void)?
+
+  override var contentOffset: CGPoint {
+    get { .zero }
+    set { super.contentOffset = .zero }
+  }
+
+  override func setContentOffset(_ contentOffset: CGPoint, animated: Bool) {
+    super.setContentOffset(.zero, animated: false)
+  }
+
+  override var keyCommands: [UIKeyCommand]? {
+    var commands = super.keyCommands ?? []
+    let tab = UIKeyCommand(input: "\t", modifierFlags: [], action: #selector(handleTabForward))
+    tab.wantsPriorityOverSystemBehavior = true
+    let backTab = UIKeyCommand(input: "\t", modifierFlags: .shift, action: #selector(handleTabBackward))
+    backTab.wantsPriorityOverSystemBehavior = true
+    let escape = UIKeyCommand(input: UIKeyCommand.inputEscape, modifierFlags: [], action: #selector(handleEscape))
+    escape.wantsPriorityOverSystemBehavior = true
+    commands.append(contentsOf: [tab, backTab, escape])
+    return commands
+  }
+
+  @objc private func handleTabForward() { onTab?(true) }
+  @objc private func handleTabBackward() { onTab?(false) }
+  @objc private func handleEscape() { onEscape?() }
+}
+
+private struct InlineTitleTextView: UIViewRepresentable {
+  @Binding var text: String
+  @Binding var isFocused: Bool
+  let onSubmit: () -> Void
+  let onDone: () -> Void
+  let onTab: (Bool) -> Void
+  let onEscape: () -> Void
+
+  private func resolvedFont(for dynamicTypeSize: DynamicTypeSize) -> UIFont {
+    let category = UIContentSizeCategory(dynamicTypeSize)
+    return UIFont.preferredFont(
+      forTextStyle: .body,
+      compatibleWith: UITraitCollection(preferredContentSizeCategory: category)
+    )
+  }
+
+  func makeUIView(context: Context) -> InlineTitleUITextView {
+    let view = InlineTitleUITextView()
+    view.delegate = context.coordinator
+    view.backgroundColor = .clear
+    view.isOpaque = false
+    view.isScrollEnabled = false
+    view.bounces = false
+    view.alwaysBounceVertical = false
+    view.showsVerticalScrollIndicator = false
+    view.showsHorizontalScrollIndicator = false
+    view.textContainerInset = .zero
+    view.textContainer.lineFragmentPadding = 0
+    view.textContainer.lineBreakMode = .byWordWrapping
+    view.textContainer.maximumNumberOfLines = 0
+    view.adjustsFontForContentSizeCategory = false
+    view.font = resolvedFont(for: context.environment.dynamicTypeSize)
+    view.textColor = .label
+    view.returnKeyType = .done
+    view.textDragInteraction?.isEnabled = false
+    view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    view.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    view.setContentHuggingPriority(.required, for: .vertical)
+    view.setContentCompressionResistancePriority(.required, for: .vertical)
+    view.text = text
+
+    let coordinator = context.coordinator
+    view.onTab = { forward in coordinator.parent.onTab(forward) }
+    view.onEscape = { coordinator.parent.onEscape() }
+
+    // SwiftUI's `.keyboard` toolbar does not attach to a UIKit text view, so
+    // carry the same Done accessory bar as `TaskMarkdownNotesEditor`.
+    let bar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 320, height: 44))
+    bar.items = [
+      UIBarButtonItem(systemItem: .flexibleSpace),
+      UIBarButtonItem(systemItem: .done, primaryAction: UIAction { _ in
+        coordinator.parent.onDone()
+      })
+    ]
+    bar.sizeToFit()
+    view.inputAccessoryView = bar
+    return view
+  }
+
+  func updateUIView(_ view: InlineTitleUITextView, context: Context) {
+    let coordinator = context.coordinator
+    coordinator.parent = self
+
+    let font = resolvedFont(for: context.environment.dynamicTypeSize)
+    if view.font != font {
+      view.font = font
+      view.invalidateIntrinsicContentSize()
+    }
+
+    if view.text != text {
+      coordinator.replaceText(in: view, with: text)
+    }
+
+    // Mirror `PlatformMarkdownNotesTextView`'s focus gate: act only on a change
+    // in the requested focus so SwiftUI's `@FocusState` echo (no native
+    // `.focused` modifier on this representable) never dismisses a live tap.
+    if isFocused != coordinator.lastRequestedFocus {
+      if isFocused, !view.isFirstResponder {
+        view.becomeFirstResponder()
+        let end = ((view.text ?? "") as NSString).length
+        view.selectedRange = NSRange(location: end, length: 0)
+      } else if !isFocused, view.isFirstResponder, !coordinator.isEditing {
+        view.resignFirstResponder()
+      }
+      coordinator.lastRequestedFocus = isFocused
+    }
+  }
+
+  func sizeThatFits(_ proposal: ProposedViewSize,
+                    uiView: InlineTitleUITextView,
+                    context: Context) -> CGSize? {
+    let width = proposal.width ?? uiView.bounds.width
+    guard width > 0 else { return nil }
+    let fitted = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+    let oneLine = uiView.font?.lineHeight ?? 0
+    return CGSize(width: width, height: max(oneLine, fitted.height))
+  }
+
+  func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+
+  final class Coordinator: NSObject, UITextViewDelegate {
+    var parent: InlineTitleTextView
+    var lastRequestedFocus = false
+    var isEditing = false
+    private var applying = false
+
+    init(parent: InlineTitleTextView) {
+      self.parent = parent
+    }
+
+    func textViewDidBeginEditing(_ textView: UITextView) {
+      isEditing = true
+      lastRequestedFocus = true
+      parent.isFocused = true
+    }
+
+    func textViewDidEndEditing(_ textView: UITextView) {
+      isEditing = false
+      lastRequestedFocus = false
+      parent.isFocused = false
+    }
+
+    func textView(_ textView: UITextView,
+                  shouldChangeTextIn range: NSRange,
+                  replacementText text: String) -> Bool {
+      // Intercept Return before UIKit inserts a newline so the field never
+      // grows by an extra line for one frame before committing.
+      if text == "\n" {
+        parent.onSubmit()
+        return false
+      }
+      // Flatten multi-line pastes in place before insertion.
+      if text.contains(where: \.isNewline) {
+        let flat = TaskTitleText.singleLine(text)
+        let current = (textView.text ?? "") as NSString
+        let updated = current.replacingCharacters(in: range, with: flat)
+        applying = true
+        textView.text = updated
+        let caret = range.location + (flat as NSString).length
+        textView.selectedRange = NSRange(location: caret, length: 0)
+        applying = false
+        parent.text = updated
+        textView.invalidateIntrinsicContentSize()
+        return false
+      }
+      return true
+    }
+
+    func textViewDidChange(_ textView: UITextView) {
+      guard !applying else { return }
+      let raw = textView.text ?? ""
+      if raw.contains(where: \.isNewline) {
+        let flat = TaskTitleText.singleLine(raw)
+        replaceText(in: textView, with: flat)
+        parent.text = flat
+      } else {
+        parent.text = raw
+      }
+      textView.invalidateIntrinsicContentSize()
+    }
+
+    func replaceText(in textView: UITextView, with text: String) {
+      applying = true
+      let selected = textView.selectedRange
+      textView.text = text
+      let length = (text as NSString).length
+      let loc = min(selected.location, length)
+      let len = min(selected.length, max(0, length - loc))
+      textView.selectedRange = NSRange(location: loc, length: len)
+      applying = false
+      textView.invalidateIntrinsicContentSize()
+    }
+  }
+}
+#endif

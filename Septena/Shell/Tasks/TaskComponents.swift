@@ -219,11 +219,10 @@ struct CheckableRow<Leading: View, Trailing: View>: View {
   var subtitle: String? = nil
   /// Fixed minimum height for the title's single-line box, centered on the
   /// checkbox line. Task rows opt in (via `TaskRow`) so the CLOSED row's title
-  /// `Text` and the OPEN inline editor's `TextField` occupy an IDENTICAL,
-  /// centered box on the same checkbox line — the closest reliable match between
-  /// the two (they still differ sub-pixel; baseline alignment was worse because
-  /// SwiftUI mis-reports a vertical-axis field's baseline). nil (non-task rows)
-  /// keeps the intrinsic height. See `TaskComposerCard.titleField`.
+  /// `Text` and the OPEN inline editor's title field (`InlineTitleTextView` on
+  /// iOS, plain `TextField` on macOS) occupy an identical, centered band on the
+  /// same checkbox line with zero vertical jump. nil (non-task rows) keeps the
+  /// intrinsic height. See `TaskComposerCard.titleField`.
   var titleBandHeight: CGFloat? = nil
   /// How many lines the title may occupy before it truncates. Task rows pass
   /// the user's Settings ▸ Tasks ▸ "Title lines" choice on iOS (see
