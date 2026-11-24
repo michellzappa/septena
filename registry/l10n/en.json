@@ -204,13 +204,26 @@
     "paths": [
       "actions.actions.app.quickAdd.addTitle",
       "actions.actions.app.shareCapture.add.title",
-      "surfaces.prompts.text.newSection.confirmTitle"
+      "surfaces.prompts.text.newSection.confirmTitle",
+      "surfaces.taskReferences.add.confirmTitle"
     ]
   },
   "Add Checklist Item": {
     "text": "Add Checklist Item",
     "paths": [
       "actions.actions.task.addChecklistItem.title"
+    ]
+  },
+  "Add Reference": {
+    "text": "Add Reference",
+    "paths": [
+      "actions.actions.task.addReference.shortTitle"
+    ]
+  },
+  "Add Reference…": {
+    "text": "Add Reference…",
+    "paths": [
+      "actions.actions.task.addReference.title"
     ]
   },
   "Add Reminder…": {
@@ -468,6 +481,12 @@
       "settings.copy.ai_explainer.localBody.label"
     ]
   },
+  "Blocked by": {
+    "text": "Blocked by",
+    "paths": [
+      "surfaces.taskReferences.roles.blocked_by.label"
+    ]
+  },
   "Bring in your tasks": {
     "text": "Bring in your tasks",
     "paths": [
@@ -491,6 +510,12 @@
     "text": "Calendar Feed (iCal)",
     "paths": [
       "settings.copy.calendar_detail.feedHeader.label"
+    ]
+  },
+  "Calendar event": {
+    "text": "Calendar event",
+    "paths": [
+      "surfaces.taskReferences.kinds.event.label"
     ]
   },
   "Cancel": {
@@ -775,6 +800,12 @@
       "actions.actions.task.copy.title"
     ]
   },
+  "Copy Link": {
+    "text": "Copy Link",
+    "paths": [
+      "actions.actions.task.reference.copyLink.title"
+    ]
+  },
   "Copy Skill": {
     "text": "Copy Skill",
     "paths": [
@@ -811,6 +842,12 @@
       "surfaces.deviceSignIn.copy.unreachable.label"
     ]
   },
+  "Couldn’t add the reference.": {
+    "text": "Couldn’t add the reference.",
+    "paths": [
+      "surfaces.taskReferences.add.failed.message"
+    ]
+  },
   "Couldn’t delete your account. Nothing was deleted.": {
     "text": "Couldn’t delete your account. Nothing was deleted.",
     "paths": [
@@ -834,6 +871,15 @@
     "text": "Create and invite",
     "paths": [
       "plans.outcomes.agents.rows.share.cells.plus"
+    ]
+  },
+  "Created from {name}": {
+    "text": "Created from {name}",
+    "placeholders": [
+      "name"
+    ],
+    "paths": [
+      "surfaces.taskReferences.createdFrom.format"
     ]
   },
   "Current device": {
@@ -1138,6 +1184,18 @@
       "tokens.textures.ridges.tag"
     ]
   },
+  "Email": {
+    "text": "Email",
+    "paths": [
+      "surfaces.taskReferences.kinds.email.label"
+    ]
+  },
+  "Email thread": {
+    "text": "Email thread",
+    "paths": [
+      "surfaces.taskReferences.kinds.thread.label"
+    ]
+  },
   "Enter the code from the other device. If you're connecting Claude, the code is in your browser.": {
     "text": "Enter the code from the other device. If you're connecting Claude, the code is in your browser.",
     "paths": [
@@ -1232,7 +1290,8 @@
   "File": {
     "text": "File",
     "paths": [
-      "actions.menuBar.file.title"
+      "actions.menuBar.file.title",
+      "surfaces.taskReferences.kinds.file.label"
     ]
   },
   "Files and images": {
@@ -1257,6 +1316,12 @@
     "text": "First prompt",
     "paths": [
       "settings.copy.claude_connector.firstPrompt.label"
+    ]
+  },
+  "Follow-up to": {
+    "text": "Follow-up to",
+    "paths": [
+      "surfaces.taskReferences.roles.follow_up.label"
     ]
   },
   "Free account": {
@@ -1304,6 +1369,12 @@
     "text": "Get started with Septena",
     "paths": [
       "surfaces.notices.items.getStarted.title"
+    ]
+  },
+  "GitHub issue": {
+    "text": "GitHub issue",
+    "paths": [
+      "surfaces.taskReferences.kinds.issue.label"
     ]
   },
   "Give any task a Repeat rule and it will show up here.": {
@@ -1597,6 +1668,12 @@
     "paths": [
       "settings.keys.appearanceMode.options.1.title",
       "settings.keys.pccReasoning.options.0.title"
+    ]
+  },
+  "Links in this task": {
+    "text": "Links in this task",
+    "paths": [
+      "surfaces.taskReferences.add.offers.title"
     ]
   },
   "List": {
@@ -2167,6 +2244,7 @@
     "text": "Open",
     "paths": [
       "actions.actions.task.open.title",
+      "actions.actions.task.reference.open.title",
       "actions.actions.notice.openStep.title"
     ]
   },
@@ -2200,6 +2278,15 @@
       "destinations.destinations.anytime.emptyState.detail"
     ]
   },
+  "Open {name}": {
+    "text": "Open {name}",
+    "placeholders": [
+      "name"
+    ],
+    "paths": [
+      "surfaces.taskReferences.open.format"
+    ]
+  },
   "Or press ⌃⌥Space anywhere on your Mac": {
     "text": "Or press ⌃⌥Space anywhere on your Mac",
     "paths": [
@@ -2229,6 +2316,12 @@
     "text": "Paste",
     "paths": [
       "surfaces.taskAttributes.paste.label"
+    ]
+  },
+  "Paste a link": {
+    "text": "Paste a link",
+    "paths": [
+      "surfaces.taskReferences.add.placeholder"
     ]
   },
   "Paste into a model's context to teach it the task tools without connecting MCP.": {
@@ -2474,6 +2567,18 @@
       "plans.outcomes.nothing_lost.rows.deleted.label"
     ]
   },
+  "Reference": {
+    "text": "Reference",
+    "paths": [
+      "surfaces.taskReferences.otherKind.label"
+    ]
+  },
+  "References": {
+    "text": "References",
+    "paths": [
+      "surfaces.taskPage.blocks.taskPage.references.label"
+    ]
+  },
   "Refreshes daily · pauses under Reduce Motion and Low Power.": {
     "text": "Refreshes daily · pauses under Reduce Motion and Low Power.",
     "paths": [
@@ -2503,6 +2608,12 @@
     "text": "Reminder…",
     "paths": [
       "actions.actions.task.reminder.title"
+    ]
+  },
+  "Remove": {
+    "text": "Remove",
+    "paths": [
+      "actions.actions.task.reference.remove.title"
     ]
   },
   "Remove from Today": {
@@ -2844,6 +2955,12 @@
       "actions.actions.app.septenaWindow.title"
     ]
   },
+  "Septena can’t add this. Paste a web link or a mail link.": {
+    "text": "Septena can’t add this. Paste a web link or a mail link.",
+    "paths": [
+      "surfaces.taskReferences.add.invalid.message"
+    ]
+  },
   "Septena can’t use the camera": {
     "text": "Septena can’t use the camera",
     "paths": [
@@ -3105,6 +3222,12 @@
       "settings.copy.ai_explainer.intro.label"
     ]
   },
+  "Starlings record": {
+    "text": "Starlings record",
+    "paths": [
+      "surfaces.taskReferences.kinds.door.label"
+    ]
+  },
   "Still want any of them?": {
     "text": "Still want any of them?",
     "paths": [
@@ -3235,7 +3358,8 @@
   "Task": {
     "text": "Task",
     "paths": [
-      "actions.menuBar.task.title"
+      "actions.menuBar.task.title",
+      "surfaces.taskReferences.kinds.task.label"
     ]
   },
   "Task Details": {
@@ -3455,6 +3579,15 @@
     "text": "This file is on another device",
     "paths": [
       "plans.upsells.file_elsewhere.title"
+    ]
+  },
+  "This task already has {count} references.": {
+    "text": "This task already has {count} references.",
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.taskReferences.add.limitReached.format"
     ]
   },
   "Thorough": {
@@ -3701,6 +3834,12 @@
     "text": "We never hold your data back",
     "paths": [
       "plans.promises.no_hostage.title"
+    ]
+  },
+  "Web page": {
+    "text": "Web page",
+    "paths": [
+      "surfaces.taskReferences.kinds.url.label"
     ]
   },
   "Wednesday": {

@@ -7,6 +7,8 @@ import SwiftUI
 /// field already open: the row never hosts a text field.
 struct ReviewTaskRow: View {
   let task: SeptenaTask
+  /// The task's newest `issue` reference.
+  var issue: TaskRefRow? = nil
   let isSelected: Bool
   /// "Area › Project", the area alone, or the Inbox.
   let listLabel: String
@@ -27,6 +29,7 @@ struct ReviewTaskRow: View {
     if let at = task.conversation.endStateAt {
       parts.append(TaskHistory.relative(at, now: DayClock.appNow))
     }
+    if let issue { parts.append(issue.title) }
     if let artifact = task.conversation.artifact, !artifact.title.isEmpty {
       parts.append(artifact.title)
     }

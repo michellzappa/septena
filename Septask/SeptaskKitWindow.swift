@@ -348,9 +348,10 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   func focusWindow() { window?.makeKeyAndOrderFront(nil) }
 
   func go(to filter: TaskFilter) { sidebar?.select(filter) }
-  func revealTask(id taskId: String, in filter: TaskFilter) {
+  func revealTask(id taskId: String, in filter: TaskFilter, opensPage: Bool = false) {
     sidebar?.select(filter)
     list?.select(taskId: taskId)
+    if opensPage { setInspector(visible: true) }
   }
   func newTask() { list?.createTask() }
   func newProject() { sidebar?.newProject() }
@@ -382,7 +383,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     // ⌘K also ticks a selected Get started step; nothing else applies to one.
     if command == .toggleComplete { return list?.hasCompletableSelection ?? false }
     // `task.open` acts on one row, like the row menu item.
-    if command == .open { return list?.hasSingleActionableSelection ?? false }
+    if command == .open || command == .addReference { return list?.hasSingleActionableSelection ?? false }
     return list?.hasActionableSelection ?? false
   }
 
@@ -410,6 +411,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     case .toggleStar: list.toggleStarSelection()
     case .editTags: list.presentTagPopover()
     case .addChecklistItem: list.addChecklistItemToSelection()
+    case .addReference: list.presentAddReference()
     case .rename: list.beginEditSelectedRow()
     case .when: list.presentDatePopover(kind: .when)
     case .deadline: list.presentDatePopover(kind: .deadline)
@@ -427,7 +429,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   }
 
   enum RowCommand {
-    case toggleComplete, cancel, toggleToday, toggleStar, editTags, addChecklistItem, rename, when, deadline, reminder, clearSchedule, delete
+    case toggleComplete, cancel, toggleToday, toggleStar, editTags, addChecklistItem, addReference, rename, when, deadline, reminder, clearSchedule, delete
     case duplicate, move, createNextCopy
     case repeatEditor
     case open

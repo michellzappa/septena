@@ -119,15 +119,16 @@ final class KitReviewTaskCell: NSTableCellView {
   }
 
   /// `contextText` is the list the task is in ("Area › Project",
-  /// `KitListPath`), shown on the meta line with "asked {ago}".
-  func configure(with task: SeptenaTask, contextText: String?) {
+  /// `KitListPath`), shown on the meta line with "asked {ago}". `issue` is the
+  /// task's newest `issue` reference.
+  func configure(with task: SeptenaTask, issue: TaskRefRow?, contextText: String?) {
     taskId = task.id
     titleLabel.stringValue = task.title
 
     let checkNote = Self.noteText(for: task)
     noteLabel.stringValue = checkNote
 
-    if let meta = Self.metaSummary(for: task, contextText: contextText) {
+    if let meta = Self.metaSummary(for: task, issue: issue, contextText: contextText) {
       metaLabel.stringValue = meta
       metaLabel.isHidden = false
     } else {
@@ -161,8 +162,8 @@ final class KitReviewTaskCell: NSTableCellView {
   }
 
   /// The meta line: the list, "asked {ago}" (only when the backend stamped
-  /// `endStateAt`) and the artifact title, joined by " · ".
-  static func metaSummary(for task: SeptenaTask, contextText: String?) -> String? {
+  /// `endStateAt`), the issue and the artifact title, joined by " · ".
+  static func metaSummary(for task: SeptenaTask, issue: TaskRefRow?, contextText: String?) -> String? {
     var parts: [String] = []
     if let contextText, !contextText.isEmpty { parts.append(contextText) }
     if let asked = task.conversation.endStateAt {
@@ -172,6 +173,7 @@ final class KitReviewTaskCell: NSTableCellView {
                             comment: "SeptaskKit: review row, when the agent asked for review"))
       }
     }
+    if let issue { parts.append(issue.title) }
     if let artifact = task.conversation.artifact, !artifact.title.isEmpty {
       parts.append(artifact.title)
     }
@@ -181,7 +183,7 @@ final class KitReviewTaskCell: NSTableCellView {
   private static let buttonGap: CGFloat = 8
   private static let buttonRowHeight: CGFloat = 22
 
-  static func height(for task: SeptenaTask, contextText: String?, width: CGFloat) -> CGFloat {
+  static func height(for task: SeptenaTask, issue: TaskRefRow?, contextText: String?, width: CGFloat) -> CGFloat {
     let inset = SeptaskKitLayout.inset(for: max(width, 360))
     let textWidth = max(140, width - inset * 2 - SeptaskKitLayout.rowLeadingPad - 10)
     let note = noteText(for: task) as NSString
@@ -191,7 +193,7 @@ final class KitReviewTaskCell: NSTableCellView {
       attributes: [.font: SeptaskKitTheme.meta])
     let titleHeight = ceil(SeptaskKitTheme.taskTitle.ascender - SeptaskKitTheme.taskTitle.descender) + 2
     let noteHeight = ceil(noteRect.height) + 2
-    let metaHeight: CGFloat = metaSummary(for: task, contextText: contextText) == nil
+    let metaHeight: CGFloat = metaSummary(for: task, issue: issue, contextText: contextText) == nil
       ? 0
       : 3 + ceil(SeptaskKitTheme.chip.ascender - SeptaskKitTheme.chip.descender) + 2
     return 10 + titleHeight + 3 + noteHeight + metaHeight + buttonGap + buttonRowHeight + 10

@@ -1944,6 +1944,14 @@
     "Add medications in Settings first." : {
 
     },
+    "Add Reference" : {
+      "comment" : "Generated from registry actions.actions.task.addReference.shortTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Add Reference…" : {
+      "comment" : "Generated from registry actions.actions.task.addReference.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Add Reminder…" : {
       "comment" : "Generated from registry actions.actions.task.reminder.addTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -2919,6 +2927,10 @@
     "Bio" : {
 
     },
+    "Blocked by" : {
+      "comment" : "Generated from registry surfaces.taskReferences.roles.blocked_by.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Blue" : {
       "localizations" : {
         "pt-BR" : {
@@ -3075,6 +3087,10 @@
           }
         }
       }
+    },
+    "Calendar event" : {
+      "comment" : "Generated from registry surfaces.taskReferences.kinds.event.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Calendar Feed (iCal)" : {
       "comment" : "Generated from registry settings.copy.calendar_detail.feedHeader.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -4039,6 +4055,10 @@
         }
       }
     },
+    "Copy Link" : {
+      "comment" : "Generated from registry actions.actions.task.reference.copyLink.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Copy setup prompt" : {
       "comment" : "Generated from registry surfaces.firstRun.steps.connectClaude.primary.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -4114,6 +4134,10 @@
           }
         }
       }
+    },
+    "Couldn’t add the reference." : {
+      "comment" : "Generated from registry surfaces.taskReferences.add.failed.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Couldn’t delete your account. Nothing was deleted." : {
       "comment" : "Generated from registry settings.copy.delete_account.failed.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -4213,6 +4237,10 @@
           }
         }
       }
+    },
+    "Created from %@" : {
+      "comment" : "Generated from registry surfaces.taskReferences.createdFrom.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Creates %@ with recordName `%@:%@`. Existing dangling references will resolve on next fetch." : {
       "localizations" : {
@@ -5230,8 +5258,16 @@
         }
       }
     },
+    "Email" : {
+      "comment" : "Generated from registry surfaces.taskReferences.kinds.email.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Email goes straight to me — I make Septena Life alone. In-app tickets tie to your Apple ID; sign in to iCloud to use them, or email any time." : {
 
+    },
+    "Email thread" : {
+      "comment" : "Generated from registry surfaces.taskReferences.kinds.thread.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Emerald" : {
       "localizations" : {
@@ -5711,6 +5747,10 @@
     "Focused tasks, in your iCloud" : {
 
     },
+    "Follow-up to" : {
+      "comment" : "Generated from registry surfaces.taskReferences.roles.follow_up.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Format" : {
       "localizations" : {
         "pt-BR" : {
@@ -5928,6 +5968,10 @@
           }
         }
       }
+    },
+    "GitHub issue" : {
+      "comment" : "Generated from registry surfaces.taskReferences.kinds.issue.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Give any task a Repeat rule and it will show up here." : {
       "comment" : "Generated from registry destinations.destinations.repeating.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -7346,6 +7390,10 @@
           }
         }
       }
+    },
+    "Links in this task" : {
+      "comment" : "Generated from registry surfaces.taskReferences.add.offers.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "List" : {
       "comment" : "SeptaskKit localization pass 2026-08-09",
@@ -9462,6 +9510,10 @@
         }
       }
     },
+    "Open %@" : {
+      "comment" : "Generated from registry surfaces.taskReferences.open.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Open a task or choose Keep to bring it back, or review the list and let the rest go." : {
       "comment" : "Generated from registry surfaces.notices.items.fadedPile.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -9654,6 +9706,10 @@
           }
         }
       }
+    },
+    "Paste a link" : {
+      "comment" : "Generated from registry surfaces.taskReferences.add.placeholder. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Paste a Septena JSON export below." : {
       "localizations" : {
@@ -10435,6 +10491,14 @@
           }
         }
       }
+    },
+    "Reference" : {
+      "comment" : "Generated from registry surfaces.taskReferences.otherKind.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "References" : {
+      "comment" : "Generated from registry surfaces.taskPage.blocks.taskPage.references.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "refresh recommended" : {
       "localizations" : {
@@ -11231,6 +11295,10 @@
           }
         }
       }
+    },
+    "Septena can’t add this. Paste a web link or a mail link." : {
+      "comment" : "Generated from registry surfaces.taskReferences.add.invalid.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Septena can’t use the camera" : {
       "comment" : "Generated from registry surfaces.prompts.items.cameraUnavailable.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -12203,6 +12271,10 @@
           }
         }
       }
+    },
+    "Starlings record" : {
+      "comment" : "Generated from registry surfaces.taskReferences.kinds.door.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Starred" : {
       "comment" : "Generated from registry destinations.destinations.starred.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -13420,6 +13492,10 @@
         }
       }
     },
+    "This task already has %lld references." : {
+      "comment" : "Generated from registry surfaces.taskReferences.add.limitReached.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "THIS WEEK" : {
 
     },
@@ -14294,6 +14370,10 @@
     },
     "Weave your calendar's events into Today and Upcoming. Grant access and choose which calendars to show in Related Settings below." : {
 
+    },
+    "Web page" : {
+      "comment" : "Generated from registry surfaces.taskReferences.kinds.url.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Wednesday" : {
       "comment" : "Generated from registry surfaces.taskDetail.weekdays.2.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

@@ -151,7 +151,7 @@ struct EmojiPickerContent: View {
               commit("")
             } label: {
               // iOS emoji picker remove action (#201).
-              Text("Remove") // septena-lint:allow shell-copy-literal
+              Text("Remove") // septena-lint:allow shell-copy-literal septena-lint:allow registry-owned-literal — clears an emoji, not a task reference
             }
           }
         }

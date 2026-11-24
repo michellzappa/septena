@@ -499,6 +499,10 @@ struct TaskListView: View {
   @State private var selectedTagIDs: Set<String> = []
   @State private var tagsByID: [String: TaskTag] = [:]
   @State private var checklistCounts: [String: (done: Int, total: Int)] = [:]
+  @State private var fromRefKinds: [String: String] = [:]
+  @State private var issueRefs: [String: TaskRefRow] = [:]
+  /// The task whose Add Reference sheet is open (row menu).
+  @State private var referenceTargetId: String?
 
   /// Pending Things-style choice when a fixed-schedule repeating task is
   /// moved. The date picker dismisses before this appears, so the decision is
@@ -640,6 +644,7 @@ struct TaskListView: View {
         repeatTargetId: $repeatTargetId,
         reminderTargetId: $reminderTargetId,
         tagsTargetIds: $tagsTargetIds,
+        referenceTargetId: $referenceTargetId,
         areas: areas,
         projects: projects,
         currentTask: currentTask,
@@ -1270,6 +1275,13 @@ struct TaskListView: View {
     guard LaunchPhase.shared.firstFrameDrawn, tagsByID.isEmpty, checklistCounts.isEmpty else { return }
     tagsByID = LocalCache.tagsByID(in: modelContext)
     checklistCounts = LocalCache.checklistSummaryByTask(in: modelContext)
+    refreshReferenceDecorations()
+  }
+
+  /// The `from` reference icon and the Review rows' issue: one read each.
+  private func refreshReferenceDecorations() {
+    fromRefKinds = LocalCache.fromRefKinds(in: modelContext)
+    issueRefs = filter == .review ? LocalCache.newestIssueRefs(in: modelContext) : [:]
   }
 
   private func refreshTodayNotices() {
@@ -2581,6 +2593,7 @@ struct TaskListView: View {
       let position = TaskCardPosition(index: idx, count: rows.count)
       ReviewTaskRow(
         task: task,
+        issue: issueRefs[task.id],
         isSelected: selection.contains(task.id),
         listLabel: reviewListLabel(task),
         onOpen: { openPage(task) },
@@ -4036,6 +4049,7 @@ struct TaskListView: View {
       checkboxDimmed: touchSelectionActive,
       accessory: accessory,
       checklistSummary: checklistCounts[task.id],
+      fromKind: fromRefKinds[task.id].map(RegistryTaskReferences.kind),
       tagChips: LocalCache.resolvedTags(for: task, tagsByID: tagsByID),
       titleMatchID: "edit-title-\(task.id)",
       checkboxMatchID: "edit-checkbox-\(task.id)",
@@ -4245,6 +4259,7 @@ struct TaskListView: View {
         onOpenTags: { target in
           tagsTargetIds = target.ids
         },
+        onAddReference: TaskRefActions.canAdd ? { task in referenceTargetId = task.id } : nil,
         onClearSchedule: { ids in clearSchedule(ids) },
         onOpenMove: { target in
           moveTargetIds = target.ids
@@ -5352,6 +5367,7 @@ struct TaskListView: View {
     if items.isEmpty { isLoading = true }
     checklistCounts = LocalCache.checklistSummaryByTask(in: modelContext)
     tagsByID = LocalCache.tagsByID(in: modelContext)
+    refreshReferenceDecorations()
     // Prune any selected tag filter whose tag was deleted or left this list.
     if !selectedTagIDs.isEmpty {
       let valid = Set(availableTagsInList.map(\.id))
@@ -5458,15 +5474,18 @@ struct TaskListView: View {
   private func consumePendingTaskReveal() {
     // On-screen only: Septask's iPhone tabs keep a second list for the same
     // route mounted (a hidden copy must leave the reveal to the visible one).
-    guard isOnScreen,
-          let reveal = nav.pendingTaskReveal,
+    // A list whose own task page covers it is off screen but still active: a
+    // reference on that page can point at another of its tasks.
+    guard let reveal = nav.pendingTaskReveal,
+          isOnScreen || (reveal.opensPage && pageTaskId != nil),
           reveal.routeID == navigationRouteID else { return }
 
-    if currentTask(id: reveal.taskID) != nil {
+    if let task = currentTask(id: reveal.taskID) {
       selection = [reveal.taskID]
       scrollToTargetID = reveal.taskID
       scrollToTargetTick += 1
       nav.pendingTaskReveal = nil
+      if reveal.opensPage { openPage(task) }
       return
     }
 

@@ -15,6 +15,8 @@ struct TaskListModalPresenter: ViewModifier {
   @Binding var repeatTargetId: String?
   var reminderTargetId: Binding<String?> = .constant(nil)
   var tagsTargetIds: Binding<[String]> = .constant([])
+  /// The task whose Add Reference sheet is open.
+  var referenceTargetId: Binding<String?> = .constant(nil)
 
   /// Set by the When sheet's Repeat row: the Repeat sheet opens for this task
   /// once the When sheet has finished dismissing (two sheets can't overlap).
@@ -130,6 +132,15 @@ struct TaskListModalPresenter: ViewModifier {
         }
         .taskPickerChrome(TaskPickerDetents.standard)
       }
+      .sheet(isPresented: Binding(
+        get: { referenceTargetId.wrappedValue != nil },
+        set: { if !$0 { referenceTargetId.wrappedValue = nil } }
+      )) {
+        if let id = referenceTargetId.wrappedValue {
+          AddReferenceSheet(taskID: id)
+            .taskPickerChrome(TaskPickerDetents.standard)
+        }
+      }
   }
 
   private func openPendingRepeat() {
@@ -203,6 +214,8 @@ struct TaskListRowContextMenu: View {
   let onOpenDeadline: (TaskListView.ActionTarget) -> Void
   var onOpenReminder: ((SeptenaTask) -> Void)? = nil
   var onOpenTags: ((TaskListView.ActionTarget) -> Void)? = nil
+  /// Nil hides Add Reference.
+  var onAddReference: ((SeptenaTask) -> Void)? = nil
   var onClearSchedule: (([String]) -> Void)? = nil
   let onOpenMove: (TaskListView.ActionTarget) -> Void
   /// Move a task straight to a destination from the inline submenu, skipping the
@@ -283,6 +296,9 @@ struct TaskListRowContextMenu: View {
     case "task.tags":
       guard let onOpenTags else { return nil }
       return .init { onOpenTags(target) }
+    case "task.addReference":
+      guard let task = single, let onAddReference else { return nil }
+      return .init { onAddReference(task) }
     case "task.when":
       return .init { onOpenWhen(target) }
     case "task.deadline":

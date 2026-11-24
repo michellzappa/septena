@@ -83,7 +83,8 @@ enum TaskA11y {
   /// Combined row announce: title, optional notes, heading vs task.
   /// `addedBy` is the row's provenance phrase ("Added by Claude") for a task
   /// an agent added; the row glyph is silent, so the row label speaks it.
-  static func rowLabel(title: String, hasNotes: Bool, isHeading: Bool, addedBy: String? = nil) -> String {
+  static func rowLabel(title: String, hasNotes: Bool, isHeading: Bool, addedBy: String? = nil,
+                       createdFrom: String? = nil) -> String {
     let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
     let base = trimmed.isEmpty
       ? (isHeading
@@ -96,6 +97,7 @@ enum TaskA11y {
     var parts = [base]
     if hasNotes { parts.append(Self.hasNotes) }
     if let addedBy { parts.append(addedBy) }
+    if let createdFrom { parts.append(RegistryTaskReferences.createdFrom(name: createdFrom)) }
     return parts.joined(separator: ", ")
   }
 

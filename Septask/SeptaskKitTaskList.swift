@@ -280,6 +280,10 @@ final class SeptaskKitTaskListController: NSViewController {
   private var foldingComposerIDs: Set<String> = []
   private var checklistCounts: [String: (done: Int, total: Int)] = [:]
   private var attachmentCounts: [String: Int] = [:]
+  /// The kind of a task's `from` reference, for the row icon.
+  private var fromRefKinds: [String: String] = [:]
+  /// The newest `issue` reference of the Review rows.
+  private var issueRefs: [String: TaskRefRow] = [:]
   private var tagsByID: [String: TaskTag] = [:]
   private var activeTagFilterIDs: Set<String> = []
 
@@ -1038,6 +1042,8 @@ final class SeptaskKitTaskListController: NSViewController {
     heldReload = false
     checklistCounts = LocalCache.checklistSummaryByTask(in: context)
     attachmentCounts = SeptenaServices.shared.taskAttachmentStore.attachmentCountsByTask()
+    fromRefKinds = LocalCache.fromRefKinds(in: context)
+    issueRefs = filter == .review ? LocalCache.newestIssueRefs(in: context) : [:]
     tagsByID = LocalCache.tagsByID(in: context)
 
     let locallyChanged = locallyChanged.union(takePendingReloadIDs())
@@ -2562,6 +2568,17 @@ final class SeptaskKitTaskListController: NSViewController {
       self.reload()
       self.onStoreChanged?()
     }
+  }
+
+  /// Add Reference for the selected row, anchored to it.
+  func presentAddReference() {
+    commitComposerTextIfOpen()
+    guard TaskRefActions.canAdd, let task = actionableSelection.first,
+          case .rect(let rect, let host)? = selectedRowAnchor else {
+      NSSound.beep()
+      return
+    }
+    SeptaskKitAddReferencePopover.present(taskID: task.id, relativeTo: rect, of: host)
   }
 
   private func toggleTagFilter(_ tagID: String) {
@@ -4147,6 +4164,9 @@ final class SeptaskKitTaskListController: NSViewController {
         guard !selection.isEmpty else { return nil }
         let allStarred = selection.allSatisfy(\.starred)
         return .init(variant: allStarred ? .remove : .add) { self.toggleStarSelection() }
+      case "task.addReference":
+        guard single != nil, TaskRefActions.canAdd else { return nil }
+        return .init { self.presentAddReference() }
       case "task.tags", "task.when", "task.deadline": return .init { self.openPicker(action: id) }
       case "task.reminder":
         guard single != nil else { return nil }
@@ -4712,7 +4732,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         return composerRowHeight ?? KitComposerCell.baseHeight
       }
       if filter == .review {
-        return KitReviewTaskCell.height(for: task,
+        return KitReviewTaskCell.height(for: task, issue: issueRefs[task.id],
                                         contextText: KitListPath.text(for: task, in: context),
                                         width: tableView.bounds.width)
       }
@@ -5435,7 +5455,8 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         let identifier = NSUserInterfaceItemIdentifier("reviewTaskCell")
         let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitReviewTaskCell
           ?? KitReviewTaskCell(identifier: identifier)
-        cell.configure(with: task, contextText: KitListPath.text(for: task, in: context))
+        cell.configure(with: task, issue: issueRefs[task.id],
+                       contextText: KitListPath.text(for: task, in: context))
         cell.onAccept = { [weak self] id in self?.acceptReviewTask(id: id) }
         cell.onSendBack = { [weak self] id in self?.openSendBack(taskID: id) }
         return cell
@@ -5447,6 +5468,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
                      contextText: taskContextText(for: task),
                      checklistSummary: checklistCounts[task.id],
                      attachmentCount: attachmentCounts[task.id] ?? 0,
+                     fromKind: fromRefKinds[task.id].map(RegistryTaskReferences.kind),
                      tags: LocalCache.resolvedTags(for: task, tagsByID: tagsByID))
       cell.configureSuggestion(suggestion) { [weak self] in
         self?.applyFilingSuggestion(taskID: task.id)
@@ -5565,8 +5587,9 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let agentGlyph = NSImageView()
   private let chip = KitChipView()
   private let statusChip = KitChipView()
-  private let issueChip = KitChipView()
   private let suggestionChip = KitSuggestionChipView()
+  /// The item the task was created from (its `from` reference).
+  private let fromGlyph = NSImageView()
   private let scheduleGlyph = NSImageView()
   private let detail = NSTextField(labelWithString: "")
   private let reminderGlyph = NSImageView()
@@ -5642,6 +5665,14 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // The row's accessibility label speaks the provenance (`TaskA11y.rowLabel`).
     agentGlyph.kitA11yIgnore()
     agentGlyph.isHidden = true
+
+    fromGlyph.translatesAutoresizingMaskIntoConstraints = false
+    fromGlyph.contentTintColor = SeptaskKitTheme.iconMuted
+    fromGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    fromGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
+    // The row's accessibility label speaks it, as for the agent glyph.
+    fromGlyph.kitA11yIgnore()
+    fromGlyph.isHidden = true
 
     detail.lineBreakMode = .byClipping
     detail.isEditable = false
@@ -5746,10 +5777,10 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     let trailingShove = NSView()
     trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
     trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
-    let trailing = NSStackView(views: [trailingShove, suggestionChip, issueChip, chip, statusChip,
+    let trailing = NSStackView(views: [trailingShove, suggestionChip, chip, statusChip,
                                       tagStack, attachmentGlyph, attachmentLabel,
                                       checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
-                                      scheduleGlyph, detail, repeatGlyph, starGlyph, notesGlyph, agentGlyph])
+                                      scheduleGlyph, detail, repeatGlyph, starGlyph, fromGlyph, notesGlyph, agentGlyph])
     trailing.orientation = .horizontal
     trailing.alignment = .centerY
     trailing.distribution = .fill
@@ -5771,7 +5802,6 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     trailing.kitA11yIgnore()
     chip.kitA11yIgnore()
     statusChip.kitA11yIgnore()
-    issueChip.kitA11yIgnore()
 
     addSubview(checkbox)
     addSubview(title)
@@ -5856,6 +5886,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
                  contextText: String?,
                  checklistSummary: (done: Int, total: Int)? = nil,
                  attachmentCount: Int = 0,
+                 fromKind: RegistryTaskReferenceKind? = nil,
                  tags: [TaskTag] = []) {
     taskId = task.id
     plainTitle = task.title
@@ -5869,7 +5900,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       agentGlyph.isHidden = true
       chip.isHidden = true
       statusChip.isHidden = true
-      issueChip.isHidden = true
+      fromGlyph.isHidden = true
       tagStack.isHidden = true
       attachmentGlyph.isHidden = true
       attachmentLabel.isHidden = true
@@ -5923,7 +5954,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     }
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
-    for view in [checkbox, title, notesGlyph, agentGlyph, chip, statusChip, issueChip, suggestionChip,
+    for view in [checkbox, title, notesGlyph, agentGlyph, fromGlyph, chip, statusChip, suggestionChip,
                  tagStack, attachmentGlyph, attachmentLabel, checklistGlyph, checklistLabel,
                  reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, starGlyph] as [NSView] {
       view.alphaValue = fade
@@ -5963,18 +5994,15 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // SwiftUI row): an agent-authored row never also wears the notes glyph.
     notesGlyph.isHidden = !hasNotes || task.isAgentAuthored
     agentGlyph.isHidden = !task.isAgentAuthored
+    fromGlyph.isHidden = fromKind == nil
+    fromGlyph.image = fromKind.flatMap {
+      NSImage(systemSymbolName: $0.sfSymbol, accessibilityDescription: nil)?
+        .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+    }
     // The chip and the inline title suffix answer the SAME question — "which
     // list is this in" — so a row never wears both. The suffix wins where it
     // is shown (flat Today): it sits on the title line where the eye already
     // is, and a pill repeating it on the far right is noise, not emphasis.
-    if let issue = task.linkedIssue {
-      issueChip.isHidden = false
-      issueChip.configure(symbol: issue.symbolName, title: issue.shortLabel)
-      issueChip.toolTip = "\(issue.fullLabel) (\(issue.owner)/\(issue.repo))"
-    } else {
-      issueChip.isHidden = true
-      issueChip.toolTip = nil
-    }
     if let chipValue, contextText == nil {
       chip.isHidden = false
       chip.configure(symbol: chipValue.symbol, title: chipValue.title)
@@ -6046,7 +6074,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     setAccessibilityLabel(TaskA11y.rowLabel(title: task.title,
                                             hasNotes: hasNotes,
                                             isHeading: false,
-                                            addedBy: task.isAgentAuthored ? task.addedByPhrase : nil))
+                                            addedBy: task.isAgentAuthored ? task.addedByPhrase : nil,
+                                            createdFrom: fromKind?.label))
     setAccessibilityRoleDescription(nil)
   }
 

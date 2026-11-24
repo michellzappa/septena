@@ -123,6 +123,17 @@
       "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "task.checklists"
     },
+    "task.addReference": {
+      "title": "Add Reference…",
+      "shortTitle": "Add Reference",
+      "icon": "action.reference",
+      "role": "default",
+      "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted"] },
+      "featureId": "task.references"
+    },
+    "task.reference.open": { "title": "Open", "icon": "action.open", "role": "default", "availability": { "selection": "none" }, "featureId": "task.references" },
+    "task.reference.copyLink": { "title": "Copy Link", "icon": "action.copy", "role": "default", "availability": { "selection": "none" }, "featureId": "task.references" },
+    "task.reference.remove": { "title": "Remove", "icon": "action.delete", "role": "destructive", "availability": { "selection": "none" }, "featureId": "task.references" },
     "task.detail.save": {
       "title": "Save",
       "icon": "action.edit_details",
@@ -550,6 +561,7 @@
       { "kind": "action", "id": "task.toggleStar" },
       { "kind": "divider" },
       { "kind": "action", "id": "task.open" },
+      { "kind": "action", "id": "task.addReference" },
       { "kind": "action", "id": "task.duplicate" },
       { "kind": "action", "id": "task.share" },
       { "kind": "action", "id": "task.select" },
@@ -557,6 +569,12 @@
       { "kind": "action", "id": "task.toggleComplete" },
       { "kind": "divider" },
       { "kind": "action", "id": "task.delete" }
+    ],
+    "task.reference": [
+      { "kind": "action", "id": "task.reference.open" },
+      { "kind": "action", "id": "task.reference.copyLink" },
+      { "kind": "divider" },
+      { "kind": "action", "id": "task.reference.remove" }
     ],
     "task.recentlyDeleted": [{ "kind": "action", "id": "task.restore" }, { "kind": "divider" }, { "kind": "action", "id": "task.deletePermanently" }],
     "task.faded": [
@@ -676,6 +694,7 @@
         { "kind": "action", "id": "task.editDetails", "titleField": "desktopTitle" },
         { "kind": "action", "id": "task.duplicate" },
         { "kind": "action", "id": "task.addChecklistItem" },
+        { "kind": "action", "id": "task.addReference" },
         { "kind": "divider" },
         { "kind": "action", "id": "task.toggleComplete" },
         { "kind": "action", "id": "task.cancel" },
