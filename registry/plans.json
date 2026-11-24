@@ -111,8 +111,7 @@
       "rows": [
         { "id": "connector", "label": "Claude connector", "limit": "connectorWritesPerDay", "featureId": "agents.connector", "cells": { "device": false, "account": "Reads, and 25 changes a day", "plus": "No daily cap" } },
         { "id": "runs", "label": "Agent runs", "limit": "agentRunsPerMonth", "featureId": "lists.agent", "cells": { "device": false, "account": "10 a month", "plus": "Within a monthly run budget" } },
-        { "id": "share", "label": "Shared projects", "limit": "createShares", "status": "planned", "cells": { "device": false, "account": "Join", "plus": "Create and invite" } },
-        { "id": "links", "label": "Linked projects (GitHub, Linear)", "limit": "linkedProjects", "status": "planned", "cells": { "device": false, "account": "1", "plus": "No cap" } }
+        { "id": "share", "label": "Shared projects", "limit": "createShares", "status": "planned", "cells": { "device": false, "account": "Join", "plus": "Create and invite" } }
       ]
     }
   ],

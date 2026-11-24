@@ -70,17 +70,16 @@ enum TaskCardMetrics {
 /// Kept independent of `TaskListView` so the task list owns only its drop
 /// policy, not the presentation and transferable-data plumbing.
 ///
-/// There are exactly TWO drop vocabularies on the task surfaces, and they mean
-/// different things — do not "unify" them:
-///   • drop INTO a container (this modifier) emphasizes the row/header itself,
-///     so it reuses the canonical `Theme.listSelectionFill`, per the one
-///     selection/target-language rule in CLAUDE.md;
-///   • drop BETWEEN rows (`TaskReorderDrop`) marks a *position*, not a row, so
-///     it parts a gap and draws an accent insertion line — the platform-standard
-///     indicator, and the only way to show where in the order the drop lands.
-/// A row can never wear both at once: reorder targets a gap, filing targets a row.
+/// Inside a task list there is ONE landing mark (mz, 2026-11-24):
+/// `TaskInsertionMark`, for a task drag and for a Magic Plus drag, on rows and
+/// on headers (`showsMark`). A container whose tasks are not on screen (a
+/// sidebar row, a project card, a Move panel row) has no place to mark, so it
+/// wears the canonical `Theme.listSelectionFill` instead.
 struct TaskMoveDrop: ViewModifier {
   let perform: ((_ ids: [String]) -> Bool)?
+  /// The target is a row or a header in a task list: show the insertion mark
+  /// under it.
+  var showsMark = false
   @State private var isTargeted = false
 
   func body(content: Content) -> some View {
@@ -88,9 +87,10 @@ struct TaskMoveDrop: ViewModifier {
       content
         .background(
           RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(isTargeted ? Theme.listSelectionFill : Color.clear)
+            .fill(isTargeted && !showsMark ? Theme.listSelectionFill : Color.clear)
             .a11yAnimation(.easeOut(duration: 0.12), value: isTargeted)
         )
+        .taskInsertionMark(before: isTargeted && showsMark ? false : nil)
         .onDrop(of: [.septenaTaskDragIDs],
                 delegate: TaskMoveDropDelegate(isTargeted: $isTargeted,
                                                perform: perform))
@@ -309,7 +309,7 @@ extension View {
 // MARK: - Magic Plus interactive drag coordinator (iPhone compact)
 
 /// What kind of drop target the dragged Magic Plus orb is currently hovering.
-/// Every kind shows the same insertion line (`MagicPlusInsertionMark`).
+/// Every kind shows the same insertion line (`TaskInsertionMark`).
 enum MagicPlusDropKind: Equatable {
   /// Between two rows in a reorderable list.
   case taskRow(context: String?)
@@ -600,15 +600,7 @@ struct MagicPlusRowDropModifier: ViewModifier {
                         frame: rect, onDrop: onDrop)
         }
         .onDisappear { drag.unregister(id: id) }
-        // The list never moves during the drag: the mark draws OVER the row
-        // edge instead of opening a gap (see `MagicPlusInsertionMark`).
-        .overlay(alignment: .top) {
-          if hoverBefore == true { MagicPlusInsertionMark() }
-        }
-        .overlay(alignment: .bottom) {
-          if hoverBefore == false { MagicPlusInsertionMark() }
-        }
-        .a11yAnimation(.snappy(duration: 0.15), value: hoverBefore)
+        .taskInsertionMark(before: hoverBefore)
     } else {
       content
     }
@@ -616,23 +608,52 @@ struct MagicPlusRowDropModifier: ViewModifier {
 
 }
 
-/// The insertion mark: the ONE landing mark of a Magic Plus drag. A row gap,
-/// a header and a Tasks index row all show it, so the drop always reads as
-/// "a new task goes here" and never as "this row is the target".
+/// The insertion mark: the ONE landing mark in a task list, for a task drag
+/// (`TaskReorderDrop`, `TaskMoveDrop`) and for a Magic Plus drag. A row gap, a
+/// header and a Tasks index row all show it, so the drop always reads as "the
+/// task goes here" and never as "this row is the target". The AppKit list
+/// draws the same bar (`KitCardRowView.dropLine`).
 ///
 /// It is a thin tinted glass bar drawn over the row edge, and the list does
 /// NOT part around it (decided 2026-11-23). A parting gap moved every row
 /// under the finger, and every hit-test model built on top of that motion
 /// (live frames, rest frames, display-space gaps) still felt flaky. With a
 /// still list, the target is just the nearest edge of what the user sees.
-/// The new row animates in on drop.
-struct MagicPlusInsertionMark: View {
+/// The row animates in on drop.
+struct TaskInsertionMark: View {
+  static let height: CGFloat = 6
+
   var body: some View {
-    Color.clear
-      .glassCard(cornerRadius: 3, tint: AppearancePreferences.shared.magicPlusSwiftUIColor)
-      .frame(height: 6)
+    bar
+      .frame(height: Self.height)
       .padding(.horizontal, TaskCardMetrics.margin)
       .allowsHitTesting(false)
+  }
+
+  @ViewBuilder private var bar: some View {
+    let tint = AppearancePreferences.shared.magicPlusSwiftUIColor
+    #if os(iOS)
+    Color.clear.glassCard(cornerRadius: Self.height / 2, tint: tint)
+    #else
+    // Cards are flat on macOS (`glassCard` has no glass there).
+    RoundedRectangle(cornerRadius: Self.height / 2, style: .continuous).fill(tint)
+    #endif
+  }
+}
+
+extension View {
+  /// Draws the insertion mark over this row's edge: above it (`true`), below
+  /// it (`false`) or not at all (`nil`). The mark above a row covers the last
+  /// points of the row before it, so "above B" and "below A" are the same
+  /// place on screen and the mark never hops between the two.
+  func taskInsertionMark(before: Bool?) -> some View {
+    overlay(alignment: .top) {
+      if before == true { TaskInsertionMark().offset(y: -TaskInsertionMark.height) }
+    }
+    .overlay(alignment: .bottom) {
+      if before == false { TaskInsertionMark() }
+    }
+    .a11yAnimation(.snappy(duration: 0.15), value: before)
   }
 }
 
@@ -660,10 +681,7 @@ struct MagicPlusSectionDropModifier: ViewModifier {
           }
         }
         .onDisappear { drag.unregister(id: id) }
-        .overlay(alignment: .bottom) {
-          if isTargeted { MagicPlusInsertionMark() }
-        }
-        .a11yAnimation(.snappy(duration: 0.15), value: isTargeted)
+        .taskInsertionMark(before: isTargeted ? false : nil)
     } else {
       content
     }
@@ -748,7 +766,7 @@ struct MagicPlusListInsertModifier: ViewModifier {
         .onDisappear { drag.unregister(id: id) }
         .overlay(alignment: hoverBefore == true ? .top : .bottom) {
           if hoverBefore != nil {
-            MagicPlusInsertionMark()
+            TaskInsertionMark()
               .padding(.leading, lineInset)
               .offset(y: lineOffset)
           }

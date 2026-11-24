@@ -1,0 +1,61 @@
+{
+  "version": 1, "id": "founder",
+  "who": "Runs a six-person company that makes software for sailing schools. A sibling gets married in three weeks.",
+  "people": ["Noor", "Idris"],
+  "look": { "accent": "haskap", "texture": "fieldMatrix", "appearance": "dark" },
+  "areas": [{ "title": "Company", "emoji": "⛵️" }, { "title": "Hiring", "emoji": "🪑" }, { "title": "Family", "emoji": "💍" }, { "title": "Paperwork", "emoji": "🗂️" }],
+  "projects": [{ "title": "First support hire", "area": "Hiring" }, { "title": "Spring release", "area": "Company", "progress": 0.35 }, { "title": "Wedding", "area": "Family", "progress": 0.5 }],
+  "moments": [{
+    "id": "hire", "plot": "Two good candidates for the first support job, and a wedding in three weeks.",
+    "project": "First support hire", "order": ["First support hire", "Company", "Wedding"], "rolledIn": 1,
+    "tasks": [
+      { "id": "second-call", "title": "Second call with the Porto candidate", "group": "First support hire", "today": true, "notes": "Ask how they said no to a customer. Let Idris do most of the talking." },
+      { "id": "salary", "title": "Agree the salary range with Idris", "group": "First support hire", "today": true, "unread": true, "notes": "We said a number in September. It was for a different job." },
+      { "id": "trial", "title": "Pick five real tickets for the trial day", "group": "First support hire", "today": true },
+      { "id": "thanks", "title": "Write to the people we said no to", "group": "First support hire" },
+      { "id": "advert", "title": "Take the job advert down", "group": "First support hire", "done": true },
+      { "id": "laptop", "title": "Order a laptop in time for January", "group": "Inbox", "today": true, "proposal": true },
+      { "id": "harbour", "title": "harbour app", "group": "Inbox", "today": true, "muted": true },
+      { "id": "refund", "title": "Refund the sailing club in Kiel", "group": "Company", "today": true },
+      { "id": "price-page", "title": "Decide on the school discount", "group": "Company", "today": true, "muted": true },
+      { "id": "seating", "title": "Call Noor about the seating", "group": "Wedding", "today": true }
+    ],
+    "capture": { "title": "Thank Idris for the demo", "group": "Company" },
+    "anytime": ["second-call", "trial", "refund", "price-page", "seating"], "picked": ["second-call", "seating"],
+    "open": ["second-call", "salary"],
+    "file": { "title": "Ask the accountant about the trial day", "notes": "Can we pay someone for one day, or does it need a contract?", "with": ["laptop", "second-call", "refund"] },
+    "dated": { "title": "Make the offer", "notes": "Call first, then send the letter. Idris wants to be on the call.", "when": 4, "due": 6 },
+    "repeating": { "title": "Week notes to the team", "group": "Company", "notes": "What shipped, what hurt, one thanks.", "repeat": "Every {weekday}", "with": ["second-call", "refund"] },
+    "attachments": { "task": "trial", "notes": "Take out every name. One angry, one confused, one that is our fault, and two easy ones. Idris has the one about the lost bookings.", "files": ["ticket-lost-bookings.pdf", "ticket-refund.pdf", "trial-day-plan.pdf"] },
+    "upcoming": [
+      { "in": 1, "tasks": [{ "id": "suit", "title": "Suit fitting, Noor drives", "group": "Wedding" }] },
+      { "in": 3, "tasks": [{ "ref": "price-page", "due": 10 }, { "id": "board", "title": "Send the numbers to the two investors", "group": "Paperwork", "repeat": "Every month" }] },
+      { "in": 4, "tasks": [{ "id": "release-freeze", "title": "Freeze the spring release list", "group": "Spring release" }] },
+      { "in": 5, "tasks": [{ "id": "speech", "title": "First draft of the speech", "group": "Wedding", "notes": "Not the canoe story. Noor asked twice." }] },
+      { "in": 6, "tasks": ["thanks"] },
+      { "in": 7, "tasks": ["repeating", { "id": "payroll-docs", "title": "Sign the payroll form", "group": "Paperwork", "files": ["payroll-form.pdf"] }] }
+    ],
+    "agent": {
+      "title": "Compare three ways to run payroll", "notes": "Seven people from January, two of them abroad. Monthly cost, and how much of it lands on me.", "due": 7,
+      "question": "What should decide it?", "options": ["Least work for me", "Lowest monthly cost"],
+      "artifact": "Payroll comparison",
+      "bodies": ["The second option is the least work. It files for both countries and needs one approval a month. It costs €84 a month more than the cheapest.", "The first option is the cheapest at €126 a month. You would file the Portuguese forms yourself, about four a year."],
+      "otherBody": "All three can handle seven people in two countries. Looking at it your way: {answer}",
+      "handoff": "Read the comparison", "acceptance": "You know which payroll to set up."
+    },
+    "discuss": {
+      "title": "Reply to the candidate who asked for remote", "group": "First support hire", "notes": "They want three days at home. We are five at one big table and like it that way.",
+      "question": "What do you want to offer?", "options": ["Two days at home", "A trial of three days"],
+      "artifact": "Reply to the candidate",
+      "bodies": ["Thanks for being so clear about this. We can do two days at home from the start. One day a week we would like everyone at the table.", "Thanks for being so clear about this. Let’s try three days at home for the first two months, and then talk about how it went."],
+      "otherBody": "Thanks for being so clear about this. Here is what we can do: {answer}",
+      "draftHandoff": "Read the reply", "handoff": "Your next step: send it tonight", "acceptance": "The candidate knows what we offer.",
+      "with": ["second-call", "salary", "refund", "seating"]
+    },
+    "review": [
+      { "title": "Compare three ways to run payroll", "group": "Paperwork", "note": "Three options by cost and by work. One price is from a sales page, so ask.", "artifact": "Payroll comparison" },
+      { "title": "Sum up the trial day answers", "group": "First support hire", "note": "Both candidates’ five replies, side by side.", "artifact": "Trial day notes" }
+    ],
+    "faded": ["Write the “why we exist” post", "Learn the new boat terms", "Office plant, a real one", "Try stand-ups without sitting", "Rename the billing folder", "Visit the school in Split", "Mug with the old logo", "Ask about the kayak market", "Podcast with that coach", "Draw the org chart", "Read the negotiation book", "Print the big roadmap", "Fix the doorbell", "Sort the stickers", "Cancel the fax number"]
+  }]
+}

@@ -266,20 +266,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// Returns `0` when the task is done, off Today, an unratified agent row
   /// (it carries its own cue), or a legacy pin with no `todaySetOn` to date it.
   func daysOnToday(today: String = SeptenaDate.today) -> Int {
-    guard status == .open, !showsAgentCue(), isOnToday else { return 0 }
-    var landed: [String] = []
-    if self.today, let t = todaySetOn { landed.append(t) }
-    if let s = scheduled, s <= today { landed.append(s) }
-    if let d = deadline, d <= today { landed.append(d) }
-    guard var earliest = landed.min() else { return 0 }
-    if let created, created > earliest { earliest = created }
-    guard let from = SeptenaDate.parse(earliest),
-          let to = SeptenaDate.parse(today) else { return 0 }
-    let cal = Calendar.current
-    let days = cal.dateComponents([.day],
-                                  from: cal.startOfDay(for: from),
-                                  to: cal.startOfDay(for: to)).day ?? 0
-    return max(0, days)
+    // The core's rule (TaskListRules): whole days since the task landed on
+    // Today, floored at `created`; 0 for a fresh agent proposal.
+    Int(listMembership(today: today)?.daysOnToday ?? 0)
   }
 
   /// Tenure strength (0…1) for the **Today checkbox fill** — the single temporal
@@ -321,11 +310,8 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// not deleted, not faded) has one. Every row, badge, widget and watch
   /// label reads this instead of comparing dates itself.
   func deadlineState(today: String = SeptenaDate.today) -> DeadlineState {
-    guard status == .open, !isHeading, deletedAt == nil, fadedAt == nil,
-          let d = deadline.map({ String($0.prefix(10)) }), !d.isEmpty else { return .none }
-    if d < today { return .overdue }
-    if d == today { return .dueToday }
-    return .later
+    TaskListRules.deadlineState(listMembership(today: today),
+                                hasDeadline: !(deadline ?? "").isEmpty)
   }
 
   /// Whether this open task is on the Today list — the DTO mirror of
@@ -334,22 +320,12 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// that has arrived. UI surfaces (the Today toggle, indicators) must read
   /// this rather than the raw `today` flag, or a scheduled-today task looks
   /// like it isn't in Today. Keep in lockstep with `TaskEntity.isOnToday`.
-  var isOnToday: Bool {
-    guard status == .open, !isHeading, fadedAt == nil else { return false }
-    if today { return true }
-    if let s = scheduled, s <= SeptenaDate.today { return true }
-    if let d = deadline, d <= SeptenaDate.today { return true }
-    return false
-  }
+  var isOnToday: Bool { listMembership()?.isOnToday ?? false }
 
   /// `docs/TASK_DATES_SPEC.md` R5: open, not on Today, and a When date or
-  /// deadline after today. A task is never on Today and in Upcoming at once
-  /// (decision Q3). Every Upcoming list and count reads this.
-  var isUpcoming: Bool {
-    guard status == .open, !isHeading, fadedAt == nil, !isOnToday else { return false }
-    let today = SeptenaDate.today
-    return (scheduled.map { $0 > today } ?? false) || (deadline.map { $0 > today } ?? false)
-  }
+  /// deadline after today (the core's rule). Every Upcoming list and count
+  /// reads this.
+  var isUpcoming: Bool { listMembership()?.matchesUpcoming ?? false }
 
   /// Sort rank for Today-surface lists (Next ▸ Tasks Today, Tasks tab Today).
   /// Mirrors what the row trailing actually shows on Next — deadline drives
@@ -392,13 +368,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   }
 
   /// Whether this task sits in the **triage band**: the Inbox members not yet
-  /// ratified (see `TaskInbox.isUnratified`, `docs/TRIAGE_BAND_SPEC.md`).
+  /// ratified (the core's rule, `TaskListRules`; `docs/TRIAGE_BAND_SPEC.md`).
   /// DTO mirror of `TaskEntity.isInTriageBand`.
-  var isInTriageBand: Bool {
-    isInInbox && TaskInbox.isUnratified(source: source, createdAt: createdAt,
-                                        acknowledgedAt: acknowledgedAt, today: today,
-                                        scheduled: scheduled, deadline: deadline)
-  }
+  var isInTriageBand: Bool { listMembership()?.inTriageBand ?? false }
 
   /// The row the Today page draws in its Inbox section — see
   /// `TaskInbox.showsInTodayInbox`.
@@ -1568,29 +1540,6 @@ enum TaskInbox {
                        isFaded: Bool = false,
                        area: String?, project: String?) -> Bool {
     status == .open && !isHeading && !isDeleted && !isFaded && isUnfiled(area: area, project: project)
-  }
-
-  /// The triage band's ratification rule, applied to an Inbox member (the
-  /// band is `contains && isUnratified`). Two unratified populations:
-  ///   • an agent proposal still inside its freshness window, and
-  ///   • a human capture with no disposition at all (no Today pin, no date).
-  ///
-  /// Agent rows leave the band when (a) filed, (b) given a when/today *and*
-  /// acknowledged, or (c) the freshness window decays. Bare `acknowledge`
-  /// alone must NOT yank an undated proposal into Anytime — that was the
-  /// "click a dashed row and it vanishes" bug (peek/select used to ack).
-  static func isUnratified(source: String?, createdAt: Date, acknowledgedAt: Date?,
-                           today: Bool, scheduled: String?, deadline: String?) -> Bool {
-    if source == TaskSource.mcp {
-      guard createdAt != .distantPast else { return false }
-      guard Date().timeIntervalSince(createdAt) < AgentCue.decayWindow else { return false }
-      // Proposed with a when/today: stay until acknowledged (then it crosses
-      // into Today/Upcoming). Undated: stay for the whole freshness window
-      // even after ack — glow clears, row does not exile itself.
-      if today || scheduled != nil || deadline != nil { return acknowledgedAt == nil }
-      return true
-    }
-    return scheduled == nil && deadline == nil && !today
   }
 
   /// What the Today page draws in its Inbox section: the triage band, then

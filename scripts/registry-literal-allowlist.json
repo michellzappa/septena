@@ -194,12 +194,6 @@
       "issue": "#260"
     },
     {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "How AI helps with your tasks",
-      "reason": "Placeholder, section title or label with no registry field yet.",
-      "issue": "#260"
-    },
-    {
       "file": "Septena/Shell/Tasks/ImportFlowView.swift",
       "literal": "File",
       "reason": "Placeholder, section title or label with no registry field yet.",
@@ -281,6 +275,24 @@
       "file": "Septena/Shell/UI/AppearancePickerView.swift",
       "literal": "Appearance",
       "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/AppearancePickerView.swift",
+      "literal": "Header Texture",
+      "reason": "The accent_color item parts in settings.json own this copy since #371 (Android reads them); the Apple picker still spells it out.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/AppearancePickerView.swift",
+      "literal": "Slow drift",
+      "reason": "The accent_color item parts in settings.json own this copy since #371 (Android reads them); the Apple picker still spells it out.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/UI/AppearancePickerView.swift",
+      "literal": "Refreshes daily · pauses under Reduce Motion and Low Power.",
+      "reason": "The accent_color item parts in settings.json own this copy since #371 (Android reads them); the Apple picker still spells it out.",
       "issue": "#260"
     },
     {
@@ -539,6 +551,24 @@
       "file": "Septask/SeptaskKitTaskList.swift",
       "literal": "Projects",
       "reason": "Heading word that the places screen and import flow now hold in surfaces.json (#238); the Swift shells do not read it yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septena/Shell/Settings/ConnectedAppsDetails.swift",
+      "literal": "Copied",
+      "reason": "Copy-button feedback word that settings.json copy claude_connector now owns (#353); this pane does not read it yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/SeptaskFirstRun.swift",
+      "literal": "Copied",
+      "reason": "Copy-button feedback word that settings.json copy claude_connector now owns (#353); the first run does not read it yet.",
+      "issue": "#260"
+    },
+    {
+      "file": "Septask/TasksSkillPane.swift",
+      "literal": "Copied",
+      "reason": "Copy-button feedback word that settings.json copy claude_connector now owns (#353); this pane does not read it yet.",
       "issue": "#260"
     }
   ]

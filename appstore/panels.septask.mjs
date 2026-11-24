@@ -68,8 +68,8 @@ const VISUAL = {
   // Slide 5: agent work waits in Review until you accept it.
   "agent-result": {
     fruit: "carambola", texture: "stippleDrift",
-    shot: { ring: { element: "task-review-brief" } },
-    card: { kind: "review", element: "task-review-brief", top: 2110 },
+    shot: { ring: { element: "task-review-1" } },
+    card: { kind: "review", element: "task-review-1", top: 2110 },
   },
   // Slide 6: the list that lets go (T4). The Faded list, and the weekly
   // notice from the registry, counted from the screen.

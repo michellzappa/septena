@@ -194,26 +194,6 @@
     },
     {
       "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "How AI helps with your tasks",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Other…",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Type your answer",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Send",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
       "literal": "Agent work stopped",
       "reasonId": "predates-rule"
     },
@@ -225,26 +205,6 @@
     {
       "file": "Septena/Shell/Tasks/ConversationCard.swift",
       "literal": "Stop",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Send back",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "What needs another pass?",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Reply to thread",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Reply…",
       "reasonId": "predates-rule"
     },
     {
@@ -368,21 +328,6 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septena/Shell/Tasks/ReviewTaskRow.swift",
-      "literal": "Send back",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ReviewTaskRow.swift",
-      "literal": "What needs another pass?",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ReviewTaskRow.swift",
-      "literal": "Send",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septena/Shell/Tasks/TaskAttributeBar.swift",
       "literal": "Add step",
       "reasonId": "predates-rule"
@@ -419,11 +364,6 @@
     },
     {
       "file": "Septena/Shell/Tasks/TaskComponents.swift",
-      "literal": "Pick another date",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/TaskComponents.swift",
       "literal": "Set Date",
       "reasonId": "predates-rule"
     },
@@ -454,11 +394,6 @@
     },
     {
       "file": "Septena/Shell/Tasks/TaskListView.swift",
-      "literal": "Complete",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/TaskListView.swift",
       "literal": "More",
       "reasonId": "predates-rule"
     },
@@ -485,16 +420,6 @@
     {
       "file": "Septena/Shell/Tasks/TaskPatternsSection.swift",
       "literal": "Check a few things off and your completion pattern shows up here.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
-      "literal": "Time",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
-      "literal": "Add time",
       "reasonId": "predates-rule"
     },
     {
@@ -728,78 +653,13 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "Approve a sign-in",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "ABCD-EFGH",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "Enter the code from the other device. If you're connecting Claude, the code is in your browser.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "Checking the code…",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "Only approve a code you started yourself. Septena never asks for a code by email, text or phone call.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "Approving…",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "Approve",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "Don't approve",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "Try another code",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "To sign in on a new phone, tablet or computer, tap Get a sign-in code on it. Then scan or enter that code here.",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septask/SeptaskClaudePairingPane.swift",
       "literal": "Sign in with Apple so Claude can connect to your tasks through your private Septena account.",
       "reasonId": "predates-rule"
     },
     {
       "file": "Septask/SeptaskClaudePairingPane.swift",
-      "literal": "Sign in to connect Claude",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskClaudePairingPane.swift",
       "literal": "Connect Claude",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskClaudePairingPane.swift",
-      "literal": "Paste the setup prompt into Claude, or add the connector URL to Claude as a custom connector. When your browser shows a code, enter it here. Once connected, paste the first prompt to set up your areas, projects and tasks. Only enter a code from a browser window you opened yourself.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskClaudePairingPane.swift",
-      "literal": "Code from the browser page",
       "reasonId": "predates-rule"
     },
     {
@@ -938,51 +798,6 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Delete account",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Deletes your account and all your tasks on the Septena server.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Delete your account?",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "This deletes the following from the Septena server:",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Your tasks, areas and projects",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Your attachments",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Your task conversations",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Your synced settings",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "It also removes your tasks from this device and signs you out. You can’t undo this.",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septask/SeptaskWatchSettings.swift",
       "literal": "Never",
       "reasonId": "predates-rule"
@@ -1020,36 +835,6 @@
     {
       "file": "Septask/TasksSkillPane.swift",
       "literal": "MCP Skills",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "android/app/src/main/kotlin/app/septena/android/ui/SignInScreen.kt",
-      "literal": "Sign in to Septena",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "android/app/src/main/kotlin/app/septena/android/ui/SignInScreen.kt",
-      "literal": "Use a device where Septena is already signed in.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "android/app/src/main/kotlin/app/septena/android/ui/SignInScreen.kt",
-      "literal": "Get a sign-in code",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "android/app/src/main/kotlin/app/septena/android/ui/SignInScreen.kt",
-      "literal": "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "android/app/src/main/kotlin/app/septena/android/ui/SignInScreen.kt",
-      "literal": "The code works for 10 minutes. After you approve it, this screen continues by itself.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "android/app/src/main/kotlin/app/septena/android/ui/SignInScreen.kt",
-      "literal": "Get a new code",
       "reasonId": "predates-rule"
     }
   ]

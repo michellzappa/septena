@@ -438,7 +438,7 @@ public extension SectionManifest {
     // per-device token (Keychain, never CloudKit — GitHub is the source of
     // truth). Homepage tile (commit counts) + sidebar destination (year
     // heatmap + weekly sparkline). See GitHubPlugin / GitHubDestinationView
-    // / GitHubProvider and the `.github` wiring in WeekDashboardView.
+    // and the `.github` wiring in WeekDashboardView.
     .init(
       key: "github",
       defaultLabel: String(localized: "GitHub", comment: "Section name"),

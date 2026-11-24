@@ -369,7 +369,25 @@ struct TaskComposerCard: View {
 
   /// The task page depth this host shows (ADR 0029): the row editor is the
   /// quick edit, the drawer and the pushed page are the full page.
-  private var pageDepth: RegistryTaskPageDepth { presentation == .inline ? .inline : .page }
+  /// A task waiting for the user to accept it opens at the review depth: the
+  /// title, notes, the conversation (with Accept and Send back) and who added
+  /// it, without the edit rows.
+  private var pageDepth: RegistryTaskPageDepth {
+    if presentation == .inline { return .inline }
+    if editingTask?.conversation.needsHumanReview == true { return .review }
+    return .page
+  }
+
+  /// "Area › Project", the area, or the Inbox, for the review depth.
+  private var reviewListLabel: String {
+    if let pid = draft.projectId, let project = projects.first(where: { $0.id == pid }) {
+      if let aid = project.area, let area = areas.first(where: { $0.id == aid }) {
+        return "\(area.title) › \(project.title)"
+      }
+      return project.title
+    }
+    return draft.listLabel(areas: areas, projects: projects)
+  }
 
   /// The blocks to render, in registry order. A create, or an inline create
   /// held as a placeholder row, has no saved task, so `editOnly` blocks drop.
@@ -487,6 +505,12 @@ struct TaskComposerCard: View {
     let kinds = Set(blocks.map(\.kind))
     return VStack(alignment: .leading, spacing: inline ? 10 : 14) {
       if kinds.contains(.header) { titleNotesCard }
+      // The review depth has no List row: name where the task lives, read-only.
+      if pageDepth == .review {
+        Label(reviewListLabel, systemImage: RegistrySurfaces.taskAttribute("list").sfSymbol)
+          .font(.septenaMeta)
+          .foregroundStyle(Theme.inkSecondary)
+      }
 
       VStack(alignment: .leading, spacing: inline ? 10 : 14) {
         // Header draws above this column; checklist and attachments draw
@@ -637,12 +661,12 @@ struct TaskComposerCard: View {
       onDone: presentation == .inline ? { saveAndCloseFromKeyboard() } : nil,
       // The page shows notes as a visible text area: a taller box the whole
       // of which takes a tap. The quick edit keeps the one-line field.
-      minHeight: pageDepth == .page ? 120 : 28
+      minHeight: pageDepth != .inline ? 120 : 28
     )
       .onKeyPress(keys: [.tab]) { press in
         moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
       }
-    if pageDepth == .page {
+    if pageDepth != .inline {
       editor
         .padding(.horizontal, 14)
         .padding(.vertical, 12)

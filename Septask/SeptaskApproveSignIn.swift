@@ -36,7 +36,7 @@ struct SeptaskApproveSignInFlow: View {
     NavigationStack {
       Form { content }
         .formStyle(.grouped)
-        .navigationTitle("Approve a sign-in")
+        .navigationTitle(RegistrySettings.copy("sign_in_approval", "title"))
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -66,7 +66,7 @@ struct SeptaskApproveSignInFlow: View {
     switch step {
     case .enter:
       Section {
-        TextField("ABCD-EFGH", text: $code)
+        TextField(RegistrySettings.copy("sign_in_approval", "codePlaceholder"), text: $code)
           .font(.title2.monospaced())
           .multilineTextAlignment(.center)
           .autocorrectionDisabled()
@@ -75,7 +75,7 @@ struct SeptaskApproveSignInFlow: View {
           #endif
           .onSubmit { Task { await check() } }
       } footer: {
-        Text("Enter the code from the other device. If you're connecting Claude, the code is in your browser.")
+        Text(RegistrySettings.copy("sign_in_approval", "enterFooter"))
       }
       Section {
         Button("Continue") { Task { await check() } }
@@ -91,7 +91,7 @@ struct SeptaskApproveSignInFlow: View {
       Section {
         HStack(spacing: 10) {
           ProgressView().controlSize(.small)
-          Text("Checking the code…").foregroundStyle(.secondary)
+          Text(RegistrySettings.copy("sign_in_approval", "checking")).foregroundStyle(.secondary)
         }
       }
 
@@ -99,7 +99,7 @@ struct SeptaskApproveSignInFlow: View {
       Section {
         RequestSummary(request: request)
       } footer: {
-        Text("Only approve a code you started yourself. Septena never asks for a code by email, text or phone call.")
+        Text(RegistrySettings.copy("sign_in_approval", "safetyFooter"))
       }
       if request.kind == .connector {
         agentSection(approving: approving)
@@ -108,12 +108,12 @@ struct SeptaskApproveSignInFlow: View {
         if approving {
           HStack(spacing: 10) {
             ProgressView().controlSize(.small)
-            Text("Approving…").foregroundStyle(.secondary)
+            Text(RegistrySettings.copy("sign_in_approval", "approving")).foregroundStyle(.secondary)
           }
         } else {
-          Button("Approve") { Task { await approve(request) } }
+          Button(RegistrySettings.copy("sign_in_approval", "approve")) { Task { await approve(request) } }
             .fontWeight(.semibold)
-          Button("Don't approve", role: .cancel) { dismiss() }
+          Button(RegistrySettings.copy("sign_in_approval", "dontApprove"), role: .cancel) { dismiss() }
         }
       }
 
@@ -135,7 +135,7 @@ struct SeptaskApproveSignInFlow: View {
         Text(message).foregroundStyle(.red)
       }
       Section {
-        Button("Try another code") {
+        Button(RegistrySettings.copy("sign_in_approval", "tryAnother")) {
           code = ""
           step = .enter
         }
@@ -215,18 +215,18 @@ struct SeptaskApproveSignInFlow: View {
   static func doneText(for request: BackendPairingRequest) -> String {
     switch request.kind {
     case .device: return String(localized: "\(request.client) is signed in.")
-    case .connector: return String(localized: "Claude is connected. Go back to your browser to finish.")
+    case .connector: return RegistrySettings.copy("sign_in_approval", "doneConnector")
     }
   }
 
   static func message(for error: Error) -> String {
     switch error {
     case TaskBackendError.http(_, let code) where code == "invalid_code":
-      return String(localized: "That code is wrong or has expired.")
+      return RegistrySettings.copy("sign_in_approval", "invalidCode")
     case TaskBackendError.http(_, let code) where code == "code_used":
-      return String(localized: "That code was already used.")
+      return RegistrySettings.copy("sign_in_approval", "codeUsed")
     case TaskBackendError.http(_, let code) where code == "too_many_attempts":
-      return String(localized: "Too many wrong codes. Try again in 10 minutes.")
+      return RegistrySettings.copy("sign_in_approval", "tooManyAttempts")
     default:
       return (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
     }
@@ -304,14 +304,14 @@ struct SeptaskSignInApprovalSection: View {
         Button {
           showingFlow = true
         } label: {
-          Label("Approve a sign-in",
+          Label(RegistrySettings.copy("sign_in_approval", "title"),
                 systemImage: RegistryIcons.sfSymbols["settings.sign_in_approval"] ?? "person.badge.key")
         }
         .sheet(isPresented: $showingFlow) {
           SeptaskApproveSignInFlow()
         }
       } footer: {
-        Text("To sign in on a new phone, tablet or computer, tap Get a sign-in code on it. Then scan or enter that code here.")
+        Text(RegistrySettings.copy("sign_in_approval", "footer"))
       }
     }
   }

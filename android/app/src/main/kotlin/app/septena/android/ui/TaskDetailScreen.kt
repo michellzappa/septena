@@ -18,7 +18,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,7 +32,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,6 +55,7 @@ import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.SyncRecord
+import app.septena.core.TaskConversation
 import app.septena.core.TaskPageBlockKinds
 import app.septena.core.TaskProvenance
 import app.septena.core.TaskPageDepths
@@ -78,7 +77,6 @@ import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
@@ -104,6 +102,8 @@ private data class TaskDetailData(
     val projects: List<DetailListItem>,
     val checklist: List<ChecklistLine>,
     val tags: List<TagLine>,
+    /** The task's conversation hands it to the user for review (`needs_verify`). */
+    val needsReview: Boolean = false,
 )
 
 private data class RepeatUnitOption(val value: String, val title: String)
@@ -127,9 +127,6 @@ fun TaskDetailScreen(
 ) {
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val labels = remember(languageTag) { TaskDetailLabels.fromRegistry(languageTag) }
-    val pageBlocks = remember(languageTag) {
-        RegistryCatalog.taskPageBlocks(TaskPageDepths.PAGE, languageTag = languageTag)
-    }
     val attributes = remember(languageTag) { RegistryCatalog.taskAttributes(languageTag) }
     val dataVersion by graph.sync.dataVersion.collectAsStateWithLifecycle()
     val signedIn by graph.credentials.signedIn.collectAsStateWithLifecycle()
@@ -227,6 +224,17 @@ fun TaskDetailScreen(
         else -> labels.noDate
     }
     val deadline = taskFields[RegistryEntityFields.Task.DEADLINE].stringValue()
+    val reminderAt = taskFields[RegistryEntityFields.Task.REMINDER_AT].stringValue()
+    val reminderMode = taskFields[RegistryEntityFields.Task.REMINDER_MODE].stringValue()
+    val reminderValue = reminderAt?.let {
+        formatReminder(
+            reminderAt = it,
+            reminderMode = reminderMode,
+            snoozedUntil = taskFields[RegistryEntityFields.Task.REMINDER_SNOOZED_UNTIL].stringValue(),
+            today = graph.clock.today(graph.clock.now()),
+            languageTag = languageTag,
+        )
+    } ?: labels.control(RegistryTaskDetail.Controls.REMINDER_NONE)
     val repeatUnit = taskFields[RegistryEntityFields.Task.RECURRENCE_UNIT].stringValue()
     val repeatInterval = taskFields[RegistryEntityFields.Task.RECURRENCE_INTERVAL].longValue() ?: 1L
     val repeatAfterCompletion = repeatUnit == null ||
@@ -267,6 +275,16 @@ fun TaskDetailScreen(
     val savedTask = data?.task
     val canEdit = savedTask != null && !deleted && !saving
     val isTaskOpen = taskFields[RegistryEntityFields.Task.STATUS].stringValue() == RegistryEntityEnums.TaskStatus.OPEN && !deleted
+    // An open task waiting for the user to accept it opens at the registry review
+    // depth (docs/AGENT_PROMPT_SPEC.md). The depth follows the loaded data, so the
+    // page switches when the task loads, is accepted or is sent back.
+    val isReviewDepth = isTaskOpen && data?.needsReview == true
+    val pageBlocks = remember(languageTag, isReviewDepth) {
+        RegistryCatalog.taskPageBlocks(
+            if (isReviewDepth) TaskPageDepths.REVIEW else TaskPageDepths.PAGE,
+            languageTag = languageTag,
+        )
+    }
     val repeatSummary = labels.repeatUnits.firstOrNull { it.value == repeatUnit }?.title?.let { unitTitle ->
         if (repeatInterval > 1L) "$repeatInterval × $unitTitle" else unitTitle
     }
@@ -274,9 +292,9 @@ fun TaskDetailScreen(
         .joinToString(" · ")
         .ifEmpty { labels.noArea }
     // On the page the conversation runs with the attributes, as on iOS, where it
-    // sits inside the Discuss card. Android has no Discuss row (it cannot start
-    // a discussion), so the conversation shows directly under the attribute rows,
-    // headed with the Discuss label. Without an attributes block it keeps its own block.
+    // sits inside the Discuss card. On Android the conversation section shows
+    // directly under the attribute rows: the Discuss button before a thread
+    // exists, then the thread headed with the Discuss label. Without an attributes block it keeps its own block.
     val conversationBlock = pageBlocks.firstOrNull { it.kind == TaskPageBlockKinds.CONVERSATION }
     val conversationInAttributes = conversationBlock != null &&
         pageBlocks.any { it.kind == TaskPageBlockKinds.ATTRIBUTES }
@@ -310,6 +328,11 @@ fun TaskDetailScreen(
 
     fun setDeadline(day: String?) {
         write { check(graph.taskMutator.setDeadline(taskId, day) != null) }
+    }
+
+    // The write bumps dataVersion, and the graph arms the alarm from the store.
+    fun setReminder(reminderAt: String?, mode: String?) {
+        write { check(graph.taskMutator.setReminder(taskId, reminderAt, mode) != null) }
     }
 
     fun setTag(tagId: String, selected: Boolean) {
@@ -364,8 +387,8 @@ fun TaskDetailScreen(
      * On the page a picker is embedded, never modal (docs/TASK_PAGE_SPEC.md §3):
      * the picker folds open in the attribute's row, and a second tap on the row
      * folds it closed, which is Cancel. A commit writes through the attribute's
-     * setter and folds the row. One row is open at a time. Reminder and star
-     * have no Android editor yet.
+     * setter and folds the row. One row is open at a time. Star
+     * has no Android editor yet.
      */
     fun openAttribute(attributeId: String) {
         if (openPicker == attributeId) {
@@ -571,6 +594,19 @@ fun TaskDetailScreen(
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                             )
 
+                            // At the review depth the list (area › project) shows as one read-only line under the title.
+                            if (isReviewDepth) {
+                                val reviewList = listOfNotNull(selectedArea?.title, selectedProject?.title)
+                                    .joinToString(" › ")
+                                if (reviewList.isNotEmpty()) {
+                                    Text(
+                                        reviewList,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+
                             // The save error shows below the text fields. With no notes block, it shows below the header.
                             if (saveFailed && pageBlocks.none { it.kind == TaskPageBlockKinds.NOTES }) {
                                 Text(labels.saveError, color = MaterialTheme.colorScheme.error)
@@ -600,7 +636,7 @@ fun TaskDetailScreen(
                             HorizontalDivider()
                             // The attributes block holds no list of its own: it renders the
                             // registry task attributes in their order. Notes, checklist and
-                            // attachments have their own blocks. Reminder and star
+                            // attachments have their own blocks. Star and
                             // paste have no editor on Android yet. Each picker folds open in
                             // its own row through [openAttribute], never in a dialog.
                             attributes.forEach { attribute ->
@@ -612,9 +648,11 @@ fun TaskDetailScreen(
                                         enabled = canEdit,
                                         onToggle = { openAttribute(RegistryTaskAttributeIds.WHEN) },
                                     ) {
-                                        EmbeddedDatePicker(
+                                        TaskDateBoard(
+                                            attribute = RegistryTaskAttributeIds.WHEN,
                                             initialDay = scheduled ?: if (isToday) graph.clock.today(graph.clock.now()).toString() else null,
-                                            clearLabel = labels.clear,
+                                            today = graph.clock.today(graph.clock.now()),
+                                            languageTag = languageTag,
                                             enabled = canEdit,
                                             onSelect = { day -> openPicker = null; setWhen(day) },
                                             onClear = { openPicker = null; setWhen(null) },
@@ -627,12 +665,31 @@ fun TaskDetailScreen(
                                         enabled = canEdit,
                                         onToggle = { openAttribute(RegistryTaskAttributeIds.DEADLINE) },
                                     ) {
-                                        EmbeddedDatePicker(
+                                        TaskDateBoard(
+                                            attribute = RegistryTaskAttributeIds.DEADLINE,
                                             initialDay = deadline,
-                                            clearLabel = labels.clear,
+                                            today = graph.clock.today(graph.clock.now()),
+                                            languageTag = languageTag,
                                             enabled = canEdit,
                                             onSelect = { day -> openPicker = null; setDeadline(day) },
                                             onClear = { openPicker = null; setDeadline(null) },
+                                        )
+                                    }
+                                    RegistryTaskAttributeIds.REMINDER -> AttributeFoldRow(
+                                        label = attribute.label,
+                                        value = reminderValue,
+                                        expanded = openPicker == RegistryTaskAttributeIds.REMINDER,
+                                        enabled = canEdit,
+                                        onToggle = { openAttribute(RegistryTaskAttributeIds.REMINDER) },
+                                    ) {
+                                        TaskReminderPicker(
+                                            graph = graph,
+                                            reminderAt = reminderAt,
+                                            reminderMode = reminderMode,
+                                            enabled = canEdit,
+                                            control = labels::control,
+                                            onSet = { at, mode -> openPicker = null; setReminder(at, mode) },
+                                            onClear = { openPicker = null; setReminder(null, null) },
                                         )
                                     }
                                     RegistryTaskAttributeIds.LIST -> AttributeFoldRow(
@@ -995,39 +1052,6 @@ private fun ChoiceRow(
     )
 }
 
-/**
- * The month calendar, embedded in its attribute row. A pick of a day commits
- * it; Clear removes the date. Both fold the row through the caller.
- */
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun EmbeddedDatePicker(
-    initialDay: String?,
-    clearLabel: String,
-    enabled: Boolean,
-    onSelect: (String) -> Unit,
-    onClear: () -> Unit,
-) {
-    val initialMillis = remember(initialDay) { initialDay?.let(::dayToEpochMillis) }
-    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
-    val selectedMillis = datePickerState.selectedDateMillis
-    LaunchedEffect(selectedMillis) {
-        if (enabled && selectedMillis != null && selectedMillis != initialMillis) {
-            onSelect(Instant.ofEpochMilli(selectedMillis).atZone(ZoneOffset.UTC).toLocalDate().toString())
-        }
-    }
-    DatePicker(
-        state = datePickerState,
-        title = null,
-        showModeToggle = false,
-    )
-    TextButton(
-        onClick = onClear,
-        enabled = enabled,
-        modifier = Modifier.padding(horizontal = 8.dp),
-    ) { Text(clearLabel) }
-}
-
 @Composable
 private fun RepeatEditor(
     labels: TaskDetailLabels,
@@ -1333,7 +1357,6 @@ private data class TaskDetailLabels(
     val noDate: String,
     val noArea: String,
     val noProject: String,
-    val clear: String,
     val selectDate: String,
     val repeatUnits: List<RepeatUnitOption>,
     val weekdays: List<RepeatChoice>,
@@ -1392,7 +1415,6 @@ private data class TaskDetailLabels(
                 noDate = controls[RegistryTaskDetail.Controls.NO_DATE].orEmpty(),
                 noArea = controls[RegistryTaskDetail.Controls.NO_AREA].orEmpty(),
                 noProject = controls[RegistryTaskDetail.Controls.NO_PROJECT].orEmpty(),
-                clear = controls[RegistryTaskDetail.Controls.CLEAR].orEmpty(),
                 selectDate = controls[RegistryTaskDetail.Controls.SELECT_DATE].orEmpty(),
                 repeatUnits = units,
                 weekdays = repeatChoices("weekdays", hasShortTitle = true),
@@ -1451,7 +1473,10 @@ private suspend fun loadTaskDetail(graph: AndroidAppGraph, taskId: String): Task
             row.fields[RegistryEntityFields.Tag.NAME].stringValue()?.let { name -> TagLine(row.id, name) }
         }
         .sortedBy { it.name.lowercase() }
-    return TaskDetailData(task, areas, projects, checklist, tags)
+    val conversation = graph.taskStore.record(RegistryEntityNames.CONVO, taskId)?.let { record ->
+        TaskConversation.from(record, graph.taskStore.turns(taskId))
+    }
+    return TaskDetailData(task, areas, projects, checklist, tags, needsReview = conversation?.needsHumanReview == true)
 }
 
 /** When the task was added: the creation instant in the device zone, else its creation day. */
@@ -1472,9 +1497,6 @@ internal fun formatDay(day: String, languageTag: String): String = runCatching {
         .withLocale(Locale.forLanguageTag(languageTag))
         .format(LocalDate.parse(day.take(10)))
 }.getOrDefault(day)
-
-private fun dayToEpochMillis(day: String): Long? =
-    runCatching { LocalDate.parse(day.take(10)).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() }.getOrNull()
 
 private fun JsonValue?.longValue(): Long? = when (this) {
     is JsonValue.IntegerValue -> value

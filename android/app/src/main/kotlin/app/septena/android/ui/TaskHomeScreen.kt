@@ -1,6 +1,10 @@
 package app.septena.android.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +29,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
@@ -41,6 +46,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -60,9 +66,10 @@ import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryCapabilityIds
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryPlatformIds
-import app.septena.core.stringValue
+import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.ui.TaskHomeContent
 import app.septena.ui.TaskRowMenuAction
+import app.septena.ui.TaskSelection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -74,12 +81,10 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
     var openedTaskAttribute by rememberSaveable { mutableStateOf<String?>(null) }
     var quickFindOpen by rememberSaveable { mutableStateOf(false) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
-    var inlineDraftOpen by rememberSaveable { mutableStateOf(false) }
     val factory = remember(graph) { TaskHomeViewModelFactory(graph) }
     val homeViewModel: TaskHomeViewModel = viewModel(factory = factory)
     val state by homeViewModel.state.collectAsStateWithLifecycle()
     val selectHomeLocation: (TaskHomeLocation) -> Unit = { location ->
-        inlineDraftOpen = false
         homeViewModel.select(location)
     }
     val undoSnackbarHostState = remember { SnackbarHostState() }
@@ -95,7 +100,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
         taskRowMenuGroups(rowMenuId, (state.location as? TaskHomeLocation.SmartList)?.destinationId, languageTag)
     }
     val rowMenuAccessibilityLabel = remember(languageTag) {
-        registrySurfaceText("taskRowMenu", "accessibilityLabel", languageTag)
+        surfaceField(RegistrySurfaceIds.TASK_ROW_MENU, "accessibilityLabel", languageTag)
     }
     val shareTitle = RegistryCatalog.actionTitle(RegistryActionIds.TASK_SHARE, languageTag = languageTag).orEmpty()
     val openTaskWithAttribute: (String, String?) -> Unit = { id, attribute ->
@@ -118,6 +123,10 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
             }
             actionId == RegistryActionIds.TASK_DELETE -> homeViewModel.delete(id)
             actionId == RegistryActionIds.TASK_RESTORE -> homeViewModel.restore(id)
+            actionId == RegistryActionIds.TASK_ACCEPT_REVIEW -> homeViewModel.acceptReview(id)
+            actionId == RegistryActionIds.TASK_KEEP_FADED -> homeViewModel.keepFaded(id)
+            actionId == RegistryActionIds.TASK_LET_GO_FADED -> homeViewModel.letGoFaded(id)
+            actionId == RegistryActionIds.TASK_SELECT -> homeViewModel.toggleSelection(id)
         }
     }
     val undoTitle = RegistryCatalog.actionTitle(
@@ -159,10 +168,6 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
         is TaskHomeLocation.Project -> location.title
     }
     val quickAddTitle = RegistryCatalog.actionTitle(
-        RegistryActionIds.APP_QUICK_ADD,
-        languageTag = languageTag,
-    ).orEmpty()
-    val quickAddSubmitTitle = RegistryCatalog.actionAddTitle(
         RegistryActionIds.APP_QUICK_ADD,
         languageTag = languageTag,
     ).orEmpty()
@@ -265,7 +270,6 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         title = pageTitle,
                         sidebarActionTitle = sidebarActionTitle,
                         quickAddTitle = quickAddTitle,
-                        quickAddSubmitTitle = quickAddSubmitTitle,
                         quickFindTitle = quickFindTitle,
                         pauseAgentsTitle = pauseAgentsTitle,
                         completeTitle = completeTitle,
@@ -273,11 +277,9 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         emptyDescription = emptyDescription,
                         inboxTitle = inboxTitle,
                         todayTitle = todayTitle,
-                        inlineDraftOpen = inlineDraftOpen,
-                        onOpenInlineDraft = { inlineDraftOpen = true },
+                        homeViewModel = homeViewModel,
+                        languageTag = languageTag,
                         showNavigationAction = false,
-                        onDraftTitleChange = homeViewModel::updateDraft,
-                        onQuickAdd = homeViewModel::quickAdd,
                         onComplete = homeViewModel::complete,
                         rowMenuGroups = rowMenuGroups,
                         rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
@@ -333,7 +335,6 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         title = pageTitle,
                         sidebarActionTitle = sidebarActionTitle,
                         quickAddTitle = quickAddTitle,
-                        quickAddSubmitTitle = quickAddSubmitTitle,
                         quickFindTitle = quickFindTitle,
                         pauseAgentsTitle = pauseAgentsTitle,
                         completeTitle = completeTitle,
@@ -341,12 +342,10 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         emptyDescription = emptyDescription,
                         inboxTitle = inboxTitle,
                         todayTitle = todayTitle,
-                        inlineDraftOpen = inlineDraftOpen,
-                        onOpenInlineDraft = { inlineDraftOpen = true },
+                        homeViewModel = homeViewModel,
+                        languageTag = languageTag,
                         showNavigationAction = true,
                         onOpenNavigation = { scope.launch { drawerState.open() } },
-                        onDraftTitleChange = homeViewModel::updateDraft,
-                        onQuickAdd = homeViewModel::quickAdd,
                         onComplete = homeViewModel::complete,
                         rowMenuGroups = rowMenuGroups,
                         rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
@@ -528,7 +527,6 @@ private fun TaskHomeScaffold(
     title: String,
     sidebarActionTitle: String,
     quickAddTitle: String,
-    quickAddSubmitTitle: String,
     quickFindTitle: String,
     pauseAgentsTitle: String,
     completeTitle: String,
@@ -536,12 +534,10 @@ private fun TaskHomeScaffold(
     emptyDescription: String,
     inboxTitle: String,
     todayTitle: String,
-    inlineDraftOpen: Boolean,
-    onOpenInlineDraft: () -> Unit,
+    homeViewModel: TaskHomeViewModel,
+    languageTag: String,
     showNavigationAction: Boolean,
     onOpenNavigation: () -> Unit = {},
-    onDraftTitleChange: (String) -> Unit,
-    onQuickAdd: () -> Unit,
     rowMenuGroups: List<List<TaskRowMenuAction>>,
     rowMenuAccessibilityLabel: String,
     onComplete: (String) -> Unit,
@@ -551,98 +547,201 @@ private fun TaskHomeScaffold(
     onToggleAgentsPaused: () -> Unit,
     onSelectHomeLocation: (TaskHomeLocation) -> Unit,
 ) {
-    Scaffold(
-        floatingActionButton = if (state.canQuickAdd && state.location is TaskHomeLocation.SmartList) {
-            {
-                FloatingActionButton(
-                    onClick = onOpenInlineDraft,
-                    modifier = Modifier.semantics { contentDescription = quickAddTitle },
-                ) {
-                    Text(
-                        text = "+",
-                        style = MaterialTheme.typography.headlineSmall,
-                        textAlign = TextAlign.Center,
+    var quickAddOpen by rememberSaveable { mutableStateOf(false) }
+    var selectionPicker by remember { mutableStateOf<SelectionPicker?>(null) }
+    var allOnToday by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val selecting = state.selectedIds.isNotEmpty()
+    val destinationId = (state.location as? TaskHomeLocation.SmartList)?.destinationId
+    val formLabels = remember(languageTag) { TaskFormLabels.fromRegistry(languageTag) }
+    val selectToggleLabel = remember(languageTag) {
+        RegistryCatalog.actionTitle(RegistryActionIds.TASK_SELECT, languageTag = languageTag).orEmpty()
+    }
+    val selection = TaskSelection(
+        selectedIds = state.selectedIds,
+        enabled = remember(destinationId) {
+            RegistryActionResolver.isAvailable(
+                RegistryActionIds.TASK_SELECT,
+                RegistryActionContext(RegistryPlatformIds.ANDROID, destinationId, selectedCount = 1),
+            )
+        },
+        toggleLabel = selectToggleLabel,
+        onToggle = homeViewModel::toggleSelection,
+    )
+    LaunchedEffect(state.selectedIds) { allOnToday = homeViewModel.allOnToday(state.selectedIds) }
+    BackHandler(enabled = selecting) { homeViewModel.clearSelection() }
+
+    if (quickAddOpen) {
+        QuickAddSheet(
+            today = graph.clock.today(graph.clock.now()),
+            errorMessage = state.errorMessage,
+            areas = state.areas,
+            projects = state.projects,
+            languageTag = languageTag,
+            onDismiss = { quickAddOpen = false },
+            onAdd = { draft -> homeViewModel.quickAdd(draft) { quickAddOpen = false } },
+        )
+    }
+    when (selectionPicker) {
+        SelectionPicker.When -> TaskWhenSheet(
+            today = graph.clock.today(graph.clock.now()),
+            languageTag = languageTag,
+            onDismiss = { selectionPicker = null },
+            onPick = { day ->
+                selectionPicker = null
+                homeViewModel.setWhenForSelection(day)
+            },
+        )
+        SelectionPicker.List -> TaskListPickerDialog(
+            title = RegistryCatalog.actionTitle(RegistryActionIds.TASK_MOVE, field = "pluralTitle", languageTag = languageTag)
+                .orEmpty(),
+            areaId = null,
+            projectId = null,
+            showsCurrent = false,
+            areas = state.areas,
+            projects = state.projects,
+            labels = formLabels,
+            onDismiss = { selectionPicker = null },
+            onPick = { areaId, projectId ->
+                selectionPicker = null
+                homeViewModel.moveSelection(areaId, projectId)
+            },
+        )
+        null -> Unit
+    }
+
+    // The header texture sits behind the transparent app bar and the first
+    // rows, on the page background (iPhone `HeaderWashView`).
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        HeaderWashBackdrop()
+        Scaffold(
+            containerColor = Color.Transparent,
+            bottomBar = if (selecting) {
+                {
+                    TaskSelectionBar(
+                        selectedCount = state.selectedIds.size,
+                        destinationId = destinationId,
+                        allOnToday = allOnToday,
+                        allSelected = remember(state.selectedIds, state.inboxTasks, state.tasks) {
+                            (state.inboxTasks + state.tasks).all { it.id in state.selectedIds }
+                        },
+                        canComplete = state.canComplete,
+                        languageTag = languageTag,
+                        onCommand = { command ->
+                            when (command) {
+                                is TaskSelectionCommand.Apply -> homeViewModel.applyToSelection(command.actionId)
+                                is TaskSelectionCommand.SetToday -> homeViewModel.applyToSelection(
+                                    RegistryActionIds.TASK_TOGGLE_TODAY,
+                                    todayEnabled = command.enabled,
+                                )
+                                TaskSelectionCommand.PickWhen -> { selectionPicker = SelectionPicker.When }
+                                TaskSelectionCommand.PickList -> { selectionPicker = SelectionPicker.List }
+                                TaskSelectionCommand.Copy -> homeViewModel.copySelection { text ->
+                                    context.getSystemService(ClipboardManager::class.java)
+                                        ?.setPrimaryClip(ClipData.newPlainText(null, text))
+                                }
+                                TaskSelectionCommand.ToggleSelectAll -> homeViewModel.toggleSelectAll()
+                                TaskSelectionCommand.Done -> homeViewModel.clearSelection()
+                            }
+                        },
                     )
                 }
-            }
-        } else {
-            {}
-        },
-        topBar = {
-            TopAppBar(
-                title = { Text(title) },
-                navigationIcon = if (showNavigationAction) {
-                    {
-                        TextButton(onClick = onOpenNavigation) {
-                            Text(sidebarActionTitle)
+            } else {
+                {}
+            },
+            floatingActionButton = if (!selecting && state.canQuickAdd && state.location is TaskHomeLocation.SmartList) {
+                {
+                    FloatingActionButton(
+                        onClick = { quickAddOpen = true },
+                        modifier = Modifier.semantics { contentDescription = quickAddTitle },
+                    ) {
+                        Text(
+                            text = "+",
+                            style = MaterialTheme.typography.headlineSmall,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+            } else {
+                {}
+            },
+            topBar = {
+                TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent,
+                    ),
+                    title = { Text(title) },
+                    navigationIcon = if (showNavigationAction) {
+                        {
+                            TextButton(onClick = onOpenNavigation) {
+                                Text(sidebarActionTitle)
+                            }
                         }
-                    }
-                } else {
-                    {}
-                },
-                actions = {
-                    TextButton(onClick = onToggleAgentsPaused) {
-                        Text(pauseAgentsTitle)
-                    }
-                    TextButton(onClick = onQuickFind) {
-                        Text(quickFindTitle)
-                    }
-                },
-            )
-        },
-    ) { contentPadding ->
-        when (val location = state.location) {
-            is TaskHomeLocation.Area -> AreasProjectsScreen(
-                graph = graph,
-                destination = AreasProjectsDestination.Area(location.id),
-                modifier = Modifier.padding(contentPadding),
-                rowMenuGroups = rowMenuGroups,
-                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                onTaskAction = onTaskAction,
-                onOpenProject = { projectId ->
-                    val project = state.projects.firstOrNull {
-                        (it.location as? TaskHomeLocation.Project)?.id == projectId
-                    }?.location ?: TaskHomeLocation.Project(projectId, "")
-                    onSelectHomeLocation(project)
-                },
-                onOpenTask = onOpenTask,
-            )
-            is TaskHomeLocation.Project -> AreasProjectsScreen(
-                graph = graph,
-                destination = AreasProjectsDestination.Project(location.id),
-                modifier = Modifier.padding(contentPadding),
-                onOpenTask = onOpenTask,
-                rowMenuGroups = rowMenuGroups,
-                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                onTaskAction = onTaskAction,
-            )
-            is TaskHomeLocation.SmartList -> TaskHomeContent(
-                quickAddTitle = quickAddTitle,
-                quickAddSubmitTitle = quickAddSubmitTitle,
-                completeTitle = completeTitle,
-                emptyTitle = emptyTitle,
-                emptyDescription = emptyDescription,
-                inboxBandTitle = inboxTitle,
-                todayTitle = todayTitle,
-                todayTint = MaterialTheme.colorScheme.secondary,
-                hasLoaded = state.hasLoaded,
-                isToday = location.destinationId == RegistryDestinationIds.TODAY,
-                inboxTasks = state.inboxTasks,
-                tasks = state.tasks,
-                canQuickAdd = state.canQuickAdd,
-                isDraftOpen = inlineDraftOpen,
-                canComplete = state.canComplete,
-                draftTitle = state.draftTitle,
-                errorMessage = state.errorMessage,
-                rowMenuGroups = rowMenuGroups,
-                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                modifier = Modifier.padding(contentPadding),
-                onDraftTitleChange = onDraftTitleChange,
-                onQuickAdd = onQuickAdd,
-                onComplete = onComplete,
-                onOpenTask = onOpenTask,
-                onTaskAction = onTaskAction,
-            )
+                    } else {
+                        {}
+                    },
+                    actions = {
+                        TextButton(onClick = onToggleAgentsPaused) {
+                            Text(pauseAgentsTitle)
+                        }
+                        TextButton(onClick = onQuickFind) {
+                            Text(quickFindTitle)
+                        }
+                    },
+                )
+            },
+        ) { contentPadding ->
+            when (val location = state.location) {
+                is TaskHomeLocation.Area -> AreasProjectsScreen(
+                    graph = graph,
+                    destination = AreasProjectsDestination.Area(location.id),
+                    modifier = Modifier.padding(contentPadding),
+                    rowMenuGroups = rowMenuGroups,
+                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    onTaskAction = onTaskAction,
+                    selection = selection,
+                    onOpenProject = { projectId ->
+                        val project = state.projects.firstOrNull {
+                            (it.location as? TaskHomeLocation.Project)?.id == projectId
+                        }?.location ?: TaskHomeLocation.Project(projectId, "")
+                        onSelectHomeLocation(project)
+                    },
+                    onOpenTask = onOpenTask,
+                )
+                is TaskHomeLocation.Project -> AreasProjectsScreen(
+                    graph = graph,
+                    destination = AreasProjectsDestination.Project(location.id),
+                    modifier = Modifier.padding(contentPadding),
+                    onOpenTask = onOpenTask,
+                    rowMenuGroups = rowMenuGroups,
+                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    onTaskAction = onTaskAction,
+                    selection = selection,
+                )
+                is TaskHomeLocation.SmartList -> TaskHomeContent(
+                    completeTitle = completeTitle,
+                    emptyTitle = emptyTitle,
+                    emptyDescription = emptyDescription,
+                    inboxBandTitle = inboxTitle,
+                    todayTitle = todayTitle,
+                    todayTint = MaterialTheme.colorScheme.secondary,
+                    hasLoaded = state.hasLoaded,
+                    isToday = location.destinationId == RegistryDestinationIds.TODAY,
+                    inboxTasks = state.inboxTasks,
+                    tasks = state.tasks,
+                    canQuickAdd = state.canQuickAdd,
+                    canComplete = state.canComplete,
+                    errorMessage = state.errorMessage,
+                    rowMenuGroups = rowMenuGroups,
+                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    modifier = Modifier.padding(contentPadding),
+                    selection = selection,
+                    onComplete = onComplete,
+                    onOpenTask = onOpenTask,
+                    onTaskAction = onTaskAction,
+                )
+            }
         }
     }
 }
@@ -656,6 +755,9 @@ private fun taskRowMenuGroups(
         setOf(RegistryActionIds.TASK_RESTORE)
     } else {
         setOf(
+            RegistryActionIds.TASK_ACCEPT_REVIEW,
+            RegistryActionIds.TASK_KEEP_FADED,
+            RegistryActionIds.TASK_LET_GO_FADED,
             RegistryActionIds.TASK_OPEN,
             RegistryActionIds.TASK_WHEN,
             RegistryActionIds.TASK_MOVE,
@@ -664,6 +766,7 @@ private fun taskRowMenuGroups(
             RegistryActionIds.TASK_TOGGLE_STAR,
             RegistryActionIds.TASK_DUPLICATE,
             RegistryActionIds.TASK_SHARE,
+            RegistryActionIds.TASK_SELECT,
             RegistryActionIds.TASK_DELETE,
         )
     }
@@ -692,10 +795,7 @@ private fun taskRowMenuGroups(
     }
 }
 
-private fun registrySurfaceText(surfaceId: String, field: String, languageTag: String): String {
-    val key = RegistryCatalog.surface(surfaceId)?.fields?.get(field).stringValue().orEmpty()
-    return RegistryCatalog.localizedString(key, languageTag) ?: key
-}
+private enum class SelectionPicker { When, List }
 
 private class TaskHomeViewModelFactory(
     private val graph: AndroidAppGraph,

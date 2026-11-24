@@ -24,6 +24,14 @@ import java.time.Instant
 class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
     private val queries = database.syncQueries
 
+    /**
+     * Called after a committed sync transaction removes a non-task row because
+     * the server deleted it (for example, to remove a cached attachment file).
+     * Never called for a reset pull or a rolled-back transaction.
+     */
+    @Volatile
+    var onRemoteDelete: (entity: String, id: String) -> Unit = { _, _ -> }
+
     constructor(driver: SqlDriver) : this(SeptenaDatabase(driver))
 
     override suspend fun record(entity: String, id: String): SyncRecord? =
@@ -111,6 +119,7 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
     }
 
     override suspend fun applyPushResults(results: List<SyncOperationResult>, at: Instant) {
+        val remotelyDeleted = mutableListOf<Pair<String, String>>()
         database.transaction {
             val outbox = queries.selectAllOutbox().executeAsList().associateBy { it.clientOpId }.toMutableMap()
             for (result in results) {
@@ -130,6 +139,10 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
                             retryable = 0L,
                         )
                         markDropped(operation, result.revision, at)
+                        val (entity, id) = operation.entityId()
+                        if (entity != RegistryEntityNames.TASK && entity != "turn") {
+                            remotelyDeleted += entity to id
+                        }
                         queries.deleteOutbox(result.clientOpId)
                     }
                     SyncResultStatus.REJECTED -> {
@@ -150,6 +163,8 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
                 }
             }
         }
+        val listener = onRemoteDelete
+        remotelyDeleted.forEach { (entity, id) -> listener(entity, id) }
     }
 
     override suspend fun notSyncedOperations(): List<RejectedSyncOperation> =
@@ -182,6 +197,7 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
     override suspend fun applyPullPage(page: app.septena.core.SyncPullPage, at: Instant) {
         require(!page.resetRequired) { "A reset-required page must be handled by the sync engine" }
         require(page.nextSince >= syncCursor()) { "Sync cursor moved backwards" }
+        val remotelyDeleted = mutableListOf<Pair<String, String>>()
         database.transaction {
             val outbox = queries.selectAllOutbox().executeAsList()
             val pendingFields = mutableMapOf<Pair<String, String>, MutableSet<String>>()
@@ -236,6 +252,7 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
                             )
                         } else {
                             queries.deleteRecord(change.entity, rowId)
+                            if (!plan.keepLocalRow) remotelyDeleted += change.entity to rowId
                         }
                         queries.upsertShadow(change.entity, rowId, canonical(plan.shadowJson), plan.revision, 1L, 1L)
                     }
@@ -258,6 +275,8 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
             }
             queries.setSyncCursor(page.nextSince.toString())
         }
+        val listener = onRemoteDelete
+        remotelyDeleted.forEach { (entity, rowId) -> listener(entity, rowId) }
     }
 
     override suspend fun syncCursor(): Long =
@@ -270,6 +289,22 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
             queries.deleteAllShadows()
             queries.deleteAllTurns()
             queries.setSyncCursor("0")
+        }
+    }
+
+    /**
+     * Removes every local row, turn, outbox entry, shadow and the sync cursor: the account is gone
+     * (account deletion). Not part of [TaskStore]: only the app's account flow calls it.
+     */
+    fun wipeAllLocalData() {
+        database.transaction {
+            queries.deleteAllRecords()
+            queries.deleteAllShadows()
+            queries.deleteAllTurns()
+            queries.deleteAllLocalTurnRows()
+            queries.deleteAllOutboxRows()
+            queries.deleteAllRejectedRows()
+            queries.deleteAllMetadata()
         }
     }
 

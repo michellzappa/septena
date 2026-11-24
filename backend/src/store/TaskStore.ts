@@ -672,6 +672,16 @@ export class TaskStore extends DurableObject<Env> {
       }
     }
 
+    // `endStateAt` (server-owned) records when `endState` last changed, so
+    // Review can show how long a hand-off has waited.
+    if (op.entity === "convo" && "endState" in op.fields) {
+      const previous = (row?.endState as string | null | undefined) ?? null;
+      if (((op.fields.endState as string | null | undefined) ?? null) !== previous) {
+        op.fields.endStateAt = now;
+        names.push("endStateAt");
+      }
+    }
+
     const rev = this.nextRev();
     const cols = Object.entries(spec.columns);
     if (!row) {
