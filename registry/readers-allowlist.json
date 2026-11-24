@@ -81,6 +81,10 @@
       "reason": "Android renders taskPage.blocks by kind (ADR 0029, #305) and reads no block by its ID.",
       "issue": "#305"
     },
+    "RegistrySurfaceIds.*": {
+      "reason": "Android reads top-level surfaces as their screens ship; the rest still name their ID as a literal.",
+      "issue": "#174"
+    },
     "RegistryActionIds.*": {
       "reason": "Android implements a subset of the registry; members gain readers as features ship (ADR 0028). Actions and menus.",
       "issue": "#174"
@@ -141,19 +145,11 @@
       "reason": "Privacy settings are not on Android yet.",
       "issue": "#244"
     },
-    "RegistryEntityEnums.ReminderMode.*": {
-      "reason": "Reminders are not on Android yet.",
-      "issue": "#174"
-    },
     "RegistryEntityEnums.ConvoAssignee.*": {
       "reason": "Task conversations are not on Android yet.",
       "issue": "#242"
     },
     "RegistryEntityEnums.ConvoEndState.*": {
-      "reason": "Task conversations are not on Android yet.",
-      "issue": "#242"
-    },
-    "RegistryEntityEnums.ConvoHandoffActionType.*": {
       "reason": "Task conversations are not on Android yet.",
       "issue": "#242"
     },
@@ -178,7 +174,7 @@
       "issue": "#174"
     },
     "RegistryEntityFields.Task.*": {
-      "reason": "Reminder fields: reminders are not on Android yet.",
+      "reason": "deferCount, dropReason and effort: Android does not read or write them yet.",
       "issue": "#174"
     },
     "RegistryRules.CUE_DECAY_DAYS": {

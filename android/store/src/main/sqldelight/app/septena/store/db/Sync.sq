@@ -216,3 +216,15 @@ UPDATE sync_record SET revision = NULL, updated_at = NULL, remote_known = 0;
 
 deleteAllMetadata:
 DELETE FROM sync_metadata;
+
+deleteAllRecords:
+DELETE FROM sync_record;
+
+deleteAllLocalTurnRows:
+DELETE FROM sync_local_turn;
+
+deleteAllOutboxRows:
+DELETE FROM sync_outbox;
+
+deleteAllRejectedRows:
+DELETE FROM sync_rejected;

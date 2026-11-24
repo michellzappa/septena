@@ -3,31 +3,45 @@ package app.septena.android.ui
 import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
+import app.septena.core.RegistryCatalog
 import app.septena.core.TaskProvenance
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
+import app.septena.core.generated.RegistrySettingKeys
 import app.septena.core.generated.RegistryTaskDetail
 import app.septena.core.stringValue
 import app.septena.transport.TaskChange
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
 
@@ -41,10 +55,43 @@ internal data class TaskHistoryRow(
     val lines: List<String>,
 )
 
+/** One upsell note from `registry/plans.json` `upsells` (same shape as iOS `RegistryPlanNote`). */
+internal data class PlanUpsellNote(
+    val id: String,
+    val title: String,
+    val detail: String,
+)
+
+private const val HISTORY_EDGE_UPSELL_ID = "history_edge"
+
+/**
+ * The quiet last line under History when the server says the free plan's
+ * window hid older changes (`TaskHistory.edgeUpsell` on Apple, spec §3.2).
+ * The server judges; returns null otherwise.
+ */
+internal fun historyEdgeUpsell(upsellId: String?, languageTag: String): PlanUpsellNote? {
+    if (upsellId != HISTORY_EDGE_UPSELL_ID) return null
+    val upsells = (RegistryCatalog.document("plans").fields["upsells"] as? JsonValue.ArrayValue)
+        ?.values
+        .orEmpty()
+    val match = upsells
+        .filterIsInstance<JsonValue.ObjectValue>()
+        .firstOrNull { it.fields["id"].stringValue() == HISTORY_EDGE_UPSELL_ID }
+        ?: return null
+    val title = registryText(match.fields["title"].stringValue(), languageTag)
+    val detail = registryText(match.fields["detail"].stringValue(), languageTag)
+    if (title.isEmpty()) return null
+    return PlanUpsellNote(id = HISTORY_EDGE_UPSELL_ID, title = title, detail = detail)
+}
+
 private sealed interface HistoryState {
     data object Loading : HistoryState
     data object Failed : HistoryState
-    data class Loaded(val rows: List<TaskHistoryRow>) : HistoryState
+    data class Loaded(
+        val rows: List<TaskHistoryRow>,
+        val edge: PlanUpsellNote?,
+        val edgeSeen: Boolean,
+    ) : HistoryState
 }
 
 /**
@@ -61,12 +108,22 @@ internal fun TaskHistoryList(
     control: (String) -> String,
 ) {
     var state by remember(taskId) { mutableStateOf<HistoryState>(HistoryState.Loading) }
+    var showingPlus by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
     LaunchedEffect(graph, taskId) {
         state = HistoryState.Loading
         state = try {
             val page = graph.taskBackend.history(taskId)
-            val titles = withContext(Dispatchers.IO) { listTitles(graph) }
-            HistoryState.Loaded(TaskHistoryText(control, languageTag).rows(page.changes) { titles[it] })
+            val (titles, seenUpsells) = withContext(Dispatchers.IO) {
+                listTitles(graph) to upsellsSeen(graph)
+            }
+            val edge = historyEdgeUpsell(page.upsell, languageTag)
+            HistoryState.Loaded(
+                rows = TaskHistoryText(control, languageTag).rows(page.changes) { titles[it] },
+                edge = edge,
+                edgeSeen = edge != null && edge.id in seenUpsells,
+            )
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -81,14 +138,125 @@ internal fun TaskHistoryList(
         when (val current = state) {
             HistoryState.Loading -> CircularProgressIndicator()
             HistoryState.Failed -> HistoryNote(control(RegistryTaskDetail.Controls.HISTORY_LOAD_FAILED))
-            is HistoryState.Loaded -> if (current.rows.isEmpty()) {
+            is HistoryState.Loaded -> if (current.rows.isEmpty() && current.edge == null) {
                 HistoryNote(control(RegistryTaskDetail.Controls.HISTORY_EMPTY))
             } else {
                 val now = System.currentTimeMillis()
                 current.rows.forEach { row -> HistoryRowView(row, now) }
+                current.edge?.let { edge ->
+                    HistoryEdgeLine(
+                        edge = edge,
+                        seen = current.edgeSeen,
+                        languageTag = languageTag,
+                        onSeePlus = {
+                            if (!current.edgeSeen) {
+                                state = current.copy(edgeSeen = true)
+                            }
+                            showingPlus = true
+                            scope.launch {
+                                runCatching { withContext(Dispatchers.IO) { markUpsellSeen(graph, edge.id) } }
+                            }
+                        },
+                    )
+                }
             }
         }
     }
+
+    if (showingPlus) {
+        HistoryPlusSheet(
+            graph = graph,
+            languageTag = languageTag,
+            onDismiss = { showingPlus = false },
+        )
+    }
+}
+
+/**
+ * A quiet last line: older changes are hidden, one tap to Plus. The detail
+ * shows until the account has seen this moment; after that only the title and
+ * the button stay (iOS `TaskHistoryPanel.edgeLine`, spec §7.1).
+ */
+@Composable
+private fun HistoryEdgeLine(
+    edge: PlanUpsellNote,
+    seen: Boolean,
+    languageTag: String,
+    onSeePlus: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            edge.title,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (!seen && edge.detail.isNotEmpty()) {
+            Text(
+                edge.detail,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        TextButton(
+            onClick = onSeePlus,
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Text(
+                plansText(languageTag, "paywall", "seePlus"),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HistoryPlusSheet(
+    graph: AndroidAppGraph,
+    languageTag: String,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val plans = remember(graph) { PlanSettingsModel(graph) }
+    LaunchedEffect(graph) { plans.refresh(signedIn = true) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 24.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Spacer(modifier = Modifier.weight(1f))
+                TextButton(onClick = onDismiss) {
+                    Text(plansText(languageTag, "paywall", "done"))
+                }
+            }
+            PlusOffer(plans = plans, languageTag = languageTag)
+        }
+    }
+}
+
+private suspend fun upsellsSeen(graph: AndroidAppGraph): Set<String> =
+    (graph.syncedSettings.value(RegistrySettingKeys.UPSELLS_SEEN) as? JsonValue.ArrayValue)
+        ?.values
+        ?.mapNotNull { it.stringValue() }
+        ?.toSet()
+        .orEmpty()
+
+private suspend fun markUpsellSeen(graph: AndroidAppGraph, id: String) {
+    val current = upsellsSeen(graph)
+    if (id in current) return
+    val updated = (current + id).sorted().map { JsonValue.StringValue(it) }
+    graph.syncedSettingsMutator.set(RegistrySettingKeys.UPSELLS_SEEN, JsonValue.ArrayValue(updated))
+    graph.sync.noteLocalChange()
+    graph.sync.requestSync()
 }
 
 @Composable

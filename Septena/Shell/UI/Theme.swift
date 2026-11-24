@@ -679,3 +679,16 @@ extension Color {
   /// surfaces like the reconnect banner.
   static let claudeAccent = Color(red: 0xF5 / 255, green: 0x85 / 255, blue: 0x6B / 255)
 }
+
+extension ControlSize {
+  /// Size for a text action button inside a task surface (Accept, Send back,
+  /// Send). Touch needs a 44pt target, so iPhone and iPad use `.large`; the
+  /// Mac keeps the compact `.small` its pointer targets fine.
+  static var taskAction: ControlSize {
+    #if os(iOS)
+    .large
+    #else
+    .small
+    #endif
+  }
+}

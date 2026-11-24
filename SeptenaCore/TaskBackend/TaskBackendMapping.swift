@@ -296,7 +296,7 @@ enum TaskBackendMapping {
       "endState": c.text("endState", convo.endState?.rawValue, max: 32),
       "endStateNote": c.text("endStateNote", convo.endStateNote, max: notesMax),
       "assignee": .from(convo.assignee?.rawValue),
-      // `claimedBy` / `claimUntil` are server-owned and never pushed.
+      // `claimedBy` / `claimUntil` / `endStateAt` are server-owned and never pushed.
       "stoppedAt": convo.stoppedAt.map { .string(stamp($0)) } ?? .null,
       "artifact": .null,
       "handoff": .null,

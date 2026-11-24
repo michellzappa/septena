@@ -4,6 +4,7 @@ import app.septena.core.TaskSyncEngine
 import app.septena.transport.SyncAuthenticationException
 import app.septena.transport.SyncSubscriptionRequiredException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,18 +44,46 @@ class SyncController(
     private val _dataVersion = MutableStateFlow(0L)
     val dataVersion: StateFlow<Long> = _dataVersion.asStateFlow()
 
+    /** Set while account deletion runs: no sync may write rows back after the server emptied the store. */
+    @Volatile private var paused = false
+
     fun requestSync() {
         again.set(true)
+        if (paused) return
         if (!running.compareAndSet(false, true)) return
+        // `pause` sets the flag, then waits on `running`; this checks in the opposite order, so a
+        // sync that slips past the first check above still never starts once `pause` has returned.
+        if (paused) {
+            running.set(false)
+            return
+        }
         scope.launch(Dispatchers.IO) {
             try {
                 while (again.getAndSet(false)) runOnce()
             } finally {
                 running.set(false)
                 // A request that landed between the last check and the reset above.
-                if (again.get()) requestSync()
+                if (again.get() && !paused) requestSync()
             }
         }
+    }
+
+    /** Runs a sync now and returns when it and any coalesced follow-up have finished. */
+    suspend fun syncAndWait() {
+        requestSync()
+        while (running.get()) delay(POLL_MS)
+    }
+
+    /** Stops new syncs and waits for a running one to finish. [resume] lets them run again. */
+    suspend fun pause() {
+        paused = true
+        while (running.get()) delay(POLL_MS)
+    }
+
+    /** Allows syncs again and, when one was asked for meanwhile, runs it. */
+    fun resume() {
+        paused = false
+        if (again.get()) requestSync()
     }
 
     /** Local writes change the store without a sync; screens reload on this too. */
@@ -78,5 +107,9 @@ class SyncController(
         } finally {
             _dataVersion.value += 1
         }
+    }
+
+    private companion object {
+        const val POLL_MS = 100L
     }
 }

@@ -29,27 +29,27 @@ struct SeptaskClaudePairingSections: View {
           .foregroundStyle(.secondary)
         SeptaskSignInButton()
       } header: {
-        Text("Sign in to connect Claude")
+        Text(RegistrySettings.copy("claude_connector", "signInHeader"))
       }
     }
 
     Section {
-      LabeledContent("Setup prompt") {
-        Button(copied == .setupPrompt ? "Copied" : "Copy") {
+      LabeledContent(RegistrySettings.copy("claude_connector", "setupPrompt")) {
+        Button(copied == .setupPrompt ? RegistrySettings.copy("claude_connector", "copied") : RegistrySettings.copy("claude_connector", "copy")) {
           copyText(Self.setupPrompt, target: .setupPrompt)
         }
       }
-      LabeledContent("First prompt") {
-        Button(copied == .starterPrompt ? "Copied" : "Copy") {
+      LabeledContent(RegistrySettings.copy("claude_connector", "firstPrompt")) {
+        Button(copied == .starterPrompt ? RegistrySettings.copy("claude_connector", "copied") : RegistrySettings.copy("claude_connector", "copy")) {
           copyText(Self.starterPrompt, target: .starterPrompt)
         }
       }
-      LabeledContent("Connector URL") {
+      LabeledContent(RegistrySettings.copy("claude_connector", "connectorUrl")) {
         HStack {
           Text(Self.connectorURL)
             .font(.callout.monospaced())
             .textSelection(.enabled)
-          Button(copied == .url ? "Copied" : "Copy") {
+          Button(copied == .url ? RegistrySettings.copy("claude_connector", "copied") : RegistrySettings.copy("claude_connector", "copy")) {
             copyText(Self.connectorURL, target: .url)
           }
         }
@@ -58,7 +58,7 @@ struct SeptaskClaudePairingSections: View {
     } header: {
       Text("Connect Claude")
     } footer: {
-      Text("Paste the setup prompt into Claude, or add the connector URL to Claude as a custom connector. When your browser shows a code, enter it here. Once connected, paste the first prompt to set up your areas, projects and tasks. Only enter a code from a browser window you opened yourself.")
+      Text(RegistrySettings.copy("claude_connector", "footer"))
     }
 
     // Agent tools (moved from About ▸ Advanced, 2026-11-22).
@@ -112,7 +112,7 @@ struct SeptaskPairingCodeField: View {
 
   var body: some View {
     HStack {
-      TextField("Code from the browser page", text: $pairCode)
+      TextField(RegistrySettings.copy("claude_connector", "codePlaceholder"), text: $pairCode)
         .font(.body.monospaced())
         .onSubmit(review)
         .disabled(!sync.signedIn)

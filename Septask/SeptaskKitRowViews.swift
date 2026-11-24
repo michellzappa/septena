@@ -944,18 +944,36 @@ final class KitCardRowView: NSTableRowView {
   override func layout() {
     super.layout()
     syncGlassBackdrop()
+    syncDropLine()
   }
 
-  /// Insertion line while a task drag is hovering. `.top` / `.bottom` sit on
-  /// this row's edge (the drop is `.above` a row, or after the last row).
-  /// Mirrors SwiftUI `TaskReorderDrop`'s 3pt capsule — a position marker,
-  /// not a row highlight, and not NSTableView's `.gap` feedback (that hole
-  /// splits a per-row card into two).
+  /// Insertion line while a task drag is hovering, on this row's `.top` or
+  /// `.bottom` edge. Same bar as SwiftUI `TaskInsertionMark` — a position
+  /// marker, not a row highlight, and not NSTableView's `.gap` feedback (that
+  /// hole splits a per-row card into two).
   enum DropLine {
     case none, top, bottom
   }
   var dropLine: DropLine = .none {
-    didSet { if oldValue != dropLine { needsDisplay = true } }
+    didSet { if oldValue != dropLine { syncDropLine() } }
+  }
+
+  /// A view above the cell, not a `drawBackground` pass: the glass backdrop
+  /// and the cell would cover a drawn line.
+  private var dropLineView: KitDropLineView?
+
+  private func syncDropLine() {
+    guard dropLine != .none else {
+      dropLineView?.removeFromSuperview()
+      return
+    }
+    let line = dropLineView ?? KitDropLineView()
+    dropLineView = line
+    if line.superview !== self { addSubview(line) }
+    let inset = SeptaskKitLayout.inset(for: bounds.width)
+    let height = KitDropLineView.height
+    line.frame = NSRect(x: inset, y: dropLine == .top ? 0 : bounds.height - height,
+                        width: max(0, bounds.width - inset * 2), height: height)
   }
 
   /// Layer-backed tables paint a full-row selection fill that never goes
@@ -1009,12 +1027,10 @@ final class KitCardRowView: NSTableRowView {
   override func drawBackground(in dirtyRect: NSRect) {
     guard isCard else {
       super.drawBackground(in: dirtyRect)
-      drawDropLine()
       return
     }
     if usesGlassBackdrop {
       syncGlassBackdrop()
-      drawDropLine()
       return
     }
     NSGraphicsContext.saveGraphicsState()
@@ -1037,7 +1053,6 @@ final class KitCardRowView: NSTableRowView {
       slice.fill()
     }
     NSGraphicsContext.restoreGraphicsState()
-    drawDropLine()
   }
 
   /// Current strength of the promote wash, 0 at rest.
@@ -1082,23 +1097,24 @@ final class KitCardRowView: NSTableRowView {
   /// kept empty so a style regression cannot restore the full-row fill.
   override func drawSelection(in dirtyRect: NSRect) {}
 
-  /// 3pt capsule on the drop edge — SwiftUI `TaskReorderDrop.insertionLine`.
-  /// Horizontal inset matches that overlay's 20pt pad inside the card.
-  private func drawDropLine() {
-    guard dropLine != .none else { return }
-    let thickness: CGFloat = 3
-    let inset = SeptaskKitLayout.inset(for: bounds.width) + 20
-    let y: CGFloat = dropLine == .top ? 0 : bounds.height - thickness
-    let rect = NSRect(x: inset, y: y,
-                      width: max(0, bounds.width - inset * 2),
-                      height: thickness)
-    SeptaskKitTheme.inkPrimary.setFill()
-    NSBezierPath(roundedRect: rect, xRadius: thickness / 2, yRadius: thickness / 2).fill()
-  }
-
   /// Keep row content in its normal ink. AppKit flips cell text to white for
   /// an emphasized selection, which would be invisible on the neutral fill.
   override var interiorBackgroundStyle: NSView.BackgroundStyle { .normal }
+}
+
+/// The insertion bar of a task drag, the AppKit twin of SwiftUI's
+/// `TaskInsertionMark`: same height, color and card-edge inset, flat like
+/// every macOS card.
+@MainActor
+private final class KitDropLineView: NSView {
+  static let height: CGFloat = 6
+
+  override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+  override func draw(_ dirtyRect: NSRect) {
+    AppearancePreferences.shared.magicPlusNSColor.setFill()
+    NSBezierPath(roundedRect: bounds, xRadius: Self.height / 2, yRadius: Self.height / 2).fill()
+  }
 }
 
 /// Source-list selection: same `listSelectionFill(emphasized:)` token as the

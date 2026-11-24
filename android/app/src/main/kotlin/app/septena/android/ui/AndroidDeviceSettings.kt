@@ -8,7 +8,7 @@ import app.septena.core.stringValue
 
 /** Device-scope settings (registry/settings.json scope "device"), in SharedPreferences. */
 class AndroidDeviceSettings(context: Context) {
-    private val preferences = context.getSharedPreferences("septena-device-settings", Context.MODE_PRIVATE)
+    internal val preferences = context.getSharedPreferences("septena-device-settings", Context.MODE_PRIVATE)
 
     fun read(key: String, definition: JsonValue.ObjectValue): JsonValue {
         val storageKey = definition.string("storageKey") ?: key

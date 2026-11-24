@@ -107,6 +107,9 @@ struct TaskConvo: Codable, Hashable {
   /// from the backend, never pushed. A claim past `claimUntil` is dead.
   var claimedBy: String?
   var claimUntil: Date?
+  /// When `endState` last changed, stamped by the backend. Server-owned:
+  /// pulled, never pushed. Review shows it as "asked 2h ago".
+  var endStateAt: Date?
 
   /// True once a terminal `endState` is recorded.
   var isTerminal: Bool { endState != nil && endState != .open }

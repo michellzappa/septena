@@ -196,6 +196,13 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     list.onOpenInspector = { [weak self] in
       self?.setInspector(visible: true, focusTitle: true)
     }
+    // Send back on a Review row: the pane opens with the Send back field
+    // open and focused, not the title. Next run-loop turn, once the pane is
+    // un-collapsed (same reason as `focusTitle`).
+    list.onOpenSendBack = { [weak self] in
+      self?.setInspector(visible: true)
+      DispatchQueue.main.async { self?.inspector?.openSendBack() }
+    }
     // An inspector attribute row opens the same picker as the row menu and
     // the composer pill for that attribute. The inspector shows the list's
     // single selected row, so the picker acts on that row.

@@ -8,10 +8,10 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 49 | 50 | 50 | 0 | 29 | 0 | 1 |
-| partial | 1 | 1 | 1 | 0 | 3 | 0 | 3 |
-| planned | 0 | 0 | 0 | 47 | 17 | 50 | 1 |
-| - | 4 | 3 | 3 | 7 | 5 | 4 | 49 |
+| ships | 53 | 54 | 54 | 0 | 40 | 0 | 1 |
+| partial | 1 | 1 | 1 | 0 | 4 | 0 | 3 |
+| planned | 0 | 0 | 0 | 51 | 9 | 54 | 1 |
+| - | 4 | 3 | 3 | 7 | 5 | 4 | 53 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|---|
@@ -23,7 +23,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `lists.anytime` | Anytime | ships | ships | ships | planned | ships | planned | - |
 | `lists.repeating` | Repeating | ships | ships | ships | planned | ships | planned | - |
 | `lists.logbook` | Logbook | ships | ships | ships | planned | ships | planned | - |
-| `lists.faded` | Faded pile | ships | ships | ships | planned | partial | planned | - |
+| `lists.faded` | Faded pile | ships | ships | ships | planned | ships | planned | - |
 | `lists.starred` | Favorites list | ships | ships | ships | planned | ships | planned | - |
 | `lists.recently-deleted` | Recently Deleted (30 days) | ships | ships | ships | planned | ships | planned | - |
 | `places.areas` | Areas | ships | ships | ships | planned | ships | planned | - |
@@ -40,14 +40,14 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `task.checklists` | Checklists inside a task | ships | ships | ships | planned | ships | planned | - |
 | `task.tags` | Tags | ships | ships | ships | planned | ships | planned | - |
 | `task.share` | Share a task (title and notes) through the system share sheet | ships | ships | ships | planned | ships | planned | - |
-| `task.alerts` | Timed reminders | ships | ships | ships | planned | planned | planned | - |
+| `task.alerts` | Timed reminders | ships | ships | ships | planned | ships | planned | - |
 | `fade.sweep` | Fade pass, Faded pile and weekly sweep | ships | ships | ships | planned | planned | planned | - |
-| `capture.quick-add` | Quick Add sheet | ships | ships | - | planned | planned | - | - |
+| `capture.quick-add` | Quick Add sheet | ships | ships | - | planned | ships | - | - |
 | `capture.share-target` | Share into Inbox | ships | ships | - | planned | ships | planned | - |
 | `capture.quick-entry` | Quick Entry global panel | - | - | ships | - | - | planned | - |
 | `edit.filing-suggestion` | On-device filing suggestion | ships | ships | ships | - | planned | planned | - |
 | `edit.undo` | Shared undo history | ships | ships | ships | planned | ships | planned | - |
-| `edit.multi-select` | Select multiple tasks | ships | ships | ships | planned | planned | planned | - |
+| `edit.multi-select` | Select multiple tasks | ships | ships | ships | planned | ships | planned | - |
 | `find.quick-find` | Quick Find | ships | ships | ships | planned | ships | planned | - |
 | `task.page` | Task page (ADR 0029) | partial | partial | partial | planned | partial | planned | partial |
 | `mac.keyboard` | Keyboard-first shortcuts | - | ships | ships | planned | planned | planned | - |
@@ -55,13 +55,13 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `calendar.events` | Calendar events in Today and Upcoming | ships | ships | ships | planned | planned | planned | - |
 | `import.reminders` | Apple Reminders into Inbox | ships | ships | ships | - | - | - | - |
 | `import.things` | One-time Things import | ships | ships | ships | - | - | - | - |
-| `ai.discuss` | Discuss: conversation on one task | ships | ships | ships | planned | planned | planned | - |
-| `ai.reach-dial` | Where AI runs | ships | ships | ships | planned | planned | planned | - |
-| `agents.connector` | Official MCP connector at api.septena.app/mcp | ships | ships | ships | planned | planned | planned | - |
-| `onboarding.first-run` | First run: welcome, account, move in, connect Claude | ships | ships | ships | planned | planned | planned | - |
+| `ai.discuss` | Discuss: conversation on one task | ships | ships | ships | planned | partial | planned | - |
+| `ai.reach-dial` | Where AI runs | ships | ships | ships | planned | ships | planned | - |
+| `agents.connector` | Official MCP connector at api.septena.app/mcp | ships | ships | ships | planned | ships | planned | - |
+| `onboarding.first-run` | First run: welcome, account, move in, connect Claude | ships | ships | ships | planned | partial | planned | - |
 | `agents.stop-pause` | Stop one task, pause all agents | ships | ships | ships | planned | ships | planned | - |
 | `sync.backend` | Sync through api.septena.app | ships | ships | ships | planned | ships | planned | planned |
-| `account.delete` | Delete account | ships | ships | ships | planned | planned | planned | - |
+| `account.delete` | Delete account | ships | ships | ships | planned | ships | planned | - |
 | `task.times` | Start time and duration on a task | ships | ships | ships | planned | planned | planned | - |
 | `calendar.feed` | Private read-only calendar feed (.ics) | ships | ships | ships | planned | planned | planned | - |
 | `widgets.tasks` | Today and Upcoming widgets | ships | ships | ships | - | planned | planned | - |
@@ -69,3 +69,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `data.import-export` | Export as JSON, Markdown or CSV; import JSON with a preview | ships | ships | ships | planned | planned | planned | - |
 | `agents.list` | Connected agents: list, name, disconnect | ships | ships | ships | planned | ships | planned | - |
 | `settings.display` | Display, badge and privacy preferences | ships | ships | ships | planned | ships | planned | - |
+| `appearance.accents` | Accent colors (Colorful and the fruit accents) | ships | ships | ships | planned | ships | planned | - |
+| `appearance.textures` | Header textures with intensity and slow drift | ships | ships | ships | planned | ships | planned | - |
+| `appearance.mode` | Light, dark or system appearance | ships | ships | ships | planned | ships | planned | - |
+| `appearance.text-size` | Text size | ships | ships | ships | planned | ships | planned | - |

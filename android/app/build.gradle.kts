@@ -101,6 +101,7 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.play.services.code.scanner)
 
     testImplementation(libs.junit)
 }

@@ -183,14 +183,6 @@
         "featureId": "lists.logbook"
       },
       {
-        "id": "deleteAccount",
-        "kind": "destructive",
-        "title": "Delete Account?",
-        "message": "Your tasks, areas, projects, and conversations are erased from the server and this device.",
-        "confirmTitle": "Delete Account",
-        "featureId": "account.delete"
-      },
-      {
         "id": "rescheduleFixedRepeat",
         "kind": "fork",
         "title": "Reschedule repeating task?",
@@ -247,7 +239,8 @@
       { "id": "renameAgent", "title": "Rename Agent", "placeholder": "Agent name", "confirmTitle": "Rename", "featureId": "agents.connector" },
       { "id": "nameAgent", "title": "Name this agent", "placeholder": "Agent name", "confirmTitle": "Save", "featureId": "agents.connector" },
       { "id": "conversationOther", "title": "Other…", "placeholder": "Type your answer", "confirmTitle": "Send", "featureId": "ai.discuss" },
-      { "id": "conversationReply", "title": "Reply…", "placeholder": "Reply to thread", "confirmTitle": "Send", "featureId": "ai.discuss" }
+      { "id": "conversationReply", "title": "Reply…", "placeholder": "Reply to thread", "confirmTitle": "Send", "featureId": "ai.discuss" },
+      { "id": "sendBackReview", "title": "Send back for another pass", "placeholder": "What needs another pass?", "confirmTitle": "Send back", "featureId": "lists.review" }
     ],
     "placesScreen": {
       "id": "placesScreen",
@@ -283,6 +276,9 @@
   "firstRun": {
     "featureId": "onboarding.first-run",
     "completionSetting": "onboardedAt",
+    "chrome": [
+      { "id": "close", "label": "Close" }
+    ],
     "prompts": {
       "setup": "Set up Septena for me using https://septena.app/agents.md",
       "first": "Set up my Septena areas, projects, and tasks by following https://api.septena.app/onboard.md"
@@ -308,6 +304,7 @@
       {
         "id": "account",
         "kind": "account",
+        "platforms": ["ios", "ipados", "macos"],
         "icon": "onboarding.account",
         "title": "Sign in to sync",
         "body": "Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.",
@@ -317,8 +314,19 @@
         "secondary": { "title": "Not now", "action": "next" }
       },
       {
+        "id": "accountDevice",
+        "kind": "account",
+        "platforms": ["android"],
+        "icon": "onboarding.account",
+        "title": "Sign in to sync",
+        "body": "Use a device where Septena is already signed in. It approves this one with a code, and your tasks sync here.",
+        "skipWhen": "signedIn",
+        "primary": { "title": "Get a sign-in code", "action": "signIn" }
+      },
+      {
         "id": "connectClaude",
         "kind": "connectAgent",
+        "featureId": "agents.connector",
         "icon": "settings.claude",
         "title": "Connect Claude",
         "body": "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.",
@@ -346,6 +354,19 @@
       }
     ]
   },
+  "deviceSignIn": {
+    "featureId": "sync.backend",
+    "title": "Sign in to Septena",
+    "copy": [
+      { "id": "intro", "label": "Use a device where Septena is already signed in." },
+      { "id": "start", "label": "Get a sign-in code" },
+      { "id": "approve", "label": "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:" },
+      { "id": "lifetime", "label": "The code works for 10 minutes. After you approve it, this screen continues by itself." },
+      { "id": "expired", "label": "The code expired." },
+      { "id": "unreachable", "label": "Could not reach Septena." },
+      { "id": "retry", "label": "Get a new code" }
+    ]
+  },
   "taskAttributes": [
     { "id": "paste", "label": "Paste", "icon": "action.paste", "commitContract": "pickCommits", "surfaceTier": "chip", "featureId": "capture.quick-entry" },
     { "id": "notes", "label": "Notes", "icon": "action.notes", "commitContract": "closeCommits", "surfaceTier": "field", "featureId": "task.notes" },
@@ -365,14 +386,14 @@
     "id": "taskPage",
     "featureId": "task.page",
     "blocks": [
-      { "id": "taskPage.header", "kind": "header", "depths": ["inline", "page"], "featureId": "lists.today" },
-      { "id": "taskPage.notes", "kind": "notes", "attribute": "notes", "depths": ["inline", "page"], "featureId": "task.notes" },
+      { "id": "taskPage.header", "kind": "header", "depths": ["inline", "page", "review"], "featureId": "lists.today" },
+      { "id": "taskPage.notes", "kind": "notes", "attribute": "notes", "depths": ["inline", "page", "review"], "featureId": "task.notes" },
       { "id": "taskPage.attributes", "kind": "attributes", "depths": ["inline", "page"], "featureId": "lists.today" },
       { "id": "taskPage.checklist", "kind": "checklist", "attribute": "checklist", "depths": ["inline", "page"], "featureId": "task.checklists", "editOnly": true },
       { "id": "taskPage.attachments", "kind": "attachments", "attribute": "attachments", "depths": ["inline", "page"], "featureId": "task.attachments", "editOnly": true },
       { "id": "taskPage.references", "kind": "references", "label": "References", "depths": ["page"], "featureId": "task.references", "editOnly": true },
-      { "id": "taskPage.conversation", "kind": "conversation", "label": "Conversation", "depths": ["page"], "featureId": "ai.discuss", "editOnly": true },
-      { "id": "taskPage.provenance", "kind": "provenance", "label": "Added by", "selfLabel": "You", "agentFallbackName": "Claude", "icon": "task.added_by_agent", "depths": ["page"], "featureId": "task.provenance", "editOnly": true },
+      { "id": "taskPage.conversation", "kind": "conversation", "label": "Conversation", "askKicker": "Your agent asks", "reviewKicker": "Review requested", "reviewFallback": "Ready for review", "acceptedLabel": "Accepted", "depths": ["page", "review"], "featureId": "ai.discuss", "editOnly": true },
+      { "id": "taskPage.provenance", "kind": "provenance", "label": "Added by", "selfLabel": "You", "agentFallbackName": "Claude", "icon": "task.added_by_agent", "depths": ["page", "review"], "featureId": "task.provenance", "editOnly": true },
       { "id": "taskPage.history", "kind": "history", "attribute": "history", "depths": ["page"], "featureId": "task.history", "editOnly": true }
     ]
   },
@@ -433,6 +454,10 @@
   "taskRowMenu": {
     "id": "taskRowMenu",
     "accessibilityLabel": "Task actions"
+  },
+  "taskSelection": {
+    "id": "taskSelection",
+    "format": "{count} selected"
   },
   "taskDetail": {
     "id": "taskDetail",
@@ -505,7 +530,30 @@
       "historyReminderSet": "Reminder set",
       "historyReminderRemoved": "Reminder removed",
       "historyFavorited": "Favorited",
-      "historyUnfavorited": "Unfavorited"
+      "historyUnfavorited": "Unfavorited",
+      "reminderNone": "No reminder",
+      "reminderInOneHour": "In 1 hour",
+      "reminderTonight": "Tonight 18:00",
+      "reminderTomorrow": "Tomorrow 09:00",
+      "reminderRemindAt": "Remind at",
+      "reminderSet": "Set Reminder",
+      "reminderFixedTimeZone": "Fixed time zone",
+      "reminderClear": "Clear Reminder",
+      "reminderNotificationsOff": "Notifications are off. Open Settings",
+      "reminderExactAlarmsOff": "Reminders can arrive late. Allow alarms in Settings",
+      "reminderNotificationTitle": "Task Reminder",
+      "reminderChannel": "Reminders",
+      "reminderComplete": "Complete",
+      "reminderSnooze15m": "Snooze 15 min",
+      "reminderSnooze1h": "Snooze 1 hour",
+      "conversationWaiting": "Waiting for Claude",
+      "conversationWorking": "Claude is working…",
+      "conversationStopped": "Agent work stopped",
+      "conversationResolved": "Resolved",
+      "conversationWontDo": "Won't do",
+      "conversationDoneWhen": "Done when: {acceptance}",
+      "conversationConnectFirst": "Connect Claude in Settings first, then tap Discuss.",
+      "conversationCheckFailed": "Could not reach your account. Check your connection and try again."
     },
     "repeatUnits": [
       { "value": "day", "title": "Day" },

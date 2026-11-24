@@ -123,6 +123,16 @@ class TaskMutator(
         return updated
     }
 
+    /** A user gesture on the task: stamps the fade clock (docs/TASK_FADE_SPEC.md §3, Swift `touch`). */
+    suspend fun touch(id: String): TaskRecord? = updateFields(
+        id,
+        mapOf(
+            RegistryEntityFields.Task.TOUCHED_AT to JsonValue.StringValue(WireTimestamp.format(clock.now())),
+            RegistryEntityFields.Task.DEFER_COUNT to JsonValue.IntegerValue(0),
+            RegistryEntityFields.Task.FADED_AT to JsonValue.Null,
+        ),
+    )
+
     /** A1 when [enabled], else A3 (Remove from Today): the core decides the fields. */
     suspend fun setToday(id: String, enabled: Boolean): TaskRecord? =
         applyDateAction(id, if (enabled) DateAction.PutOnToday(RescheduleMode.MAKE_EXCEPTION) else DateAction.RemoveFromToday)
@@ -186,6 +196,69 @@ class TaskMutator(
             }
         }
         return updateFields(id, changes)
+    }
+
+    /**
+     * Sets or clears the timed reminder, as Apple's `setReminder`: a new
+     * reminder starts with no snooze and no dismissal. [reminderAt] is wall
+     * clock `YYYY-MM-DDTHH:MM` for a floating reminder or a UTC instant for a
+     * fixed one.
+     */
+    suspend fun setReminder(id: String, reminderAt: String?, mode: String?): TaskRecord? = updateFields(
+        id,
+        linkedMapOf(
+            RegistryEntityFields.Task.REMINDER_AT to JsonValue.stringOrNull(reminderAt),
+            RegistryEntityFields.Task.REMINDER_MODE to JsonValue.stringOrNull(if (reminderAt == null) null else mode),
+            RegistryEntityFields.Task.REMINDER_SNOOZED_UNTIL to JsonValue.Null,
+            RegistryEntityFields.Task.REMINDER_DISMISSED_AT to JsonValue.Null,
+        ),
+    )
+
+    /** Moves the alert to [until] and clears a dismissal. A task with no reminder is left as is. */
+    suspend fun snoozeReminder(id: String, until: java.time.Instant): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.fields[RegistryEntityFields.Task.REMINDER_AT].stringValue() == null) return existing
+        return updateFields(
+            id,
+            linkedMapOf(
+                RegistryEntityFields.Task.REMINDER_SNOOZED_UNTIL to JsonValue.StringValue(WireTimestamp.format(until)),
+                RegistryEntityFields.Task.REMINDER_DISMISSED_AT to JsonValue.Null,
+            ),
+        )
+    }
+
+    /** Marks the alert as seen on every device and clears a snooze. A task with no reminder is left as is. */
+    suspend fun dismissReminder(id: String): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.fields[RegistryEntityFields.Task.REMINDER_AT].stringValue() == null) return existing
+        return updateFields(
+            id,
+            linkedMapOf(
+                RegistryEntityFields.Task.REMINDER_DISMISSED_AT to JsonValue.StringValue(WireTimestamp.format(clock.now())),
+                RegistryEntityFields.Task.REMINDER_SNOOZED_UNTIL to JsonValue.Null,
+            ),
+        )
+    }
+
+    /**
+     * Files a task in an area, a project, or (both null) the Inbox. A new home
+     * drops the section: a heading only means something inside its project. A
+     * move to the list the task is already in writes nothing.
+     */
+    suspend fun moveToList(id: String, area: String?, project: String?): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        val targetArea = if (project == null) area else null
+        if (existing.fields[RegistryEntityFields.Task.AREA].stringValue() == targetArea &&
+            existing.fields[RegistryEntityFields.Task.PROJECT].stringValue() == project
+        ) return existing
+        return updateFields(
+            id,
+            mapOf(
+                RegistryEntityFields.Task.AREA to JsonValue.stringOrNull(targetArea),
+                RegistryEntityFields.Task.PROJECT to JsonValue.stringOrNull(project),
+                RegistryEntityFields.Task.HEADING to JsonValue.Null,
+            ),
+        )
     }
 
     suspend fun setNotes(id: String, notes: String?): TaskRecord? = updateFields(
@@ -360,6 +433,93 @@ class TaskMutator(
                 SyncOperation.Upsert(ids.nextClientOpId(), RegistryEntityNames.CHECKLIST_ITEM, itemId, itemFields),
             )
         }
+    }
+
+    /** Clear the agent cue: the user engaged with an agent's row. No-op for other rows. */
+    suspend fun acknowledge(id: String): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        val f = existing.fields
+        if (f[RegistryEntityFields.Task.SOURCE].stringValue() != app.septena.core.generated.RegistryEntityEnums.TaskSource.MCP ||
+            f[RegistryEntityFields.Task.ACKNOWLEDGED_AT].stringValue() != null
+        ) return existing
+        return updateFields(id, mapOf(RegistryEntityFields.Task.ACKNOWLEDGED_AT to JsonValue.StringValue(WireTimestamp.format(clock.now()))))
+    }
+
+    /** Review ▸ Accept (as iOS): complete the task and clear the agent cue. */
+    suspend fun acceptReview(id: String): TaskRecord? {
+        val done = complete(id) ?: return null
+        acknowledge(id)
+        return done
+    }
+
+    /**
+     * Faded ▸ Keep (docs/TASK_FADE_SPEC.md §4, as iOS TasksBackend.touch):
+     * the user touched the task, so its fade clock restarts and it returns
+     * to its list.
+     */
+    suspend fun keepFaded(id: String): TaskRecord? = updateFields(
+        id,
+        linkedMapOf(
+            RegistryEntityFields.Task.TOUCHED_AT to JsonValue.StringValue(WireTimestamp.format(clock.now())),
+            RegistryEntityFields.Task.DEFER_COUNT to JsonValue.IntegerValue(0),
+            RegistryEntityFields.Task.FADED_AT to JsonValue.Null,
+        ),
+    )
+
+    /** Faded ▸ Let Go (spec §5, as iOS dropFaded): cancel it with dropReason "faded"; it goes to the Logbook. */
+    suspend fun letGoFaded(id: String): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.deletedAt != null || existing.status != TaskStatus.OPEN) return null
+        return updateFields(
+            id,
+            linkedMapOf(
+                RegistryEntityFields.Task.STATUS to JsonValue.StringValue(app.septena.core.generated.RegistryEntityEnums.TaskStatus.CANCELLED),
+                RegistryEntityFields.Task.DROP_REASON to JsonValue.StringValue("faded"),
+                RegistryEntityFields.Task.COMPLETED_AT to JsonValue.StringValue(WireTimestamp.format(clock.now())),
+            ),
+        )
+    }
+
+    /**
+     * The daily fade pass (docs/TASK_FADE_SPEC.md §4), as iOS
+     * TasksBackend.runFadePass: stamps fadedAt on every open task the core's
+     * shouldFade says has gone untouched for the fade window. Never touches
+     * touchedAt. [conversations] maps a task id to its conversation, so agent
+     * work and waiting threads stay. Returns how many tasks faded.
+     */
+    suspend fun runFadePass(conversations: Map<String, TaskConversation>): Int {
+        val now = clock.now()
+        val today = clock.today(now).toString()
+        var faded = 0
+        for (record in store.records(RegistryEntityNames.TASK)) {
+            if (record.deletedAt != null) continue
+            val task = runCatching { TaskSnapshot.from(record) }.getOrNull() ?: continue
+            if (task.status != app.septena.core.generated.RegistryEntityEnums.TaskStatus.OPEN || task.fadedAt != null) continue
+            val convo = conversations[task.id]
+            val fades = runCatching {
+                TaskFadeRules.shouldFade(
+                    isOpen = true,
+                    isHeading = task.isHeading,
+                    isDeleted = false,
+                    isFaded = false,
+                    deadline = task.deadline,
+                    scheduled = task.scheduled,
+                    hasRecurrence = task.recurrenceUnit != null,
+                    isAgentTurn = convo?.isAgentTurn(now) == true,
+                    isAssignedToClaude = convo?.assignee == app.septena.core.generated.RegistryEntityEnums.ConvoAssignee.CLAUDE,
+                    touchedAt = task.touchedAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() },
+                    createdAt = task.createdAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() },
+                    created = task.created,
+                    now = now,
+                    today = today,
+                    isAwaitingHuman = convo?.awaitsHuman == true,
+                )
+            }.getOrDefault(false)
+            if (!fades) continue
+            updateFields(task.id, mapOf(RegistryEntityFields.Task.FADED_AT to JsonValue.StringValue(WireTimestamp.format(now))))
+            faded++
+        }
+        return faded
     }
 
     suspend fun cancel(id: String): TaskRecord? = updateFields(

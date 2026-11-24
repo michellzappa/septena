@@ -56,7 +56,8 @@
       "availability": { "selection": "any" },
       "featureId": "lists.today"
     },
-    "task.select": { "title": "Select", "icon": "action.checklist", "role": "default", "availability": { "selection": "single", "platforms": ["ios", "ipados"], "excludeDestinations": ["recentlyDeleted"] }, "featureId": "edit.multi-select" },
+    "task.select": { "title": "Select", "activeTitle": "Done", "icon": "action.checklist", "role": "default", "availability": { "selection": "single", "platforms": ["ios", "ipados", "android"], "excludeDestinations": ["recentlyDeleted"] }, "featureId": "edit.multi-select" },
+    "task.selectAll": { "title": "Select All", "activeTitle": "Deselect All", "icon": "action.checklist", "role": "default", "availability": { "selection": "any", "platforms": ["ios", "ipados", "android"], "excludeDestinations": ["recentlyDeleted"] }, "featureId": "edit.multi-select" },
     "task.duplicate": {
       "title": "Duplicate",
       "pluralTitle": "Duplicate Tasks",
@@ -68,6 +69,7 @@
     },
     "task.toggleComplete": {
       "title": "Mark as Complete",
+      "shortTitle": "Complete",
       "icon": "action.complete",
       "role": "default",
       "shortcut": { "key": "k", "modifiers": ["primary"] },
@@ -372,6 +374,7 @@
     },
     "app.quickAdd": {
       "title": "Quick Add…",
+      "addTitle": "Add",
       "icon": "action.add",
       "role": "default",
       "shortcut": { "key": "i", "modifiers": ["primary"] },

@@ -29,10 +29,9 @@ extension UTType {
 
 /// Row-level reorder target for manually-ordered lists — the in-list
 /// counterpart of the sidebar's `SidebarTaskDrop`, same `TaskDragIDs`
-/// payload. While a drag hovers, the row parts an animated gap on the side
-/// the drop would land (top half = insert above, bottom half = below) —
-/// pushing the rows beneath out of the way — with an accent insertion line
-/// in the opening. `perform` is nil on rows that aren't reorderable
+/// payload. While a drag hovers, the row shows the `TaskInsertionMark` on the
+/// side the drop would land (top half = insert above, bottom half = below).
+/// The list does not move. `perform` is nil on rows that aren't reorderable
 /// (date/tier-sorted lists), which makes the modifier a pass-through.
 ///
 /// Uses `onDrop(of:delegate:)` rather than `.dropDestination` deliberately:
@@ -40,8 +39,6 @@ extension UTType {
 /// for the insertion side) and the drop proposal (`.move`, so the cursor
 /// doesn't wear the green copy badge).
 struct TaskReorderDrop: ViewModifier {
-  static let gapHeight: CGFloat = 14
-
   let perform: ((_ ids: [String], _ before: Bool) -> Bool)?
   /// nil = no drag hovering; true = would insert above this row; false = below.
   @State private var hoverBefore: Bool? = nil
@@ -50,14 +47,8 @@ struct TaskReorderDrop: ViewModifier {
   func body(content: Content) -> some View {
     if let perform {
       content
-        // Height of the un-parted row — captured before the gap padding so
-        // the delegate's midline compare doesn't shift when the gap opens.
         .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { rowHeight = $0 }
-        .padding(.top, hoverBefore == true ? Self.gapHeight : 0)
-        .padding(.bottom, hoverBefore == false ? Self.gapHeight : 0)
-        .overlay(alignment: .top) { if hoverBefore == true { insertionLine } }
-        .overlay(alignment: .bottom) { if hoverBefore == false { insertionLine } }
-        .a11yAnimation(.easeOut(duration: 0.14), value: hoverBefore)
+        .taskInsertionMark(before: hoverBefore)
         .onDrop(of: [.septenaTaskDragIDs],
                 delegate: TaskReorderDropDelegate(hoverBefore: $hoverBefore,
                                                   rowHeight: { rowHeight },
@@ -65,15 +56,6 @@ struct TaskReorderDrop: ViewModifier {
     } else {
       content
     }
-  }
-
-  /// A 3pt accent capsule centered in the parted gap.
-  private var insertionLine: some View {
-    Capsule()
-      .fill(Color.accentColor)
-      .frame(height: 3)
-      .padding(.horizontal, 20)
-      .frame(height: Self.gapHeight)
   }
 }
 
@@ -111,13 +93,9 @@ private struct TaskReorderDropDelegate: DropDelegate {
     return true
   }
 
-  /// Which side of the row the pointer is on. The open gap pads the content
-  /// down, so subtract it before the midline compare; the flip then moves the
-  /// content *away* from the pointer, so the side is hysteresis-stable (no
-  /// flicker at the midline).
+  /// Which side of the row the pointer is on.
   private func update(_ info: DropInfo) {
-    let adjusted = info.location.y - (hoverBefore == true ? TaskReorderDrop.gapHeight : 0)
-    hoverBefore = adjusted < rowHeight() / 2
+    hoverBefore = info.location.y < rowHeight() / 2
   }
 }
 
