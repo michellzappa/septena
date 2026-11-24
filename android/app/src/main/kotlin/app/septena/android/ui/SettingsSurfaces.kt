@@ -52,6 +52,7 @@ internal val SETTINGS_SURFACES = setOf(
     "about_header", "send_feedback", "privacy_explainer", "ai_explainer", "septena_life_link",
     "reset_get_started", "mcp_skills", "sync_diagnostics", "smart_lists_editor", "plus_offer", "calendar_detail",
     "reset_first_run", DELETE_ACCOUNT,
+    "sign_in_approval", "claude_connector",
 )
 
 @Composable
@@ -90,6 +91,8 @@ internal fun SettingsCustomSurface(
             PlusOffer(env.plans, languageTag)
         }
         "calendar_detail" -> CalendarFeedSection(env.graph, env.signedIn, languageTag)
+        "sign_in_approval" -> SignInApprovalSection(env.graph, env.signedIn, languageTag)
+        "claude_connector" -> ClaudeConnectorSection(env.graph, env.signedIn, languageTag)
     }
 }
 
@@ -245,7 +248,7 @@ private fun SyncOperation.subject(): String = when (this) {
     is SyncOperation.AppendTurn -> taskId
 }
 
-private fun appName(context: Context): String = context.applicationInfo.loadLabel(context.packageManager).toString()
+internal fun appName(context: Context): String = context.applicationInfo.loadLabel(context.packageManager).toString()
 
 private const val AI_EXPLAINER = "ai_explainer"
 private const val MCP_SKILLS = "mcp_skills"

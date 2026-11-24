@@ -123,6 +123,16 @@ class TaskMutator(
         return updated
     }
 
+    /** A user gesture on the task: stamps the fade clock (docs/TASK_FADE_SPEC.md §3, Swift `touch`). */
+    suspend fun touch(id: String): TaskRecord? = updateFields(
+        id,
+        mapOf(
+            RegistryEntityFields.Task.TOUCHED_AT to JsonValue.StringValue(WireTimestamp.format(clock.now())),
+            RegistryEntityFields.Task.DEFER_COUNT to JsonValue.IntegerValue(0),
+            RegistryEntityFields.Task.FADED_AT to JsonValue.Null,
+        ),
+    )
+
     /** A1 when [enabled], else A3 (Remove from Today): the core decides the fields. */
     suspend fun setToday(id: String, enabled: Boolean): TaskRecord? =
         applyDateAction(id, if (enabled) DateAction.PutOnToday(RescheduleMode.MAKE_EXCEPTION) else DateAction.RemoveFromToday)

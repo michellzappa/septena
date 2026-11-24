@@ -515,7 +515,15 @@
       "reminderChannel": "Reminders",
       "reminderComplete": "Complete",
       "reminderSnooze15m": "Snooze 15 min",
-      "reminderSnooze1h": "Snooze 1 hour"
+      "reminderSnooze1h": "Snooze 1 hour",
+      "conversationWaiting": "Waiting for Claude",
+      "conversationWorking": "Claude is working…",
+      "conversationStopped": "Agent work stopped",
+      "conversationResolved": "Resolved",
+      "conversationWontDo": "Won't do",
+      "conversationDoneWhen": "Done when: {acceptance}",
+      "conversationConnectFirst": "Connect Claude in Settings first, then tap Discuss.",
+      "conversationCheckFailed": "Could not reach your account. Check your connection and try again."
     },
     "repeatUnits": [
       { "value": "day", "title": "Day" },

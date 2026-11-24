@@ -653,78 +653,13 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "Approve a sign-in",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "ABCD-EFGH",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "Enter the code from the other device. If you're connecting Claude, the code is in your browser.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "Checking the code…",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "Only approve a code you started yourself. Septena never asks for a code by email, text or phone call.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "Approving…",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "Approve",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "Don't approve",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "Try another code",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskApproveSignIn.swift",
-      "literal": "To sign in on a new phone, tablet or computer, tap Get a sign-in code on it. Then scan or enter that code here.",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septask/SeptaskClaudePairingPane.swift",
       "literal": "Sign in with Apple so Claude can connect to your tasks through your private Septena account.",
       "reasonId": "predates-rule"
     },
     {
       "file": "Septask/SeptaskClaudePairingPane.swift",
-      "literal": "Sign in to connect Claude",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskClaudePairingPane.swift",
       "literal": "Connect Claude",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskClaudePairingPane.swift",
-      "literal": "Paste the setup prompt into Claude, or add the connector URL to Claude as a custom connector. When your browser shows a code, enter it here. Once connected, paste the first prompt to set up your areas, projects and tasks. Only enter a code from a browser window you opened yourself.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskClaudePairingPane.swift",
-      "literal": "Code from the browser page",
       "reasonId": "predates-rule"
     },
     {

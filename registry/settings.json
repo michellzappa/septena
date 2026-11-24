@@ -427,6 +427,45 @@
       { "id": "copyFooter", "label": "Paste into a model's context to teach it the task tools without connecting MCP." },
       { "id": "loadFailed", "label": "The brief did not load. Check your connection and open this page again." }
     ],
+    "sign_in_approval": [
+      { "id": "title", "label": "Approve a sign-in" },
+      { "id": "footer", "label": "To sign in on a new phone, tablet or computer, tap Get a sign-in code on it. Then scan or enter that code here." },
+      { "id": "codePlaceholder", "label": "ABCD-EFGH" },
+      { "id": "enterFooter", "label": "Enter the code from the other device. If you're connecting Claude, the code is in your browser." },
+      { "id": "continue", "label": "Continue" },
+      { "id": "checking", "label": "Checking the code…" },
+      { "id": "safetyFooter", "label": "Only approve a code you started yourself. Septena never asks for a code by email, text or phone call." },
+      { "id": "approve", "label": "Approve" },
+      { "id": "dontApprove", "label": "Don't approve" },
+      { "id": "approving", "label": "Approving…" },
+      { "id": "tryAnother", "label": "Try another code" },
+      { "id": "done", "label": "Done" },
+      { "id": "invalidCode", "label": "That code is wrong or has expired." },
+      { "id": "codeUsed", "label": "That code was already used." },
+      { "id": "tooManyAttempts", "label": "Too many wrong codes. Try again in 10 minutes." },
+      { "id": "confirmDevice", "label": "Sign in on {client}?" },
+      { "id": "confirmConnector", "label": "Connect {client} to your tasks?" },
+      { "id": "detailDevice", "label": "{client} gets full access to your Septena account, including tasks, lists, conversations and settings. It stays signed in until you sign it out." },
+      { "id": "detailConnector", "label": "{client} can read and change your tasks. You can pause it in AI & Agents." },
+      { "id": "doneDevice", "label": "{client} is signed in." },
+      { "id": "doneConnector", "label": "Claude is connected. Go back to your browser to finish." }
+    ],
+    "claude_connector": [
+      { "id": "signInHeader", "label": "Sign in to connect Claude" },
+      { "id": "signInBody", "label": "Sign in so Claude can connect to your tasks through your private Septena account." },
+      { "id": "setupPrompt", "label": "Setup prompt" },
+      { "id": "firstPrompt", "label": "First prompt" },
+      { "id": "connectorUrl", "label": "Connector URL" },
+      { "id": "copy", "label": "Copy" },
+      { "id": "copied", "label": "Copied" },
+      { "id": "codePlaceholder", "label": "Code from the browser page" },
+      { "id": "footer", "label": "Paste the setup prompt into Claude, or add the connector URL to Claude as a custom connector. When your browser shows a code, enter it here. Once connected, paste the first prompt to set up your areas, projects and tasks. Only enter a code from a browser window you opened yourself." }
+    ],
+    "aiMode": [
+      { "id": "useMyClaude", "label": "Prefer your connected Claude for reasoning (your account, your data). {app} still never runs AI on your tasks." },
+      { "id": "onDeviceOnlyNoModel", "label": "Discuss never leaves this device. Septena has no on-device model here, so Discuss is off." },
+      { "id": "autoNoModel", "label": "Septena has no on-device model here, so Discuss hands the task to your own Claude. Recommended." }
+    ],
     "smart_lists_editor": [
       { "id": "topHeader", "label": "Above Areas & Projects" },
       { "id": "topFooter", "label": "Working lists shown at the top of the sidebar." },

@@ -10,6 +10,8 @@ kotlinx-coroutines = "1.10.2"
 # The shared core's UniFFI Kotlin bindings load it through JNA (ADR 0025).
 jna = "5.17.0"
 junit = "4.13.2"
+# Google Play services code scanner (sign-in QR, #353): no camera permission, no bundled model.
+play-services-code-scanner = "16.1.0"
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
@@ -31,4 +33,5 @@ lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-com
 lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
 junit = { module = "junit:junit", version.ref = "junit" }
+play-services-code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version.ref = "play-services-code-scanner" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }

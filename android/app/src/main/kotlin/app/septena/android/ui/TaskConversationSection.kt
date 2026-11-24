@@ -59,6 +59,7 @@ private data class ConversationLine(
 )
 
 private data class ConversationSectionData(
+    val record: SyncRecord,
     val conversation: TaskConversation,
     val turns: List<ConversationLine>,
 )
@@ -89,6 +90,7 @@ internal fun TaskConversationSection(
                 ?: SyncRecord(RegistryEntityNames.CONVO, taskId, emptyMap())
             val turns = graph.taskStore.turns(taskId)
             ConversationSectionData(
+                record = record,
                 conversation = TaskConversation.from(record, turns),
                 turns = turns.sortedBy(SyncTurn::sequence).map(SyncTurn::asConversationLine),
             )
@@ -97,7 +99,10 @@ internal fun TaskConversationSection(
 
     val current = data ?: return
     val conversation = current.conversation
-    if (!conversation.hasStarted) return
+    if (!conversation.hasStarted && !conversation.isHandedToClaude) {
+        DiscussStart(graph, taskId, isTaskOpen, canWrite, languageTag)
+        return
+    }
 
     val openQuestion = current.turns.lastOrNull()?.takeIf {
         it.role == RegistryEntityEnums.ConvoTurnRole.PROVIDER && it.options.isNotEmpty()
@@ -131,7 +136,7 @@ internal fun TaskConversationSection(
             busy = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    graph.conversationMutator.appendTurn(taskId, fields)
+                    appendUserTurn(graph, taskId, fields)
                 }
             }.onSuccess {
                 graph.sync.noteLocalChange()
@@ -313,6 +318,8 @@ internal fun TaskConversationSection(
             }
         }
 
+        ConversationArtifact(current.record)
+
         // The agent prompt (docs/AGENT_PROMPT_SPEC.md): kicker, question, a vertical
         // list of full-width choices, and a last choice that turns into a field.
         if (openQuestion != null) {
@@ -387,10 +394,8 @@ internal fun TaskConversationSection(
             } else {
                 conversation.endStateNote?.takeIf(String::isNotBlank)?.let { Text(it) }
             }
-        } else if (!conversation.isTerminal && !conversation.handoffExists) {
-            TextButton(onClick = ::toggleStopped, enabled = canWrite && !busy) {
-                Text(stopTitle)
-            }
+        } else {
+            ConversationStatus(current.record, conversation, stopTitle, canWrite && !busy, languageTag, ::toggleStopped)
         }
 
         if (openQuestion == null && isTaskOpen && !conversation.needsHumanReview) {
@@ -412,6 +417,8 @@ internal fun TaskConversationSection(
                 }
             }
         }
+
+        ConversationAcceptance(current.record, languageTag)
     }
 }
 

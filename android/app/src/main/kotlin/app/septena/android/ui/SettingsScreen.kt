@@ -358,6 +358,12 @@ private fun SettingsRegistryRow(
                 TextSizeSettingRow(label, languageTag)
                 return
             }
+            if (key == RegistrySettingKeys.AI_MODE) {
+                // Where AI runs: each mode with what it means (AiModeSettings.kt), as on iPhone.
+                val current = (values[key] ?: definition.fields["default"]).stringValue().orEmpty()
+                AiModePicker(current, languageTag) { onValueChange(key, JsonValue.StringValue(it)) }
+                return
+            }
             RegistrySettingControl(
                 key = key,
                 label = label,
