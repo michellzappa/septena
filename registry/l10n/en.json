@@ -1,4 +1,10 @@
 {
+  "1": {
+    "text": "1",
+    "paths": [
+      "plans.outcomes.agents.rows.connected.cells.account"
+    ]
+  },
   "1, backed up": {
     "text": "1, backed up",
     "paths": [
@@ -9,12 +15,6 @@
     "text": "1, not synced",
     "paths": [
       "plans.outcomes.everywhere.rows.devices.cells.device"
-    ]
-  },
-  "10 a month": {
-    "text": "10 a month",
-    "paths": [
-      "plans.outcomes.agents.rows.runs.cells.account"
     ]
   },
   "1st": {
@@ -37,6 +37,18 @@
       "plans.outcomes.nothing_lost.rows.deleted.cells.account"
     ]
   },
+  "30 days of change history": {
+    "text": "30 days of change history",
+    "paths": [
+      "plans.cards.account.points.3"
+    ]
+  },
+  "30 days, 90 planned": {
+    "text": "30 days, 90 planned",
+    "paths": [
+      "plans.outcomes.nothing_lost.rows.deleted.cells.plus"
+    ]
+  },
   "365 days": {
     "text": "365 days",
     "paths": [
@@ -55,14 +67,14 @@
       "surfaces.taskDetail.ordinals.3.title"
     ]
   },
-  "90 days": {
-    "text": "90 days",
+  "A backup of the device you use": {
+    "text": "A backup of the device you use",
     "paths": [
-      "plans.outcomes.nothing_lost.rows.deleted.cells.plus"
+      "plans.cards.account.points.0"
     ]
   },
-  "A free account allows 25 agent changes a day. Plus has no daily cap.": {
-    "text": "A free account allows 25 agent changes a day. Plus has no daily cap.",
+  "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit.": {
+    "text": "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit.",
     "paths": [
       "plans.upsells.connector_cap.detail"
     ]
@@ -79,8 +91,8 @@
       "plans.upsells.second_device.detail"
     ]
   },
-  "A year of change history, and 90 days to restore deleted tasks": {
-    "text": "A year of change history, and 90 days to restore deleted tasks",
+  "A year of change history": {
+    "text": "A year of change history",
     "paths": [
       "plans.cards.plus.points.1"
     ]
@@ -251,18 +263,6 @@
       "surfaces.prompts.text.nameAgent.placeholder"
     ]
   },
-  "Agent runs": {
-    "text": "Agent runs",
-    "paths": [
-      "plans.outcomes.agents.rows.runs.label"
-    ]
-  },
-  "Agent runs resume on the 1st": {
-    "text": "Agent runs resume on the 1st",
-    "paths": [
-      "plans.upsells.agent_runs.title"
-    ]
-  },
   "Agent tools": {
     "text": "Agent tools",
     "paths": [
@@ -276,11 +276,16 @@
       "settings.pages.agents.title"
     ]
   },
-  "All": {
-    "text": "All",
+  "Agents read and change your tasks": {
+    "text": "Agents read and change your tasks",
     "paths": [
-      "plans.outcomes.nothing_lost.rows.logbook.cells.device",
-      "plans.outcomes.nothing_lost.rows.logbook.cells.plus"
+      "plans.outcomes.agents.rows.connector.label"
+    ]
+  },
+  "Agents work on the copy on our server, so an agent needs an account.": {
+    "text": "Agents work on the copy on our server, so an agent needs an account.",
+    "paths": [
+      "plans.cards.account.footnote"
     ]
   },
   "All dated tasks": {
@@ -548,6 +553,12 @@
       "plans.outcomes.nothing_lost.rows.history.label"
     ]
   },
+  "Changes from your agent arrive live": {
+    "text": "Changes from your agent arrive live",
+    "paths": [
+      "plans.cards.account.points.2"
+    ]
+  },
   "Changes the server refused appear here, newest first. The server kept its own version of each.": {
     "text": "Changes the server refused appear here, newest first. The server kept its own version of each.",
     "paths": [
@@ -576,12 +587,6 @@
     "text": "Classic Window",
     "paths": [
       "actions.actions.app.classicWindow.title"
-    ]
-  },
-  "Claude connector": {
-    "text": "Claude connector",
-    "paths": [
-      "plans.outcomes.agents.rows.connector.label"
     ]
   },
   "Claude is connected. Go back to your browser to finish.": {
@@ -726,7 +731,8 @@
   "Connected agents": {
     "text": "Connected agents",
     "paths": [
-      "settings.pages.agents.sections.agents.header"
+      "settings.pages.agents.sections.agents.header",
+      "plans.outcomes.agents.rows.connected.label"
     ]
   },
   "Connections": {
@@ -1144,26 +1150,20 @@
       "surfaces.prompts.error.title"
     ]
   },
-  "Every few minutes": {
-    "text": "Every few minutes",
-    "paths": [
-      "plans.outcomes.everywhere.rows.live.cells.account"
-    ]
-  },
   "Every new account starts with 14 days of Plus": {
     "text": "Every new account starts with 14 days of Plus",
     "paths": [
       "plans.trial.title"
     ]
   },
-  "Every task feature is free on the device you use. Plus syncs your list to all your devices and keeps its full history and files. It also lets your agents work without a daily cap.": {
-    "text": "Every task feature is free on the device you use. Plus syncs your list to all your devices and keeps its full history and files. It also lets your agents work without a daily cap.",
+  "Every task feature is free on the device you use. A free account adds a backup and lets you connect one agent. Plus covers all your devices, three agents, synced files and a longer history.": {
+    "text": "Every task feature is free on the device you use. A free account adds a backup and lets you connect one agent. Plus covers all your devices, three agents, synced files and a longer history.",
     "paths": [
       "plans.subhead"
     ]
   },
-  "Everything in Free is included.": {
-    "text": "Everything in Free is included.",
+  "Everything in the free account is included.": {
+    "text": "Everything in the free account is included.",
     "paths": [
       "plans.cards.plus.footnote"
     ]
@@ -1259,16 +1259,11 @@
       "settings.copy.claude_connector.firstPrompt.label"
     ]
   },
-  "Free": {
-    "text": "Free",
-    "paths": [
-      "plans.cards.free.title"
-    ]
-  },
   "Free account": {
     "text": "Free account",
     "paths": [
       "plans.levels.account.title",
+      "plans.cards.account.title",
       "plans.status.free"
     ]
   },
@@ -1564,12 +1559,6 @@
       "surfaces.taskDetail.ordinals.4.title"
     ]
   },
-  "Last 90 days": {
-    "text": "Last 90 days",
-    "paths": [
-      "plans.outcomes.nothing_lost.rows.logbook.cells.account"
-    ]
-  },
   "Last used {time}": {
     "text": "Last used {time}",
     "placeholders": [
@@ -1622,12 +1611,6 @@
       "settings.rootGroups.lists_root.header"
     ]
   },
-  "Live": {
-    "text": "Live",
-    "paths": [
-      "plans.outcomes.everywhere.rows.live.cells.plus"
-    ]
-  },
   "Live sync on every iPhone, iPad and Mac": {
     "text": "Live sync on every iPhone, iPad and Mac",
     "paths": [
@@ -1637,8 +1620,7 @@
   "Logbook": {
     "text": "Logbook",
     "paths": [
-      "destinations.destinations.logbook.title",
-      "plans.outcomes.nothing_lost.rows.logbook.label"
+      "destinations.destinations.logbook.title"
     ]
   },
   "Logbook is empty": {
@@ -1838,6 +1820,12 @@
       "actions.actions.task.move.title"
     ]
   },
+  "Moving to a new device is free": {
+    "text": "Moving to a new device is free",
+    "paths": [
+      "plans.cards.account.points.4"
+    ]
+  },
   "Name this agent": {
     "text": "Name this agent",
     "paths": [
@@ -1923,12 +1911,6 @@
     "text": "No agent work",
     "paths": [
       "destinations.destinations.agent.emptyState.title"
-    ]
-  },
-  "No daily cap": {
-    "text": "No daily cap",
-    "paths": [
-      "plans.outcomes.agents.rows.connector.cells.plus"
     ]
   },
   "No matches": {
@@ -2120,6 +2102,8 @@
   "On this device": {
     "text": "On this device",
     "paths": [
+      "plans.levels.device.title",
+      "plans.cards.free.title",
       "plans.outcomes.nothing_lost.rows.history.cells.device",
       "plans.outcomes.nothing_lost.rows.files.cells.device",
       "plans.status.device"
@@ -2159,6 +2143,12 @@
     "text": "One",
     "paths": [
       "settings.keys.tasksTitleLines.options.0.title"
+    ]
+  },
+  "One agent, such as Claude, connected to your list": {
+    "text": "One agent, such as Claude, connected to your list",
+    "paths": [
+      "plans.cards.account.points.1"
     ]
   },
   "Only This Task": {
@@ -2334,12 +2324,6 @@
       "plans.paywall.success"
     ]
   },
-  "Plus is the same app on every device, and nothing in it is capped.": {
-    "text": "Plus is the same app on every device, and nothing in it is capped.",
-    "paths": [
-      "plans.cards.plus.detail"
-    ]
-  },
   "Plus syncs files and images to all your devices.": {
     "text": "Plus syncs files and images to all your devices.",
     "paths": [
@@ -2476,12 +2460,6 @@
     "text": "Read-only subscription feed for your scheduled tasks and deadlines. Anyone with the private URL can read titles and notes in the feed; rotate or disable it anytime.",
     "paths": [
       "settings.copy.calendar_detail.feedFooter.label"
-    ]
-  },
-  "Reads, and 25 changes a day": {
-    "text": "Reads, and 25 changes a day",
-    "paths": [
-      "plans.outcomes.agents.rows.connector.cells.account"
     ]
   },
   "Ready for review": {
@@ -3016,12 +2994,6 @@
       "settings.copy.syncStatus.needsSignIn.label"
     ]
   },
-  "Sign in for a free account. The server then keeps a backup of that device, and you can try agents on real tasks.": {
-    "text": "Sign in for a free account. The server then keeps a backup of that device, and you can try agents on real tasks.",
-    "paths": [
-      "plans.cards.free.footnote"
-    ]
-  },
   "Sign in on {client}?": {
     "text": "Sign in on {client}?",
     "placeholders": [
@@ -3198,12 +3170,6 @@
     "text": "Sync issues",
     "paths": [
       "settings.copy.sync_diagnostics.issues.label"
-    ]
-  },
-  "Sync speed": {
-    "text": "Sync speed",
-    "paths": [
-      "plans.outcomes.everywhere.rows.live.label"
     ]
   },
   "Synced": {
@@ -3411,6 +3377,18 @@
       "plans.paywall.failed"
     ]
   },
+  "The same app on all your devices, with more agents and your files.": {
+    "text": "The same app on all your devices, with more agents and your files.",
+    "paths": [
+      "plans.cards.plus.detail"
+    ]
+  },
+  "The same app, with a copy of your list on our server. Sign in with Apple.": {
+    "text": "The same app, with a copy of your list on our server. Sign in with Apple.",
+    "paths": [
+      "plans.cards.account.detail"
+    ]
+  },
   "The same tasks on your phone, tablet and Mac, updated as you type.": {
     "text": "The same tasks on your phone, tablet and Mac, updated as you type.",
     "paths": [
@@ -3465,12 +3443,6 @@
     "text": "This deletes the following from the Septena server:",
     "paths": [
       "settings.copy.delete_account.intro.label"
-    ]
-  },
-  "This device": {
-    "text": "This device",
-    "paths": [
-      "plans.levels.device.title"
     ]
   },
   "This device is not syncing": {
@@ -3650,6 +3622,18 @@
       "settings.copy.access_devices.deviceUnknown.label"
     ]
   },
+  "Up to 3": {
+    "text": "Up to 3",
+    "paths": [
+      "plans.outcomes.agents.rows.connected.cells.plus"
+    ]
+  },
+  "Up to 3 agents connected to your list": {
+    "text": "Up to 3 agents connected to your list",
+    "paths": [
+      "plans.cards.plus.points.3"
+    ]
+  },
   "Upcoming": {
     "text": "Upcoming",
     "paths": [
@@ -3799,12 +3783,6 @@
       "settings.copy.ai_explainer.turnHeader.label"
     ]
   },
-  "Within a monthly run budget": {
-    "text": "Within a monthly run budget",
-    "paths": [
-      "plans.outcomes.agents.rows.runs.cells.plus"
-    ]
-  },
   "Work": {
     "text": "Work",
     "paths": [
@@ -3939,12 +3917,6 @@
       "surfaces.firstRun.steps.welcome.points.1.title"
     ]
   },
-  "Your agents work your tasks without a daily cap": {
-    "text": "Your agents work your tasks without a daily cap",
-    "paths": [
-      "plans.cards.plus.points.3"
-    ]
-  },
   "Your attachments": {
     "text": "Your attachments",
     "paths": [
@@ -3979,12 +3951,6 @@
     "text": "Your data",
     "paths": [
       "settings.pages.privacy.sections.data_locality.header"
-    ]
-  },
-  "Your free account used its 10 runs this month. The work waits for you. Plus runs it now.": {
-    "text": "Your free account used its 10 runs this month. The work waits for you. Plus runs it now.",
-    "paths": [
-      "plans.upsells.agent_runs.detail"
     ]
   },
   "Your list everywhere": {
@@ -4239,7 +4205,8 @@
   "€0": {
     "text": "€0",
     "paths": [
-      "plans.cards.free.priceLabel"
+      "plans.cards.free.priceLabel",
+      "plans.cards.account.priceLabel"
     ]
   },
   "€5 a month. You save €24 against paying monthly.": {

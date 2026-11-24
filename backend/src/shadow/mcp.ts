@@ -274,18 +274,11 @@ async function callTool(
     const args = zAgentArgs[name as AgentToolName].safeParse(params.arguments ?? {});
     if (!args.success) return invalidArgs(id, args.error, era);
     // A release always works: it hands the task back. A claim is one agent
-    // run (a renewal is not). History reads show the plan's window.
+    // run (a renewal is not): counted, not capped. History reads show the plan's window.
     let historySince: string | null = null;
     if (name === "tasks_claim" || name === "tasks_history" || name === "tasks_activity") {
       const { state, block } = await connectorPlan(env, grant.userId, name);
       if (block) return rpcResult(id, { isError: true, content: [{ type: "text", text: PLAN_CHECK_FAILED_MESSAGE }] }, era);
-      if (state && name === "tasks_claim") {
-        const breach: LimitBreach | null = atCap(state.usage[usageKeys.agentRuns()], state.limits.agentRunsPerMonth)
-          ? { limit: "agentRunsPerMonth", upsell: "agent_runs" } : null;
-        if (decide(env, grant.userId, "mcp_claim", state, breach) === "block") {
-          return rpcResult(id, { isError: true, content: [{ type: "text", text: limitMessage(breach!) }] }, era);
-        }
-      }
       historySince = historyCutoff(env, state?.limits ?? null);
     }
     const result = await runAgentTool(store, grant.clientId, name as AgentToolName, args.data as Record<string, unknown>, historySince);

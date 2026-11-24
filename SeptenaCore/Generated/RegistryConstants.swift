@@ -1845,7 +1845,7 @@ enum RegistryPlans {
   static var name: String { RegistryL10n.t("Septena Plus") }
   static var shortName: String { RegistryL10n.t("Plus") }
   static var headline: String { RegistryL10n.t("Free on one device. Plus on all of them.") }
-  static var subhead: String { RegistryL10n.t("Every task feature is free on the device you use. Plus syncs your list to all your devices and keeps its full history and files. It also lets your agents work without a daily cap.") }
+  static var subhead: String { RegistryL10n.t("Every task feature is free on the device you use. A free account adds a backup and lets you connect one agent. Plus covers all your devices, three agents, synced files and a longer history.") }
   static let checkoutOpen = false
   static var checkoutNotice: String { RegistryL10n.t("Subscriptions open at App Store launch.") }
   static let trialDays = 14
@@ -1857,26 +1857,25 @@ enum RegistryPlans {
     RegistryPlanPrice(id: "monthly", productId: "com.septena.tasks.sync.monthly", amountMinor: 700, currency: "EUR", interval: "month", highlighted: false, label: RegistryL10n.t("€7 a month"), detail: RegistryL10n.t("Cancel at any time.")),
   ] }
   static var cards: [RegistryPlanCard] { [
-    RegistryPlanCard(id: "free", title: RegistryL10n.t("Free"), icon: "plans.free", detail: RegistryL10n.t("The full task app on one iPhone, iPad or Mac. You do not need an account."), points: [RegistryL10n.t("Today with its Inbox, Upcoming, Anytime, Faded and Logbook"), RegistryL10n.t("Areas, projects, sections, notes and attachments"), RegistryL10n.t("When dates, deadlines and repeats"), RegistryL10n.t("Task conversations with the on-device model"), RegistryL10n.t("Import from Things and Apple Reminders"), RegistryL10n.t("Export everything as plain JSON")], footnote: RegistryL10n.t("Sign in for a free account. The server then keeps a backup of that device, and you can try agents on real tasks."), highlighted: false),
-    RegistryPlanCard(id: "plus", title: RegistryL10n.t("Septena Plus"), icon: "settings.plus", detail: RegistryL10n.t("Plus is the same app on every device, and nothing in it is capped."), points: [RegistryL10n.t("Live sync on every iPhone, iPad and Mac"), RegistryL10n.t("A year of change history, and 90 days to restore deleted tasks"), RegistryL10n.t("Files and images synced, up to 10 GB"), RegistryL10n.t("Your agents work your tasks without a daily cap"), RegistryL10n.t("Early builds on TestFlight")], footnote: RegistryL10n.t("Everything in Free is included."), highlighted: true),
+    RegistryPlanCard(id: "free", title: RegistryL10n.t("On this device"), icon: "plans.free", detail: RegistryL10n.t("The full task app on one iPhone, iPad or Mac. You do not need an account."), points: [RegistryL10n.t("Today with its Inbox, Upcoming, Anytime, Faded and Logbook"), RegistryL10n.t("Areas, projects, sections, notes and attachments"), RegistryL10n.t("When dates, deadlines and repeats"), RegistryL10n.t("Task conversations with the on-device model"), RegistryL10n.t("Import from Things and Apple Reminders"), RegistryL10n.t("Export everything as plain JSON")], footnote: nil, highlighted: false),
+    RegistryPlanCard(id: "account", title: RegistryL10n.t("Free account"), icon: "settings.data", detail: RegistryL10n.t("The same app, with a copy of your list on our server. Sign in with Apple."), points: [RegistryL10n.t("A backup of the device you use"), RegistryL10n.t("One agent, such as Claude, connected to your list"), RegistryL10n.t("Changes from your agent arrive live"), RegistryL10n.t("30 days of change history"), RegistryL10n.t("Moving to a new device is free")], footnote: RegistryL10n.t("Agents work on the copy on our server, so an agent needs an account."), highlighted: false),
+    RegistryPlanCard(id: "plus", title: RegistryL10n.t("Septena Plus"), icon: "settings.plus", detail: RegistryL10n.t("The same app on all your devices, with more agents and your files."), points: [RegistryL10n.t("Live sync on every iPhone, iPad and Mac"), RegistryL10n.t("A year of change history"), RegistryL10n.t("Files and images synced, up to 10 GB"), RegistryL10n.t("Up to 3 agents connected to your list"), RegistryL10n.t("Early builds on TestFlight")], footnote: RegistryL10n.t("Everything in the free account is included."), highlighted: true),
   ] }
   static var outcomes: [RegistryPlanOutcome] { [
     RegistryPlanOutcome(id: "everywhere", icon: "onboarding.devices", title: RegistryL10n.t("Your list everywhere"), detail: RegistryL10n.t("The same tasks on your phone, tablet and Mac, updated as you type."), rows: [
       RegistryPlanRow(id: "devices", label: RegistryL10n.t("Devices"), planned: false, device: .text(RegistryL10n.t("1, not synced")), account: .text(RegistryL10n.t("1, backed up")), plus: .text(RegistryL10n.t("All your devices"))),
-      RegistryPlanRow(id: "live", label: RegistryL10n.t("Sync speed"), planned: false, device: .notIncluded, account: .text(RegistryL10n.t("Every few minutes")), plus: .text(RegistryL10n.t("Live"))),
       RegistryPlanRow(id: "new_device", label: RegistryL10n.t("Move to a new device"), planned: false, device: .text(RegistryL10n.t("Export and import")), account: .included, plus: .included),
       RegistryPlanRow(id: "watch", label: RegistryL10n.t("Apple Watch through the server"), planned: false, device: .notIncluded, account: .notIncluded, plus: .included),
     ]),
     RegistryPlanOutcome(id: "nothing_lost", icon: "plans.history", title: RegistryL10n.t("Nothing lost"), detail: RegistryL10n.t("See who changed what and bring back what you deleted. Your files open on every device."), rows: [
       RegistryPlanRow(id: "history", label: RegistryL10n.t("Change history"), planned: false, device: .text(RegistryL10n.t("On this device")), account: .text(RegistryL10n.t("30 days")), plus: .text(RegistryL10n.t("365 days"))),
-      RegistryPlanRow(id: "logbook", label: RegistryL10n.t("Logbook"), planned: false, device: .text(RegistryL10n.t("All")), account: .text(RegistryL10n.t("Last 90 days")), plus: .text(RegistryL10n.t("All"))),
-      RegistryPlanRow(id: "deleted", label: RegistryL10n.t("Recently Deleted"), planned: false, device: .text(RegistryL10n.t("30 days")), account: .text(RegistryL10n.t("30 days")), plus: .text(RegistryL10n.t("90 days"))),
+      RegistryPlanRow(id: "deleted", label: RegistryL10n.t("Recently Deleted"), planned: false, device: .text(RegistryL10n.t("30 days")), account: .text(RegistryL10n.t("30 days")), plus: .text(RegistryL10n.t("30 days, 90 planned"))),
       RegistryPlanRow(id: "files", label: RegistryL10n.t("Files and images"), planned: false, device: .text(RegistryL10n.t("On this device")), account: .text(RegistryL10n.t("On the device that added them")), plus: .text(RegistryL10n.t("Synced, up to 10 GB"))),
       RegistryPlanRow(id: "export", label: RegistryL10n.t("Export as JSON"), planned: false, device: .included, account: .included, plus: .included),
     ]),
     RegistryPlanOutcome(id: "agents", icon: "onboarding.agent", title: RegistryL10n.t("Help that keeps working"), detail: RegistryL10n.t("Connect Claude or another agent to your list. It asks before it acts, and you can stop it at any time."), rows: [
-      RegistryPlanRow(id: "connector", label: RegistryL10n.t("Claude connector"), planned: false, device: .notIncluded, account: .text(RegistryL10n.t("Reads, and 25 changes a day")), plus: .text(RegistryL10n.t("No daily cap"))),
-      RegistryPlanRow(id: "runs", label: RegistryL10n.t("Agent runs"), planned: false, device: .notIncluded, account: .text(RegistryL10n.t("10 a month")), plus: .text(RegistryL10n.t("Within a monthly run budget"))),
+      RegistryPlanRow(id: "connected", label: RegistryL10n.t("Connected agents"), planned: false, device: .notIncluded, account: .text(RegistryL10n.t("1")), plus: .text(RegistryL10n.t("Up to 3"))),
+      RegistryPlanRow(id: "connector", label: RegistryL10n.t("Agents read and change your tasks"), planned: false, device: .notIncluded, account: .included, plus: .included),
       RegistryPlanRow(id: "share", label: RegistryL10n.t("Shared projects"), planned: true, device: .notIncluded, account: .text(RegistryL10n.t("Join")), plus: .text(RegistryL10n.t("Create and invite"))),
     ]),
   ] }
@@ -1890,8 +1889,7 @@ enum RegistryPlans {
     RegistryPlanNote(id: "second_device", title: RegistryL10n.t("This device is not syncing"), detail: RegistryL10n.t("A free account syncs one device. Plus syncs all of them. You can also move your free account to this device.")),
     RegistryPlanNote(id: "history_edge", title: RegistryL10n.t("Older changes are hidden"), detail: RegistryL10n.t("A free account shows 30 days of history. Plus shows a full year.")),
     RegistryPlanNote(id: "file_elsewhere", title: RegistryL10n.t("This file is on another device"), detail: RegistryL10n.t("Plus syncs files and images to all your devices.")),
-    RegistryPlanNote(id: "agent_runs", title: RegistryL10n.t("Agent runs resume on the 1st"), detail: RegistryL10n.t("Your free account used its 10 runs this month. The work waits for you. Plus runs it now.")),
-    RegistryPlanNote(id: "connector_cap", title: RegistryL10n.t("Daily change limit reached"), detail: RegistryL10n.t("A free account allows 25 agent changes a day. Plus has no daily cap.")),
+    RegistryPlanNote(id: "connector_cap", title: RegistryL10n.t("Daily change limit reached"), detail: RegistryL10n.t("A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit.")),
     RegistryPlanNote(id: "share_create", title: RegistryL10n.t("Sharing a project needs Plus"), detail: RegistryL10n.t("Anyone can join a shared project for free. Plus lets you create one and invite people.")),
     RegistryPlanNote(id: "trial_end", title: RegistryL10n.t("Your 14 days of Plus have ended"), detail: RegistryL10n.t("Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are.")),
   ] }

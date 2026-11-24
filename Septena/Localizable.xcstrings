@@ -2,7 +2,7 @@
   "sourceLanguage" : "en",
   "strings" : {
     "1" : {
-      "comment" : "Generated from registry plans.outcomes.agents.rows.links.cells.account. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry plans.outcomes.agents.rows.connected.cells.account. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "%lld selected" : {
@@ -1370,6 +1370,14 @@
         }
       }
     },
+    "30 days of change history" : {
+      "comment" : "Generated from registry plans.cards.account.points.3. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "30 days, 90 planned" : {
+      "comment" : "Generated from registry plans.outcomes.nothing_lost.rows.deleted.cells.plus. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "30d" : {
       "shouldTranslate" : false
     },
@@ -1393,6 +1401,10 @@
       "comment" : "Generated from registry plans.outcomes.nothing_lost.rows.history.cells.plus. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "A backup of the device you use" : {
+      "comment" : "Generated from registry plans.cards.account.points.0. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "A centered greeting at the top of the home tab." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1411,6 +1423,10 @@
 
     },
     "A free account allows 25 agent changes a day. Plus has no daily cap." : {
+      "comment" : "Generated from registry plans.upsells.connector_cap.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit." : {
       "comment" : "Generated from registry plans.upsells.connector_cap.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
@@ -1468,6 +1484,10 @@
           }
         }
       }
+    },
+    "A year of change history" : {
+      "comment" : "Generated from registry plans.cards.plus.points.1. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "A year of change history, and 90 days to restore deleted tasks" : {
       "comment" : "Generated from registry plans.cards.plus.points.1. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -2139,6 +2159,14 @@
     },
     "Agents" : {
       "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Agents read and change your tasks" : {
+      "comment" : "Generated from registry plans.outcomes.agents.rows.connector.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Agents work on the copy on our server, so an agent needs an account." : {
+      "comment" : "Generated from registry plans.cards.account.footnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Aging starts the day after a task lands on Today and deepens over a week — a quiet signal that you keep deferring it. Resets when you move it off Today or check it off. A flat Today list keeps the same area and project order, under a single divider, with each task's list shown as a subtitle instead of a heading." : {
@@ -3209,6 +3237,10 @@
     },
     "Change history" : {
       "comment" : "Generated from registry plans.outcomes.nothing_lost.rows.history.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Changes from your agent arrive live" : {
+      "comment" : "Generated from registry plans.cards.account.points.2. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Changes the server refused appear here, newest first. The server kept its own version of each." : {
@@ -5333,11 +5365,19 @@
         }
       }
     },
+    "Every task feature is free on the device you use. A free account adds a backup and lets you connect one agent. Plus covers all your devices, three agents, synced files and a longer history." : {
+      "comment" : "Generated from registry plans.subhead. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Every task feature is free on the device you use. Plus syncs your list to all your devices and keeps its full history and files. It also lets your agents work without a daily cap." : {
       "comment" : "Generated from registry plans.subhead. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Everything in Free is included." : {
+      "comment" : "Generated from registry plans.cards.plus.footnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Everything in the free account is included." : {
       "comment" : "Generated from registry plans.cards.plus.footnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
@@ -8201,6 +8241,10 @@
         }
       }
     },
+    "Moving to a new device is free" : {
+      "comment" : "Generated from registry plans.cards.account.points.4. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "n < %@ — too noisy to plot" : {
       "localizations" : {
         "pt-BR" : {
@@ -9269,7 +9313,7 @@
       "extractionState" : "manual"
     },
     "On this device" : {
-      "comment" : "Generated from registry plans.outcomes.nothing_lost.rows.history.cells.device. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry plans.levels.device.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "On this device · Sign in to sync" : {
@@ -9351,6 +9395,10 @@
           }
         }
       }
+    },
+    "One agent, such as Claude, connected to your list" : {
+      "comment" : "Generated from registry plans.cards.account.points.1. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "One app for every corner of your life" : {
       "localizations" : {
@@ -13172,8 +13220,16 @@
       "comment" : "Generated from registry plans.paywall.failed. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "The same app on all your devices, with more agents and your files." : {
+      "comment" : "Generated from registry plans.cards.plus.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "The same app on every device, with nothing capped." : {
       "comment" : "Generated from registry plans.cards.plus.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "The same app, with a copy of your list on our server. Sign in with Apple." : {
+      "comment" : "Generated from registry plans.cards.account.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "The same tasks on your phone, tablet and Mac, updated as you type." : {
@@ -13908,6 +13964,14 @@
     },
     "Unset" : {
 
+    },
+    "Up to 3" : {
+      "comment" : "Generated from registry plans.outcomes.agents.rows.connected.cells.plus. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Up to 3 agents connected to your list" : {
+      "comment" : "Generated from registry plans.cards.plus.points.3. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Upbeat" : {
       "localizations" : {
