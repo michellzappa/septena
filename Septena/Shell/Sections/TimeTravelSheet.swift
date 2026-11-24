@@ -148,7 +148,7 @@ struct TimeTravelSheet: View {
       .septenaInlineTitle()
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
+          DrawerCloseButton { dismiss() }
         }
       }
     }

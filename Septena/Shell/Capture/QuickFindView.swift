@@ -80,7 +80,7 @@ struct QuickFindView: View {
       .toolbar {
         if !embedded {
           ToolbarItem(placement: .cancellationAction) {
-            Button("Cancel") { dismiss() }
+            DrawerCloseButton { dismiss() }
           }
         }
       }

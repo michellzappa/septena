@@ -159,7 +159,7 @@ struct AddTaskPage: View {
     .toolbar {
       if hostsTitleField {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
+          DrawerCloseButton { dismiss() }
         }
         ToolbarItem(placement: .confirmationAction) {
           Button("Add") { commit(title: trimmed) }
