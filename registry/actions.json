@@ -328,6 +328,13 @@
       "availability": { "selection": "single" },
       "featureId": "places.projects"
     },
+    "project.share": {
+      "title": "Share Project…",
+      "icon": "action.share_project",
+      "role": "default",
+      "availability": { "selection": "single" },
+      "featureId": "sharing.projects"
+    },
     "logged.clear": {
       "title": "Clear Logged…",
       "icon": "action.delete",
@@ -336,6 +343,7 @@
       "featureId": "lists.logbook"
     },
     "sidebar.newArea": { "title": "New Area", "icon": "action.add", "role": "default", "availability": { "selection": "none" }, "featureId": "places.areas" },
+    "sidebar.joinShared": { "title": "Join a Shared Project…", "icon": "action.share_project", "role": "default", "availability": { "selection": "none" }, "featureId": "sharing.projects" },
     "sidebar.newProject": { "title": "New Project", "icon": "action.add", "role": "default", "availability": { "selection": "none" }, "featureId": "places.projects" },
     "section.new": { "title": "New Section", "icon": "action.add", "role": "default", "availability": { "selection": "none" }, "featureId": "places.sections" },
     "section.newTask": {
@@ -563,6 +571,13 @@
           { "kind": "action", "id": "task.move" }
         ]
       },
+      {
+        "kind": "submenu",
+        "id": "assign",
+        "title": "Assign To",
+        "icon": "action.assign",
+        "items": [{ "kind": "slot", "slot": "assignees" }]
+      },
       { "kind": "action", "id": "task.tags" },
       { "kind": "action", "id": "task.deadline" },
       { "kind": "action", "id": "task.toggleStar" },
@@ -612,13 +627,14 @@
         "icon": "action.move",
         "items": [{ "kind": "slot", "slot": "moveToAreaDestinations" }]
       },
+      { "kind": "action", "id": "project.share" },
       { "kind": "divider" },
       { "kind": "action", "id": "project.markDone" },
       { "kind": "action", "id": "project.cancel" },
       { "kind": "divider" },
       { "kind": "action", "id": "project.delete" }
     ],
-    "sidebar.empty": [{ "kind": "action", "id": "sidebar.newArea" }, { "kind": "action", "id": "sidebar.newProject" }],
+    "sidebar.empty": [{ "kind": "action", "id": "sidebar.newArea" }, { "kind": "action", "id": "sidebar.newProject" }, { "kind": "action", "id": "sidebar.joinShared" }],
     "project.heading": [
       { "kind": "action", "id": "section.rename" },
       { "kind": "action", "id": "section.newTask" },
@@ -684,6 +700,7 @@
       "title": "Task",
       "items": [
         { "kind": "action", "id": "sidebar.newProject" },
+        { "kind": "action", "id": "sidebar.joinShared" },
         { "kind": "action", "id": "sidebar.newArea" },
         { "kind": "divider" },
         { "kind": "action", "id": "task.toggleToday" },
