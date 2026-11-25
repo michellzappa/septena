@@ -175,7 +175,7 @@ export const TASK_TOOLS: Tool[] = [
   {
     name: "tasks_defer",
     title: "Defer task",
-    description: "Set a task’s When to a future date (sets scheduled, clears today).",
+    description: "Set a task’s When to a future date (sets scheduled, clears today). The task leaves Today until that date. Its deadline does not change: a task that is due or overdue stays marked so in Upcoming.",
     inputSchema: deferTaskJsonSchema,
     annotations: { title: "Defer task", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },

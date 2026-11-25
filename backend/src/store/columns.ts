@@ -155,6 +155,9 @@ export const ENTITIES = {
       durationMinutes: { kind: "int", zod: z.number().int().min(5).max(1440).nullable() },
       timeZone: { kind: "text", zod: zIanaTz },
       deadline: day(),
+      // The deadline the user planned past (docs/TASK_DATES_SPEC.md I8). The
+      // core owns it: it keeps that deadline from holding the task on Today.
+      deferredDeadline: day(),
       today: bool(),
       starred: bool(),
       tags: json(z.array(zId).max(MAX_TAGS_PER_TASK)),

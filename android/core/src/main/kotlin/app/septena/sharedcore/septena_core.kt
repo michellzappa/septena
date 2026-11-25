@@ -1089,7 +1089,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_septena_core_checksum_func_normalize_ref_key() != 43412.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_septena_core_checksum_func_normalize_task_dates() != 27973.toShort()) {
+    if (lib.uniffi_septena_core_checksum_func_normalize_task_dates() != 42374.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_septena_core_checksum_func_occurrence_id() != 31912.toShort()) {
@@ -1997,6 +1997,7 @@ public object FfiConverterTypeTaskConversation: FfiConverterRustBuffer<TaskConve
 data class TaskDateFields (
     var `scheduled`: kotlin.String?, 
     var `deadline`: kotlin.String?, 
+    var `deferredDeadline`: kotlin.String?, 
     var `today`: kotlin.Boolean, 
     var `todaySetOn`: kotlin.String?, 
     var `startTime`: kotlin.String?, 
@@ -2020,6 +2021,7 @@ public object FfiConverterTypeTaskDateFields: FfiConverterRustBuffer<TaskDateFie
         return TaskDateFields(
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -2036,6 +2038,7 @@ public object FfiConverterTypeTaskDateFields: FfiConverterRustBuffer<TaskDateFie
     override fun allocationSize(value: TaskDateFields) = (
             FfiConverterOptionalString.allocationSize(value.`scheduled`) +
             FfiConverterOptionalString.allocationSize(value.`deadline`) +
+            FfiConverterOptionalString.allocationSize(value.`deferredDeadline`) +
             FfiConverterBoolean.allocationSize(value.`today`) +
             FfiConverterOptionalString.allocationSize(value.`todaySetOn`) +
             FfiConverterOptionalString.allocationSize(value.`startTime`) +
@@ -2051,6 +2054,7 @@ public object FfiConverterTypeTaskDateFields: FfiConverterRustBuffer<TaskDateFie
     override fun write(value: TaskDateFields, buf: ByteBuffer) {
             FfiConverterOptionalString.write(value.`scheduled`, buf)
             FfiConverterOptionalString.write(value.`deadline`, buf)
+            FfiConverterOptionalString.write(value.`deferredDeadline`, buf)
             FfiConverterBoolean.write(value.`today`, buf)
             FfiConverterOptionalString.write(value.`todaySetOn`, buf)
             FfiConverterOptionalString.write(value.`startTime`, buf)
@@ -2116,6 +2120,10 @@ data class TaskSnapshot (
     var `createdAt`: kotlin.String?, 
     var `scheduled`: kotlin.String?, 
     var `deadline`: kotlin.String?, 
+    /**
+     * The deadline the user planned past (spec §2, I8).
+     */
+    var `deferredDeadline`: kotlin.String?, 
     var `today`: kotlin.Boolean, 
     var `todaySetOn`: kotlin.String?, 
     var `source`: kotlin.String?, 
@@ -2162,6 +2170,7 @@ public object FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer<TaskSnapshot>
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -2192,6 +2201,7 @@ public object FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer<TaskSnapshot>
             FfiConverterOptionalString.allocationSize(value.`createdAt`) +
             FfiConverterOptionalString.allocationSize(value.`scheduled`) +
             FfiConverterOptionalString.allocationSize(value.`deadline`) +
+            FfiConverterOptionalString.allocationSize(value.`deferredDeadline`) +
             FfiConverterBoolean.allocationSize(value.`today`) +
             FfiConverterOptionalString.allocationSize(value.`todaySetOn`) +
             FfiConverterOptionalString.allocationSize(value.`source`) +
@@ -2221,6 +2231,7 @@ public object FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer<TaskSnapshot>
             FfiConverterOptionalString.write(value.`createdAt`, buf)
             FfiConverterOptionalString.write(value.`scheduled`, buf)
             FfiConverterOptionalString.write(value.`deadline`, buf)
+            FfiConverterOptionalString.write(value.`deferredDeadline`, buf)
             FfiConverterBoolean.write(value.`today`, buf)
             FfiConverterOptionalString.write(value.`todaySetOn`, buf)
             FfiConverterOptionalString.write(value.`source`, buf)
@@ -3723,7 +3734,7 @@ public object FfiConverterSequenceTypeParsedRef: FfiConverterRustBuffer<List<Par
     
 
         /**
-         * A12 and restore: the task's fields brought to invariants I1–I7. A pin
+         * A12 and restore: the task's fields brought to invariants I1–I8. A pin
          * with a future When date loses the pin; a pin with an arrived When date
          * loses the date. An empty or invalid day becomes none.
          */
