@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Golden conformance vectors for the task date actions of docs/TASK_DATES_SPEC.md §4 (ADR 0027). `actions`: one action on one task; `expected` holds only the fields the action changed, or the error. `normalize`: invariants I1–I7 on a created or restored task. `nextOccurrence`: the date fields of the next occurrence of a repeating task (A10).",
+  "description": "Golden conformance vectors for the task date actions of docs/TASK_DATES_SPEC.md §4 (ADR 0027). `actions`: one action on one task; `expected` holds only the fields the action changed, or the error. `normalize`: invariants I1–I8 on a created or restored task. `nextOccurrence`: the date fields of the next occurrence of a repeating task (A10).",
   "today": "2026-11-21",
   "now": "2026-11-21T12:00:00Z",
   "actions": [
@@ -62,7 +62,67 @@
       "name": "A2 future day on a pinned row with an overdue deadline: unpins, deadline stays (Q1)",
       "task": { "id": "d1", "title": "Task", "status": "open", "today": true, "area": "work", "source": "app", "created": "2026-11-01", "todaySetOn": "2026-11-20", "deadline": "2026-11-19", "startTime": "09:00", "durationMinutes": 30 },
       "action": { "type": "scheduleFor", "day": "2026-11-25" },
-      "expected": { "scheduled": "2026-11-25", "today": false, "todaySetOn": null }
+      "expected": { "scheduled": "2026-11-25", "deferredDeadline": "2026-11-19", "today": false, "todaySetOn": null }
+    },
+    {
+      "name": "A2 future day on a row due today: the task leaves Today, the deadline stays (Q8, I8)",
+      "task": { "id": "d1", "title": "Task", "status": "open", "today": false, "area": "work", "source": "app", "created": "2026-11-01", "deadline": "2026-11-21" },
+      "action": { "type": "scheduleFor", "day": "2026-11-22" },
+      "expected": { "scheduled": "2026-11-22", "deferredDeadline": "2026-11-21" }
+    },
+    {
+      "name": "A2 future day with a future deadline: nothing is deferred",
+      "task": { "id": "d1", "title": "Task", "status": "open", "today": false, "area": "work", "source": "app", "created": "2026-11-01", "deadline": "2026-11-28" },
+      "action": { "type": "scheduleFor", "day": "2026-11-22" },
+      "expected": { "scheduled": "2026-11-22" }
+    },
+    {
+      "name": "A2 a second defer of an overdue row keeps the deferral",
+      "task": { "id": "d1", "title": "Task", "status": "open", "today": false, "area": "work", "source": "app", "created": "2026-11-01", "scheduled": "2026-11-20", "deadline": "2026-11-19", "deferredDeadline": "2026-11-19" },
+      "action": { "type": "scheduleFor", "day": "2026-11-22" },
+      "expected": { "scheduled": "2026-11-22" }
+    },
+    {
+      "name": "A1 on a deferred row: the deferral goes",
+      "task": { "id": "d1", "title": "Task", "status": "open", "today": false, "area": "work", "source": "app", "created": "2026-11-01", "scheduled": "2026-11-25", "deadline": "2026-11-19", "deferredDeadline": "2026-11-19" },
+      "action": { "type": "putOnToday" },
+      "expected": { "scheduled": null, "deferredDeadline": null, "today": true, "todaySetOn": "2026-11-21" }
+    },
+    {
+      "name": "A3 on a deferred row whose When date arrived: both dates go",
+      "task": { "id": "d1", "title": "Task", "status": "open", "today": false, "area": "work", "source": "app", "created": "2026-11-01", "scheduled": "2026-11-21", "deadline": "2026-11-19", "deferredDeadline": "2026-11-19" },
+      "action": { "type": "removeFromToday" },
+      "expected": { "scheduled": null, "deadline": null, "deferredDeadline": null }
+    },
+    {
+      "name": "A3 on a deferred row that is not on Today: nothing changes",
+      "task": { "id": "d1", "title": "Task", "status": "open", "today": false, "area": "work", "source": "app", "created": "2026-11-01", "scheduled": "2026-11-25", "deadline": "2026-11-19", "deferredDeadline": "2026-11-19" },
+      "action": { "type": "removeFromToday" },
+      "expected": {}
+    },
+    {
+      "name": "A4 deferred row is not on Today: Toggle Today puts it there",
+      "task": { "id": "d1", "title": "Task", "status": "open", "today": false, "area": "work", "source": "app", "created": "2026-11-01", "scheduled": "2026-11-25", "deadline": "2026-11-19", "deferredDeadline": "2026-11-19" },
+      "action": { "type": "toggleToday" },
+      "expected": { "scheduled": null, "deferredDeadline": null, "today": true, "todaySetOn": "2026-11-21" }
+    },
+    {
+      "name": "A5 on a deferred row: the deferral goes, so the deadline holds the task on Today again",
+      "task": { "id": "d1", "title": "Task", "status": "open", "today": false, "area": "work", "source": "app", "created": "2026-11-01", "scheduled": "2026-11-25", "deadline": "2026-11-19", "deferredDeadline": "2026-11-19" },
+      "action": { "type": "clearWhenDate" },
+      "expected": { "scheduled": null, "deferredDeadline": null }
+    },
+    {
+      "name": "A7 another deadline on a deferred row: the deferral goes, no pin",
+      "task": { "id": "d1", "title": "Task", "status": "open", "today": false, "area": "work", "source": "app", "created": "2026-11-01", "scheduled": "2026-11-25", "deadline": "2026-11-19", "deferredDeadline": "2026-11-19" },
+      "action": { "type": "setDeadline", "day": "2026-11-28" },
+      "expected": { "deadline": "2026-11-28", "deferredDeadline": null }
+    },
+    {
+      "name": "A8 clears the deadline of a deferred row: the deferral goes",
+      "task": { "id": "d1", "title": "Task", "status": "open", "today": false, "area": "work", "source": "app", "created": "2026-11-01", "scheduled": "2026-11-25", "deadline": "2026-11-19", "deferredDeadline": "2026-11-19" },
+      "action": { "type": "setDeadline" },
+      "expected": { "deadline": null, "deferredDeadline": null }
     },
     {
       "name": "A2 today is A1",
@@ -310,6 +370,21 @@
       "expected": {}
     },
     {
+      "name": "I8 a deferral with no When date goes",
+      "task": { "id": "d1", "title": "Task", "status": "open", "today": false, "area": "work", "source": "app", "created": "2026-11-01", "deadline": "2026-11-19", "deferredDeadline": "2026-11-19" },
+      "expected": { "deferredDeadline": null }
+    },
+    {
+      "name": "I8 a deferral of another deadline goes",
+      "task": { "id": "d1", "title": "Task", "status": "open", "today": false, "area": "work", "source": "app", "created": "2026-11-01", "scheduled": "2026-11-25", "deadline": "2026-11-20", "deferredDeadline": "2026-11-19" },
+      "expected": { "deferredDeadline": null }
+    },
+    {
+      "name": "I8 a deferral with its deadline and a When date stays",
+      "task": { "id": "d1", "title": "Task", "status": "open", "today": false, "area": "work", "source": "app", "created": "2026-11-01", "scheduled": "2026-11-25", "deadline": "2026-11-19", "deferredDeadline": "2026-11-19" },
+      "expected": {}
+    },
+    {
       "name": "I7 duration without a start time goes",
       "task": { "id": "d1", "title": "Task", "status": "open", "today": false, "area": "work", "source": "app", "created": "2026-11-01", "scheduled": "2026-11-25", "durationMinutes": 30 },
       "expected": { "durationMinutes": null }
@@ -320,13 +395,13 @@
       "name": "fixed weekly repeat: no deadline, no pin, same slot, reminder follows, slot recorded",
       "task": { "id": "d1", "title": "Task", "status": "open", "today": true, "area": "work", "source": "app", "created": "2026-11-01", "scheduled": "2026-11-21", "recurrenceAnchorDate": "2026-11-21", "deadline": "2026-11-21", "todaySetOn": "2026-11-20", "startTime": "07:00", "durationMinutes": 30, "reminderAt": "2026-11-21T06:45", "reminderDismissedAt": "2026-11-21T06:50:00Z", "recurrenceUnit": "week", "recurrenceAfterCompletion": false },
       "nextScheduled": "2026-11-28",
-      "expected": { "scheduled": "2026-11-28", "deadline": null, "today": false, "todaySetOn": null, "startTime": "07:00", "durationMinutes": 30, "timeZone": null, "reminderAt": "2026-11-28T06:45", "reminderSnoozedUntil": null, "reminderDismissedAt": null, "recurrenceAnchorDate": "2026-11-28", "acknowledgedAt": null }
+      "expected": { "scheduled": "2026-11-28", "deadline": null, "deferredDeadline": null, "today": false, "todaySetOn": null, "startTime": "07:00", "durationMinutes": 30, "timeZone": null, "reminderAt": "2026-11-28T06:45", "reminderSnoozedUntil": null, "reminderDismissedAt": null, "recurrenceAnchorDate": "2026-11-28", "acknowledgedAt": null }
     },
     {
       "name": "agent row repeating after completion: reminder keeps its day offset, arrives acknowledged",
       "task": { "id": "d1", "title": "Task", "status": "open", "today": false, "area": "work", "source": "mcp", "created": "2026-11-01", "scheduled": "2026-11-20", "reminderAt": "2026-11-19T20:00", "recurrenceUnit": "day", "recurrenceAfterCompletion": true },
       "nextScheduled": "2026-11-22",
-      "expected": { "scheduled": "2026-11-22", "deadline": null, "today": false, "todaySetOn": null, "startTime": null, "durationMinutes": null, "timeZone": null, "reminderAt": "2026-11-21T20:00", "reminderSnoozedUntil": null, "reminderDismissedAt": null, "recurrenceAnchorDate": null, "acknowledgedAt": "2026-11-21T12:00:00Z" }
+      "expected": { "scheduled": "2026-11-22", "deadline": null, "deferredDeadline": null, "today": false, "todaySetOn": null, "startTime": null, "durationMinutes": null, "timeZone": null, "reminderAt": "2026-11-21T20:00", "reminderSnoozedUntil": null, "reminderDismissedAt": null, "recurrenceAnchorDate": null, "acknowledgedAt": "2026-11-21T12:00:00Z" }
     }
   ]
 }

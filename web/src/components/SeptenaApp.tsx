@@ -799,7 +799,13 @@ export function SeptenaApp() {
           );
         }}
         onToggleToday={async () => {
-          const prev = { today: Boolean(task.today), todaySetOn: task.todaySetOn ?? null, scheduled: task.scheduled ?? null };
+          const prev = {
+            today: Boolean(task.today),
+            todaySetOn: task.todaySetOn ?? null,
+            scheduled: task.scheduled ?? null,
+            deadline: task.deadline ?? null,
+            deferredDeadline: task.deferredDeadline ?? null,
+          };
           await engine.toggleTaskToday(task);
           undoStack.record({
             label: prev.today ? `Removed “${task.title}” from Today` : `Moved “${task.title}” to Today`,
