@@ -62,16 +62,24 @@ enum TaskRefActions {
   static func open(_ row: TaskRefRow, navigation: NavigationState?) {
     switch row.target {
     case .url(let url): open(url)
-    case .task(let id):
-      if let navigation {
-        SeptaskDeepLinkRouter.openTask(id, opensPage: true, navigation: navigation, context: context)
-      } else {
-        #if os(macOS)
-        SeptaskDeepLinkRouter.openTaskMac(id, opensPage: true)
-        #endif
-      }
+    case .task(let id): openTask(id, navigation: navigation)
     case nil: break
     }
+  }
+
+  static func openTask(_ id: String, navigation: NavigationState?) {
+    if let navigation {
+      SeptaskDeepLinkRouter.openTask(id, opensPage: true, navigation: navigation, context: context)
+    } else {
+      #if os(macOS)
+      SeptaskDeepLinkRouter.openTaskMac(id, opensPage: true)
+      #endif
+    }
+  }
+
+  /// The other open tasks that point at the same things (§6.4).
+  static func alsoIn(taskID: String, title: String, notes: String?) -> [TaskRefLookup.Other] {
+    TaskRefLookup.alsoIn(taskID: taskID, title: title, notes: notes, in: context)
   }
 
   private static func open(_ url: URL) {
@@ -214,34 +222,48 @@ struct TaskReferencesPanel: View {
 
 // MARK: - Suggestions
 
-/// The links of the task's text that are not references yet, one faint chip
-/// each. A tap makes the reference and leaves the text as it is.
+/// Under the References block: the links of the task's text that are not
+/// references yet (a tap makes the reference and leaves the text as it is),
+/// then the other open tasks that point at the same things (a tap opens one).
 struct TaskReferenceSuggestions: View {
   let offers: [TaskRefRows.Offer]
+  let others: [TaskRefLookup.Other]
   let onTake: (TaskRefRows.Offer) -> Void
+
+  @Environment(NavigationState.self) private var navigation: NavigationState?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       ForEach(offers) { offer in
-        Button { onTake(offer) } label: {
-          HStack(spacing: 6) {
-            Image(systemName: "plus")
-            Text(offer.title)
-              .lineLimit(1)
-              .truncationMode(.middle)
-          }
-          .font(.septenaCaption)
-          .foregroundStyle(Theme.inkSecondary)
-          .padding(.horizontal, 10)
-          .padding(.vertical, 7)
-          .overlay(Capsule().strokeBorder(Theme.inkSecondary.opacity(0.35),
-                                          style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
-          .contentShape(Capsule())
+        chip(offer.title, icon: "plus", stroke: StrokeStyle(lineWidth: 1, dash: [3, 3])) { onTake(offer) }
+          .accessibilityLabel(RegistryTaskReferences.suggestion(name: offer.title))
+      }
+      ForEach(others) { other in
+        chip(RegistryTaskReferences.alsoIn(name: other.title),
+             icon: RegistryTaskReferences.kind("task").sfSymbol, stroke: StrokeStyle(lineWidth: 1)) {
+          TaskRefActions.openTask(other.id, navigation: navigation)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(RegistryTaskReferences.suggestion(name: offer.title))
       }
     }
+  }
+
+  private func chip(_ title: String, icon: String, stroke: StrokeStyle,
+                    action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      HStack(spacing: 6) {
+        Image(systemName: icon)
+        Text(title)
+          .lineLimit(1)
+          .truncationMode(.middle)
+      }
+      .font(.septenaCaption)
+      .foregroundStyle(Theme.inkSecondary)
+      .padding(.horizontal, 10)
+      .padding(.vertical, 7)
+      .overlay(Capsule().strokeBorder(Theme.inkSecondary.opacity(0.35), style: stroke))
+      .contentShape(Capsule())
+    }
+    .buttonStyle(.plain)
   }
 }
 

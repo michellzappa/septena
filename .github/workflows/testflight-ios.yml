@@ -35,6 +35,14 @@ name: Septena iOS TestFlight
 # external group "Public beta", which owns the public link, and sends it to
 # beta review (scripts/testflight-distribute.mjs). Apple holds one build in
 # review at a time; a refused submission is a notice, not a failure.
+#
+# Device builds (docs/DEVICE_BUILDS.md): a push to device/<name>, or a manual
+# run with `branch`, builds that branch for the internal group "Device builds"
+# only. It never reaches "Public beta" and is never sent to beta review. It
+# ships in its own version train (<major>.999.<n>), so its numbers never
+# collide with a build from main. The environment apple-device needs mz's
+# approval before the job gets the signing secrets, because the job runs the
+# branch's own build scripts.
 
 on:
   push:
@@ -46,25 +54,45 @@ on:
       - "appstore/**"
       - "**/*.md"
   workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch for a device build. Empty: the normal Public beta build of main."
+        type: string
+        default: ""
+  workflow_run:
+    workflows: ["Device build request"]
+    branches: ["device/**"]
+    types: [completed]
 
 # Several sessions push to main within minutes of each other. Cancelling the
 # running upload on each push meant no run ever finished. A running upload now
 # finishes; GitHub keeps only the newest pending run behind it.
+# A device build gives way to the next push of the same branch.
 concurrency:
-  group: testflight-ios
-  cancel-in-progress: false
+  group: ${{ (github.event_name == 'workflow_run' && format('testflight-device-{0}', github.event.workflow_run.head_branch)) || (inputs.branch && format('testflight-device-{0}', inputs.branch)) || 'testflight-ios' }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_run' || (inputs.branch || '') != '' }}
 
 permissions:
   contents: read
 
 env:
   TEAM_ID: 992N457T8D
+  DEVICE_BUILD: ${{ github.event_name == 'workflow_run' || (inputs.branch || '') != '' }}
 
 jobs:
   upload:
     name: Archive and upload (iOS)
+    # A fork can start a workflow_run too. Only a successful push to a device
+    # branch of this repository counts.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: macos-26
+    environment: ${{ (github.event_name == 'workflow_run' || (inputs.branch || '') != '') && 'apple-device' || 'apple-release' }}
     outputs:
+      marketing_version: ${{ steps.stamp.outputs.marketing_version }}
       ready: ${{ steps.gate.outputs.ready }}
       build_number: ${{ steps.stamp.outputs.build_number }}
     steps:
@@ -84,7 +112,9 @@ jobs:
       - uses: actions/checkout@v4
         if: steps.gate.outputs.ready == 'true'
         with:
+          ref: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || inputs.branch || github.sha }}
           fetch-depth: 0  # stamp-version.sh needs the full commit count
+          persist-credentials: false
 
       - name: Select Xcode
         if: steps.gate.outputs.ready == 'true'
@@ -102,6 +132,12 @@ jobs:
         run: |
           scripts/stamp-version.sh
           echo "build_number=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+          VERSION=$(sed -nE 's/^ +MARKETING_VERSION: "([0-9.]+)"$/\1/p' project.yml)
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "no single MARKETING_VERSION in project.yml" >&2; exit 1; }
+          if [[ "$DEVICE_BUILD" == "true" ]]; then
+            VERSION="${VERSION%%.*}.999.$(( GITHUB_RUN_NUMBER * 10 + GITHUB_RUN_ATTEMPT ))"
+          fi
+          echo "marketing_version=$VERSION" >> "$GITHUB_OUTPUT"
           xcodegen generate
 
       - name: Import signing identities and API key
@@ -137,6 +173,7 @@ jobs:
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          MARKETING: ${{ steps.stamp.outputs.marketing_version }}
         run: |
           xcodebuild archive \
             -scheme Septask \
@@ -147,7 +184,8 @@ jobs:
             -authenticationKeyPath "$ASC_KEY_PATH" \
             -authenticationKeyID "$APPLE_API_KEY_ID" \
             -authenticationKeyIssuerID "$APPLE_API_ISSUER_ID" \
-            SEPTENA_DEVELOPMENT_TEAM="$TEAM_ID"
+            SEPTENA_DEVELOPMENT_TEAM="$TEAM_ID" \
+            MARKETING_VERSION="$MARKETING"
 
       - name: Export and upload to App Store Connect
         if: steps.gate.outputs.ready == 'true'
@@ -187,10 +225,13 @@ jobs:
           rm -f "$ASC_KEY_PATH"
 
   distribute:
-    name: Add to Public beta and send to review
+    name: Distribute
     needs: upload
     if: needs.upload.outputs.ready == 'true'
     runs-on: ubuntu-latest
+    # This job runs main's own script, never the branch's, so a device build
+    # needs no second approval here.
+    environment: apple-release
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -209,5 +250,7 @@ jobs:
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
           ASC_APP_ID: "6836809027"
           BUILD_NUMBER: ${{ needs.upload.outputs.build_number }}
-          TESTFLIGHT_GROUP: Public beta
+          MARKETING_VERSION: ${{ needs.upload.outputs.marketing_version }}
+          TESTFLIGHT_GROUP: ${{ env.DEVICE_BUILD == 'true' && 'Device builds' || 'Public beta' }}
+          DEVICE_NOTE: ${{ env.DEVICE_BUILD == 'true' && (github.event.workflow_run.head_branch || inputs.branch) || '' }}
         run: node scripts/testflight-distribute.mjs

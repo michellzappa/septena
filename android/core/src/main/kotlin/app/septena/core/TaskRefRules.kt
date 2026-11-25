@@ -219,7 +219,7 @@ object TaskRefOffers {
         return of(title, notes, existing).take(minOf(room, max).coerceAtLeast(0))
     }
 
-    private fun linkTexts(text: String): List<String> =
+    internal fun linkTexts(text: String): List<String> =
         link.findAll(text).map { trimmedEnd(it.value) }.filter(::canRead).toList()
 
     /** Sentence punctuation after a link, and the bracket that closes a Markdown link. */

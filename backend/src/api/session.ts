@@ -18,6 +18,10 @@ import type { RenewResult, SessionGrant } from "../store/sessions.js";
 
 export const ACCESS_TTL_S = 60 * 60;
 export const REFRESH_TTL_S = 180 * 24 * 60 * 60;
+/// The first refresh token of a session handed to a companion device. The
+/// device trades it for a full one at first use, so a handoff that never
+/// arrives leaves no long-lived session behind.
+export const HANDOFF_TTL_S = 7 * 24 * 60 * 60;
 const ACCESS_PREFIX = "sa1";
 const REFRESH_PREFIX = "sr2";
 const LEGACY_REFRESH_PREFIX = "sr1";
@@ -117,12 +121,12 @@ export async function mintRefresh(env: Env, prefix: string, userId: string, sid:
   return { token, hash: await sha256Base64Url(token), expiresAt: Date.now() + ttlSeconds * 1000 };
 }
 
-async function mintAppRefresh(env: Env, userId: string, sid: string): Promise<MintedRefresh> {
-  if (issuesSignedTokens(env)) return mintRefresh(env, REFRESH_PREFIX, userId, sid, REFRESH_TTL_S);
+async function mintAppRefresh(env: Env, userId: string, sid: string, ttlSeconds = REFRESH_TTL_S): Promise<MintedRefresh> {
+  if (issuesSignedTokens(env)) return mintRefresh(env, REFRESH_PREFIX, userId, sid, ttlSeconds);
   const token = `${LEGACY_REFRESH_PREFIX}.${randomId(32)}`;
   const hash = await sha256Base64Url(token);
-  await env.TOKENS.put(`api-refresh:${hash}`, userId, { expirationTtl: REFRESH_TTL_S, metadata: { sid } });
-  return { token, hash, expiresAt: Date.now() + REFRESH_TTL_S * 1000 };
+  await env.TOKENS.put(`api-refresh:${hash}`, userId, { expirationTtl: ttlSeconds, metadata: { sid } });
+  return { token, hash, expiresAt: Date.now() + ttlSeconds * 1000 };
 }
 
 export interface RefreshRef {
@@ -148,9 +152,9 @@ async function issued(env: Env, userId: string, sid: string, refresh: MintedRefr
   return { accessToken: await signAccessToken(env, userId, sid, refresh.hash), refreshToken: refresh.token, expiresIn: ACCESS_TTL_S, userId };
 }
 
-export async function issueSession(env: Env, userId: string): Promise<IssuedSession> {
+export async function issueSession(env: Env, userId: string, refreshTtlSeconds = REFRESH_TTL_S): Promise<IssuedSession> {
   const sid = crypto.randomUUID();
-  const refresh = await mintAppRefresh(env, userId, sid);
+  const refresh = await mintAppRefresh(env, userId, sid, refreshTtlSeconds);
   await storeFor(env, userId).createSession(refresh.hash, refresh.expiresAt, sid);
   return issued(env, userId, sid, refresh);
 }

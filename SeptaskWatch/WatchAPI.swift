@@ -50,19 +50,24 @@ actor WatchAPI {
   nonisolated static var hasSession: Bool { WatchKeychain.load() != nil }
 
   func adopt(_ handoff: WatchSessionHandoff) {
-    WatchKeychain.store(handoff.refreshToken)
+    let replaced = WatchKeychain.load()
+    guard WatchKeychain.store(handoff.refreshToken) else { return }
     UserDefaults.standard.set(handoff.userId, forKey: "septena.watch.userId")
     accessToken = nil
     accessExpiry = .distantPast
+    // The session it replaces has no holder any more: end it.
+    if let replaced, replaced != handoff.refreshToken { Task { await revoke(replaced) } }
   }
 
   /// Drops the session. Best effort revokes it on the server first.
   func signOut() async {
-    if let token = WatchKeychain.load(),
-       let body = try? JSONEncoder().encode(["refreshToken": token]) {
-      _ = try? await perform(path: "/v1/auth/signout", method: "POST", body: body, auth: nil)
-    }
+    if let token = WatchKeychain.load() { await revoke(token) }
     clear()
+  }
+
+  private func revoke(_ token: String) async {
+    guard let body = try? JSONEncoder().encode(["refreshToken": token]) else { return }
+    _ = try? await perform(path: "/v1/auth/signout", method: "POST", body: body, auth: nil)
   }
 
   private func clear() {

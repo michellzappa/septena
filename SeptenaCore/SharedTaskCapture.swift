@@ -1,4 +1,7 @@
 import Foundation
+#if !SHARE_EXTENSION
+import SwiftData
+#endif
 
 /// Versioned hand-off written by a Share extension and consumed by its app.
 /// Attachments can later be added as stable relative references without
@@ -23,6 +26,19 @@ struct SharedTaskCapture: Codable, Identifiable, Sendable {
     self.today = today
     self.sourceURL = sourceURL
   }
+}
+
+/// The links of the open tasks, written by the app and read by the Share
+/// extension, which cannot open the store (docs/TASK_REFERENCES_SPEC.md §6.4).
+struct SharedTaskLinkIndex: Codable, Sendable {
+  struct Entry: Codable, Sendable {
+    let title: String
+    let keys: [String]
+  }
+
+  /// "Already a task", in the app's language.
+  let heading: String
+  let entries: [Entry]
 }
 
 /// The raw value is a folder name in the app group, so it stays `septask`.
@@ -62,6 +78,26 @@ enum SharedTaskCaptureQueue {
     }
   }
 
+  // MARK: Links of the open tasks
+
+  private static let linkIndexName = "links.json"
+
+  static func linkIndex(for destination: SharedTaskCaptureDestination) -> SharedTaskLinkIndex? {
+    guard let url = try? directory(for: destination, leaf: "index").appendingPathComponent(linkIndexName),
+          let data = try? Data(contentsOf: url) else { return nil }
+    return try? JSONDecoder().decode(SharedTaskLinkIndex.self, from: data)
+  }
+
+  /// Nil removes the index.
+  static func saveLinkIndex(_ index: SharedTaskLinkIndex?, for destination: SharedTaskCaptureDestination) {
+    guard let url = try? directory(for: destination, leaf: "index").appendingPathComponent(linkIndexName) else { return }
+    guard let index, let data = try? JSONEncoder().encode(index) else {
+      try? FileManager.default.removeItem(at: url)
+      return
+    }
+    try? data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+  }
+
   static func finish(_ claimedURL: URL) { try? FileManager.default.removeItem(at: claimedURL) }
 
   private static func directory(for destination: SharedTaskCaptureDestination,
@@ -94,10 +130,29 @@ enum SharedTaskCaptureImporter {
       let title = capture.title.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !title.isEmpty else { SharedTaskCaptureQueue.finish(claimedURL); continue }
       let notes = capture.notes.trimmingCharacters(in: .whitespacesAndNewlines)
-      _ = mutator.create(title: title, today: capture.today,
-                         notes: notes.isEmpty ? nil : notes, source: "share_extension")
+      let task = mutator.create(title: title, today: capture.today,
+                                notes: notes.isEmpty ? nil : notes, source: "share_extension")
+      if let url = capture.sourceURL {
+        _ = mutator.addTaskRef(taskID: task.id, input: url.absoluteString, role: .from)
+      }
       SharedTaskCaptureQueue.finish(claimedURL)
     }
+    #endif
+  }
+
+  /// What the Share extension reads, written when the app leaves the
+  /// foreground. Nothing while App Lock hides the tasks.
+  static func publishLinkIndex(in context: ModelContext) {
+    #if os(iOS)
+    SharedTaskCaptureQueue.saveLinkIndex(
+      TasksWidgetBuilder.isAppLockRedacted() ? nil : TaskRefLookup.shareIndex(in: context), for: .septask)
+    #endif
+  }
+
+  /// Account switch, sign-out or delete: the index holds the old tasks.
+  static func clearLinkIndex() {
+    #if os(iOS)
+    SharedTaskCaptureQueue.saveLinkIndex(nil, for: .septask)
     #endif
   }
 }

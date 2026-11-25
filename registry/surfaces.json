@@ -410,6 +410,8 @@
     "featureId": "task.references",
     "open": { "format": "Open {name}" },
     "createdFrom": { "format": "Created from {name}" },
+    "alsoIn": { "format": "Also in {name}" },
+    "alreadyTask": { "title": "Already a task" },
     "kinds": {
       "email": { "label": "Email", "icon": "reference.email" },
       "thread": { "label": "Email thread", "icon": "reference.thread" },

@@ -2061,11 +2061,13 @@ enum RegistryTaskReferences {
   static func createdFrom(name: String) -> String { RegistryL10n.format("Created from %@", english: "Created from %@", args: [name]) }
   static func limitReached(count: Int) -> String { RegistryL10n.format("This task already has %lld references.", english: "This task already has %lld references.", args: [count]) }
   static func suggestion(name: String) -> String { RegistryL10n.format("Add %@ as a reference", english: "Add %@ as a reference", args: [name]) }
+  static func alsoIn(name: String) -> String { RegistryL10n.format("Also in %@", english: "Also in %@", args: [name]) }
   static let addPlaceholder: String = RegistryL10n.t("Paste a link")
   static let addConfirmTitle: String = RegistryL10n.t("Add")
   static let offersTitle: String = RegistryL10n.t("Links in this task")
   static let invalidMessage: String = RegistryL10n.t("Septena can’t add this. Paste a web link or a mail link.")
   static let failedMessage: String = RegistryL10n.t("Couldn’t add the reference.")
+  static let alreadyTaskTitle: String = RegistryL10n.t("Already a task")
   /// The most links of one task's title and notes that show as suggestions.
   static let maxSuggestions = 3
 }

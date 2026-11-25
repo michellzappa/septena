@@ -205,6 +205,7 @@ private struct SeptaskMainWindow: View {
           // Close the backend live socket and try once more to drain the
           // task outbox.
           TaskSyncEngine.shared.enterBackground()
+          SharedTaskCaptureImporter.publishLinkIndex(in: localStore.container.mainContext)
         }
         if phase == .active {
           #if os(iOS)

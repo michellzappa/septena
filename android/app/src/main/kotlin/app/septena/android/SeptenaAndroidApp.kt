@@ -20,6 +20,7 @@ import app.septena.core.SyncedSettingsMutator
 import app.septena.core.SystemDayClock
 import app.septena.core.TaskConversation
 import app.septena.core.TaskMutator
+import app.septena.core.TaskRefLookup
 import app.septena.core.TaskRefMutator
 import app.septena.core.TaskSyncEngine
 import app.septena.core.UuidTaskIdGenerator
@@ -77,6 +78,7 @@ class AndroidAppGraph(application: Application) {
     val fadeSweepStore = app.septena.android.ui.FadeSweepStore(application)
     val registryEntityMutator = RegistryEntityMutator(taskStore, clock, ids)
     val taskRefMutator = TaskRefMutator(taskStore, clock, ids)
+    val taskRefLookup = TaskRefLookup(taskStore)
     val conversationMutator = ConversationMutator(taskStore, ids)
     val recurrenceRules = RecurrenceRules
     val conversationRules = ConversationRules
