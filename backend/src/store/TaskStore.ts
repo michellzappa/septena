@@ -208,6 +208,8 @@ const TOMBSTONE_TTL_MS = DOMAIN_RULES.tombstoneTtlDays * DAY_MS;
 const CLIENT_OP_TTL_MS = DOMAIN_RULES.clientOpTtlDays * DAY_MS;
 /// A connection unused this long has an expired refresh token (src/shadow/tokens.ts).
 const CONNECTION_TTL_MS = MCP_REFRESH_TTL_S * 1000;
+/// How long the store remembers an item whose proposal the user turned down (#497).
+const DISMISSED_REF_TTL_MS = 365 * DAY_MS;
 const CHANGE_LOG_TTL_MS = DOMAIN_RULES.changeLogTtlDays * DAY_MS;
 const MAX_PULL = ENTITY_LIMITS.maxPull;
 const PAIR_FAIL_WINDOW_MS = 10 * 60 * 1000;
@@ -243,6 +245,8 @@ export interface Capture {
   taskId: string;
   fromKeys: string[];
   allowDuplicate: boolean;
+  /// An agent's own suggestion, not a user's request or a person's capture.
+  suggestion: boolean;
 }
 
 /// The task a capture met: the newest one made from one of its keys.
@@ -259,7 +263,8 @@ export interface CaptureHit {
 
 export type CaptureOutcome =
   | { existing: CaptureHit }
-  | { existing: null; results: OpResult[]; followUp: { id: string; title: string } | null };
+  | { existing: null; dismissed: string[] }
+  | { existing: null; dismissed: null; results: OpResult[]; followUp: { id: string; title: string } | null };
 
 /// A task that points at a key (`findByRef`).
 export type RefHit = {
@@ -452,6 +457,7 @@ export class TaskStore extends DurableObject<Env> {
         op TEXT NOT NULL, fields TEXT, clientOpId TEXT, actor TEXT NOT NULL, at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS changes_row ON changes(entity, id, rev);
+      CREATE TABLE IF NOT EXISTS dismissed_refs (key TEXT PRIMARY KEY, at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS client_ops (
         clientOpId TEXT PRIMARY KEY, result TEXT NOT NULL, at INTEGER NOT NULL
       );
@@ -681,6 +687,7 @@ export class TaskStore extends DurableObject<Env> {
       this.log(rev, op.entity, op.id, "delete", null, op.clientOpId, actor, now, snapshot);
       if (op.entity === "attachment") purgedAttachmentIds.push(op.id);
       if (op.entity === "task") {
+        if (this.isTurnDown(row, actor)) this.rememberTurnDown(op.id, now);
         this.tombstoneConvo(op.id, now);
         purgedAttachmentIds.push(...this.tombstoneAttachments(op.id, now));
         this.tombstoneChecklistItems(op.id, now);
@@ -747,6 +754,7 @@ export class TaskStore extends DurableObject<Env> {
         owned = { kind: ref.kind, createdBy: actor, ...(op.fields.createdAt ? {} : { createdAt: now }) };
         if (!isAgentActor(actor)) {
           this.sql.exec("DELETE FROM task_ref_removals WHERE taskId = ? AND key = ?", taskId, ref.key);
+          this.sql.exec("DELETE FROM dismissed_refs WHERE key = ?", ref.key);
         }
       }
     } else {
@@ -805,6 +813,10 @@ export class TaskStore extends DurableObject<Env> {
       const sets = names.map((n) => `"${n}" = ?`).concat(["rev = ?", "updatedAt = ?"]).join(", ");
       const values = names.map((n) => encodeValue(spec.columns[n], op.fields[n]));
       this.sql.exec(`UPDATE ${spec.table} SET ${sets} WHERE id = ?`, ...values, rev, now, op.id);
+    }
+    if (op.entity === "task" && row && "status" in op.fields && op.fields.status !== row.status && !isAgentActor(actor)) {
+      if (op.fields.status === "cancelled" && this.isTurnDown(row, actor)) this.rememberTurnDown(op.id, now);
+      if (op.fields.status === "open") this.forgetTurnDown(op.id);
     }
     const before = row ? decodeRow(spec, row as Record<string, unknown>) : null;
     this.log(rev, op.entity, op.id, "upsert", names, op.clientOpId, actor, now, this.diffFor(before, op.fields));
@@ -1472,7 +1484,8 @@ export class TaskStore extends DurableObject<Env> {
 
   /// Creates a task made from items outside Septena, unless an active task is
   /// made from one of them: then nothing is created and that task is the
-  /// answer. When only closed tasks have a key, the new task gets a
+  /// answer. An agent's suggestion from an item that the user turned down is
+  /// not created either. When only closed tasks have a key, the new task gets a
   /// `follow_up` reference to the closed one. There is no await between the
   /// lookup and the insert, so two captures of one item can never both create.
   captureTask(ops: Op[], actor: string, capture: Capture): CaptureOutcome {
@@ -1480,6 +1493,10 @@ export class TaskStore extends DurableObject<Env> {
     if (hit?.active && !capture.allowDuplicate) {
       this.stampSeen(hit, actor);
       return { existing: hit };
+    }
+    if (capture.suggestion && !capture.allowDuplicate) {
+      const dismissed = this.dismissedKeys(capture.fromKeys);
+      if (dismissed.length > 0) return { existing: null, dismissed };
     }
     let followUpAt = -1;
     if (hit && !hit.active) {
@@ -1496,7 +1513,7 @@ export class TaskStore extends DurableObject<Env> {
     const { results } = this.push(ops, actor).result;
     if (hit && this.liveTask(capture.taskId)) this.stampSeen(hit, actor);
     return {
-      existing: null, results,
+      existing: null, dismissed: null, results,
       followUp: hit && results[followUpAt]?.status === "applied" ? { id: hit.id, title: hit.title } : null,
     };
   }
@@ -1520,6 +1537,40 @@ export class TaskStore extends DurableObject<Env> {
       id: row.id as string, title: row.title ?? "", status: row.status ?? "open", area: row.area, project: row.project,
       active: row.status === "open" && row.fadedAt === null, keys: matched.map((m) => m.key),
     };
+  }
+
+  /// True when a person removes an agent proposal they never accepted.
+  private isTurnDown(row: Record<string, unknown>, actor: string): boolean {
+    return !isAgentActor(actor) && row.source === "mcp" && !row.acknowledgedAt && row.status === "open";
+  }
+
+  /// Remembers the items a turned-down proposal was made from: the key and
+  /// the time, nothing else.
+  private rememberTurnDown(taskId: string, now: string): void {
+    this.sql.exec(
+      `INSERT OR REPLACE INTO dismissed_refs (key, at)
+       SELECT key, ? FROM task_refs WHERE taskId = ? AND role = 'from' AND deletedAt IS NULL`,
+      now, taskId,
+    );
+  }
+
+  /// The user took the task back, so its items may be proposed again.
+  private forgetTurnDown(taskId: string): void {
+    this.sql.exec(
+      "DELETE FROM dismissed_refs WHERE key IN (SELECT key FROM task_refs WHERE taskId = ? AND deletedAt IS NULL)", taskId,
+    );
+  }
+
+  /// The keys of a capture that the user turned down. A thread key counts
+  /// only alone: a new message in a thread is a new item.
+  private dismissedKeys(keys: string[]): string[] {
+    const items = keys.filter((k) => !k.startsWith("thread:"));
+    return (items.length > 0 ? items : keys).filter((key) => this.isDismissed(key));
+  }
+
+  /// The user turned down a proposal made from this item. `key` is in normal form.
+  isDismissed(key: string): boolean {
+    return this.sql.exec("SELECT 1 FROM dismissed_refs WHERE key = ?", key).toArray().length > 0;
   }
 
   /// Stamps the references a capture met, with a "captured again" entry in
@@ -2527,6 +2578,7 @@ export class TaskStore extends DurableObject<Env> {
         this.sql.exec(`DELETE FROM note_revisions WHERE container = ? AND id NOT IN (SELECT id FROM ${ENTITIES[c].table})`, c);
       }
       this.setMeta("purgedThrough", purged);
+      this.sql.exec("DELETE FROM dismissed_refs WHERE at < ?", new Date(now - DISMISSED_REF_TTL_MS).toISOString());
       this.sql.exec("DELETE FROM client_ops WHERE at < ?", now - CLIENT_OP_TTL_MS);
       this.sql.exec("DELETE FROM changes WHERE at < ?", new Date(now - CHANGE_LOG_TTL_MS).toISOString());
       this.sql.exec("DELETE FROM sessions WHERE expiresAt < ?", now);
