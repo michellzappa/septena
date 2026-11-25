@@ -383,7 +383,7 @@ fun TaskHomeContent(
                         targetLocationKey = targetKey,
                     )
                     item(key = "upcoming-header:$dayIso") {
-                        val headerModifier = Modifier
+                        val headerModifier = taskListMotion()
                             .then(
                                 if (onDropGroupHeader != null) {
                                     Modifier.magicPlusSectionDrop(
@@ -420,6 +420,7 @@ fun TaskHomeContent(
                                 position = cardPosition(idx, dayEvents.size),
                                 isDark = isDarkTheme,
                                 hasActiveTexture = hasActiveTexture,
+                                modifier = taskListMotion(),
                             )
                         }
                     }
@@ -447,7 +448,7 @@ fun TaskHomeContent(
                                 canReorder = canReorder && onReorderTaskRow != null,
                                 orderedDragIds = orderedSelectionIds,
                                 onApplyFilingSuggestion = onApplyFilingSuggestion,
-                                dropModifier = Modifier
+                                dropModifier = taskListMotion()
                                     .magicPlusRowDrop(
                                         id = "mp-task-${task.id}",
                                         enabled = onDropTaskRow != null,
@@ -653,12 +654,14 @@ private fun CalendarAgendaCardRow(
     position: TaskCardPosition,
     isDark: Boolean,
     hasActiveTexture: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     TaskCardSlice(
         position = position,
         isSelected = false,
         isDark = isDark,
         hasActiveTexture = hasActiveTexture,
+        modifier = modifier,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
