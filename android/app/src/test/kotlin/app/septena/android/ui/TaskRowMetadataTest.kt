@@ -102,6 +102,8 @@ class TaskRowMetadataTest {
                 RegistryEntityFields.Task.SOURCE_CLIENT to JsonValue.StringValue("Claude"),
                 RegistryEntityFields.Task.TAGS to JsonValue.ArrayValue(listOf(JsonValue.StringValue("tag1"))),
                 RegistryEntityFields.Task.REMINDER_AT to JsonValue.StringValue("2026-11-24T10:00:00Z"),
+                RegistryEntityFields.Task.START_TIME to JsonValue.StringValue("14:00"),
+                RegistryEntityFields.Task.DURATION_MINUTES to JsonValue.IntegerValue(60),
             ),
         )
         val item = buildTaskListItem(
@@ -134,6 +136,7 @@ class TaskRowMetadataTest {
         assertFalse(item.deadlineIsRed)
         assertTrue(item.deadlineShowsFlag)
         assertNull(item.scheduledText)
+        assertEquals("14:00–15:00", item.timeSlotText)
         assertEquals(2, item.checklistDone)
         assertEquals(5, item.checklistTotal)
         assertEquals(listOf("Urgent"), item.tagNames)
@@ -143,5 +146,30 @@ class TaskRowMetadataTest {
         assertTrue(item.hasAttachments)
         assertEquals("Claude", item.agentName)
         assertTrue(item.reminderIsPastDue)
+    }
+
+    @Test
+    fun completedTaskHidesTimeSlot() {
+        val doneRecord = taskRecord(
+            extra = mapOf(
+                RegistryEntityFields.Task.STATUS to JsonValue.StringValue(RegistryEntityEnums.TaskStatus.DONE),
+                RegistryEntityFields.Task.START_TIME to JsonValue.StringValue("09:30"),
+                RegistryEntityFields.Task.DURATION_MINUTES to JsonValue.IntegerValue(30),
+            ),
+        )
+        val item = buildTaskListItem(
+            record = doneRecord,
+            snapshot = TaskSnapshot.from(doneRecord),
+            membership = TaskViewRules.INACTIVE_MEMBERSHIP,
+            subtitle = null,
+            catalog = TaskRowMetadataCatalog(),
+            today = today,
+            now = now,
+            showTodayIndicator = false,
+            isLogbook = true,
+            languageTag = "en-US",
+            zoneId = ZoneOffset.UTC,
+        )
+        assertNull(item.timeSlotText)
     }
 }

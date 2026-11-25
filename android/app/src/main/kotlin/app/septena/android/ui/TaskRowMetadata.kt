@@ -7,6 +7,7 @@ import app.septena.core.TaskFadeRules
 import app.septena.core.TaskProvenance
 import app.septena.core.TaskSnapshot
 import app.septena.core.TaskStore
+import app.septena.core.TaskTimeSlot
 import app.septena.core.TaskViewMembership
 import app.septena.core.TaskViewRules
 import app.septena.core.booleanValue
@@ -161,6 +162,12 @@ internal fun buildTaskListItem(
         null
     }
 
+    val timeSlotText = if (isOpen && !isDeleted) {
+        TaskTimeSlot.format(snapshot.startTime, snapshot.durationMinutes)
+    } else {
+        null
+    }
+
     return TaskListItem(
         id = record.id,
         title = snapshot.title,
@@ -175,6 +182,7 @@ internal fun buildTaskListItem(
         deadlineShowsFlag = deadlineShowsFlag,
         scheduledText = scheduledText,
         completedDateText = completedDateText,
+        timeSlotText = timeSlotText,
         checklistDone = checklistDone,
         checklistTotal = checklistTotal,
         tagNames = tagNames,

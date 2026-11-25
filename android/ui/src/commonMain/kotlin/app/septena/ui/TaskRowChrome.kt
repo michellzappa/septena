@@ -524,6 +524,23 @@ fun TaskCardRow(
                             }
                         }
 
+                        // Scheduled time slot (`14:00` or `14:00–15:00`, feature `task.times`).
+                        if (!task.isCompleted && task.timeSlotText != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                ClockSmallGlyph(tint = mutedInk, size = 11.dp)
+                                Text(
+                                    text = task.timeSlotText,
+                                    fontSize = 11.5.sp,
+                                    lineHeight = 13.sp,
+                                    color = mutedInk,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+
                         // Checklist summary (`done/total`).
                         if (task.checklistTotal > 0) {
                             Row(
@@ -821,21 +838,7 @@ private fun TaskMenuActionGlyph(
         TaskMenuActionIcon.Delete -> SeptenaGlyph(kind = SeptenaIconKind.RecentlyDeleted, tint = tint, size = size)
         TaskMenuActionIcon.Restore -> RepeatSmallGlyph(tint = tint, size = size)
         TaskMenuActionIcon.Check -> CheckmarkGlyph(tint = tint, size = size)
-        TaskMenuActionIcon.Tags -> Canvas(modifier = Modifier.size(size)) {
-            val w = this.size.width
-            val h = this.size.height
-            val stroke = (w * 0.095f).coerceAtLeast(1.3.dp.toPx())
-            val tag = Path().apply {
-                moveTo(w * 0.14f, h * 0.14f)
-                lineTo(w * 0.52f, h * 0.14f)
-                lineTo(w * 0.88f, h * 0.50f)
-                lineTo(w * 0.50f, h * 0.88f)
-                lineTo(w * 0.14f, h * 0.52f)
-                close()
-            }
-            drawPath(tag, tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
-            drawCircle(tint, radius = w * 0.075f, center = Offset(w * 0.34f, h * 0.34f))
-        }
+        TaskMenuActionIcon.Tags -> TagSmallGlyph(tint = tint, size = size)
         TaskMenuActionIcon.Open -> Canvas(modifier = Modifier.size(size)) {
             val w = this.size.width
             val h = this.size.height
@@ -1053,6 +1056,60 @@ fun DeadlineFlagGlyph(tint: Color, size: Dp = 12.dp, modifier: Modifier = Modifi
             close()
         }
         drawPath(flag, color = tint, style = Fill)
+    }
+}
+
+@Composable
+fun ClockSmallGlyph(tint: Color, size: Dp = 12.dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(size)) {
+        val cx = this.size.width / 2f
+        val cy = this.size.height / 2f
+        val r = this.size.minDimension * 0.40f
+        val stroke = (this.size.minDimension * 0.11f).coerceAtLeast(1.1.dp.toPx())
+        drawCircle(tint, radius = r, center = Offset(cx, cy), style = Stroke(width = stroke))
+        drawLine(tint, Offset(cx, cy), Offset(cx, cy - r * 0.56f), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(tint, Offset(cx, cy), Offset(cx + r * 0.42f, cy + r * 0.22f), strokeWidth = stroke, cap = StrokeCap.Round)
+    }
+}
+
+@Composable
+fun TagSmallGlyph(tint: Color, size: Dp = 14.dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val stroke = (w * 0.095f).coerceAtLeast(1.2.dp.toPx())
+        val tag = Path().apply {
+            moveTo(w * 0.14f, h * 0.14f)
+            lineTo(w * 0.52f, h * 0.14f)
+            lineTo(w * 0.88f, h * 0.50f)
+            lineTo(w * 0.50f, h * 0.88f)
+            lineTo(w * 0.14f, h * 0.52f)
+            close()
+        }
+        drawPath(tag, tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawCircle(tint, radius = w * 0.075f, center = Offset(w * 0.34f, h * 0.34f))
+    }
+}
+
+@Composable
+fun PlusSmallGlyph(tint: Color, size: Dp = 14.dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val stroke = (w * 0.12f).coerceAtLeast(1.4.dp.toPx())
+        drawLine(tint, Offset(w * 0.50f, h * 0.18f), Offset(w * 0.50f, h * 0.82f), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(tint, Offset(w * 0.18f, h * 0.50f), Offset(w * 0.82f, h * 0.50f), strokeWidth = stroke, cap = StrokeCap.Round)
+    }
+}
+
+@Composable
+fun CloseSmallGlyph(tint: Color, size: Dp = 14.dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val stroke = (w * 0.12f).coerceAtLeast(1.4.dp.toPx())
+        drawLine(tint, Offset(w * 0.24f, h * 0.24f), Offset(w * 0.76f, h * 0.76f), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(tint, Offset(w * 0.76f, h * 0.24f), Offset(w * 0.24f, h * 0.76f), strokeWidth = stroke, cap = StrokeCap.Round)
     }
 }
 

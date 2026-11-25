@@ -40,7 +40,12 @@ sealed interface AreasProjectsDestination {
         }
 }
 
-data class PlaceProjectRow(val id: String, val title: String)
+data class PlaceProjectRow(
+    val id: String,
+    val title: String,
+    val progress: Float = 0f,
+    val openCount: Int = 0,
+)
 data class PlaceTaskRow(
     val id: String,
     val title: String,
@@ -306,14 +311,15 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         val today = graph.clock.today(now)
         val metadataCatalog = TaskRowMetadataCatalog.load(graph.taskStore)
         val showAging = graph.deviceSettings.bool(RegistrySettingKeys.TASKS_SHOW_AGING)
-        val taskRows = graph.taskStore.records(RegistryEntityNames.TASK)
+        val allTaskRecords = graph.taskStore.records(RegistryEntityNames.TASK)
             .asSequence()
             .filter { it.deletedAt == null }
             .mapNotNull { record ->
                 runCatching { record to TaskSnapshot.from(record) }.getOrNull()
             }
-            .filter { (_, task) -> task.status == RegistryEntityEnums.TaskStatus.OPEN }
             .toList()
+        val taskRows = allTaskRecords
+            .filter { (_, task) -> task.status == RegistryEntityEnums.TaskStatus.OPEN }
 
         fun placeRow(record: app.septena.core.SyncRecord, task: TaskSnapshot, pos: Double?): PlaceTaskRow {
             val membership = TaskViewRules.membership(task, today, now)
@@ -361,6 +367,16 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
         return when (selected) {
             is AreasProjectsDestination.Area -> {
+                val projectStats = mutableMapOf<String, Pair<Int, Int>>()
+                for ((_, task) in allTaskRecords) {
+                    if (task.isHeading) continue
+                    val pid = task.project ?: continue
+                    val prev = projectStats[pid] ?: (0 to 0)
+                    when (task.status) {
+                        RegistryEntityEnums.TaskStatus.OPEN -> projectStats[pid] = (prev.first + 1) to prev.second
+                        RegistryEntityEnums.TaskStatus.DONE -> projectStats[pid] = prev.first to (prev.second + 1)
+                    }
+                }
                 val projects = graph.taskStore.records(RegistryEntityNames.PROJECT)
                     .asSequence()
                     .filter { it.deletedAt == null }
@@ -368,7 +384,10 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     .filter { it.fields[RegistryEntityFields.Project.AREA].stringValue() == selected.id }
                     .mapNotNull { record ->
                         record.fields[RegistryEntityFields.Project.TITLE].stringValue()?.let { name ->
-                            record to PlaceProjectRow(record.id, name)
+                            val (open, done) = projectStats[record.id] ?: (0 to 0)
+                            val total = open + done
+                            val progress = if (total > 0) done.toFloat() / total.toFloat() else 0f
+                            record to PlaceProjectRow(record.id, name, progress = progress, openCount = open)
                         }
                     }
                     .sortedWith(compareBy({ it.first.fields[RegistryEntityFields.Project.POSITION].numberValue() ?: Double.MAX_VALUE }, { it.second.title.lowercase() }))

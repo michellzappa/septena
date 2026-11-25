@@ -7,15 +7,18 @@ import android.text.format.Formatter
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,16 +26,27 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.septena.android.AndroidAppGraph
 import app.septena.android.AttachmentTooLargeException
-import app.septena.android.R
 import app.septena.core.SyncRecord
 import app.septena.core.generated.RegistryTaskDetail
+import app.septena.ui.AttachmentSmallGlyph
+import app.septena.ui.CloseSmallGlyph
+import app.septena.ui.PlusSmallGlyph
+import app.septena.ui.TaskCardMetrics
+import app.septena.ui.TaskCardSlice
+import app.septena.ui.cardPosition
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -40,10 +54,9 @@ import kotlinx.coroutines.withContext
 
 /**
  * The task's files (feature `task.attachments`, block `taskPage.attachments`),
- * as iOS `TaskAttachmentsPanel`: one row per file with its size, a tap opens
- * it in another app, the close button removes it, and the add button opens
- * the system file picker. A file that only the server holds downloads on the
- * first open.
+ * styled as a continuous glass card matching iOS `TaskAttachmentsPanel`: one
+ * row per file with its size, tap opens it in another app, trailing close removes
+ * it, and the bottom add row opens the system file picker.
  */
 @Composable
 internal fun TaskAttachmentsSection(
@@ -55,6 +68,8 @@ internal fun TaskAttachmentsSection(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val isDark = LocalSeptenaDarkTheme.current
+    val hasActiveTexture = LocalAppearance.current.hasActiveTexture
     val dataVersion by graph.sync.dataVersion.collectAsStateWithLifecycle()
     var rows by remember(taskId) { mutableStateOf<List<SyncRecord>>(emptyList()) }
     var busy by remember(taskId) { mutableStateOf(false) }
@@ -115,34 +130,121 @@ internal fun TaskAttachmentsSection(
         graph.sync.requestSync()
     }
 
+    val totalSlices = rows.size + 1
+    val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
+
     Column(modifier = Modifier.fillMaxWidth()) {
-        HorizontalDivider()
-        heading?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
-        rows.forEach { record ->
-            val name = graph.attachments.filename(record)
-            ListItem(
-                headlineContent = { Text(name, maxLines = 1) },
-                supportingContent = { Text(Formatter.formatShortFileSize(context, graph.attachments.byteCount(record))) },
-                trailingContent = {
-                    IconButton(onClick = { remove(record) }, enabled = canEdit && !busy) {
-                        Icon(
-                            painterResource(R.drawable.ic_close),
-                            contentDescription = control(RegistryTaskDetail.Controls.ATTACHMENT_REMOVE).replace("{name}", name),
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) { open(record) },
-            )
-        }
-        TextButton(onClick = { picker.launch(arrayOf(ANY_TYPE)) }, enabled = canEdit && !busy) {
+        heading?.let {
             Text(
-                control(
-                    if (rows.isEmpty()) RegistryTaskDetail.Controls.ATTACHMENT_CHOOSE
-                    else RegistryTaskDetail.Controls.ATTACHMENT_ADD_ANOTHER,
+                text = it,
+                fontSize = 18.sp,
+                lineHeight = 22.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(
+                    start = TaskCardMetrics.HeaderLeading,
+                    end = TaskCardMetrics.Margin,
+                    top = 14.dp,
+                    bottom = 6.dp,
                 ),
             )
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        rows.forEachIndexed { index, record ->
+            val name = graph.attachments.filename(record)
+            val removeLabel = control(RegistryTaskDetail.Controls.ATTACHMENT_REMOVE).replace("{name}", name)
+            TaskCardSlice(
+                position = cardPosition(index, totalSlices),
+                isSelected = false,
+                isDark = isDark,
+                hasActiveTexture = hasActiveTexture,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !busy) { open(record) }
+                        .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 10.dp),
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
+                    ) {
+                        AttachmentSmallGlyph(tint = mutedInk, size = 15.dp)
+                    }
+                    Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(1.dp),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            text = name,
+                            fontSize = 15.sp,
+                            lineHeight = 20.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = Formatter.formatShortFileSize(context, graph.attachments.byteCount(record)),
+                            fontSize = 12.sp,
+                            lineHeight = 15.sp,
+                            color = mutedInk,
+                            maxLines = 1,
+                        )
+                    }
+                    if (canEdit) {
+                        IconButton(
+                            onClick = { remove(record) },
+                            enabled = !busy,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .semantics { contentDescription = removeLabel },
+                        ) {
+                            CloseSmallGlyph(tint = mutedInk.copy(alpha = 0.75f), size = 13.dp)
+                        }
+                    }
+                }
+            }
+        }
+        TaskCardSlice(
+            position = cardPosition(rows.size, totalSlices),
+            isSelected = false,
+            isDark = isDark,
+            hasActiveTexture = hasActiveTexture,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = canEdit && !busy) { picker.launch(arrayOf(ANY_TYPE)) }
+                    .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 12.dp),
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
+                ) {
+                    PlusSmallGlyph(tint = MaterialTheme.colorScheme.primary, size = 15.dp)
+                }
+                Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
+                Text(
+                    text = control(
+                        if (rows.isEmpty()) RegistryTaskDetail.Controls.ATTACHMENT_CHOOSE
+                        else RegistryTaskDetail.Controls.ATTACHMENT_ADD_ANOTHER,
+                    ),
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        error?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
+            )
+        }
     }
 }
 

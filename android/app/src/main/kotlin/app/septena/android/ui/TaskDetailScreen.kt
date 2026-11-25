@@ -1,37 +1,45 @@
 package app.septena.android.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,13 +51,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
@@ -57,21 +70,42 @@ import app.septena.core.RegistryCatalog
 import app.septena.core.SyncRecord
 import app.septena.core.TaskConversation
 import app.septena.core.TaskPageBlockKinds
-import app.septena.core.TaskProvenance
 import app.septena.core.TaskPageDepths
+import app.septena.core.TaskProvenance
+import app.septena.core.TaskTimeSlot
 import app.septena.core.WireTimestamp
 import app.septena.core.booleanValue
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryDestinationIds
+import app.septena.core.generated.RegistryEntities
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityLimits
 import app.septena.core.generated.RegistryEntityNames
-import app.septena.core.generated.RegistryEntities
 import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.core.generated.RegistryTaskAttributeIds
 import app.septena.core.generated.RegistryTaskDetail
 import app.septena.core.stringValue
+import app.septena.ui.AgentSparkleBubbleGlyph
+import app.septena.ui.BellSmallGlyph
+import app.septena.ui.CalendarSmallGlyph
+import app.septena.ui.CheckmarkGlyph
+import app.septena.ui.ChevronDownGlyph
+import app.septena.ui.ChevronLeftGlyph
+import app.septena.ui.ChevronRightGlyph
+import app.septena.ui.CloseSmallGlyph
+import app.septena.ui.DeadlineFlagGlyph
+import app.septena.ui.PlusSmallGlyph
+import app.septena.ui.RepeatSmallGlyph
+import app.septena.ui.SeptenaGlyph
+import app.septena.ui.SeptenaIconKind
+import app.septena.ui.SeptenaTaskCheckbox
+import app.septena.ui.StarGlyph
+import app.septena.ui.TagSmallGlyph
+import app.septena.ui.TaskCardMetrics
+import app.septena.ui.TaskCardPosition
+import app.septena.ui.TaskCardSlice
+import app.septena.ui.cardPosition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -116,9 +150,18 @@ private val CHECKLIST_TITLE_MAX_LENGTH = RegistryEntities.all
     .getValue(RegistryEntityFields.ChecklistItem.TITLE)
     .max ?: RegistryEntityLimits.TEXT_MAX
 
-/** Standalone task-detail surface. The shell owns routing and supplies [onBack]. */
+private val SUPPORTED_DETAIL_ATTRIBUTES = setOf(
+    RegistryTaskAttributeIds.WHEN,
+    RegistryTaskAttributeIds.DEADLINE,
+    RegistryTaskAttributeIds.REMINDER,
+    RegistryTaskAttributeIds.LIST,
+    RegistryTaskAttributeIds.TAGS,
+    RegistryTaskAttributeIds.REPEAT,
+)
+
+/** Standalone task-detail surface styled with iOS-aligned translucent glass cards. */
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 fun TaskDetailScreen(
     graph: AndroidAppGraph,
     taskId: String,
@@ -127,6 +170,8 @@ fun TaskDetailScreen(
     initialAttribute: String? = null,
 ) {
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
+    val isDark = LocalSeptenaDarkTheme.current
+    val hasActiveTexture = LocalAppearance.current.hasActiveTexture
     val labels = remember(languageTag) { TaskDetailLabels.fromRegistry(languageTag) }
     val attributes = remember(languageTag) { RegistryCatalog.taskAttributes(languageTag) }
     val dataVersion by graph.sync.dataVersion.collectAsStateWithLifecycle()
@@ -217,14 +262,31 @@ fun TaskDetailScreen(
 
     val taskFields = data?.task?.fields.orEmpty()
     val deleted = data?.task?.deletedAt != null
+    val status = taskFields[RegistryEntityFields.Task.STATUS].stringValue()
+    val isCompleted = status == RegistryEntityEnums.TaskStatus.DONE
+    val isStarred = taskFields[RegistryEntityFields.Task.STARRED].booleanValue() == true
     val scheduled = taskFields[RegistryEntityFields.Task.SCHEDULED].stringValue()
     val isToday = taskFields[RegistryEntityFields.Task.TODAY].booleanValue() == true
-    val whenValue = when {
+    val startTime = taskFields[RegistryEntityFields.Task.START_TIME].stringValue()
+    val durationMinutes = taskFields[RegistryEntityFields.Task.DURATION_MINUTES].longValue()?.toInt()
+    val timeSlotText = TaskTimeSlot.format(startTime, durationMinutes)
+    val whenDateText = when {
         isToday -> RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag).orEmpty()
         scheduled != null -> formatDay(scheduled, languageTag)
+        else -> null
+    }
+    val whenValue = when {
+        whenDateText != null && timeSlotText != null -> "$whenDateText · $timeSlotText"
+        whenDateText != null -> whenDateText
+        timeSlotText != null -> timeSlotText
         else -> labels.noDate
     }
+    val whenIsSet = whenDateText != null || timeSlotText != null
     val deadline = taskFields[RegistryEntityFields.Task.DEADLINE].stringValue()
+    val todayDate = graph.clock.today(graph.clock.now())
+    val deadlineIsOverdue = deadline?.let {
+        runCatching { !LocalDate.parse(it.take(10)).isAfter(todayDate) }.getOrDefault(false)
+    } ?: false
     val reminderAt = taskFields[RegistryEntityFields.Task.REMINDER_AT].stringValue()
     val reminderMode = taskFields[RegistryEntityFields.Task.REMINDER_MODE].stringValue()
     val reminderValue = reminderAt?.let {
@@ -232,7 +294,7 @@ fun TaskDetailScreen(
             reminderAt = it,
             reminderMode = reminderMode,
             snoozedUntil = taskFields[RegistryEntityFields.Task.REMINDER_SNOOZED_UNTIL].stringValue(),
-            today = graph.clock.today(graph.clock.now()),
+            today = todayDate,
             languageTag = languageTag,
         )
     } ?: labels.control(RegistryTaskDetail.Controls.REMINDER_NONE)
@@ -256,6 +318,12 @@ fun TaskDetailScreen(
         ?: selectedProject?.parentAreaId
     val selectedArea = data?.areas?.firstOrNull { it.id == selectedAreaId }
     val saveAction = RegistryCatalog.actionTitle(RegistryActionIds.TASK_DETAIL_SAVE, languageTag = languageTag).orEmpty()
+    val completeAction = RegistryCatalog.actionTitle(RegistryActionIds.TASK_TOGGLE_COMPLETE, languageTag = languageTag).orEmpty()
+    val starAction = RegistryCatalog.actionTitle(
+        RegistryActionIds.TASK_TOGGLE_STAR,
+        field = if (isStarred) "removeTitle" else "addTitle",
+        languageTag = languageTag,
+    ).orEmpty()
     val repeatPauseAction = RegistryCatalog.actionTitle(
         RegistryActionIds.TASK_PAUSE_RESUME_REPEAT,
         field = if (recurrencePaused) "activeTitle" else "title",
@@ -275,10 +343,7 @@ fun TaskDetailScreen(
     ).orEmpty()
     val savedTask = data?.task
     val canEdit = savedTask != null && !deleted && !saving
-    val isTaskOpen = taskFields[RegistryEntityFields.Task.STATUS].stringValue() == RegistryEntityEnums.TaskStatus.OPEN && !deleted
-    // An open task waiting for the user to accept it opens at the registry review
-    // depth (docs/AGENT_PROMPT_SPEC.md). The depth follows the loaded data, so the
-    // page switches when the task loads, is accepted or is sent back.
+    val isTaskOpen = status == RegistryEntityEnums.TaskStatus.OPEN && !deleted
     val isReviewDepth = isTaskOpen && data?.needsReview == true
     val pageBlocks = remember(languageTag, isReviewDepth) {
         RegistryCatalog.taskPageBlocks(
@@ -292,10 +357,7 @@ fun TaskDetailScreen(
     val listValue = listOfNotNull(selectedArea?.title, selectedProject?.title)
         .joinToString(" · ")
         .ifEmpty { labels.noArea }
-    // On the page the conversation runs with the attributes, as on iOS, where it
-    // sits inside the Discuss card. On Android the conversation section shows
-    // directly under the attribute rows: the Discuss button before a thread
-    // exists, then the thread headed with the Discuss label. Without an attributes block it keeps its own block.
+    val listIsSet = selectedArea != null || selectedProject != null
     val conversationBlock = pageBlocks.firstOrNull { it.kind == TaskPageBlockKinds.CONVERSATION }
     val conversationInAttributes = conversationBlock != null &&
         pageBlocks.any { it.kind == TaskPageBlockKinds.ATTRIBUTES }
@@ -321,17 +383,42 @@ fun TaskDetailScreen(
         }
     }
 
-    // One editor per attribute (ADR 0029). The page and row menu use the same editors.
+    fun toggleComplete() {
+        if (!canEdit) return
+        if (isCompleted) {
+            write {
+                check(
+                    graph.taskMutator.updateFields(
+                        taskId,
+                        mapOf(
+                            RegistryEntityFields.Task.STATUS to JsonValue.StringValue(RegistryEntityEnums.TaskStatus.OPEN),
+                            RegistryEntityFields.Task.COMPLETED_AT to JsonValue.Null,
+                        ),
+                    ) != null,
+                )
+            }
+        } else {
+            write { check(graph.taskMutator.complete(taskId) != null) }
+        }
+    }
+
+    fun toggleStarred() {
+        write { check(graph.taskMutator.setStarred(taskId, !isStarred) != null) }
+    }
 
     fun setWhen(day: String?) {
         write { check(graph.taskMutator.setWhen(taskId, day) != null) }
+    }
+
+    fun setTimeSlot(start: String?, duration: Int?) {
+        val zone = start?.let { ZoneId.systemDefault().id }
+        write { check(graph.taskMutator.setTimeSlot(taskId, start, duration?.toLong(), zone) != null) }
     }
 
     fun setDeadline(day: String?) {
         write { check(graph.taskMutator.setDeadline(taskId, day) != null) }
     }
 
-    // The write bumps dataVersion, and the graph arms the alarm from the store.
     fun setReminder(reminderAt: String?, mode: String?) {
         write { check(graph.taskMutator.setReminder(taskId, reminderAt, mode) != null) }
     }
@@ -383,14 +470,6 @@ fun TaskDetailScreen(
         }
     }
 
-    /**
-     * Opens the picker for a task attribute (actions.json `opensAttribute`).
-     * On the page a picker is embedded, never modal (docs/TASK_PAGE_SPEC.md §3):
-     * the picker folds open in the attribute's row, and a second tap on the row
-     * folds it closed, which is Cancel. A commit writes through the attribute's
-     * setter and folds the row. One row is open at a time. Star
-     * has no Android editor yet.
-     */
     fun openAttribute(attributeId: String) {
         if (openPicker == attributeId) {
             openPicker = null
@@ -487,8 +566,6 @@ fun TaskDetailScreen(
         }
     }
 
-    // Opening Repeat on a task without a rule seeds the default rule, as the iOS
-    // picker does when it appears. Turning Repeat off folds its row closed.
     fun startRepeat() {
         if (!canEdit) return
         setRepeat(repeatUnit ?: RegistryEntityEnums.RecurrenceUnit.WEEK)
@@ -538,507 +615,863 @@ fun TaskDetailScreen(
         }
     }
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = { Text(labels.title) },
-                navigationIcon = {
-                    TextButton(onClick = ::handleBack, enabled = !saving) {
-                        Text(labels.back)
-                    }
-                },
-                actions = {
-                    TextButton(onClick = ::saveTaskText, enabled = data != null && !saving && titleDraft.isNotBlank()) {
-                        Text(saveAction)
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        if (!hasLoaded) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else if (data == null) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text(labels.taskUnavailable)
-            }
-        } else {
-            Box(Modifier.fillMaxSize().padding(padding)) {
-                Column(
-                modifier = Modifier
-                    .widthIn(max = 720.dp)
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                // The registry owns the order and the headings of the sections (ADR 0029).
-                // Android writes one renderer per block kind.
-                pageBlocks.forEach { block ->
-                    val heading = RegistryCatalog.taskPageBlockHeading(block, languageTag)
-                    when (block.kind) {
-                        TaskPageBlockKinds.HEADER -> {
-                            OutlinedTextField(
-                                value = titleDraft,
-                                onValueChange = {
-                                    titleDraft = it.take(RegistryEntityLimits.TEXT_MAX.toInt())
-                                    textIsDirty = true
-                                    saveFailed = false
-                                },
-                                label = { Text(labels.field(RegistryTaskDetail.Fields.TITLE)) },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
+    val canvasBackground = if (isDark) {
+        MaterialTheme.colorScheme.background
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerLow
+    }
+    val accent = MaterialTheme.colorScheme.primary
+    val todayGold = MaterialTheme.colorScheme.secondary
+    val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
+    val overdueRed = if (isDark) Color(0xFFFF453A) else Color(0xFFFF3B30)
+
+    Box(modifier = modifier.fillMaxSize().background(canvasBackground)) {
+        HeaderWashBackdrop()
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent,
+                    ),
+                    title = {},
+                    navigationIcon = {
+                        IconButton(
+                            onClick = ::handleBack,
+                            enabled = !saving,
+                            modifier = Modifier.semantics { contentDescription = labels.back },
+                        ) {
+                            ChevronLeftGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                        }
+                    },
+                    actions = {
+                        if (savedTask != null && !deleted) {
+                            IconButton(
+                                onClick = ::toggleStarred,
                                 enabled = canEdit,
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                            )
-
-                            // At the review depth the list (area › project) shows as one read-only line under the title.
-                            if (isReviewDepth) {
-                                val reviewList = listOfNotNull(selectedArea?.title, selectedProject?.title)
-                                    .joinToString(" › ")
-                                if (reviewList.isNotEmpty()) {
-                                    Text(
-                                        reviewList,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-
-                            // The save error shows below the text fields. With no notes block, it shows below the header.
-                            if (saveFailed && pageBlocks.none { it.kind == TaskPageBlockKinds.NOTES }) {
-                                Text(labels.saveError, color = MaterialTheme.colorScheme.error)
+                                modifier = Modifier.semantics { contentDescription = starAction },
+                            ) {
+                                StarGlyph(
+                                    filled = isStarred,
+                                    tint = if (isStarred) todayGold else MaterialTheme.colorScheme.onSurface,
+                                    size = 21.dp,
+                                )
                             }
                         }
-                        TaskPageBlockKinds.NOTES -> {
-                            OutlinedTextField(
-                                value = notesDraft,
-                                onValueChange = {
-                                    notesDraft = it.take(RegistryEntityLimits.NOTES_MAX.toInt())
-                                    textIsDirty = true
-                                    saveFailed = false
-                                },
-                                label = { Text(heading ?: labels.field(RegistryTaskDetail.Fields.NOTES)) },
-                                modifier = Modifier.fillMaxWidth(),
-                                minLines = 3,
-                                maxLines = 8,
-                                enabled = canEdit,
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
-                            )
-
-                            if (saveFailed) {
-                                Text(labels.saveError, color = MaterialTheme.colorScheme.error)
+                        if (textIsDirty || saveFailed) {
+                            TextButton(
+                                onClick = ::saveTaskText,
+                                enabled = data != null && !saving && titleDraft.isNotBlank(),
+                            ) {
+                                Text(saveAction, fontWeight = FontWeight.SemiBold)
                             }
                         }
-                        TaskPageBlockKinds.ATTRIBUTES -> {
-                            HorizontalDivider()
-                            // The attributes block holds no list of its own: it renders the
-                            // registry task attributes in their order. Notes, checklist and
-                            // attachments have their own blocks. Star and
-                            // paste have no editor on Android yet. Each picker folds open in
-                            // its own row through [openAttribute], never in a dialog.
-                            attributes.forEach { attribute ->
-                                when (attribute.id) {
-                                    RegistryTaskAttributeIds.WHEN -> AttributeFoldRow(
-                                        label = labels.field(RegistryTaskDetail.Fields.WHEN),
-                                        value = whenValue,
-                                        expanded = openPicker == RegistryTaskAttributeIds.WHEN,
-                                        enabled = canEdit,
-                                        onToggle = { openAttribute(RegistryTaskAttributeIds.WHEN) },
-                                    ) {
-                                        TaskDateBoard(
-                                            attribute = RegistryTaskAttributeIds.WHEN,
-                                            initialDay = scheduled ?: if (isToday) graph.clock.today(graph.clock.now()).toString() else null,
-                                            today = graph.clock.today(graph.clock.now()),
-                                            languageTag = languageTag,
-                                            enabled = canEdit,
-                                            onSelect = { day -> openPicker = null; setWhen(day) },
-                                            onClear = { openPicker = null; setWhen(null) },
-                                        )
+                    },
+                )
+            },
+        ) { padding ->
+            if (!hasLoaded) {
+                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (data == null) {
+                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    Text(labels.taskUnavailable, color = mutedInk)
+                }
+            } else {
+                Box(Modifier.fillMaxSize().padding(padding)) {
+                    Column(
+                        modifier = Modifier
+                            .widthIn(max = 720.dp)
+                            .fillMaxWidth()
+                            .align(Alignment.TopCenter)
+                            .verticalScroll(rememberScrollState())
+                            .navigationBarsPadding()
+                            .padding(top = 4.dp, bottom = 48.dp),
+                    ) {
+                        pageBlocks.forEachIndexed { blockIndex, block ->
+                            val heading = RegistryCatalog.taskPageBlockHeading(block, languageTag)
+                            val prevKind = pageBlocks.getOrNull(blockIndex - 1)?.kind
+                            val nextKind = pageBlocks.getOrNull(blockIndex + 1)?.kind
+
+                            when (block.kind) {
+                                TaskPageBlockKinds.HEADER -> {
+                                    val headerPosition = if (nextKind == TaskPageBlockKinds.NOTES) {
+                                        TaskCardPosition.Top
+                                    } else {
+                                        TaskCardPosition.Solo
                                     }
-                                    RegistryTaskAttributeIds.DEADLINE -> AttributeFoldRow(
-                                        label = labels.field(RegistryTaskDetail.Fields.DEADLINE),
-                                        value = deadline?.let { formatDay(it, languageTag) } ?: labels.noDate,
-                                        expanded = openPicker == RegistryTaskAttributeIds.DEADLINE,
-                                        enabled = canEdit,
-                                        onToggle = { openAttribute(RegistryTaskAttributeIds.DEADLINE) },
+                                    TaskCardSlice(
+                                        position = headerPosition,
+                                        isSelected = false,
+                                        isDark = isDark,
+                                        hasActiveTexture = hasActiveTexture,
                                     ) {
-                                        TaskDateBoard(
-                                            attribute = RegistryTaskAttributeIds.DEADLINE,
-                                            initialDay = deadline,
-                                            today = graph.clock.today(graph.clock.now()),
-                                            languageTag = languageTag,
-                                            enabled = canEdit,
-                                            onSelect = { day -> openPicker = null; setDeadline(day) },
-                                            onClear = { openPicker = null; setDeadline(null) },
-                                        )
-                                    }
-                                    RegistryTaskAttributeIds.REMINDER -> AttributeFoldRow(
-                                        label = attribute.label,
-                                        value = reminderValue,
-                                        expanded = openPicker == RegistryTaskAttributeIds.REMINDER,
-                                        enabled = canEdit,
-                                        onToggle = { openAttribute(RegistryTaskAttributeIds.REMINDER) },
-                                    ) {
-                                        TaskReminderPicker(
-                                            graph = graph,
-                                            reminderAt = reminderAt,
-                                            reminderMode = reminderMode,
-                                            enabled = canEdit,
-                                            control = labels::control,
-                                            onSet = { at, mode -> openPicker = null; setReminder(at, mode) },
-                                            onClear = { openPicker = null; setReminder(null, null) },
-                                        )
-                                    }
-                                    RegistryTaskAttributeIds.LIST -> AttributeFoldRow(
-                                        label = attribute.label,
-                                        value = listValue,
-                                        expanded = openPicker == RegistryTaskAttributeIds.LIST,
-                                        enabled = canEdit,
-                                        onToggle = { openAttribute(RegistryTaskAttributeIds.LIST) },
-                                    ) {
-                                        Text(
-                                            labels.field(RegistryTaskDetail.Fields.AREA),
-                                            style = MaterialTheme.typography.titleSmall,
-                                            modifier = Modifier.padding(horizontal = 16.dp),
-                                        )
-                                        ChoiceRow(
-                                            title = labels.noArea,
-                                            selected = selectedAreaId == null,
-                                            enabled = canEdit,
-                                            onClick = { openPicker = null; moveToArea(null) },
-                                        )
-                                        data?.areas.orEmpty().forEach { area ->
-                                            ChoiceRow(
-                                                title = area.title,
-                                                selected = area.id == selectedAreaId,
-                                                enabled = canEdit,
-                                                onClick = { openPicker = null; moveToArea(area.id) },
-                                            )
-                                        }
-                                        Text(
-                                            labels.field(RegistryTaskDetail.Fields.PROJECT),
-                                            style = MaterialTheme.typography.titleSmall,
-                                            modifier = Modifier.padding(horizontal = 16.dp),
-                                        )
-                                        ChoiceRow(
-                                            title = labels.noProject,
-                                            selected = selectedProjectId == null,
-                                            enabled = canEdit,
-                                            onClick = { openPicker = null; moveToProject(null) },
-                                        )
-                                        data?.projects.orEmpty().forEach { project ->
-                                            ChoiceRow(
-                                                title = project.title,
-                                                selected = project.id == selectedProjectId,
-                                                enabled = canEdit,
-                                                onClick = { openPicker = null; moveToProject(project.id) },
-                                            )
-                                        }
-                                    }
-                                    RegistryTaskAttributeIds.TAGS -> {
-                                        val selectedIds = (taskFields[RegistryEntityFields.Task.TAGS] as? JsonValue.ArrayValue)
-                                            ?.values?.mapNotNull { it.stringValue() }.orEmpty()
-                                        val selectedNames = data?.tags.orEmpty()
-                                            .filter { it.id in selectedIds }
-                                            .map(TagLine::name)
-                                        val tagLabels = taskTagPickerLabels(languageTag)
-                                        AttributeFoldRow(
-                                            label = attribute.label,
-                                            value = selectedNames.joinToString().ifEmpty { tagLabels.emptyTitle },
-                                            expanded = openPicker == RegistryTaskAttributeIds.TAGS,
-                                            enabled = canEdit,
-                                            onToggle = { openAttribute(RegistryTaskAttributeIds.TAGS) },
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(
+                                                    horizontal = TaskCardMetrics.ContentInset,
+                                                    vertical = 12.dp,
+                                                ),
                                         ) {
-                                            OutlinedTextField(
-                                                value = tagFilterDraft,
-                                                onValueChange = {
-                                                    tagFilterDraft = it.take(RegistryEntityLimits.TAG_NAME_MAX.toInt())
-                                                },
-                                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                                                singleLine = true,
-                                                label = { Text(tagLabels.filterPlaceholder) },
-                                                enabled = canEdit,
-                                            )
-                                            val filteredTags = data?.tags.orEmpty().filter { tag ->
-                                                tag.name.contains(tagFilterDraft.trim(), ignoreCase = true)
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.fillMaxWidth(),
+                                            ) {
+                                                SeptenaTaskCheckbox(
+                                                    checked = isCompleted,
+                                                    enabled = canEdit,
+                                                    accessibilityLabel = completeAction,
+                                                    isDark = isDark,
+                                                    onToggle = ::toggleComplete,
+                                                )
+                                                Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
+                                                Box(modifier = Modifier.weight(1f)) {
+                                                    if (titleDraft.isEmpty()) {
+                                                        Text(
+                                                            text = labels.field(RegistryTaskDetail.Fields.TITLE),
+                                                            fontSize = 19.sp,
+                                                            lineHeight = 25.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = mutedInk.copy(alpha = 0.55f),
+                                                        )
+                                                    }
+                                                    BasicTextField(
+                                                        value = titleDraft,
+                                                        onValueChange = {
+                                                            titleDraft = it.take(RegistryEntityLimits.TEXT_MAX.toInt())
+                                                            textIsDirty = true
+                                                            saveFailed = false
+                                                        },
+                                                        enabled = canEdit,
+                                                        textStyle = MaterialTheme.typography.titleMedium.copy(
+                                                            fontSize = 19.sp,
+                                                            lineHeight = 25.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = if (isCompleted) mutedInk else MaterialTheme.colorScheme.onSurface,
+                                                            textDecoration = if (isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                                                        ),
+                                                        cursorBrush = SolidColor(accent),
+                                                        maxLines = 4,
+                                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .semantics { contentDescription = labels.field(RegistryTaskDetail.Fields.TITLE) },
+                                                    )
+                                                }
                                             }
-                                            if (filteredTags.isNotEmpty()) {
-                                                Column {
-                                                    filteredTags.forEach { tag ->
-                                                        FilterChip(
-                                                            selected = tag.id in selectedIds,
-                                                            onClick = { setTag(tag.id, tag.id !in selectedIds) },
-                                                            label = { Text(tag.name) },
-                                                            enabled = canEdit && !saving,
-                                                            modifier = Modifier.padding(horizontal = 12.dp),
+
+                                            if (isReviewDepth) {
+                                                val reviewList = listOfNotNull(selectedArea?.title, selectedProject?.title)
+                                                    .joinToString(" › ")
+                                                if (reviewList.isNotEmpty()) {
+                                                    Text(
+                                                        text = reviewList,
+                                                        fontSize = 13.sp,
+                                                        color = mutedInk,
+                                                        modifier = Modifier.padding(
+                                                            start = TaskCardMetrics.LeadingColumnWidth + TaskCardMetrics.IconTextGap,
+                                                            top = 4.dp,
+                                                        ),
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (saveFailed && pageBlocks.none { it.kind == TaskPageBlockKinds.NOTES }) {
+                                        Text(
+                                            text = labels.saveError,
+                                            color = MaterialTheme.colorScheme.error,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
+                                        )
+                                    }
+                                }
+
+                                TaskPageBlockKinds.NOTES -> {
+                                    val notesPosition = if (prevKind == TaskPageBlockKinds.HEADER) {
+                                        TaskCardPosition.Bottom
+                                    } else {
+                                        TaskCardPosition.Solo
+                                    }
+                                    val notesLabel = heading ?: labels.field(RegistryTaskDetail.Fields.NOTES)
+                                    TaskCardSlice(
+                                        position = notesPosition,
+                                        isSelected = false,
+                                        isDark = isDark,
+                                        hasActiveTexture = hasActiveTexture,
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(
+                                                    start = TaskCardMetrics.TitleInsetInCard,
+                                                    end = TaskCardMetrics.ContentInset,
+                                                    top = 12.dp,
+                                                    bottom = 14.dp,
+                                                ),
+                                        ) {
+                                            if (notesDraft.isEmpty()) {
+                                                Text(
+                                                    text = notesLabel,
+                                                    fontSize = 15.sp,
+                                                    lineHeight = 21.sp,
+                                                    color = mutedInk.copy(alpha = 0.55f),
+                                                )
+                                            }
+                                            BasicTextField(
+                                                value = notesDraft,
+                                                onValueChange = {
+                                                    notesDraft = it.take(RegistryEntityLimits.NOTES_MAX.toInt())
+                                                    textIsDirty = true
+                                                    saveFailed = false
+                                                },
+                                                enabled = canEdit,
+                                                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                                    fontSize = 15.sp,
+                                                    lineHeight = 21.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                ),
+                                                cursorBrush = SolidColor(accent),
+                                                minLines = 3,
+                                                maxLines = 12,
+                                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .semantics { contentDescription = notesLabel },
+                                            )
+                                        }
+                                    }
+
+                                    if (saveFailed) {
+                                        Text(
+                                            text = labels.saveError,
+                                            color = MaterialTheme.colorScheme.error,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
+                                        )
+                                    }
+                                }
+
+                                TaskPageBlockKinds.ATTRIBUTES -> {
+                                    val renderedAttributes = attributes.filter { it.id in SUPPORTED_DETAIL_ATTRIBUTES }
+                                    renderedAttributes.forEachIndexed { attrIndex, attribute ->
+                                        val slicePos = cardPosition(attrIndex, renderedAttributes.size)
+                                        TaskCardSlice(
+                                            position = slicePos,
+                                            isSelected = false,
+                                            isDark = isDark,
+                                            hasActiveTexture = hasActiveTexture,
+                                        ) {
+                                            when (attribute.id) {
+                                                RegistryTaskAttributeIds.WHEN -> AttributeFoldRow(
+                                                    label = labels.field(RegistryTaskDetail.Fields.WHEN),
+                                                    value = whenValue,
+                                                    valueColor = if (whenIsSet) accent else mutedInk,
+                                                    expanded = openPicker == RegistryTaskAttributeIds.WHEN,
+                                                    enabled = canEdit,
+                                                    icon = {
+                                                        if (isToday) {
+                                                            SeptenaGlyph(kind = SeptenaIconKind.Today, tint = todayGold, size = 16.dp)
+                                                        } else {
+                                                            CalendarSmallGlyph(tint = if (whenIsSet) accent else mutedInk, size = 15.dp)
+                                                        }
+                                                    },
+                                                    onToggle = { openAttribute(RegistryTaskAttributeIds.WHEN) },
+                                                ) {
+                                                    TaskDateBoard(
+                                                        attribute = RegistryTaskAttributeIds.WHEN,
+                                                        initialDay = scheduled ?: if (isToday) todayDate.toString() else null,
+                                                        today = todayDate,
+                                                        languageTag = languageTag,
+                                                        enabled = canEdit,
+                                                        onSelect = { day -> openPicker = null; setWhen(day) },
+                                                        onClear = { openPicker = null; setWhen(null) },
+                                                        startTime = startTime,
+                                                        durationMinutes = durationMinutes,
+                                                        onTimeSlotChange = { start, dur -> setTimeSlot(start, dur) },
+                                                    )
+                                                }
+
+                                                RegistryTaskAttributeIds.DEADLINE -> AttributeFoldRow(
+                                                    label = labels.field(RegistryTaskDetail.Fields.DEADLINE),
+                                                    value = deadline?.let { formatDay(it, languageTag) } ?: labels.noDate,
+                                                    valueColor = when {
+                                                        deadlineIsOverdue -> overdueRed
+                                                        deadline != null -> MaterialTheme.colorScheme.onSurface
+                                                        else -> mutedInk
+                                                    },
+                                                    expanded = openPicker == RegistryTaskAttributeIds.DEADLINE,
+                                                    enabled = canEdit,
+                                                    icon = {
+                                                        DeadlineFlagGlyph(
+                                                            tint = if (deadlineIsOverdue) overdueRed else mutedInk,
+                                                            size = 15.dp,
+                                                        )
+                                                    },
+                                                    onToggle = { openAttribute(RegistryTaskAttributeIds.DEADLINE) },
+                                                ) {
+                                                    TaskDateBoard(
+                                                        attribute = RegistryTaskAttributeIds.DEADLINE,
+                                                        initialDay = deadline,
+                                                        today = todayDate,
+                                                        languageTag = languageTag,
+                                                        enabled = canEdit,
+                                                        onSelect = { day -> openPicker = null; setDeadline(day) },
+                                                        onClear = { openPicker = null; setDeadline(null) },
+                                                    )
+                                                }
+
+                                                RegistryTaskAttributeIds.REMINDER -> AttributeFoldRow(
+                                                    label = attribute.label,
+                                                    value = reminderValue,
+                                                    valueColor = if (reminderAt != null) accent else mutedInk,
+                                                    expanded = openPicker == RegistryTaskAttributeIds.REMINDER,
+                                                    enabled = canEdit,
+                                                    icon = {
+                                                        BellSmallGlyph(tint = if (reminderAt != null) accent else mutedInk, size = 15.dp)
+                                                    },
+                                                    onToggle = { openAttribute(RegistryTaskAttributeIds.REMINDER) },
+                                                ) {
+                                                    TaskReminderPicker(
+                                                        graph = graph,
+                                                        reminderAt = reminderAt,
+                                                        reminderMode = reminderMode,
+                                                        enabled = canEdit,
+                                                        control = labels::control,
+                                                        onSet = { at, mode -> openPicker = null; setReminder(at, mode) },
+                                                        onClear = { openPicker = null; setReminder(null, null) },
+                                                    )
+                                                }
+
+                                                RegistryTaskAttributeIds.LIST -> AttributeFoldRow(
+                                                    label = attribute.label,
+                                                    value = listValue,
+                                                    valueColor = if (listIsSet) MaterialTheme.colorScheme.onSurface else mutedInk,
+                                                    expanded = openPicker == RegistryTaskAttributeIds.LIST,
+                                                    enabled = canEdit,
+                                                    icon = {
+                                                        SeptenaGlyph(
+                                                            kind = if (selectedProject != null) SeptenaIconKind.Project else SeptenaIconKind.Area,
+                                                            tint = if (listIsSet) accent else mutedInk,
+                                                            size = 16.dp,
+                                                        )
+                                                    },
+                                                    onToggle = { openAttribute(RegistryTaskAttributeIds.LIST) },
+                                                ) {
+                                                    Text(
+                                                        text = labels.field(RegistryTaskDetail.Fields.AREA),
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = mutedInk,
+                                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+                                                    )
+                                                    ChoiceRow(
+                                                        title = labels.noArea,
+                                                        selected = selectedAreaId == null,
+                                                        enabled = canEdit,
+                                                        onClick = { openPicker = null; moveToArea(null) },
+                                                    )
+                                                    data?.areas.orEmpty().forEach { area ->
+                                                        ChoiceRow(
+                                                            title = area.title,
+                                                            selected = area.id == selectedAreaId,
+                                                            enabled = canEdit,
+                                                            onClick = { openPicker = null; moveToArea(area.id) },
+                                                        )
+                                                    }
+                                                    Text(
+                                                        text = labels.field(RegistryTaskDetail.Fields.PROJECT),
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = mutedInk,
+                                                        modifier = Modifier.padding(
+                                                            start = 14.dp,
+                                                            end = 14.dp,
+                                                            top = 8.dp,
+                                                            bottom = 4.dp,
+                                                        ),
+                                                    )
+                                                    ChoiceRow(
+                                                        title = labels.noProject,
+                                                        selected = selectedProjectId == null,
+                                                        enabled = canEdit,
+                                                        onClick = { openPicker = null; moveToProject(null) },
+                                                    )
+                                                    data?.projects.orEmpty().forEach { project ->
+                                                        ChoiceRow(
+                                                            title = project.title,
+                                                            selected = project.id == selectedProjectId,
+                                                            enabled = canEdit,
+                                                            onClick = { openPicker = null; moveToProject(project.id) },
                                                         )
                                                     }
                                                 }
-                                            } else if (data?.tags.isNullOrEmpty()) {
-                                                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                                                    Text(tagLabels.emptyTitle, style = MaterialTheme.typography.bodyMedium)
-                                                    Text(
-                                                        tagLabels.emptyDetail,
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+
+                                                RegistryTaskAttributeIds.TAGS -> {
+                                                    val selectedIds = (taskFields[RegistryEntityFields.Task.TAGS] as? JsonValue.ArrayValue)
+                                                        ?.values?.mapNotNull { it.stringValue() }.orEmpty()
+                                                    val selectedNames = data?.tags.orEmpty()
+                                                        .filter { it.id in selectedIds }
+                                                        .map(TagLine::name)
+                                                    val tagLabels = taskTagPickerLabels(languageTag)
+                                                    AttributeFoldRow(
+                                                        label = attribute.label,
+                                                        value = selectedNames.joinToString(", ").ifEmpty { tagLabels.emptyTitle },
+                                                        valueColor = if (selectedNames.isNotEmpty()) MaterialTheme.colorScheme.onSurface else mutedInk,
+                                                        expanded = openPicker == RegistryTaskAttributeIds.TAGS,
+                                                        enabled = canEdit,
+                                                        icon = {
+                                                            TagSmallGlyph(
+                                                                tint = if (selectedNames.isNotEmpty()) accent else mutedInk,
+                                                                size = 15.dp,
+                                                            )
+                                                        },
+                                                        onToggle = { openAttribute(RegistryTaskAttributeIds.TAGS) },
+                                                    ) {
+                                                        OutlinedTextField(
+                                                            value = tagFilterDraft,
+                                                            onValueChange = {
+                                                                tagFilterDraft = it.take(RegistryEntityLimits.TAG_NAME_MAX.toInt())
+                                                            },
+                                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+                                                            singleLine = true,
+                                                            label = { Text(tagLabels.filterPlaceholder) },
+                                                            enabled = canEdit,
+                                                        )
+                                                        val filteredTags = data?.tags.orEmpty().filter { tag ->
+                                                            tag.name.contains(tagFilterDraft.trim(), ignoreCase = true)
+                                                        }
+                                                        if (filteredTags.isNotEmpty()) {
+                                                            FlowRow(
+                                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+                                                            ) {
+                                                                filteredTags.forEach { tag ->
+                                                                    FilterChip(
+                                                                        selected = tag.id in selectedIds,
+                                                                        onClick = { setTag(tag.id, tag.id !in selectedIds) },
+                                                                        label = { Text(tag.name) },
+                                                                        enabled = canEdit && !saving,
+                                                                    )
+                                                                }
+                                                            }
+                                                        } else if (data?.tags.isNullOrEmpty()) {
+                                                            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                                                                Text(tagLabels.emptyTitle, style = MaterialTheme.typography.bodyMedium)
+                                                                Text(
+                                                                    tagLabels.emptyDetail,
+                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                    color = mutedInk,
+                                                                )
+                                                            }
+                                                        }
+                                                        val duplicateTag = data?.tags.orEmpty().any {
+                                                            it.name.equals(tagFilterDraft.trim(), ignoreCase = true)
+                                                        }
+                                                        if (tagFilterDraft.isNotBlank() && !duplicateTag) {
+                                                            TextButton(
+                                                                onClick = ::createAndAssignTag,
+                                                                enabled = canEdit && !saving,
+                                                                modifier = Modifier.align(Alignment.End).padding(end = 8.dp),
+                                                            ) { Text(tagLabels.addTitle) }
+                                                        }
+                                                    }
+                                                }
+
+                                                RegistryTaskAttributeIds.REPEAT -> AttributeFoldRow(
+                                                    label = labels.field(RegistryTaskDetail.Fields.REPEAT),
+                                                    value = repeatSummary,
+                                                    valueColor = if (repeatUnit != null) accent else mutedInk,
+                                                    expanded = openPicker == RegistryTaskAttributeIds.REPEAT && repeatUnit != null,
+                                                    enabled = canEdit,
+                                                    icon = {
+                                                        RepeatSmallGlyph(tint = if (repeatUnit != null) accent else mutedInk, size = 15.dp)
+                                                    },
+                                                    onToggle = {
+                                                        if (repeatUnit == null) startRepeat()
+                                                        else openAttribute(RegistryTaskAttributeIds.REPEAT)
+                                                    },
+                                                    trailing = {
+                                                        Switch(
+                                                            checked = repeatUnit != null,
+                                                            onCheckedChange = { on -> if (on) startRepeat() else stopRepeat() },
+                                                            enabled = canEdit,
+                                                        )
+                                                    },
+                                                ) {
+                                                    RepeatEditor(
+                                                        labels = labels,
+                                                        units = labels.repeatUnits,
+                                                        selectedUnit = repeatUnit,
+                                                        interval = repeatInterval,
+                                                        afterCompletion = repeatAfterCompletion,
+                                                        paused = recurrencePaused,
+                                                        pauseAction = repeatPauseAction,
+                                                        weekdays = labels.weekdays,
+                                                        monthlyRules = labels.monthlyRules,
+                                                        calendarWeekdays = labels.calendarWeekdays,
+                                                        ordinals = labels.ordinals,
+                                                        selectedWeekdays = recurrenceWeekdays,
+                                                        monthDay = recurrenceMonthDay,
+                                                        ordinalWeekday = recurrenceOrdinal,
+                                                        hasScheduledDate = scheduled != null,
+                                                        enabled = canEdit,
+                                                        onUnitChange = { setRepeat(it) },
+                                                        onIntervalChange = { setRepeat(repeatUnit, it) },
+                                                        onAfterCompletionChange = { setRepeat(repeatUnit, repeatInterval, it) },
+                                                        onWeekdaysChange = { setRepeat(repeatUnit, repeatInterval, false, it, null, null) },
+                                                        onMonthDayChange = { setRepeat(repeatUnit, repeatInterval, false, emptySet(), it, null) },
+                                                        onOrdinalWeekdayChange = { setRepeat(repeatUnit, repeatInterval, false, emptySet(), null, it) },
+                                                        onMonthRuleChange = { mode ->
+                                                            val date = (scheduled ?: todayDate.toString()).let(LocalDate::parse)
+                                                            val day = date.dayOfMonth
+                                                            val weekday = date.dayOfWeek.value % 7 + 1
+                                                            val ordinal = minOf(4, ((day - 1) / 7) + 1)
+                                                            when (mode) {
+                                                                "anchor" -> setRepeat(repeatUnit, repeatInterval, false, emptySet(), null, null)
+                                                                "dayOfMonth" -> setRepeat(repeatUnit, repeatInterval, false, emptySet(), recurrenceMonthDay ?: day, null)
+                                                                "ordinal" -> setRepeat(
+                                                                    repeatUnit,
+                                                                    repeatInterval,
+                                                                    false,
+                                                                    emptySet(),
+                                                                    null,
+                                                                    recurrenceOrdinal ?: (ordinal to weekday),
+                                                                )
+                                                            }
+                                                        },
+                                                        onPauseToggle = ::setRepeatPaused,
                                                     )
                                                 }
-                                            }
-                                            val duplicateTag = data?.tags.orEmpty().any {
-                                                it.name.equals(tagFilterDraft.trim(), ignoreCase = true)
-                                            }
-                                            if (tagFilterDraft.isNotBlank() && !duplicateTag) {
-                                                TextButton(
-                                                    onClick = ::createAndAssignTag,
-                                                    enabled = canEdit && !saving,
-                                                    modifier = Modifier.align(Alignment.End),
-                                                ) { Text(tagLabels.addTitle) }
                                             }
                                         }
                                     }
-                                    RegistryTaskAttributeIds.REPEAT -> AttributeFoldRow(
-                                        label = labels.field(RegistryTaskDetail.Fields.REPEAT),
-                                        value = repeatSummary,
-                                        expanded = openPicker == RegistryTaskAttributeIds.REPEAT && repeatUnit != null,
-                                        enabled = canEdit,
-                                        onToggle = {
-                                            if (repeatUnit == null) startRepeat()
-                                            else openAttribute(RegistryTaskAttributeIds.REPEAT)
-                                        },
-                                        trailing = {
-                                            Switch(
-                                                checked = repeatUnit != null,
-                                                onCheckedChange = { on -> if (on) startRepeat() else stopRepeat() },
-                                                enabled = canEdit,
-                                            )
-                                        },
-                                    ) {
-                                        RepeatEditor(
-                                            labels = labels,
-                                            units = labels.repeatUnits,
-                                            selectedUnit = repeatUnit,
-                                            interval = repeatInterval,
-                                            afterCompletion = repeatAfterCompletion,
-                                            paused = recurrencePaused,
-                                            pauseAction = repeatPauseAction,
-                                            weekdays = labels.weekdays,
-                                            monthlyRules = labels.monthlyRules,
-                                            calendarWeekdays = labels.calendarWeekdays,
-                                            ordinals = labels.ordinals,
-                                            selectedWeekdays = recurrenceWeekdays,
-                                            monthDay = recurrenceMonthDay,
-                                            ordinalWeekday = recurrenceOrdinal,
-                                            hasScheduledDate = scheduled != null,
-                                            enabled = canEdit,
-                                            onUnitChange = { setRepeat(it) },
-                                            onIntervalChange = { setRepeat(repeatUnit, it) },
-                                            onAfterCompletionChange = { setRepeat(repeatUnit, repeatInterval, it) },
-                                            onWeekdaysChange = { setRepeat(repeatUnit, repeatInterval, false, it, null, null) },
-                                            onMonthDayChange = { setRepeat(repeatUnit, repeatInterval, false, emptySet(), it, null) },
-                                            onOrdinalWeekdayChange = { setRepeat(repeatUnit, repeatInterval, false, emptySet(), null, it) },
-                                            onMonthRuleChange = { mode ->
-                                                val date = (scheduled ?: graph.clock.today(graph.clock.now()).toString()).let(LocalDate::parse)
-                                                val day = date.dayOfMonth
-                                                val weekday = date.dayOfWeek.value % 7 + 1
-                                                val ordinal = minOf(4, ((day - 1) / 7) + 1)
-                                                when (mode) {
-                                                    "anchor" -> setRepeat(repeatUnit, repeatInterval, false, emptySet(), null, null)
-                                                    "dayOfMonth" -> setRepeat(repeatUnit, repeatInterval, false, emptySet(), recurrenceMonthDay ?: day, null)
-                                                    "ordinal" -> setRepeat(
-                                                        repeatUnit,
-                                                        repeatInterval,
-                                                        false,
-                                                        emptySet(),
-                                                        null,
-                                                        recurrenceOrdinal ?: (ordinal to weekday),
-                                                    )
-                                                }
-                                            },
-                                            onPauseToggle = ::setRepeatPaused,
-                                        )
+                                    if (conversationInAttributes) {
+                                        TaskCardSlice(
+                                            position = TaskCardPosition.Solo,
+                                            isSelected = false,
+                                            isDark = isDark,
+                                            hasActiveTexture = hasActiveTexture,
+                                        ) {
+                                            Box(modifier = Modifier.padding(14.dp)) {
+                                                TaskConversationSection(
+                                                    graph = graph,
+                                                    taskId = taskId,
+                                                    isTaskOpen = isTaskOpen,
+                                                    canWrite = canEdit,
+                                                    heading = discussHeading,
+                                                )
+                                            }
+                                        }
                                     }
                                 }
-                            }
-                            if (conversationInAttributes) {
-                                TaskConversationSection(
-                                    graph = graph,
-                                    taskId = taskId,
-                                    isTaskOpen = isTaskOpen,
-                                    canWrite = canEdit,
-                                    heading = discussHeading,
-                                )
-                            }
-                        }
-                        TaskPageBlockKinds.CHECKLIST -> {
-                            HorizontalDivider()
-                            Text(
-                                heading ?: labels.field(RegistryTaskDetail.Fields.CHECKLIST),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            data?.checklist.orEmpty().forEach { item ->
-                                ChecklistRow(
-                                    item = item,
-                                    title = checklistDrafts[item.id] ?: item.title,
-                                    emptyTitle = labels.field(RegistryTaskDetail.Fields.CHECKLIST_ITEM),
-                                    toggleLabel = toggleChecklistAction,
-                                    deleteLabel = deleteChecklistAction,
-                                    enabled = canEdit,
-                                    onTitleChange = { checklistDrafts[item.id] = it.take(CHECKLIST_TITLE_MAX_LENGTH.toInt()) },
-                                    onFocusChange = { focused ->
-                                        focusedChecklistId = if (focused) item.id else focusedChecklistId.takeUnless { it == item.id }
-                                    },
-                                    onCommitTitle = { saveChecklistTitle(item) },
-                                    onToggle = { checked ->
-                                        val checkedAt = if (checked) WireTimestamp.format(graph.clock.now()) else null
-                                        write {
-                                            check(
-                                                graph.registryEntityMutator.update(
-                                                    RegistryEntityNames.CHECKLIST_ITEM,
-                                                    item.id,
-                                                    mapOf(
-                                                        RegistryEntityFields.ChecklistItem.CHECKED to JsonValue.BooleanValue(checked),
-                                                        RegistryEntityFields.ChecklistItem.CHECKED_AT to JsonValue.stringOrNull(checkedAt),
-                                                    ),
-                                                ) != null,
+
+                                TaskPageBlockKinds.CHECKLIST -> {
+                                    val checklistItems = data?.checklist.orEmpty()
+                                    val canAddMore = checklistItems.size.toLong() < RegistryEntityLimits.MAX_CHECKLIST_ITEMS_PER_TASK
+                                    val totalSlices = checklistItems.size + if (canAddMore) 1 else 0
+                                    DetailSectionHeader(heading ?: labels.field(RegistryTaskDetail.Fields.CHECKLIST))
+                                    checklistItems.forEachIndexed { index, item ->
+                                        TaskCardSlice(
+                                            position = cardPosition(index, totalSlices),
+                                            isSelected = false,
+                                            isDark = isDark,
+                                            hasActiveTexture = hasActiveTexture,
+                                        ) {
+                                            ChecklistRow(
+                                                item = item,
+                                                title = checklistDrafts[item.id] ?: item.title,
+                                                emptyTitle = labels.field(RegistryTaskDetail.Fields.CHECKLIST_ITEM),
+                                                toggleLabel = toggleChecklistAction,
+                                                deleteLabel = deleteChecklistAction,
+                                                isDark = isDark,
+                                                enabled = canEdit,
+                                                onTitleChange = { checklistDrafts[item.id] = it.take(CHECKLIST_TITLE_MAX_LENGTH.toInt()) },
+                                                onFocusChange = { focused ->
+                                                    focusedChecklistId = if (focused) item.id else focusedChecklistId.takeUnless { it == item.id }
+                                                },
+                                                onCommitTitle = { saveChecklistTitle(item) },
+                                                onToggle = { checked ->
+                                                    val checkedAt = if (checked) WireTimestamp.format(graph.clock.now()) else null
+                                                    write {
+                                                        check(
+                                                            graph.registryEntityMutator.update(
+                                                                RegistryEntityNames.CHECKLIST_ITEM,
+                                                                item.id,
+                                                                mapOf(
+                                                                    RegistryEntityFields.ChecklistItem.CHECKED to JsonValue.BooleanValue(checked),
+                                                                    RegistryEntityFields.ChecklistItem.CHECKED_AT to JsonValue.stringOrNull(checkedAt),
+                                                                ),
+                                                            ) != null,
+                                                        )
+                                                    }
+                                                },
+                                                onDelete = {
+                                                    write { check(graph.registryEntityMutator.delete(RegistryEntityNames.CHECKLIST_ITEM, item.id) != null) }
+                                                },
                                             )
                                         }
-                                    },
-                                    onDelete = {
-                                        write { check(graph.registryEntityMutator.delete(RegistryEntityNames.CHECKLIST_ITEM, item.id) != null) }
-                                    },
-                                )
-                            }
-                            TextButton(
-                                onClick = {
-                                    val nextPosition = data?.checklist.orEmpty().maxOfOrNull(ChecklistLine::position)?.plus(1.0) ?: 0.0
-                                    write {
-                                        val item = graph.registryEntityMutator.create(
-                                            RegistryEntityNames.CHECKLIST_ITEM,
-                                            mapOf(
-                                                RegistryEntityFields.ChecklistItem.TASK_ID to JsonValue.StringValue(taskId),
-                                                RegistryEntityFields.ChecklistItem.TITLE to JsonValue.StringValue(""),
-                                                RegistryEntityFields.ChecklistItem.POSITION to JsonValue.DecimalValue(nextPosition),
-                                            ),
-                                        )
-                                        checklistDrafts[item.id] = ""
                                     }
-                                },
-                                enabled = canEdit && data?.checklist.orEmpty().size.toLong() < RegistryEntityLimits.MAX_CHECKLIST_ITEMS_PER_TASK,
-                                modifier = Modifier.align(Alignment.Start),
-                            ) { Text(addChecklistAction) }
-                        }
-                        // With an attributes block the conversation renders there (see above).
-                        TaskPageBlockKinds.CONVERSATION -> if (!conversationInAttributes) {
-                            TaskConversationSection(
-                                graph = graph,
-                                taskId = taskId,
-                                isTaskOpen = isTaskOpen,
-                                canWrite = canEdit,
-                                heading = heading,
-                            )
-                        }
-                        TaskPageBlockKinds.ATTACHMENTS -> if (savedTask != null) {
-                            TaskAttachmentsSection(
-                                graph = graph,
-                                taskId = taskId,
-                                heading = heading,
-                                canEdit = canEdit,
-                                control = labels::control,
-                            )
-                        }
-                        // Who added the task and when: permanent, read-only metadata.
-                        TaskPageBlockKinds.PROVENANCE -> {
-                            val source = taskFields[RegistryEntityFields.Task.SOURCE].stringValue()
-                            val name = TaskProvenance.addedByName(
-                                source,
-                                taskFields[RegistryEntityFields.Task.SOURCE_CLIENT].stringValue(),
-                                languageTag,
-                            )
-                            val on = formatAddedOn(
-                                taskFields[RegistryEntityFields.Task.CREATED_AT].stringValue(),
-                                taskFields[RegistryEntityFields.Task.CREATED].stringValue(),
-                                languageTag,
-                            )
-                            HorizontalDivider()
-                            heading?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
-                            Text(
-                                if (on == null) name else "$name · $on",
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
-                        // The change log lives on the server only, so the row shows with a
-                        // session. It folds open like an attribute row and loads on open.
-                        TaskPageBlockKinds.HISTORY -> if (savedTask != null && signedIn) {
-                            HorizontalDivider()
-                            AttributeFoldRow(
-                                label = heading.orEmpty(),
-                                value = null,
-                                expanded = openPicker == RegistryTaskAttributeIds.HISTORY,
-                                enabled = canEdit,
-                                onToggle = { openAttribute(RegistryTaskAttributeIds.HISTORY) },
-                            ) {
-                                TaskHistoryList(
-                                    graph = graph,
-                                    taskId = taskId,
-                                    languageTag = languageTag,
-                                    control = labels::control,
-                                )
+                                    if (canAddMore) {
+                                        TaskCardSlice(
+                                            position = cardPosition(checklistItems.size, totalSlices),
+                                            isSelected = false,
+                                            isDark = isDark,
+                                            hasActiveTexture = hasActiveTexture,
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable(enabled = canEdit) {
+                                                        val nextPosition = checklistItems.maxOfOrNull(ChecklistLine::position)?.plus(1.0) ?: 0.0
+                                                        write {
+                                                            val item = graph.registryEntityMutator.create(
+                                                                RegistryEntityNames.CHECKLIST_ITEM,
+                                                                mapOf(
+                                                                    RegistryEntityFields.ChecklistItem.TASK_ID to JsonValue.StringValue(taskId),
+                                                                    RegistryEntityFields.ChecklistItem.TITLE to JsonValue.StringValue(""),
+                                                                    RegistryEntityFields.ChecklistItem.POSITION to JsonValue.DecimalValue(nextPosition),
+                                                                ),
+                                                            )
+                                                            checklistDrafts[item.id] = ""
+                                                        }
+                                                    }
+                                                    .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 12.dp),
+                                            ) {
+                                                Box(
+                                                    contentAlignment = Alignment.Center,
+                                                    modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
+                                                ) {
+                                                    PlusSmallGlyph(tint = accent, size = 15.dp)
+                                                }
+                                                Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
+                                                Text(
+                                                    text = addChecklistAction,
+                                                    fontSize = 15.sp,
+                                                    lineHeight = 20.sp,
+                                                    color = accent,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                TaskPageBlockKinds.CONVERSATION -> if (!conversationInAttributes) {
+                                    TaskCardSlice(
+                                        position = TaskCardPosition.Solo,
+                                        isSelected = false,
+                                        isDark = isDark,
+                                        hasActiveTexture = hasActiveTexture,
+                                    ) {
+                                        Box(modifier = Modifier.padding(14.dp)) {
+                                            TaskConversationSection(
+                                                graph = graph,
+                                                taskId = taskId,
+                                                isTaskOpen = isTaskOpen,
+                                                canWrite = canEdit,
+                                                heading = heading,
+                                            )
+                                        }
+                                    }
+                                }
+
+                                TaskPageBlockKinds.ATTACHMENTS -> if (savedTask != null) {
+                                    TaskAttachmentsSection(
+                                        graph = graph,
+                                        taskId = taskId,
+                                        heading = heading,
+                                        canEdit = canEdit,
+                                        control = labels::control,
+                                    )
+                                }
+
+                                TaskPageBlockKinds.PROVENANCE -> {
+                                    val source = taskFields[RegistryEntityFields.Task.SOURCE].stringValue()
+                                    val isAgent = TaskProvenance.isAgentAuthored(source)
+                                    val name = TaskProvenance.addedByName(
+                                        source,
+                                        taskFields[RegistryEntityFields.Task.SOURCE_CLIENT].stringValue(),
+                                        languageTag,
+                                    )
+                                    val on = formatAddedOn(
+                                        taskFields[RegistryEntityFields.Task.CREATED_AT].stringValue(),
+                                        taskFields[RegistryEntityFields.Task.CREATED].stringValue(),
+                                        languageTag,
+                                    )
+                                    heading?.let { DetailSectionHeader(it) }
+                                    TaskCardSlice(
+                                        position = TaskCardPosition.Solo,
+                                        isSelected = false,
+                                        isDark = isDark,
+                                        hasActiveTexture = hasActiveTexture,
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 12.dp),
+                                        ) {
+                                            if (isAgent) {
+                                                Box(
+                                                    contentAlignment = Alignment.Center,
+                                                    modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
+                                                ) {
+                                                    AgentSparkleBubbleGlyph(tint = mutedInk, size = 16.dp)
+                                                }
+                                            }
+                                            Text(
+                                                text = if (on == null) name else "$name · $on",
+                                                fontSize = 14.5.sp,
+                                                lineHeight = 20.sp,
+                                                color = mutedInk,
+                                            )
+                                        }
+                                    }
+                                }
+
+                                TaskPageBlockKinds.HISTORY -> if (savedTask != null && signedIn) {
+                                    TaskCardSlice(
+                                        position = TaskCardPosition.Solo,
+                                        isSelected = false,
+                                        isDark = isDark,
+                                        hasActiveTexture = hasActiveTexture,
+                                    ) {
+                                        AttributeFoldRow(
+                                            label = heading.orEmpty(),
+                                            value = null,
+                                            valueColor = mutedInk,
+                                            expanded = openPicker == RegistryTaskAttributeIds.HISTORY,
+                                            enabled = canEdit,
+                                            icon = {
+                                                SeptenaGlyph(kind = SeptenaIconKind.Logbook, tint = mutedInk, size = 15.dp)
+                                            },
+                                            onToggle = { openAttribute(RegistryTaskAttributeIds.HISTORY) },
+                                        ) {
+                                            TaskHistoryList(
+                                                graph = graph,
+                                                taskId = taskId,
+                                                languageTag = languageTag,
+                                                control = labels::control,
+                                            )
+                                        }
+                                    }
+                                }
+
+                                else -> Unit
                             }
                         }
-                        // A kind that a newer registry adds has no Android renderer yet: skip.
-                        else -> Unit
                     }
-                }
                 }
             }
         }
     }
+}
 
+@Composable
+private fun DetailSectionHeader(title: String) {
+    Text(
+        text = title,
+        fontSize = 18.sp,
+        lineHeight = 22.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(
+            start = TaskCardMetrics.HeaderLeading,
+            end = TaskCardMetrics.Margin,
+            top = 14.dp,
+            bottom = 6.dp,
+        ),
+    )
 }
 
 /**
- * One attribute row on the task page. A tap folds the attribute's picker open
- * under the row, in the same row; a second tap folds it closed (Cancel). The
- * picker never opens in a dialog or a sheet (docs/TASK_PAGE_SPEC.md §3).
+ * One iOS-style attribute row inside a continuous glass card slice. A tap folds
+ * the attribute's picker open in-place; a second tap folds it closed (Cancel).
  */
 @Composable
 private fun AttributeFoldRow(
     label: String,
     value: String?,
+    valueColor: Color,
     expanded: Boolean,
     enabled: Boolean,
+    icon: @Composable () -> Unit,
     onToggle: () -> Unit,
     trailing: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
+    val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
     Column(modifier = Modifier.fillMaxWidth()) {
-        ListItem(
-            headlineContent = { Text(label) },
-            supportingContent = if (value != null) {
-                { Text(value) }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = enabled || expanded, onClick = onToggle)
+                .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 12.dp),
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
+            ) {
+                icon()
+            }
+            Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
+            Text(
+                text = label,
+                fontSize = 15.5.sp,
+                lineHeight = 20.sp,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            if (value != null) {
+                Text(
+                    text = value,
+                    fontSize = 14.5.sp,
+                    lineHeight = 20.sp,
+                    color = valueColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                )
             } else {
-                null
-            },
-            trailingContent = trailing,
-            // A row that is open can always fold closed, also while a write runs.
-            modifier = Modifier.fillMaxWidth().clickable(enabled = enabled || expanded, onClick = onToggle),
-        )
+                Spacer(modifier = Modifier.weight(1f))
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            if (trailing != null) {
+                trailing()
+            } else if (expanded) {
+                ChevronDownGlyph(tint = mutedInk.copy(alpha = 0.65f), size = 14.dp)
+            } else {
+                ChevronRightGlyph(tint = mutedInk.copy(alpha = 0.55f), size = 13.dp)
+            }
+        }
         if (expanded) {
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = TaskCardMetrics.ContentInset),
+                thickness = 0.5.dp,
+                color = dividerColor,
+            )
             Column(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
                 content = content,
             )
         }
     }
 }
 
-/** One choice in an embedded list picker. A tap commits it. */
+/** One choice in an embedded list picker. Clean iOS checkmark row; a tap commits it. */
 @Composable
 private fun ChoiceRow(
     title: String,
@@ -1046,11 +1479,28 @@ private fun ChoiceRow(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    ListItem(
-        headlineContent = { Text(title) },
-        leadingContent = { RadioButton(selected = selected, onClick = null, enabled = enabled) },
-        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick),
-    )
+    val accent = MaterialTheme.colorScheme.primary
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Text(
+            text = title,
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (selected) accent else MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (selected) {
+            CheckmarkGlyph(tint = accent, size = 15.dp)
+        }
+    }
 }
 
 @Composable
@@ -1112,11 +1562,13 @@ private fun RepeatEditor(
         else intervalDraft = interval.toString()
     }
 
-    // The Repeat row above holds the on/off switch; this is the rule, folded open under it.
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         if (selectedUnit != null) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -1152,17 +1604,23 @@ private fun RepeatEditor(
                     }
                 }
             }
-            ListItem(
-                headlineContent = { Text(labels.field(RegistryTaskDetail.Fields.AFTER_COMPLETION)) },
-                trailingContent = {
-                    Switch(
-                        checked = !hasScheduledDate || afterCompletion,
-                        onCheckedChange = onAfterCompletionChange,
-                        enabled = enabled && hasScheduledDate,
-                    )
-                },
-            )
-            if (selectedUnit != null && !afterCompletion && hasScheduledDate &&
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = labels.field(RegistryTaskDetail.Fields.AFTER_COMPLETION),
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Switch(
+                    checked = !hasScheduledDate || afterCompletion,
+                    onCheckedChange = onAfterCompletionChange,
+                    enabled = enabled && hasScheduledDate,
+                )
+            }
+            if (!afterCompletion && hasScheduledDate &&
                 selectedUnit in setOf(RegistryEntityEnums.RecurrenceUnit.WEEK, RegistryEntityEnums.RecurrenceUnit.MONTH, RegistryEntityEnums.RecurrenceUnit.YEAR)
             ) {
                 TextButton(onClick = { customOptionsOpen = !customOptionsOpen }, enabled = enabled) {
@@ -1267,13 +1725,15 @@ private fun RepeatEditor(
                     }
                 }
             }
-            if (selectedUnit != null) {
-                TextButton(onClick = { onPauseToggle(!paused) }, enabled = enabled) {
-                    Text(pauseAction)
-                }
+            TextButton(onClick = { onPauseToggle(!paused) }, enabled = enabled) {
+                Text(pauseAction)
             }
-            if (selectedUnit != null && !hasScheduledDate) {
-                Text(labels.control(RegistryTaskDetail.Controls.NO_SCHEDULE_FOR_FIXED), style = MaterialTheme.typography.bodySmall)
+            if (!hasScheduledDate) {
+                Text(
+                    text = labels.control(RegistryTaskDetail.Controls.NO_SCHEDULE_FOR_FIXED),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -1286,6 +1746,7 @@ private fun ChecklistRow(
     emptyTitle: String,
     toggleLabel: String,
     deleteLabel: String,
+    isDark: Boolean,
     enabled: Boolean,
     onTitleChange: (String) -> Unit,
     onFocusChange: (Boolean) -> Unit,
@@ -1294,27 +1755,47 @@ private fun ChecklistRow(
     onDelete: () -> Unit,
 ) {
     var wasFocused by remember(item.id) { mutableStateOf(false) }
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(
-                checked = item.checked,
-                onCheckedChange = onToggle,
-                enabled = enabled,
-                modifier = Modifier.semantics { contentDescription = "$toggleLabel: $title" },
-            )
-            OutlinedTextField(
+    val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
+    val accent = MaterialTheme.colorScheme.primary
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 6.dp),
+    ) {
+        SeptenaTaskCheckbox(
+            checked = item.checked,
+            enabled = enabled,
+            accessibilityLabel = "$toggleLabel: $title",
+            isDark = isDark,
+            onToggle = { onToggle(!item.checked) },
+        )
+        Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
+        Box(modifier = Modifier.weight(1f)) {
+            if (title.isEmpty()) {
+                Text(
+                    text = item.title.ifEmpty { emptyTitle },
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
+                    color = mutedInk.copy(alpha = 0.55f),
+                )
+            }
+            BasicTextField(
                 value = title,
                 onValueChange = onTitleChange,
-                label = { Text(item.title.ifEmpty { emptyTitle }) },
                 enabled = enabled,
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
+                    color = if (item.checked) mutedInk.copy(alpha = 0.72f) else MaterialTheme.colorScheme.onSurface,
                     textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
                 ),
+                cursorBrush = SolidColor(accent),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { onCommitTitle() }),
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxWidth()
                     .onFocusChanged { focus ->
                         onFocusChange(focus.isFocused)
                         if (wasFocused && !focus.isFocused) onCommitTitle()
@@ -1322,8 +1803,15 @@ private fun ChecklistRow(
                     },
             )
         }
-        TextButton(onClick = onDelete, enabled = enabled, modifier = Modifier.align(Alignment.End)) {
-            Text(deleteLabel)
+        if (enabled) {
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier
+                    .size(30.dp)
+                    .semantics { contentDescription = deleteLabel },
+            ) {
+                CloseSmallGlyph(tint = mutedInk.copy(alpha = 0.65f), size = 12.dp)
+            }
         }
     }
 }

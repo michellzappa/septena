@@ -1,5 +1,7 @@
 package app.septena.android.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,28 +12,47 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -39,14 +60,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
-import app.septena.core.stringValue
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryPlacesScreenIds
 import app.septena.core.generated.RegistryPromptIds
 import app.septena.core.generated.RegistryTaskAttributeIds
+import app.septena.core.stringValue
 import app.septena.ui.ChevronRightGlyph
-import app.septena.ui.SeptenaGlyph
-import app.septena.ui.SeptenaIconKind
+import app.septena.ui.MoreDotsGlyph
+import app.septena.ui.PlusSmallGlyph
+import app.septena.ui.ProjectProgressRingGlyph
 import app.septena.ui.TaskCardMetrics
 import app.septena.ui.TaskCardPosition
 import app.septena.ui.TaskCardRow
@@ -58,7 +80,7 @@ import app.septena.ui.insertionPosition
 import app.septena.ui.magicPlusRowDrop
 import app.septena.ui.magicPlusSectionDrop
 
-/** Detail content for an area or project. The shell owns navigation and routes callbacks to these details. */
+/** Detail content for an area or project, aligned with iOS AreaDetailView / ProjectDetailView. */
 @Composable
 fun AreasProjectsScreen(
     graph: AndroidAppGraph,
@@ -86,18 +108,33 @@ fun AreasProjectsScreen(
     val isDark = LocalSeptenaDarkTheme.current
     val hasActiveTexture = LocalAppearance.current.hasActiveTexture
     val todayTint = MaterialTheme.colorScheme.secondary
+    val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
+    val accent = MaterialTheme.colorScheme.primary
     var dialog by remember { mutableStateOf<PlacesDialog?>(null) }
     var emojiPickerOpen by rememberSaveable(destination.key) { mutableStateOf(false) }
     var notesDraft by rememberSaveable(destination.key) { mutableStateOf("") }
+    var notesFocused by remember(destination.key) { mutableStateOf(false) }
     var areaTaskDraft by rememberSaveable(destination.key) { mutableStateOf("") }
     var projectTaskDraft by rememberSaveable(destination.key) { mutableStateOf("") }
     var sectionTaskDrafts by remember(destination.key) { mutableStateOf(emptyMap<String, String>()) }
 
     LaunchedEffect(destination) { viewModel.select(destination) }
-    LaunchedEffect(state.destination, state.notes) { notesDraft = state.notes }
+    LaunchedEffect(state.destination, state.notes) {
+        if (!notesFocused) notesDraft = state.notes
+    }
     LaunchedEffect(newSectionTrigger) {
         if (newSectionTrigger > 0 && destination is AreasProjectsDestination.Project) {
             dialog = PlacesDialog.CreateSection
+        }
+    }
+
+    val latestNotesDraft by rememberUpdatedState(notesDraft)
+    val latestSavedNotes by rememberUpdatedState(state.notes)
+    DisposableEffect(destination.key) {
+        onDispose {
+            if (latestNotesDraft != latestSavedNotes) {
+                viewModel.saveNotes(latestNotesDraft)
+            }
         }
     }
 
@@ -129,6 +166,75 @@ fun AreasProjectsScreen(
                         headerContent()
                     }
                 }
+
+                // Borderless glass Notes card (auto-saves on blur & leave, quiet Save link while dirty).
+                item(key = "place-notes") {
+                    val notesLabel = surfaceText(RegistryTaskAttributeIds.NOTES, "label", languageTag)
+                    val notesDirty = notesDraft != state.notes
+                    TaskCardSlice(
+                        position = TaskCardPosition.Solo,
+                        isSelected = false,
+                        isDark = isDark,
+                        hasActiveTexture = hasActiveTexture,
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 10.dp),
+                        ) {
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                if (notesDraft.isEmpty()) {
+                                    Text(
+                                        text = notesLabel,
+                                        fontSize = 14.5.sp,
+                                        lineHeight = 20.sp,
+                                        color = mutedInk.copy(alpha = 0.55f),
+                                    )
+                                }
+                                BasicTextField(
+                                    value = notesDraft,
+                                    onValueChange = { notesDraft = it },
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                        fontSize = 14.5.sp,
+                                        lineHeight = 20.sp,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    ),
+                                    cursorBrush = SolidColor(accent),
+                                    minLines = 1,
+                                    maxLines = 8,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .semantics { contentDescription = notesLabel }
+                                        .onFocusChanged { focus ->
+                                            if (notesFocused && !focus.isFocused && notesDraft != state.notes) {
+                                                viewModel.saveNotes(notesDraft)
+                                            }
+                                            notesFocused = focus.isFocused
+                                        },
+                                )
+                            }
+                            if (notesDirty) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                                    horizontalArrangement = Arrangement.End,
+                                ) {
+                                    Text(
+                                        text = actionTitle(RegistryActionIds.PLACE_SAVE_NOTES, languageTag),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = accent,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .clickable { viewModel.saveNotes(notesDraft) }
+                                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Quiet action pills row (Emoji / Rename / + Project or + Section).
                 item(key = "place-actions") {
                     Row(
                         modifier = Modifier
@@ -143,68 +249,49 @@ fun AreasProjectsScreen(
                                 accessibilityLabel = actionTitle(RegistryActionIds.AREA_CHANGE_EMOJI, languageTag),
                                 onClick = { emojiPickerOpen = true },
                             )
+                            PlaceActionChip(
+                                label = actionTitle(RegistryActionIds.AREA_NEW_PROJECT, languageTag),
+                                isDark = isDark,
+                                onClick = { dialog = PlacesDialog.CreateProject },
+                            )
+                        } else {
+                            PlaceActionChip(
+                                label = actionTitle(RegistryActionIds.SECTION_NEW, languageTag),
+                                isDark = isDark,
+                                onClick = { dialog = PlacesDialog.CreateSection },
+                            )
                         }
-                        Spacer(modifier = Modifier.weight(1f))
-                        TextButton(onClick = { dialog = PlacesDialog.RenamePlace(state.title) }) {
-                            Text(actionTitle(destination.renameAction(), languageTag))
-                        }
-                    }
-                }
-                item(key = "place-notes") {
-                    OutlinedTextField(
-                        value = notesDraft,
-                        onValueChange = { notesDraft = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = TaskCardMetrics.Margin),
-                        label = { Text(surfaceText(RegistryTaskAttributeIds.NOTES, "label", languageTag)) },
-                        minLines = 2,
-                    )
-                }
-                item(key = "save-notes") {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = TaskCardMetrics.Margin),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        TextButton(onClick = { viewModel.saveNotes(notesDraft) }) {
-                            Text(actionTitle(RegistryActionIds.PLACE_SAVE_NOTES, languageTag))
-                        }
+                        PlaceActionChip(
+                            label = actionTitle(destination.renameAction(), languageTag),
+                            isDark = isDark,
+                            onClick = { dialog = PlacesDialog.RenamePlace(state.title) },
+                        )
                     }
                 }
 
                 if (destination is AreasProjectsDestination.Area) {
                     item(key = "projects-heading") {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
+                        Text(
+                            text = surfaceText(RegistryPlacesScreenIds.AREA_PROJECTS_HEADING, "label", languageTag),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(
                                     start = TaskCardMetrics.HeaderLeading,
                                     end = TaskCardMetrics.Margin,
-                                    top = 12.dp,
+                                    top = 14.dp,
                                     bottom = 6.dp,
                                 ),
-                        ) {
-                            Text(
-                                text = surfaceText(RegistryPlacesScreenIds.AREA_PROJECTS_HEADING, "label", languageTag),
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f),
-                            )
-                            TextButton(onClick = { dialog = PlacesDialog.CreateProject }) {
-                                Text(actionTitle(RegistryActionIds.AREA_NEW_PROJECT, languageTag))
-                            }
-                        }
+                        )
                     }
                     if (state.projects.isEmpty()) {
                         item(key = "projects-empty") {
                             Text(
                                 text = surfaceText(RegistryPlacesScreenIds.EMPTY_AREA_PROJECTS, "title", languageTag),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = mutedInk,
                                 modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
                             )
                         }
@@ -222,26 +309,39 @@ fun AreasProjectsScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable { onOpenProject(project.id) }
-                                        .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 12.dp),
+                                        .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 11.dp),
                                 ) {
                                     Box(
                                         contentAlignment = Alignment.Center,
                                         modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
                                     ) {
-                                        SeptenaGlyph(
-                                            kind = SeptenaIconKind.Project,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            size = 18.dp,
+                                        ProjectProgressRingGlyph(
+                                            progress = project.progress,
+                                            tint = mutedInk,
+                                            size = 17.dp,
                                         )
                                     }
                                     Text(
                                         text = project.title,
-                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontSize = 16.sp,
+                                        lineHeight = 20.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.weight(1f),
                                     )
+                                    if (project.openCount > 0) {
+                                        Text(
+                                            text = project.openCount.toString(),
+                                            fontSize = 13.5.sp,
+                                            color = mutedInk.copy(alpha = 0.78f),
+                                            style = TextStyle(fontFeatureSettings = "tnum"),
+                                        )
+                                    }
                                     ChevronRightGlyph(
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                                        size = 14.dp,
+                                        tint = mutedInk.copy(alpha = 0.55f),
+                                        size = 13.dp,
                                     )
                                 }
                             }
@@ -270,7 +370,7 @@ fun AreasProjectsScreen(
                                 .padding(
                                     start = TaskCardMetrics.HeaderLeading,
                                     end = TaskCardMetrics.Margin,
-                                    top = 16.dp,
+                                    top = 14.dp,
                                     bottom = 6.dp,
                                 ),
                         )
@@ -280,7 +380,7 @@ fun AreasProjectsScreen(
                             Text(
                                 text = surfaceText(RegistryPlacesScreenIds.EMPTY_AREA_TASKS, "title", languageTag),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = mutedInk,
                                 modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
                             )
                         }
@@ -318,23 +418,27 @@ fun AreasProjectsScreen(
                         }
                     }
                     item(key = "area-quick-add") {
-                        QuickAddRow(
+                        InlineGlassQuickAddRow(
                             draft = areaTaskDraft,
                             onDraftChange = { areaTaskDraft = it },
-                            title = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
+                            placeholder = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
+                            isDark = isDark,
+                            hasActiveTexture = hasActiveTexture,
                             onAdd = {
                                 viewModel.createTask(areaTaskDraft)
                                 areaTaskDraft = ""
                             },
-                            modifier = Modifier.padding(horizontal = TaskCardMetrics.Margin, vertical = 8.dp),
                         )
                     }
                 }
 
                 if (destination is AreasProjectsDestination.Project) {
                     item(key = "project-tasks-heading") {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
+                        Text(
+                            text = surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .magicPlusSectionDrop(
@@ -352,28 +456,17 @@ fun AreasProjectsScreen(
                                 .padding(
                                     start = TaskCardMetrics.HeaderLeading,
                                     end = TaskCardMetrics.Margin,
-                                    top = 12.dp,
+                                    top = 14.dp,
                                     bottom = 6.dp,
                                 ),
-                        ) {
-                            Text(
-                                text = surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag),
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f),
-                            )
-                            TextButton(onClick = { dialog = PlacesDialog.CreateSection }) {
-                                Text(actionTitle(RegistryActionIds.SECTION_NEW, languageTag))
-                            }
-                        }
+                        )
                     }
                     if (visibleUnsectioned.isEmpty() && visibleSections.isEmpty()) {
                         item(key = "project-tasks-empty") {
                             Text(
                                 text = surfaceText(RegistryPlacesScreenIds.EMPTY_PROJECT_TASKS, "title", languageTag),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = mutedInk,
                                 modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
                             )
                         }
@@ -412,15 +505,16 @@ fun AreasProjectsScreen(
                         }
                     }
                     item(key = "project-quick-add") {
-                        QuickAddRow(
+                        InlineGlassQuickAddRow(
                             draft = projectTaskDraft,
                             onDraftChange = { projectTaskDraft = it },
-                            title = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
+                            placeholder = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
+                            isDark = isDark,
+                            hasActiveTexture = hasActiveTexture,
                             onAdd = {
                                 viewModel.createTask(projectTaskDraft)
                                 projectTaskDraft = ""
                             },
-                            modifier = Modifier.padding(horizontal = TaskCardMetrics.Margin, vertical = 8.dp),
                         )
                     }
                     item(key = "sections-heading") {
@@ -432,7 +526,7 @@ fun AreasProjectsScreen(
                             modifier = Modifier.padding(
                                 start = TaskCardMetrics.HeaderLeading,
                                 end = TaskCardMetrics.Margin,
-                                top = 16.dp,
+                                top = 14.dp,
                                 bottom = 4.dp,
                             ),
                         )
@@ -442,7 +536,7 @@ fun AreasProjectsScreen(
                             Text(
                                 text = surfaceText(RegistryPlacesScreenIds.EMPTY_PROJECT_SECTIONS, "title", languageTag),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = mutedInk,
                                 modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
                             )
                         }
@@ -538,26 +632,102 @@ fun AreasProjectsScreen(
 }
 
 @Composable
-private fun QuickAddRow(
+private fun PlaceActionChip(
+    label: String,
+    isDark: Boolean,
+    onClick: () -> Unit,
+) {
+    val bg = if (isDark) Color.White.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.72f)
+    val border = if (isDark) Color.White.copy(alpha = 0.12f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(bg)
+            .border(0.65.dp, border, CircleShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    ) {
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+        )
+    }
+}
+
+/** Calm translucent glass inline `+ New task` input matching iOS card rhythm. */
+@Composable
+private fun InlineGlassQuickAddRow(
     draft: String,
     onDraftChange: (String) -> Unit,
-    title: String,
+    placeholder: String,
+    isDark: Boolean,
+    hasActiveTexture: Boolean,
     onAdd: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    val accent = MaterialTheme.colorScheme.primary
+    val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
+    TaskCardSlice(
+        position = TaskCardPosition.Solo,
+        isSelected = false,
+        isDark = isDark,
+        hasActiveTexture = hasActiveTexture,
     ) {
-        OutlinedTextField(
-            value = draft,
-            onValueChange = onDraftChange,
-            modifier = Modifier.weight(1f),
-            singleLine = true,
-            label = { Text(title) },
-        )
-        Button(enabled = draft.isNotBlank(), onClick = onAdd) { Text(title) }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 10.dp),
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
+            ) {
+                PlusSmallGlyph(tint = if (draft.isNotBlank()) accent else mutedInk.copy(alpha = 0.7f), size = 14.dp)
+            }
+            Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
+            Box(modifier = Modifier.weight(1f)) {
+                if (draft.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        fontSize = 15.sp,
+                        lineHeight = 20.sp,
+                        color = mutedInk.copy(alpha = 0.60f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                BasicTextField(
+                    value = draft,
+                    onValueChange = onDraftChange,
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 15.sp,
+                        lineHeight = 20.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    cursorBrush = SolidColor(accent),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (draft.isNotBlank()) onAdd() }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (draft.isNotBlank()) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = placeholder,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = accent,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onAdd)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+            }
+        }
     }
 }
 
@@ -567,7 +737,7 @@ private fun PlaceTaskItem(
     position: TaskCardPosition,
     completeTitle: String,
     todayTitle: String,
-    todayTint: androidx.compose.ui.graphics.Color,
+    todayTint: Color,
     fadedTitle: String,
     isDark: Boolean,
     hasActiveTexture: Boolean,
@@ -608,7 +778,7 @@ private fun PlaceSectionBlock(
     languageTag: String,
     completeTitle: String,
     todayTitle: String,
-    todayTint: androidx.compose.ui.graphics.Color,
+    todayTint: Color,
     fadedTitle: String,
     isDark: Boolean,
     hasActiveTexture: Boolean,
@@ -625,6 +795,11 @@ private fun PlaceSectionBlock(
     onDelete: () -> Unit,
     onMagicPlusDrop: ((QuickAddDraft) -> Unit)? = null,
 ) {
+    var menuOpen by remember(section.id) { mutableStateOf(false) }
+    val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
+    val destructiveRed = if (isDark) Color(0xFFFF453A) else Color(0xFFFF3B30)
+    val menuBg = if (isDark) MaterialTheme.colorScheme.surfaceContainerHigh else Color(0xF7FFFFFF)
+
     Column {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -646,8 +821,8 @@ private fun PlaceSectionBlock(
                 .padding(
                     start = TaskCardMetrics.HeaderLeading,
                     end = TaskCardMetrics.Margin,
-                    top = 16.dp,
-                    bottom = 6.dp,
+                    top = 14.dp,
+                    bottom = 4.dp,
                 ),
         ) {
             Text(
@@ -655,20 +830,70 @@ private fun PlaceSectionBlock(
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = onRename) {
-                Text(actionTitle(RegistryActionIds.SECTION_RENAME, languageTag))
-            }
-            TextButton(onClick = onDelete) {
-                Text(actionTitle(RegistryActionIds.SECTION_DELETE, languageTag))
+            Box {
+                IconButton(
+                    onClick = { menuOpen = true },
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    MoreDotsGlyph(tint = mutedInk.copy(alpha = 0.72f), size = 16.dp)
+                }
+                DropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { menuOpen = false },
+                    shape = RoundedCornerShape(14.dp),
+                    containerColor = menuBg,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 10.dp,
+                    modifier = Modifier.width(210.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                menuOpen = false
+                                onRename()
+                            }
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                    ) {
+                        Text(
+                            text = actionTitle(RegistryActionIds.SECTION_RENAME, languageTag),
+                            fontSize = 15.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                menuOpen = false
+                                onDelete()
+                            }
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                    ) {
+                        Text(
+                            text = actionTitle(RegistryActionIds.SECTION_DELETE, languageTag),
+                            fontSize = 15.sp,
+                            color = destructiveRed,
+                        )
+                    }
+                }
             }
         }
         if (section.tasks.isEmpty()) {
             Text(
                 text = surfaceText(RegistryPlacesScreenIds.EMPTY_SECTION_TASKS, "title", languageTag),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = mutedInk,
                 modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
             )
         } else {
@@ -705,12 +930,13 @@ private fun PlaceSectionBlock(
                 )
             }
         }
-        QuickAddRow(
+        InlineGlassQuickAddRow(
             draft = taskDraft,
             onDraftChange = onTaskDraftChange,
-            title = actionTitle(RegistryActionIds.SECTION_NEW_TASK, languageTag),
+            placeholder = actionTitle(RegistryActionIds.SECTION_NEW_TASK, languageTag),
+            isDark = isDark,
+            hasActiveTexture = hasActiveTexture,
             onAdd = onAddTask,
-            modifier = Modifier.padding(horizontal = TaskCardMetrics.Margin, vertical = 6.dp),
         )
     }
 }

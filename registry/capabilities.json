@@ -51,7 +51,7 @@
     "agents.stop-pause": { "title": "Stop one task, pause all agents", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "sync.backend": { "title": "Sync through api.septena.app", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "planned" },
     "account.delete": { "title": "Delete account", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "task.times": { "title": "Start time and duration on a task", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
+    "task.times": { "title": "Start time and duration on a task", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "calendar.feed": { "title": "Private read-only calendar feed (.ics)", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
     "widgets.tasks": { "title": "Today and Upcoming widgets", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "not_applicable", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
     "watch.app": { "title": "Apple Watch app", "ios": "not_applicable", "ipados": "not_applicable", "macos": "not_applicable", "web": "not_applicable", "android": "not_applicable", "windows": "not_applicable", "watchos": "ships" },
