@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "septena-web",
+  // The Septena Cloudflare account (ADR 0018), same as backend/wrangler.toml.
+  "account_id": "1d2ed1f57832a528b7f197b5a9d68d39",
+  "compatibility_date": "2026-11-25",
+  "assets": {
+    "directory": "./out",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    {
+      "pattern": "web.septena.app",
+      "custom_domain": true
+    }
+  ]
+}

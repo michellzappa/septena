@@ -70,6 +70,14 @@ mkdir -p "$wasm_dir"
 tar -xzf "$tmp/$wasm_name" -C "$wasm_dir"
 printf '%s\n' "$version" > "$wasm_dir/VERSION"
 
+# The web client (web/) runs the same WASM release in the browser (C2, #248).
+if [ -d "$root/web" ]; then
+  web_wasm_lib="$root/web/src/lib/core/wasm"
+  rm -rf "$web_wasm_lib"
+  mkdir -p "$web_wasm_lib"
+  cp "$wasm_dir/septena_core_wasm.js" "$wasm_dir/septena_core_wasm.d.ts" "$wasm_dir/septena_core_wasm_bg.wasm" "$wasm_dir/VERSION" "$web_wasm_lib/"
+fi
+
 # Android and the JVM (C1, #247): the UniFFI Kotlin bindings are source and
 # are committed; the native libraries come from release.json at build time
 # (android/app/build.gradle.kts, task fetchCoreJniLibs).
