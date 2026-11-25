@@ -35,11 +35,12 @@ object TaskFadeRules {
         now: Instant,
         today: String,
         isAwaitingHuman: Boolean = false,
+        isProposal: Boolean = false,
         zone: ZoneId = ZoneId.systemDefault(),
     ): Boolean = coreShouldFade(
         input(
             isOpen, isHeading, isDeleted, isFaded, deadline, scheduled, hasRecurrence, isAgentTurn,
-            isAssignedToClaude, isAwaitingHuman, false, touchedAt, createdAt, created, now, today, zone,
+            isAssignedToClaude, isAwaitingHuman, false, isProposal, touchedAt, createdAt, created, now, today, zone,
         ),
     )
 
@@ -60,11 +61,13 @@ object TaskFadeRules {
         now: Instant,
         today: String,
         isAwaitingHuman: Boolean = false,
+        isProposal: Boolean = false,
         zone: ZoneId = ZoneId.systemDefault(),
     ): Double? = coreFadeFill(
         input(
             isOpen, isHeading, isDeleted, isFaded, deadline, scheduled, hasRecurrence, isAgentTurn,
-            isAssignedToClaude, isAwaitingHuman, showsAgentCue, touchedAt, createdAt, created, now, today, zone,
+            isAssignedToClaude, isAwaitingHuman, showsAgentCue, isProposal, touchedAt, createdAt, created, now, today,
+            zone,
         ),
     )
 
@@ -80,6 +83,7 @@ object TaskFadeRules {
         isAssignedToClaude: Boolean,
         isAwaitingHuman: Boolean,
         showsAgentCue: Boolean,
+        isProposal: Boolean,
         touchedAt: Instant?,
         createdAt: Instant?,
         created: String?,
@@ -98,6 +102,7 @@ object TaskFadeRules {
         isAssignedToClaude = isAssignedToClaude,
         isAwaitingHuman = isAwaitingHuman,
         showsAgentCue = showsAgentCue,
+        isProposal = isProposal,
         touchedAt = touchedAt?.toString(),
         createdAt = createdAt?.toString(),
         created = created,

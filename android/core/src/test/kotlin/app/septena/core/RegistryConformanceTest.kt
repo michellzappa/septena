@@ -124,6 +124,8 @@ class RegistryConformanceTest {
                 created = input.stringAt("created"),
                 now = Instant.parse(input.requiredString("now")),
                 today = input.requiredString("today"),
+                isAwaitingHuman = input.booleanAt("isAwaitingHuman") ?: false,
+                isProposal = input.booleanAt("isProposal") ?: false,
                 zone = ZoneId.of("UTC"),
             )
             assertEquals(

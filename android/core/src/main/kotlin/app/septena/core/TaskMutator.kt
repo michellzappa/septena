@@ -464,14 +464,21 @@ class TaskMutator(
     /**
      * Faded ▸ Keep (docs/TASK_FADE_SPEC.md §4, as iOS TasksBackend.touch):
      * the user touched the task, so its fade clock restarts and it returns
-     * to its list.
+     * to its list. Keeping an agent's proposal accepts it (ADR 0039).
      */
-    suspend fun keepFaded(id: String): TaskRecord? = touch(id)
+    suspend fun keepFaded(id: String): TaskRecord? {
+        touch(id) ?: return null
+        return acknowledge(id)
+    }
 
-    /** Faded ▸ Let Go (spec §5, as iOS dropFaded): cancel it with dropReason "faded"; it goes to the Logbook. */
+    /**
+     * Faded ▸ Let Go (spec §5, as iOS dropFaded): cancel it with dropReason "faded"; it goes to the Logbook.
+     * A task that came back since the row was drawn is left as is.
+     */
     suspend fun letGoFaded(id: String): TaskRecord? {
         val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
         if (existing.deletedAt != null || existing.status != TaskStatus.OPEN) return null
+        if (!TaskFadeRules.isFaded(existing.fields[RegistryEntityFields.Task.FADED_AT].stringValue())) return existing
         return updateFields(
             id,
             linkedMapOf(
@@ -515,6 +522,7 @@ class TaskMutator(
                     now = now,
                     today = today,
                     isAwaitingHuman = convo?.awaitsHuman == true,
+                    isProposal = TaskProvenance.isProposal(task.source, task.acknowledgedAt),
                 )
             }.getOrDefault(false)
             if (!fades) continue

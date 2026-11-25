@@ -21,6 +21,8 @@ data class ConversationSnapshotState(
     val awaitsHuman: Boolean,
     val isClaimed: Boolean,
     val agentStage: String?,
+    /** The Review group an open task is in because of its conversation ([ReviewGroupIds]), or null. */
+    val reviewGroup: String?,
 ) {
     /** Matches core `deriveConversation(...).badge == "working"`. */
     val isAgentWorking: Boolean get() = agentStage == "working"
@@ -55,6 +57,7 @@ data class TaskConversation(
             awaitsHuman = s.awaitsHuman,
             isClaimed = s.isClaimed,
             agentStage = s.agentStage,
+            reviewGroup = s.reviewGroup,
         )
     }
 
@@ -67,7 +70,7 @@ data class TaskConversation(
     /** An agent holds a live claim on the task (it is working now). */
     fun isClaimed(now: Instant = Instant.now()): Boolean = state(now).isClaimed
 
-    /** The Agent list stage (queued, working, yourTurn, review, done), or null when not agent work. */
+    /** The Agent list stage (queued, working, yourTurn, stopped, review, done), or null when not agent work. */
     fun agentStage(now: Instant = Instant.now()): String? = state(now).agentStage
 
     /** The agent holds the turn (the row shows "working"): it does not fade. */
@@ -90,6 +93,11 @@ data class TaskConversation(
     )
 
     companion object {
+        /** The conversation hands the task to the user to check. The end state alone decides it, so no turns are read. */
+        fun needsHumanReview(record: SyncRecord): Boolean =
+            record.deletedAt == null && record.fields["endState"].stringValue() != null &&
+                from(record, emptyList()).needsHumanReview
+
         fun from(record: SyncRecord, turns: List<SyncTurn>): TaskConversation {
             require(record.entity == "convo") { "Expected a conversation record" }
             val fields = record.fields
