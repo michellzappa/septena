@@ -2,8 +2,8 @@ import SwiftUI
 import SwiftData
 
 // The settings mirror cache — extracted from SettingsView.swift so both
-// shells compile it (Septask injects it for the profile name, telemetry
-// level, and What's New; docs/SEPTASK.md). No view types referenced.
+// shells compile it (Septask injects it for the profile name
+// and What's New; docs/SEPTASK.md). No view types referenced.
 
 // MARK: - Store
 //
@@ -43,7 +43,6 @@ final class SettingsStore {
         let context = LocalStore.shared.container.mainContext
         self.reloadFromMirror(context: context)
         self.reconcileWelcomeName(context: context, engine: nil)
-        self.reconcileTelemetryLevel(context: context, engine: nil)
         self.reconcileHiddenCalendars(context: context, engine: nil)
       }
     }
@@ -67,11 +66,6 @@ final class SettingsStore {
     // first frame's greeting is right. No engine here (init context), so the
     // local→cloud migration leg is deferred to the launch reconcile.
     reconcileWelcomeName(context: context, engine: nil)
-    // Same bridge for the analytics privacy level: adopt an inbound synced level
-    // into the local @AppStorage mirror so `TelemetryClient` gates correctly from
-    // the first frame. Inbound-only here (no engine); the launch task pushes a
-    // legacy/default level up.
-    reconcileTelemetryLevel(context: context, engine: nil)
     // Inbound-only at init (no engine): if a synced `onboardedAt` is already
     // in the local mirror, adopt it into the device-local flag now so the
     // welcome gate decides synchronously on the first frame and never waits
@@ -126,24 +120,6 @@ final class SettingsStore {
     SettingsMirror.upsert(settings: s, context: context, engine: engine)
   }
 
-  /// Set the analytics privacy level. Writes the device-local `@AppStorage`
-  /// mirror (`SettingsKey.telemetryLevel`, read synchronously by
-  /// `TelemetryClient` to gate what it sends) AND the CloudKit-synced
-  /// `telemetryLevel` payload (so the choice follows the user across devices).
-  /// Mirrors the `setWelcomeName` write pattern. Also emits
-  /// the operational level-change ping (sent even for `.none`, so opt-out counts
-  /// stay knowable).
-  func setTelemetryLevel(_ level: TelemetryClient.TelemetryLevel,
-                         context: ModelContext, engine: CKEngine?) {
-    UserDefaults.standard.set(level.rawValue, forKey: SettingsKey.telemetryLevel)
-    Task { await TelemetryClient.shared.recordLevelChange(level) }
-    guard serverSettings?.telemetryLevel != level.rawValue else { return }
-    var s = serverSettings ?? AppSettings()
-    s.telemetryLevel = level.rawValue
-    serverSettings = s
-    SettingsMirror.upsert(settings: s, context: context, engine: engine)
-  }
-
   /// "Pause all agents". Synced account-wide; the task backend enforces it.
   var agentsPaused: Bool { serverSettings?.agentsPaused == true }
 
@@ -155,39 +131,11 @@ final class SettingsStore {
     SettingsMirror.upsert(settings: s, context: context, engine: engine)
   }
 
-  /// Reconcile the synced privacy level with the device-local `@AppStorage`
-  /// mirror `TelemetryClient` reads. Same inbound/outbound shape as
-  /// `reconcileWelcomeName`:
-  /// - A synced value wins: copy it into the local mirror so a level chosen on
-  ///   another device takes effect here.
-  /// - No synced value yet: resolve the effective local level (honoring a local
-  ///   pick or the legacy `shareUsageData` bool, else `.balanced`), materialize
-  ///   it into the mirror so the picker binds to a concrete value, and push it
-  ///   up so it syncs. The push enqueues a CloudKit save, so it only runs with a
-  ///   non-nil `engine` (the launch path); the init/paint path passes nil.
-  func reconcileTelemetryLevel(context: ModelContext, engine: CKEngine?) {
-    let key = SettingsKey.telemetryLevel
-    if let synced = serverSettings?.telemetryLevel,
-       TelemetryClient.TelemetryLevel(rawValue: synced) != nil {
-      if UserDefaults.standard.string(forKey: key) != synced {
-        UserDefaults.standard.set(synced, forKey: key)
-      }
-      return
-    }
-    let effective = TelemetryClient.currentLevel()
-    if UserDefaults.standard.string(forKey: key) != effective.rawValue {
-      UserDefaults.standard.set(effective.rawValue, forKey: key)
-    }
-    if engine != nil {
-      setTelemetryLevel(effective, context: context, engine: engine)
-    }
-  }
-
   /// Show or hide one calendar (by `EKCalendar.title`) from the day timeline /
   /// Next feed. Writes `CalendarBridge`'s local cache (the authority EventKit
   /// fetches filter on) AND the CloudKit-synced `calendarHiddenTitles` payload,
   /// so the selection follows the user across devices. Mirrors the
-  /// `setTelemetryLevel` write shape.
+  /// `setWelcomeName` write shape.
   func setCalendarHidden(_ hidden: Bool, title: String,
                          context: ModelContext, engine: CKEngine?) {
     var titles = CalendarBridge.shared.hiddenCalendarTitles
@@ -202,7 +150,7 @@ final class SettingsStore {
   }
 
   /// Reconcile the synced hidden-calendar selection with `CalendarBridge`'s
-  /// local cache. Same inbound/outbound shape as `reconcileTelemetryLevel`:
+  /// local cache. Same inbound/outbound shape as `reconcileWelcomeName`:
   /// - A synced value wins: adopt it into the bridge so a selection made on
   ///   another device takes effect here.
   /// - No synced value yet: migrate any legacy local selection (via

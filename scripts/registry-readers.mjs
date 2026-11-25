@@ -157,8 +157,8 @@ export function checkReaders(repo) {
     }
   }
   const tsGen = fs.readFileSync(path.join(repo, "backend/src/generated/registries.ts"), "utf8").split("\n");
-  const tsHand = readAll(["backend/src", "backend/test", "backend/scripts"]
-    .flatMap((d) => walk(path.join(repo, d), [".ts", ".mjs", ".js"])));
+  const tsHand = readAll(["backend/src", "backend/test", "backend/scripts", "web/src", "web/test"]
+    .flatMap((d) => walk(path.join(repo, d), [".ts", ".tsx", ".mjs", ".js"])));
 
   const ktGen = fs.readFileSync(path.join(repo, "android/core/src/main/kotlin/app/septena/core/generated/RegistryConstants.kt"), "utf8").split("\n");
   const ktHand = readAll(walk(path.join(repo, "android"), [".kt"]));

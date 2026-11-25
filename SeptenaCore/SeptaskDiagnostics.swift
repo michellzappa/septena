@@ -2,8 +2,7 @@ import Foundation
 
 /// A deliberately small, opt-in weekly snapshot for product diagnostics.
 ///
-/// This is separate from `TelemetryClient`: it never contains task content,
-/// counts, or account identifiers. It carries a random local installation
+/// It never contains task content, counts, or account identifiers. It carries a random local installation
 /// token only so the worker can de-duplicate one weekly report per install.
 public struct SeptaskDiagnosticsBatch: Codable, Equatable, Sendable {
     public struct App: Codable, Equatable, Sendable {

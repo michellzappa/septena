@@ -281,7 +281,8 @@ import Testing
     #expect(RegistryNotices.maxConcurrentExplainers == 1)
     #expect(RegistryPrompts.fixed[.deleteSection]?.confirmTitle == "Delete Section")
     #expect(RegistryCapabilities.status("lists.today", on: "macos") == "ships")
-    #expect(!RegistryCapabilities.isAvailable("lists.today", on: "web"))
+    #expect(RegistryCapabilities.isAvailable("lists.today", on: "web"))
+    #expect(!RegistryCapabilities.isAvailable("lists.today", on: "windows"))
     // Ensure iPad excludes macOS-only ⌃⌘S sidebar shortcut
     let sidebar = RegistryActions.shortcutsGeneral.first { $0.actionId == .appToggleSidebar }
     #expect(sidebar?.keycaps == ["⌃", "⌘", "S"])

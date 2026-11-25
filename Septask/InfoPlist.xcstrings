@@ -1,0 +1,61 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSCalendarsFullAccessUsageDescription" : {
+      "comment" : "Explains why Septena requests full calendar access.",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Septena shows today's calendar events above your task list." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Septena zeigt die heutigen Kalenderereignisse über deiner Aufgabenliste an." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Septena muestra los eventos del calendario de hoy encima de tu lista de tareas." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Septena affiche les événements de calendrier du jour au-dessus de votre liste de tâches." } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Septena toont de agenda-items van vandaag boven je takenlijst." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena mostra os eventos de hoje acima da sua lista de tarefas." } }
+      }
+    },
+    "NSCalendarsUsageDescription" : {
+      "comment" : "Explains why Septena requests calendar access.",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Septena shows today's calendar events above your task list." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Septena zeigt die heutigen Kalenderereignisse über deiner Aufgabenliste an." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Septena muestra los eventos del calendario de hoy encima de tu lista de tareas." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Septena affiche les événements de calendrier du jour au-dessus de votre liste de tâches." } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Septena toont de agenda-items van vandaag boven je takenlijst." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena mostra os eventos de hoje acima da sua lista de tarefas." } }
+      }
+    },
+    "NSCameraUsageDescription" : {
+      "comment" : "Explains why Septena requests camera access to scan sign-in codes.",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Septena uses the camera to scan sign-in codes from your other devices." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Septena verwendet die Kamera, um Anmeldecodes von deinen anderen Geräten zu scannen." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Septena usa la cámara para escanear códigos de inicio de sesión de tus otros dispositivos." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Septena utilise l’appareil photo pour scanner les codes de connexion de vos autres appareils." } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Septena gebruikt de camera om aanmeldcodes van je andere apparaten te scannen." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena usa a câmera para ler códigos de acesso dos seus outros dispositivos." } }
+      }
+    },
+    "NSRemindersFullAccessUsageDescription" : {
+      "comment" : "Explains why Septena requests full Reminders access.",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Septena moves reminders from your Reminders lists into the Inbox and deletes them from Reminders." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Septena verschiebt Erinnerungen aus deinen Erinnerungslisten in den Eingang und löscht sie aus Erinnerungen." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Septena mueve los recordatorios de tus listas a la bandeja de entrada y los elimina de Recordatorios." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Septena déplace les rappels de vos listes Rappels vers la boîte de réception et les supprime de Rappels." } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Septena verplaatst herinneringen uit je Herinneringen-lijsten naar je Postvak IN en verwijdert ze uit Herinneringen." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena move lembretes das suas listas do Lembretes para a Entrada e os apaga do Lembretes." } }
+      }
+    },
+    "NSRemindersUsageDescription" : {
+      "comment" : "Explains why Septena requests Reminders access.",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Septena moves reminders from your Reminders lists into the Inbox and deletes them from Reminders." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Septena verschiebt Erinnerungen aus deinen Erinnerungslisten in den Eingang und löscht sie aus Erinnerungen." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Septena mueve los recordatorios de tus listas a la bandeja de entrada y los elimina de Recordatorios." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Septena déplace les rappels de vos listes Rappels vers la boîte de réception et les supprime de Rappels." } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Septena verplaatst herinneringen uit je Herinneringen-lijsten naar je Postvak IN en verwijdert ze uit Herinneringen." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena move lembretes das suas listas do Lembretes para a Entrada e os apaga do Lembretes." } }
+      }
+    }
+  },
+  "version" : "1.1"
+}

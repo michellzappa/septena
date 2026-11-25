@@ -202,6 +202,9 @@ export const ENTITIES = {
       dropReason: text(16),
       // The capture-cleanup size estimate (spec §9).
       effort: text(16),
+      // Shared projects: the member id of the person who does this task
+      // (docs/PROJECT_SHARING_SPEC.md §3). Null = nobody in particular.
+      assignedTo: text(64),
     },
     requiredOnInsert: ["title", "status"],
   },
@@ -241,6 +244,9 @@ export const ENTITIES = {
       // Retired (2026-11-21): kept so older clients' pushes still validate.
       attachment: json(zAttachmentPointer),
       position: int(),
+      // Who shares this project (store/shares.ts `ShareInfo`). Null = private.
+      // Never pushed.
+      share: { kind: "json", zod: z.never() },
     },
     requiredOnInsert: ["title", "status"],
   },
