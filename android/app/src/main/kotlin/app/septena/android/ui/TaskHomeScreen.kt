@@ -112,6 +112,8 @@ fun TaskHomeScreen(
     var openedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var openedTaskAttribute by rememberSaveable { mutableStateOf<String?>(null) }
     var openedTaskSendBack by rememberSaveable { mutableStateOf(false) }
+    /** The task whose Add Reference dialog is open (row menu). */
+    var referenceTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var quickFindOpen by rememberSaveable { mutableStateOf(false) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     // On mobile, opens on Today with the Lists Homepage one Back away (Things / iOS `SeptaskRootView`).
@@ -186,6 +188,7 @@ fun TaskHomeScreen(
             RegistryCatalog.actionOpensAttribute(actionId) != null ->
                 openTaskWithAttribute(id, RegistryCatalog.actionOpensAttribute(actionId))
             actionId == RegistryActionIds.TASK_TOGGLE_STAR -> homeViewModel.toggleStar(id)
+            actionId == RegistryActionIds.TASK_ADD_REFERENCE -> referenceTaskId = id
             actionId == RegistryActionIds.TASK_DUPLICATE -> homeViewModel.duplicate(id)
             actionId == RegistryActionIds.TASK_SHARE -> homeViewModel.shareText(id) { shareText ->
                 val intent = Intent(Intent.ACTION_SEND).apply {
@@ -318,6 +321,10 @@ fun TaskHomeScreen(
 
     val isDark = LocalSeptenaDarkTheme.current
     val appearance = LocalAppearance.current
+
+    referenceTaskId?.let { id ->
+        AddReferenceDialog(graph = graph, taskId = id, onDismiss = { referenceTaskId = null })
+    }
 
     homeQuickAddDraft?.let { initialDraft ->
         QuickAddSheet(
@@ -1331,6 +1338,7 @@ private fun taskRowMenuGroups(
             RegistryActionIds.TASK_TAGS,
             RegistryActionIds.TASK_DEADLINE,
             RegistryActionIds.TASK_TOGGLE_STAR,
+            RegistryActionIds.TASK_ADD_REFERENCE,
             RegistryActionIds.TASK_DUPLICATE,
             RegistryActionIds.TASK_SHARE,
             RegistryActionIds.TASK_SELECT,
@@ -1370,6 +1378,7 @@ private fun actionMenuIcon(actionId: String): TaskMenuActionIcon = when (actionI
     RegistryActionIds.TASK_DEADLINE -> TaskMenuActionIcon.Deadline
     RegistryActionIds.TASK_TOGGLE_STAR -> TaskMenuActionIcon.Star
     RegistryActionIds.TASK_OPEN -> TaskMenuActionIcon.Open
+    RegistryActionIds.TASK_ADD_REFERENCE -> TaskMenuActionIcon.AddReference
     RegistryActionIds.TASK_DUPLICATE -> TaskMenuActionIcon.Duplicate
     RegistryActionIds.TASK_SHARE -> TaskMenuActionIcon.Share
     RegistryActionIds.TASK_SELECT -> TaskMenuActionIcon.Select

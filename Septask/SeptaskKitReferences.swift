@@ -9,7 +9,8 @@ import SwiftData
 
 // MARK: - Block
 
-/// The rows of one task's references. The host hides the block when it is empty.
+/// The rows of one task's references, then the links of its text that are not
+/// references yet (`TaskRefRows.suggestions`). The host hides it when it is empty.
 @MainActor
 final class KitReferencesView: NSView {
   /// `rows` in the inspector; `chips` in the composer, drawn as its attachments are.
@@ -18,9 +19,12 @@ final class KitReferencesView: NSView {
   private let style: Style
   private let stack = NSStackView()
   private var rows: [TaskRefRow] = []
-  var isEmpty: Bool { rows.isEmpty }
-  /// The rows' height, for a host that computes its own (the composer).
-  var preferredHeight: CGFloat { rows.isEmpty ? 0 : ceil(stack.fittingSize.height) }
+  private var suggestions: [TaskRefRows.Offer] = []
+  var isEmpty: Bool { rows.isEmpty && suggestions.isEmpty }
+  /// The content's height, for a host that computes its own (the composer).
+  var preferredHeight: CGFloat { isEmpty ? 0 : ceil(stack.fittingSize.height) }
+  /// A click on a suggestion.
+  var onTakeSuggestion: ((TaskRefRows.Offer) -> Void)?
 
   init(style: Style = .rows) {
     self.style = style
@@ -40,11 +44,22 @@ final class KitReferencesView: NSView {
 
   required init?(coder: NSCoder) { fatalError("KitReferencesView is code-only") }
 
-  func configure(rows next: [TaskRefRow]) {
-    guard next != rows else { return }
+  func configure(rows next: [TaskRefRow], suggestions offers: [TaskRefRows.Offer]) {
+    guard next != rows || offers != suggestions else { return }
     rows = next
+    suggestions = offers
     stack.kitReplaceArrangedSubviews(with: rows.map { KitReferenceRowView(row: $0, isChip: style == .chips) },
                                      fillsWidth: style == .rows)
+    stack.kitAddArrangedSubviews(suggestions.map { offer in
+      KitReferenceSuggestionButton(offer: offer) { [weak self] in self?.onTakeSuggestion?(offer) }
+    }, fillsWidth: false)
+  }
+
+  /// Both hosts read the store and the text on screen the same way.
+  func reload(taskID: String, title: String, notes: String?) {
+    let context = LocalStore.shared.container.mainContext
+    configure(rows: LocalCache.taskRefRows(forTaskID: taskID, in: context),
+              suggestions: TaskRefActions.suggestions(taskID: taskID, title: title, notes: notes))
   }
 }
 
@@ -176,6 +191,68 @@ private final class KitReferenceHitButton: NSButton {
   override func menu(for event: NSEvent) -> NSMenu? { menuProvider?() }
 }
 
+/// One suggested link: a faint dashed chip with a plus. A click adds it.
+@MainActor
+private final class KitReferenceSuggestionButton: NSButton {
+  private let onPress: () -> Void
+  private let outline = CAShapeLayer()
+
+  init(offer: TaskRefRows.Offer, onPress: @escaping () -> Void) {
+    self.onPress = onPress
+    super.init(frame: .zero)
+    translatesAutoresizingMaskIntoConstraints = false
+    isBordered = false
+    refusesFirstResponder = true
+    title = offer.title
+    font = SeptaskKitTheme.chip
+    contentTintColor = SeptaskKitTheme.inkSecondary
+    image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+    imagePosition = .imageLeading
+    imageHugsTitle = true
+    lineBreakMode = .byTruncatingMiddle
+    setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    target = self
+    action = #selector(press)
+    let label = RegistryTaskReferences.suggestion(name: offer.title)
+    toolTip = label
+    setAccessibilityLabel(label)
+    wantsLayer = true
+    outline.fillColor = nil
+    outline.lineWidth = 0.75
+    outline.lineDashPattern = [3, 3]
+    layer?.addSublayer(outline)
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitReferenceSuggestionButton is code-only") }
+
+  /// Room for the outline around the title.
+  override var intrinsicContentSize: NSSize {
+    let size = super.intrinsicContentSize
+    return NSSize(width: size.width + 16, height: size.height + 6)
+  }
+
+  override func layout() {
+    super.layout()
+    let rect = bounds.insetBy(dx: 0.5, dy: 0.5)
+    outline.frame = bounds
+    outline.path = CGPath(roundedRect: rect, cornerWidth: min(6, rect.width / 2),
+                          cornerHeight: min(6, rect.height / 2), transform: nil)
+    effectiveAppearance.performAsCurrentDrawingAppearance {
+      outline.strokeColor = NSColor.secondaryLabelColor.withAlphaComponent(0.4).cgColor
+    }
+  }
+
+  override func viewDidChangeEffectiveAppearance() {
+    super.viewDidChangeEffectiveAppearance()
+    needsLayout = true
+  }
+
+  override func resetCursorRects() { addCursorRect(bounds, cursor: .pointingHand) }
+
+  @objc private func press() { onPress() }
+}
+
 private extension NSStackView {
   /// Rows in place of what the stack showed: full width, or no wider than it.
   func kitReplaceArrangedSubviews(with views: [NSView], fillsWidth: Bool = true) {
@@ -183,6 +260,10 @@ private extension NSStackView {
       removeArrangedSubview(view)
       view.removeFromSuperview()
     }
+    kitAddArrangedSubviews(views, fillsWidth: fillsWidth)
+  }
+
+  func kitAddArrangedSubviews(_ views: [NSView], fillsWidth: Bool) {
     for view in views {
       addArrangedSubview(view)
       let inset = -edgeInsets.left - edgeInsets.right

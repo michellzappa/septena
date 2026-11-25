@@ -1002,6 +1002,28 @@ private fun TaskMenuActionGlyph(
             }
             drawPath(arrow, tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
+        TaskMenuActionIcon.AddReference -> Canvas(modifier = Modifier.size(size)) {
+            val w = this.size.width
+            val h = this.size.height
+            val stroke = (w * 0.095f).coerceAtLeast(1.3.dp.toPx())
+            // Two chain links on a diagonal, and a plus (iOS `link.badge.plus`).
+            val links = Path().apply {
+                moveTo(w * 0.40f, h * 0.34f)
+                lineTo(w * 0.52f, h * 0.22f)
+                quadraticTo(w * 0.66f, h * 0.10f, w * 0.78f, h * 0.22f)
+                quadraticTo(w * 0.90f, h * 0.34f, w * 0.78f, h * 0.48f)
+                lineTo(w * 0.68f, h * 0.58f)
+                moveTo(w * 0.32f, h * 0.42f)
+                lineTo(w * 0.22f, h * 0.52f)
+                quadraticTo(w * 0.10f, h * 0.66f, w * 0.22f, h * 0.78f)
+                quadraticTo(w * 0.34f, h * 0.90f, w * 0.48f, h * 0.78f)
+                moveTo(w * 0.36f, h * 0.64f)
+                lineTo(w * 0.62f, h * 0.38f)
+            }
+            drawPath(links, tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            drawLine(tint, Offset(w * 0.76f, h * 0.66f), Offset(w * 0.76f, h * 0.94f), strokeWidth = stroke, cap = StrokeCap.Round)
+            drawLine(tint, Offset(w * 0.62f, h * 0.80f), Offset(w * 0.90f, h * 0.80f), strokeWidth = stroke, cap = StrokeCap.Round)
+        }
         TaskMenuActionIcon.Duplicate -> Canvas(modifier = Modifier.size(size)) {
             val w = this.size.width
             val h = this.size.height

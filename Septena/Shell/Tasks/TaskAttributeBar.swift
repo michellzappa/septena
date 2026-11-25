@@ -41,8 +41,9 @@ struct TaskAttributeBar: View {
   /// its panel.
   var showsChecklist: Bool = true
   var showsAttachments: Bool = true
-  /// The task page's `references` block is on at this depth. It
-  /// shows for a task that has references.
+  /// The task page's `references` block is on at this depth. The page always
+  /// shows it, with Add Reference. The inline editor shows it for a task that
+  /// has references or suggestions.
   var showsReferences: Bool = false
   /// The task page's `history` block is on at this depth (page only).
   var showsHistory: Bool = false
@@ -144,6 +145,8 @@ struct TaskAttributeBar: View {
   @State private var discussWorking = false
   /// The Add Reference sheet, from the References block.
   @State private var addingReference = false
+  /// The links of the draft's text that are not references yet.
+  @State private var suggestions: [TaskRefRows.Offer] = []
   /// The Checklist pill was tapped on a task with no steps yet. A task WITH
   /// steps shows its checklist without this (same as the Mac composer).
   @State private var checklistOpened = false
@@ -188,10 +191,19 @@ struct TaskAttributeBar: View {
       case .rows: rowsBody(edit: edit)
       }
     }
-    .onAppear(perform: reloadDiscussState)
+    .onAppear {
+      reloadDiscussState()
+      reloadSuggestions()
+    }
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
       reloadDiscussState()
+      reloadSuggestions()
       editRevision += 1
+    }
+    // A half-typed link is not a suggestion: wait for a pause.
+    .task(id: [draft.title, draft.notes]) {
+      guard (try? await Task.sleep(for: .milliseconds(500))) != nil else { return }
+      reloadSuggestions()
     }
     .sheet(item: $picker, onDismiss: {
       editRevision += 1
@@ -252,9 +264,11 @@ struct TaskAttributeBar: View {
         pageSection(.attachments) { TaskAttachmentsPanel(taskID: task.id) }
       }
 
-      if showsReferences, let task = discussTask, edit?.hasReferences == true {
+      if showsReferences, let task = discussTask,
+         edit?.hasReferences == true || (TaskRefActions.canAdd && task.deletedAt == nil) {
         pageSection(.references) {
-          TaskReferencesPanel(taskID: task.id) { addingReference = true }
+          TaskReferencesPanel(taskID: task.id, onAdd: task.deletedAt == nil ? { addingReference = true } : nil)
+          suggestionChips(for: task)
         }
       }
     }
@@ -304,6 +318,26 @@ struct TaskAttributeBar: View {
     a11yAnimate(.snappy(duration: 0.22)) { expanded = nil }
   }
 
+  @ViewBuilder
+  private func suggestionChips(for task: SeptenaTask) -> some View {
+    if !suggestions.isEmpty {
+      TaskReferenceSuggestions(offers: suggestions) { offer in
+        // Any result but a new reference reads the store again, too.
+        _ = TaskRefActions.add(offer.input, to: task.id)
+        reloadSuggestions()
+      }
+    }
+  }
+
+  private func reloadSuggestions() {
+    guard showsReferences, let task = discussTask, task.deletedAt == nil else {
+      suggestions = []
+      return
+    }
+    let next = TaskRefActions.suggestions(taskID: task.id, title: draft.title, notes: draft.notes)
+    if next != suggestions { suggestions = next }
+  }
+
   /// A page section: the block's registry heading over its content.
   private func pageSection<Content: View>(_ kind: RegistryTaskPageBlockKind,
                                           @ViewBuilder content: () -> Content) -> some View {
@@ -330,6 +364,7 @@ struct TaskAttributeBar: View {
       if showsReferences, let task = discussTask, edit?.hasReferences == true {
         TaskReferencesPanel(taskID: task.id)
       }
+      if showsReferences, let task = discussTask { suggestionChips(for: task) }
 
       // Horizontal rail of icon + label capsules — scrolls sideways inside its
       // bounded slot so the rail never widens its card past the screen. "Today"

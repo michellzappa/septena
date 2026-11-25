@@ -1,6 +1,7 @@
 package app.septena.android.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,10 +9,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -41,6 +45,8 @@ import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.TaskRefAddResult
+import app.septena.core.TaskRefOffer
+import app.septena.core.TaskRefOffers
 import app.septena.core.TaskRefRecord
 import app.septena.core.TaskRefResolver
 import app.septena.core.TaskRefTarget
@@ -50,20 +56,22 @@ import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityLimits
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.generated.RegistrySurfaceIds
+import app.septena.core.longValue
 import app.septena.core.stringValue
 import app.septena.ui.PlusSmallGlyph
 import app.septena.ui.TaskCardMetrics
 import app.septena.ui.TaskCardSlice
 import app.septena.ui.cardPosition
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
  * Task References block (`taskPage.references`, `docs/TASK_REFERENCES_SPEC.md` §8):
- * shows zero chrome when a task has no references; renders glass card slices when
- * present, with tap-to-open, long-press context menu (Open / Copy link / Remove),
- * and an Add Reference row.
+ * glass card slices with tap-to-open and a long-press context menu (Open / Copy
+ * link / Remove), the links of the task's text that are not references yet as
+ * faint rows, and an Add Reference row, which a task without references has too.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -72,6 +80,8 @@ internal fun TaskReferencesSection(
     taskId: String,
     heading: String?,
     canEdit: Boolean,
+    taskTitle: String,
+    taskNotes: String,
     showAddDialog: Boolean,
     onShowAddDialogChange: (Boolean) -> Unit,
     onOpenTask: (String) -> Unit,
@@ -84,14 +94,13 @@ internal fun TaskReferencesSection(
     val scope = rememberCoroutineScope()
 
     var refs by remember(taskId) { mutableStateOf<List<TaskRefRecord>>(emptyList()) }
+    var loaded by remember(taskId) { mutableStateOf(false) }
+    var suggestions by remember(taskId) { mutableStateOf<List<TaskRefOffer>>(emptyList()) }
     var liveTaskIds by remember(taskId) { mutableStateOf<Set<String>>(emptySet()) }
 
     LaunchedEffect(graph, taskId, dataVersion) {
         val (loadedRefs, loadedTaskIds) = withContext(Dispatchers.IO) {
-            val allRefs = graph.taskStore.records(RegistryEntityNames.TASK_REF)
-                .mapNotNull(TaskRefRecord::from)
-                .filter { it.taskId == taskId }
-                .sortedWith(compareBy<TaskRefRecord>({ it.position ?: Double.MAX_VALUE }, { it.id }))
+            val allRefs = graph.taskRefs(taskId)
             val ids = graph.taskStore.records(RegistryEntityNames.TASK)
                 .filter { it.deletedAt == null }
                 .mapTo(HashSet()) { it.id }
@@ -99,9 +108,24 @@ internal fun TaskReferencesSection(
         }
         refs = loadedRefs
         liveTaskIds = loadedTaskIds
+        loaded = true
     }
 
     val surface = remember(languageTag) { RegistryCatalog.surface(RegistrySurfaceIds.TASK_REFERENCES)?.fields.orEmpty() }
+    val addCopy = (surface["add"] as? JsonValue.ObjectValue)?.fields.orEmpty()
+    val suggestionCopy = (addCopy["suggestions"] as? JsonValue.ObjectValue)?.fields.orEmpty()
+    val suggestionFormat = registryText(suggestionCopy["format"].stringValue(), languageTag)
+    val maxSuggestions = suggestionCopy["max"].longValue()?.toInt() ?: 0
+
+    LaunchedEffect(refs, loaded, taskTitle, taskNotes, maxSuggestions) {
+        if (!loaded) return@LaunchedEffect
+        // A half-typed link is not a suggestion: wait for a pause.
+        delay(SUGGESTION_PAUSE_MS)
+        suggestions = withContext(Dispatchers.Default) {
+            TaskRefOffers.suggestions(taskTitle, taskNotes, refs, maxSuggestions)
+        }
+    }
+
     val kindsMap = (surface["kinds"] as? JsonValue.ObjectValue)?.fields.orEmpty()
     val otherKindLabel = registryText((surface["otherKind"] as? JsonValue.ObjectValue)?.fields?.get("label").stringValue(), languageTag)
     val addTitle = remember(languageTag) {
@@ -121,24 +145,31 @@ internal fun TaskReferencesSection(
         AddReferenceDialog(
             graph = graph,
             taskId = taskId,
-            surface = surface,
-            languageTag = languageTag,
+            draftTitle = taskTitle,
+            draftNotes = taskNotes,
             onDismiss = { onShowAddDialogChange(false) },
-            onAdded = {
-                onShowAddDialogChange(false)
-                graph.sync.noteLocalChange()
-                graph.sync.requestSync()
-            },
         )
     }
 
-    // Spec §1: A task without references shows no reference UI.
-    if (refs.isEmpty()) return
+    if (refs.isEmpty() && !canEdit) return
 
     val accent = MaterialTheme.colorScheme.primary
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
     val canAddMore = canEdit && refs.size < RegistryEntityLimits.MAX_REFS_PER_TASK.toInt()
-    val totalSlices = refs.size + if (canAddMore) 1 else 0
+    val shownSuggestions = if (canAddMore) suggestions.filter { offer -> refs.none { it.key == offer.key } } else emptyList()
+    val totalSlices = refs.size + shownSuggestions.size + if (canAddMore) 1 else 0
+
+    fun takeSuggestion(offer: TaskRefOffer) {
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { graph.taskRefMutator.add(taskId, offer.input) }.getOrDefault(TaskRefAddResult.Failed)
+            }
+            if (result is TaskRefAddResult.Added) {
+                graph.sync.noteLocalChange()
+                graph.sync.requestSync()
+            }
+        }
+    }
 
     heading?.let {
         Text(
@@ -280,9 +311,43 @@ internal fun TaskReferencesSection(
         }
     }
 
+    shownSuggestions.forEachIndexed { index, offer ->
+        val label = suggestionFormat.replace("{name}", offer.title)
+        TaskCardSlice(
+            position = cardPosition(refs.size + index, totalSlices),
+            isSelected = false,
+            isDark = isDark,
+            hasActiveTexture = hasActiveTexture,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .combinedClickable(onClickLabel = label, onClick = { takeSuggestion(offer) })
+                    .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 12.dp),
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
+                ) {
+                    PlusSmallGlyph(tint = mutedInk.copy(alpha = 0.7f), size = 13.dp)
+                }
+                Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
+                Text(
+                    text = offer.title,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = mutedInk,
+                    maxLines = 1,
+                    overflow = TextOverflow.MiddleEllipsis,
+                )
+            }
+        }
+    }
+
     if (canAddMore) {
         TaskCardSlice(
-            position = cardPosition(refs.size, totalSlices),
+            position = cardPosition(refs.size + shownSuggestions.size, totalSlices),
             isSelected = false,
             isDark = isDark,
             hasActiveTexture = hasActiveTexture,
@@ -312,21 +377,47 @@ internal fun TaskReferencesSection(
     }
 }
 
+private const val SUGGESTION_PAUSE_MS = 500L
+
+/** The task's references, in order. Reads the store: never on the main thread. */
+private suspend fun AndroidAppGraph.taskRefs(taskId: String): List<TaskRefRecord> =
+    taskStore.records(RegistryEntityNames.TASK_REF)
+        .mapNotNull(TaskRefRecord::from)
+        .filter { it.taskId == taskId }
+        .sortedWith(compareBy<TaskRefRecord>({ it.position ?: Double.MAX_VALUE }, { it.id }))
+
+/**
+ * Paste a link, or take one that is in the task's title or notes already. The
+ * task page passes its unsaved text; the row menu reads the stored task.
+ */
 @Composable
-private fun AddReferenceDialog(
+internal fun AddReferenceDialog(
     graph: AndroidAppGraph,
     taskId: String,
-    surface: Map<String, JsonValue>,
-    languageTag: String,
     onDismiss: () -> Unit,
-    onAdded: () -> Unit,
+    draftTitle: String? = null,
+    draftNotes: String? = null,
 ) {
+    val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
+    val surface = remember { RegistryCatalog.surface(RegistrySurfaceIds.TASK_REFERENCES)?.fields.orEmpty() }
+    var offers by remember(taskId) { mutableStateOf<List<TaskRefOffer>>(emptyList()) }
+    LaunchedEffect(graph, taskId, draftTitle, draftNotes) {
+        offers = withContext(Dispatchers.IO) {
+            val task = graph.taskStore.record(RegistryEntityNames.TASK, taskId)?.fields.orEmpty()
+            TaskRefOffers.of(
+                title = draftTitle ?: task[RegistryEntityFields.Task.TITLE].stringValue().orEmpty(),
+                notes = draftNotes ?: task[RegistryEntityFields.Task.NOTES].stringValue(),
+                existing = graph.taskRefs(taskId),
+            )
+        }
+    }
     val scope = rememberCoroutineScope()
     var input by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
 
     val addObj = (surface["add"] as? JsonValue.ObjectValue)?.fields.orEmpty()
+    val offersTitle = registryText((addObj["offers"] as? JsonValue.ObjectValue)?.fields?.get("title").stringValue(), languageTag)
     val placeholder = registryText(addObj["placeholder"].stringValue(), languageTag)
     val confirmTitle = registryText(addObj["confirmTitle"].stringValue(), languageTag)
     val invalidMsg = registryText((addObj["invalid"] as? JsonValue.ObjectValue)?.fields?.get("message").stringValue(), languageTag)
@@ -337,18 +428,22 @@ private fun AddReferenceDialog(
     val title = RegistryCatalog.actionTitle(RegistryActionIds.TASK_ADD_REFERENCE, languageTag = languageTag).orEmpty()
     val cancelLabel = RegistryCatalog.localizedString("Cancel", languageTag) ?: "Cancel"
 
-    fun submit() {
-        if (busy || input.isBlank()) return
+    fun submit(text: String = input) {
+        if (busy || text.isBlank()) return
         busy = true
         errorMessage = null
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { graph.taskRefMutator.add(taskId, input) }.getOrDefault(TaskRefAddResult.Failed)
+                runCatching { graph.taskRefMutator.add(taskId, text) }.getOrDefault(TaskRefAddResult.Failed)
             }
             busy = false
             when (result) {
-                is TaskRefAddResult.Added,
-                is TaskRefAddResult.Existing -> onAdded()
+                is TaskRefAddResult.Added -> {
+                    graph.sync.noteLocalChange()
+                    graph.sync.requestSync()
+                    onDismiss()
+                }
+                is TaskRefAddResult.Existing -> onDismiss()
                 TaskRefAddResult.Invalid -> errorMessage = invalidMsg
                 TaskRefAddResult.LimitReached -> errorMessage = limitMsg
                 TaskRefAddResult.Failed -> errorMessage = failedMsg
@@ -377,10 +472,31 @@ private fun AddReferenceDialog(
                 errorMessage?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
+                if (offers.isNotEmpty()) {
+                    Text(
+                        text = offersTitle,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Column(modifier = Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState())) {
+                        offers.forEach { offer ->
+                            Text(
+                                text = "${kindGlyph(offer.kind)}  ${offer.title}",
+                                fontSize = 15.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.MiddleEllipsis,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(enabled = !busy) { submit(offer.input) }
+                                    .padding(vertical = 12.dp),
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
-            TextButton(onClick = ::submit, enabled = !busy && input.isNotBlank()) {
+            TextButton(onClick = { submit() }, enabled = !busy && input.isNotBlank()) {
                 Text(confirmTitle)
             }
         },
