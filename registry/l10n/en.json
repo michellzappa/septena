@@ -1804,6 +1804,12 @@
       "settings.pages.claude_pairing.sections.agent_tools.items.0.label"
     ]
   },
+  "MIT License": {
+    "text": "MIT License",
+    "paths": [
+      "settings.pages.about.sections.open_source.items.0.detail"
+    ]
+  },
   "Mac": {
     "text": "Mac",
     "paths": [
@@ -2329,6 +2335,12 @@
     "text": "Open in Calendar",
     "paths": [
       "settings.copy.calendar_detail.openInCalendar.label"
+    ]
+  },
+  "Open source": {
+    "text": "Open source",
+    "paths": [
+      "settings.pages.about.sections.open_source.items.0.label"
     ]
   },
   "Open tasks without a date live here.": {
