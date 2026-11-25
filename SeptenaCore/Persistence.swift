@@ -1215,11 +1215,19 @@ enum LocalCache {
   /// change.
   @MainActor
   static func projectCompletionRatios(in context: ModelContext) -> [String: Double] {
-    ProjectProgressCache.ratios { computeProjectCompletionRatios(in: context) }
+    ProjectProgressCache.read { computeProjectTallies(in: context) }.ratios
+  }
+
+  /// Open tasks per project, faded ones left out: the sidebar's project count.
+  /// The same memoized aggregate as the rings, so a page that shows both pays
+  /// for one read.
+  @MainActor
+  static func projectOpenCounts(in context: ModelContext) -> [String: Int] {
+    ProjectProgressCache.read { computeProjectTallies(in: context) }.openCounts
   }
 
   @MainActor
-  private static func computeProjectCompletionRatios(in context: ModelContext) -> [String: Double] {
+  private static func computeProjectTallies(in context: ModelContext) -> ProjectTallies {
     var descriptor = FetchDescriptor<TaskEntity>(
       predicate: #Predicate { e in
         e.deletedAt == nil && !e.pendingDeletion
@@ -1232,6 +1240,7 @@ enum LocalCache {
     let rows = StoreHealth.fetch(context, descriptor)
     var done: [String: Int] = [:]
     var total: [String: Int] = [:]
+    var open: [String: Int] = [:]
     for row in rows {
       guard let project = row.project else { continue }
       switch row.status {
@@ -1239,14 +1248,17 @@ enum LocalCache {
         done[project, default: 0] += 1
         total[project, default: 0] += 1
       case .open:
-        if row.fadedAt == nil { total[project, default: 0] += 1 }
+        guard row.fadedAt == nil else { continue }
+        total[project, default: 0] += 1
+        open[project, default: 0] += 1
       case .cancelled:
         break
       }
     }
-    return total.reduce(into: [:]) { result, pair in
+    let ratios = total.reduce(into: [String: Double]()) { result, pair in
       result[pair.key] = Double(done[pair.key] ?? 0) / Double(pair.value)
     }
+    return ProjectTallies(ratios: ratios, openCounts: open)
   }
 
   /// The section-divider "heading" rows filed in a project, in manual order
@@ -2007,8 +2019,16 @@ enum TaskConvoDecodeCache {
 
 // MARK: - ProjectProgressCache (process-wide project ring memo)
 
-/// Memo for `LocalCache.projectCompletionRatios`. Any task, structure or
-/// unscoped data change bumps a generation, and the next read recomputes.
+/// Per project: done / (done + open), and the open count. Cancelled and faded
+/// open tasks are in neither.
+struct ProjectTallies {
+  let ratios: [String: Double]
+  let openCounts: [String: Int]
+}
+
+/// Memo for `LocalCache.projectCompletionRatios` and `projectOpenCounts`. Any
+/// task, structure or unscoped data change bumps a generation, and the next
+/// read recomputes.
 ///
 /// The observer runs on the posting thread (`queue: nil`), so the generation
 /// moves inside the `post` call itself. Every reader reloads after a coalesce
@@ -2016,14 +2036,14 @@ enum TaskConvoDecodeCache {
 /// generation sits behind a lock because a few posts come from sync threads.
 @MainActor
 enum ProjectProgressCache {
-  private static var cached: (generation: Int, ratios: [String: Double])?
+  private static var cached: (generation: Int, tallies: ProjectTallies)?
   private static var observersInstalled = false
   nonisolated private static let generation = OSAllocatedUnfairLock(initialState: 0)
 
-  static func ratios(compute: () -> [String: Double]) -> [String: Double] {
+  static func read(compute: () -> ProjectTallies) -> ProjectTallies {
     installObserversIfNeeded()
     let current = generation.withLock { $0 }
-    if let cached, cached.generation == current { return cached.ratios }
+    if let cached, cached.generation == current { return cached.tallies }
     let token = StoreHealth.readToken()
     let fresh = compute()
     // Same rule as `StructureCache`: never memoize a failed (empty) read.

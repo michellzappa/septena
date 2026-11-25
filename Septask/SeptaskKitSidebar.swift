@@ -222,7 +222,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   private typealias StructureSnapshot = (areas: [Area], projects: [Project])
 
   /// Mirrors `SettingsKey.septaskSidebarCounts`'s contract: absent → on.
-  private var showsCounts: Bool {
+  static var showsCounts: Bool {
     UserDefaults.standard.object(forKey: SettingsKey.septaskSidebarCounts) == nil
       ? true
       : UserDefaults.standard.bool(forKey: SettingsKey.septaskSidebarCounts)
@@ -232,7 +232,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// (a rebuild isn't needed, the counts are already computed; only the
   /// badge text visibility changes).
   func toggleShowsCounts() {
-    UserDefaults.standard.set(!showsCounts, forKey: SettingsKey.septaskSidebarCounts)
+    UserDefaults.standard.set(!Self.showsCounts, forKey: SettingsKey.septaskSidebarCounts)
     outlineView.reloadData()
   }
 
@@ -1127,7 +1127,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       cell.textField?.textColor = SeptaskKitTheme.inkPrimary
       cell.imageView?.image = KitGlyph.progress(progress)
     }
-    cell.badge.stringValue = showsCounts ? (node.count.map(String.init) ?? "") : ""
+    cell.badge.stringValue = Self.showsCounts ? (node.count.map(String.init) ?? "") : ""
 
     if node.children.isEmpty {
       cell.disclosure.isHidden = true

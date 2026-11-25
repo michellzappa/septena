@@ -140,6 +140,7 @@ enum class TaskMenuActionIcon {
     Deadline,
     Star,
     Open,
+    AddReference,
     Duplicate,
     Share,
     Select,

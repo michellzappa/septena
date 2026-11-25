@@ -51,6 +51,7 @@ class LogbookPurgeTest {
 
     private val clock = object : DayClock {
         override fun now(): Instant = Instant.parse("2026-11-25T12:00:00Z")
+        override fun today(): LocalDate = LocalDate.of(2026, 11, 25)
         override fun today(at: Instant): LocalDate = LocalDate.of(2026, 11, 25)
     }
 

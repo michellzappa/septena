@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import os
 import Security
 
 // HTTP client for the task backend at api.septena.app
@@ -7,15 +8,19 @@ import Security
 //
 // Auth: Sign in with Apple gives an identity token; POST /v1/auth/apple trades
 // it (plus the raw nonce) for a 1-hour access token and a refresh token. The
-// refresh token is single-use and rotates on every refresh, so the client
-// stores the new one in the Keychain before it uses the new access token. It
-// stays device-local (`synchronizable: false`): two devices sharing one
-// rotating token would race and log each other out.
+// refresh token is replaced on every refresh. The server keeps the old one good
+// until the new one is used (ADR 0040), so the client stores the new one in the
+// Keychain before it uses the new access token: whatever fails before that, the
+// stored token still works. It stays device-local (`synchronizable: false`):
+// two devices sharing one token look like theft, and the server ends the session.
 //
 // UI-free. The Sign in with Apple sheet lives in the Mac settings pane.
 
 enum TaskBackendError: LocalizedError, Equatable {
   case notSignedIn
+  /// The Keychain did not answer (locked, or a failed write). The session is
+  /// not lost: retry.
+  case keychainUnavailable
   /// HTTP 402 plan-limit refusal (`{ error, limit, upsell, message }`, spec §6.3).
   case limitReached(BackendLimitError)
   case http(status: Int, code: String)
@@ -25,6 +30,7 @@ enum TaskBackendError: LocalizedError, Equatable {
   var errorDescription: String? {
     switch self {
     case .notSignedIn: return "Not signed in to Septena sync."
+    case .keychainUnavailable: return "The Keychain is not available right now."
     case .limitReached(let limit): return limit.userMessage
     case .http(let status, let code): return "The server answered \(status) (\(code))."
     case .badResponse(let what): return "The server sent a reply the app couldn’t read (\(what))."
@@ -48,8 +54,7 @@ actor TaskBackendClient {
   private let session: URLSession
   private var accessToken: String?
   private var accessExpiry: Date = .distantPast
-  /// One refresh at a time: refresh tokens are single-use, so two parallel
-  /// refreshes with the same token would make the second fail and sign out.
+  /// One refresh at a time: a reply that loses the race is of no use.
   private var refreshTask: Task<String, Error>?
 
   init() {
@@ -62,10 +67,16 @@ actor TaskBackendClient {
 
   // MARK: - Session
 
-  /// True when this device holds a refresh token. Reads the Keychain only.
+  /// True when this device holds a refresh token. Reads the Keychain only. A
+  /// Keychain that does not answer is not a sign-out.
   nonisolated static var hasSession: Bool {
-    KeychainStore.load(account: refreshAccount) != nil
+    KeychainStore.read(account: refreshAccount) != .missing
   }
+
+  /// True while a refresh waits for its reply. The Mac app lets it finish
+  /// before it quits.
+  nonisolated static var isRefreshing: Bool { refreshing.withLock { $0 } }
+  private static let refreshing = OSAllocatedUnfairLock(initialState: false)
 
   /// A one-time raw nonce and the value to hand Apple (`request.nonce`): the
   /// hex SHA-256 of the raw nonce. The server checks the token's nonce claim
@@ -87,7 +98,7 @@ actor TaskBackendClient {
     let (data, status) = try await perform(path: "/v1/auth/apple", method: "POST", body: body, auth: nil)
     guard status == 200 else { throw Self.httpError(status, data) }
     let session = try decode(BackendSession.self, from: data, what: "session")
-    adopt(session)
+    try adopt(session)
     return session.userId
   }
 
@@ -115,8 +126,8 @@ actor TaskBackendClient {
 
   /// Adopts the session of an approved device sign-in. Returns its user id.
   @discardableResult
-  func adoptDeviceSession(_ session: BackendSession) -> String {
-    adopt(session)
+  func adoptDeviceSession(_ session: BackendSession) throws -> String {
+    try adopt(session)
     return session.userId
   }
 
@@ -146,9 +157,12 @@ actor TaskBackendClient {
     accessExpiry = .distantPast
   }
 
-  private func adopt(_ s: BackendSession) {
-    // Store the rotated refresh token first: the old one is already spent.
-    KeychainStore.store(s.refreshToken, account: Self.refreshAccount, synchronizable: false)
+  private func adopt(_ s: BackendSession) throws {
+    // Store the new refresh token first. Using the access token retires the
+    // old one, so a token that was not stored must stay unused.
+    guard KeychainStore.store(s.refreshToken, account: Self.refreshAccount, synchronizable: false) else {
+      throw TaskBackendError.keychainUnavailable
+    }
     accessToken = s.accessToken
     accessExpiry = Date().addingTimeInterval(TimeInterval(max(s.expiresIn - 60, 0)))
   }
@@ -163,18 +177,35 @@ actor TaskBackendClient {
   }
 
   private func refresh() async throws -> String {
-    guard let token = KeychainStore.load(account: Self.refreshAccount) else { throw TaskBackendError.notSignedIn }
+    let token: String
+    switch KeychainStore.read(account: Self.refreshAccount) {
+    case .found(let stored): token = stored
+    case .missing: throw TaskBackendError.notSignedIn
+    case .unavailable: throw TaskBackendError.keychainUnavailable
+    }
+    Self.refreshing.withLock { $0 = true }
+    defer { Self.refreshing.withLock { $0 = false } }
     let body = try JSONEncoder().encode(["refreshToken": token])
     let (data, status) = try await perform(path: "/v1/auth/refresh", method: "POST", body: body, auth: nil)
-    if status == 401 {
-      // The token is spent or revoked. Keeping it would only fail again.
-      KeychainStore.delete(account: Self.refreshAccount)
+    if status == 401, (try? JSONDecoder().decode(BackendErrorBody.self, from: data))?.error == "invalid_grant" {
+      // Our server ended the session. Any other 401 (a proxy, a captive
+      // portal) is an ordinary failure below. A sign-in that landed while we
+      // waited keeps its token.
       accessToken = nil
+      guard KeychainStore.load(account: Self.refreshAccount) == token else {
+        throw TaskBackendError.network("the session changed")
+      }
+      KeychainStore.delete(account: Self.refreshAccount)
       throw TaskBackendError.notSignedIn
     }
     guard status == 200 else { throw Self.httpError(status, data) }
     let s = try decode(BackendSession.self, from: data, what: "session")
-    adopt(s)
+    // A sign-out or sign-in that landed while we waited wins.
+    switch KeychainStore.read(account: Self.refreshAccount) {
+    case .missing: throw TaskBackendError.notSignedIn
+    case .found(let stored) where stored != token: throw TaskBackendError.network("the session changed")
+    case .found, .unavailable: try adopt(s)
+    }
     return s.accessToken
   }
 

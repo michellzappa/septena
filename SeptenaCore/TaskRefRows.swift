@@ -231,8 +231,19 @@ enum TaskRefRows {
     }
   }
 
+  /// The offers an open task shows on their own, one tap each. Nothing becomes
+  /// a reference before that tap. Add Reference lists every offer.
+  static func suggestions(title: String, notes: String?, existing: [TaskRef]) -> [Offer] {
+    let room = RegistryEntityLimits.maxRefsPerTask - existing.count
+    guard room > 0 else { return [] }
+    return Array(offers(title: title, notes: notes, existing: existing)
+      .prefix(min(room, RegistryTaskReferences.maxSuggestions)))
+  }
+
   private static func linkTexts(in text: String) -> [String] {
-    guard !text.isEmpty,
+    // Every link has a scheme. This runs while the user types, so it skips
+    // the detector on the usual text.
+    guard text.contains(":"),
           let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
     else { return [] }
     let whole = text as NSString

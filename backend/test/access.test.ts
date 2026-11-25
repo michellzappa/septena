@@ -57,7 +57,8 @@ describe("signing out", () => {
     store.deviceAccess("sid-a", "ios", null);
     store.deviceAccess("sid-b", "android", null);
     assert.deepEqual(store.revokeDevice("sid-b"), ["h-b"]);
-    assert.equal(store.rotateSession("h-b", "h-b2", Date.now() + DAY), null, "the refresh token is dead");
+    assert.equal(store.renewSession("h-b", "h-b2", Date.now() + DAY, "sid-b").ok, false, "the refresh token is dead");
+    assert.equal(store.authorizeSession("sid-b", null), null, "and so is its access token");
     assert.deepEqual(store.accessSummary("sid-a", null).devices.map((d) => d.sid), ["sid-a"]);
     assert.deepEqual(store.revokeDevice("sid-unknown"), []);
   });

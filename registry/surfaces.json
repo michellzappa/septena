@@ -429,6 +429,7 @@
       "placeholder": "Paste a link",
       "confirmTitle": "Add",
       "offers": { "title": "Links in this task" },
+      "suggestions": { "max": 3, "format": "Add {name} as a reference" },
       "invalid": { "message": "Septena can’t add this. Paste a web link or a mail link." },
       "limitReached": { "format": "This task already has {count} references." },
       "failed": { "message": "Couldn’t add the reference." }

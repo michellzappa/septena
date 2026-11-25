@@ -12,8 +12,8 @@ import Security
 /// race between two synced devices, so they pass `synchronizable: false`.
 ///
 /// `kSecAttrSynchronizable` can't be flipped on an existing item via
-/// `SecItemUpdate`, so `store` deletes any existing variant first and re-adds
-/// with the desired flag — that keeps the attribute authoritative. Reads and
+/// `SecItemUpdate`, so `store` writes the variant with the desired flag, then
+/// deletes the other one — that keeps the attribute authoritative. Reads and
 /// deletes use `kSecAttrSynchronizableAny` so they match whichever variant
 /// happens to exist (important during the migration from the old local-only
 /// items — see `makeSynchronizable`).
@@ -38,24 +38,54 @@ public enum KeychainStore {
   }
 
   /// Store (or replace) `value` under `account`. When `synchronizable` is true
-  /// the item propagates via iCloud Keychain.
-  public static func store(_ value: String, account: String, synchronizable: Bool) {
-    delete(account: account)  // clear any existing variant so the flag is authoritative
+  /// the item propagates via iCloud Keychain; a local item never leaves this
+  /// device, not even in a backup. Replaces in place: when this fails, or the
+  /// process dies here, the old value is still there. Returns false on failure.
+  @discardableResult
+  public static func store(_ value: String, account: String, synchronizable: Bool) -> Bool {
     let query: [String: Any] = [
       kSecClass as String:              kSecClassGenericPassword,
       kSecAttrAccount as String:        account,
-      kSecValueData as String:          Data(value.utf8),
-      kSecAttrAccessible as String:     kSecAttrAccessibleAfterFirstUnlock,
       kSecAttrSynchronizable as String: synchronizable,
     ]
-    if SecItemAdd(scoped(query), nil) == errSecMissingEntitlement {
-      useDataProtection = false
-      SecItemAdd(scoped(query), nil)
+    let values: [String: Any] = [
+      kSecValueData as String:      Data(value.utf8),
+      kSecAttrAccessible as String: synchronizable
+        ? kSecAttrAccessibleAfterFirstUnlock : kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+    ]
+    func write() -> OSStatus {
+      let status = SecItemUpdate(scoped(query), values as CFDictionary)
+      guard status == errSecItemNotFound else { return status }
+      return SecItemAdd(scoped(query.merging(values) { $1 }), nil)
     }
+    var status = write()
+    if status == errSecMissingEntitlement {
+      useDataProtection = false
+      status = write()
+    }
+    guard status == errSecSuccess else { return false }
+    // Clear the other variant so the flag is authoritative.
+    var other = query
+    other[kSecAttrSynchronizable as String] = !synchronizable
+    SecItemDelete(scoped(other))
+    return true
+  }
+
+  /// What a read found. `unavailable` is not `missing`: the keychain is locked
+  /// (before the first unlock after a restart) or busy, and the item may exist.
+  public enum ReadResult: Equatable {
+    case found(String)
+    case missing
+    case unavailable(OSStatus)
   }
 
   /// Load the value for `account`, matching either a synced or a local item.
   public static func load(account: String) -> String? {
+    guard case .found(let value) = read(account: account) else { return nil }
+    return value
+  }
+
+  public static func read(account: String) -> ReadResult {
     let query: [String: Any] = [
       kSecClass as String:              kSecClassGenericPassword,
       kSecAttrAccount as String:        account,
@@ -69,8 +99,12 @@ public enum KeychainStore {
       useDataProtection = false
       status = SecItemCopyMatching(scoped(query), &item)
     }
-    guard status == errSecSuccess, let data = item as? Data else { return nil }
-    return String(data: data, encoding: .utf8)
+    if [errSecInteractionNotAllowed, errSecNotAvailable, errSecServiceNotAvailable].contains(status) {
+      return .unavailable(status)
+    }
+    guard status == errSecSuccess, let data = item as? Data,
+          let value = String(data: data, encoding: .utf8) else { return .missing }
+    return .found(value)
   }
 
   /// Delete the value for `account`, matching either a synced or a local item.

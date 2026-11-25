@@ -85,6 +85,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private let checklistView = KitChecklistView()
   private let attachmentsView = KitAttachmentsView()
   private let referencesView = KitReferencesView(style: .chips)
+  private var referencesRefresh: DispatchWorkItem?
   /// Title, notes, checklist (when shown), attachments (when shown), pills — stacked.
   private let column = NSStackView()
   private let pillRow = NSStackView()
@@ -367,6 +368,11 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     column.addArrangedSubview(notesScroll)
     column.addArrangedSubview(checklistView)
     column.addArrangedSubview(attachmentsView)
+    referencesView.onTakeSuggestion = { [weak self] offer in
+      guard let self, let taskID = self.configuredTaskID else { return }
+      _ = TaskRefActions.add(offer.input, to: taskID)
+      self.refreshReferences()
+    }
     referencesView.translatesAutoresizingMaskIntoConstraints = false
     referencesView.isHidden = true
     column.addArrangedSubview(referencesView)
@@ -629,14 +635,26 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// undone while the row is open shows at once.
   func refreshReferences(notify: Bool = true) {
     guard let taskID = configuredTaskID else { return }
-    referencesView.configure(rows: LocalCache.taskRefRows(
-      forTaskID: taskID, in: LocalStore.shared.container.mainContext))
+    referencesView.reload(taskID: taskID, title: pendingTitle, notes: pendingNotes)
     referencesView.isHidden = referencesView.isEmpty
     let h = referencesView.preferredHeight
     if abs(referencesHeightConstraint.constant - h) > 0.5 {
       referencesHeightConstraint.constant = h
       if notify { onContentHeightChanged?() }
     }
+  }
+
+  /// The suggestions follow the text. A half-typed link is not a suggestion:
+  /// wait for a pause.
+  private func scheduleReferencesRefresh() {
+    referencesRefresh?.cancel()
+    let taskID = configuredTaskID
+    let work = DispatchWorkItem { [weak self] in
+      guard let self, self.configuredTaskID == taskID else { return }
+      self.refreshReferences()
+    }
+    referencesRefresh = work
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
   }
 
   private func updateAttachPill() {
@@ -1005,6 +1023,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
       MarkdownNotesStyle.restyle(notesView, fontSize: SeptaskKitTheme.notesFontSize)
     }
     recomputeContentHeights(notify: true)
+    scheduleReferencesRefresh()
   }
 
   /// A title is one line. A pasted multi-line string would otherwise sit in

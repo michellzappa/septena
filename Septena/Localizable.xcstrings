@@ -1963,6 +1963,24 @@
         }
       }
     },
+    "Add %@ as a reference" : {
+      "comment" : "Generated from registry surfaces.taskReferences.add.suggestions.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voeg %@ toe als verwijzing"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar %@ como referência"
+          }
+        }
+      }
+    },
     "Add %lld categories" : {
       "extractionState" : "stale",
       "localizations" : {

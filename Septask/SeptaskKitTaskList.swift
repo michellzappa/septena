@@ -100,7 +100,7 @@ final class SeptaskKitTaskListController: NSViewController {
     case screenTitle(title: String, icon: GroupIcon)
     case logbookBar(tab: LogbookTab, deletedCount: Int, showsSegmented: Bool, canEmptyTrash: Bool)
     case tagFilterBar(tags: [TaskTag], active: [String])
-    case projectTarget(id: String, title: String, progress: Double)
+    case projectTarget(id: String, title: String, progress: Double, count: Int)
     case task(SeptenaTask, chip: Chip?, suggestion: SuggestionEngine.Suggestion?)
     case event(Event)
     case fadedFooter(count: Int, expanded: Bool)
@@ -143,7 +143,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .screenTitle: return "screen-title"
       case .logbookBar: return "logbook-bar"
       case .tagFilterBar: return "tag-filter-bar"
-      case .projectTarget(let id, _, _): return "project-target:" + id
+      case .projectTarget(let id, _, _, _): return "project-target:" + id
       case .task(let task, _, _): return task.id
       case .event(let event): return "e:" + event.id
       case .fadedFooter: return "faded-footer"
@@ -1252,6 +1252,7 @@ final class SeptaskKitTaskListController: NSViewController {
           }
           if !areaProjects.isEmpty {
             let progress = projectProgress()
+            let openCounts = SeptaskKitSidebarController.showsCounts ? LocalCache.projectOpenCounts(in: context) : [:]
             projectRows = [.header(id: "area-projects-\(areaID)",
                                    title: String(localized: "Projects",
                                                  comment: "SeptaskKit: area page section"),
@@ -1260,7 +1261,8 @@ final class SeptaskKitTaskListController: NSViewController {
               + areaProjects.map {
                 .projectTarget(id: $0.id,
                                title: $0.title,
-                               progress: progress[$0.id] ?? 0)
+                               progress: progress[$0.id] ?? 0,
+                               count: openCounts[$0.id] ?? 0)
               }
           }
         }
@@ -5783,12 +5785,12 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.onClear = { [weak self] in _ = self?.clearTagFilterIfActive() }
       return cell
 
-    case .projectTarget(let id, let title, let progress):
+    case .projectTarget(let id, let title, let progress, let count):
       let identifier = NSUserInterfaceItemIdentifier("projectTargetCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil)
         as? KitProjectTargetCell
         ?? KitProjectTargetCell(identifier: identifier)
-      cell.configure(title: title, progress: progress)
+      cell.configure(title: title, progress: progress, count: count)
       cell.onTap = { [weak self] in
         self?.onNavigate?(.filter(.project(id), title: title))
       }
@@ -6737,6 +6739,9 @@ final class KitProjectTargetCell: NSTableCellView {
   private let progress = NSImageView()
   private let title = NSTextField(labelWithString: "")
   private let chevron = NSImageView()
+  /// Open tasks, in the sidebar badge's style. Empty at zero, and with View ▸
+  /// Show Sidebar Counts off.
+  private let badge = NSTextField(labelWithString: "")
   private var leadingConstraint: NSLayoutConstraint!
   private var trailingConstraint: NSLayoutConstraint!
   /// The whole row is the click target, and it has to be a real `NSButton`:
@@ -6762,6 +6767,10 @@ final class KitProjectTargetCell: NSTableCellView {
     chevron.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)?
       .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
     chevron.contentTintColor = SeptaskKitTheme.iconMuted
+    badge.translatesAutoresizingMaskIntoConstraints = false
+    badge.textColor = SeptaskKitTheme.iconMuted
+    badge.setContentHuggingPriority(.required, for: .horizontal)
+    badge.setContentCompressionResistancePriority(.required, for: .horizontal)
 
     hit.translatesAutoresizingMaskIntoConstraints = false
     hit.isBordered = false
@@ -6776,18 +6785,20 @@ final class KitProjectTargetCell: NSTableCellView {
     progress.kitA11yIgnore()
     title.kitA11yIgnore()
     chevron.kitA11yIgnore()
+    badge.kitA11yIgnore()
 
     addSubview(progress)
     addSubview(title)
     addSubview(chevron)
+    addSubview(badge)
     // Last, so it layers above the content and takes every click in the row.
     addSubview(hit)
     textField = title
     setAccessibilityElement(true)
     leadingConstraint = progress.leadingAnchor.constraint(
       equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + SeptaskKitLayout.rowLeadingPad)
-    trailingConstraint = chevron.trailingAnchor.constraint(
-      lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    trailingConstraint = badge.trailingAnchor.constraint(
+      equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
     hitPin = KitContentColumnPin(hit, in: self)
     NSLayoutConstraint.activate([
       leadingConstraint,
@@ -6800,6 +6811,8 @@ final class KitProjectTargetCell: NSTableCellView {
       title.centerYAnchor.constraint(equalTo: centerYAnchor),
       chevron.leadingAnchor.constraint(equalTo: title.trailingAnchor, constant: 6),
       chevron.centerYAnchor.constraint(equalTo: title.centerYAnchor),
+      chevron.trailingAnchor.constraint(lessThanOrEqualTo: badge.leadingAnchor, constant: -6),
+      badge.centerYAnchor.constraint(equalTo: title.centerYAnchor),
       trailingConstraint,
       hit.topAnchor.constraint(equalTo: topAnchor),
       hit.bottomAnchor.constraint(equalTo: bottomAnchor),
@@ -6817,7 +6830,7 @@ final class KitProjectTargetCell: NSTableCellView {
     super.layout()
   }
 
-  func configure(title titleText: String, progress progressValue: Double) {
+  func configure(title titleText: String, progress progressValue: Double, count: Int) {
     self.progress.image = KitGlyph.progress(progressValue, diameter: 13)
     title.attributedStringValue = NSAttributedString(
       string: titleText,
@@ -6827,6 +6840,8 @@ final class KitProjectTargetCell: NSTableCellView {
         .foregroundColor: NSColor.labelColor,
       ])
     title.toolTip = titleText
+    badge.font = SeptaskKitTheme.meta
+    badge.stringValue = count > 0 ? String(count) : ""
     // Plain title, like a navigable `KitGroupHeaderCell` — this row drills
     // into the project, it does not open the nav menu.
     kitA11yButton(label: titleText)

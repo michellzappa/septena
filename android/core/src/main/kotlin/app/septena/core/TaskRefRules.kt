@@ -35,7 +35,7 @@ data class TaskRefRecord(
         title?.takeIf(String::isNotBlank)
             ?: when (kind) {
                 "issue" -> keyId
-                "url" -> runCatching { URI(keyId).host?.removePrefix("www.") }.getOrNull()?.takeIf(String::isNotBlank) ?: keyId
+                "url" -> webTitle(keyId)
                 else -> keyId.takeIf(String::isNotBlank) ?: fallbackKindLabel
             }
 
@@ -49,6 +49,13 @@ data class TaskRefRecord(
     }
 
     companion object {
+        /** Host and path, as Apple `TaskRef.title`. */
+        internal fun webTitle(url: String): String {
+            val uri = runCatching { URI(url) }.getOrNull()
+            val host = uri?.host?.takeIf(String::isNotBlank) ?: return url
+            return host + uri.path.orEmpty().takeIf { it != "/" }.orEmpty()
+        }
+
         fun from(record: SyncRecord): TaskRefRecord? {
             if (record.entity != RegistryEntityNames.TASK_REF || record.deletedAt != null) return null
             val fields = record.fields
@@ -172,6 +179,67 @@ object TaskRefResolver {
 
     private fun enc(value: String): String =
         URLEncoder.encode(value, StandardCharsets.UTF_8.name()).replace("+", "%20")
+}
+
+/** One link of a task's own text, offered by Add Reference (§8). */
+data class TaskRefOffer(
+    val key: String,
+    val input: String,
+    val kind: String,
+    val title: String,
+)
+
+/** The links in a task's title and notes that are not references yet (§8). */
+object TaskRefOffers {
+    private val link = Regex("""(?:https?://|message:)[^\s<>"]+""", RegexOption.IGNORE_CASE)
+
+    /** In order, one per key. The core decides what each link is. */
+    fun of(title: String, notes: String?, existing: List<TaskRefRecord>): List<TaskRefOffer> {
+        val keys = existing.mapTo(HashSet()) { it.key }
+        return listOf(title, notes.orEmpty()).flatMap(::linkTexts).mapNotNull { text ->
+            val parsed = runCatching { parseRef(text) }.getOrNull() ?: return@mapNotNull null
+            if (!keys.add(parsed.key)) return@mapNotNull null
+            val label = when (parsed.kind) {
+                "issue" -> parsed.id
+                "url" -> TaskRefRecord.webTitle(parsed.id)
+                else -> text
+            }
+            TaskRefOffer(parsed.key, text, parsed.kind, label)
+        }
+    }
+
+    /** The offers an open task shows on its own. Nothing becomes a reference before a tap. */
+    fun suggestions(
+        title: String,
+        notes: String?,
+        existing: List<TaskRefRecord>,
+        max: Int,
+    ): List<TaskRefOffer> {
+        val room = RegistryEntityLimits.MAX_REFS_PER_TASK.toInt() - existing.size
+        return of(title, notes, existing).take(minOf(room, max).coerceAtLeast(0))
+    }
+
+    private fun linkTexts(text: String): List<String> =
+        link.findAll(text).map { trimmedEnd(it.value) }.filter(::canRead).toList()
+
+    /** Sentence punctuation after a link, and the bracket that closes a Markdown link. */
+    private fun trimmedEnd(found: String): String {
+        var text = found
+        while (text.isNotEmpty()) {
+            val last = text.last()
+            val closes = when (last) {
+                ')' -> text.count { it == ')' } > text.count { it == '(' }
+                ']' -> text.count { it == ']' } > text.count { it == '[' }
+                else -> last in ".,;:!?'*_"
+            }
+            if (!closes) return text
+            text = text.dropLast(1)
+        }
+        return text
+    }
+
+    private fun canRead(text: String): Boolean =
+        text.startsWith("message:", ignoreCase = true) || TaskRefResolver.canOpenWebUrl(text)
 }
 
 sealed interface TaskRefAddResult {
