@@ -74,6 +74,7 @@ export interface TaskRow {
   durationMinutes?: number | null;
   timeZone?: string | null;
   deadline?: string | null;
+  deferredDeadline?: string | null;
   today?: boolean;
   starred?: boolean;
   tags?: string[] | null;

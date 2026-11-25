@@ -155,6 +155,66 @@
       }
     },
     {
+      "name": "due today, planned for tomorrow: Upcoming, still red (I8)",
+      "task": { "id": "v20", "title": "Pay invoice", "status": "open", "today": false, "area": "work", "source": "app", "scheduled": "2026-11-22", "deadline": "2026-11-21", "deferredDeadline": "2026-11-21", "created": "2026-11-01" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": false, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": false, "inbox": false, "upcoming": true, "anytime": false },
+        "dueState": "dueToday", "deadlineRed": true, "upcomingDay": "2026-11-22", "arrivedOnOwn": false
+      }
+    },
+    {
+      "name": "overdue, planned for a later day: Upcoming, still red (I8)",
+      "task": { "id": "v21", "title": "Pay invoice", "status": "open", "today": false, "area": "work", "source": "app", "scheduled": "2026-11-25", "deadline": "2026-11-18", "deferredDeadline": "2026-11-18", "created": "2026-11-01" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": false, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": false, "inbox": false, "upcoming": true, "anytime": false },
+        "dueState": "overdue", "deadlineRed": true, "upcomingDay": "2026-11-25", "arrivedOnOwn": false
+      }
+    },
+    {
+      "name": "planned past its deadline, the When date arrives: on Today, overdue, counted from the When date",
+      "task": { "id": "v22", "title": "Pay invoice", "status": "open", "today": false, "area": "work", "source": "app", "scheduled": "2026-11-21", "deadline": "2026-11-18", "deferredDeadline": "2026-11-18", "created": "2026-11-01" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": true, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": "overdue", "deadlineRed": true, "upcomingDay": null, "arrivedOnOwn": true
+      }
+    },
+    {
+      "name": "future When date set before the deadline arrived: the deadline puts it on Today",
+      "task": { "id": "v23", "title": "Pay invoice", "status": "open", "today": false, "area": "work", "source": "app", "scheduled": "2026-11-25", "deadline": "2026-11-21", "created": "2026-11-01" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": true, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": "dueToday", "deadlineRed": true, "upcomingDay": null, "arrivedOnOwn": true
+      }
+    },
+    {
+      "name": "deferral of an older deadline does not count",
+      "task": { "id": "v24", "title": "Pay invoice", "status": "open", "today": false, "area": "work", "source": "app", "scheduled": "2026-11-25", "deadline": "2026-11-20", "deferredDeadline": "2026-11-18", "created": "2026-11-01" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": true, "inInbox": false,
+        "daysOnToday": 1,
+        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": "overdue", "deadlineRed": true, "upcomingDay": null, "arrivedOnOwn": false
+      }
+    },
+    {
+      "name": "deferral without a When date does not count",
+      "task": { "id": "v25", "title": "Pay invoice", "status": "open", "today": false, "area": "work", "source": "app", "deadline": "2026-11-20", "deferredDeadline": "2026-11-20", "created": "2026-11-01" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": true, "inInbox": false,
+        "daysOnToday": 1,
+        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": "overdue", "deadlineRed": true, "upcomingDay": null, "arrivedOnOwn": false
+      }
+    },
+    {
       "name": "deleted task is excluded from every view",
       "task": { "id": "v7", "title": "Deleted", "status": "open", "today": true, "area": "work", "source": "app", "todaySetOn": "2026-11-20", "deadline": "2026-11-19", "created": "2026-11-10", "deletedAt": "2026-11-20T10:00:00Z" },
       "expected": {

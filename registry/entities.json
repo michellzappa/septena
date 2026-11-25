@@ -93,6 +93,7 @@
         "durationMinutes": { "kind": "int", "min": 5, "max": 1440, "nullable": true },
         "timeZone": { "kind": "text", "max": 64, "nullable": true },
         "deadline": { "kind": "text", "format": "day", "nullable": true },
+        "deferredDeadline": { "kind": "text", "format": "day", "nullable": true },
         "today": { "kind": "bool", "default": 0 },
         "starred": { "kind": "bool", "default": 0 },
         "tags": { "kind": "json", "maxJsonLength": 4000, "nullable": true },

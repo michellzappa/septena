@@ -71,6 +71,7 @@ export interface CoreTask {
   createdAt?: string | null;
   scheduled?: string | null;
   deadline?: string | null;
+  deferredDeadline?: string | null;
   today?: boolean;
   todaySetOn?: string | null;
   source?: string | null;
@@ -207,7 +208,7 @@ export function applyDateAction(
   return callCore("applyDateAction", { task, action, today, now });
 }
 
-/// The fields a row needs to meet the date invariants (I1–I7).
+/// The fields a row needs to meet the date invariants (I1–I8).
 export function normalizeTaskDates(task: CoreTask, today: string): Record<string, unknown> {
   return callCore("normalizeTaskDates", { task, today });
 }

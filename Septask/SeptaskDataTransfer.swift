@@ -169,7 +169,7 @@ enum TaskJSONTransfer {
       "id": e.id, "title": e.title, "status": e.statusRaw,
       "created": e.created, "scheduled": e.scheduled,
       "startTime": e.startTime, "durationMinutes": e.durationMinutes, "timeZone": e.timeZone,
-      "deadline": e.deadline,
+      "deadline": e.deadline, "deferredDeadline": e.deferredDeadline,
       "today": e.today, "starred": e.starred ? true : nil,
       "tags": e.tagIDs.isEmpty ? nil : e.tagIDs,
       "todaySetOn": e.todaySetOn, "completedAt": e.completedAt,
@@ -438,6 +438,7 @@ enum TaskJSONTransfer {
     entity.durationMinutes = intValue(r["durationMinutes"]).map { min(1440, max(5, $0)) }
     entity.timeZone = nonEmptyString(r["timeZone"])
     entity.deadline = nonEmptyString(r["deadline"])
+    entity.deferredDeadline = nonEmptyString(r["deferredDeadline"])
     entity.today = (r["today"] as? Bool) ?? false
     entity.starred = (r["starred"] as? Bool) ?? false
     if let rawTags = r["tags"] as? [Any] {
