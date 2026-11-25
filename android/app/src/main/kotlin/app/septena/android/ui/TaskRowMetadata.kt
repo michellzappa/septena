@@ -100,10 +100,14 @@ internal fun buildTaskListItem(
     var scheduledText: String? = null
     var completedDateText: String? = null
 
-    if (isLogbook || snapshot.status != RegistryEntityEnums.TaskStatus.OPEN) {
-        val completedAt = record.fields[RegistryEntityFields.Task.COMPLETED_AT].stringValue()
-        completedDateText = completedAt?.let { formatShortInstantDay(it, today, todayLabel, tomorrowLabel, languageTag, zoneId) }
-    } else if (!isDeleted) {
+    if (isLogbook || isDeleted || snapshot.status != RegistryEntityEnums.TaskStatus.OPEN) {
+        val archiveAt = if (isDeleted) {
+            record.deletedAt ?: record.fields[RegistryEntityFields.Task.COMPLETED_AT].stringValue()
+        } else {
+            record.fields[RegistryEntityFields.Task.COMPLETED_AT].stringValue()
+        }
+        completedDateText = archiveAt?.let { formatShortInstantDay(it, today, todayLabel, tomorrowLabel, languageTag, zoneId) }
+    } else {
         val dueDay = snapshot.deadline?.let { parseIsoDay(it) }
         if (dueDay != null) {
             when (membership.dueState) {

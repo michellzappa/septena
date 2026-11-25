@@ -181,6 +181,46 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
         invalidateCache(record.entity)
     }
 
+    override suspend fun purgeLocalAndEnqueue(
+        entity: String,
+        id: String,
+        operation: SyncOperation.Delete,
+    ) {
+        require(entity in RegistryEntityNames.all) {
+            "Local record entity '$entity' is not in the registry"
+        }
+        require(operation.entity == entity && operation.id == id) {
+            "Delete operation does not match the purged row"
+        }
+        database.transaction {
+            val previous = queries.selectRecord(entity, id).executeAsOneOrNull()
+            val shadow = queries.selectShadow(entity, id).executeAsOneOrNull()
+            val remoteKnown = previous?.remoteKnown == 1L || shadow?.remoteKnown == 1L
+            queries.deleteRecord(entity, id)
+            if (entity == RegistryEntityNames.TASK) {
+                queries.deleteLocalTurns(id)
+                queries.deleteTurns(id)
+            }
+            val rowOps = queries.selectOutboxForRow(entity, id).executeAsList()
+            val unsentDelete = rowOps.firstOrNull { it.kind == "delete" && it.sent == 0L }
+            if (unsentDelete != null) {
+                if (!remoteKnown && rowOps.none { it.sent != 0L }) {
+                    queries.deleteUnsentRowOutbox(entity, id)
+                } else {
+                    queries.updateUnsentOutbox(
+                        op_json = unsentDelete.operationJson,
+                        payload_json = unsentDelete.payloadJson,
+                        not_before_ms = Instant.EPOCH.toEpochMilli(),
+                        client_op_id = unsentDelete.clientOpId,
+                    )
+                }
+            } else {
+                enqueueDelete(operation, Instant.EPOCH, remoteKnown)
+            }
+        }
+        invalidateCache(entity)
+    }
+
     override suspend fun appendTurnAndEnqueue(
         taskId: String,
         turn: Map<String, JsonValue>,

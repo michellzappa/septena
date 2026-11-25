@@ -191,6 +191,7 @@ fun TaskHomeContent(
     onDropInboxHeader: (() -> Unit)? = null,
     onDropInboxRow: ((index: Int, before: Boolean) -> Unit)? = null,
     onDropTaskRow: ((index: Int, before: Boolean) -> Unit)? = null,
+    onDropGroupHeader: ((targetLocationKey: String) -> Unit)? = null,
     canReorder: Boolean = false,
     onReorderInboxHeader: ((ids: List<String>) -> Unit)? = null,
     onReorderInboxRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
@@ -392,6 +393,7 @@ fun TaskHomeContent(
                 onTaskAction = onTaskAction,
                 onOpenGroupTarget = onOpenGroupTarget,
                 onDropRow = onDropTaskRow,
+                onDropGroupHeader = onDropGroupHeader,
                 canReorder = canReorder && onReorderTaskRow != null,
                 orderedDragIds = orderedSelectionIds,
                 onReorderRow = onReorderTaskRow,
@@ -430,6 +432,7 @@ private fun LazyListScope.taskCardRows(
     onTaskAction: (String, String) -> Unit,
     onOpenGroupTarget: ((String) -> Unit)?,
     onDropRow: ((index: Int, before: Boolean) -> Unit)?,
+    onDropGroupHeader: ((targetLocationKey: String) -> Unit)? = null,
     canReorder: Boolean = false,
     orderedDragIds: List<String> = emptyList(),
     onReorderRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
@@ -449,17 +452,32 @@ private fun LazyListScope.taskCardRows(
         val prevHeader = tasks.getOrNull(index - 1)?.resolvedGroup()
         if (header != null && header.key != prevHeader?.key) {
             val target = header.targetLocationKey
+            val headerModifier = Modifier
+                .then(
+                    if (target != null && onDropGroupHeader != null) {
+                        Modifier.magicPlusSectionDrop(
+                            id = "mp-group-$keyPrefix-${header.key}",
+                            enabled = true,
+                            onDrop = { onDropGroupHeader(target) },
+                        )
+                    } else {
+                        Modifier
+                    },
+                )
+                .then(
+                    if (target != null && canReorder && onReorderGroupHeader != null) {
+                        Modifier.taskReorderSectionDrop(
+                            id = "reorder-group-$keyPrefix-${header.key}",
+                            enabled = true,
+                            onDrop = { ids -> onReorderGroupHeader(ids, target) },
+                        )
+                    } else {
+                        Modifier
+                    },
+                )
             TaskGroupHeaderRow(
                 header = header,
-                modifier = if (target != null && canReorder && onReorderGroupHeader != null) {
-                    Modifier.taskReorderSectionDrop(
-                        id = "reorder-group-$keyPrefix-${header.key}",
-                        enabled = true,
-                        onDrop = { ids -> onReorderGroupHeader(ids, target) },
-                    )
-                } else {
-                    Modifier
-                },
+                modifier = headerModifier,
                 onClick = if (target != null && onOpenGroupTarget != null) {
                     { onOpenGroupTarget(target) }
                 } else null,
