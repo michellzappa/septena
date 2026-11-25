@@ -2156,7 +2156,7 @@
       }
     },
     "Areas, projects, sections, notes and attachments" : {
-      "comment" : "Generated from registry plans.fullApp.points.1. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry plans.fullApp.points.structure.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -3073,6 +3073,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Copiado"
+          }
+        }
+      }
+    },
+    "Copies your areas, projects and tasks. Things stays as it is." : {
+      "comment" : "Generated from registry importSources.sources.things.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia suas áreas, projetos e tarefas. O Things fica como está."
           }
         }
       }
@@ -4198,6 +4210,18 @@
         }
       }
     },
+    "Every list, from Today to the Logbook" : {
+      "comment" : "Generated from registry plans.fullApp.points.lists.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todas as listas, de Hoje ao Registro"
+          }
+        }
+      }
+    },
     "Every new account starts with 14 days of Plus" : {
       "comment" : "Generated from registry plans.trial.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -4317,7 +4341,7 @@
       }
     },
     "Export everything as plain JSON" : {
-      "comment" : "Generated from registry plans.fullApp.points.5. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry plans.fullApp.points.export.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -5126,6 +5150,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Importe de outro app"
+          }
+        }
+      }
+    },
+    "Import from other task apps" : {
+      "comment" : "Generated from registry plans.fullApp.points.import.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importe de outros apps de tarefas"
           }
         }
       }
@@ -6181,6 +6217,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Movida para %@"
+          }
+        }
+      }
+    },
+    "Moves reminders into your Inbox. Each one you import leaves Reminders." : {
+      "comment" : "Generated from registry importSources.sources.reminders.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move lembretes para a sua Caixa de entrada. Cada um que você importa sai do Lembretes."
           }
         }
       }
@@ -9673,7 +9721,7 @@
       }
     },
     "Task conversations with the on-device model" : {
-      "comment" : "Generated from registry plans.fullApp.points.3. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry plans.fullApp.points.discuss.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -9942,6 +9990,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "O código funciona por 10 minutos. Depois que você aprovar, esta tela continua automaticamente."
+          }
+        }
+      }
+    },
+    "The full task app on one device. You do not need an account." : {
+      "comment" : "Generated from registry plans.cards.free.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O app completo de tarefas em um dispositivo. Você não precisa de uma conta."
           }
         }
       }
@@ -10873,7 +10933,7 @@
       }
     },
     "When dates, deadlines and repeats" : {
-      "comment" : "Generated from registry plans.fullApp.points.2. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry plans.fullApp.points.dates.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "pt-BR" : {
@@ -11084,6 +11144,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Você pode cancelar quando quiser em Ajustes."
+          }
+        }
+      }
+    },
+    "You can undo an import in Past imports." : {
+      "comment" : "Generated from registry settings.pages.import_export.sections.move_in.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "You can undo an import." : {
+      "comment" : "Generated from registry settings.pages.import_export.sections.move_in.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você pode desfazer uma importação."
           }
         }
       }

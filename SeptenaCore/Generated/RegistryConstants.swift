@@ -1,5 +1,5 @@
 // GENERATED FILE — DO NOT EDIT BY HAND.
-// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces,plans}.json
+// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces,plans,import-sources}.json
 // Regenerate: node scripts/gen-registries.mjs
 
 import Foundation
@@ -627,8 +627,8 @@ enum RegistrySettings {
       ]),
     ]),
     RegistrySettingsPage(id: "import_export", title: RegistryL10n.t("Import & Export"), iconId: "settings.data", sfSymbol: "square.and.arrow.up", depth: 2, platforms: nil, featureId: "sync.backend", sections: [
-      RegistrySettingsSection(id: "move_in", header: RegistryL10n.t("Move from another app"), footer: RegistryL10n.t("Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import."), platforms: ["ios", "ipados", "macos"], items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "things_import", label: RegistryL10n.t("Import from Things"), detail: nil, iconId: "settings.import", sfSymbol: "square.and.arrow.down", statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "import.things"),
+      RegistrySettingsSection(id: "move_in", header: RegistryL10n.t("Move from another app"), footer: RegistryL10n.t("You can undo an import."), platforms: ["ios", "ipados", "macos"], items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "import_sources", label: RegistryL10n.t("Move from another app"), detail: nil, iconId: "settings.import", sfSymbol: "square.and.arrow.down", statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "import.things"),
       ]),
       RegistrySettingsSection(id: "transfer", header: nil, footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "import_export", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
@@ -1946,7 +1946,7 @@ enum RegistryPlans {
     RegistryPlanPrice(id: "monthly", productId: "com.septena.tasks.sync.monthly", amountMinor: 700, currency: "EUR", interval: "month", highlighted: false, label: RegistryL10n.t("€7 a month"), detail: RegistryL10n.t("Cancel at any time.")),
   ] }
   static var cards: [RegistryPlanCard] { [
-    RegistryPlanCard(id: "free", title: RegistryL10n.t("Free"), icon: "plans.free", detail: RegistryL10n.t("The full task app on one iPhone, iPad or Mac. You do not need an account."), footnote: nil, highlighted: false),
+    RegistryPlanCard(id: "free", title: RegistryL10n.t("Free"), icon: "plans.free", detail: RegistryL10n.t("The full task app on one device. You do not need an account."), footnote: nil, highlighted: false),
     RegistryPlanCard(id: "plus", title: RegistryL10n.t("Septena Plus"), icon: "settings.plus", detail: RegistryL10n.t("Your list on every device, updated live."), footnote: RegistryL10n.t("Everything in Free is included."), highlighted: true),
   ] }
   static var outcomes: [RegistryPlanOutcome] { [
@@ -2031,6 +2031,29 @@ enum RegistryPlans {
     static var syncThisDeviceFailed: String { RegistryL10n.t("Septena could not reach the server. Try again in a moment.") }
     static var done: String { RegistryL10n.t("Done") }
   }
+}
+
+/// One app Septena imports from, or plans to (`registry/import-sources.json`).
+struct RegistryImportSource: Sendable, Hashable {
+  let id: String
+  let name: String
+  let status: String
+  let input: String
+  let issue: Int
+  let detail: String?
+}
+
+enum RegistryImportSources {
+  static var all: [RegistryImportSource] { [
+    RegistryImportSource(id: "things", name: "Things", status: "ships", input: "file", issue: 99, detail: RegistryL10n.t("Copies your areas, projects and tasks. Things stays as it is.")),
+    RegistryImportSource(id: "reminders", name: "Apple Reminders", status: "ships", input: "localLibrary", issue: 99, detail: RegistryL10n.t("Moves reminders into your Inbox. Each one you import leaves Reminders.")),
+    RegistryImportSource(id: "microsoft-todo", name: "Microsoft To Do", status: "planned", input: "account", issue: 52, detail: nil),
+    RegistryImportSource(id: "todoist", name: "Todoist", status: "planned", input: "account", issue: 100, detail: nil),
+    RegistryImportSource(id: "ticktick", name: "TickTick", status: "planned", input: "account", issue: 100, detail: nil),
+    RegistryImportSource(id: "omnifocus", name: "OmniFocus", status: "planned", input: "file", issue: 102, detail: nil),
+    RegistryImportSource(id: "superlist", name: "Superlist", status: "planned", input: "file", issue: 101, detail: nil),
+    RegistryImportSource(id: "anydo", name: "Any.do", status: "assisted", input: "file", issue: 102, detail: nil),
+  ] }
 }
 
 /// Canonical capability parity ledger (`registry/capabilities.json`, ADR 0013 / ADR 0015).

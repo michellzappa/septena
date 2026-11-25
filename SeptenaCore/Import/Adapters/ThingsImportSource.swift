@@ -7,30 +7,26 @@ import Foundation
 struct ThingsImportSource: ImportSource {
   static let id = "things"
 
-  let descriptor = ImportSourceDescriptor(
-    id: ThingsImportSource.id,
-    displayName: "Things 3",
-    inputKind: .file,
-    state: .available,
-    issue: 99,
-    coverage: [
-      ImportCoverage("areas", .mapped),
-      ImportCoverage("projects", .mapped),
-      ImportCoverage("headings", .mapped),
-      ImportCoverage("notes", .mapped),
-      ImportCoverage("today", .mapped),
-      ImportCoverage("startDate", .mapped, "Becomes the scheduled day."),
-      ImportCoverage("deadline", .mapped),
-      ImportCoverage("order", .mapped),
-      ImportCoverage("status", .mapped),
-      ImportCoverage("checklist", .preserved),
-      ImportCoverage("tags", .preserved),
-      ImportCoverage("completionDate", .transformed, "Completed tasks show the import day."),
-      ImportCoverage("someday", .unsupported, "Someday tasks arrive unscheduled."),
-      ImportCoverage("reminderTime", .unsupported, "Not read from the database yet."),
-      ImportCoverage("repeating", .unsupported, "Repeat rules are not read yet; their next copy imports as a task."),
-      ImportCoverage("trashedAreasProjects", .unsupported, "Trashed areas and projects are left out."),
-    ])
+  var id: String { Self.id }
+
+  let coverage: [ImportCoverage] = [
+    ImportCoverage("areas", .mapped),
+    ImportCoverage("projects", .mapped),
+    ImportCoverage("headings", .mapped),
+    ImportCoverage("notes", .mapped),
+    ImportCoverage("today", .mapped),
+    ImportCoverage("startDate", .mapped, "Becomes the scheduled day."),
+    ImportCoverage("deadline", .mapped),
+    ImportCoverage("order", .mapped),
+    ImportCoverage("status", .mapped),
+    ImportCoverage("checklist", .preserved),
+    ImportCoverage("tags", .preserved),
+    ImportCoverage("completionDate", .transformed, "Completed tasks show the import day."),
+    ImportCoverage("someday", .unsupported, "Someday tasks arrive unscheduled."),
+    ImportCoverage("reminderTime", .unsupported, "Not read from the database yet."),
+    ImportCoverage("repeating", .unsupported, "Repeat rules are not read yet; their next copy imports as a task."),
+    ImportCoverage("trashedAreasProjects", .unsupported, "Trashed areas and projects are left out."),
+  ]
 
   func read(_ request: ImportReadRequest) async throws -> ImportBundle {
     guard let url = request.fileURL else { throw ThingsImportError.databaseNotFound }

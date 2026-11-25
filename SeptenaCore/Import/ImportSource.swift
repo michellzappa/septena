@@ -4,7 +4,7 @@ import Foundation
 // source and returns one `ImportBundle`. It never writes Septena data, never
 // matches titles, and never knows what the user already has: that is the
 // engine's job (`ImportPlanner`). Adding a source = one adapter + its
-// descriptor row in `ImportSourceCatalog`.
+// row in `registry/import-sources.json`.
 
 /// How an adapter reaches its data.
 enum ImportInputKind: String, Codable, Sendable, Hashable {
@@ -45,7 +45,7 @@ struct ImportCoverage: Sendable, Hashable {
 
 /// Where a source stands in the app.
 enum ImportSourceState: String, Codable, Sendable, Hashable {
-  case available
+  case available = "ships"
   case planned
   /// No structured route; the guide walks the user through a manual path.
   case assisted
@@ -60,7 +60,20 @@ struct ImportSourceDescriptor: Sendable, Hashable, Identifiable {
   let state: ImportSourceState
   /// Tracking issue on michellzappa/septena.
   let issue: Int?
+  /// What moving in does, shown on an available source's row.
+  let detail: String?
   let coverage: [ImportCoverage]
+
+  /// A row of `registry/import-sources.json`, with the adapter's coverage.
+  init(_ row: RegistryImportSource, coverage: [ImportCoverage] = []) {
+    id = row.id
+    displayName = row.name
+    inputKind = ImportInputKind(rawValue: row.input) ?? .file
+    state = ImportSourceState(rawValue: row.status) ?? .planned
+    issue = row.issue
+    detail = row.detail
+    self.coverage = coverage
+  }
 
   /// The `TaskEntity.source` value for rows this source creates.
   var taskSource: String { "import:\(id)" }
@@ -73,41 +86,35 @@ struct ImportReadRequest: Sendable {
 }
 
 protocol ImportSource: Sendable {
-  var descriptor: ImportSourceDescriptor { get }
+  /// The source's id in `registry/import-sources.json`.
+  var id: String { get }
+  var coverage: [ImportCoverage] { get }
   /// Reads the whole source. Filtering (completed, trashed) is the engine's
   /// job, so an adapter returns everything it can read.
   func read(_ request: ImportReadRequest) async throws -> ImportBundle
 }
 
-/// Every source Septena knows about, built or not. One list, read by the
-/// moving-in UI. The `planned` rows carry their issue so the UI can say when.
+/// Every source Septena knows about, built or not. The list, its order and
+/// each status come from `registry/import-sources.json`, which the site reads
+/// too. An available source with no adapter has its own screen (Reminders).
 enum ImportSourceCatalog {
   static let adapters: [any ImportSource] = [
     ThingsImportSource(),
   ]
 
-  static let planned: [ImportSourceDescriptor] = [
-    ImportSourceDescriptor(id: "reminders", displayName: "Apple Reminders",
-                           inputKind: .localLibrary, state: .planned, issue: 99, coverage: []),
-    ImportSourceDescriptor(id: "microsoft-todo", displayName: "Microsoft To Do",
-                           inputKind: .account, state: .planned, issue: 52, coverage: []),
-    ImportSourceDescriptor(id: "todoist", displayName: "Todoist",
-                           inputKind: .account, state: .planned, issue: 100, coverage: []),
-    ImportSourceDescriptor(id: "ticktick", displayName: "TickTick",
-                           inputKind: .account, state: .planned, issue: 100, coverage: []),
-    ImportSourceDescriptor(id: "superlist", displayName: "Superlist",
-                           inputKind: .file, state: .planned, issue: 101, coverage: []),
-    ImportSourceDescriptor(id: "omnifocus", displayName: "OmniFocus",
-                           inputKind: .file, state: .planned, issue: 102, coverage: []),
-    ImportSourceDescriptor(id: "anydo", displayName: "Any.do",
-                           inputKind: .file, state: .assisted, issue: 102, coverage: []),
-  ]
-
   static var all: [ImportSourceDescriptor] {
-    adapters.map(\.descriptor) + planned
+    RegistryImportSources.all.map { row in
+      ImportSourceDescriptor(row, coverage: adapter(id: row.id)?.coverage ?? [])
+    }
+  }
+
+  static func descriptor(id: String) -> ImportSourceDescriptor? {
+    RegistryImportSources.all.first { $0.id == id }.map {
+      ImportSourceDescriptor($0, coverage: adapter(id: id)?.coverage ?? [])
+    }
   }
 
   static func adapter(id: String) -> (any ImportSource)? {
-    adapters.first { $0.descriptor.id == id }
+    adapters.first { $0.id == id }
   }
 }

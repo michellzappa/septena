@@ -393,7 +393,7 @@
   "Areas, projects, sections, notes and attachments": {
     "text": "Areas, projects, sections, notes and attachments",
     "paths": [
-      "plans.fullApp.points.1"
+      "plans.fullApp.points.structure.title"
     ]
   },
   "Attachments": {
@@ -750,6 +750,12 @@
     "text": "Copied",
     "paths": [
       "settings.copy.claude_connector.copied.label"
+    ]
+  },
+  "Copies your areas, projects and tasks. Things stays as it is.": {
+    "text": "Copies your areas, projects and tasks. Things stays as it is.",
+    "paths": [
+      "importSources.sources.things.detail"
     ]
   },
   "Copy": {
@@ -1186,6 +1192,12 @@
       "surfaces.prompts.error.title"
     ]
   },
+  "Every list, from Today to the Logbook": {
+    "text": "Every list, from Today to the Logbook",
+    "paths": [
+      "plans.fullApp.points.lists.title"
+    ]
+  },
   "Every new account starts with 14 days of Plus": {
     "text": "Every new account starts with 14 days of Plus",
     "paths": [
@@ -1225,7 +1237,7 @@
   "Export everything as plain JSON": {
     "text": "Export everything as plain JSON",
     "paths": [
-      "plans.fullApp.points.5"
+      "plans.fullApp.points.export.title"
     ]
   },
   "Export works on every plan. A limit hides older items. It never deletes them, and Plus shows them again.": {
@@ -1493,22 +1505,16 @@
       "settings.pages.privacy.sections.transfer.items.0.label"
     ]
   },
-  "Import from Things": {
-    "text": "Import from Things",
-    "paths": [
-      "settings.pages.import_export.sections.move_in.items.0.label"
-    ]
-  },
-  "Import from Things and Apple Reminders": {
-    "text": "Import from Things and Apple Reminders",
-    "paths": [
-      "plans.fullApp.points.4"
-    ]
-  },
   "Import from another app": {
     "text": "Import from another app",
     "paths": [
       "surfaces.notices.items.getStarted.steps.importTasks.detail"
+    ]
+  },
+  "Import from other task apps": {
+    "text": "Import from other task apps",
+    "paths": [
+      "plans.fullApp.points.import.title"
     ]
   },
   "Inactive tasks start to fade": {
@@ -1816,7 +1822,8 @@
   "Move from another app": {
     "text": "Move from another app",
     "paths": [
-      "settings.pages.import_export.sections.move_in.header"
+      "settings.pages.import_export.sections.move_in.header",
+      "settings.pages.import_export.sections.move_in.items.0.label"
     ]
   },
   "Move only this task, or update the repeating schedule to the new date?": {
@@ -1884,6 +1891,12 @@
     ],
     "paths": [
       "surfaces.toasts.templates.movedBulk.format"
+    ]
+  },
+  "Moves reminders into your Inbox. Each one you import leaves Reminders.": {
+    "text": "Moves reminders into your Inbox. Each one you import leaves Reminders.",
+    "paths": [
+      "importSources.sources.reminders.detail"
     ]
   },
   "Move…": {
@@ -2952,12 +2965,6 @@
       "surfaces.prompts.items.cameraUnavailable.title"
     ]
   },
-  "Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import.": {
-    "text": "Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import.",
-    "paths": [
-      "settings.pages.import_export.sections.move_in.footer"
-    ]
-  },
   "Septena could not reach the server. Try again in a moment.": {
     "text": "Septena could not reach the server. Try again in a moment.",
     "paths": [
@@ -3349,7 +3356,7 @@
   "Task conversations with the on-device model": {
     "text": "Task conversations with the on-device model",
     "paths": [
-      "plans.fullApp.points.3"
+      "plans.fullApp.points.discuss.title"
     ]
   },
   "Task deleted": {
@@ -3467,8 +3474,8 @@
       "surfaces.deviceSignIn.copy.lifetime.label"
     ]
   },
-  "The full task app on one iPhone, iPad or Mac. You do not need an account.": {
-    "text": "The full task app on one iPhone, iPad or Mac. You do not need an account.",
+  "The full task app on one device. You do not need an account.": {
+    "text": "The full task app on one device. You do not need an account.",
     "paths": [
       "plans.cards.free.detail"
     ]
@@ -3616,12 +3623,6 @@
     "text": "Today shows what to do now. Anything you skipped stays on the Get started list.",
     "paths": [
       "surfaces.firstRun.steps.done.body"
-    ]
-  },
-  "Today with its Inbox, Upcoming, Anytime, Faded and Logbook": {
-    "text": "Today with its Inbox, Upcoming, Anytime, Faded and Logbook",
-    "paths": [
-      "plans.fullApp.points.0"
     ]
   },
   "Toggle Checklist Item": {
@@ -3849,7 +3850,7 @@
   "When dates, deadlines and repeats": {
     "text": "When dates, deadlines and repeats",
     "paths": [
-      "plans.fullApp.points.2"
+      "plans.fullApp.points.dates.title"
     ]
   },
   "When off, tasks appear in one list with their project or area underneath.": {
@@ -3922,6 +3923,12 @@
     "text": "You can cancel at any time in Settings.",
     "paths": [
       "plans.paywall.cancelNote"
+    ]
+  },
+  "You can undo an import.": {
+    "text": "You can undo an import.",
+    "paths": [
+      "settings.pages.import_export.sections.move_in.footer"
     ]
   },
   "You can undo this.": {
