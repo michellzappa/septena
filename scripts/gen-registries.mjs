@@ -1712,6 +1712,15 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  // 8a. Sign-in by device approval (surfaces.json `deviceSignIn`, ADR 0016)
+  const deviceSignIn = surfaces.deviceSignIn;
+  lines.push("/// Sign-in by device approval (`registry/surfaces.json` `deviceSignIn`).");
+  lines.push("enum RegistryDeviceSignIn {");
+  lines.push(`  static let title: String = ${L(deviceSignIn.title, deviceSignIn, "title")}`);
+  for (const e of deviceSignIn.copy) lines.push(`  static let ${e.id}: String = ${L(e.label, e, "label")}`);
+  lines.push("}");
+  lines.push("");
+
   // 8b. First run (surfaces.json `firstRun`)
   const fr = surfaces.firstRun;
   const frButton = (b) => (b === undefined ? "nil" : `RegistryFirstRunButton(title: ${L(b.title, b, "title")}, action: ${swiftStr(b.action)})`);

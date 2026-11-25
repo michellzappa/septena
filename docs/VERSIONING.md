@@ -54,8 +54,10 @@ commit.
 
 ### Marketing version (SemVer, pre-1.0)
 
-We use [SemVer](https://semver.org). Until the public App Store launch we stay
-on `0.MINOR.PATCH`:
+We use [SemVer](https://semver.org). One version covers every platform: Apple
+targets read `MARKETING_VERSION`, and Android's `versionName` reads it from
+`project.yml`. mz set **0.9.0** on 2026-11-25: 0.9.x is the public beta. Until
+the public App Store launch we stay on `0.MINOR.PATCH`:
 
 - **MINOR** (`0.1.0` → `0.2.0`) — a batch of user-facing features / a TestFlight
   drop worth announcing.
@@ -64,6 +66,12 @@ on `0.MINOR.PATCH`:
   changes, MINOR for features, PATCH for fixes, as usual.
 
 ## Cutting a release
+
+The task app's Mac release is `scripts/release-macos.sh`
+(`docs/RELEASING-MAC.md`). Its notes come from `changelog/updates/`. Every push
+to `main` ships the iPhone and iPad app to TestFlight with the same version and
+a higher build number. The steps below are Septena Life's, which keeps
+`changelog.json`.
 
 One deliberate act, done in a **single session** (the changelog and `project.yml`
 are conflict hotspots — don't spread a release across parallel sessions). Most of

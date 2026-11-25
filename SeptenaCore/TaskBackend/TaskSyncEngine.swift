@@ -1483,9 +1483,18 @@ final class TaskSyncEngine {
   /// pulls from rev 0. The engine pauses across the sign-in, so no run
   /// pushes the old outbox with the new session before that check.
   func signIn(identityToken: String, rawNonce: String) async throws {
+    try await signIn { try await $0.signIn(identityToken: identityToken, rawNonce: rawNonce) }
+  }
+
+  /// The same, with the session a signed-in device approved (ADR 0016).
+  func signIn(deviceSession session: BackendSession) async throws {
+    try await signIn { await $0.adoptDeviceSession(session) }
+  }
+
+  private func signIn(_ authenticate: (TaskBackendClient) async throws -> String) async throws {
     let wasRunning = await pauseSync()
     defer { if wasRunning { start() } }
-    let userID = try await client.signIn(identityToken: identityToken, rawNonce: rawNonce)
+    let userID = try await authenticate(client)
     // No stored id (the first sign-in on this device, or a session from a
     // build before this check): keep the local data, as before.
     if let last = lastUserID, last != userID {

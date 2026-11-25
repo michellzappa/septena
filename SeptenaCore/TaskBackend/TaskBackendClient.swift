@@ -91,6 +91,35 @@ actor TaskBackendClient {
     return session.userId
   }
 
+  /// Starts sign-in by device approval (`POST /v1/auth/device/start`,
+  /// ADR 0016): the code a signed-in Septena approves.
+  func startDeviceSignIn(clientName: String) async throws -> BackendDeviceCode {
+    let body = try JSONEncoder().encode(["clientName": clientName])
+    let (data, status) = try await perform(path: "/v1/auth/device/start", method: "POST", body: body, auth: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendDeviceCode.self, from: data, what: "sign-in code")
+  }
+
+  /// One poll of a started sign-in (`POST /v1/auth/device/poll`). The server
+  /// hands the session over once, so the caller must adopt it.
+  func pollDeviceSignIn(_ device: BackendDeviceCode) async throws -> BackendDevicePoll {
+    let body = try JSONEncoder().encode(["code": device.code, "pollSecret": device.pollSecret])
+    let (data, status) = try await perform(path: "/v1/auth/device/poll", method: "POST", body: body, auth: nil)
+    switch status {
+    case 200: return .approved(try decode(BackendSession.self, from: data, what: "session"))
+    case 202: return .pending
+    case 410: return .expired
+    default: throw Self.httpError(status, data)
+    }
+  }
+
+  /// Adopts the session of an approved device sign-in. Returns its user id.
+  @discardableResult
+  func adoptDeviceSession(_ session: BackendSession) -> String {
+    adopt(session)
+    return session.userId
+  }
+
   func signOut() async {
     if let token = KeychainStore.load(account: Self.refreshAccount),
        let body = try? JSONEncoder().encode(["refreshToken": token]) {

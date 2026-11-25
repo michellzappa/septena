@@ -333,7 +333,13 @@ struct SeptaskFirstRunView: View {
 
   private func applies(_ step: RegistryFirstRunStep) -> Bool {
     let platform = SeptaskFirstRunGate.platform
-    if !step.platforms.isEmpty, !step.platforms.contains(platform) { return false }
+    if step.kind == "account" {
+      // A build without Sign in with Apple takes the code step, as Android does.
+      let usesCode = step.id == "accountDevice"
+      if usesCode == SeptaskSignIn.appleAvailable { return false }
+    } else if !step.platforms.isEmpty, !step.platforms.contains(platform) {
+      return false
+    }
     if let featureId = step.featureId,
        !RegistryCapabilities.isAvailable(featureId, on: platform) {
       return false

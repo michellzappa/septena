@@ -167,6 +167,39 @@ struct BackendSession: Decodable, Sendable {
   let userId: String
 }
 
+/// `POST /v1/auth/device/start`: a new device's sign-in code (ADR 0016).
+struct BackendDeviceCode: Decodable, Sendable, Equatable {
+  /// The QR's modules, row by row, "1" dark and "0" light. The client adds
+  /// the 4-module quiet zone.
+  struct QR: Decodable, Sendable, Equatable {
+    let size: Int
+    let modules: String
+
+    /// The dark flags, or nil when the matrix is malformed.
+    var dark: [Bool]? {
+      guard (21...177).contains(size), (size - 17) % 4 == 0, modules.utf8.count == size * size,
+            modules.utf8.allSatisfy({ $0 == 0x30 || $0 == 0x31 }) else { return nil }
+      return modules.utf8.map { $0 == 0x31 }
+    }
+  }
+
+  let code: String
+  let pollSecret: String
+  let expiresIn: Int
+  let interval: Int
+  let qr: QR?
+
+  var displayCode: String {
+    code.count == 8 ? "\(code.prefix(4))-\(code.suffix(4))" : code
+  }
+}
+
+enum BackendDevicePoll: Sendable {
+  case pending
+  case expired
+  case approved(BackendSession)
+}
+
 // MARK: - iCal Feed (IC1)
 
 enum BackendIcalScope: String, Codable, CaseIterable, Identifiable, Sendable {

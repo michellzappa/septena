@@ -41,7 +41,7 @@ settings:
     # here on purpose: it lives in Config/Base.xcconfig so `scripts/stamp-
     # version.sh` can stamp it from the git commit count at archive time
     # (monotonic, conflict-free across parallel sessions).
-    MARKETING_VERSION: "0.7.0"
+    MARKETING_VERSION: "0.9.0"
     DEVELOPMENT_TEAM: $(SEPTENA_DEVELOPMENT_TEAM)
     CODE_SIGN_STYLE: Automatic
     INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
@@ -410,7 +410,7 @@ targets:
           - pt-BR
         ITSAppUsesNonExemptEncryption: false
         CFBundleIconFile: AppIcon
-        SUFeedURL: https://updates.centaur-labs.io/appcast.xml
+        SUFeedURL: https://septena.app/mac/appcast.xml
         SUPublicEDKey: $(SPARKLE_PUBLIC_ED_KEY)
         SUEnableAutomaticChecks: true
         SUScheduledCheckInterval: 86400

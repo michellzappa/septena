@@ -17,7 +17,7 @@ reports-worker/node_modules/
 # community-worker npm deps (restore with `npm install`)
 community-worker/node_modules/
 
-# Local release build (scripts/build-macos-release.sh)
+# Mac release build (scripts/release-macos.sh)
 .build-macos-release/
 dist/
 

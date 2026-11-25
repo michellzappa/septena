@@ -21,7 +21,7 @@ name: Septena iOS TestFlight
 # Watch: project.yml has the SeptaskWatch embed commented out
 # (WATCH_EMBED_DISABLED), so these builds ship WITHOUT the watch app.
 #
-# Secrets (shared with release-macos.yml where the name matches):
+# Secrets:
 #   APPLE_API_KEY         App Store Connect .p8 contents
 #   APPLE_API_KEY_ID      key id
 #   APPLE_API_ISSUER_ID   issuer id
