@@ -248,7 +248,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld selecionados"
+            "value" : "%lld itens selecionados"
           }
         }
       }
@@ -332,7 +332,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ terá acesso completo à sua conta Septena, incluindo tarefas, listas, conversas e ajustes. A sessão continuará ativa até você encerrá-la."
+            "value" : "%@ terá acesso completo à sua conta Septena, incluindo tarefas, listas, conversas e ajustes. A conta continuará conectada até você sair dela."
           }
         }
       }
@@ -374,7 +374,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sessão iniciada em %@."
+            "value" : "Conta conectada em %@."
           }
         }
       }
@@ -2744,13 +2744,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "1 attività attenuata questa settimana"
+                  "value" : "1 attività spostata in Inattive questa settimana"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld attività attenuate questa settimana"
+                  "value" : "%lld attività spostate in Inattive questa settimana"
                 }
               }
             }
@@ -2780,13 +2780,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "1 tarefa esmaeceu esta semana"
+                  "value" : "1 tarefa foi movida para Inativas esta semana"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld tarefas esmaeceram esta semana"
+                  "value" : "%lld tarefas foram movidas para Inativas esta semana"
                 }
               }
             }
@@ -4116,7 +4116,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ativo %@ · não sincronizando"
+            "value" : "Ativo %@ · sem sincronização"
           }
         }
       }
@@ -4839,7 +4839,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adicionado pelo Claude, ainda não visto"
+            "value" : "Adicionada pelo Claude, ainda não visualizada"
           }
         },
         "nl" : {
@@ -5815,7 +5815,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Permita o acesso do Septena à câmera em Ajustes ou digite o código."
+            "value" : "Permita que o app Septena use a câmera em Ajustes ou digite o código."
           }
         }
       }
@@ -6589,7 +6589,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "As listas de arquivo e utilitárias aparecem abaixo das áreas e dos projetos. Arraste para reordenar dentro de uma seção ou use as setas para mover uma lista para cima ou para baixo. As alterações são sincronizadas em todos os seus dispositivos."
+            "value" : "As listas arquivadas e auxiliares aparecem abaixo das áreas e dos projetos. Arraste para reordená-las dentro de uma seção ou use as setas para movê-las para cima ou para baixo. As alterações são sincronizadas em todos os dispositivos."
           }
         }
       }
@@ -6631,7 +6631,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "As listas de arquivo e utilitárias aparecem abaixo das áreas e dos projetos. Use as setas para reordenar uma lista ou movê-la para cima ou para baixo. As alterações são sincronizadas em todos os seus dispositivos."
+            "value" : "As listas arquivadas e auxiliares aparecem abaixo das áreas e dos projetos. Use as setas para reordená-las ou movê-las para cima ou para baixo. As alterações são sincronizadas em todos os dispositivos."
           }
         }
       }
@@ -6804,7 +6804,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chegou a Hoje"
+            "value" : "Entrou em Hoje"
           }
         },
         "nl" : {
@@ -6834,7 +6834,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Arrivata in Oggi"
+            "value" : "Spostata in Oggi"
           }
         }
       }
@@ -7064,7 +7064,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Costas"
+            "value" : "Voltar"
           }
         },
         "nl" : {
@@ -7386,7 +7386,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Linha de base"
+            "value" : "Padrão"
           }
         }
       }
@@ -7504,7 +7504,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Além das conversas, o %@ aprende pequenos padrões localmente, como a sugestão “Mover para…” que prevê onde uma tarefa deve ficar com base no seu próprio histórico. Esse modelo é treinado no seu dispositivo e nunca sai dele."
+            "value" : "Além das conversas, o app %@ aprende padrões de uso no próprio dispositivo, como a sugestão “Mover para…”, que prevê onde você costuma guardar uma tarefa com base no seu histórico. Esse modelo é treinado no dispositivo e nunca sai dele."
           }
         }
       }
@@ -7730,7 +7730,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Traga suas tarefas"
+            "value" : "Importar suas tarefas"
           }
         }
       }
@@ -8390,7 +8390,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "As alterações que o servidor recusou aparecem aqui, das mais recentes para as mais antigas. O servidor manteve a própria versão de cada uma."
+            "value" : "Aqui aparecem as alterações recusadas pelo servidor, começando pelas mais recentes. O servidor manteve sua própria versão de cada uma."
           }
         }
       }
@@ -8432,7 +8432,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Buscar atualizações…"
+            "value" : "Verificar atualizações…"
           }
         }
       }
@@ -8964,13 +8964,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Limpar 1 item registrado de “%2$@”?"
+                  "value" : "Limpar 1 item do registro de “%2$@”?"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Limpar %lld itens registrados de “%@”?"
+                  "value" : "Limpar %lld itens do registro de “%@”?"
                 }
               }
             }
@@ -9015,7 +9015,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Limpar registrados…"
+            "value" : "Limpar registros…"
           }
         }
       }
@@ -9176,7 +9176,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Os itens limpos vão para Apagadas recentemente. Você pode desfazer isso."
+            "value" : "Os itens removidos vão para Apagadas recentemente. Você pode desfazer essa ação."
           }
         }
       }
@@ -10254,7 +10254,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Copia suas áreas, projetos e tarefas. O Things fica como está."
+            "value" : "Copia suas áreas, projetos e tarefas. O Things permanece inalterado."
           }
         }
       }
@@ -11106,7 +11106,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Limite diário de alterações atingido"
+            "value" : "Você atingiu o limite diário de alterações."
           }
         }
       }
@@ -11306,7 +11306,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SEQUÊNCIA DE DIAS"
+            "value" : "DIAS SEGUIDOS"
           }
         },
         "nl" : {
@@ -11336,7 +11336,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "GIORNI DI FILA"
+            "value" : "GIORNI CONSECUTIVI"
           }
         }
       }
@@ -11537,7 +11537,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diminuir texto"
+            "value" : "Diminuir tamanho do texto"
           }
         }
       }
@@ -12148,13 +12148,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Apagar 1 tarefa apagada permanentemente?"
+                  "value" : "Apagar definitivamente a tarefa já apagada?"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Apagar todas as %lld tarefas apagadas permanentemente?"
+                  "value" : "Apagar definitivamente todas as %lld tarefas já apagadas?"
                 }
               }
             }
@@ -12963,7 +12963,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Discuti"
+            "value" : "Parlane"
           }
         },
         "nl" : {
@@ -12975,7 +12975,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Discutir"
+            "value" : "Conversar"
           }
         }
       }
@@ -13005,7 +13005,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Discuti non lascia mai questo dispositivo. Qui Septena non dispone di un modello sul dispositivo, quindi Discuti è disattivato."
+            "value" : "Le conversazioni sulle attività restano su questo dispositivo. Qui Septena non dispone di un modello locale, quindi la funzione è disattivata."
           }
         },
         "nl" : {
@@ -13017,7 +13017,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O modo Discutir nunca sai deste dispositivo. O Septena não tem um modelo local aqui, então o modo Discutir está desativado."
+            "value" : "As conversas sobre tarefas ficam somente neste dispositivo. Como o app Septena não tem um modelo local aqui, esse recurso está desativado."
           }
         }
       }
@@ -13099,7 +13099,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Faz o que pode: um rascunho, uma comparação. Só usa a web ou o seu Claude quando necessário."
+            "value" : "Faz o que pode, como criar um rascunho ou comparar opções. Só acessa a internet ou seu Claude quando necessário."
           }
         }
       }
@@ -13525,7 +13525,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cada app em que você iniciou sessão. Um dispositivo do qual você sair para de sincronizar em até uma hora."
+            "value" : "Cada app em que você entrou. Quando você sai de um dispositivo, ele para de sincronizar em até uma hora."
           }
         }
       }
@@ -14414,7 +14414,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tudo fica neste dispositivo. Se uma etapa precisar de um modelo maior, ela pausa e pergunta a você."
+            "value" : "Tudo fica neste dispositivo. Se alguma etapa precisar de um modelo maior, o app pausa e pergunta se você quer continuar."
           }
         },
         "fr" : {
@@ -14444,7 +14444,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tutto resta su questo dispositivo. Se un passaggio richiede un modello più potente, si mette in pausa e te lo chiede."
+            "value" : "Tutto resta su questo dispositivo. Se un passaggio richiede un modello più potente, il processo si mette in pausa e ti chiede se vuoi continuare."
           }
         }
       }
@@ -14888,7 +14888,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A exportação funciona em todos os planos. Um limite oculta os itens mais antigos, mas nunca os apaga; com o Plus, eles voltam a aparecer."
+            "value" : "A exportação está disponível em todos os planos. O limite apenas oculta os itens mais antigos; eles não são apagados e voltam a aparecer com o Plus."
           }
         }
       }
@@ -15090,7 +15090,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esmaecer tarefas inativas"
+            "value" : "Diminuir o destaque das tarefas inativas"
           }
         }
       }
@@ -15120,7 +15120,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Attenuate"
+            "value" : "Inattive"
           }
         },
         "nl" : {
@@ -15132,7 +15132,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esmaecidas"
+            "value" : "Inativas"
           }
         }
       }
@@ -15162,7 +15162,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Attività attenuate"
+            "value" : "Attività inattive"
           }
         },
         "nl" : {
@@ -15174,7 +15174,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tarefas esmaecidas"
+            "value" : "Tarefas inativas"
           }
         }
       }
@@ -15292,7 +15292,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Favorite tarefas importantes para tê-las a um toque."
+            "value" : "Marque as tarefas importantes como favoritas para acessá-las com um toque."
           }
         }
       }
@@ -15334,7 +15334,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Favoritos"
+            "value" : "Favoritas"
           }
         }
       }
@@ -15952,7 +15952,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dos Lembretes"
+            "value" : "Do app Lembretes"
           }
         },
         "nl" : {
@@ -16024,7 +16024,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tarefas, áreas, projetos e checklists completos do Septena (importável)"
+            "value" : "Tarefas, áreas, projetos e checklists do Septena (prontos para importar)"
           }
         }
       }
@@ -16344,7 +16344,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dê uma regra de repetição a qualquer tarefa e ela aparece aqui."
+            "value" : "Defina uma repetição para qualquer tarefa e ela aparecerá aqui."
           }
         }
       }
@@ -16727,7 +16727,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Delegar"
+            "value" : "Atribuir"
           }
         }
       }
@@ -18040,7 +18040,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Importe de outro app"
+            "value" : "Importar de outro app"
           }
         }
       }
@@ -18082,7 +18082,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Importe de outros apps de tarefas"
+            "value" : "Importar de outros apps de tarefas"
           }
         }
       }
@@ -18361,7 +18361,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tarefas inativas começam a esmaecer"
+            "value" : "As tarefas inativas começam a perder destaque."
           }
         }
       }
@@ -18874,7 +18874,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Também remove suas tarefas deste dispositivo e encerra sua sessão. Não é possível desfazer."
+            "value" : "Isso também remove suas tarefas deste dispositivo e tira você da conta. Não é possível desfazer."
           }
         }
       }
@@ -19534,7 +19534,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deixe o Claude ou seu próprio agente trabalhar na sua lista"
+            "value" : "Deixe o Claude ou seu agente cuidar da sua lista"
           }
         }
       }
@@ -19564,7 +19564,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lascia andare"
+            "value" : "Scarta"
           }
         },
         "nl" : {
@@ -19576,7 +19576,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deixar ir"
+            "value" : "Descartar"
           }
         }
       }
@@ -19618,7 +19618,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Leve"
+            "value" : "Claro"
           }
         }
       }
@@ -19790,7 +19790,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ao vivo"
+            "value" : "Em tempo real"
           }
         },
         "fr" : {
@@ -20219,7 +20219,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Marcar como feito"
+            "value" : "Marcar como concluída"
           }
         }
       }
@@ -20261,7 +20261,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Marcar como não feito"
+            "value" : "Marcar como não concluída"
           }
         }
       }
@@ -20303,7 +20303,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Marcar como feito"
+            "value" : "Marcar como concluída"
           }
         }
       }
@@ -21055,7 +21055,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mover para cima de Áreas e projetos"
+            "value" : "Mover para antes de Áreas e projetos"
           }
         }
       }
@@ -21097,7 +21097,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mover para baixo de Áreas e projetos"
+            "value" : "Mover para depois de Áreas e projetos"
           }
         }
       }
@@ -21467,7 +21467,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mover para área"
+            "value" : "Mover para uma área"
           }
         }
       }
@@ -21952,7 +21952,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Move lembretes para a sua Caixa de entrada. Cada um que você importa sai do Lembretes."
+            "value" : "Os lembretes vão para a Caixa de entrada; cada item importado é removido do app Lembretes."
           }
         }
       }
@@ -22455,7 +22455,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Próximo"
+            "value" : "Próximas"
           }
         },
         "nl" : {
@@ -22699,7 +22699,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nessuna attività attenuata"
+            "value" : "Nessuna attività inattiva"
           }
         },
         "nl" : {
@@ -22711,7 +22711,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nenhuma tarefa esmaecida"
+            "value" : "Nenhuma tarefa inativa"
           }
         }
       }
@@ -22753,7 +22753,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nenhum favorito"
+            "value" : "Nenhuma tarefa favorita"
           }
         }
       }
@@ -23099,7 +23099,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nenhum item selecionado"
+            "value" : "Nada selecionado"
           }
         },
         "nl" : {
@@ -23129,7 +23129,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nessuna selezione"
+            "value" : "Nessun elemento selezionato"
           }
         }
       }
@@ -23421,7 +23421,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sem sessão iniciada"
+            "value" : "Você não entrou na conta"
           }
         }
       }
@@ -23431,7 +23431,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não é compatível com este dispositivo."
+            "value" : "Este recurso não é compatível com este dispositivo."
           }
         },
         "nl" : {
@@ -23461,7 +23461,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Non supportato su questo dispositivo."
+            "value" : "Funzione non supportata su questo dispositivo."
           }
         }
       }
@@ -23729,7 +23729,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nessuna attività in In qualsiasi momento"
+            "value" : "Nessuna attività senza data"
           }
         },
         "nl" : {
@@ -23741,7 +23741,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nada em A qualquer momento"
+            "value" : "Nenhuma tarefa sem data"
           }
         }
       }
@@ -23941,7 +23941,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nada em breve"
+            "value" : "Nenhuma tarefa próxima"
           }
         }
       }
@@ -24107,7 +24107,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Desligado"
+            "value" : "Desativado"
           }
         },
         "nl" : {
@@ -24380,7 +24380,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No modo Automático, cada etapa é executada primeiro no seu dispositivo. Só recorre a outros recursos para etapas que ele não consegue executar (↗)."
+            "value" : "No modo Automático, cada etapa é executada primeiro no seu dispositivo. Só recorre a outros recursos quando o dispositivo não consegue realizar uma etapa (↗)."
           }
         }
       }
@@ -24668,7 +24668,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neste dispositivo · Inicie sessão para sincronizar"
+            "value" : "Neste dispositivo · Entre para sincronizar"
           }
         }
       }
@@ -24848,7 +24848,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Primeiro no dispositivo; só usa o Private Cloud Compute da Apple ou o seu próprio Claude se uma etapa precisar de um modelo maior. Recomendado."
+            "value" : "Primeiro, no dispositivo; só recorre ao Private Cloud Compute da Apple ou ao seu Claude quando uma etapa precisa de um modelo maior. Recomendado."
           }
         },
         "fr" : {
@@ -24878,7 +24878,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prima sul dispositivo; si passa ad Apple Private Cloud Compute o al tuo Claude solo se un passaggio richiede un modello più potente. Consigliato."
+            "value" : "Prima sul dispositivo; si ricorre a Private Cloud Compute di Apple o al tuo Claude solo quando un passaggio richiede un modello più potente. Consigliato."
           }
         }
       }
@@ -25224,7 +25224,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apri un’attività o scegli Mantieni per recuperarla; altrimenti rivedi l’elenco e lascia andare le altre."
+            "value" : "Apri un’attività o scegli Mantieni per recuperarla; altrimenti rivedi l’elenco e scarta le altre."
           }
         },
         "nl" : {
@@ -25236,7 +25236,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abra uma tarefa ou escolha Manter para recuperá-la, ou revise a lista e descarte o restante."
+            "value" : "Abra uma tarefa ou escolha Manter para trazê-la de volta. Revise a lista e descarte as demais."
           }
         }
       }
@@ -25851,7 +25851,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cole no contexto de um modelo para ensiná-lo a usar as ferramentas de tarefas sem conectar ao MCP."
+            "value" : "Cole no contexto do modelo para ensinar como usar as ferramentas de tarefas sem conectá-lo ao MCP."
           }
         }
       }
@@ -25935,7 +25935,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cole o prompt de configuração no Claude ou adicione a URL do conector ao Claude como um conector personalizado. Quando o navegador mostrar um código, digite-o aqui. Depois de conectar, cole o primeiro prompt para configurar suas áreas, projetos e tarefas. Digite apenas códigos exibidos em uma janela do navegador que você mesmo abriu."
+            "value" : "Cole o prompt de configuração no Claude ou adicione o URL do conector como um conector personalizado. Quando o navegador mostrar um código, digite-o aqui. Depois de conectar, cole o primeiro prompt para configurar suas áreas, projetos e tarefas. Digite apenas um código exibido em uma janela do navegador que você abriu."
           }
         }
       }
@@ -26729,7 +26729,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aponte a câmera para o código QR na outra tela."
+            "value" : "Aponte a câmera para o código QR que aparece na outra tela."
           }
         }
       }
@@ -27073,7 +27073,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Feed iCal privado"
+            "value" : "Feed privado do iCal"
           }
         }
       }
@@ -27756,7 +27756,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agenda somente leitura em Hoje e Em breve"
+            "value" : "Agenda somente leitura em Hoje e Próximas"
           }
         }
       }
@@ -27798,7 +27798,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Feed de assinatura somente para leitura com suas tarefas agendadas e prazos. Qualquer pessoa com a URL privada pode ver os títulos e as notas do feed; você pode trocar a URL ou desativar o feed quando quiser."
+            "value" : "Feed de calendário somente para leitura com suas tarefas agendadas e prazos. Qualquer pessoa com o URL privado pode ver os títulos e as notas; você pode gerar um novo URL ou desativar o feed quando quiser."
           }
         }
       }
@@ -29737,7 +29737,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trocar o link do feed de calendário?"
+            "value" : "Gerar um novo link do feed de calendário?"
           }
         }
       }
@@ -29779,7 +29779,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trocar link"
+            "value" : "Gerar novo link"
           }
         }
       }
@@ -29821,7 +29821,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A troca substitui imediatamente o link privado do feed. As assinaturas de calendário existentes deixarão de ser atualizadas até que você assine novamente com a nova URL."
+            "value" : "O novo link substitui o atual imediatamente. As assinaturas de calendário existentes deixarão de ser atualizadas até que você assine novamente usando o novo URL."
           }
         }
       }
@@ -30885,7 +30885,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena não pode adicionar isso. Cole um link da web ou um link de e-mail."
+            "value" : "O app Septena não pode adicionar isso. Cole um link de site ou de e-mail."
           }
         }
       }
@@ -30927,7 +30927,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena não consegue usar a câmera"
+            "value" : "O app Septena não consegue usar a câmera."
           }
         }
       }
@@ -30987,7 +30987,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena não conseguiu se conectar ao servidor. Tente novamente em instantes."
+            "value" : "O app Septena não conseguiu se conectar ao servidor. Tente novamente em instantes."
           }
         }
       }
@@ -31017,7 +31017,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Qui Septena non dispone di un modello sul dispositivo, quindi Discuti affida l’attività al tuo Claude. Consigliato."
+            "value" : "Qui Septena non dispone di un modello locale, quindi la funzione «Parlane» inoltra la richiesta al tuo Claude. Consigliato."
           }
         },
         "nl" : {
@@ -31029,7 +31029,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena não tem um modelo local aqui, então o modo Discutir encaminha a tarefa para o seu Claude. Recomendado."
+            "value" : "Como o app Septena não tem um modelo local neste dispositivo, o recurso Conversar encaminha a tarefa para o seu Claude. Recomendado."
           }
         }
       }
@@ -31071,7 +31071,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena guarda as tarefas apagadas aqui por 30 dias e depois as apaga de vez."
+            "value" : "O app Septena mantém as tarefas apagadas aqui por 30 dias e depois as exclui definitivamente."
           }
         }
       }
@@ -31125,7 +31125,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena nunca roda IA nos seus dados e nunca os lê. A inteligência é sua (Apple no dispositivo, Private Cloud Compute ou seu Claude). Isto só define onde as solicitações podem rodar."
+            "value" : "O app Septena nunca usa IA nos seus dados nem os lê. A inteligência é sua (Apple no dispositivo, Private Cloud Compute ou seu Claude). Esta opção só define onde as solicitações podem ser processadas."
           }
         }
       }
@@ -31251,7 +31251,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena mantém o servidor de sincronização e o conector. Quando você conecta o Claude ou outro agente, a cobrança fica com o respectivo provedor."
+            "value" : "O app Septena mantém o servidor de sincronização e o conector. Quando você conecta o Claude ou outro agente, a cobrança fica com o respectivo provedor."
           }
         }
       }
@@ -32066,7 +32066,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mostra attività attenuate"
+            "value" : "Mostra le attività inattive"
           }
         },
         "nl" : {
@@ -32078,7 +32078,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mostrar tarefas esmaecidas"
+            "value" : "Mostrar tarefas inativas"
           }
         }
       }
@@ -32108,7 +32108,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mostra le attività attenuate nei progetti e nelle aree."
+            "value" : "Mostra le attività inattive nei progetti e nelle aree."
           }
         },
         "nl" : {
@@ -32120,7 +32120,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mostra tarefas esmaecidas em projetos e áreas."
+            "value" : "Mostrar tarefas inativas em projetos e áreas."
           }
         }
       }
@@ -32497,7 +32497,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Iniciar sessão"
+            "value" : "Entrar"
           }
         }
       }
@@ -32539,7 +32539,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Entrar no Septena"
+            "value" : "Entrar na sua conta Septena"
           }
         }
       }
@@ -32581,7 +32581,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Iniciar sessão em %@?"
+            "value" : "Entrar em %@?"
           }
         }
       }
@@ -32623,7 +32623,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inicie sessão para que o Claude possa se conectar às suas tarefas pela sua conta privada do Septena."
+            "value" : "Entre na sua conta privada Septena para que o Claude possa se conectar às suas tarefas."
           }
         }
       }
@@ -32665,7 +32665,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inicie sessão para conectar o Claude"
+            "value" : "Entrar para conectar o Claude"
           }
         }
       }
@@ -32707,7 +32707,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inicie sessão na sincronização do Septena para criar uma URL privada de feed de calendário para o Calendário da Apple, Google Agenda ou Outlook."
+            "value" : "Entre na sua conta Septena para criar um link privado de calendário para Apple Calendar, Google Agenda ou Outlook."
           }
         }
       }
@@ -32749,7 +32749,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Entre para sincronizar"
+            "value" : "Entrar para sincronizar"
           }
         }
       }
@@ -32789,7 +32789,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Iniciar sessão com a Apple"
+            "value" : "Entrar com a Apple"
           }
         }
       }
@@ -32831,7 +32831,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inicie sessão com a Apple para ter suas tarefas em todos os dispositivos e deixar o Claude se conectar. O Septena nunca vê sua senha da Apple."
+            "value" : "Entre com a Apple para manter suas tarefas em todos os dispositivos e permitir que o Claude se conecte. O app Septena nunca vê sua senha da Apple."
           }
         }
       }
@@ -32915,7 +32915,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Encerrar sessão"
+            "value" : "Sair"
           }
         }
       }
@@ -32957,7 +32957,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Encerrar a sessão de %@?"
+            "value" : "Sair de %@?"
           }
         }
       }
@@ -32980,6 +32980,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ignorer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salta"
           }
         },
         "nl" : {
@@ -33367,7 +33373,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Alcune attività richiedono una riflessione prima di agire. Tocca Discuti e ragionaci direttamente nell’attività."
+            "value" : "Alcune attività richiedono un po’ di riflessione. Tocca «Parlane» per ragionarci direttamente nell’attività."
           }
         },
         "nl" : {
@@ -33379,7 +33385,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Algumas tarefas exigem reflexão antes de agir. Toque em Discutir para pensar nelas, direto na tarefa."
+            "value" : "Algumas tarefas exigem reflexão antes de agir. Toque em Conversar para pensar sobre elas direto na tarefa."
           }
         }
       }
@@ -35222,7 +35228,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le attività inattive da 14 giorni si attenuano e vengono spostate in Attenuate."
+            "value" : "Dopo 14 giorni senza attività, le attività perdono risalto e vengono spostate in Inattive."
           }
         },
         "nl" : {
@@ -35234,7 +35240,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tarefas sem atividade por 14 dias esmaecem e vão para Esmaecidas."
+            "value" : "Depois de 14 dias sem atividade, as tarefas perdem destaque e vão para Inativas."
           }
         }
       }
@@ -35318,7 +35324,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tarefas que você conclui ou descarta vêm parar aqui."
+            "value" : "Aqui ficam as tarefas que você concluiu ou descartou."
           }
         }
       }
@@ -35360,7 +35366,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nenhum plano limita o número de tarefas, listas, projetos ou áreas."
+            "value" : "Nenhum plano limita a quantidade de tarefas, listas, projetos ou áreas."
           }
         }
       }
@@ -35566,7 +35572,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esse dispositivo deixará de sincronizar em até uma hora. As tarefas continuarão nele até você iniciar sessão novamente."
+            "value" : "Esse dispositivo deixará de sincronizar em até uma hora. As tarefas continuarão nele até você entrar novamente."
           }
         }
       }
@@ -36246,7 +36252,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Plus deste ID Apple pertence a outra conta do Septena. Entre nessa conta para usá-lo."
+            "value" : "O Plus deste ID Apple está vinculado a outra conta Septena. Entre nessa conta para usá-lo."
           }
         }
       }
@@ -36501,7 +36507,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esta tarefa já atingiu o limite de %lld referências."
+            "value" : "Esta tarefa já tem %lld referências."
           }
         }
       }
@@ -36793,7 +36799,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Para iniciar sessão em um novo celular, tablet ou computador, toque em Obter código de acesso nele. Depois, leia ou digite o código aqui."
+            "value" : "Para entrar em um novo celular, tablet ou computador, toque em Obter código de acesso nesse dispositivo. Depois, escaneie ou digite o código aqui."
           }
         }
       }
@@ -36968,7 +36974,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hoje, com Caixa de entrada, Em breve, A qualquer momento, Esmaecidas e Registro"
+            "value" : "Hoje, com Caixa de entrada, Próximas, A qualquer momento, Inativas e Registro"
           }
         }
       }
@@ -37605,7 +37611,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le attività senza data si attenuano dopo 14 giorni di inattività e vengono spostate in Attenuate. Apri o modifica un’attività per recuperarla. Puoi disattivare questa opzione in Impostazioni."
+            "value" : "Le attività senza data e inattive da 14 giorni vengono spostate in Inattive. Aprine una o modificala per farla tornare visibile. Puoi disattivare questa opzione in Impostazioni."
           }
         },
         "nl" : {
@@ -37617,7 +37623,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tarefas sem data esmaecem após 14 dias sem atividade e vão para Esmaecidas. Abra ou edite uma tarefa para trazê-la de volta. Você pode desativar isso nos Ajustes."
+            "value" : "As tarefas sem data que ficarem inativas por 14 dias vão para Inativas. Abra ou edite uma delas para trazê-la de volta. Você pode desativar isso em Ajustes."
           }
         }
       }
@@ -37647,7 +37653,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Qui appaiono le attività senza data e inattive da 14 giorni, finché non decidi se mantenerle o lasciarle andare."
+            "value" : "Le attività senza data e inattive da 14 giorni compaiono qui, dove puoi decidere se tenerle o scartarle."
           }
         },
         "nl" : {
@@ -37659,7 +37665,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tarefas sem data e sem atividade por 14 dias aparecem aqui até você mantê-las ou descartá-las."
+            "value" : "As tarefas sem data e sem atividade há 14 dias aparecem aqui até você decidir se quer mantê-las ou descartá-las."
           }
         }
       }
@@ -37743,7 +37749,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Desfavoritar"
+            "value" : "Remover dos favoritos"
           }
         }
       }
@@ -37870,7 +37876,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Em breve"
+            "value" : "Próximas"
           }
         }
       }
@@ -38024,7 +38030,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Use um dispositivo em que o Septena já está conectado."
+            "value" : "Use um dispositivo em que você já tenha entrado no app Septena."
           }
         }
       }
@@ -38066,7 +38072,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Use um dispositivo em que o Septena já está conectado. Ele aprova este com um código, e suas tarefas sincronizam aqui."
+            "value" : "Use um dispositivo em que você já tenha entrado no app Septena. Ele aprovará este dispositivo com um código, e suas tarefas serão sincronizadas aqui."
           }
         }
       }
@@ -38326,7 +38332,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Voto registrado"
+            "value" : "Voto enviado"
           }
         },
         "nl" : {
@@ -38356,7 +38362,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Voto espresso"
+            "value" : "Voto inviato"
           }
         }
       }
@@ -39055,7 +39061,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quando ativo, os itens pendentes da lista de origem são importados automaticamente e removidos dos Lembretes. Roda ao abrir o app e sempre que os Lembretes mudam."
+            "value" : "Quando ativado, os lembretes pendentes da lista de origem são importados automaticamente e removidos do app Lembretes. A importação acontece ao abrir o app e sempre que houver alterações no Lembretes."
           }
         },
         "nl" : {
@@ -39085,7 +39091,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Se attivato, gli elementi in sospeso dell’elenco sorgente vengono importati automaticamente e rimossi da Promemoria. L’importazione avviene all’avvio dell’app e ogni volta che Promemoria cambia."
+            "value" : "Se attivata, l’app importa automaticamente gli elementi in sospeso dall’elenco selezionato e li rimuove da Promemoria. L’importazione avviene all’avvio dell’app e ogni volta che Promemoria cambia."
           }
         }
       }
@@ -39203,7 +39209,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onde a IA roda"
+            "value" : "Onde a IA funciona"
           }
         }
       }
@@ -39945,7 +39951,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sua assinatura do Plus é pela Google Play. Gerencie-a na Google Play."
+            "value" : "Você assina o Plus pela Google Play. Gerencie sua assinatura na Google Play."
           }
         }
       }
@@ -40029,7 +40035,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sua assinatura do Plus é pela web. Gerencie-a em septena.app."
+            "value" : "Você assina o Plus pelo site. Gerencie sua assinatura em septena.app."
           }
         }
       }
@@ -40071,7 +40077,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Você paga ao seu provedor de IA, não a nós"
+            "value" : "O pagamento é feito ao seu provedor de IA, não a nós."
           }
         }
       }
@@ -41031,7 +41037,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suas tarefas ficam em sincronia no iPhone, iPad e Mac."
+            "value" : "Suas tarefas ficam sempre atualizadas no iPhone, iPad e Mac."
           }
         }
       }
@@ -41291,6 +41297,12 @@
             "value" : "%lld min"
           }
         },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld min"
+          }
+        },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
@@ -41376,6 +41388,24 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld minutes se sont écoulées."
+                }
+              }
+            }
+          }
+        },
+        "it" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "È passato 1 minuto."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Sono passati %lld minuti."
                 }
               }
             }
@@ -41555,6 +41585,12 @@
             "value" : "Ajouter et faire"
           }
         },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi e fai"
+          }
+        },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
@@ -41589,6 +41625,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Faire"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fai"
           }
         },
         "nl" : {
@@ -41627,6 +41669,12 @@
             "value" : "Faire ici"
           }
         },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fai qui"
+          }
+        },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
@@ -41661,6 +41709,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En cours : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In corso: %@"
           }
         },
         "nl" : {
@@ -41699,6 +41753,12 @@
             "value" : "En cours"
           }
         },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In corso"
+          }
+        },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
@@ -41733,6 +41793,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Terminé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminata"
           }
         },
         "nl" : {
@@ -41771,6 +41837,12 @@
             "value" : "Plus tard…"
           }
         },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Più tardi…"
+          }
+        },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
@@ -41805,6 +41877,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Durée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durata"
           }
         },
         "nl" : {
@@ -41843,6 +41921,12 @@
             "value" : "Reporté à plus tard"
           }
         },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimandata a più tardi"
+          }
+        },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
@@ -41877,6 +41961,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sans durée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Senza durata"
           }
         },
         "nl" : {
@@ -41915,6 +42005,12 @@
             "value" : "Afficher la liste"
           }
         },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra elenco"
+          }
+        },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
@@ -41949,6 +42045,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Toujours sur %@ ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stai ancora lavorando a %@?"
           }
         },
         "nl" : {
@@ -41987,6 +42089,12 @@
             "value" : "J’y suis encore"
           }
         },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ci sto ancora lavorando"
+          }
+        },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
@@ -42021,6 +42129,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Arrêter pour l’instant"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermati per ora"
           }
         },
         "nl" : {
@@ -42059,6 +42173,12 @@
             "value" : "Arrêté pour l’instant"
           }
         },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrotta per ora"
+          }
+        },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
@@ -42093,6 +42213,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Passé à une autre tâche"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passaggio a un’altra attività"
           }
         },
         "nl" : {
@@ -42131,6 +42257,12 @@
             "value" : "Quelle est la première étape ?"
           }
         },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qual è il primo passo?"
+          }
+        },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
@@ -42167,6 +42299,12 @@
             "value" : "Où vous êtes-vous arrêté ?"
           }
         },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A che punto sei?"
+          }
+        },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
@@ -42201,6 +42339,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Là où vous vous êtes arrêté"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A che punto eri"
           }
         },
         "nl" : {
