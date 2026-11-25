@@ -64,14 +64,6 @@
     "RegistryRules.doLapseHours": {
       "reason": "The shared core applies it (resolve_do_sessions).",
       "issue": "#517"
-    },
-    "RegistryEntityLimits.doPlannedMinutesMax": {
-      "reason": "Do (ADR 0041): the client half reads it.",
-      "issue": "#517"
-    },
-    "RegistryEntityLimits.doNoteMax": {
-      "reason": "Do (ADR 0041): the client half reads it.",
-      "issue": "#517"
     }
   },
   "ts": {

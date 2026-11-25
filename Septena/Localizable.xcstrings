@@ -37,6 +37,144 @@
         }
       }
     },
+    "%lld min" : {
+      "comment" : "Generated from registry surfaces.doing.screen.length.option.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld min"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld min"
+          }
+        }
+      }
+    },
+    "%lld minutes are up." : {
+      "comment" : "Generated from registry surfaces.doing.plannedEnd.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "1 minute is up."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld minutes are up."
+                }
+              }
+            }
+          }
+        },
+        "nl" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "1 minuut is om."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld minuten zijn om."
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "1 minuto se passou."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld minutos se passaram."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld things need you" : {
+      "comment" : "Generated from registry surfaces.doing.needsYou.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "1 thing needs you"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld things need you"
+                }
+              }
+            }
+          }
+        },
+        "nl" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "1 ding wacht op je"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld dingen wachten op je"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "1 coisa precisa de você"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld coisas precisam de você"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld non-task records will be skipped." : {
       "comment" : "Generated from registry settings.copy.import_export.importSkipped.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -2181,6 +2319,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Adicione uma tarefa ou mova uma para cá quando quiser trabalhar nela hoje."
+          }
+        }
+      }
+    },
+    "Add and Do" : {
+      "comment" : "Generated from registry actions.actions.do.addAndDo.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toevoegen en doen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar e fazer"
           }
         }
       }
@@ -5808,6 +5964,42 @@
         }
       }
     },
+    "Do" : {
+      "comment" : "Generated from registry actions.actions.task.do.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Doen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fazer"
+          }
+        }
+      }
+    },
+    "Do Here" : {
+      "comment" : "Generated from registry actions.actions.do.here.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hier doen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fazer aqui"
+          }
+        }
+      }
+    },
     "Does what it can: a draft, a comparison. Uses the web or your Claude only when needed." : {
       "comment" : "Generated from registry settings.copy.ai_explainer.workDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -5822,6 +6014,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Faz o que pode: um rascunho, uma comparação. Só usa a web ou o seu Claude quando necessário."
+          }
+        }
+      }
+    },
+    "Doing %@" : {
+      "comment" : "Generated from registry surfaces.doing.notice.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bezig met %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fazendo %@"
+          }
+        }
+      }
+    },
+    "Doing now" : {
+      "comment" : "Generated from registry surfaces.doing.openExit.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nu bezig"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fazendo agora"
           }
         }
       }
@@ -6194,6 +6422,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ingeschakeld"
+          }
+        }
+      }
+    },
+    "Ended" : {
+      "comment" : "Generated from registry surfaces.doing.exits.closed.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afgelopen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encerrada"
           }
         }
       }
@@ -8591,6 +8837,24 @@
         }
       }
     },
+    "Later…" : {
+      "comment" : "Generated from registry actions.actions.do.later.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Later…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mais tarde…"
+          }
+        }
+      }
+    },
     "Learn where you usually file similar tasks." : {
       "comment" : "Generated from registry settings.rootGroups.lists_root.items.5.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -8615,6 +8879,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Links"
+          }
+        }
+      }
+    },
+    "Length" : {
+      "comment" : "Generated from registry surfaces.doing.screen.length.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duur"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duração"
           }
         }
       }
@@ -9648,6 +9930,24 @@
         }
       }
     },
+    "Moved to later" : {
+      "comment" : "Generated from registry surfaces.doing.exits.later.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verplaatst naar later"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adiada"
+          }
+        }
+      }
+    },
     "Moves reminders into your Inbox. Each one you import leaves Reminders." : {
       "comment" : "Generated from registry importSources.sources.reminders.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -10007,6 +10307,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nenhum favorito"
+          }
+        }
+      }
+    },
+    "No length" : {
+      "comment" : "Generated from registry surfaces.doing.screen.length.noneTitle.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geen duur"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem duração"
           }
         }
       }
@@ -14040,6 +14358,24 @@
         }
       }
     },
+    "Show List" : {
+      "comment" : "Generated from registry actions.actions.do.showList.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lijst tonen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar lista"
+          }
+        }
+      }
+    },
     "Show more" : {
       "comment" : "Generated from registry surfaces.placeNotes.showMore.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -14346,16 +14682,16 @@
     },
     "Skip" : {
       "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pular"
-          }
-        },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Overslaan"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pular"
           }
         }
       }
@@ -14608,6 +14944,42 @@
         }
       }
     },
+    "Still on %@?" : {
+      "comment" : "Generated from registry surfaces.doing.stale.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nog bezig met %@?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda em %@?"
+          }
+        }
+      }
+    },
+    "Still on It" : {
+      "comment" : "Generated from registry actions.actions.do.confirm.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nog mee bezig"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda estou nisso"
+          }
+        }
+      }
+    },
     "Still want any of them?" : {
       "comment" : "Generated from registry surfaces.notices.items.weeklySweep.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -14658,6 +15030,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Parar"
+          }
+        }
+      }
+    },
+    "Stop for Now" : {
+      "comment" : "Generated from registry actions.actions.do.stop.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voor nu stoppen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parar por agora"
+          }
+        }
+      }
+    },
+    "Stopped for now" : {
+      "comment" : "Generated from registry surfaces.doing.exits.stopped.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voor nu gestopt"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parou por agora"
           }
         }
       }
@@ -14858,6 +15266,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Deslizar para a direita"
+          }
+        }
+      }
+    },
+    "Switched to another task" : {
+      "comment" : "Generated from registry surfaces.doing.exits.replaced.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overgestapt op een andere taak"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trocou para outra tarefa"
           }
         }
       }
@@ -16932,6 +17358,24 @@
         }
       }
     },
+    "What’s the first step?" : {
+      "comment" : "Generated from registry surfaces.doing.screen.firstStep.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wat is de eerste stap?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qual é o primeiro passo?"
+          }
+        }
+      }
+    },
     "When" : {
       "comment" : "SeptaskKit localization pass 2026-08-09",
       "localizations" : {
@@ -17067,6 +17511,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Onde a IA roda"
+          }
+        }
+      }
+    },
+    "Where did you stop?" : {
+      "comment" : "Generated from registry surfaces.doing.stopNote.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waar ben je gebleven?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onde você parou?"
+          }
+        }
+      }
+    },
+    "Where you stopped" : {
+      "comment" : "Generated from registry surfaces.doing.screen.lastTime.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waar je gebleven was"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onde você parou"
           }
         }
       }

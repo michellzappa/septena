@@ -67,6 +67,21 @@
       "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "lists.today"
     },
+    "task.do": {
+      "title": "Do",
+      "icon": "action.do",
+      "role": "default",
+      "shortcut": { "key": "j", "modifiers": ["primary"] },
+      "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted", "logbook"] },
+      "featureId": "task.do"
+    },
+    "do.done": { "title": "Done", "icon": "action.complete", "role": "default", "availability": { "selection": "none" }, "featureId": "task.do" },
+    "do.stop": { "title": "Stop for Now", "icon": "action.do_stop", "role": "default", "availability": { "selection": "none" }, "featureId": "task.do" },
+    "do.later": { "title": "Later…", "icon": "action.when", "role": "default", "availability": { "selection": "none" }, "featureId": "task.do" },
+    "do.here": { "title": "Do Here", "icon": "action.do_here", "role": "default", "availability": { "selection": "none" }, "featureId": "task.do" },
+    "do.showList": { "title": "Show List", "icon": "action.do_show_list", "role": "default", "availability": { "selection": "none" }, "featureId": "task.do" },
+    "do.confirm": { "title": "Still on It", "icon": "action.do", "role": "default", "availability": { "selection": "none" }, "featureId": "task.do" },
+    "do.addAndDo": { "title": "Add and Do", "icon": "action.do", "role": "default", "availability": { "selection": "none" }, "featureId": "task.do" },
     "task.toggleComplete": {
       "title": "Mark as Complete",
       "shortTitle": "Complete",
@@ -549,6 +564,7 @@
       { "kind": "action", "id": "task.sendBackReview" },
       { "kind": "slot", "slot": "filingSuggestion" },
       { "kind": "divider" },
+      { "kind": "action", "id": "task.do" },
       { "kind": "action", "id": "task.when" },
       {
         "kind": "submenu",

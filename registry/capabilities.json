@@ -22,6 +22,7 @@
     "task.repeat": { "title": "Repeat from schedule or after completion, pause", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "task.notes": { "title": "Notes", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "task.attachments": { "title": "Attachments", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
+    "task.do": { "title": "Do: one task now, on every screen", "ios": "planned", "ipados": "planned", "macos": "planned", "web": "planned", "android": "planned", "windows": "planned", "watchos": "planned" },
     "task.references": { "title": "References: the email, link, issue or task that a task is about", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "task.history": { "title": "Per-task change history", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "task.provenance": { "title": "Who added a task: you or a named agent, on the row and the task page", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
