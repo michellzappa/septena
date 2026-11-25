@@ -227,6 +227,15 @@
       "surfaces.notices.items.getStarted.steps.addTask.title"
     ]
   },
+  "Add {name} as a reference": {
+    "text": "Add {name} as a reference",
+    "placeholders": [
+      "name"
+    ],
+    "paths": [
+      "surfaces.taskReferences.add.suggestions.format"
+    ]
+  },
   "Added by": {
     "text": "Added by",
     "paths": [

@@ -650,21 +650,6 @@ fun TaskDetailScreen(
                     },
                     actions = {
                         if (savedTask != null && !deleted) {
-                            val addRefTitle = remember(languageTag) {
-                                RegistryCatalog.actionTitle(RegistryActionIds.TASK_ADD_REFERENCE, languageTag = languageTag)
-                                    ?.takeIf(String::isNotBlank) ?: "Add Reference"
-                            }
-                            IconButton(
-                                onClick = { showAddReferenceDialog = true },
-                                enabled = canEdit,
-                                modifier = Modifier.semantics { contentDescription = addRefTitle },
-                            ) {
-                                Text(
-                                    text = "↗",
-                                    fontSize = 18.sp,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                            }
                             IconButton(
                                 onClick = ::toggleStarred,
                                 enabled = canEdit,
@@ -1317,6 +1302,8 @@ fun TaskDetailScreen(
                                         taskId = taskId,
                                         heading = heading,
                                         canEdit = canEdit,
+                                        taskTitle = titleDraft,
+                                        taskNotes = notesDraft,
                                         showAddDialog = showAddReferenceDialog,
                                         onShowAddDialogChange = { showAddReferenceDialog = it },
                                         onOpenTask = onOpenTask,

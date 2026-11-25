@@ -591,6 +591,7 @@ function validateTaskReferences(surfaces, icons, caps, entities) {
     assert(entities.enums.taskRefRole.includes(role), `surfaces.json: taskReferences unknown role "${role}"`);
     assert(typeof r.label === "string" && r.label.length > 0, `surfaces.json: taskReferences role ${role} needs a label`);
   }
+  assert(Number.isInteger(t.add.suggestions.max) && t.add.suggestions.max > 0, "surfaces.json: taskReferences.add.suggestions.max is not a positive integer");
   for (const [p, v] of stringsOf(t, "taskReferences")) assert(!/[–—]/.test(v), `surfaces.json: ${p} contains an em or en dash`);
 }
 
@@ -1768,7 +1769,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static func kind(_ id: String) -> RegistryTaskReferenceKind { kinds.first { $0.id == id } ?? otherKind }");
   lines.push("  /// The label of a role that shows one, by role.");
   lines.push(`  static let roleLabels: [String: String] = [${Object.entries(refs.roles).map(([id, r]) => `${swiftStr(id)}: ${L(r.label, r, "label")}`).join(", ")}]`);
-  for (const [name, node] of [["open", refs.open], ["createdFrom", refs.createdFrom], ["limitReached", refs.add.limitReached]]) {
+  for (const [name, node] of [["open", refs.open], ["createdFrom", refs.createdFrom], ["limitReached", refs.add.limitReached], ["suggestion", refs.add.suggestions]]) {
     const t = refTmpl(node);
     lines.push(`  static func ${name}(${t.params}) -> String { ${t.body} }`);
   }
@@ -1777,6 +1778,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     ["offersTitle", refs.add.offers, "title"], ["invalidMessage", refs.add.invalid, "message"],
     ["failedMessage", refs.add.failed, "message"],
   ]) lines.push(`  static let ${name}: String = ${L(node[field], node, field)}`);
+  lines.push("  /// The most links of one task's title and notes that show as suggestions.");
+  lines.push(`  static let maxSuggestions = ${refs.add.suggestions.max}`);
   lines.push("}");
   lines.push("");
 
