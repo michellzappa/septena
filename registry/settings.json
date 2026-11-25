@@ -498,6 +498,27 @@
       { "id": "rotateTitle", "label": "Rotate Calendar Feed Link?" },
       { "id": "rotateMessage", "label": "Rotating replaces your private feed link immediately. Existing calendar subscriptions will stop updating until you re-subscribe with the new URL." },
       { "id": "feedFooter", "label": "Read-only subscription feed for your scheduled tasks and deadlines. Anyone with the private URL can read titles and notes in the feed; rotate or disable it anytime." }
+    ],
+    "import_export": [
+      { "id": "exportJsonTitle", "label": "Export JSON backup" },
+      { "id": "exportJsonDetail", "label": "Full Septena tasks, areas, projects, and checklists (importable)" },
+      { "id": "exportMarkdownTitle", "label": "Export Markdown" },
+      { "id": "exportMarkdownDetail", "label": "Readable checklist grouped by area and project" },
+      { "id": "exportCsvTitle", "label": "Export CSV" },
+      { "id": "exportCsvDetail", "label": "Spreadsheet-friendly table of tasks" },
+      { "id": "importJsonTitle", "label": "Import JSON backup…" },
+      { "id": "importJsonDetail", "label": "Preview and import a Septena JSON export" },
+      { "id": "importDialogTitle", "label": "Import Septena backup" },
+      { "id": "importSummary", "label": "Found {areas} areas, {projects} projects, and {tasks} tasks." },
+      { "id": "importSkipped", "label": "{count} non-task records will be skipped." },
+      { "id": "importNote", "label": "Existing items with matching IDs are kept; new items are added and synced." },
+      { "id": "importConfirm", "label": "Import" },
+      { "id": "exportedJson", "label": "Exported JSON backup." },
+      { "id": "exportedMarkdown", "label": "Exported Markdown." },
+      { "id": "exportedCsv", "label": "Exported CSV." },
+      { "id": "importedCount", "label": "Imported {count} items." },
+      { "id": "exportFailed", "label": "Export failed." },
+      { "id": "importFailed", "label": "Import failed." }
     ]
   },
   "desktopTabs": [

@@ -9,6 +9,10 @@
       "comment" : "Generated from registry plans.outcomes.agents.rows.connected.cells.plus. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "%lld non-task records will be skipped." : {
+      "comment" : "Generated from registry settings.copy.import_export.importSkipped.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "€60 a year or €7 a month" : {
       "comment" : "Generated from registry plans.levels.plus.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -3194,6 +3198,10 @@
         }
       }
     },
+    "Existing items with matching IDs are kept; new items are added and synced." : {
+      "comment" : "Generated from registry settings.copy.import_export.importNote.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Export" : {
       "localizations" : {
         "pt-BR" : {
@@ -3208,8 +3216,24 @@
       "comment" : "Generated from registry plans.outcomes.nothing_lost.rows.export.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Export CSV" : {
+      "comment" : "Generated from registry settings.copy.import_export.exportCsvTitle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Export everything as plain JSON" : {
       "comment" : "Generated from registry plans.fullApp.points.5. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Export failed." : {
+      "comment" : "Generated from registry settings.copy.import_export.exportFailed.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Export JSON backup" : {
+      "comment" : "Generated from registry settings.copy.import_export.exportJsonTitle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Export Markdown" : {
+      "comment" : "Generated from registry settings.copy.import_export.exportMarkdownTitle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Export works on every plan. A limit hides older items. It never deletes them, and Plus shows them again." : {
@@ -3225,6 +3249,18 @@
           }
         }
       }
+    },
+    "Exported CSV." : {
+      "comment" : "Generated from registry settings.copy.import_export.exportedCsv.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Exported JSON backup." : {
+      "comment" : "Generated from registry settings.copy.import_export.exportedJson.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Exported Markdown." : {
+      "comment" : "Generated from registry settings.copy.import_export.exportedMarkdown.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Fade inactive tasks" : {
       "comment" : "Generated from registry settings.rootGroups.lists_root.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -3376,6 +3412,10 @@
         }
       }
     },
+    "Found %@ areas, %@ projects, and %@ tasks." : {
+      "comment" : "Generated from registry settings.copy.import_export.importSummary.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Free" : {
       "localizations" : {
         "pt-BR" : {
@@ -3407,6 +3447,10 @@
           }
         }
       }
+    },
+    "Full Septena tasks, areas, projects, and checklists (importable)" : {
+      "comment" : "Generated from registry settings.copy.import_export.exportJsonDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "General" : {
       "comment" : "Generated from registry settings.desktopTabs.general.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -3838,6 +3882,10 @@
     "Import complete" : {
 
     },
+    "Import failed." : {
+      "comment" : "Generated from registry settings.copy.import_export.importFailed.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Import from another app" : {
       "comment" : "Generated from registry surfaces.notices.items.getStarted.steps.importTasks.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -3864,6 +3912,18 @@
     },
     "Import from Things and Apple Reminders" : {
       "comment" : "Generated from registry plans.fullApp.points.4. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Import JSON backup…" : {
+      "comment" : "Generated from registry settings.copy.import_export.importJsonTitle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Import Septena backup" : {
+      "comment" : "Generated from registry settings.copy.import_export.importDialogTitle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Imported %lld items." : {
+      "comment" : "Generated from registry settings.copy.import_export.importedCount.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Importing…" : {
@@ -5559,6 +5619,10 @@
     "Preview" : {
 
     },
+    "Preview and import a Septena JSON export" : {
+      "comment" : "Generated from registry settings.copy.import_export.importJsonDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price." : {
       "comment" : "Generated from registry plans.priceFootnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -5741,6 +5805,10 @@
     },
     "Read-only subscription feed for your scheduled tasks and deadlines. Anyone with the private URL can read titles and notes in the feed; rotate or disable it anytime." : {
       "comment" : "Generated from registry settings.copy.calendar_detail.feedFooter.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Readable checklist grouped by area and project" : {
+      "comment" : "Generated from registry settings.copy.import_export.exportMarkdownDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Ready for review" : {
@@ -6817,6 +6885,10 @@
           }
         }
       }
+    },
+    "Spreadsheet-friendly table of tasks" : {
+      "comment" : "Generated from registry settings.copy.import_export.exportCsvDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Star" : {
       "comment" : "Generated from registry actions.actions.task.toggleStar.addTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

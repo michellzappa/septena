@@ -271,8 +271,10 @@ object TaskDataTransferCodec {
                 today = row["today"].booleanValue() == true,
                 scheduled = row["scheduled"].stringValue(),
                 deadline = row["deadline"].stringValue(),
-                starred = row["starred"].booleanValue() == true,
             )
+            if (row["starred"].booleanValue() == true) {
+                graph.taskMutator.setStarred(created.id, true)
+            }
             if (row["status"].stringValue() == RegistryEntityEnums.TaskStatus.DONE) {
                 graph.taskMutator.complete(created.id)
             }
@@ -292,6 +294,7 @@ internal fun DataTransferSection(graph: AndroidAppGraph, languageTag: String) {
     var busy by remember { mutableStateOf(false) }
 
     val stamp = remember { LocalDate.now(ZoneOffset.UTC).toString() }
+    fun copy(id: String, vararg args: Pair<String, String>) = settingsCopy(IMPORT_EXPORT, id, languageTag, *args)
 
     val exportJsonLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
@@ -305,12 +308,12 @@ internal fun DataTransferSection(graph: AndroidAppGraph, languageTag: String) {
                 }
                 withContext(Dispatchers.IO) {
                     context.contentResolver.openOutputStream(uri)?.use { it.write(payload.toByteArray()) }
-                        ?: error("Couldn’t write export file.")
+                        ?: error(copy("exportFailed"))
                 }
             }.onSuccess {
-                statusMessage = "Exported JSON backup."
+                statusMessage = copy("exportedJson")
             }.onFailure {
-                statusMessage = it.message ?: "Export failed."
+                statusMessage = it.message ?: copy("exportFailed")
             }
             busy = false
         }
@@ -326,12 +329,12 @@ internal fun DataTransferSection(graph: AndroidAppGraph, languageTag: String) {
                 val payload = withContext(Dispatchers.IO) { TaskDataTransferCodec.exportMarkdown(graph.taskStore) }
                 withContext(Dispatchers.IO) {
                     context.contentResolver.openOutputStream(uri)?.use { it.write(payload.toByteArray()) }
-                        ?: error("Couldn’t write Markdown file.")
+                        ?: error(copy("exportFailed"))
                 }
             }.onSuccess {
-                statusMessage = "Exported Markdown."
+                statusMessage = copy("exportedMarkdown")
             }.onFailure {
-                statusMessage = it.message ?: "Export failed."
+                statusMessage = it.message ?: copy("exportFailed")
             }
             busy = false
         }
@@ -347,12 +350,12 @@ internal fun DataTransferSection(graph: AndroidAppGraph, languageTag: String) {
                 val payload = withContext(Dispatchers.IO) { TaskDataTransferCodec.exportCsv(graph.taskStore) }
                 withContext(Dispatchers.IO) {
                     context.contentResolver.openOutputStream(uri)?.use { it.write(payload.toByteArray()) }
-                        ?: error("Couldn’t write CSV file.")
+                        ?: error(copy("exportFailed"))
                 }
             }.onSuccess {
-                statusMessage = "Exported CSV."
+                statusMessage = copy("exportedCsv")
             }.onFailure {
-                statusMessage = it.message ?: "Export failed."
+                statusMessage = it.message ?: copy("exportFailed")
             }
             busy = false
         }
@@ -367,7 +370,7 @@ internal fun DataTransferSection(graph: AndroidAppGraph, languageTag: String) {
             val parsed = withContext(Dispatchers.IO) {
                 runCatching {
                     val raw = context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText()
-                        ?: error("Couldn’t read selected file.")
+                        ?: error(copy("importFailed"))
                     TaskDataTransferCodec.parseEnvelope(raw).getOrThrow()
                 }
             }
@@ -376,30 +379,34 @@ internal fun DataTransferSection(graph: AndroidAppGraph, languageTag: String) {
                 pendingImport = env
                 statusMessage = null
             }.onFailure {
-                statusMessage = it.message ?: "Couldn’t read JSON backup."
+                statusMessage = it.message ?: copy("importFailed")
             }
         }
     }
 
     pendingImport?.let { env ->
-        val cancelLabel = RegistryCatalog.localizedString("Cancel", languageTag) ?: "Cancel"
         AlertDialog(
             onDismissRequest = { if (!busy) pendingImport = null },
-            title = { Text("Import Septena backup") },
+            title = { Text(copy("importDialogTitle")) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        "Found ${env.areas.size} areas, ${env.projects.size} projects, and ${env.tasks.size} tasks.",
+                        copy(
+                            "importSummary",
+                            "areas" to env.areas.size.toString(),
+                            "projects" to env.projects.size.toString(),
+                            "tasks" to env.tasks.size.toString(),
+                        ),
                     )
                     if (env.skippedCount > 0) {
                         Text(
-                            "${env.skippedCount} non-task records will be skipped.",
+                            copy("importSkipped", "count" to env.skippedCount.toString()),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Text(
-                        "Existing items with matching IDs are kept; new items are added and synced.",
+                        copy("importNote"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -419,20 +426,21 @@ internal fun DataTransferSection(graph: AndroidAppGraph, languageTag: String) {
                             result.onSuccess { count ->
                                 graph.sync.noteLocalChange()
                                 graph.sync.requestSync()
-                                statusMessage = "Imported $count items."
-                                Toast.makeText(context, "Imported $count items", Toast.LENGTH_SHORT).show()
+                                val msg = copy("importedCount", "count" to count.toString())
+                                statusMessage = msg
+                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                             }.onFailure {
-                                statusMessage = it.message ?: "Import failed."
+                                statusMessage = it.message ?: copy("importFailed")
                             }
                         }
                     },
                 ) {
-                    Text("Import")
+                    Text(copy("importConfirm"))
                 }
             },
             dismissButton = {
                 TextButton(enabled = !busy, onClick = { pendingImport = null }) {
-                    Text(cancelLabel)
+                    Text(promptCancelTitle(languageTag))
                 }
             },
         )
@@ -440,29 +448,29 @@ internal fun DataTransferSection(graph: AndroidAppGraph, languageTag: String) {
 
     Column(modifier = Modifier.fillMaxWidth()) {
         ListItem(
-            headlineContent = { Text("Export JSON backup", color = MaterialTheme.colorScheme.primary) },
-            supportingContent = { Text("Full Septena tasks, areas, projects, and checklists (importable)") },
+            headlineContent = { Text(copy("exportJsonTitle"), color = MaterialTheme.colorScheme.primary) },
+            supportingContent = { Text(copy("exportJsonDetail")) },
             modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) {
                 exportJsonLauncher.launch("septena-tasks-$stamp.json")
             },
         )
         ListItem(
-            headlineContent = { Text("Export Markdown", color = MaterialTheme.colorScheme.primary) },
-            supportingContent = { Text("Readable checklist grouped by area and project") },
+            headlineContent = { Text(copy("exportMarkdownTitle"), color = MaterialTheme.colorScheme.primary) },
+            supportingContent = { Text(copy("exportMarkdownDetail")) },
             modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) {
                 exportMdLauncher.launch("septena-tasks-$stamp.md")
             },
         )
         ListItem(
-            headlineContent = { Text("Export CSV", color = MaterialTheme.colorScheme.primary) },
-            supportingContent = { Text("Spreadsheet-friendly table of tasks") },
+            headlineContent = { Text(copy("exportCsvTitle"), color = MaterialTheme.colorScheme.primary) },
+            supportingContent = { Text(copy("exportCsvDetail")) },
             modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) {
                 exportCsvLauncher.launch("septena-tasks-$stamp.csv")
             },
         )
         ListItem(
-            headlineContent = { Text("Import JSON backup…", color = MaterialTheme.colorScheme.primary) },
-            supportingContent = { Text("Preview and import a Septena JSON export") },
+            headlineContent = { Text(copy("importJsonTitle"), color = MaterialTheme.colorScheme.primary) },
+            supportingContent = { Text(copy("importJsonDetail")) },
             modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) {
                 importJsonLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
             },
@@ -477,3 +485,5 @@ internal fun DataTransferSection(graph: AndroidAppGraph, languageTag: String) {
         }
     }
 }
+
+private const val IMPORT_EXPORT = "import_export"

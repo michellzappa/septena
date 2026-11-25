@@ -789,6 +789,22 @@ enum RegistrySettings {
     "calendar_detail.rotateTitle": RegistryL10n.t("Rotate Calendar Feed Link?"),
     "calendar_detail.rotateMessage": RegistryL10n.t("Rotating replaces your private feed link immediately. Existing calendar subscriptions will stop updating until you re-subscribe with the new URL."),
     "calendar_detail.feedFooter": RegistryL10n.t("Read-only subscription feed for your scheduled tasks and deadlines. Anyone with the private URL can read titles and notes in the feed; rotate or disable it anytime."),
+    "import_export.exportJsonTitle": RegistryL10n.t("Export JSON backup"),
+    "import_export.exportJsonDetail": RegistryL10n.t("Full Septena tasks, areas, projects, and checklists (importable)"),
+    "import_export.exportMarkdownTitle": RegistryL10n.t("Export Markdown"),
+    "import_export.exportMarkdownDetail": RegistryL10n.t("Readable checklist grouped by area and project"),
+    "import_export.exportCsvTitle": RegistryL10n.t("Export CSV"),
+    "import_export.exportCsvDetail": RegistryL10n.t("Spreadsheet-friendly table of tasks"),
+    "import_export.importJsonTitle": RegistryL10n.t("Import JSON backup…"),
+    "import_export.importJsonDetail": RegistryL10n.t("Preview and import a Septena JSON export"),
+    "import_export.importDialogTitle": RegistryL10n.t("Import Septena backup"),
+    "import_export.importNote": RegistryL10n.t("Existing items with matching IDs are kept; new items are added and synced."),
+    "import_export.importConfirm": RegistryL10n.t("Import"),
+    "import_export.exportedJson": RegistryL10n.t("Exported JSON backup."),
+    "import_export.exportedMarkdown": RegistryL10n.t("Exported Markdown."),
+    "import_export.exportedCsv": RegistryL10n.t("Exported CSV."),
+    "import_export.exportFailed": RegistryL10n.t("Export failed."),
+    "import_export.importFailed": RegistryL10n.t("Import failed."),
   ]
 }
 
