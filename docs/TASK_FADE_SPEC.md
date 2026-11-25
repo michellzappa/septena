@@ -5,7 +5,7 @@ until mz overrules them in §11.
 **Decisions:** [ADR 0006](adr/0006-tasks-fade-by-default.md),
 [ADR 0014](adr/0014-today-rollover-review-or-clean-slate.md) (§6, added
 2026-11-21), [ADR 0039](adr/0039-unanswered-proposals-expire.md) (unanswered
-agent proposals, not built: #499), [ADR 0002](adr/0002-own-backend-replaces-icloud.md).
+agent proposals), [ADR 0002](adr/0002-own-backend-replaces-icloud.md).
 **Builds on:** the triage band (`docs/TRIAGE_BAND_SPEC.md`), the task
 conversation loop (`SeptenaCore/TaskConvo.swift`,
 `docs/TASK_CONVERSATIONS_PLAN.md`), the Next feed
@@ -110,11 +110,22 @@ task from the pile is a gesture and is on the undo stack.
 
 ### 4.1 What ends a fade (mz, 2026-11-25)
 
-A task with a deadline is never faded. The store enforces it for every writer
+A task with a deadline that the user made or accepted is never faded. An
+unaccepted agent proposal expires after `cueDecayDays` with or without a date
+(ADR 0039); proposals made before 2026-11-26 keep the old rule. The store enforces it for every writer
 (`TaskStore.fadeEnds`), so a deadline that an agent or another member of a
 shared project sets on a faded task brings it back. The store also drops a
 fade that is older than `touchedAt`: an old device cannot push its fade over a
 task the user touched since. The client's fade pass keeps its own check.
+
+The store also refuses a new fade from a device that did not know the newest
+facts (`TaskStore.fadeIsStale`): the task was touched inside the fade window,
+has a When date ahead, waits on the user, or is assigned to Claude. A push that
+carries its own `touchedAt` is trusted. The app waits for a sync before its
+pass, so this is the second guard.
+
+"Fade inactive tasks" is one setting per account (`tasksShowAging`), and so is
+the sweep state (`fadeSweptAt`, `fadeSweepDismissedOn`).
 
 ### 4.2 Projects (mz, 2026-11-25: "ask on review")
 

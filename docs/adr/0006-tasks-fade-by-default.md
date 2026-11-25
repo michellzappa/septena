@@ -49,7 +49,8 @@ four the same.
 
 ## Amendment (2026-11-25)
 
-- A task with a deadline is never faded, also when the deadline comes after
+- A task with a deadline is never faded (except an unaccepted agent proposal,
+  ADR 0039), also when the deadline comes after
   the fade. The store enforces it (`docs/TASK_FADE_SPEC.md` §4.1).
 - A project fades when its tasks did. It dims in place and the weekly review
   asks; it never leaves the sidebar by itself (§4.2).

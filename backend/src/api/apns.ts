@@ -29,6 +29,18 @@ export interface AgentQuestionPush {
   options: string[];
 }
 
+/// An agent handed work over to Review. `note` says what to check.
+export interface AgentReviewPush {
+  taskId: string;
+  taskTitle: string;
+  note: string;
+}
+
+/// A question carries `turnSeq`; a hand-off does not.
+export type AgentPush = AgentQuestionPush | AgentReviewPush;
+
+const isQuestion = (push: AgentPush): push is AgentQuestionPush => "turnSeq" in push;
+
 export interface ApnsConfig {
   keyPem: string;
   keyId: string;
@@ -54,6 +66,8 @@ export const APNS_PROD_HOST = "https://api.push.apple.com";
 export const APNS_SANDBOX_HOST = "https://api.sandbox.push.apple.com";
 export const APNS_DEFAULT_BUNDLE_ID = "com.septena.tasks";
 export const AGENT_QUESTION_CATEGORY = "AGENT_QUESTION";
+/// No buttons: a hand-off is accepted after a look, not from the lock screen.
+export const AGENT_REVIEW_CATEGORY = "AGENT_REVIEW";
 export const MAX_NOTIFICATION_OPTIONS = 3;
 
 /// APNs requires provider JWTs to be rotated before 60 minutes (and not more
@@ -207,6 +221,28 @@ export function buildAgentQuestionPayload(q: AgentQuestionPush): AgentQuestionAp
   };
 }
 
+export interface AgentReviewApnsPayload {
+  aps: {
+    alert: { title: string; body: string };
+    sound: "default";
+    category: typeof AGENT_REVIEW_CATEGORY;
+    "thread-id": string;
+  };
+  taskId: string;
+}
+
+export function buildAgentReviewPayload(r: AgentReviewPush): AgentReviewApnsPayload {
+  return {
+    aps: {
+      alert: { title: clip(r.taskTitle || "Septena", 120) || "Septena", body: clip(r.note, 300) },
+      sound: "default",
+      category: AGENT_REVIEW_CATEGORY,
+      "thread-id": `agent-review:${r.taskId}`,
+    },
+    taskId: r.taskId,
+  };
+}
+
 export function topicForPlatform(bundleId: string, platform: PushPlatform): string {
   return platform === "watchos" ? `${bundleId}.watchkitapp` : bundleId;
 }
@@ -222,13 +258,13 @@ function shouldPruneResponse(status: number, reason: string | null): boolean {
   return false;
 }
 
-/// Sends an agent question push notification to all registered device tokens.
+/// Sends an agent question or hand-off notification to all registered device tokens.
 /// Returns tokens that APNs rejected as dead (`410 Unregistered` or
 /// `BadDeviceToken`) so the caller can prune them. Never throws on missing
 /// secrets or network errors.
-export async function sendAgentQuestionPushes(
+export async function sendAgentPushes(
   env: Partial<Env>,
-  question: AgentQuestionPush,
+  push: AgentPush,
   tokens: PushTokenRow[],
   opts: ApnsSendOptions = {},
 ): Promise<ApnsBatchResult> {
@@ -240,8 +276,8 @@ export async function sendAgentQuestionPushes(
   if (!config) {
     logEvent("apns_skipped", {
       reason: "missing_secrets",
-      taskId: question.taskId,
-      turnSeq: question.turnSeq,
+      taskId: push.taskId,
+      turnSeq: isQuestion(push) ? push.turnSeq : null,
       tokenCount: tokens.length,
     });
     return { attempted: 0, delivered: 0, pruned: [], skipped: "missing_secrets" };
@@ -252,13 +288,13 @@ export async function sendAgentQuestionPushes(
     jwt = await mintApnsJwt(config, opts.nowMs);
   } catch (err) {
     logEvent("apns_jwt_failed", {
-      taskId: question.taskId,
+      taskId: push.taskId,
       error: err instanceof Error ? err.message.slice(0, 120) : "unknown",
     });
     return { attempted: 0, delivered: 0, pruned: [] };
   }
 
-  const payloadStr = JSON.stringify(buildAgentQuestionPayload(question));
+  const payloadStr = JSON.stringify(isQuestion(push) ? buildAgentQuestionPayload(push) : buildAgentReviewPayload(push));
   const doFetch = opts.fetchFn ?? testFetchOverride ?? fetch;
   const pruned: string[] = [];
   let delivered = 0;
@@ -275,7 +311,7 @@ export async function sendAgentQuestionPushes(
             "apns-topic": topic,
             "apns-push-type": "alert",
             "apns-priority": "10",
-            "apns-collapse-id": `agent-q-${question.taskId}`.slice(0, 64),
+            "apns-collapse-id": `agent-${isQuestion(push) ? "q" : "r"}-${push.taskId}`.slice(0, 64),
             "content-type": "application/json",
           },
           body: payloadStr,
@@ -300,12 +336,12 @@ export async function sendAgentQuestionPushes(
           platform: row.platform,
           sandbox: config.sandboxOverride !== null ? config.sandboxOverride : row.sandbox,
           pruned: shouldPruneResponse(res.status, reason),
-          taskId: question.taskId,
+          taskId: push.taskId,
         });
       } catch (err) {
         logEvent("apns_send_error", {
           platform: row.platform,
-          taskId: question.taskId,
+          taskId: push.taskId,
           error: err instanceof Error ? err.message.slice(0, 120) : "network_error",
         });
       }
@@ -313,8 +349,8 @@ export async function sendAgentQuestionPushes(
   );
 
   logEvent("apns_push_batch", {
-    taskId: question.taskId,
-    turnSeq: question.turnSeq,
+    taskId: push.taskId,
+    turnSeq: isQuestion(push) ? push.turnSeq : null,
     attempted: tokens.length,
     delivered,
     pruned: pruned.length,

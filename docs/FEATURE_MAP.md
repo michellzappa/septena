@@ -17,13 +17,13 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 |---|---|---|---|---|---|---|---|---|
 | `lists.inbox` | Inbox band on Today | ships | ships | ships | ships | ships | planned | partial |
 | `lists.today` | Today | ships | ships | ships | ships | ships | planned | partial |
-| `lists.review` | Review (needs_verify) | ships | ships | ships | ships | ships | planned | - |
+| `lists.review` | Review (questions, finished work, faded tasks) | ships | ships | ships | ships | ships | planned | - |
 | `lists.agent` | Agent (claimed and assigned work by stage) | ships | ships | ships | ships | ships | planned | - |
 | `lists.upcoming` | Upcoming | ships | ships | ships | ships | ships | planned | - |
 | `lists.anytime` | Anytime | ships | ships | ships | ships | ships | planned | - |
 | `lists.repeating` | Repeating | ships | ships | ships | ships | ships | planned | - |
 | `lists.logbook` | Logbook | ships | ships | ships | ships | ships | planned | - |
-| `lists.faded` | Faded pile | ships | ships | ships | ships | ships | planned | - |
+| `lists.faded` | Faded group of Review | ships | ships | ships | ships | ships | planned | - |
 | `lists.starred` | Favorites list | ships | ships | ships | ships | ships | planned | - |
 | `lists.recently-deleted` | Recently Deleted (30 days) | ships | ships | ships | ships | ships | planned | - |
 | `places.areas` | Areas | ships | ships | ships | ships | ships | planned | - |

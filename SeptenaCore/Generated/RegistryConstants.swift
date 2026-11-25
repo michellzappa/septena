@@ -129,6 +129,7 @@ enum RegistryIcons {
     "agent.queued": "clock",
     "agent.working": "ellipsis.circle",
     "agent.your_turn": "questionmark.bubble",
+    "agent.stopped": "stop.circle",
     "agent.done": "checkmark.circle",
     "list.upcoming": "calendar",
     "list.repeating": "arrow.clockwise",
@@ -416,7 +417,7 @@ struct RegistrySettingsPage: Sendable, Hashable, Identifiable {
 
 /// Unified task-app settings keys, defaults, synced-key list, and taxonomy (`registry/settings.json`).
 enum RegistrySettings {
-  static let syncedKeys: [String] = ["welcomeName", "telemetryLevel", "calendarHiddenTitles", "rolledInDismissedOn", "homeTimezone", "agentsPaused", "getStartedDismissed", "getStartedSteps", "upsellsSeen", "onboardedAt", "accentColor", "canvasTexture", "textureIntensity", "textureMotion", "smartListOrder", "smartListHidden", "smartListPlacement"]
+  static let syncedKeys: [String] = ["welcomeName", "telemetryLevel", "calendarHiddenTitles", "rolledInDismissedOn", "homeTimezone", "agentsPaused", "getStartedDismissed", "getStartedSteps", "upsellsSeen", "onboardedAt", "accentColor", "canvasTexture", "textureIntensity", "textureMotion", "smartListOrder", "smartListHidden", "smartListPlacement", "tasksShowAging", "fadeSweptAt", "fadeSweepDismissedOn"]
 
   enum StorageKey {
     static let welcomeName = "septena.homepage.welcomeName"
@@ -542,7 +543,7 @@ enum RegistrySettings {
       RegistrySettingsItem(kind: "pageLink", key: nil, page: "smart_lists", surface: nil, label: RegistryL10n.t("Smart Lists"), detail: nil, iconId: "list.today", sfSymbol: "sun.max.fill", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
       RegistrySettingsItem(kind: "setting", key: "todayGroupByList", page: nil, surface: nil, label: RegistryL10n.t("Group Today by list"), detail: RegistryL10n.t("When off, tasks appear in one list with their project or area underneath."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "lists.today"),
       RegistrySettingsItem(kind: "setting", key: "todayShowCompleted", page: nil, surface: nil, label: RegistryL10n.t("Show completed tasks"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "lists.today"),
-      RegistrySettingsItem(kind: "setting", key: "tasksShowAging", page: nil, surface: nil, label: RegistryL10n.t("Fade inactive tasks"), detail: RegistryL10n.t("Tasks without activity for 14 days fade out and move to Faded."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "task.aging"),
+      RegistrySettingsItem(kind: "setting", key: "tasksShowAging", page: nil, surface: nil, label: RegistryL10n.t("Fade inactive tasks"), detail: RegistryL10n.t("Tasks without activity for 14 days fade out and move to Review. This applies on all your devices."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "task.aging"),
       RegistrySettingsItem(kind: "setting", key: "tasksShowFaded", page: nil, surface: nil, label: RegistryL10n.t("Show faded tasks"), detail: RegistryL10n.t("Show faded tasks in projects and areas."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "task.aging"),
       RegistrySettingsItem(kind: "setting", key: "tasksFilingSuggestions", page: nil, surface: nil, label: RegistryL10n.t("Suggest where to file"), detail: RegistryL10n.t("Learn where you usually file similar tasks."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "edit.filing-suggestion"),
       RegistrySettingsItem(kind: "setting", key: "badgeShowOverdue", page: nil, surface: nil, label: RegistryL10n.t("Overdue app icon badge"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["macos"], featureId: "settings.display"),
@@ -876,14 +877,14 @@ enum RegistryDestinations {
   static let all: [RegistryDestination] = [
     RegistryDestination(id: .inbox, navigationKey: "triage", serverView: "triage", title: RegistryL10n.t("Inbox"), iconId: "list.inbox", sfSymbol: "tray.full", sidebarSection: "top", visibility: "todayBand", canHide: false, canMoveSection: false, emptyTitle: RegistryL10n.t("Inbox is empty"), emptyDetail: RegistryL10n.t("New tasks wait at the top of Today until you schedule or file them."), featureId: "lists.inbox"),
     RegistryDestination(id: .today, navigationKey: "today", serverView: "today", title: RegistryL10n.t("Today"), iconId: "list.today", sfSymbol: "sun.max.fill", sidebarSection: "top", visibility: "always", canHide: false, canMoveSection: false, emptyTitle: RegistryL10n.t("Nothing on Today"), emptyDetail: RegistryL10n.t("Add a task or move one here when you want to work on it today."), featureId: "lists.today"),
-    RegistryDestination(id: .review, navigationKey: "review", serverView: "all", title: RegistryL10n.t("Review"), iconId: "list.review", sfSymbol: "eye", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("Nothing to review"), emptyDetail: RegistryL10n.t("Work an agent finished appears here so you can check and accept it."), featureId: "lists.review"),
+    RegistryDestination(id: .review, navigationKey: "review", serverView: "all", title: RegistryL10n.t("Review"), iconId: "list.review", sfSymbol: "eye", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("Nothing to review"), emptyDetail: RegistryL10n.t("Questions and finished work from your agent show up here. So do tasks that faded."), featureId: "lists.review"),
     RegistryDestination(id: .agent, navigationKey: "agent", serverView: "all", title: RegistryL10n.t("Agent"), iconId: "list.agent", sfSymbol: "person.2.badge.gearshape", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("No agent work"), emptyDetail: RegistryL10n.t("Tasks you assign to Claude appear here, grouped by where the work stands."), featureId: "lists.agent"),
     RegistryDestination(id: .upcoming, navigationKey: "upcoming", serverView: "upcoming", title: RegistryL10n.t("Upcoming"), iconId: "list.upcoming", sfSymbol: "calendar", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("Nothing upcoming"), emptyDetail: RegistryL10n.t("Tasks with a future When or Deadline date appear here."), featureId: "lists.upcoming"),
     RegistryDestination(id: .repeating, navigationKey: "repeating", serverView: "all", title: RegistryL10n.t("Repeating"), iconId: "list.repeating", sfSymbol: "arrow.clockwise", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("No repeating tasks"), emptyDetail: RegistryL10n.t("Give any task a Repeat rule and it will show up here."), featureId: "lists.repeating"),
     RegistryDestination(id: .anytime, navigationKey: "unscheduled", serverView: "unscheduled", title: RegistryL10n.t("Anytime"), iconId: "list.anytime", sfSymbol: "rectangle.stack.fill", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("Nothing in Anytime"), emptyDetail: RegistryL10n.t("Open tasks without a date live here."), featureId: "lists.anytime"),
     RegistryDestination(id: .logbook, navigationKey: "logbook", serverView: "logbook", title: RegistryL10n.t("Logbook"), iconId: "list.logbook", sfSymbol: "checkmark", sidebarSection: "bottom", visibility: "always", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("Logbook is empty"), emptyDetail: RegistryL10n.t("Tasks you complete or let go end up here."), featureId: "lists.logbook"),
     RegistryDestination(id: .starred, navigationKey: "starred", serverView: "all", title: RegistryL10n.t("Favorites"), iconId: "list.starred", sfSymbol: "star.fill", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("No Favorites"), emptyDetail: RegistryL10n.t("Favorite important tasks to keep them one tap away."), featureId: "lists.starred"),
-    RegistryDestination(id: .faded, navigationKey: "faded", serverView: "all", title: RegistryL10n.t("Faded"), iconId: "list.faded", sfSymbol: "circle.dashed", sidebarSection: "bottom", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("No Faded Tasks"), emptyDetail: RegistryL10n.t("Undated tasks without activity for 14 days appear here until you keep them or let them go."), featureId: "lists.faded"),
+    RegistryDestination(id: .faded, navigationKey: "faded", serverView: "all", title: RegistryL10n.t("Faded"), iconId: "list.faded", sfSymbol: "circle.dashed", sidebarSection: "top", visibility: "reviewGroup", canHide: false, canMoveSection: false, emptyTitle: RegistryL10n.t("No Faded Tasks"), emptyDetail: RegistryL10n.t("Tasks without activity for 14 days appear here until you keep them or let them go."), featureId: "lists.faded"),
     RegistryDestination(id: .recentlyDeleted, navigationKey: "recentlyDeleted", serverView: "all", title: RegistryL10n.t("Deleted"), iconId: "list.recently_deleted", sfSymbol: "trash", sidebarSection: "top", visibility: "logbookTab", canHide: false, canMoveSection: false, emptyTitle: RegistryL10n.t("No Deleted Tasks"), emptyDetail: RegistryL10n.t("Septena keeps deleted tasks here for 30 days, then deletes them for good."), featureId: "lists.recently-deleted"),
   ]
 
@@ -908,11 +909,15 @@ enum RegistryDestinations {
 
   /// Ordered row groups per destination id (`groups` in destinations.json).
   static let groups: [RegistryDestinationID: [RegistryDestinationGroup]] = [
+    .review: [
+      RegistryDestinationGroup(id: "questions", title: RegistryL10n.t("Questions"), iconId: "agent.your_turn", sfSymbol: "questionmark.bubble"),
+      RegistryDestinationGroup(id: "finished", title: RegistryL10n.t("Finished work"), iconId: "list.review", sfSymbol: "eye"),
+      RegistryDestinationGroup(id: "faded", title: RegistryL10n.t("Faded"), iconId: "list.faded", sfSymbol: "circle.dashed"),
+    ],
     .agent: [
-      RegistryDestinationGroup(id: "queued", title: RegistryL10n.t("Queued"), iconId: "agent.queued", sfSymbol: "clock"),
       RegistryDestinationGroup(id: "working", title: RegistryL10n.t("Working"), iconId: "agent.working", sfSymbol: "ellipsis.circle"),
-      RegistryDestinationGroup(id: "yourTurn", title: RegistryL10n.t("Your turn"), iconId: "agent.your_turn", sfSymbol: "questionmark.bubble"),
-      RegistryDestinationGroup(id: "review", title: RegistryL10n.t("Review"), iconId: "list.review", sfSymbol: "eye"),
+      RegistryDestinationGroup(id: "queued", title: RegistryL10n.t("Queued"), iconId: "agent.queued", sfSymbol: "clock"),
+      RegistryDestinationGroup(id: "stopped", title: RegistryL10n.t("Stopped"), iconId: "agent.stopped", sfSymbol: "stop.circle"),
       RegistryDestinationGroup(id: "done", title: RegistryL10n.t("Done"), iconId: "agent.done", sfSymbol: "checkmark.circle"),
     ],
   ]
@@ -1394,8 +1399,8 @@ enum RegistryActions {
     .taskRestore: RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: [.recentlyDeleted], requiresRecurrence: false, featureId: "lists.recently-deleted"),
     .taskDeletePermanently: RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: [.recentlyDeleted], requiresRecurrence: false, featureId: "lists.recently-deleted"),
     .taskEmptyTrash: RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [.recentlyDeleted], requiresRecurrence: false, featureId: "lists.recently-deleted"),
-    .taskKeepFaded: RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: [.faded], requiresRecurrence: false, featureId: "fade.sweep"),
-    .taskLetGoFaded: RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: [.faded], requiresRecurrence: false, featureId: "fade.sweep"),
+    .taskKeepFaded: RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: [.faded, .review], requiresRecurrence: false, featureId: "fade.sweep"),
+    .taskLetGoFaded: RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: [.faded, .review], requiresRecurrence: false, featureId: "fade.sweep"),
     .placeSaveNotes: RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
     .areaNewProject: RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
     .areaRename: RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.areas"),
@@ -1675,7 +1680,7 @@ enum RegistryNotices {
     RegistryNotice(id: .secondDevice, kind: "info", priority: 1, iconId: "notice.second_device", sfSymbol: "laptopcomputer.and.iphone", dismissScope: "account", dismissible: true, explainerSlot: false, featureId: "sync.backend", title: nil, detail: nil, platformDetails: [:], primaryTitle: RegistryL10n.t("See Plus"), upsellId: "second_device", steps: []),
     RegistryNotice(id: .weeklySweep, kind: "info", priority: 3, iconId: "notice.weekly_sweep", sfSymbol: "circle.dashed", dismissScope: "accountWeek", dismissible: true, explainerSlot: false, featureId: "fade.sweep", title: nil, detail: RegistryL10n.t("Still want any of them?"), platformDetails: [:], primaryTitle: RegistryL10n.t("Review"), upsellId: nil, steps: []),
     RegistryNotice(id: .fadedPile, kind: "info", priority: 5, iconId: "notice.weekly_sweep", sfSymbol: "circle.dashed", dismissScope: "none", dismissible: false, explainerSlot: false, featureId: "lists.faded", title: RegistryL10n.t("Tasks without activity for 14 days"), detail: RegistryL10n.t("Open a task or choose Keep to bring it back, or review the list and let the rest go."), platformDetails: [:], primaryTitle: RegistryL10n.t("Review…"), upsellId: nil, steps: []),
-    RegistryNotice(id: .fadeIntro, kind: "info", priority: 4, iconId: "notice.fade_intro", sfSymbol: "circle.lefthalf.filled", dismissScope: "device", dismissible: true, explainerSlot: true, featureId: "task.aging", title: RegistryL10n.t("Inactive tasks start to fade"), detail: RegistryL10n.t("Undated tasks fade after 14 days without activity and move to Faded. Open or edit a task to bring it back. You can turn this off in Settings."), platformDetails: [:], primaryTitle: nil, upsellId: nil, steps: []),
+    RegistryNotice(id: .fadeIntro, kind: "info", priority: 4, iconId: "notice.fade_intro", sfSymbol: "circle.lefthalf.filled", dismissScope: "device", dismissible: true, explainerSlot: true, featureId: "task.aging", title: RegistryL10n.t("Inactive tasks start to fade"), detail: RegistryL10n.t("Tasks fade after 14 days without activity and move to Review. A deadline or a date ahead keeps a task out. Open or edit a task to bring it back. You can turn this off in Settings."), platformDetails: [:], primaryTitle: nil, upsellId: nil, steps: []),
   ]
   static let byId: [RegistryNoticeID: RegistryNotice] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
   static func rolledInTitle(count: Int) -> String { RegistryL10n.plural("%lld tasks rolled into Today", count: count, one: "1 task rolled into Today", other: "%lld tasks rolled into Today", args: [count]) }

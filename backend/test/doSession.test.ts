@@ -184,7 +184,7 @@ describe("Do: agents", () => {
   it("a question's push waits during a Do and not during a stale one", async () => {
     const { store, start } = await setup();
     let sent = 0;
-    Object.assign(store, { listPushTokens: () => [{}], dispatchAgentQuestionPushes: async () => { sent++; } });
+    Object.assign(store, { listPushTokens: () => [{}], dispatchAgentPushes: async () => { sent++; } });
     const ask = () => store.push([op({
       op: "appendTurn", taskId: "b",
       turn: { role: "provider", step: "scope", question: "Which?", options: ["Red", "Blue"], ts: "2026-11-24T11:00:00Z" },

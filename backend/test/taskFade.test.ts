@@ -58,4 +58,36 @@ describe("what ends a fade", () => {
     assert.equal(fadedAt(), null);
     assert.equal(store.endStaleFades(), 0);
   });
+
+  it("a device that missed a touch, a date ahead or a hand-off cannot fade the task", async () => {
+    const now = "2026-11-25T10:00:00Z";
+    for (const known of [{ touchedAt: "2026-11-24T10:00:00Z" }, { scheduled: "2026-12-24" }]) {
+      const { write, fadedAt } = await setup();
+      write({ fadedAt: null, touchedAt: "2026-10-01T10:00:00Z" });
+      write(known);
+      write({ fadedAt: now });
+      assert.equal(fadedAt(), null, JSON.stringify(known));
+    }
+    const { store, write, fadedAt } = await setup();
+    write({ fadedAt: null });
+    store.push([{ clientOpId: `taskfade_${++n}`, op: "upsert", entity: "convo", id: "a", fields: { endState: "needs_verify", endStateNote: "x" } } as never], AGENT);
+    write({ fadedAt: now });
+    assert.equal(fadedAt(), null);
+  });
+
+  it("a push with its own touch may fade, and undo restores a fade", async () => {
+    const { write, fadedAt } = await setup();
+    write({ fadedAt: null, touchedAt: "2026-11-25T10:00:00Z" });
+    write({ fadedAt: FADED, touchedAt: "2026-11-01T09:00:00Z" });
+    assert.equal(fadedAt(), FADED);
+  });
+
+  it("an unaccepted proposal fades with a deadline (ADR 0039)", async () => {
+    const { write, fadedAt } = await setup();
+    write({ fadedAt: null, source: "mcp", deadline: "2026-12-20" });
+    write({ fadedAt: FADED });
+    assert.equal(fadedAt(), FADED);
+    write({ acknowledgedAt: "2026-11-25T10:00:00Z", touchedAt: "2026-11-25T10:00:00Z" });
+    assert.equal(fadedAt(), null);
+  });
 });
