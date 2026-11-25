@@ -1804,6 +1804,7 @@
 				en,
 				es,
 				fr,
+				it,
 				nl,
 				"pt-BR",
 			);

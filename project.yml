@@ -131,6 +131,7 @@ targets:
           - fr
           - de
           - es
+          - it
           - pt-BR
           - nl
         ITSAppUsesNonExemptEncryption: false
@@ -238,6 +239,7 @@ targets:
           - fr
           - de
           - es
+          - it
           - pt-BR
           - nl
         NSExtension:
@@ -295,6 +297,7 @@ targets:
           - fr
           - de
           - es
+          - it
           - pt-BR
           - nl
         NSExtension:
@@ -350,6 +353,7 @@ targets:
           - fr
           - de
           - es
+          - it
           - pt-BR
           - nl
         NSExtension:
@@ -435,6 +439,7 @@ targets:
           - fr
           - de
           - es
+          - it
           - pt-BR
           - nl
         ITSAppUsesNonExemptEncryption: false
@@ -511,6 +516,7 @@ targets:
           - fr
           - de
           - es
+          - it
           - pt-BR
           - nl
         WKApplication: true
@@ -562,6 +568,7 @@ targets:
           - fr
           - de
           - es
+          - it
           - pt-BR
           - nl
         NSExtension:
