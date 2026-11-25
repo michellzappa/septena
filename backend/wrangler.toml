@@ -42,7 +42,7 @@ APPLE_AUDIENCES = "com.septena.cloud,com.septena.cloud.mac,com.septena.tasks,com
 # "true" only after mz has a grant row (spec §6, "Grant yourself").
 ENTITLEMENT_ENFORCE = "false"
 # ADR 0040 rollout. Step 1 accepts signed tokens, step 2 ("true") issues them.
-SIGNED_SESSIONS = "false"
+SIGNED_SESSIONS = "true"
 # App Store purchases count only from these bundle ids and environments.
 # Sandbox stays on for TestFlight and P1 testing; drop it at public launch.
 APPLE_IAP_BUNDLE_IDS = "com.septena.tasks"
