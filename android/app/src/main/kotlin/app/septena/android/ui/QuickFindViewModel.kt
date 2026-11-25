@@ -126,6 +126,11 @@ class QuickFindViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         val now = graph.clock.now()
         val today = graph.clock.today(now)
         val ranked = mutableListOf<RankedResult>()
+        val refTexts = graph.taskRefLookup.searchTexts()
+        // A pasted link: the tasks that point at the item come first, whatever
+        // way the link is spelled there.
+        val pointing = graph.taskRefLookup.taskIdsForLink(rawQuery).orEmpty()
+            .withIndex().associate { (index, id) -> id to index }
 
         for (record in taskRecords) {
             if (record.deletedAt != null) continue
@@ -139,7 +144,9 @@ class QuickFindViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 .mapNotNull { value -> value.stringValue()?.let(tagNames::get) }
                 .joinToString(" ") { "$it #$it" }
             val notes = record.fields[RegistryEntityFields.Task.NOTES].stringValue().orEmpty()
-            val score = score(task.title, "$notes $tagText", tokens)
+            val found = score(task.title, "$notes $tagText ${refTexts[record.id].orEmpty()}", tokens)
+            val rank = pointing[record.id]
+            val score = found + if (rank == null) 0 else POINTING_SCORE - rank
             if (score <= 0) continue
             val destinationId = destinationFor(routableTask, today, now)
             val subtitle = taskSubtitle(task, today, now, areaTitles, projectTitles)
@@ -156,7 +163,11 @@ class QuickFindViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         destinationId = destinationId,
                     ),
                 ),
-                score = score + if (task.status == RegistryEntityEnums.TaskStatus.DONE) -1 else 0,
+                score = score + when {
+                    task.status != RegistryEntityEnums.TaskStatus.DONE -> 0
+                    rank == null -> -1
+                    else -> -POINTING_SCORE / 2
+                },
             )
         }
 
@@ -256,6 +267,7 @@ class QuickFindViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private companion object {
         val WHITESPACE = Regex("\\s+")
         const val RESULT_LIMIT = 12
+        const val POINTING_SCORE = 10_000
     }
 }
 

@@ -4,14 +4,16 @@ import app.septena.core.TaskSyncEngine
 import app.septena.transport.SyncAuthenticationException
 import app.septena.transport.SyncSubscriptionRequiredException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 sealed interface SyncState {
     data object Idle : SyncState
@@ -36,6 +38,7 @@ class SyncController(
 ) {
     private val running = AtomicBoolean(false)
     private val again = AtomicBoolean(false)
+    private val pendingDebounce = AtomicReference<Job?>(null)
 
     private val _state = MutableStateFlow<SyncState>(SyncState.Idle)
     val state: StateFlow<SyncState> = _state.asStateFlow()
@@ -45,15 +48,17 @@ class SyncController(
     val dataVersion: StateFlow<Long> = _dataVersion.asStateFlow()
 
     /** Set while account deletion runs: no sync may write rows back after the server emptied the store. */
-    @Volatile private var paused = false
+    private val _paused = MutableStateFlow(false)
+    val paused: StateFlow<Boolean> = _paused.asStateFlow()
 
     fun requestSync() {
+        pendingDebounce.getAndSet(null)?.cancel()
         again.set(true)
-        if (paused) return
+        if (_paused.value) return
         if (!running.compareAndSet(false, true)) return
         // `pause` sets the flag, then waits on `running`; this checks in the opposite order, so a
         // sync that slips past the first check above still never starts once `pause` has returned.
-        if (paused) {
+        if (_paused.value) {
             running.set(false)
             return
         }
@@ -63,9 +68,23 @@ class SyncController(
             } finally {
                 running.set(false)
                 // A request that landed between the last check and the reset above.
-                if (again.get() && !paused) requestSync()
+                if (again.get() && !_paused.value) requestSync()
             }
         }
+    }
+
+    /** Coalesces rapid live nudges into one sync run after [delayMs]. */
+    fun requestSyncDebounced(delayMs: Long = SyncPollPolicy.NUDGE_DEBOUNCE_MS) {
+        if (_paused.value) return
+        if (delayMs <= 0L) {
+            requestSync()
+            return
+        }
+        val job = scope.launch(Dispatchers.Default) {
+            delay(delayMs)
+            requestSync()
+        }
+        pendingDebounce.getAndSet(job)?.cancel()
     }
 
     /** Runs a sync now and returns when it and any coalesced follow-up have finished. */
@@ -76,13 +95,14 @@ class SyncController(
 
     /** Stops new syncs and waits for a running one to finish. [resume] lets them run again. */
     suspend fun pause() {
-        paused = true
+        pendingDebounce.getAndSet(null)?.cancel()
+        _paused.value = true
         while (running.get()) delay(POLL_MS)
     }
 
     /** Allows syncs again and, when one was asked for meanwhile, runs it. */
     fun resume() {
-        paused = false
+        _paused.value = false
         if (again.get()) requestSync()
     }
 

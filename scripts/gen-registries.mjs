@@ -1783,14 +1783,14 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static func kind(_ id: String) -> RegistryTaskReferenceKind { kinds.first { $0.id == id } ?? otherKind }");
   lines.push("  /// The label of a role that shows one, by role.");
   lines.push(`  static let roleLabels: [String: String] = [${Object.entries(refs.roles).map(([id, r]) => `${swiftStr(id)}: ${L(r.label, r, "label")}`).join(", ")}]`);
-  for (const [name, node] of [["open", refs.open], ["createdFrom", refs.createdFrom], ["limitReached", refs.add.limitReached], ["suggestion", refs.add.suggestions]]) {
+  for (const [name, node] of [["open", refs.open], ["createdFrom", refs.createdFrom], ["limitReached", refs.add.limitReached], ["suggestion", refs.add.suggestions], ["alsoIn", refs.alsoIn]]) {
     const t = refTmpl(node);
     lines.push(`  static func ${name}(${t.params}) -> String { ${t.body} }`);
   }
   for (const [name, node, field] of [
     ["addPlaceholder", refs.add, "placeholder"], ["addConfirmTitle", refs.add, "confirmTitle"],
     ["offersTitle", refs.add.offers, "title"], ["invalidMessage", refs.add.invalid, "message"],
-    ["failedMessage", refs.add.failed, "message"],
+    ["failedMessage", refs.add.failed, "message"], ["alreadyTaskTitle", refs.alreadyTask, "title"],
   ]) lines.push(`  static let ${name}: String = ${L(node[field], node, field)}`);
   lines.push("  /// The most links of one task's title and notes that show as suggestions.");
   lines.push(`  static let maxSuggestions = ${refs.add.suggestions.max}`);

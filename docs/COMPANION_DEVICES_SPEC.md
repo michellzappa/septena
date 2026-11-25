@@ -1,6 +1,6 @@
 # Companion devices
 
-Status: building (2026-11-24; CD0, CD1 and CD3 built). Rests on ADR 0034 and ADR 0035 (both proposed).
+Status: building (2026-11-24; CD0, CD1 and CD3 built). Rests on ADR 0034 and ADR 0035 (both accepted 2026-11-25). CD2 and CD4 are for later.
 This spec is the backend contract. The desk orb's firmware and its own roadmap
 are in `michellzappa/tinyseptena` (private).
 
@@ -94,22 +94,22 @@ puts these routes on its list.
 |---|---|---|
 | CD0 (#430) | Added feed | done |
 | CD1 (#424) | Questions view, `accept` / `send_back` / `answer` | done |
-| CD2 (#358) | Companion scope, device list | ADR 0034 accepted |
+| CD2 (#358) | Companion scope, device list | nothing; not started |
 | CD3 (#425) | Live nudge | done, before CD2: open to every session |
-| CD4 (#426) | Voice transcription | ADR 0009, ADR 0035, CD2 |
+| CD4 (#426) | Voice transcription | CD2, a price decision (ADR 0009), the terms check in ADR 0035 |
 
 CD2 gates any release outside mz's desk.
 
 ## Open questions
 
-Collected for mz in #427.
+mz accepted the ADRs in #427; the defaults below stand.
 
 | Question | Default |
 |---|---|
 | Does a companion take a sync device slot? | No, like the watch |
 | Does the added feed skip imports and repeats? | Yes |
 | Can a companion create tasks? | Yes, so voice has somewhere to write |
-| Where is speech turned into text? | Workers AI, when ADR 0009 is accepted |
+| Where is speech turned into text? | Workers AI |
 | Is voice on when a companion signs in? | Off, turned on in the app |
 | Can a companion send back without words? | Yes. The agent gets "Sent back, no note" and may ask |
 | Do questions from a companion's "Other" take free text? | No until CD4. The device shows the options and says "Answer on your phone" for the rest |

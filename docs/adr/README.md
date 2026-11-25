@@ -14,7 +14,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0006](0006-tasks-fade-by-default.md) | Tasks fade by default; the list asks why a task is stuck | accepted |
 | [0007](0007-septena-is-the-task-app.md) | Septena is the task app; the life OS becomes Septena Life | accepted |
 | [0008](0008-agent-loop-rules-live-in-the-store.md) | Agent loop rules live in the store; the human holds the stop | accepted |
-| [0009](0009-trustable-private-ai.md) | Run AI on tasks with checkable privacy guarantees | proposed |
+| [0009](0009-trustable-private-ai.md) | Run AI on tasks with checkable privacy guarantees | accepted; provider, default and pricing per feature |
 | [0010](0010-free-server-tier-with-limits.md) | Offer a free server tier with limits; paid lifts them | accepted, amended by 0023 (devices) and 0036 (agents, live sync, Logbook) |
 | [0011](0011-self-hostable-backend.md) | Keep the backend self-hostable on the user's own Cloudflare account | accepted |
 | [0012](0012-project-notes-are-agent-context.md) | Project notes are the context agents read first | accepted |
@@ -38,8 +38,8 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0031](0031-references-are-keyed-pointers.md) | A task reference is a keyed pointer, separate from a link | accepted |
 | [0032](0032-github-issues-are-followed-not-mirrored.md) | Follow GitHub issues, do not mirror them | superseded by 0033 |
 | [0033](0033-no-github-integration-issue-links-are-references.md) | Drop the GitHub integration; issue links are references | accepted |
-| [0034](0034-companion-devices-get-a-limited-session.md) | Give companion devices a limited session and a small verb set | proposed |
-| [0035](0035-companion-voice-is-push-to-talk-and-confirmed.md) | Make companion voice push-to-talk, unstored and confirmed | proposed |
+| [0034](0034-companion-devices-get-a-limited-session.md) | Give companion devices a limited session and a small verb set | accepted |
+| [0035](0035-companion-voice-is-push-to-talk-and-confirmed.md) | Make companion voice push-to-talk, unstored and confirmed | accepted |
 | [0036](0036-plan-ladder-one-agent-then-three.md) | Four plan levels: an account adds the server, Plus adds more than one (amends 0010, 0023) | accepted, presentation amended by 0037 |
 | [0037](0037-show-free-plus-and-planned-pro.md) | Show three plans: Free, Plus and a planned Pro (amends 0036) | accepted |
 | [0038](0038-agents-are-the-integrations.md) | Agents are the integrations; Septena connects to no source (extends 0033, amends 0003) | accepted |

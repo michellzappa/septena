@@ -240,7 +240,7 @@ enum TaskRefRows {
       .prefix(min(room, RegistryTaskReferences.maxSuggestions)))
   }
 
-  private static func linkTexts(in text: String) -> [String] {
+  static func linkTexts(in text: String) -> [String] {
     // Every link has a scheme. This runs while the user types, so it skips
     // the detector on the usual text.
     guard text.contains(":"),

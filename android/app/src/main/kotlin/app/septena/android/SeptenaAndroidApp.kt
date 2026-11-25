@@ -6,6 +6,7 @@ import app.septena.android.auth.AppCredentials
 import app.septena.android.auth.SessionStore
 import app.septena.android.reminders.TaskReminderScheduler
 import app.septena.android.sync.SyncController
+import app.septena.android.sync.SyncLiveCoordinator
 import app.septena.android.ui.AppearanceStore
 import app.septena.core.ConversationMutator
 import app.septena.core.ConversationRules
@@ -18,6 +19,7 @@ import app.septena.core.SyncedSettingsMutator
 import app.septena.core.SystemDayClock
 import app.septena.core.TaskConversation
 import app.septena.core.TaskMutator
+import app.septena.core.TaskRefLookup
 import app.septena.core.TaskRefMutator
 import app.septena.core.TaskSyncEngine
 import app.septena.core.UuidTaskIdGenerator
@@ -31,6 +33,7 @@ import app.septena.store.db.SeptenaDatabase
 import app.septena.transport.SeptenaAccessClient
 import app.septena.transport.SeptenaAuthClient
 import app.septena.transport.SeptenaTaskBackendClient
+import app.septena.transport.SyncLiveSocket
 import app.septena.transport.UrlConnectionSyncTransport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -74,6 +77,7 @@ class AndroidAppGraph(application: Application) {
     val fadeSweepStore = app.septena.android.ui.FadeSweepStore(application)
     val registryEntityMutator = RegistryEntityMutator(taskStore, clock, ids)
     val taskRefMutator = TaskRefMutator(taskStore, clock, ids)
+    val taskRefLookup = TaskRefLookup(taskStore)
     val conversationMutator = ConversationMutator(taskStore, ids)
     val recurrenceRules = RecurrenceRules
     val conversationRules = ConversationRules
@@ -88,6 +92,14 @@ class AndroidAppGraph(application: Application) {
     val attachments = TaskAttachmentStore(application, taskStore, registryEntityMutator, clock, taskBackend)
     val accountWipe = AccountWipe(application, taskStore, attachments, taskUndoHistory)
     val sync = SyncController(TaskSyncEngine(taskStore, transport, clock), appScope, afterSync = ::afterSync)
+    private val liveSocket = SyncLiveSocket(credentials, clientVersion)
+    val liveSync = SyncLiveCoordinator(
+        sync = sync,
+        signedIn = credentials.signedIn,
+        currentCursor = { taskStore.syncCursor() },
+        connectSocket = liveSocket::connectAndListen,
+        scope = appScope,
+    )
     val appearance = AppearanceStore(deviceSettings, syncedSettings, syncedSettingsMutator, sync, clock, appScope)
     val firstRun = FirstRunState(application, taskStore, syncedSettings, syncedSettingsMutator, clock)
 

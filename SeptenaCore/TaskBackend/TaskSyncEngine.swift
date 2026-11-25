@@ -1532,6 +1532,7 @@ final class TaskSyncEngine {
     // The launch snapshot shows this account's Today (#82).
     TodaySnapshotStore.invalidate()
     TasksWidgetSnapshotStore.invalidate()
+    SharedTaskCaptureImporter.clearLinkIndex()
     #if os(iOS)
     WatchBridge.shared.accountChanged()
     #endif
@@ -1601,6 +1602,7 @@ final class TaskSyncEngine {
     // Account switch / delete: the launch snapshot holds the old rows (#82).
     TodaySnapshotStore.invalidate()
     TasksWidgetSnapshotStore.invalidate()
+    SharedTaskCaptureImporter.clearLinkIndex()
     #if os(iOS)
     WatchBridge.shared.accountChanged()
     #endif
