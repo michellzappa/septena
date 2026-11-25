@@ -2168,6 +2168,7 @@ struct TaskListView: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(PlainHoverRowButtonStyle())
+    .geometryGroup()
     .textCase(nil)
     .selectionDisabled()
   }
@@ -4386,6 +4387,7 @@ struct TaskListView: View {
       showsFadedIndicator: filter != .faded,
       isListSelected: selection.contains(task.id),
       checkboxDimmed: touchSelectionActive,
+      isSettling: model.settle.isSettling(task.id),
       accessory: accessory,
       checklistSummary: checklistCounts[task.id],
       fromKind: fromRefKinds[task.id].map(RegistryTaskReferences.kind),
@@ -4404,11 +4406,12 @@ struct TaskListView: View {
       },
       onTap: nil
     )
-    // Fade on insert/removal. The fade only plays inside an animated
-    // transaction; every settle-driven removal runs through `motion.run`, so
-    // Reduce Motion still gets an instant (un-animated) drop. A row coming
-    // back from its folding editor does not fade: a fade there cross-fades
-    // with the editor (the "flash"); see `foldingEditId`.
+    // Covers the row ↔ editor swap. The row's own arrival and exit is
+    // `rowTransition` on the card slice (`cardedRows`). Both only play inside
+    // an animated transaction, and those run through `motion.run`, so Reduce
+    // Motion still gets an instant drop. A row coming back from its folding
+    // editor does not fade: a fade there cross-fades with the editor (the
+    // "flash"); see `foldingEditId`.
     .transition(foldingEditId == task.id ? .identity : .opacity)
     // Open + selection gestures live on `selectableScrollRow` (applied via
     // `asTaskRow`): tap → open (touch), single-click → select / double-click →
@@ -5076,6 +5079,7 @@ struct TaskListView: View {
         ))
         .zIndex(isExpanded ? 1 : 0)
         .inlineEditDimmed(isInlineEditing && !isExpanded, onDismiss: collapseEdit))
+        .transition(rowTransition(task, position))
     }
     if rendersQuickAdd {
       AnyView(quickAddLine(showsEditor: quickAddShowsEditor)
@@ -5092,6 +5096,14 @@ struct TaskListView: View {
         .zIndex(isEditingQuickAdd ? 1 : 0)
         .inlineEditDimmed(isInlineEditing && !isEditingQuickAdd, onDismiss: collapseEdit))
     }
+  }
+
+  /// The whole card slice leaves with `TaskListRowExit`. A row coming back from
+  /// its folding editor has no transition (see `foldingEditId`).
+  private func rowTransition(_ task: SeptenaTask, _ position: TaskCardPosition) -> AnyTransition {
+    foldingEditId == task.id
+      ? .identity
+      : AnyTransition(TaskListRowExit(fades: position == .solo))
   }
 
   /// Filters applied client-side before rendering:
@@ -5159,6 +5171,7 @@ struct TaskListView: View {
     }
     return groupHeaderBody(icon: icon, title: title, areaEmoji: areaEmoji,
                            projectProgress: projectProgress, onTap: onTap, onAdd: onAdd)
+      .geometryGroup()
       .textCase(nil)
       .selectionDisabled()
       .modifier(dropModifier)
@@ -5168,6 +5181,7 @@ struct TaskListView: View {
         onDropIDs: resolvedMagicDrop
       ))
       .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
+      .transition(TaskListRowExit(fades: true))
   }
 
   private func groupHeaderBody(icon: String?, title: String,
@@ -5517,7 +5531,7 @@ struct TaskListView: View {
     // posts can't yank it. After the beat the settle clears and the row fades
     // out IN PLACE and is gone (it lives on in the dedicated Logbook);
     // `endSettle` inside the animated transaction lets that removal play
-    // `.transition(.opacity)` and rows below slide up.
+    // `TaskListRowExit` and rows below slide up.
     // Uncomplete cancels the pending fade.
     //
     // Order matters: the pool filter is `status != .done || model.settle.isSettling`.

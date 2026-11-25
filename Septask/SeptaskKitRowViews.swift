@@ -955,8 +955,13 @@ final class KitCardRowView: NSTableRowView {
       }
       maskPath = NSBezierPath(roundedRect: r, xRadius: Self.corner, yRadius: Self.corner)
     }
+    // A bare layer animates its own changes. Off, so the card surface never
+    // trails the row it sits behind.
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
     mask.frame = local
     mask.path = maskPath.cgPath
+    CATransaction.commit()
 
     overlay.frame = bounds
     overlay.slicePath = slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup)

@@ -1441,6 +1441,7 @@ private fun TaskHomeScaffold(
                                 rowMenuGroups = rowMenuGroups,
                                 rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                                 modifier = Modifier.fillMaxSize(),
+                                listKey = location.destinationId to showingDeletedTab,
                             selection = selection,
                             onComplete = onComplete,
                             onOpenTask = onOpenTask,
