@@ -100,6 +100,15 @@ export const zChangesResponse = z.object({
   changes: z.array(zChangeEntry),
 });
 
+export const zIcalFeedSettings = z.object({
+  enabled: z.boolean(),
+  scope: z.enum(["all", "timed"]),
+  url: z.string().nullable(),
+  webcalUrl: z.string().nullable(),
+  createdAt: z.string().nullable(),
+});
+export type IcalFeedSettings = z.infer<typeof zIcalFeedSettings>;
+
 export interface OrdinalWeekday {
   ordinal: number;
   weekday: number;
