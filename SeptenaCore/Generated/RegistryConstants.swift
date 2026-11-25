@@ -76,6 +76,7 @@ enum RegistryEntityEnums {
   static let convoHandoffActionType: [String] = ["open_url", "compose", "call", "none"]
   static let convoTurnRole: [String] = ["user", "provider"]
   static let convoTurnStep: [String] = ["confirm", "ground", "scope", "decide", "work"]
+  static let doExit: [String] = ["done", "stopped", "later", "replaced", "closed"]
   static let taskRefRole: [String] = ["about", "from", "blocked_by", "follow_up"]
   static let telemetryLevel: [String] = ["none", "minimal", "balanced", "full"]
   static let appearanceMode: [String] = ["system", "light", "dark"]
@@ -103,6 +104,8 @@ enum RegistryRules {
   static let upcomingCalendarDays: Int = 30
   static let toastDurationSeconds: Int = 7
   static let deleteGraceSeconds: Int = 120
+  static let doStaleHours: Int = 4
+  static let doLapseHours: Int = 24
 }
 
 /// Semantic icon ID → SF Symbol lookup (`registry/icons.json`).

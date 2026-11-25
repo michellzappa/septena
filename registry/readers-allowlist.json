@@ -52,6 +52,18 @@
     "RegistryRules.fadeGraceDays": {
       "reason": "The fade grace period is read by the shared Rust core (ADR 0025); Swift calls the core for fadeFill.",
       "issue": "#250"
+    },
+    "RegistryEntityEnums.doExit": {
+      "reason": "Do (ADR 0041): the core holds the rule; the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryRules.doStaleHours": {
+      "reason": "The shared core applies it (resolve_do_sessions).",
+      "issue": "#517"
+    },
+    "RegistryRules.doLapseHours": {
+      "reason": "The shared core applies it (resolve_do_sessions).",
+      "issue": "#517"
     }
   },
   "ts": {
@@ -204,6 +216,30 @@
     "RegistryEntityFields.TaskRef.LAST_SEEN_AT": {
       "reason": "Server-owned re-capture timestamp rendered in task history.",
       "issue": "#390"
+    },
+    "RegistryEntityEnums.DoExit.STOPPED": {
+      "reason": "Do (ADR 0041): the core holds the rule; the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryEntityEnums.DoExit.LATER": {
+      "reason": "Do (ADR 0041): the core holds the rule; the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryEntityEnums.DoExit.REPLACED": {
+      "reason": "Do (ADR 0041): the core holds the rule; the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryEntityEnums.DoExit.CLOSED": {
+      "reason": "Do (ADR 0041): the core holds the rule; the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryRules.DO_STALE_HOURS": {
+      "reason": "The shared core applies it (resolve_do_sessions).",
+      "issue": "#517"
+    },
+    "RegistryRules.DO_LAPSE_HOURS": {
+      "reason": "The shared core applies it (resolve_do_sessions).",
+      "issue": "#517"
     }
   }
 }

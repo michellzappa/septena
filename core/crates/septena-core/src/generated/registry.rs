@@ -20,6 +20,8 @@ pub mod rules {
     pub const CLIENT_OP_TTL_DAYS: i64 = 30;
     pub const CHANGE_LOG_TTL_DAYS: i64 = 365;
     pub const DELETE_GRACE_SECONDS: i64 = 120;
+    pub const DO_STALE_HOURS: i64 = 4;
+    pub const DO_LAPSE_HOURS: i64 = 24;
 }
 
 /// Wire limits (`registry/entities.json` `limits`).
@@ -131,6 +133,14 @@ pub mod enums {
         pub const DECIDE: &str = "decide";
         pub const WORK: &str = "work";
         pub const ALL: &[&str] = &["confirm", "ground", "scope", "decide", "work"];
+    }
+    pub mod do_exit {
+        pub const DONE: &str = "done";
+        pub const STOPPED: &str = "stopped";
+        pub const LATER: &str = "later";
+        pub const REPLACED: &str = "replaced";
+        pub const CLOSED: &str = "closed";
+        pub const ALL: &[&str] = &["done", "stopped", "later", "replaced", "closed"];
     }
     pub mod task_ref_role {
         pub const ABOUT: &str = "about";

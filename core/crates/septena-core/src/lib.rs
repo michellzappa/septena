@@ -17,6 +17,7 @@ mod generated {
 mod conformance;
 mod convo;
 mod date;
+mod do_session;
 mod error;
 mod fade;
 mod json;
@@ -31,6 +32,7 @@ mod views;
 
 pub use conformance::*;
 pub use convo::*;
+pub use do_session::*;
 pub use error::*;
 pub use fade::*;
 pub use json::*;
