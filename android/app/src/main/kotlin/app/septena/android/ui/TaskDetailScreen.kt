@@ -651,8 +651,7 @@ fun TaskDetailScreen(
                     actions = {
                         if (savedTask != null && !deleted) {
                             val addRefTitle = remember(languageTag) {
-                                RegistryCatalog.actionTitle(RegistryActionIds.TASK_ADD_REFERENCE, languageTag = languageTag)
-                                    ?.takeIf(String::isNotBlank) ?: "Add Reference"
+                                RegistryCatalog.actionTitle(RegistryActionIds.TASK_ADD_REFERENCE, languageTag = languageTag).orEmpty()
                             }
                             IconButton(
                                 onClick = { showAddReferenceDialog = true },

@@ -169,7 +169,7 @@ struct CalendarDetail: View {
   var body: some View {
     Form {
       Section {
-        Toggle("Show calendar events", isOn: $showCalendarEvents)
+        Toggle(RegistrySettings.copy("calendar_detail", "deviceToggle"), isOn: $showCalendarEvents)
       } footer: {
         Text("Show your calendar events in Today and Upcoming. Hidden calendars stay untouched in Calendar.")
       }

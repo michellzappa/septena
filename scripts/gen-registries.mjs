@@ -1682,6 +1682,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const k of ["askKicker", "reviewKicker", "reviewFallback", "acceptedLabel"]) {
     lines.push(`  static let agentPrompt${k[0].toUpperCase()}${k.slice(1)}: String = ${L(convoBlock[k], convoBlock, k)}`);
   }
+  lines.push("  /// The weekly fade sweep's title (`surfaces.json` `fadeSweep`).");
+  lines.push(`  static let fadeSweepTitle: String = ${L(surfaces.fadeSweep.title, surfaces.fadeSweep, "title")}`);
   const qf = surfaces.quickFind;
   lines.push("  /// Quick Find copy (`surfaces.json` `quickFind`).");
   lines.push(`  static let quickFindPlaceholder: String = ${L(qf.placeholder, qf, "placeholder")}`);
