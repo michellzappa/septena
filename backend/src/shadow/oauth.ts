@@ -275,6 +275,9 @@ export const zDeviceStartBody = z.object({
 export const zDevicePollBody = z.object({
   code: z.string().min(1).max(32),
   pollSecret: z.string().regex(/^[A-Za-z0-9_-]{20,64}$/),
+  /// Web clients request `"cookie"` so the refresh token stays in an HttpOnly
+  /// cookie on api.septena.app instead of the JSON response body (WEB_CLIENT_SPEC.md §4).
+  sessionMode: z.enum(["body", "cookie"]).optional(),
 }).strict();
 
 /// `qr` is the sign-in QR (src/shadow/pairQr.ts) for clients that draw it;

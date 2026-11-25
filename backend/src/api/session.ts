@@ -17,7 +17,7 @@ import type { RenewResult, SessionGrant } from "../store/sessions.js";
 // - Renewal: src/store/sessions.ts.
 
 export const ACCESS_TTL_S = 60 * 60;
-const REFRESH_TTL_S = 180 * 24 * 60 * 60;
+export const REFRESH_TTL_S = 180 * 24 * 60 * 60;
 const ACCESS_PREFIX = "sa1";
 const REFRESH_PREFIX = "sr2";
 const LEGACY_REFRESH_PREFIX = "sr1";

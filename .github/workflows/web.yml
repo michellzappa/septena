@@ -1,0 +1,121 @@
+name: Web
+
+# Septena web client (web/, static Next.js export on Cloudflare Workers static
+# assets at web.septena.app — docs/WEB_CLIENT_SPEC.md, issue #21).
+
+on:
+  push:
+    branches: [main, "wt/**"]
+    paths:
+      - "web/**"
+      - "registry/conformance/**"
+      - ".github/workflows/web.yml"
+  pull_request:
+    paths:
+      - "web/**"
+      - "registry/conformance/**"
+      - ".github/workflows/web.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Web typecheck, tests and static build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Unit & conformance tests
+        run: pnpm test
+
+      - name: Static export build
+        run: pnpm run build
+
+  deploy:
+    name: Deploy web.septena.app
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: web-deploy
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Token present
+        id: token
+        working-directory: .
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::warning::Secret CLOUDFLARE_API_TOKEN is missing. web.septena.app was not deployed."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true'
+
+      - uses: pnpm/action-setup@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install
+        if: steps.token.outputs.ok == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Build static export
+        if: steps.token.outputs.ok == 'true'
+        run: pnpm run build
+
+      - name: Deploy to Cloudflare Workers
+        if: steps.token.outputs.ok == 'true'
+        run: pnpm exec wrangler deploy
+
+      - name: Smoke check
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          for i in 1 2 3 4 5; do
+            if curl -fsSI https://web.septena.app | head -n 1; then exit 0; fi
+            sleep 5
+          done
+          echo "::error::https://web.septena.app did not answer after the deploy."
+          exit 1

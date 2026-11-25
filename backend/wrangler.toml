@@ -47,6 +47,8 @@ SIGNED_SESSIONS = "true"
 # Sandbox stays on for TestFlight and P1 testing; drop it at public launch.
 APPLE_IAP_BUNDLE_IDS = "com.septena.tasks"
 APPLE_IAP_ENVIRONMENTS = "Production,Sandbox"
+# Allowed browser origins for the web client (docs/WEB_CLIENT_SPEC.md §4–§5).
+WEB_ALLOWED_ORIGINS = "https://web.septena.app"
 
 # Created via `wrangler kv namespace create <NAME>`; paste returned IDs here.
 [[kv_namespaces]]

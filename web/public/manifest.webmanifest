@@ -1,0 +1,16 @@
+{
+  "name": "Septena",
+  "short_name": "Septena",
+  "description": "Calm, local-first task manager on the web.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#007aff",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
