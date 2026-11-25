@@ -297,7 +297,9 @@ thin clients (`backend/src/api/tasksRest.ts`) gets the same fields.
 ## 8. App surfaces
 
 - **Task page:** a new block kind `references` in `registry/surfaces.json`
-  (`taskPage.references`, depth `page`, `editOnly`), after attachments. One
+  (`taskPage.references`, depths `inline` and `page`, `editOnly`), after
+  attachments. The inline editor shows the rows above the pills, with no
+  heading and no add row. One
   row per reference: kind icon, title, subtitle. A tap opens it. The context
   menu has Open, Copy Link, Remove. The block is absent on a task with no
   references, except through "Add Reference" in the task's menu.

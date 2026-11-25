@@ -84,6 +84,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private let notesScroll = KitNestedScrollView()
   private let checklistView = KitChecklistView()
   private let attachmentsView = KitAttachmentsView()
+  private let referencesView = KitReferencesView()
   /// Title, notes, checklist (when shown), attachments (when shown), pills — stacked.
   private let column = NSStackView()
   private let pillRow = NSStackView()
@@ -128,6 +129,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private var notesHeightConstraint: NSLayoutConstraint!
   private var checklistHeightConstraint: NSLayoutConstraint!
   private var attachmentsHeightConstraint: NSLayoutConstraint!
+  private var referencesHeightConstraint: NSLayoutConstraint!
   /// False only before `configure(with:)` has run — an open row always shows
   /// its notes. Kept as a guard so a cell the table measures before it is
   /// configured doesn't reserve notes height it isn't drawing yet.
@@ -226,18 +228,21 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// Row height for a one-line title with no notes — the controller's answer
   /// until the live cell has measured itself (`expandedHeight`).
   static var baseHeight: CGFloat {
-    height(titleHeight: titleLineHeight, notesHeight: nil, checklistHeight: 0, attachmentsHeight: 0)
+    height(titleHeight: titleLineHeight, notesHeight: nil, checklistHeight: 0, attachmentsHeight: 0,
+           referencesHeight: 0)
   }
 
   /// Layout: a closed-row-height band at the top (checkbox + first title line
   /// centered exactly as `SeptaskKitTaskCell`), any extra title lines, then
-  /// notes, optional checklist, optional attachments, and pills hanging below.
+  /// notes, optional checklist, attachments and references, and pills hanging below.
   private static func height(titleHeight: CGFloat, notesHeight: CGFloat?,
-                             checklistHeight: CGFloat, attachmentsHeight: CGFloat) -> CGFloat {
+                             checklistHeight: CGFloat, attachmentsHeight: CGFloat,
+                             referencesHeight: CGFloat) -> CGFloat {
     var height = SeptaskKitTheme.rowHeight + max(0, titleHeight - titleLineHeight) + interRowGap
     if let notesHeight { height += notesHeight + interRowGap }
     if checklistHeight > 0 { height += checklistHeight + interRowGap }
     if attachmentsHeight > 0 { height += attachmentsHeight + interRowGap }
+    if referencesHeight > 0 { height += referencesHeight + interRowGap }
     return height + pillRowHeight + bottomPadding
   }
 
@@ -248,7 +253,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     return Self.height(titleHeight: measuredTitleHeight,
                        notesHeight: notesShown ? measuredNotesHeight : nil,
                        checklistHeight: checklistH,
-                       attachmentsHeight: attachH)
+                       attachmentsHeight: attachH,
+                       referencesHeight: referencesView.preferredHeight)
   }
 
   init(identifier: NSUserInterfaceItemIdentifier) {
@@ -358,6 +364,9 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     column.addArrangedSubview(notesScroll)
     column.addArrangedSubview(checklistView)
     column.addArrangedSubview(attachmentsView)
+    referencesView.translatesAutoresizingMaskIntoConstraints = false
+    referencesView.isHidden = true
+    column.addArrangedSubview(referencesView)
     pillScroll.drawsBackground = false
     pillScroll.hasHorizontalScroller = false
     pillScroll.hasVerticalScroller = false
@@ -388,6 +397,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
       equalToConstant: Self.notesMinHeight)
     checklistHeightConstraint = checklistView.heightAnchor.constraint(equalToConstant: 0)
     attachmentsHeightConstraint = attachmentsView.heightAnchor.constraint(equalToConstant: 0)
+    referencesHeightConstraint = referencesView.heightAnchor.constraint(equalToConstant: 0)
     NSLayoutConstraint.activate([
       leadingConstraint,
       // Match `SeptaskKitTaskCell`: checkbox on the vertical center of a
@@ -408,6 +418,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
       checklistHeightConstraint,
       attachmentsView.widthAnchor.constraint(equalTo: column.widthAnchor),
       attachmentsHeightConstraint,
+      referencesView.widthAnchor.constraint(equalTo: column.widthAnchor),
+      referencesHeightConstraint,
       pillScroll.heightAnchor.constraint(equalToConstant: Self.pillRowHeight),
       pillScroll.widthAnchor.constraint(equalTo: column.widthAnchor),
       pillRow.topAnchor.constraint(equalTo: pillScroll.contentView.topAnchor),
@@ -524,6 +536,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     syncChecklistHeight(notify: false)
     attachmentsView.configure(taskID: task.id)
     syncAttachmentsHeight(notify: false)
+    refreshReferences(notify: false)
     updateKeyChain()
     recomputeContentHeights(notify: false)
     refreshPills(with: task, listName: listName)
@@ -597,6 +610,20 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     let h = attachmentsView.isHidden ? 0 : attachmentsView.preferredHeight
     if abs(attachmentsHeightConstraint.constant - h) > 0.5 {
       attachmentsHeightConstraint.constant = h
+      if notify { onContentHeightChanged?() }
+    }
+  }
+
+  /// Also the list's answer to a task change, so a reference added, removed or
+  /// undone while the row is open shows at once.
+  func refreshReferences(notify: Bool = true) {
+    guard let taskID = configuredTaskID else { return }
+    referencesView.configure(rows: LocalCache.taskRefRows(
+      forTaskID: taskID, in: LocalStore.shared.container.mainContext))
+    referencesView.isHidden = referencesView.isEmpty
+    let h = referencesView.preferredHeight
+    if abs(referencesHeightConstraint.constant - h) > 0.5 {
+      referencesHeightConstraint.constant = h
       if notify { onContentHeightChanged?() }
     }
   }

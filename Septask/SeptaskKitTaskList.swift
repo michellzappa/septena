@@ -680,7 +680,11 @@ final class SeptaskKitTaskListController: NSViewController {
         // `queueTodayArrivalFlashes` in `reload`). Notifications are posted
         // synchronously, but the actual repaint is coalesced so a multi-field
         // gesture does not rebuild the whole page once per write.
-        MainActor.assumeIsolated { self?.scheduleReload(locallyChanged: note.changedTaskIDs ?? []) }
+        MainActor.assumeIsolated {
+          guard let self else { return }
+          self.scheduleReload(locallyChanged: note.changedTaskIDs ?? [])
+          if let id = self.composingTaskId { self.composerCell(for: id)?.refreshReferences() }
+        }
       })
     }
     observers.append(NotificationCenter.default.addObserver(

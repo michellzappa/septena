@@ -25,7 +25,7 @@ First cut:
 | attributes | attributes (pills inline, rows on the page) | yes | yes |
 | checklist | checklist | yes (from its pill) | yes |
 | attachments | attachments | yes (from its pill) | yes |
-| references | references (only for a task that has some) | no | yes |
+| references | references (only for a task that has some) | yes | yes |
 | conversation | conversation | no | yes |
 | provenance | provenance ("Added by": the agent's name or "You", and when) | no | yes |
 | history | history | no | yes |
