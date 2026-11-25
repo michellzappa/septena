@@ -5,14 +5,15 @@
 use serde::Deserialize;
 use serde_json::{Value, json};
 
+use crate::do_session::{do_end_wins, resolve_do_sessions};
 use crate::error::CoreError;
 use crate::task_dates::patch_json;
 use crate::{
-    ConversationProjection, DateAction, DoSession, EmailRefInput, FadeInput, OrdinalWeekday, ParsedRef, PullPageHeader,
+    ConversationProjection, DateAction, EmailRefInput, FadeInput, OrdinalWeekday, ParsedRef, PullPageHeader,
     PushOutcome, RecurrenceRule, ReminderArmInput, TaskConversation, TaskSnapshot, TaskViewMembership,
-    apply_date_action, check_pull_page, checklist_occurrence_id, conversation_state, derive_conversation, do_end_wins,
+    apply_date_action, check_pull_page, checklist_occurrence_id, conversation_state, derive_conversation,
     email_ref_keys, fade_fill, find_issue_refs, next_occurrence_dates, next_scheduled_date, normalize_ref_key,
-    normalize_task_dates, occurrence_id, parse_ref, plan_pull_row, plan_push_response, resolve_do_sessions, row_opacity,
+    normalize_task_dates, occurrence_id, parse_ref, plan_pull_row, plan_push_response, row_opacity,
     server_rejection_reason, shift_reminder_for_recurrence, shift_reminder_on_reschedule, should_arm_reminder,
     should_fade, task_ref_id, task_view_membership,
 };
@@ -144,13 +145,12 @@ pub(crate) fn invoke_value(function: &str, input: Value) -> Result<Value, CoreEr
                 .map_err(|e| CoreError::invalid(e.to_string()))
         }
         "resolveDoSessions" => {
-            let args: DoArgs = decode(input).map_err(|e| parse(&e))?;
-            serde_json::to_value(resolve_do_sessions(args.sessions, args.now)?)
-                .map_err(|e| CoreError::invalid(e.to_string()))
+            let now = text_arg(&input, "now").ok_or_else(|| parse("now"))?;
+            resolve_do_sessions(&input["sessions"], &now)
         }
         "doEndWins" => {
-            let args: DoEndArgs = decode(input).map_err(|e| parse(&e))?;
-            Ok(json!(do_end_wins(args.current, args.incoming)?))
+            let incoming = text_arg(&input, "incoming").ok_or_else(|| parse("incoming"))?;
+            Ok(json!(do_end_wins(input["current"].as_str(), &incoming)?))
         }
         "checkPullPage" => {
             let args: PullPageArgs = decode(input).map_err(|e| parse(&e))?;
@@ -356,19 +356,6 @@ pub(crate) struct ConvoArgs {
     #[serde(alias = "convo")]
     pub conversation: TaskConversation,
     pub now: String,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct DoArgs {
-    pub sessions: Vec<DoSession>,
-    pub now: String,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct DoEndArgs {
-    #[serde(default)]
-    pub current: Option<String>,
-    pub incoming: String,
 }
 
 #[derive(Deserialize)]
