@@ -357,7 +357,7 @@ struct SeptaskSettingsView: View {
           .foregroundStyle(.primary)
         HStack(spacing: 6) {
           if TaskSyncEngine.shared.signedIn {
-            if PlanStatus.shared.isPlus { SeptenaPlusBadge() } else { FreeAccountBadge() }
+            if PlanStatus.shared.isPlus { SeptenaPlusBadge(isPro: PlanStatus.shared.isPro) } else { FreeAccountBadge() }
             Text("·")
               .font(.caption)
               .foregroundStyle(.tertiary)
@@ -718,7 +718,7 @@ private struct SeptaskAccountPane: View {
               }
             if TaskSyncEngine.shared.signedIn {
               if PlanStatus.shared.isPlus {
-                SeptenaPlusBadge()
+                SeptenaPlusBadge(isPro: PlanStatus.shared.isPro)
               } else {
                 FreeAccountBadge()
               }
@@ -741,8 +741,8 @@ private struct SeptaskAccountPane: View {
           LabeledContent {
             if let line = PlanStatus.shared.statusLine { Text(line) }
           } label: {
-            Label(RegistrySettings.pageById[RegistrySettings.PageID.plus]?.title ?? RegistryPlans.name,
-                  systemImage: RegistryIcons.sfSymbols["settings.plus"] ?? "plus.circle.fill")
+            Label(PlanStatus.shared.title,
+                  systemImage: RegistryIcons.sfSymbols[PlanStatus.shared.isPro ? RegistryPlans.proCard.icon : "settings.plus"] ?? "plus.circle.fill")
           }
         }
       }
@@ -935,6 +935,10 @@ private struct SeptaskAboutPane: View {
         nav.showSettings = false
         #endif
       } label: {
+        label(item)
+      }
+    case "open_help":
+      Link(destination: RegistrySettings.helpURL) {
         label(item)
       }
     case "send_feedback":

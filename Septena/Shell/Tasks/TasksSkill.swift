@@ -37,6 +37,8 @@ enum TasksSkill {
               inputs: "required: id, acceptance"),
         SectionSkill.Tool("tasks_set_artifact",  "Attach what you PRODUCED (comparison/draft/summary) — renders as a block (agent_assisted)",
               inputs: "required: id, artifact{title} · optional in artifact: kind, body, refs[]"),
+        SectionSkill.Tool("tasks_attachment_add", "Attach a file of up to 10 MB to a task. For a file on disk, pass neither text nor base64 and run the returned upload command. You cannot read or remove files",
+              inputs: "required: task_id, filename, content_type · optional: text or base64"),
         SectionSkill.Tool("tasks_set_handoff",   "The human's last-mile action, rendered as a tappable button (open_url|compose|call|none)",
               inputs: "required: id, handoff{instruction} · optional in handoff: actionType, payload"),
         SectionSkill.Tool("tasks_set_endstate",  "Record the conversation's end-state (agent_done|human_done|agent_assisted_done|needs_verify|decomposed|reminder_set|promoted_to_today|wont_do|open). Setting needs_verify releases your claim and hands the task to the user's Review list",
@@ -109,6 +111,11 @@ enum TasksSkill {
       ```
       tasks_list(view: "anytime")
       ```
+
+      ### How the app works (help)
+      - When the user asks how to do something in Septena, what a word means, or why something does not work, read `https://septena.app/help.md`. It lists every help page as Markdown, and `https://septena.app/llms-full.txt` has them all in one file. Answer from those pages with the app's own menu names.
+      - When the pages do not answer it, say so and point to `https://septena.app/support`. Never guess a menu, a shortcut or a feature.
+      - You cannot press buttons in the app. Tell the user where to tap, or make the change with a tool when one exists.
 
       ### Verification habit
       If you're about to tell the user "I added/moved/scheduled X," and routing matters, list the destination view first to confirm X is actually there. `tasks_create` and `tasks_update` return success on any schema-valid write — they don't validate that the result matches user intent.

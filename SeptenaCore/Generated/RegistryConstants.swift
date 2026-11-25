@@ -226,6 +226,7 @@ enum RegistryIcons {
     "settings.import": "square.and.arrow.down",
     "settings.backend": "arrow.up.doc",
     "settings.animations": "party.popper",
+    "settings.help": "questionmark.circle",
     "settings.feedback": "paperplane",
     "settings.open_source": "chevron.left.forwardslash.chevron.right",
     "settings.paste": "doc.on.clipboard",
@@ -422,6 +423,8 @@ struct RegistrySettingsPage: Sendable, Hashable, Identifiable {
 
 /// Unified task-app settings keys, defaults, synced-key list, and taxonomy (`registry/settings.json`).
 enum RegistrySettings {
+  /// The help center. Help rows and menu items open it or a page below it.
+  static let helpURL = URL(string: "https://septena.app/help")!
   static let syncedKeys: [String] = ["welcomeName", "telemetryLevel", "calendarHiddenTitles", "rolledInDismissedOn", "homeTimezone", "agentsPaused", "getStartedDismissed", "getStartedSteps", "upsellsSeen", "onboardedAt", "accentColor", "canvasTexture", "textureIntensity", "textureMotion", "smartListOrder", "smartListHidden", "smartListPlacement"]
 
   enum StorageKey {
@@ -663,6 +666,7 @@ enum RegistrySettings {
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "open_source", label: RegistryL10n.t("Open source"), detail: RegistryL10n.t("MIT License"), iconId: "settings.open_source", sfSymbol: "chevron.left.forwardslash.chevron.right", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
       RegistrySettingsSection(id: "actions", header: nil, footer: nil, platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "open_help", label: RegistryL10n.t("Help"), detail: nil, iconId: "settings.help", sfSymbol: "questionmark.circle", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "check_updates", label: RegistryL10n.t("Check for Updates…"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["macos", "windows"], featureId: "mac.updates"),
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_get_started", label: RegistryL10n.t("Show Get Started Again"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_first_run", label: RegistryL10n.t("Show Welcome Again"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "onboarding.first-run"),
@@ -1021,6 +1025,7 @@ enum RegistryActionID: String, CaseIterable, Hashable, Sendable {
   case appUndo = "app.undo"
   case accountSignOut = "account.signOut"
   case settingsSave = "settings.save"
+  case appHelp = "app.help"
   case appKeyboardShortcuts = "app.keyboardShortcuts"
   case appToggleSidebarCounts = "app.toggleSidebarCounts"
   case appTextSizeIncrease = "app.textSizeIncrease"
@@ -1193,6 +1198,7 @@ enum RegistryActions {
     .appUndo: RegistryL10n.t("Undo"),
     .accountSignOut: RegistryL10n.t("Sign out"),
     .settingsSave: RegistryL10n.t("Save"),
+    .appHelp: RegistryL10n.t("Septena Help"),
     .appKeyboardShortcuts: RegistryL10n.t("Keyboard Shortcuts"),
     .appToggleSidebarCounts: RegistryL10n.t("Show Sidebar Counts"),
     .appTextSizeIncrease: RegistryL10n.t("Increase Text Size"),
@@ -1289,6 +1295,7 @@ enum RegistryActions {
     .appUndo: "arrow.uturn.backward",
     .accountSignOut: "xmark.circle",
     .settingsSave: "checkmark.circle",
+    .appHelp: "questionmark.circle",
     .appKeyboardShortcuts: "info.circle",
     .appToggleSidebarCounts: "number",
     .appTextSizeIncrease: "textformat.size",
@@ -1475,6 +1482,7 @@ enum RegistryActions {
     .appUndo: RegistryActionAvailability(selection: "none", platforms: ["android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "edit.undo"),
     .accountSignOut: RegistryActionAvailability(selection: "none", platforms: ["android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "sync.backend"),
     .settingsSave: RegistryActionAvailability(selection: "none", platforms: ["android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "settings.display"),
+    .appHelp: RegistryActionAvailability(selection: "none", platforms: ["macos", "ipados", "web", "windows"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "settings.display"),
     .appKeyboardShortcuts: RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "mac.keyboard"),
     .appToggleSidebarCounts: RegistryActionAvailability(selection: "none", platforms: ["macos", "ipados", "web", "windows"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "settings.display"),
     .appTextSizeIncrease: RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "settings.display"),
@@ -1626,6 +1634,7 @@ enum RegistryActions {
       RegistryMenuItem(kind: "action", id: "task.delete", actionId: .taskDelete, title: RegistryL10n.t("Delete"), sfSymbol: "trash", items: []),
     ]),
     RegistryMenu(id: .help, title: RegistryL10n.t("Help"), system: "help", items: [
+      RegistryMenuItem(kind: "action", id: "app.help", actionId: .appHelp, title: RegistryL10n.t("Septena Help"), sfSymbol: "questionmark.circle", items: []),
       RegistryMenuItem(kind: "action", id: "app.keyboardShortcuts", actionId: .appKeyboardShortcuts, title: RegistryL10n.t("Keyboard Shortcuts"), sfSymbol: "info.circle", items: []),
     ]),
   ]
@@ -2271,6 +2280,7 @@ struct RegistryPlanRow: Sendable, Hashable, Identifiable {
   let planned: Bool
   let free: RegistryPlanCell
   let plus: RegistryPlanCell
+  let pro: RegistryPlanCell
 }
 
 struct RegistryPlanOutcome: Sendable, Hashable, Identifiable {
@@ -2291,6 +2301,7 @@ struct RegistryPlanNote: Sendable, Hashable, Identifiable {
 enum RegistryPlans {
   static var name: String { RegistryL10n.t("Septena Plus") }
   static var shortName: String { RegistryL10n.t("Plus") }
+  static var proName: String { RegistryL10n.t("Pro") }
   static var headline: String { RegistryL10n.t("Free on one device. Plus on all of them.") }
   static var subhead: String { RegistryL10n.t("Every task feature is free on the device you use. A free account adds a backup and lets you connect one agent. Plus covers all your devices, three agents, synced files and a longer history.") }
   static let checkoutOpen = false
@@ -2307,22 +2318,24 @@ enum RegistryPlans {
     RegistryPlanCard(id: "free", title: RegistryL10n.t("Free"), icon: "plans.free", detail: RegistryL10n.t("The full task app on one device. You do not need an account."), footnote: nil, highlighted: false),
     RegistryPlanCard(id: "plus", title: RegistryL10n.t("Septena Plus"), icon: "settings.plus", detail: RegistryL10n.t("Your list on every device, updated live."), footnote: RegistryL10n.t("Everything in Free is included."), highlighted: true),
   ] }
+  /// Only for an account that has Pro: no store sells it (ADR 0037, ADR 0045).
+  static var proCard: RegistryPlanCard { RegistryPlanCard(id: "pro", title: RegistryL10n.t("Septena Pro"), icon: "plans.pro", detail: RegistryL10n.t("For people who run many agents on one list."), footnote: RegistryL10n.t("Everything in Plus is included."), highlighted: false) }
   static var outcomes: [RegistryPlanOutcome] { [
     RegistryPlanOutcome(id: "everywhere", icon: "onboarding.devices", title: RegistryL10n.t("Your list everywhere"), detail: RegistryL10n.t("The same tasks on your phone, tablet and Mac, updated as you type."), rows: [
-      RegistryPlanRow(id: "devices", label: RegistryL10n.t("Devices"), planned: false, free: .text(RegistryL10n.t("1")), plus: .text(RegistryL10n.t("All your devices"))),
-      RegistryPlanRow(id: "backup", label: RegistryL10n.t("Backup on our server"), planned: false, free: .included, plus: .included),
-      RegistryPlanRow(id: "new_device", label: RegistryL10n.t("Move to a new device"), planned: false, free: .included, plus: .included),
-      RegistryPlanRow(id: "beta", label: RegistryL10n.t("Early builds on TestFlight"), planned: false, free: .notIncluded, plus: .included),
+      RegistryPlanRow(id: "devices", label: RegistryL10n.t("Devices"), planned: false, free: .text(RegistryL10n.t("1")), plus: .text(RegistryL10n.t("All your devices")), pro: .text(RegistryL10n.t("All your devices"))),
+      RegistryPlanRow(id: "backup", label: RegistryL10n.t("Backup on our server"), planned: false, free: .included, plus: .included, pro: .included),
+      RegistryPlanRow(id: "new_device", label: RegistryL10n.t("Move to a new device"), planned: false, free: .included, plus: .included, pro: .included),
+      RegistryPlanRow(id: "beta", label: RegistryL10n.t("Early builds on TestFlight"), planned: false, free: .notIncluded, plus: .included, pro: .included),
     ]),
     RegistryPlanOutcome(id: "nothing_lost", icon: "plans.history", title: RegistryL10n.t("Nothing lost"), detail: RegistryL10n.t("See who changed what and bring back what you deleted. Your files open on every device."), rows: [
-      RegistryPlanRow(id: "history", label: RegistryL10n.t("Change history"), planned: false, free: .text(RegistryL10n.t("30 days")), plus: .text(RegistryL10n.t("365 days"))),
-      RegistryPlanRow(id: "deleted", label: RegistryL10n.t("Recently Deleted"), planned: false, free: .text(RegistryL10n.t("30 days")), plus: .text(RegistryL10n.t("30 days"))),
-      RegistryPlanRow(id: "files", label: RegistryL10n.t("Files"), planned: false, free: .text(RegistryL10n.t("On your device")), plus: .text(RegistryL10n.t("10 GB synced"))),
-      RegistryPlanRow(id: "export", label: RegistryL10n.t("Export as JSON"), planned: false, free: .included, plus: .included),
+      RegistryPlanRow(id: "history", label: RegistryL10n.t("Change history"), planned: false, free: .text(RegistryL10n.t("30 days")), plus: .text(RegistryL10n.t("365 days")), pro: .text(RegistryL10n.t("365 days"))),
+      RegistryPlanRow(id: "deleted", label: RegistryL10n.t("Recently Deleted"), planned: false, free: .text(RegistryL10n.t("30 days")), plus: .text(RegistryL10n.t("30 days")), pro: .text(RegistryL10n.t("30 days"))),
+      RegistryPlanRow(id: "files", label: RegistryL10n.t("Files"), planned: false, free: .text(RegistryL10n.t("On your device")), plus: .text(RegistryL10n.t("10 GB synced")), pro: .text(RegistryL10n.t("50 GB synced"))),
+      RegistryPlanRow(id: "export", label: RegistryL10n.t("Export as JSON"), planned: false, free: .included, plus: .included, pro: .included),
     ]),
     RegistryPlanOutcome(id: "agents", icon: "onboarding.agent", title: RegistryL10n.t("Help that keeps working"), detail: RegistryL10n.t("Connect Claude or another agent to your list. It asks before it acts, and you can stop it at any time."), rows: [
-      RegistryPlanRow(id: "connected", label: RegistryL10n.t("Agents"), planned: false, free: .text(RegistryL10n.t("1")), plus: .text(RegistryL10n.t("3"))),
-      RegistryPlanRow(id: "share", label: RegistryL10n.t("Shared projects"), planned: true, free: .text(RegistryL10n.t("Join")), plus: .text(RegistryL10n.t("Create and invite"))),
+      RegistryPlanRow(id: "connected", label: RegistryL10n.t("Agents"), planned: false, free: .text(RegistryL10n.t("1")), plus: .text(RegistryL10n.t("3")), pro: .text(RegistryL10n.t("No limit"))),
+      RegistryPlanRow(id: "share", label: RegistryL10n.t("Shared projects"), planned: true, free: .text(RegistryL10n.t("Join")), plus: .text(RegistryL10n.t("Create and invite")), pro: .text(RegistryL10n.t("Create and invite"))),
     ]),
   ] }
   static var promises: [RegistryPlanNote] { [
@@ -2368,6 +2381,7 @@ enum RegistryPlans {
     static var plus: String { RegistryL10n.t("Plus") }
     static func trialEnds(date: String) -> String { RegistryL10n.format("Plus trial until %@", english: "Plus trial until %@", args: [date]) }
     static func paidThrough(date: String) -> String { RegistryL10n.format("Plus through %@", english: "Plus through %@", args: [date]) }
+    static func proThrough(date: String) -> String { RegistryL10n.format("Pro through %@", english: "Pro through %@", args: [date]) }
   }
 
   enum Paywall {
@@ -2385,6 +2399,7 @@ enum RegistryPlans {
     static var ownedWeb: String { RegistryL10n.t("You have Plus through the web. Manage it at septena.app.") }
     static var ownedGoogle: String { RegistryL10n.t("You have Plus through Google Play. Manage it in Google Play.") }
     static var ownedGrant: String { RegistryL10n.t("Plus is on for this account.") }
+    static var ownedGrantPro: String { RegistryL10n.t("Pro is on for this account.") }
     static var ownedOtherAccount: String { RegistryL10n.t("This Apple ID's Plus belongs to another Septena account. Sign in to that account to use it.") }
     static var syncThisDeviceFailed: String { RegistryL10n.t("Septena could not reach the server. Try again in a moment.") }
     static var done: String { RegistryL10n.t("Done") }
@@ -2420,7 +2435,7 @@ enum RegistryCapabilities {
     "ios": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.do": "ships", "task.references": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "sharing.projects": "ships", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "not_applicable", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "ships", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships", "appearance.accents": "ships", "appearance.textures": "ships", "appearance.mode": "ships", "appearance.text-size": "ships"],
     "ipados": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.do": "ships", "task.references": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "sharing.projects": "ships", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "ships", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "ships", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships", "appearance.accents": "ships", "appearance.textures": "ships", "appearance.mode": "ships", "appearance.text-size": "ships"],
     "macos": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.do": "ships", "task.references": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "not_applicable", "sharing.projects": "ships", "capture.share-target": "not_applicable", "capture.quick-entry": "ships", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "ships", "mac.updates": "ships", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "ships", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships", "appearance.accents": "ships", "appearance.textures": "ships", "appearance.mode": "ships", "appearance.text-size": "ships"],
-    "web": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "partial", "task.do": "planned", "task.references": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "planned", "task.alerts": "planned", "fade.sweep": "planned", "capture.quick-add": "planned", "sharing.projects": "planned", "capture.share-target": "planned", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "not_applicable", "edit.undo": "ships", "edit.multi-select": "planned", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "partial", "mac.updates": "not_applicable", "calendar.events": "planned", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "ships", "ai.reach-dial": "planned", "agents.connector": "planned", "onboarding.first-run": "planned", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "planned", "task.times": "ships", "calendar.feed": "planned", "widgets.tasks": "not_applicable", "watch.app": "not_applicable", "data.import-export": "partial", "agents.list": "ships", "settings.display": "planned", "appearance.accents": "ships", "appearance.textures": "planned", "appearance.mode": "ships", "appearance.text-size": "ships"],
+    "web": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.do": "planned", "task.references": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "sharing.projects": "planned", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "not_applicable", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "ships", "mac.updates": "not_applicable", "calendar.events": "planned", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "not_applicable", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships", "appearance.accents": "ships", "appearance.textures": "ships", "appearance.mode": "ships", "appearance.text-size": "ships"],
     "android": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.do": "ships", "task.references": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "sharing.projects": "ships", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "planned", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "partial", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "ships", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships", "appearance.accents": "ships", "appearance.textures": "ships", "appearance.mode": "ships", "appearance.text-size": "ships"],
     "windows": ["lists.inbox": "planned", "lists.today": "planned", "lists.review": "planned", "lists.agent": "planned", "lists.upcoming": "planned", "lists.anytime": "planned", "lists.repeating": "planned", "lists.logbook": "planned", "lists.faded": "planned", "lists.starred": "planned", "lists.recently-deleted": "planned", "places.areas": "planned", "places.projects": "planned", "places.sections": "planned", "task.when-deadline": "planned", "task.repeat": "planned", "task.notes": "planned", "task.attachments": "planned", "task.do": "planned", "task.references": "planned", "task.history": "planned", "task.provenance": "planned", "task.aging": "planned", "task.checklists": "planned", "task.tags": "planned", "task.share": "planned", "task.alerts": "planned", "fade.sweep": "planned", "capture.quick-add": "not_applicable", "sharing.projects": "planned", "capture.share-target": "planned", "capture.quick-entry": "planned", "edit.filing-suggestion": "planned", "edit.undo": "planned", "edit.multi-select": "planned", "find.quick-find": "planned", "task.page": "planned", "mac.keyboard": "planned", "mac.updates": "planned", "calendar.events": "planned", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "planned", "ai.reach-dial": "planned", "agents.connector": "planned", "onboarding.first-run": "planned", "agents.stop-pause": "planned", "sync.backend": "planned", "account.delete": "planned", "task.times": "planned", "calendar.feed": "planned", "widgets.tasks": "planned", "watch.app": "not_applicable", "data.import-export": "planned", "agents.list": "planned", "settings.display": "planned", "appearance.accents": "planned", "appearance.textures": "planned", "appearance.mode": "planned", "appearance.text-size": "planned"],
     "watchos": ["lists.inbox": "partial", "lists.today": "partial", "lists.review": "not_applicable", "lists.agent": "not_applicable", "lists.upcoming": "not_applicable", "lists.anytime": "not_applicable", "lists.repeating": "not_applicable", "lists.logbook": "not_applicable", "lists.faded": "not_applicable", "lists.starred": "not_applicable", "lists.recently-deleted": "not_applicable", "places.areas": "not_applicable", "places.projects": "not_applicable", "places.sections": "not_applicable", "task.when-deadline": "not_applicable", "task.repeat": "not_applicable", "task.notes": "not_applicable", "task.attachments": "not_applicable", "task.do": "planned", "task.references": "not_applicable", "task.history": "not_applicable", "task.provenance": "not_applicable", "task.aging": "not_applicable", "task.checklists": "not_applicable", "task.tags": "not_applicable", "task.share": "not_applicable", "task.alerts": "not_applicable", "fade.sweep": "not_applicable", "capture.quick-add": "not_applicable", "sharing.projects": "not_applicable", "capture.share-target": "not_applicable", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "not_applicable", "edit.undo": "not_applicable", "edit.multi-select": "not_applicable", "find.quick-find": "not_applicable", "task.page": "partial", "mac.keyboard": "not_applicable", "mac.updates": "not_applicable", "calendar.events": "not_applicable", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "not_applicable", "ai.reach-dial": "not_applicable", "agents.connector": "not_applicable", "onboarding.first-run": "not_applicable", "agents.stop-pause": "not_applicable", "sync.backend": "planned", "account.delete": "not_applicable", "task.times": "not_applicable", "calendar.feed": "not_applicable", "widgets.tasks": "not_applicable", "watch.app": "ships", "data.import-export": "not_applicable", "agents.list": "not_applicable", "settings.display": "not_applicable", "appearance.accents": "not_applicable", "appearance.textures": "not_applicable", "appearance.mode": "not_applicable", "appearance.text-size": "not_applicable"],

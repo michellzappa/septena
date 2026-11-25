@@ -1,6 +1,6 @@
 import type { Env } from "../env.js";
 import { logEvent } from "../util.js";
-import { isRowActive } from "../entitlement/entitlement.js";
+import { isRowActive, type PaidPlanId } from "../entitlement/entitlement.js";
 import { storeFor } from "../api/session.js";
 import { accountStoreFor, type AccountIndexRow } from "../store/AccountStore.js";
 import type { AccountSummary } from "../store/TaskStore.js";
@@ -59,6 +59,9 @@ export async function sweepAccounts(env: Env, olderThanMs = REFRESH_AFTER_MS, no
 
 // ---- what the page says about an account ----
 
+/// The grant row the admin page writes: one per account.
+export const ADMIN_GRANT_ID = "grant:admin";
+
 export type PlanWord = "paid" | "granted" | "trial" | "lapsed" | "trial over" | "free";
 
 const PAID = new Set(["apple", "stripe", "google"]);
@@ -69,6 +72,10 @@ const isCustomerRow = (e: AccountSummary["entitlements"][number]) =>
 
 export interface PlanView {
   word: PlanWord;
+  /// The plan the account is on now; null on the free account.
+  plan: PaidPlanId | null;
+  /// mz gave this account a plan on the admin page.
+  adminGrant: boolean;
   /// When the active row ends; null = no end or nothing active.
   until: number | null;
   period: "year" | "month" | null;
@@ -83,7 +90,8 @@ export function planView(summary: AccountSummary | null, now = Date.now()): Plan
   const paid = pick((r) => PAID.has(r.source));
   const granted = pick((r) => r.source === "grant");
   const trial = pick((r) => r.source === "trial");
-  const best = paid.length ? paid : granted.length ? granted : trial;
+  const pro = pick((r) => r.plan === "pro");
+  const best = pro.length ? pro : paid.length ? paid : granted.length ? granted : trial;
   const customer = rows.some(isCustomerRow);
   const hadTrial = rows.some((r) => r.source === "trial");
   const word: PlanWord = paid.length ? "paid" : granted.length ? "granted" : trial.length ? "trial"
@@ -91,6 +99,8 @@ export function planView(summary: AccountSummary | null, now = Date.now()): Plan
   const product = paid[0]?.productId ?? "";
   return {
     word,
+    plan: pro.length ? "pro" : active.length ? "plus" : null,
+    adminGrant: rows.some((r) => r.id === ADMIN_GRANT_ID),
     until: best.length && best.every((r) => r.expiresAt !== null) ? Math.max(...best.map((r) => r.expiresAt!)) : null,
     period: /annual|year/.test(product) ? "year" : /month/.test(product) ? "month" : null,
     hadTrial,
@@ -120,6 +130,7 @@ export function overview(rows: AccountIndexRow[], now = Date.now()) {
     paidYear: plans.filter((p) => p.word === "paid" && p.period === "year").length,
     paidMonth: plans.filter((p) => p.word === "paid" && p.period === "month").length,
     granted: plan("granted"),
+    pro: plans.filter((p) => p.plan === "pro").length,
     lapsed: plan("lapsed"),
     openTasks: rows.reduce((n, r) => n + (r.summary?.openTasks ?? 0), 0),
     closedTasks: rows.reduce((n, r) => n + (r.summary?.closedTasks ?? 0), 0),

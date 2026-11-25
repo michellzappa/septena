@@ -60,6 +60,7 @@ const ORDER_GAP = 1024;
 /// declarations: the generated RPC stub type recurses too deep on JSON rows.
 type StoreMethod =
   | "readTasks" | "readReviewTasks" | "readOpenQuestions" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates" | "readTaskLinks"
+  | "readAttachments" | "hasAttachment" | "attachmentBytes" | "finishUpload"
   | "readTaskRefs" | "findByRef" | "isDismissed" | "newRefId"
   | "readChecklistItems" | "readChecklistItem" | "readChecklistCounts"
   | "readTags" | "readTagByName"
@@ -317,14 +318,14 @@ export async function runWriteTool(ctx: WriteContext, name: WriteToolName, args:
 /// One push for the whole call. The ops are checked against the same schema
 /// /v1/sync/push uses, so this path can never store what an app push could
 /// not.
-async function push(store: StoreRpc, actor: string | undefined, ops: NewOp[]): Promise<OpResult[]> {
+export async function pushAs(store: StoreRpc, actor: string | undefined, ops: NewOp[]): Promise<OpResult[]> {
   const { result } = await store.push(mintOps(ops), actor ?? MCP_ACTOR);
   return result.results;
 }
 
 /// One push by a person's client. Throws when an op was refused.
 export async function pushOps(ctx: WriteContext, ops: NewOp[]): Promise<void> {
-  const results = await push(ctx.store, ctx.actor, ops);
+  const results = await pushAs(ctx.store, ctx.actor, ops);
   for (const r of results) {
     if (r.status === "rejected") throw new Error(/unknown_task|missing_required/.test(r.reason) ? "Task not found" : r.reason);
     if (r.status === "dropped") throw new Error("Task not found");
@@ -346,7 +347,7 @@ const applied = (r: OpResult | undefined) => r?.status === "applied";
 
 /// A rejected or dropped op on an existing task means the task is gone (or
 /// never existed): the live connector's error for that.
-function requireApplied(r: OpResult | undefined, id: string): void {
+export function requireApplied(r: OpResult | undefined, id: string): void {
   if (applied(r) || r?.status === "noop") return;
   if (r?.status === "dropped" || (r?.status === "rejected" && /unknown_task|missing_required/.test(r.reason))) {
     throw new Error(`Task not found: ${id}`);
@@ -653,7 +654,7 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     results = outcome.results;
     followUp = outcome.followUp;
   } else {
-    results = await push(store, ctx.actor, ops);
+    results = await pushAs(store, ctx.actor, ops);
   }
   const r = results[taskOpIdx];
   if (!applied(r)) throw new Error(`Task was not created: ${r?.status === "rejected" ? (r.rule ? `${r.reason}: ${r.rule}` : r.reason) : r?.status ?? "no result"}`);
@@ -683,7 +684,7 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
   const refOps = await planRefs(store, input);
   if (updated.length === 0 && !hasTagChange) {
     if (refOps.ops.length === 0) return { id: input.id, updated: refOps.updated };
-    const results = await push(store, ctx.actor, refOps.ops);
+    const results = await pushAs(store, ctx.actor, refOps.ops);
     for (const r of results) requireApplied(r, input.id);
     return { id: input.id, updated: refOps.updated };
   }
@@ -747,7 +748,7 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
   ops.push({ op: "upsert", entity: "task", id: input.id, fields });
   ops.push(...refOps.ops);
 
-  const results = await push(store, ctx.actor, ops);
+  const results = await pushAs(store, ctx.actor, ops);
   requireApplied(results[taskOpIdx], input.id);
   // The task changed. A refused reference (the limit) is named, so
   // the caller does not retry the fields that landed.
@@ -937,7 +938,7 @@ async function completeTask(ctx: WriteContext, id: string) {
     }
   }
 
-  const results = await push(store, ctx.actor, ops);
+  const results = await pushAs(store, ctx.actor, ops);
   if (results[0]?.status === "rejected" && results[0].reason === "human_accepts") {
     return {
       id,
@@ -984,7 +985,7 @@ async function checklistAdd(ctx: WriteContext, taskId: string, items: string[]) 
     added.push({ id, title, position: maxPos });
   }
   if (ops.length === 0) return { task_id: taskId, added: [] };
-  const results = await push(store, ctx.actor, ops);
+  const results = await pushAs(store, ctx.actor, ops);
   for (let i = 0; i < results.length; i++) {
     requireApplied(results[i], added[i].id);
   }
@@ -1006,7 +1007,7 @@ async function checklistUpdate(
   }
   if (input.position !== undefined) fields.position = input.position;
   if (Object.keys(fields).length === 0) return { id: input.id, updated: [] };
-  const [r] = await push(store, ctx.actor, [{ op: "upsert", entity: "checklistItem", id: input.id, fields }]);
+  const [r] = await pushAs(store, ctx.actor, [{ op: "upsert", entity: "checklistItem", id: input.id, fields }]);
   requireApplied(r, input.id);
   return { id: input.id, updated: Object.keys(fields) };
 }
@@ -1015,7 +1016,7 @@ async function checklistDelete(ctx: WriteContext, id: string) {
   const { store } = ctx;
   const current = await store.readChecklistItem(id);
   if (!current) throw new Error(`Checklist item not found: ${id}`);
-  const [r] = await push(store, ctx.actor, [{ op: "delete", entity: "checklistItem", id }]);
+  const [r] = await pushAs(store, ctx.actor, [{ op: "delete", entity: "checklistItem", id }]);
   requireApplied(r, id);
   return { id, deleted: true };
 }
@@ -1045,7 +1046,7 @@ async function threadAppend(
   if (confirmedIntent !== undefined) {
     ops.push({ op: "upsert", entity: "convo", id: input.id, fields: { confirmedIntent } });
   }
-  const results = await push(ctx.store, ctx.actor, ops);
+  const results = await pushAs(ctx.store, ctx.actor, ops);
   requireApplied(results[0], input.id);
   const r = results[0];
   return { id: input.id, seq: r.status === "applied" ? r.seq : undefined };
@@ -1054,7 +1055,7 @@ async function threadAppend(
 /// The app's Send back (`TasksBackend.sendBackConvo`): the user's note as a
 /// turn, the task open again and back with the agent. One push.
 export async function sendBackReview(ctx: WriteContext, id: string, note: string): Promise<{ id: string; seq?: number }> {
-  const results = await push(ctx.store, ctx.actor, [
+  const results = await pushAs(ctx.store, ctx.actor, [
     { op: "appendTurn", taskId: id, turn: { role: "user", step: "work", note, ts: new Date().toISOString() } },
     { op: "upsert", entity: "convo", id, fields: { endState: "open", endStateNote: null, stoppedAt: null, assignee: "claude" } },
   ]);
@@ -1070,13 +1071,13 @@ export async function acceptReview(ctx: WriteContext, id: string): Promise<objec
   const before = await ctx.store.readTask(id);
   const done = await completeTask(ctx, id);
   if (before?.task.source === "mcp" && !before.task.acknowledgedAt) {
-    await push(ctx.store, ctx.actor, [{ op: "upsert", entity: "task", id, fields: { acknowledgedAt: new Date().toISOString() } }]);
+    await pushAs(ctx.store, ctx.actor, [{ op: "upsert", entity: "task", id, fields: { acknowledgedAt: new Date().toISOString() } }]);
   }
   return done;
 }
 
 async function writeConvo(ctx: WriteContext, id: string, fields: Record<string, unknown>): Promise<void> {
-  const [r] = await push(ctx.store, ctx.actor, [{ op: "upsert", entity: "convo", id, fields }]);
+  const [r] = await pushAs(ctx.store, ctx.actor, [{ op: "upsert", entity: "convo", id, fields }]);
   requireApplied(r, id);
 }
 

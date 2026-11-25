@@ -13,7 +13,7 @@ import {
   rpcResult,
   unauthorized,
 } from "../rpc.js";
-import { TURN_FIELDS } from "../generated/registries.js";
+import { HELP_URL, TURN_FIELDS } from "../generated/registries.js";
 import { zId } from "../store/columns.js";
 import type { Doing, Row, TaskLinkRow } from "../store/TaskStore.js";
 import { isValidTz, todayYMD } from "../tz.js";
@@ -45,6 +45,7 @@ import {
 } from "../tools/taskShared.js";
 import { MCP_CLIENT_PREFIX, MCP_READ_SCOPE, MCP_WRITE_SCOPE, hasScope, verifyMcpAccess, type McpGrant } from "./tokens.js";
 import { getClient } from "../storage.js";
+import { ATTACHMENT_TOOLS, type AttachmentAddInput, addAttachment, attachmentsOut, zAttachmentArgs } from "./attachments.js";
 import { MAX_REF_INPUT, findByRef, refsOut } from "./refs.js";
 import { type StoreRpc, type WriteToolName, WRITE_TOOL_NAMES, mcpActorFor, rpcStoreFor, runWriteTool, zWriteArgs } from "./writes.js";
 import { AGENT_TOOLS, type AgentToolName, agentStage, runAgentTool, zAgentArgs } from "./agent.js";
@@ -93,7 +94,9 @@ const INSTRUCTIONS =
   "paused, stop: only the user can resume. `doing` marks the task the user works on at this moment: a claim on it is " +
   "refused, so work on other tasks. Setting up a new or empty account: use the `onboard_septena` prompt " +
   "(also at https://api.septena.app/onboard.md) to propose real areas (with emoji and context), projects (with " +
-  "context) and tasks from what you already know about the user, or ask them, and confirm before writing.";
+  "context) and tasks from what you already know about the user, or ask them, and confirm before writing. " +
+  `When the user asks how Septena works or where something is, read ${HELP_URL}.md and answer from those pages; ` +
+  "when they do not say, tell the user that and do not guess a menu, a shortcut or a feature.";
 
 const RESOURCE_METADATA = (env: Env) => `${env.API_PUBLIC_URL}/.well-known/oauth-protected-resource`;
 
@@ -173,8 +176,8 @@ if (LIVE_TOOLS.length !== TOOL_NAMES.size) {
   throw new Error("api connector: a task tool has no definition in src/tools/taskTools.ts");
 }
 // Plus the agent loop and project notes, which only this connector serves
-// (./agent.ts, ./notes.ts).
-const TOOLS: Tool[] = [...LIVE_TOOLS, ...AGENT_TOOLS, ...NOTES_TOOLS];
+// (./agent.ts, ./notes.ts), and files (./attachments.ts).
+const TOOLS: Tool[] = [...LIVE_TOOLS, ...ATTACHMENT_TOOLS, ...AGENT_TOOLS, ...NOTES_TOOLS];
 
 export async function previewMcpHandler(c: Context<{ Bindings: Env }>) {
   const auth = c.req.header("Authorization") ?? "";
@@ -237,6 +240,14 @@ export async function previewMcpHandler(c: Context<{ Bindings: Env }>) {
   }
 }
 
+/// The agent's name is the author a created task names ("Added by
+/// Claude Code") and the history actor: the name the user gave it, else
+/// the client's registered name. One store read per write call.
+async function agentNameFor(env: Env, store: StoreRpc, grant: McpGrant): Promise<string | undefined> {
+  return (grant.familyId ? await store.connectionName(grant.familyId) : null)
+    ?? (await getClient(env, grant.clientId, MCP_CLIENT_PREFIX))?.name;
+}
+
 async function callTool(
   env: Env,
   grant: McpGrant,
@@ -256,16 +267,25 @@ async function callTool(
     if (!args.success) return invalidArgs(id, args.error, era);
     const refused = await gateConnectorWrite(env, grant.userId, "mcp_write");
     if (refused) return rpcResult(id, { isError: true, content: [{ type: "text", text: refused }] }, era);
-    // The agent's name is the author a created task names ("Added by
-    // Claude Code") and the history actor: the name the user gave it, else
-    // the client's registered name. One store read per write call.
-    const agentName = (grant.familyId ? await store.connectionName(grant.familyId) : null)
-      ?? (await getClient(env, grant.clientId, MCP_CLIENT_PREFIX))?.name;
+    const agentName = await agentNameFor(env, store, grant);
     const result = await runWriteTool(
       { store, timeZone, agentName, actor: mcpActorFor(agentName) },
       name as WriteToolName,
       args.data as Record<string, unknown>,
     );
+    await store.addUsage(usageKeys.connectorWrites());
+    return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] }, era);
+  }
+  if (name === "tasks_attachment_add") {
+    if (!hasScope(grant, MCP_WRITE_SCOPE)) {
+      return rpcResult(id, { isError: true, content: [{ type: "text", text: RECONNECT_MESSAGE }] }, era);
+    }
+    const args = zAttachmentArgs.tasks_attachment_add.safeParse(params.arguments ?? {});
+    if (!args.success) return invalidArgs(id, args.error, era);
+    const refused = await gateConnectorWrite(env, grant.userId, "mcp_attachment");
+    if (refused) return rpcResult(id, { isError: true, content: [{ type: "text", text: refused }] }, era);
+    const actor = mcpActorFor(await agentNameFor(env, store, grant));
+    const result = await addAttachment(env, store, grant.userId, actor, args.data as AttachmentAddInput);
     await store.addUsage(usageKeys.connectorWrites());
     return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] }, era);
   }
@@ -330,9 +350,10 @@ async function callTool(
       if (!r || r.task.kind === "heading") throw new Error(`Task not found: ${a.id}`);
       const tagMap = tagNameMap(await store.readTags());
       const t = annotate(taskOut(r.task, tagMap), todayYMD(timeZone), Date.now());
-      const [checklistRows, refRows, backlinks, doing] = await Promise.all([
+      const [checklistRows, refRows, attachmentRows, backlinks, doing] = await Promise.all([
         store.readChecklistItems(t.id),
         store.readTaskRefs(t.id),
+        store.readAttachments(t.id),
         store.findByRef(`task:${t.id}`, 50),
         store.readDoing(),
       ]);
@@ -356,6 +377,7 @@ async function callTool(
         ...(doing && !doing.isStale && doing.taskId === t.id ? { doing: true } : {}),
         ...(checklist.length > 0 ? { checklist } : {}),
         ...(refRows.length > 0 ? { refs: refsOut(refRows) } : {}),
+        ...(attachmentRows.length > 0 ? { attachments: attachmentsOut(attachmentRows) } : {}),
         ...(backlinks.tasks.length > 0
           ? { backlinks: backlinks.tasks.map(({ id: taskId, title, status }) => ({ id: taskId, title, status })) }
           : {}),
@@ -582,8 +604,8 @@ export async function listTasks(
 }
 
 /// `tasks_orientation`: the server instructions (one copy, INSTRUCTIONS), the
-/// tools grouped by family from the served definitions, and which areas have
-/// a brief (text above `## Log` in the area notes).
+/// tools grouped by family from the served definitions, the help index, and
+/// which areas have a brief (text above `## Log` in the area notes).
 function orientation(areas: Row[], doing: Doing | null) {
   const agentNames = new Set(AGENT_TOOLS.map((t) => t.name));
   const notesNames = new Set(NOTES_TOOLS.map((t) => t.name));
@@ -592,11 +614,12 @@ function orientation(areas: Row[], doing: Doing | null) {
     : notesNames.has(t.name) ? "area and project notes: the brief and the log"
     : /^tasks_(thread_|set_)/.test(t.name) ? "task conversation: turns, acceptance, artifact, handoff, end state"
     : t.annotations?.readOnlyHint ? "read"
-    : "write tasks and checklists";
+    : "write tasks, checklists and files";
   const families: Record<string, { name: string; title: string }[]> = {};
   for (const t of TOOLS) (families[family(t)] ??= []).push({ name: t.name, title: t.title ?? t.name });
   return {
     guide: INSTRUCTIONS,
+    help: `${HELP_URL}.md`,
     ...(doing && !doing.isStale ? { doing: { taskId: doing.taskId, title: doing.title, startedAt: doing.startedAt } } : {}),
     tools: families,
     areas: areas.map((r) => {

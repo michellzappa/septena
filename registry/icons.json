@@ -115,6 +115,7 @@
     "settings.import": { "sfSymbol": "square.and.arrow.down", "material": "download", "lucide": "download" },
     "settings.backend": { "sfSymbol": "arrow.up.doc", "material": "cloud_sync", "lucide": "cloud" },
     "settings.animations": { "sfSymbol": "party.popper", "material": "celebration", "lucide": "party-popper" },
+    "settings.help": { "sfSymbol": "questionmark.circle", "material": "help", "lucide": "circle-help" },
     "settings.feedback": { "sfSymbol": "paperplane", "material": "send", "lucide": "send" },
     "settings.open_source": { "sfSymbol": "chevron.left.forwardslash.chevron.right", "material": "code", "lucide": "code" },
     "settings.paste": { "sfSymbol": "doc.on.clipboard", "material": "content_paste", "lucide": "clipboard-paste" },

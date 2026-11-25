@@ -126,7 +126,7 @@ export const TASK_TOOLS: Tool[] = [
     name: "tasks_get",
     title: "Get task",
     description:
-      "Inspect a single task by id: title, status, area, project, scheduled, deadline, today, completedAt, source, `refs` (what it points at: key, kind, role, snapshot), `backlinks` (the tasks that point at it), a compact conversation summary, and the read-only fade fields when set (touchedAt, deferCount, fadedAt, dropReason, effort: only the app writes them). One call answers 'where is this task and what's its state?' regardless of view or status. Pass include_notes for the project and area notes: the context to read before deciding anything about the task.",
+      "Inspect a single task by id: title, status, area, project, scheduled, deadline, today, completedAt, source, `refs` (what it points at: key, kind, role, snapshot), `backlinks` (the tasks that point at it), `attachments` (its files: filename, contentType, byteCount, and `uploaded: false` when the bytes are only on one device; the bytes are not readable here), a compact conversation summary, and the read-only fade fields when set (touchedAt, deferCount, fadedAt, dropReason, effort: only the app writes them). One call answers 'where is this task and what's its state?' regardless of view or status. Pass include_notes for the project and area notes: the context to read before deciding anything about the task.",
     inputSchema: getTaskJsonSchema,
     annotations: { title: "Get task", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },

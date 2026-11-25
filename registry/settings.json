@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "helpURL": "https://septena.app/help",
   "description": "Canonical Septena task-app settings: synced keys (backend SETTING_VALUES + Swift SeptaskSyncedSettings), device-local keys/defaults, and new-user-first progressive-disclosure taxonomy (docs/SETTINGS_UX_SPEC.md).",
   "keys": {
     "welcomeName": {
@@ -1087,6 +1088,7 @@
         {
           "id": "actions",
           "items": [
+            { "kind": "customSurface", "surface": "open_help", "label": "Help", "icon": "settings.help" },
             { "kind": "customSurface", "surface": "check_updates", "label": "Check for Updates…", "platforms": ["macos", "windows"], "featureId": "mac.updates" },
             { "kind": "customSurface", "surface": "reset_get_started", "label": "Show Get Started Again" },
             { "kind": "customSurface", "surface": "reset_first_run", "label": "Show Welcome Again", "featureId": "onboarding.first-run" },

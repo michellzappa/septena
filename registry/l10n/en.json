@@ -35,13 +35,15 @@
     "paths": [
       "plans.outcomes.nothing_lost.rows.history.cells.free",
       "plans.outcomes.nothing_lost.rows.deleted.cells.free",
-      "plans.outcomes.nothing_lost.rows.deleted.cells.plus"
+      "plans.outcomes.nothing_lost.rows.deleted.cells.plus",
+      "plans.outcomes.nothing_lost.rows.deleted.cells.pro"
     ]
   },
   "365 days": {
     "text": "365 days",
     "paths": [
-      "plans.outcomes.nothing_lost.rows.history.cells.plus"
+      "plans.outcomes.nothing_lost.rows.history.cells.plus",
+      "plans.outcomes.nothing_lost.rows.history.cells.pro"
     ]
   },
   "3rd": {
@@ -54,6 +56,12 @@
     "text": "4th",
     "paths": [
       "surfaces.taskDetail.ordinals.3.title"
+    ]
+  },
+  "50 GB synced": {
+    "text": "50 GB synced",
+    "paths": [
+      "plans.outcomes.nothing_lost.rows.files.cells.pro"
     ]
   },
   "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit.": {
@@ -291,7 +299,8 @@
   "All your devices": {
     "text": "All your devices",
     "paths": [
-      "plans.outcomes.everywhere.rows.devices.cells.plus"
+      "plans.outcomes.everywhere.rows.devices.cells.plus",
+      "plans.outcomes.everywhere.rows.devices.cells.pro"
     ]
   },
   "Allow calendar access": {
@@ -589,7 +598,7 @@
   "Check for Updates…": {
     "text": "Check for Updates…",
     "paths": [
-      "settings.pages.about.sections.actions.items.0.label"
+      "settings.pages.about.sections.actions.items.1.label"
     ]
   },
   "Checking the code…": {
@@ -872,7 +881,8 @@
   "Create and invite": {
     "text": "Create and invite",
     "paths": [
-      "plans.outcomes.agents.rows.share.cells.plus"
+      "plans.outcomes.agents.rows.share.cells.plus",
+      "plans.outcomes.agents.rows.share.cells.pro"
     ]
   },
   "Created from {name}": {
@@ -1584,6 +1594,7 @@
   "Help": {
     "text": "Help",
     "paths": [
+      "settings.pages.about.sections.actions.items.0.label",
       "actions.menuBar.help.title"
     ]
   },
@@ -2253,6 +2264,12 @@
       "surfaces.doing.screen.length.noneTitle.title"
     ]
   },
+  "No limit": {
+    "text": "No limit",
+    "paths": [
+      "plans.outcomes.agents.rows.connected.cells.pro"
+    ]
+  },
   "No matches": {
     "text": "No matches",
     "paths": [
@@ -2781,7 +2798,23 @@
   "Pro": {
     "text": "Pro",
     "paths": [
+      "plans.proName",
       "plans.levels.pro.title"
+    ]
+  },
+  "Pro is on for this account.": {
+    "text": "Pro is on for this account.",
+    "paths": [
+      "plans.paywall.ownedGrantPro"
+    ]
+  },
+  "Pro through {date}": {
+    "text": "Pro through {date}",
+    "placeholders": [
+      "date"
+    ],
+    "paths": [
+      "plans.status.proThrough"
     ]
   },
   "Project": {
@@ -3235,13 +3268,19 @@
   "Send feedback": {
     "text": "Send feedback",
     "paths": [
-      "settings.pages.about.sections.actions.items.3.label"
+      "settings.pages.about.sections.actions.items.4.label"
     ]
   },
   "Septena": {
     "text": "Septena",
     "paths": [
       "actions.menuBar.app.title"
+    ]
+  },
+  "Septena Help": {
+    "text": "Septena Help",
+    "paths": [
+      "actions.actions.app.help.title"
     ]
   },
   "Septena Plus": {
@@ -3377,7 +3416,7 @@
   "Show Get Started Again": {
     "text": "Show Get Started Again",
     "paths": [
-      "settings.pages.about.sections.actions.items.1.label"
+      "settings.pages.about.sections.actions.items.2.label"
     ]
   },
   "Show Info": {
@@ -3407,7 +3446,7 @@
   "Show Welcome Again": {
     "text": "Show Welcome Again",
     "paths": [
-      "settings.pages.about.sections.actions.items.2.label"
+      "settings.pages.about.sections.actions.items.3.label"
     ]
   },
   "Show calendar events": {

@@ -32,7 +32,7 @@ struct SeptaskPlusSheet: View {
   var body: some View {
     NavigationStack {
       content
-        .navigationTitle(RegistryPlans.name)
+        .navigationTitle(status.title)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -196,7 +196,7 @@ private struct PlusOwnedView: View {
 
   var body: some View {
     VStack(spacing: 16) {
-      Image(systemName: RegistryIcons.sfSymbols["settings.plus"] ?? "plus.circle.fill")
+      Image(systemName: RegistryIcons.sfSymbols[PlanStatus.shared.isPro ? RegistryPlans.proCard.icon : "settings.plus"] ?? "plus.circle.fill")
         .font(.largeTitle)
         .foregroundStyle(.tint)
       Text(line).multilineTextAlignment(.center)
@@ -226,7 +226,7 @@ private struct PlusOwnedView: View {
     case "apple": return RegistryPlans.Paywall.ownedApple
     case "stripe": return RegistryPlans.Paywall.ownedWeb
     case "google": return RegistryPlans.Paywall.ownedGoogle
-    default: return RegistryPlans.Paywall.ownedGrant
+    default: return PlanStatus.shared.isPro ? RegistryPlans.Paywall.ownedGrantPro : RegistryPlans.Paywall.ownedGrant
     }
   }
 }

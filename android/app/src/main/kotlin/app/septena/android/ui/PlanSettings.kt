@@ -36,8 +36,11 @@ internal sealed interface AccountPlan {
     /** The reverse trial: Plus limits, nothing paid. */
     data class Trial(val endsAtMs: Long) : AccountPlan
 
-    /** An active entitlement; [paidThroughMs] is null for a grant with no expiry. */
-    data class Plus(val paidThroughMs: Long?, val source: String) : AccountPlan
+    /**
+     * An active entitlement; [paidThroughMs] is null for a grant with no expiry. Pro
+     * (ADR 0045) has every Plus limit or more, so only the words differ.
+     */
+    data class Plus(val paidThroughMs: Long?, val source: String, val isPro: Boolean = false) : AccountPlan
 }
 
 /** Reads the plan from `GET /v1/entitlement`. The server decides access; this only reads its answer. */
@@ -59,7 +62,16 @@ internal class PlanSettingsModel(private val graph: AndroidAppGraph) {
         }
     }
 
+    val isPro: Boolean get() = (plan as? AccountPlan.Plus)?.isPro == true
+
     val isPlus: Boolean get() = plan is AccountPlan.Plus || plan is AccountPlan.Trial
+
+    /**
+     * The name of the plan page and its Settings row (iOS `PlanStatus.title`): Plus is the
+     * offer, and an account on Pro sees its own plan.
+     */
+    fun title(languageTag: String): String =
+        if (isPro) proCard(languageTag, "title") else plansText(languageTag, "name")
 
     /** One status line for Settings (`statusKey: planStatus`), from plans.json `status`. */
     fun statusLine(languageTag: String): String? = when (val current = plan) {
@@ -67,30 +79,34 @@ internal class PlanSettingsModel(private val graph: AndroidAppGraph) {
         is AccountPlan.Free -> plansText(languageTag, "status", "free")
         is AccountPlan.Trial -> plansText(languageTag, "status", "trialEnds").replace("{date}", day(current.endsAtMs))
         is AccountPlan.Plus -> current.paidThroughMs?.let {
-            plansText(languageTag, "status", "paidThrough").replace("{date}", day(it))
-        } ?: plansText(languageTag, "status", "plus")
+            plansText(languageTag, "status", if (current.isPro) "proThrough" else "paidThrough").replace("{date}", day(it))
+        } ?: if (current.isPro) plansText(languageTag, "proName") else plansText(languageTag, "status", "plus")
         null -> null
     }
 
     companion object {
         const val PLAN_STATUS_KEY = "planStatus"
+        const val PAGE = "plus"
 
         fun accountPlan(answer: AccountEntitlement): AccountPlan {
             val live = answer.rows.filter { it.active }
             if (!answer.active || live.isEmpty()) {
                 return AccountPlan.Free(lapsed = answer.rows.any { it.source != TRIAL })
             }
-            val paid = live.filter { it.source != TRIAL }
+            val isPro = answer.plan == PRO
+            // The words name the plan the account is on, so its rows give the date.
+            val paid = live.filter { if (isPro) it.plan == PRO else it.source != TRIAL }
             if (paid.isEmpty()) {
                 val end = answer.trialEndsAtMs ?: live.mapNotNull { it.expiresAtMs }.maxOrNull() ?: 0L
                 return AccountPlan.Trial(end)
             }
-            paid.firstOrNull { it.expiresAtMs == null }?.let { return AccountPlan.Plus(null, it.source) }
+            paid.firstOrNull { it.expiresAtMs == null }?.let { return AccountPlan.Plus(null, it.source, isPro) }
             val latest = paid.maxBy { it.expiresAtMs ?: 0L }
-            return AccountPlan.Plus(latest.expiresAtMs, latest.source)
+            return AccountPlan.Plus(latest.expiresAtMs, latest.source, isPro)
         }
 
         private const val TRIAL = "trial"
+        private const val PRO = "pro"
 
         private fun day(ms: Long): String = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(ms))
     }
@@ -125,7 +141,11 @@ internal fun AccountProfileCard(
 ) {
     val title = name.trim().ifEmpty { settingsCopy(ACCOUNT_CARD, "yourProfile", languageTag) }
     val detail = if (signedIn) {
-        val plan = if (plans.isPlus) plansText(languageTag, "shortName") else plansText(languageTag, "status", "free")
+        val plan = when {
+            plans.isPro -> plansText(languageTag, "proName")
+            plans.isPlus -> plansText(languageTag, "shortName")
+            else -> plansText(languageTag, "status", "free")
+        }
         "$plan · ${syncStatusLine(signedIn = true, state = syncState, languageTag = languageTag)}"
     } else {
         settingsCopy(ACCOUNT_CARD, "signInToSync", languageTag)
@@ -149,9 +169,12 @@ private const val ACCOUNT_CARD = "account_profile_card"
 internal fun PlusOffer(plans: PlanSettingsModel, languageTag: String) {
     val document = RegistryCatalog.document("plans")
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(plansText(languageTag, "headline"), style = MaterialTheme.typography.titleLarge)
         Text(
-            plansText(languageTag, "subhead"),
+            if (plans.isPro) proCard(languageTag, "title") else plansText(languageTag, "headline"),
+            style = MaterialTheme.typography.titleLarge,
+        )
+        Text(
+            if (plans.isPro) proCard(languageTag, "detail") else plansText(languageTag, "subhead"),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp),
         )
@@ -164,21 +187,7 @@ internal fun PlusOffer(plans: PlanSettingsModel, languageTag: String) {
     }
     HorizontalDivider()
 
-    SectionHeader(plansText(languageTag, "name"))
-    document.objects("prices").forEach { price ->
-        val highlighted = price.fields["highlighted"].booleanValue() == true
-        ListItem(
-            headlineContent = {
-                Text(
-                    registryText(price.fields["label"].stringValue(), languageTag),
-                    fontWeight = if (highlighted) FontWeight.SemiBold else FontWeight.Normal,
-                )
-            },
-            supportingContent = { Text(registryText(price.fields["detail"].stringValue(), languageTag)) },
-        )
-    }
-    val checkoutOpen = (document.fields["checkout"] as? JsonValue.ObjectValue)?.fields?.get("open").booleanValue() == true
-    SectionFooter(if (checkoutOpen) plansText(languageTag, "priceFootnote") else plansText(languageTag, "checkout", "notice"))
+    if (!plans.isPro) PlanPrices(document, languageTag)
 
     if (plans.plan == AccountPlan.Device) {
         ListItem(
@@ -187,9 +196,14 @@ internal fun PlusOffer(plans: PlanSettingsModel, languageTag: String) {
         )
     }
 
-    val freeTitle = document.objects("cards").firstOrNull { it.fields["id"].stringValue() == "free" }
-        ?.let { registryText(it.fields["title"].stringValue(), languageTag) }.orEmpty()
+    // The account's plan next to the plan below it.
+    val freeTitle = planCard("free", "title", languageTag)
     val plusTitle = plansText(languageTag, "shortName")
+    val columns = if (plans.isPro) {
+        listOf("plus" to plusTitle, "pro" to plansText(languageTag, "proName"))
+    } else {
+        listOf("free" to freeTitle, "plus" to plusTitle)
+    }
     document.objects("outcomes").forEach { outcome ->
         HorizontalDivider()
         SectionHeader(registryText(outcome.fields["title"].stringValue(), languageTag))
@@ -200,8 +214,9 @@ internal fun PlusOffer(plans: PlanSettingsModel, languageTag: String) {
                 headlineContent = { Text(registryText(row.fields["label"].stringValue(), languageTag)) },
                 supportingContent = {
                     Column {
-                        Text("$freeTitle: ${planCell(cells?.fields?.get("free"), languageTag)}")
-                        Text("$plusTitle: ${planCell(cells?.fields?.get("plus"), languageTag)}")
+                        columns.forEach { (id, title) ->
+                            Text("$title: ${planCell(cells?.fields?.get(id), languageTag)}")
+                        }
                         if (planned) {
                             Text(
                                 plansText(languageTag, "labels", "planned"),
@@ -224,6 +239,33 @@ internal fun PlusOffer(plans: PlanSettingsModel, languageTag: String) {
         )
     }
 }
+
+/** What Plus costs. An account on Pro does not see it: nothing to buy. */
+@Composable
+private fun PlanPrices(document: JsonValue.ObjectValue, languageTag: String) {
+    SectionHeader(plansText(languageTag, "name"))
+    document.objects("prices").forEach { price ->
+        val highlighted = price.fields["highlighted"].booleanValue() == true
+        ListItem(
+            headlineContent = {
+                Text(
+                    registryText(price.fields["label"].stringValue(), languageTag),
+                    fontWeight = if (highlighted) FontWeight.SemiBold else FontWeight.Normal,
+                )
+            },
+            supportingContent = { Text(registryText(price.fields["detail"].stringValue(), languageTag)) },
+        )
+    }
+    val checkoutOpen = (document.fields["checkout"] as? JsonValue.ObjectValue)?.fields?.get("open").booleanValue() == true
+    SectionFooter(if (checkoutOpen) plansText(languageTag, "priceFootnote") else plansText(languageTag, "checkout", "notice"))
+}
+
+/** A field of a plan card (plans.json `cards`). Pro has one, but no store sells it (ADR 0045). */
+private fun planCard(id: String, field: String, languageTag: String): String =
+    RegistryCatalog.document("plans").objects("cards").firstOrNull { it.fields["id"].stringValue() == id }
+        ?.let { registryText(it.fields[field].stringValue(), languageTag) }.orEmpty()
+
+private fun proCard(languageTag: String, field: String): String = planCard("pro", field, languageTag)
 
 /** One comparison cell: included, not included, or the registry's text. */
 private fun planCell(cell: JsonValue?, languageTag: String): String = when (cell) {

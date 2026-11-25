@@ -42,6 +42,8 @@ data class EntitlementRow(
     /** ms since 1970; null means no expiry (a grant). */
     val expiresAtMs: Long?,
     val active: Boolean,
+    /** The plan the row gives; null means Plus (ADR 0045). */
+    val plan: String? = null,
 )
 
 /**
@@ -50,6 +52,8 @@ data class EntitlementRow(
  */
 data class AccountEntitlement(
     val active: Boolean,
+    /** The plan the account is on: `free`, `plus` or `pro`. */
+    val plan: String?,
     val rows: List<EntitlementRow>,
     /** ms since 1970: the reverse trial's end while it is the only active row. */
     val trialEndsAtMs: Long?,
@@ -222,11 +226,13 @@ class SeptenaAccessClient(
                 source = row.fields["source"].stringValue() ?: return@mapNotNull null,
                 expiresAtMs = row.fields["expiresAt"].longValue(),
                 active = row.fields["active"].booleanValue() ?: false,
+                plan = row.fields["plan"].stringValue(),
             )
         }
         val device = json.fields["device"] as? JsonValue.ObjectValue
         return AccountEntitlement(
             active = json.fields["active"].booleanValue() ?: false,
+            plan = json.fields["plan"].stringValue(),
             rows = rows,
             trialEndsAtMs = json.fields["trialEndsAt"].longValue(),
             enforced = json.fields["enforced"].booleanValue() ?: false,

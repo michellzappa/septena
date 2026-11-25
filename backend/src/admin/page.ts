@@ -67,12 +67,20 @@ const table = (head: string[], rows: string[], empty: string) =>
   rows.length ? `<div class="scroll"><table><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`
     : `<p class="dim">${esc(empty)}</p>`;
 
+const lasts = (selected: string) =>
+  `<select name="months">${[["1", "1 month"], ["3", "3 months"], ["6", "6 months"], ["12", "12 months"], ["24", "24 months"], ["forever", "no end"]]
+    .map(([v, t]) => `<option value="${v}"${v === selected ? " selected" : ""}>${t}</option>`).join("")}</select>`;
+const planSelect = (selected: "plus" | "pro") =>
+  `<select name="plan">${(["plus", "pro"] as const).map((p) => `<option value="${p}"${p === selected ? " selected" : ""}>${PLAN[p]}</option>`).join("")}</select>`;
+const PLAN = { plus: "Plus", pro: "Pro" };
+
 function matches(r: AccountIndexRow, v: AdminView): boolean {
   if (!v.query) return true;
   if (v.query.includes("@")) return r.userId === v.emailUserId;
   const q = v.query.toLowerCase();
   return r.userId.toLowerCase().startsWith(q)
     || planView(r.summary, v.now).word === q
+    || planView(r.summary, v.now).plan === q
     || r.providers.includes(q)
     || r.plusLinks.some((l) => l.label.toLowerCase().includes(q));
 }
@@ -84,12 +92,14 @@ function accountRow(r: AccountIndexRow, now: number): string {
   const devices = (s?.devices ?? []).map((d) => `<div>${esc(deviceLabel(d))} <span class="dim">${esc(when(d.lastSeen, now))}</span></div>`).join("");
   const agents = (s?.agents ?? []).map((a) => `<div>${esc(a.client)} <span class="dim">${esc(when(a.lastUsed, now))}</span></div>`).join("");
   const hooks = s && s.webhooks > 0 ? `<div class="${s.failingWebhooks ? "warn" : "dim"}">${s.webhooks} webhooks, ${s.failingWebhooks} failing</div>` : "";
-  const planText = `${plan.word}${plan.period ? `, ${plan.period}` : ""}`;
+  const give = `<details><summary class="dim">Give a plan</summary><form method="post" action="/admin/accounts/${esc(r.userId)}/plan">${planSelect("pro")}${lasts("forever")}<button>Give</button></form>${
+    plan.adminGrant ? ` <form method="post" action="/admin/accounts/${esc(r.userId)}/plan/end"><button>Take back</button></form>` : ""}</details>`;
+  const planText = `${plan.plan ? `${PLAN[plan.plan]}, ` : ""}${plan.word}${plan.period ? `, ${plan.period}` : ""}`;
   const until = plan.word === "paid" || plan.word === "granted" || plan.word === "trial" ? `<div class="dim">${plan.until === null ? "no end" : `until ${day(plan.until)}`}</div>` : "";
   return `<tr>
     <td><details><summary><code>${esc(short(r.userId))}</code></summary><code>${esc(r.userId)}</code></details>${r.plusLinks.map((l) => `<div class="dim">${esc(l.label)}</div>`).join("")}</td>
     <td>${esc(r.providers.join(", ") || "not seen yet")}</td>
-    <td><span class="${plan.word === "paid" ? "ok" : plan.word === "lapsed" ? "warn" : ""}">${esc(planText)}</span>${until}</td>
+    <td><span class="${plan.word === "paid" ? "ok" : plan.word === "lapsed" ? "warn" : ""}">${esc(planText)}</span>${until}${give}</td>
     <td>${esc(when(r.createdAt, now))}</td>
     <td>${esc(when(seen, now))}<div class="dim">${s?.signedIn ? "signed in" : "signed out"}</div></td>
     <td class="n">${s ? `${s.openTasks}<div class="dim">${s.closedTasks} closed</div>` : ""}</td>
@@ -105,8 +115,8 @@ function linkRow(l: PlusLink, uses: PlusLinkUse[]): string {
   const people = uses.filter((u) => u.linkId === l.id).map((u) => `<div><code>${esc(short(u.userId))}</code> <span class="dim">${u.revokedAt ? "revoked" : esc(day(u.expiresAt))}</span>
     ${u.revokedAt ? "" : `<form method="post" action="/admin/links/${esc(l.id)}/revoke"><input type="hidden" name="who" value="${esc(u.userId)}"><button>Take back</button></form>`}</div>`).join("");
   const close = state === "open" ? `<form method="post" action="/admin/links/${esc(l.id)}/close"><button>Close</button></form> ` : "";
-  const revoke = l.revokedAt ? "" : `<details><summary>Take back from everyone</summary><form method="post" action="/admin/links/${esc(l.id)}/revoke"><input type="hidden" name="who" value="all"><button>Yes, end Plus for all ${l.useCount}</button></form></details>`;
-  return `<tr><td>${esc(l.label)}</td><td>${l.months === null ? "no end" : `${l.months} months`}</td><td class="n">${l.useCount} of ${l.maxUses}</td>
+  const revoke = l.revokedAt ? "" : `<details><summary>Take back from everyone</summary><form method="post" action="/admin/links/${esc(l.id)}/revoke"><input type="hidden" name="who" value="all"><button>Yes, end the plan for all ${l.useCount}</button></form></details>`;
+  return `<tr><td>${esc(l.label)}</td><td>${PLAN[l.plan]}</td><td>${l.months === null ? "no end" : `${l.months} months`}</td><td class="n">${l.useCount} of ${l.maxUses}</td>
     <td><span class="${state === "open" ? "ok" : "dim"}">${state}</span></td><td>${day(l.createdAt)}</td><td>${people}</td><td>${close}${revoke}</td></tr>`;
 }
 
@@ -126,25 +136,26 @@ export function renderAdmin(v: AdminView): string {
 <header><h1>Septena admin</h1><span class="dim">${esc(v.admin)}</span>
   <form method="post" action="/admin/refresh"><button>Refresh counts</button></form></header>
 ${v.error ? `<div class="box warn">${esc(v.error)}</div>` : ""}
-${v.newUrl ? `<div class="box"><b>New Plus link</b><p><code>${esc(v.newUrl)}</code></p><span class="dim">Copy it now. Only a hash is stored, so this page cannot show it again.</span></div>` : ""}
+${v.newUrl ? `<div class="box"><b>New plan link</b><p><code>${esc(v.newUrl)}</code></p><span class="dim">Copy it now. Only a hash is stored, so this page cannot show it again.</span></div>` : ""}
 
 <div class="tiles">
   ${tile(o.accounts, "accounts")}${tile(o.newThisWeek, "new this week")}${tile(o.activeThisWeek, "active this week")}${tile(o.twoDevices, "with 2+ devices")}
   ${tile(o.withAgent, "with an agent")}${tile(o.agentChangesWeek, "agent changes this week")}
-  ${tile(o.paid, `paid (${o.paidYear} year, ${o.paidMonth} month)`)}${tile(o.granted, "granted")}${tile(o.onTrial, "on trial")}${tile(o.trialsConverted, `bought, of ${o.trialsStarted} trials`)}${tile(o.lapsed, "lapsed")}
+  ${tile(o.paid, `paid (${o.paidYear} year, ${o.paidMonth} month)`)}${tile(o.granted, `granted (${o.pro} Pro)`)}${tile(o.onTrial, "on trial")}${tile(o.trialsConverted, `bought, of ${o.trialsStarted} trials`)}${tile(o.lapsed, "lapsed")}
   ${tile(o.openTasks, "open tasks")}${tile(o.closedTasks, "closed tasks")}${tile(o.files, `files (${size(o.fileBytes)})`)}
 </div>
 <p class="dim">Counts refresh daily. Revenue and renewals are in App Store Connect.</p>
 
-<h2>Plus links</h2>
+<h2>Plan links</h2>
 <form method="post" action="/admin/links">
   <label>Label<input name="label" maxlength="60" required placeholder="Anna, press"></label>
-  <label>Plus lasts<select name="months"><option value="1">1 month</option><option value="3">3 months</option><option value="6">6 months</option><option value="12" selected>12 months</option><option value="24">24 months</option><option value="forever">no end</option></select></label>
+  <label>Plan${planSelect("plus")}</label>
+  <label>Lasts${lasts("12")}</label>
   <label>People<input name="maxUses" type="number" min="1" max="500" value="1" required></label>
   <button>Make a link</button>
 </form>
-<p class="dim">Close stops new people and keeps Plus for those who have it. Take back ends their Plus.</p>
-${table(["Label", "Lasts", "Used", "State", "Made", "Accounts", ""], v.links.map((l) => linkRow(l, v.uses)), "No links yet.")}
+<p class="dim">Close stops new people and keeps the plan for those who have it. Take back ends it.</p>
+${table(["Label", "Plan", "Lasts", "Used", "State", "Made", "Accounts", ""], v.links.map((l) => linkRow(l, v.uses)), "No links yet.")}
 
 <h2>Accounts</h2>
 <form method="post" action="/admin/search"><label>Account id, link label, plan, sign-in or email<input name="q" value="${esc(v.query)}" maxlength="200"></label><button>Search</button></form>

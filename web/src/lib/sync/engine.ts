@@ -16,8 +16,10 @@ import {
   taskRefId,
 } from "../core";
 import { LocalStore, pendingFieldsFor, turnSyntheticId, type LocalMutation } from "../store/db";
+import type { ParsedBackupPreview } from "../export";
 import type {
   AreaRow,
+  AttachmentRow,
   ChecklistItemRow,
   ConvoRow,
   NotSyncedItem,
@@ -188,6 +190,22 @@ export class WebSyncEngine {
   async signOutAndWipe(): Promise<void> {
     this.stop();
     await this.api.signOut();
+    await this.store.clearAll();
+    if (typeof navigator !== "undefined" && navigator.serviceWorker?.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: "CLEAR_SHELL_CACHE" });
+    }
+    this.emit({
+      snapshot: EMPTY_SNAPSHOT,
+      syncing: false,
+      liveConnected: false,
+      lastError: null,
+      notSynced: [],
+    });
+  }
+
+  async deleteAccountAndWipe(): Promise<void> {
+    this.stop();
+    await this.api.deleteAccount();
     await this.store.clearAll();
     if (typeof navigator !== "undefined" && navigator.serviceWorker?.controller) {
       navigator.serviceWorker.controller.postMessage({ type: "CLEAR_SHELL_CACHE" });
@@ -804,6 +822,484 @@ export class WebSyncEngine {
       [{ entity: "taskRef", action: "delete", id: ref.id }],
       [{ clientOpId: newClientOpId(), op: "delete", entity: "taskRef", id: ref.id, queuedAt: Date.now() }],
     );
+  }
+
+  // ---- Attachments (metadata sync + R2 binary PUT) ----
+
+  async uploadAttachment(taskId: string, file: File): Promise<AttachmentRow> {
+    await ensureCoreReady();
+    const maxBytes = 26_214_400; // ENTITY_LIMITS.maxAttachmentBytes
+    if (file.size > maxBytes) {
+      throw new Error(`File exceeds the 25 MB attachment limit (${file.name}).`);
+    }
+    const id = newId("att");
+    const now = new Date().toISOString();
+    const existing = this.state.snapshot.attachments.filter((a) => !a.deletedAt && a.taskId === taskId);
+    const maxPos = existing.reduce((m, a) => Math.max(m, a.position ?? 0), -1);
+    const contentType = file.type || "application/octet-stream";
+    const fields: Record<string, unknown> = {
+      taskId,
+      filename: file.name,
+      contentType,
+      byteCount: file.size,
+      position: maxPos + 1,
+      createdAt: now,
+    };
+    const row: AttachmentRow = {
+      id,
+      taskId,
+      filename: file.name,
+      contentType,
+      byteCount: file.size,
+      position: maxPos + 1,
+      createdAt: now,
+    };
+    const op: OutboxOp = {
+      clientOpId: newClientOpId(),
+      op: "upsert",
+      entity: "attachment",
+      id,
+      fields,
+      queuedAt: Date.now(),
+    };
+    // Push metadata first so the server accepts PUT /v1/attachments/:id.
+    const pushRes = await this.api.push([op]);
+    const rejected = pushRes.results.find((r) => r.status === "rejected");
+    if (rejected && rejected.status === "rejected") {
+      throw new Error(rejected.reason);
+    }
+    await this.api.uploadAttachmentBytes(id, file);
+    const uploadedRow: AttachmentRow = { ...row, uploadedAt: new Date().toISOString() };
+    await this.store.commitLocalAndQueue([{ entity: "attachment", action: "put", id, row: uploadedRow }], []);
+    await this.reloadFromDisk();
+    this.broadcastChange();
+    this.scheduleSync();
+    return uploadedRow;
+  }
+
+  async deleteAttachment(att: AttachmentRow): Promise<void> {
+    await this.commit(
+      [{ entity: "attachment", action: "delete", id: att.id }],
+      [{ clientOpId: newClientOpId(), op: "delete", entity: "attachment", id: att.id, queuedAt: Date.now() }],
+    );
+  }
+
+  // ---- Reminders ----
+
+  async setTaskReminder(
+    task: TaskRow,
+    reminderAt: string | null,
+    mode: "floating" | "fixed" = "floating",
+  ): Promise<void> {
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    await this.patchTask(task, {
+      reminderAt,
+      reminderMode: reminderAt ? mode : null,
+      reminderSnoozedUntil: null,
+      reminderDismissedAt: null,
+      touchedAt: now,
+    });
+  }
+
+  async snoozeTaskReminder(task: TaskRow, untilIso: string): Promise<void> {
+    await ensureCoreReady();
+    await this.patchTask(task, {
+      reminderSnoozedUntil: untilIso,
+      reminderDismissedAt: null,
+      touchedAt: new Date().toISOString(),
+    });
+  }
+
+  async dismissTaskReminder(task: TaskRow): Promise<void> {
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    await this.patchTask(task, {
+      reminderDismissedAt: now,
+      reminderSnoozedUntil: null,
+      touchedAt: now,
+    });
+  }
+
+  // ---- Duplicate, Reorder, Bulk Operations, Fade Pass & JSON Import ----
+
+  async duplicateTask(task: TaskRow): Promise<TaskRow> {
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    const todayYMD = localTodayYMD();
+    const id = newId("w");
+    const fields: Record<string, unknown> = {
+      title: task.title,
+      status: "open",
+      kind: task.kind ?? null,
+      heading: task.heading ?? null,
+      area: task.area ?? null,
+      project: task.project ?? null,
+      notes: task.notes ?? null,
+      today: Boolean(task.today),
+      todaySetOn: task.today ? todayYMD : null,
+      starred: Boolean(task.starred),
+      scheduled: task.scheduled ?? null,
+      deadline: task.deadline ?? null,
+      startTime: task.startTime ?? null,
+      durationMinutes: task.durationMinutes ?? null,
+      timeZone: task.timeZone ?? null,
+      tags: task.tags ?? null,
+      created: todayYMD,
+      createdAt: now,
+      touchedAt: now,
+      source: "app",
+      sourceClient: "web",
+    };
+    const row: TaskRow = { id, title: task.title, status: "open", ...fields };
+    const queuedAt = Date.now();
+    const mutations: LocalMutation[] = [{ entity: "task", action: "put", id, row }];
+    const ops: OutboxOp[] = [{ clientOpId: newClientOpId(), op: "upsert", entity: "task", id, fields, queuedAt }];
+
+    const items = this.state.snapshot.checklistItems
+      .filter((c) => !c.deletedAt && c.taskId === task.id)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    items.forEach((item, idx) => {
+      const cid = newId("chk");
+      const cFields: Record<string, unknown> = {
+        taskId: id,
+        title: item.title,
+        checked: false,
+        checkedAt: null,
+        position: idx,
+        createdAt: now,
+      };
+      mutations.push({
+        entity: "checklistItem",
+        action: "put",
+        id: cid,
+        row: { id: cid, taskId: id, title: item.title, ...cFields },
+      });
+      ops.push({
+        clientOpId: newClientOpId(),
+        op: "upsert",
+        entity: "checklistItem",
+        id: cid,
+        fields: cFields,
+        queuedAt: queuedAt + idx + 1,
+      });
+    });
+
+    await this.commit(mutations, ops);
+    return row;
+  }
+
+  async reorderTasks(orderedIds: string[], field: "position" | "todayPosition"): Promise<void> {
+    if (orderedIds.length === 0) return;
+    const byId = new Map(this.state.snapshot.tasks.map((t) => [t.id, t]));
+    const mutations: LocalMutation[] = [];
+    const ops: OutboxOp[] = [];
+    const queuedAt = Date.now();
+    orderedIds.forEach((id, index) => {
+      const task = byId.get(id);
+      if (!task) return;
+      const nextPos = (index + 1) * 1000;
+      if (task[field] === nextPos) return;
+      const patch = { [field]: nextPos };
+      mutations.push({ entity: "task", action: "put", id, row: { ...task, ...patch } });
+      ops.push({
+        clientOpId: newClientOpId(),
+        op: "upsert",
+        entity: "task",
+        id,
+        fields: patch,
+        queuedAt: queuedAt + index,
+      });
+    });
+    if (mutations.length > 0) await this.commit(mutations, ops);
+  }
+
+  async bulkUpdateTasks(tasks: TaskRow[], fields: Record<string, unknown>): Promise<void> {
+    if (tasks.length === 0) return;
+    const now = new Date().toISOString();
+    const queuedAt = Date.now();
+    const mutations: LocalMutation[] = [];
+    const ops: OutboxOp[] = [];
+    tasks.forEach((task, idx) => {
+      const patch = { ...fields, touchedAt: now };
+      mutations.push({ entity: "task", action: "put", id: task.id, row: { ...task, ...patch } });
+      ops.push({
+        clientOpId: newClientOpId(),
+        op: "upsert",
+        entity: "task",
+        id: task.id,
+        fields: patch,
+        queuedAt: queuedAt + idx,
+      });
+    });
+    await this.commit(mutations, ops);
+  }
+
+  async bulkToggleToday(tasks: TaskRow[], putOnToday: boolean): Promise<void> {
+    if (tasks.length === 0) return;
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    const todayYMD = localTodayYMD();
+    const queuedAt = Date.now();
+    const mutations: LocalMutation[] = [];
+    const ops: OutboxOp[] = [];
+    tasks.forEach((task, idx) => {
+      const datePatch = applyDateAction(
+        task,
+        putOnToday ? { type: "putOnToday" } : { type: "removeFromToday" },
+        todayYMD,
+        now,
+      );
+      if (Object.keys(datePatch).length === 0) return;
+      const patch = { ...datePatch, touchedAt: now };
+      mutations.push({ entity: "task", action: "put", id: task.id, row: { ...task, ...patch } });
+      ops.push({
+        clientOpId: newClientOpId(),
+        op: "upsert",
+        entity: "task",
+        id: task.id,
+        fields: patch,
+        queuedAt: queuedAt + idx,
+      });
+    });
+    if (mutations.length > 0) await this.commit(mutations, ops);
+  }
+
+  async bulkCompleteTasks(tasks: TaskRow[]): Promise<string[]> {
+    if (tasks.length === 0) return [];
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    const todayYMD = localTodayYMD();
+    const queuedAt = Date.now();
+    const mutations: LocalMutation[] = [];
+    const ops: OutboxOp[] = [];
+    const spawnedIds: string[] = [];
+    tasks.forEach((task, idx) => {
+      const patch: Record<string, unknown> = { status: "done", completedAt: now, touchedAt: now };
+      mutations.push({ entity: "task", action: "put", id: task.id, row: { ...task, ...patch } });
+      ops.push({
+        clientOpId: newClientOpId(),
+        op: "upsert",
+        entity: "task",
+        id: task.id,
+        fields: patch,
+        queuedAt: queuedAt + idx * 10,
+      });
+      if (task.recurrenceUnit && !task.recurrencePaused) {
+        const nextOcc = this.buildNextRecurrenceMutations(task, todayYMD, now);
+        mutations.push(...nextOcc.mutations);
+        ops.push(...nextOcc.ops);
+        if (nextOcc.spawnedTaskId) spawnedIds.push(nextOcc.spawnedTaskId);
+      }
+    });
+    await this.commit(mutations, ops);
+    return spawnedIds;
+  }
+
+  async bulkDeleteTasks(tasks: TaskRow[]): Promise<void> {
+    if (tasks.length === 0) return;
+    const now = new Date().toISOString();
+    const queuedAt = Date.now();
+    const mutations: LocalMutation[] = [];
+    const ops: OutboxOp[] = [];
+    tasks.forEach((task, idx) => {
+      mutations.push({ entity: "task", action: "put", id: task.id, row: { ...task, deletedAt: now } });
+      ops.push({
+        clientOpId: newClientOpId(),
+        op: "delete",
+        entity: "task",
+        id: task.id,
+        queuedAt: queuedAt + idx,
+      });
+    });
+    await this.commit(mutations, ops);
+  }
+
+  async bulkDropFadedTasks(tasks: TaskRow[]): Promise<void> {
+    if (tasks.length === 0) return;
+    const now = new Date().toISOString();
+    await this.bulkUpdateTasks(tasks, {
+      status: "cancelled",
+      completedAt: now,
+      dropReason: "faded",
+    });
+  }
+
+  async markTasksFaded(tasks: TaskRow[]): Promise<void> {
+    if (tasks.length === 0) return;
+    const now = new Date().toISOString();
+    const queuedAt = Date.now();
+    const mutations: LocalMutation[] = [];
+    const ops: OutboxOp[] = [];
+    tasks.forEach((task, idx) => {
+      if (task.fadedAt) return;
+      const patch = { fadedAt: now };
+      mutations.push({ entity: "task", action: "put", id: task.id, row: { ...task, ...patch } });
+      ops.push({
+        clientOpId: newClientOpId(),
+        op: "upsert",
+        entity: "task",
+        id: task.id,
+        fields: patch,
+        queuedAt: queuedAt + idx,
+      });
+    });
+    if (mutations.length > 0) await this.commit(mutations, ops);
+  }
+
+  async purgeDeletedTasks(tasks: TaskRow[]): Promise<void> {
+    if (tasks.length === 0) return;
+    const mutations: LocalMutation[] = tasks.map((t) => ({
+      entity: "task",
+      action: "delete",
+      id: t.id,
+    }));
+    await this.store.commitLocalAndQueue(mutations, []);
+    await this.reloadFromDisk();
+    this.broadcastChange();
+  }
+
+  async importBackup(preview: ParsedBackupPreview): Promise<number> {
+    await ensureCoreReady();
+    const snap = this.state.snapshot;
+    const existingAreas = new Set(snap.areas.map((a) => a.id));
+    const existingProjects = new Set(snap.projects.map((p) => p.id));
+    const existingTags = new Set(snap.tags.map((t) => t.id));
+    const existingTasks = new Set(snap.tasks.map((t) => t.id));
+    const existingChecks = new Set(snap.checklistItems.map((c) => c.id));
+    const existingRefs = new Set(snap.taskRefs.map((r) => r.id));
+
+    const now = new Date().toISOString();
+    const todayYMD = localTodayYMD();
+    let queuedAt = Date.now();
+    const mutations: LocalMutation[] = [];
+    const ops: OutboxOp[] = [];
+    let count = 0;
+
+    for (const a of preview.areas) {
+      if (existingAreas.has(a.id)) continue;
+      const fields: Record<string, unknown> = {
+        title: a.title,
+        context: a.context ?? null,
+        emoji: a.emoji ?? null,
+        position: a.position ?? count,
+      };
+      mutations.push({ entity: "area", action: "put", id: a.id, row: { ...a, ...fields } });
+      ops.push({ clientOpId: newClientOpId(), op: "upsert", entity: "area", id: a.id, fields, queuedAt: queuedAt++ });
+      count++;
+    }
+
+    for (const p of preview.projects) {
+      if (existingProjects.has(p.id)) continue;
+      const fields: Record<string, unknown> = {
+        title: p.title,
+        status: p.status,
+        area: p.area ?? null,
+        notes: p.notes ?? null,
+        created: p.created ?? todayYMD,
+        position: p.position ?? count,
+      };
+      mutations.push({ entity: "project", action: "put", id: p.id, row: { ...p, ...fields } });
+      ops.push({ clientOpId: newClientOpId(), op: "upsert", entity: "project", id: p.id, fields, queuedAt: queuedAt++ });
+      count++;
+    }
+
+    for (const t of preview.tags) {
+      if (existingTags.has(t.id)) continue;
+      const fields: Record<string, unknown> = {
+        name: t.name,
+        color: t.color ?? null,
+        position: t.position ?? count,
+      };
+      mutations.push({ entity: "tag", action: "put", id: t.id, row: { ...t, ...fields } });
+      ops.push({ clientOpId: newClientOpId(), op: "upsert", entity: "tag", id: t.id, fields, queuedAt: queuedAt++ });
+      count++;
+    }
+
+    for (const task of preview.tasks) {
+      if (existingTasks.has(task.id)) continue;
+      const fields: Record<string, unknown> = {
+        title: task.title,
+        status: task.status,
+        kind: task.kind ?? null,
+        heading: task.heading ?? null,
+        area: task.area ?? null,
+        project: task.project ?? null,
+        notes: task.notes ?? null,
+        today: Boolean(task.today),
+        todaySetOn: task.todaySetOn ?? (task.today ? todayYMD : null),
+        starred: Boolean(task.starred),
+        scheduled: task.scheduled ?? null,
+        deadline: task.deadline ?? null,
+        startTime: task.startTime ?? null,
+        durationMinutes: task.durationMinutes ?? null,
+        tags: task.tags ?? null,
+        position: task.position ?? null,
+        todayPosition: task.todayPosition ?? null,
+        created: task.created ?? todayYMD,
+        createdAt: task.createdAt ?? now,
+        completedAt: task.completedAt ?? null,
+        touchedAt: now,
+        source: "app",
+        sourceClient: "web",
+        recurrenceUnit: task.recurrenceUnit ?? null,
+        recurrenceInterval: task.recurrenceInterval ?? null,
+        recurrenceAfterCompletion: Boolean(task.recurrenceAfterCompletion),
+        recurrencePaused: Boolean(task.recurrencePaused),
+      };
+      mutations.push({ entity: "task", action: "put", id: task.id, row: { ...task, ...fields } });
+      ops.push({ clientOpId: newClientOpId(), op: "upsert", entity: "task", id: task.id, fields, queuedAt: queuedAt++ });
+      count++;
+    }
+
+    for (const c of preview.checklistItems) {
+      if (existingChecks.has(c.id)) continue;
+      const fields: Record<string, unknown> = {
+        taskId: c.taskId,
+        title: c.title,
+        checked: Boolean(c.checked),
+        checkedAt: c.checkedAt ?? null,
+        position: c.position ?? 0,
+        createdAt: now,
+      };
+      mutations.push({ entity: "checklistItem", action: "put", id: c.id, row: { ...c, ...fields } });
+      ops.push({
+        clientOpId: newClientOpId(),
+        op: "upsert",
+        entity: "checklistItem",
+        id: c.id,
+        fields,
+        queuedAt: queuedAt++,
+      });
+      count++;
+    }
+
+    for (const r of preview.taskRefs) {
+      if (existingRefs.has(r.id)) continue;
+      const fields: Record<string, unknown> = {
+        taskId: r.taskId,
+        key: r.key,
+        role: r.role ?? "about",
+        snapshot: r.snapshot ?? null,
+        position: r.position ?? 0,
+        createdAt: now,
+      };
+      mutations.push({ entity: "taskRef", action: "put", id: r.id, row: { ...r, ...fields } });
+      ops.push({
+        clientOpId: newClientOpId(),
+        op: "upsert",
+        entity: "taskRef",
+        id: r.id,
+        fields,
+        queuedAt: queuedAt++,
+      });
+      count++;
+    }
+
+    if (mutations.length > 0) {
+      await this.commit(mutations, ops);
+    }
+    return count;
   }
 
   // ---- Areas & Projects ----

@@ -17,6 +17,11 @@ The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, 
 ### First-time setup (onboarding)
 - When helping a user populate a new or sparse Septena account, follow the onboarding guide at `https://api.septena.app/onboard.md` (also exposed as the MCP prompt `onboard_septena`). Draw from what you already know about their ongoing work, projects, and responsibilities — or interview them briefly if starting fresh — to propose real Areas (with context + emoji), Projects (with context briefs), and at least a few concrete Tasks, and confirm before writing.
 
+### How the app works (help)
+- When the user asks how to do something in Septena, what a word means, or why something does not work, read `https://septena.app/help.md`. It lists every help page as Markdown, and `https://septena.app/llms-full.txt` has them all in one file. Answer from those pages with the app's own menu names.
+- When the pages do not answer it, say so and point to `https://septena.app/support`. Never guess a menu, a shortcut or a feature.
+- You cannot press buttons in the app. Tell the user where to tap, or make the change with a tool when one exists.
+
 ### Context first: project and area notes
 - Every project and area has **notes**: what it is for, who is involved, what was decided, what holds. They are the context for every task inside. Read them before you decide anything about a task. `tasks_claim` returns the task's project and area notes; `tasks_get(id, include_notes: true)` and `tasks_project_get(id)` return them too.
 - Notes have two parts. The **brief** is everything above a line `## Log`; it is the user's. The **log** is under it; agents add to it.
@@ -52,6 +57,12 @@ A task can point at up to 20 items: an email, a mail thread, a calendar event, a
 - `tasks_get` returns `refs` and `backlinks` (the tasks that point at this one). List rows carry `refCount`, and `issue` from the newest GitHub issue or PR reference.
 - A GitHub issue or PR URL that you write into an artifact, a handoff, an end-state note or a turn becomes a reference on its own. A reference that the user removed does not come back this way.
 - A reference never completes a task.
+
+#### Files on a task
+
+- `tasks_get` lists `attachments` (filename, contentType, byteCount). You cannot read a file's bytes. `uploaded: false` means the bytes are only on the device that added the file.
+- **`tasks_attachment_add(task_id, filename, content_type)`** adds a file of up to 10 MB. Pass `text` for text you wrote, or `base64` for a tiny binary. For a file on disk, pass neither and run the returned `command` (one-time token, 15 minutes). The file is attached when that upload answers `attached: true`.
+- For a web page or an email, add a reference instead. Only the user can remove a file.
 
 #### Task Conversations (agent-driven resolution)
 

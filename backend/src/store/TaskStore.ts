@@ -83,7 +83,7 @@ export interface AccountSummary {
   agentChangesWeek: number;
   webhooks: number;
   failingWebhooks: number;
-  entitlements: Pick<EntitlementRow, "id" | "source" | "productId" | "expiresAt" | "status" | "environment" | "signedAt">[];
+  entitlements: Pick<EntitlementRow, "id" | "source" | "productId" | "expiresAt" | "status" | "plan" | "environment" | "signedAt">[];
 }
 
 /// `GET /v1/access`: every place the account is signed in.
@@ -636,6 +636,9 @@ export class TaskStore extends DurableObject<Env> {
     // The name the user gave an agent (pairing or Settings rename). Null =
     // the client's registered name.
     const connectionCols = this.sql.exec<{ name: string }>("PRAGMA table_info(connections)").toArray().map((r) => r.name);
+    // The plan a grant gives (ADR 0045); null = Plus.
+    const entitlementCols = this.sql.exec<{ name: string }>("PRAGMA table_info(entitlements)").toArray().map((r) => r.name);
+    if (!entitlementCols.includes("plan")) this.sql.exec("ALTER TABLE entitlements ADD COLUMN plan TEXT");
     // The app version a device last sent (`X-Septena-Version`).
     const deviceCols = this.sql.exec<{ name: string }>("PRAGMA table_info(devices)").toArray().map((r) => r.name);
     if (!deviceCols.includes("version")) this.sql.exec("ALTER TABLE devices ADD COLUMN version TEXT");
@@ -2290,6 +2293,17 @@ export class TaskStore extends DurableObject<Env> {
     ).toArray().map((r) => decodeRow(ENTITIES.taskRef, r) as Row);
   }
 
+  readAttachments(taskId: string): Row[] {
+    return this.sql.exec(
+      "SELECT * FROM attachments WHERE taskId = ? AND deletedAt IS NULL ORDER BY position IS NULL, position, createdAt, id", taskId,
+    ).toArray().map((r) => decodeRow(ENTITIES.attachment, r) as Row);
+  }
+
+  /// Whether the id was ever used, also by a file that is now deleted.
+  hasAttachment(id: string): boolean {
+    return this.sql.exec("SELECT 1 FROM attachments WHERE id = ?", id).toArray().length > 0;
+  }
+
   /// The tasks that point at a key, active first, then the newest write
   /// first. `key` is in normal form.
   findByRef(key: string, limit: number): { tasks: RefHit[]; total: number } {
@@ -2950,14 +2964,14 @@ export class TaskStore extends DurableObject<Env> {
         }
       }
       this.sql.exec(
-        `INSERT INTO entitlements (id, source, productId, expiresAt, originalTransactionId, status, environment, note, signedAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO entitlements (id, source, productId, expiresAt, originalTransactionId, status, plan, environment, note, signedAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET source = excluded.source, productId = excluded.productId,
            expiresAt = excluded.expiresAt, originalTransactionId = excluded.originalTransactionId,
-           status = excluded.status, environment = excluded.environment, note = excluded.note,
+           status = excluded.status, plan = excluded.plan, environment = excluded.environment, note = excluded.note,
            signedAt = excluded.signedAt, updatedAt = excluded.updatedAt`,
         row.id, row.source, row.productId, row.expiresAt, row.originalTransactionId, row.status,
-        row.environment, row.note, row.signedAt, Date.now(),
+        row.plan ?? null, row.environment, row.note, row.signedAt, Date.now(),
       );
       return true;
     });
@@ -2995,7 +3009,7 @@ export class TaskStore extends DurableObject<Env> {
     ).toArray().map((r) => ({ ...r }));
     const entitlements = this.entitlements().map((r) => ({
       id: r.id, source: r.source, productId: r.productId, expiresAt: r.expiresAt, status: r.status,
-      environment: r.environment, signedAt: r.signedAt,
+      plan: r.plan ?? null, environment: r.environment, signedAt: r.signedAt,
     }));
     const openTasks = count(`${tasks} = 'open'`);
     const closedTasks = count(`${tasks} != 'open'`);

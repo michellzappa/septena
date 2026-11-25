@@ -180,6 +180,7 @@ function validateCapabilities(caps) {
 
 function validateSettings(settings, entities, icons, caps) {
   assert(settings.version === 2, "settings.json: version must be 2");
+  assert(/^https:\/\/[^\s]+[^/\s]$/.test(settings.helpURL ?? ""), "settings.json: helpURL must be an https URL with no trailing slash");
   const validTypes = new Set(["bool", "int", "enum", "string", "string[]", "record"]);
   const validScopes = new Set(["synced", "device"]);
   const validPlatforms = new Set(caps.platforms);
@@ -660,9 +661,10 @@ const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checkli
 const TASK_PAGE_DEPTHS = new Set(["inline", "page", "review"]);
 
 // ---- plans.json (ADR 0010, ADR 0023) ----
-// Pro is planned: the site shows it, the apps and the server do not (ADR 0037).
+// Pro is planned: the site shows it and no store sells it. The server has it for
+// grants, and the apps name it on an account that has it (ADR 0037, ADR 0045).
 const PLAN_LEVELS = ["free", "plus", "pro"];
-const PLAN_LIMIT_PLANS = ["account", "plus"];
+const PLAN_LIMIT_PLANS = ["account", "plus", "pro"];
 
 /** Every string in a JSON value, with its path. */
 function stringsOf(node, p, out = []) {
@@ -699,7 +701,7 @@ function validateImportSources(file, caps) {
 function validatePlans(plans, icons, caps, importSources) {
   assert(plans.version === 1, "plans.json: version must be 1");
   assert(plans.featureId in caps.capabilities, `plans.json: unknown featureId "${plans.featureId}"`);
-  for (const f of ["name", "shortName", "headline", "subhead", "ladderHeadline", "accountNote", "agentNote"]) assert(typeof plans[f] === "string" && plans[f].length > 0, `plans.json: ${f} missing`);
+  for (const f of ["name", "shortName", "proName", "headline", "subhead", "ladderHeadline", "accountNote", "agentNote"]) assert(typeof plans[f] === "string" && plans[f].length > 0, `plans.json: ${f} missing`);
   // House rule: rendered copy has no em or en dashes.
   for (const [p, v] of stringsOf(plans, "plans")) assert(!/[–—]/.test(v), `plans.json: ${p} contains an em or en dash`);
   assert(typeof plans.checkout?.open === "boolean", "plans.json: checkout.open must be a boolean");
@@ -724,7 +726,7 @@ function validatePlans(plans, icons, caps, importSources) {
   assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: cards must be ${PLAN_LEVELS.join(", ")}`);
   assert(plans.cards.find((c) => c.id === "pro").status === "planned", "plans.json: the pro card must be planned");
   assert(plans.cards.filter((c) => c.highlighted).length === 1, "plans.json: exactly one card must be highlighted");
-  for (const k of ["seePlus", "startTrial", "trialStarted", "trialBilling", "success", "pending", "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedOtherAccount", "done"]) {
+  for (const k of ["seePlus", "startTrial", "trialStarted", "trialBilling", "success", "pending", "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedGrantPro", "ownedOtherAccount", "done"]) {
     assert(typeof plans.paywall?.[k] === "string" && plans.paywall[k].length > 0, `plans.json: paywall.${k} missing`);
   }
   assert(plans.paywall.startTrial.includes(String(plans.trial.days)), `plans.json: paywall.startTrial must state ${plans.trial.days} days`);
@@ -1095,6 +1097,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("");
   lines.push("/// Unified task-app settings keys, defaults, synced-key list, and taxonomy (`registry/settings.json`).");
   lines.push("enum RegistrySettings {");
+  lines.push("  /// The help center. Help rows and menu items open it or a page below it.");
+  lines.push(`  static let helpURL = URL(string: ${swiftStr(settings.helpURL)})!`);
   lines.push(`  static let syncedKeys: [String] = [${syncedKeys.map(swiftStr).join(", ")}]`);
   lines.push("");
   lines.push("  enum StorageKey {");
@@ -1967,6 +1971,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let planned: Bool");
   lines.push("  let free: RegistryPlanCell");
   lines.push("  let plus: RegistryPlanCell");
+  lines.push("  let pro: RegistryPlanCell");
   lines.push("}");
   lines.push("");
   lines.push("struct RegistryPlanOutcome: Sendable, Hashable, Identifiable {");
@@ -1985,7 +1990,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("");
   lines.push("/// Plans and pricing (`registry/plans.json`). The site's /pricing page reads the same file.");
   lines.push("enum RegistryPlans {");
-  for (const f of ["name", "shortName", "headline", "subhead"]) lines.push(`  static var ${f}: String { ${L(P[f], P, f)} }`);
+  for (const f of ["name", "shortName", "proName", "headline", "subhead"]) lines.push(`  static var ${f}: String { ${L(P[f], P, f)} }`);
   lines.push(`  static let checkoutOpen = ${P.checkout.open}`);
   lines.push(`  static var checkoutNotice: String { ${L(P.checkout.notice, P.checkout, "notice")} }`);
   lines.push(`  static let trialDays = ${P.trial.days}`);
@@ -1996,11 +2001,14 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const pr of P.prices) lines.push(`    RegistryPlanPrice(id: ${swiftStr(pr.id)}, productId: ${swiftStr(pr.productId)}, amountMinor: ${pr.amountMinor}, currency: ${swiftStr(pr.currency)}, interval: ${swiftStr(pr.interval)}, highlighted: ${pr.highlighted}, label: ${L(pr.label, pr, "label")}, detail: ${L(pr.detail, pr, "detail")}),`);
   lines.push("  ] }");
   lines.push("  static var cards: [RegistryPlanCard] { [");
-  for (const c of P.cards.filter((c) => c.status !== "planned")) lines.push(`    RegistryPlanCard(id: ${swiftStr(c.id)}, title: ${L(c.title, c, "title")}, icon: ${swiftStr(c.icon)}, detail: ${L(c.detail, c, "detail")}, footnote: ${LOpt(c.footnote, c, "footnote")}, highlighted: ${c.highlighted === true}),`);
+  const cardSwift = (c) => `RegistryPlanCard(id: ${swiftStr(c.id)}, title: ${L(c.title, c, "title")}, icon: ${swiftStr(c.icon)}, detail: ${L(c.detail, c, "detail")}, footnote: ${LOpt(c.footnote, c, "footnote")}, highlighted: ${c.highlighted === true})`;
+  for (const c of P.cards.filter((c) => c.status !== "planned")) lines.push(`    ${cardSwift(c)},`);
   lines.push("  ] }");
+  lines.push("  /// Only for an account that has Pro: no store sells it (ADR 0037, ADR 0045).");
+  lines.push(`  static var proCard: RegistryPlanCard { ${cardSwift(P.cards.find((c) => c.id === "pro"))} }`);
   lines.push("  static var outcomes: [RegistryPlanOutcome] { [");
   for (const o of P.outcomes) {
-    const rows = o.rows.map((r) => `RegistryPlanRow(id: ${swiftStr(r.id)}, label: ${L(r.label, r, "label")}, planned: ${r.status === "planned"}, free: ${cellSwift(r.cells.free, r, "free")}, plus: ${cellSwift(r.cells.plus, r, "plus")})`).join(",\n      ");
+    const rows = o.rows.map((r) => `RegistryPlanRow(id: ${swiftStr(r.id)}, label: ${L(r.label, r, "label")}, planned: ${r.status === "planned"}, free: ${cellSwift(r.cells.free, r, "free")}, plus: ${cellSwift(r.cells.plus, r, "plus")}, pro: ${cellSwift(r.cells.pro, r, "pro")})`).join(",\n      ");
     lines.push(`    RegistryPlanOutcome(id: ${swiftStr(o.id)}, icon: ${swiftStr(o.icon)}, title: ${L(o.title, o, "title")}, detail: ${L(o.detail, o, "detail")}, rows: [\n      ${rows},\n    ]),`);
   }
   lines.push("  ] }");
@@ -2126,6 +2134,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push("");
   const syncedKeys = Object.entries(settings.keys).filter(([, v]) => v.scope === "synced").map(([k]) => k);
   lines.push(`export const SYNCED_SETTING_KEYS = ${JSON.stringify(syncedKeys)} as const;`);
+  lines.push(`export const HELP_URL = ${JSON.stringify(settings.helpURL)};`);
   lines.push(`export const SETTINGS_REGISTRY = ${JSON.stringify({ version: settings.version, keys: settings.keys, desktopTabs: settings.desktopTabs, rootGroups: settings.rootGroups, pages: settings.pages })} as const;`);
   lines.push(`export const VIEW_ALIASES = ${JSON.stringify(dests.viewAliases)} as const;`);
   lines.push(`export const DESTINATIONS = ${JSON.stringify(dests.destinations)} as const;`);
@@ -2320,6 +2329,11 @@ function generateKotlinCore(bundle) {
   };
 
   emitIdObject("RegistrySettingKeys", Object.keys(settings.keys));
+  lines.push("object RegistryLinks {");
+  lines.push("    /** The help center (`settings.json` `helpURL`). */");
+  lines.push(`    const val HELP: String = ${JSON.stringify(settings.helpURL)}`);
+  lines.push("}");
+  lines.push("");
   emitIdObject("RegistryDestinationIds", dests.destinations.map((destination) => destination.id));
   emitIdObject("RegistryActionIds", Object.keys(actions.actions));
   emitIdObject("RegistryCapabilityIds", Object.keys(caps.capabilities));
