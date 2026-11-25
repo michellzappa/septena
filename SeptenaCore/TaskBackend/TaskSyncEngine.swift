@@ -616,11 +616,11 @@ final class TaskSyncEngine {
                   store: store, lookup: lookup)
   }
 
-  /// Areas, projects, attachments: no soft delete; a missing row is a delete.
+  /// Every entity but tasks: no soft delete; a missing row is a delete.
   ///
-  /// An area or project delete is HELD for `deleteGrace`, like a task's: ⌘Z
-  /// on the delete re-creates the row under the same id
-  /// (`ProjectsMutator.revive`, `AreasMutator.revive`), and the backend never
+  /// The delete is HELD for `deleteGrace`, like a task's: ⌘Z on the delete
+  /// re-creates the row under the same id (`ProjectsMutator.revive`,
+  /// `AreasMutator.revive`, the `restore…` mutators), and the backend never
   /// revives a deleted row, so the delete must still be in the outbox for
   /// undo to cancel it.
   private func captureSimple(_ entity: BackendEntity, _ id: String,
@@ -630,9 +630,7 @@ final class TaskSyncEngine {
     let shadow = lookup(key)
     guard let plan else {
       if let shadow, !shadow.gone {
-        queueDeleteIfNeeded(entity, id,
-                            hold: entity == .project || entity == .area || entity == .checklistItem || entity == .taskRef || entity == .tag || entity == .attachment,
-                            store: store)
+        queueDeleteIfNeeded(entity, id, hold: true, store: store)
         shadow.gone = true
         store.saveSoon()
       }
@@ -648,16 +646,19 @@ final class TaskSyncEngine {
 
     // Re-created inside the grace period (undo): the backend never saw the
     // delete. Drop it and send only what differs from the last synced row.
-    if entity == .project || entity == .area || entity == .taskRef, shadow?.gone == true,
+    if let shadow, shadow.gone,
        let last = store.lastRowOp(entity: entity.rawValue, rowID: id),
        last.kind == TaskSyncOpKind.delete, !last.sent {
       store.remove(last)
-      shadow?.gone = false
-      var patch: [String: BackendJSON] = [:]
-      for (k, v) in mapped where (old[k] ?? .null).canonical != v.canonical { patch[k] = v }
-      if !patch.isEmpty { enqueueUpsert(entity, id, patch, store: store) }
-      writeShadow(shadow, key, old: old, new: mapped, store: store)
-      return
+      shadow.gone = false
+      store.saveSoon()
+      // A sync while the row was away drops its waiting upload. A file the
+      // plan refused stays local.
+      if entity == .attachment, old["_uploaded"] != .bool(true), old["_localOnly"] != .bool(true),
+         let a = fetchAttachment(id), a.localFilename != nil,
+         !store.ops(entity: entity.rawValue, rowID: id).contains(where: { $0.kind == TaskSyncOpKind.upload }) {
+        store.append(kind: TaskSyncOpKind.upload, entity: entity.rawValue, rowID: id, payload: [:])
+      }
     }
 
     if shadow == nil || shadow?.gone == true {
@@ -1582,6 +1583,7 @@ final class TaskSyncEngine {
     for t in (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? [] { context.delete(t) }
     for p in (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? [] { context.delete(p) }
     for a in (try? context.fetch(FetchDescriptor<AreaEntity>())) ?? [] { context.delete(a) }
+    for t in (try? context.fetch(FetchDescriptor<TagEntity>())) ?? [] { context.delete(t) }
     _ = StoreHealth.save(context, op: "taskSync.wipe")
     // Account switch / delete: clear cached per-account synced settings and
     // smart-list mirrors so the previous account cannot leak into the next one.
