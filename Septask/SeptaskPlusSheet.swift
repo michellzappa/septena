@@ -60,7 +60,9 @@ struct SeptaskPlusSheet: View {
       case .plus(_, let source):
         PlusOwnedView(source: source)
       case .free, .trial:
-        if PlusStore.checkoutAvailable, status.canPurchase {
+        if status.plusOwnedByAnotherAccount {
+          PlusInfoView(upsellID: upsellID, onSynced: close)
+        } else if PlusStore.checkoutAvailable, status.canPurchase {
           storeView
         } else {
           PlusInfoView(upsellID: upsellID, onSynced: close)
@@ -129,7 +131,9 @@ private struct PlusSheetHeader: View {
         VStack(alignment: .leading, spacing: 4) {
           Text(RegistryPlans.Paywall.trialStarted(date: end.formatted(date: .abbreviated, time: .omitted)))
             .font(.subheadline.weight(.semibold))
-          Text(RegistryPlans.Paywall.trialBilling).font(.footnote).foregroundStyle(.secondary)
+          if !status.plusOwnedByAnotherAccount {
+            Text(RegistryPlans.Paywall.trialBilling).font(.footnote).foregroundStyle(.secondary)
+          }
         }
       }
     }
@@ -144,7 +148,8 @@ private struct PlusSheetHeader: View {
 }
 
 /// The sheet when it cannot sell here: signed out (the trial is the offer),
-/// or before checkout opens.
+/// this Apple ID's Plus belongs to another Septena account (spec §6.4
+/// finding 7), or before checkout opens.
 private struct PlusInfoView: View {
   var upsellID: String?
   var onSynced: () -> Void = {}
@@ -154,22 +159,26 @@ private struct PlusInfoView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 20) {
         PlusSheetHeader(upsellID: upsellID, onSynced: onSynced)
-        VStack(alignment: .leading, spacing: 8) {
-          ForEach(RegistryPlans.prices) { price in
-            VStack(alignment: .leading, spacing: 2) {
-              Text(price.label).font(.body.weight(price.highlighted ? .semibold : .regular))
-              Text(price.detail).font(.subheadline).foregroundStyle(.secondary)
+        if !status.plusOwnedByAnotherAccount {
+          VStack(alignment: .leading, spacing: 8) {
+            ForEach(RegistryPlans.prices) { price in
+              VStack(alignment: .leading, spacing: 2) {
+                Text(price.label).font(.body.weight(price.highlighted ? .semibold : .regular))
+                Text(price.detail).font(.subheadline).foregroundStyle(.secondary)
+              }
             }
           }
+          .padding(.horizontal)
         }
-        .padding(.horizontal)
         VStack(alignment: .leading, spacing: 10) {
-          if status.plan == .device || status.plan == nil {
+          if status.plusOwnedByAnotherAccount {
+            Text(RegistryPlans.Paywall.ownedOtherAccount)
+          } else if status.plan == .device || status.plan == nil {
             Text(RegistryPlans.Paywall.startTrial).font(.headline)
             Text(RegistryPlans.trialDetail).font(.subheadline).foregroundStyle(.secondary)
             SeptaskSignInButton()
           } else {
-            Text(line).font(.subheadline).foregroundStyle(.secondary)
+            Text(RegistryPlans.checkoutNotice).font(.subheadline).foregroundStyle(.secondary)
           }
         }
         .padding(.horizontal)
@@ -177,8 +186,6 @@ private struct PlusInfoView: View {
       .padding(.bottom)
     }
   }
-
-  private var line: String { RegistryPlans.checkoutNotice }
 }
 
 /// The sheet for an account already on Plus: where it is managed, and no

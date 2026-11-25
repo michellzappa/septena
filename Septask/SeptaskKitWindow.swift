@@ -32,7 +32,10 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
       return
     }
     let controller = SeptaskKitWindowController()
+    // Registered before any list content loads, so nothing that runs during
+    // that load can build a second shell.
     current = controller
+    controller.restoreDestination()
     controller.window?.makeKeyAndOrderFront(nil)
     // After the window is on screen, so `makeFirstResponder` sticks: keyboard
     // focus starts on the DETAIL pane (the task list), not the sidebar.
@@ -236,6 +239,14 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     // The SwiftUI root normally starts the runtime; harmless if already up
     // (start() memoizes), load-bearing if this window somehow opens first.
     Task { await SeptenaServices.shared.start() }
+  }
+
+  /// First content load, called by `show()` once the shell is registered.
+  private func restoreDestination() {
+    guard let sidebar else { return }
+    // The sidebar's rows steer the list, so they must exist even if AppKit
+    // ever defers loading a collapsed sidebar (as it does the inspector).
+    sidebar.loadViewIfNeeded()
     // Restore the list that was showing last time; Today when it is gone.
     // That fallback also covers a saved "next" from before Septask's Next
     // page was removed (2026-11-19): no row has that key any more.
@@ -353,7 +364,13 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     list?.select(taskId: taskId)
     if opensPage { setInspector(visible: true) }
   }
+  func openTaskConversation(id taskId: String, in filter: TaskFilter) {
+    revealTask(id: taskId, in: filter)
+    setInspector(visible: true)
+  }
   func newTask() { list?.createTask() }
+  var canCreateSection: Bool { list?.isViewingProject ?? false }
+  func newSection() { list?.createSection() }
   func newProject() { sidebar?.newProject() }
   func newArea() { sidebar?.newArea() }
   func showQuickFind() { quickFind?.show() }
@@ -579,6 +596,8 @@ enum SeptaskKitCommands {
     controller.go(to: filter)
   }
   static func newTask() { shell?.newTask() }
+  static var canCreateSection: Bool { shell?.canCreateSection ?? false }
+  static func newSection() { shell?.newSection() }
   static func newProject() { shell?.newProject() }
   static func newArea() { shell?.newArea() }
   static func quickFind() { shell?.showQuickFind() }

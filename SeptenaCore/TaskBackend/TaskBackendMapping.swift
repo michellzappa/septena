@@ -106,6 +106,16 @@ enum TaskBackendMapping {
 
   // MARK: - Rows
 
+  private static func notesProposal(_ proposal: NotesProposal?, using c: inout Checker) -> BackendJSON {
+    guard let proposal else { return .null }
+    return .object([
+      "body": c.text("notesProposal.body", proposal.body, max: notesMax),
+      "agent": c.text("notesProposal.agent", proposal.agent, max: 80),
+      "at": c.stamp("notesProposal.at", proposal.at),
+      "why": c.text("notesProposal.why", proposal.why, max: 500),
+    ])
+  }
+
   @MainActor
   static func area(_ a: AreaEntity) -> Result<BackendRowPlan, TaskBackendIssue> {
     var c = Checker()
@@ -113,6 +123,8 @@ enum TaskBackendMapping {
     let fields: [String: BackendJSON] = [
       "title": c.text("title", a.title),
       "context": c.text("context", a.context, max: notesMax),
+      // `noteRev` is server-owned (`zod: z.never()`) and never pushed.
+      "notesProposal": notesProposal(a.notesProposal, using: &c),
       "emoji": c.text("emoji", a.emoji, max: 16),
       "position": .int(Int64(a.position)),
     ]
@@ -130,6 +142,8 @@ enum TaskBackendMapping {
       "created": c.day("created", p.created),
       "completedAt": c.stamp("completedAt", p.completedAt),
       "notes": c.text("notes", p.notes, max: notesMax),
+      // `noteRev` is server-owned (`zod: z.never()`) and never pushed.
+      "notesProposal": notesProposal(p.notesProposal, using: &c),
       // No "context": retired (ADR 0012). The backend merged it into notes
       // and refuses agent writes to it; pushing the stale local copy on
       // every project change would bring the duplicate back.

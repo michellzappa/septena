@@ -12,6 +12,7 @@ import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from 
 import { issueSession, refreshSession, revokeSession, storeFor, verifyAccessToken } from "./session.js";
 import {
   approvePairing,
+  denyPairing,
   zAgentName,
   inspectPairing,
   pollDevicePairing,
@@ -19,9 +20,11 @@ import {
   zDevicePollBody,
   zDeviceStartBody,
   zPairApproveBody,
+  zPairDenyBody,
   zPairInspectBody,
 } from "../shadow/oauth.js";
-import { disconnectFamily } from "../shadow/tokens.js";
+import { MCP_READ_SCOPE, disconnectFamily, hasScope, verifyMcpAccess } from "../shadow/tokens.js";
+import { MAX_AGENT_WEBHOOKS, validateWebhookUrl } from "./agentWake.js";
 import {
   TRIAL_ROW_ID,
   appAccountTokenFor,
@@ -53,6 +56,7 @@ import {
   type NotificationV2,
 } from "../entitlement/appleJws.js";
 import { appleRow, rejectReason } from "../entitlement/apple.js";
+import { notesHistoryRest } from "./notesHistoryRest.js";
 import { tasksRest } from "./tasksRest.js";
 
 // Task backend API, mounted at /v1 (docs/SEPTASK_BACKEND.md in the app repo).
@@ -145,16 +149,20 @@ api.post("/auth/signout", async (c) => {
 api.post("/auth/device/start", async (c) => {
   const body = await parse(c, zDeviceStartBody);
   if (body instanceof Response) return body;
-  const res = await startDevicePairing(c.env, body);
-  return res ? c.json(res, 200, { "Cache-Control": "no-store" }) : c.json({ error: "pairing_unavailable" }, 503);
+  const res = await startDevicePairing(c.env, body, c.req.header("CF-Connecting-IP"));
+  return res.ok
+    ? c.json(res.data, 200, { "Cache-Control": "no-store" })
+    : c.json({ error: res.error }, res.status, { "Cache-Control": "no-store" });
 });
 
 api.post("/auth/device/poll", async (c) => {
   const body = await parse(c, zDevicePollBody);
   if (body instanceof Response) return body;
-  const res = await pollDevicePairing(c.env, body);
+  const res = await pollDevicePairing(c.env, body, c.req.header("CF-Connecting-IP"));
   if (res.status === "pending") return c.json({ status: "pending" }, 202, { "Cache-Control": "no-store" });
-  if (res.status === "gone") return c.json({ error: "expired_or_unknown" }, 410);
+  if (res.status === "denied") return c.json({ error: "denied" }, 410, { "Cache-Control": "no-store" });
+  if (res.status === "rate_limited") return c.json({ error: "too_many_attempts" }, 429, { "Cache-Control": "no-store" });
+  if (res.status === "gone") return c.json({ error: "expired_or_unknown" }, 410, { "Cache-Control": "no-store" });
   return c.json(await issueSession(c.env, res.userId), 200, { "Cache-Control": "no-store" });
 });
 
@@ -164,6 +172,38 @@ async function requireUser(c: Ctx, next: Next) {
   const header = c.req.header("Authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
   const claims = token ? await verifyAccessToken(c.env, token) : null;
+  if (!claims) return c.json({ error: "unauthorized" }, 401, { "WWW-Authenticate": "Bearer" });
+  const client = zClientName.safeParse(c.req.header("X-Septena-Client"));
+  c.set("userId", claims.userId);
+  c.set("sid", claims.sid);
+  c.set("client", client.success ? client.data : null);
+  c.set("actor", `app:${client.success ? client.data : "unknown"}`);
+  await next();
+}
+
+/// Accepts either an app session bearer token (`sa1.*`) or an MCP OAuth access
+/// token (`sm1.*`) with `tasks:read` scope. Used by the agent wake event stream
+/// so both the app and background runners can subscribe.
+async function requireAgentOrUser(c: Ctx, next: Next) {
+  const header = c.req.header("Authorization") ?? "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+  if (!token) return c.json({ error: "unauthorized" }, 401, { "WWW-Authenticate": "Bearer" });
+
+  if (token.startsWith("sm1.")) {
+    const grant = await verifyMcpAccess(c.env, token);
+    if (!grant) return c.json({ error: "unauthorized" }, 401, { "WWW-Authenticate": "Bearer" });
+    if (!hasScope(grant, MCP_READ_SCOPE)) {
+      return c.json({ error: "insufficient_scope", scope: MCP_READ_SCOPE }, 403);
+    }
+    c.set("userId", grant.userId);
+    c.set("sid", null);
+    c.set("client", null);
+    c.set("actor", `mcp:${grant.clientId}`);
+    await next();
+    return;
+  }
+
+  const claims = await verifyAccessToken(c.env, token);
   if (!claims) return c.json({ error: "unauthorized" }, 401, { "WWW-Authenticate": "Bearer" });
   const client = zClientName.safeParse(c.req.header("X-Septena-Client"));
   c.set("userId", claims.userId);
@@ -232,6 +272,7 @@ api.use("/account", requireUser);
 api.use("/devices/*", requireUser);
 api.use("/ical/settings", requireUser);
 api.use("/changes", requireUser, loadPlan("open", "changes"), requireSyncDevice);
+api.use("/notes/*", requireUser);
 api.use("/pair/*", requireUser);
 api.use("/auth/device", requireUser);
 // The watch is a companion of a signed-in phone or Mac: it loads the plan
@@ -240,6 +281,9 @@ api.use("/tasks", requireUser, loadPlan("open", "tasks"));
 api.use("/tasks/*", requireUser, loadPlan("open", "tasks"));
 api.use("/access", apiHostOnly, requireUser);
 api.use("/access/*", apiHostOnly, requireUser);
+api.use("/agent/events/*", apiHostOnly, requireAgentOrUser);
+api.use("/agent/webhooks", apiHostOnly, requireUser);
+api.use("/agent/webhooks/*", apiHostOnly, requireUser);
 api.use("/entitlement", apiHostOnly, requireUser);
 api.use("/entitlement/*", apiHostOnly, requireUser);
 api.use("/webhooks/*", apiHostOnly);
@@ -323,6 +367,10 @@ api.get("/changes", async (c) => {
   // only on the free plan when older changes were hidden.
   return c.json({ changes, windowDays: plan!.limits.changeLogDays, hiddenOlder: hidden, upsell: historyEdgeUpsell(plan ?? null, hidden) });
 });
+
+// ---- project & area notes history (docs/PROJECT_NOTES_SPEC.md §6, #123) ----
+
+api.route("/notes", notesHistoryRest);
 
 // ---- attachments (bytes proxied through the Worker; §10 limits) ----
 
@@ -446,7 +494,18 @@ api.post("/pair/approve", async (c) => {
   const body = await parse(c, zPairApproveBody);
   if (body instanceof Response) return body;
   const res = await approvePairing(c.env, c.get("userId"), body);
-  return res.ok ? c.json({ ok: true, client: res.client, kind: res.kind }) : c.json({ error: res.error }, res.status);
+  return res.ok
+    ? c.json({ ok: true, client: res.client, kind: res.kind }, 200, { "Cache-Control": "no-store" })
+    : c.json({ error: res.error }, res.status, { "Cache-Control": "no-store" });
+});
+
+api.post("/pair/deny", async (c) => {
+  const body = await parse(c, zPairDenyBody);
+  if (body instanceof Response) return body;
+  const res = await denyPairing(c.env, c.get("userId"), body);
+  return res.ok
+    ? c.json({ ok: true, client: res.client, kind: res.kind }, 200, { "Cache-Control": "no-store" })
+    : c.json({ error: res.error }, res.status, { "Cache-Control": "no-store" });
 });
 
 // ---- Devices & Access (Settings > Account > Devices & Access) ----
@@ -909,6 +968,64 @@ api.get("/ical/:tokenFile", async (c) => {
       "Content-Disposition": 'inline; filename="septena-tasks.ics"',
     },
   });
+});
+
+// ---- agent wake transport (docs/TASK_FACTORY_SPEC.md §4, §8, issue #5) ----
+// Multi-user wake plumbing backed by the user's TaskStore DO:
+//   - GET  /v1/agent/events/stream  — SSE (`text/event-stream`) or WebSocket
+//     upgrade with `since` / `Last-Event-ID` replay + live push + heartbeats.
+//   - GET  /v1/agent/webhooks       — list registered outbound webhooks.
+//   - POST /v1/agent/webhooks       — register a signed outbound HTTPS webhook.
+//   - DELETE /v1/agent/webhooks/:id — remove a webhook.
+
+api.get("/agent/events/stream", async (c) => {
+  const rawCursor = c.req.query("since") ?? c.req.header("Last-Event-ID");
+  if (rawCursor !== undefined && rawCursor !== "") {
+    if (!/^\d+$/.test(rawCursor) || !Number.isSafeInteger(Number(rawCursor))) {
+      return c.json({ error: "invalid_request" }, 400);
+    }
+  }
+  return storeFor(c.env, c.get("userId")).fetch(c.req.raw);
+});
+
+const zCreateWebhookBody = z.object({
+  url: z.string().min(1).max(2048),
+  secret: z.string().min(16).max(256).optional(),
+  enabled: z.boolean().optional(),
+}).strict();
+
+api.get("/agent/webhooks", async (c) => {
+  const webhooks = await storeFor(c.env, c.get("userId")).listAgentWebhooks();
+  return c.json({ webhooks }, 200, { "Cache-Control": "no-store" });
+});
+
+api.post("/agent/webhooks", async (c) => {
+  const body = await parse(c, zCreateWebhookBody);
+  if (body instanceof Response) return body;
+  const validated = validateWebhookUrl(body.url);
+  if (!validated.ok) {
+    return c.json({ error: "invalid_webhook_url", reason: validated.reason }, 400);
+  }
+  const secret = body.secret ?? `whsec_${randomId(32)}`;
+  const res = await storeFor(c.env, c.get("userId")).createAgentWebhook(
+    validated.url,
+    secret,
+    body.enabled ?? true,
+  );
+  if (!res.ok) {
+    return c.json({ error: "webhook_limit_reached", max: MAX_AGENT_WEBHOOKS }, 409);
+  }
+  logEvent("agent_webhook_created", { webhookId: res.webhook.id });
+  return c.json(res.webhook, 201, { "Cache-Control": "no-store" });
+});
+
+api.delete("/agent/webhooks/:id", async (c) => {
+  const id = zId.safeParse(c.req.param("id"));
+  if (!id.success) return c.json({ error: "invalid_request" }, 400);
+  const removed = await storeFor(c.env, c.get("userId")).deleteAgentWebhook(id.data);
+  if (!removed) return c.json({ error: "not_found" }, 404);
+  logEvent("agent_webhook_deleted", { webhookId: id.data });
+  return c.body(null, 204);
 });
 
 // ---- account deletion (§10) ----

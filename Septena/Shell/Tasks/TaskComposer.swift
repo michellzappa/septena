@@ -75,6 +75,10 @@ struct TaskComposerCard: View {
   /// placeholder for row identity. Intent remains CREATE; this storage detail
   /// must not enable edit-only behavior or disable create-only behavior.
   let deferredCreate: Bool
+  /// True when composing inside a project view: committing a new task titled
+  /// `# <Heading>` converts it into a project heading (#209). False everywhere
+  /// else, where headings are not supported.
+  var allowsHeadingPrefix: Bool = false
   /// Inline collapse hook — how the form asks its host row to fold shut (Return
   /// to save, etc.). The scaffold/`.adaptiveDetail` owns closing in `.drawer`.
   let onClose: (() -> Void)?
@@ -174,6 +178,10 @@ struct TaskComposerCard: View {
   /// Explicit Cancel → Discard. Terminal for this editing session, unlike the
   /// save bookkeeping above: it must survive any number of teardowns.
   @State private var discarded = false
+  /// A `# Heading` new-task draft inside a project has been converted into a
+  /// heading and its placeholder purged (#209). Terminal for this session so
+  /// teardown never creates a duplicate heading.
+  @State private var convertedToHeading = false
   /// SuggestionEngine's learned area/project pick for the current title (the
   /// "Suggested" chip). Recomputed as the title changes; create-mode only.
   @State private var suggestedList: SuggestionEngine.Suggestion?
@@ -192,6 +200,7 @@ struct TaskComposerCard: View {
 
   init(mode: Mode, areas: [Area], projects: [Project], accent: Color,
        presentation: Presentation = .drawer, deferredCreate: Bool = false,
+       allowsHeadingPrefix: Bool = false,
        onClose: (() -> Void)? = nil,
        onToggleComplete: (() -> Void)? = nil,
        titleMatchID: String? = nil, checkboxMatchID: String? = nil,
@@ -205,6 +214,7 @@ struct TaskComposerCard: View {
     self.accent = accent
     self.presentation = presentation
     self.deferredCreate = deferredCreate
+    self.allowsHeadingPrefix = allowsHeadingPrefix
     self.onClose = onClose
     self.onToggleComplete = onToggleComplete
     self.titleMatchID = titleMatchID
@@ -736,8 +746,17 @@ struct TaskComposerCard: View {
   /// Date phrases and #project / @area / !today tokens detected in the title,
   /// limited to ones whose field isn't already set. Create-mode only — parsing
   /// an existing title on edit would surface noise.
+  /// Non-nil when this new-task draft inside a project should convert into a
+  /// heading on commit (`# Design` → `Design`, issue #209). Never fires outside
+  /// projects, never on edits of existing tasks, and never on `## ` or `# `.
+  private var headingPrefixMatch: (title: String, projectId: String)? {
+    guard allowsHeadingPrefix, isCreating, let projectId = draft.projectId else { return nil }
+    guard let title = TaskTitleText.headingPrefixTitle(draft.title) else { return nil }
+    return (title, projectId)
+  }
+
   private var detectedTokens: [DetectedToken] {
-    guard isCreating else { return [] }
+    guard isCreating, headingPrefixMatch == nil else { return [] }
     return TaskTitleParser.detect(in: draft.title, projects: projects, areas: areas)
       .filter(isUnset)
   }
@@ -1040,6 +1059,7 @@ struct TaskComposerCard: View {
     // A new subject starts with nothing written and nothing discarded.
     lastPersistedDraft = nil
     discarded = false
+    convertedToHeading = false
     keyboardCloseInFlight = false
     recordedCreateUndo = false
     switch mode {
@@ -1154,6 +1174,15 @@ struct TaskComposerCard: View {
     // a mid-flight subject swap flushes the outgoing edit into the right task.
     switch seededMode ?? mode {
     case .create:
+      if let match = headingPrefixMatch {
+        if let created = mutator.createHeading(title: match.title, project: match.projectId) {
+          TaskUndo.recordHeadingCreate(id: created.id, title: match.title,
+                                       project: match.projectId, position: created.position,
+                                       mutator: mutator)
+        }
+        convertedToHeading = true
+        return true
+      }
       applyPendingTokens()
       titleImageOnlyDraft()
       let created = draft.create(via: mutator)
@@ -1162,6 +1191,18 @@ struct TaskComposerCard: View {
       return true
     case .edit(let task):
       if seededDeferredCreate {
+        if let match = headingPrefixMatch {
+          if let created = mutator.createHeading(title: match.title, project: match.projectId,
+                                                 afterHeadingID: task.heading) {
+            TaskUndo.recordHeadingCreate(id: created.id, title: match.title,
+                                         project: match.projectId, position: created.position,
+                                         mutator: mutator)
+          }
+          mutator.purge(id: task.id)
+          convertedToHeading = true
+          recordedCreateUndo = true
+          return true
+        }
         // Same create pipeline as the drawer, except the inline host already
         // inserted a push-deferred entity for layout identity. Updating its
         // title releases the first CloudKit push.
@@ -1211,7 +1252,7 @@ struct TaskComposerCard: View {
   /// user goes on typing into a view whose state is still very much alive.
   @discardableResult
   private func persistOnce() -> Bool {
-    guard !discarded else { return false }
+    guard !discarded, !convertedToHeading else { return false }
     guard canSave else { return false }
     guard draft != lastPersistedDraft || !pastedImages.isEmpty else { return true }
     // Mark the draft persisted only AFTER the write reports that it landed.
@@ -1223,6 +1264,7 @@ struct TaskComposerCard: View {
     let landed = persist()
     if landed { lastPersistedDraft = draft }
     onDone()
+    if convertedToHeading, presentation == .inline { onClose?() }
     return landed
   }
 

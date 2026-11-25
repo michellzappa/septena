@@ -149,6 +149,7 @@ export async function createTestTaskStore(existing?: DatabaseSync, envOverrides:
   let alarm: number | null = null;
   let inTx = false;
   const pendingWaitUntil: Promise<unknown>[] = [];
+  const sockets: Array<{ ws: WebSocket; tags: string[] }> = [];
 
   const ctx = {
     storage: {
@@ -180,18 +181,25 @@ export async function createTestTaskStore(existing?: DatabaseSync, envOverrides:
       pendingWaitUntil.push(Promise.resolve(p));
     },
     setWebSocketAutoResponse() {},
-    getWebSockets() { return []; },
+    acceptWebSocket(ws: WebSocket, tags?: string[]) {
+      sockets.push({ ws, tags: tags ?? [] });
+    },
+    getWebSockets(tag?: string) {
+      if (!tag) return sockets.map((s) => s.ws);
+      return sockets.filter((s) => s.tags.includes(tag)).map((s) => s.ws);
+    },
   };
+
+  async function flushWaitUntil(): Promise<void> {
+    while (pendingWaitUntil.length > 0) {
+      const batch = pendingWaitUntil.splice(0, pendingWaitUntil.length);
+      await Promise.allSettled(batch);
+    }
+  }
 
   // Expose an RPC-like async proxy matching `StoreRpc` as well as direct calls.
   const store = new TaskStore(ctx as never, envOverrides as never);
-  const flushWaitUntil = async () => {
-    while (pendingWaitUntil.length > 0) {
-      const batch = pendingWaitUntil.splice(0, pendingWaitUntil.length);
-      await Promise.all(batch);
-    }
-  };
-  return { store, db, flushWaitUntil };
+  return { store, db, flushWaitUntil, sockets };
 }
 
 /// Creates a real `AccountStore` instance backed by an in-memory SQLite
@@ -228,4 +236,43 @@ export async function createTestAccountStore(existing?: DatabaseSync) {
 
   const store = new AccountStore(ctx as never, {} as never);
   return { store, db };
+}
+
+/// Creates a real `PairingStore` instance backed by an in-memory KV map so
+/// tests exercise the actual Durable Object methods and alarm/expiry cleanup.
+export async function createTestPairingStore() {
+  installWorkerTestHooks();
+  const { PairingStore } = await import("../src/shadow/PairingStore.ts");
+  const data = new Map<string, unknown>();
+  let alarm: number | null = null;
+
+  const ctx = {
+    storage: {
+      async get<T>(key: string): Promise<T | undefined> {
+        return data.get(key) as T | undefined;
+      },
+      async put(key: string, value: unknown): Promise<void> {
+        data.set(key, value);
+      },
+      async deleteAll(): Promise<void> {
+        data.clear();
+      },
+      async getAlarm(): Promise<number | null> {
+        return alarm;
+      },
+      async setAlarm(ts: number): Promise<void> {
+        alarm = ts;
+      },
+      async deleteAlarm(): Promise<void> {
+        alarm = null;
+      },
+    },
+  };
+
+  const store = new PairingStore(ctx as never, {} as never);
+  return {
+    store,
+    data,
+    getAlarm: () => alarm,
+  };
 }

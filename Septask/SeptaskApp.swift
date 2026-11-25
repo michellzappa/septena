@@ -32,6 +32,12 @@ struct SeptaskApp: App {
   #endif
 
   init() {
+    #if os(macOS)
+    // AppKit swallows an exception raised while it handles an event, and the
+    // app stays alive half-built. An exception unwound through Swift frames
+    // is undefined behavior anyway. Crash with a report, as iOS does.
+    UserDefaults.standard.register(defaults: ["NSApplicationCrashOnExceptions": true])
+    #endif
     // Launch signpost (docs/LAUNCH_PERF.md). The stored properties above run
     // first, so `launch.localStoreOpen` lands before this milestone.
     LaunchTrace.milestone("launch.appInit")
@@ -166,6 +172,13 @@ private struct SeptaskMainWindow: View {
         #if os(iOS)
         if let pending = SeptaskAppDelegate.consumePendingShortcut() {
           navigation.pendingShortcut = pending
+        }
+        if let intentAction = SeptaskDeepLinkRouter.consumePendingIntentAction() {
+          SeptaskDeepLinkRouter.apply(
+            intentAction,
+            navigation: navigation,
+            context: localStore.container.mainContext
+          )
         }
         // A Home Screen quick action targets the foreground window. Updating
         // this reference when a scene activates keeps the delegate's warm path

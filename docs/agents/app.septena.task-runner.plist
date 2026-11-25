@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  LaunchAgent template: scheduled Septena task runner on mz-mini (every 15 minutes).
+  See docs/TASK_FACTORY_SPEC.md §4.2 for installation instructions.
+  Replace REPLACE_WITH_USER with the local macOS username before loading.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>app.septena.task-runner</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/REPLACE_WITH_USER/Dev/septena/scripts/task-runner.sh</string>
+    <string>--max</string>
+    <string>2</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/REPLACE_WITH_USER/Dev/septena</string>
+
+  <!-- Run every 15 minutes (900 seconds). Overlap with wake runs is guarded by lock dir. -->
+  <key>StartInterval</key>
+  <integer>900</integer>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/Users/REPLACE_WITH_USER/.local/bin</string>
+    <key>SEPTENA_MCP_SERVER</key>
+    <string>septena</string>
+    <key>RUNNER_LOG_KEEP</key>
+    <string>100</string>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/Users/REPLACE_WITH_USER/Library/Logs/septena-runner/launchd-scheduled.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/REPLACE_WITH_USER/Library/Logs/septena-runner/launchd-scheduled.err.log</string>
+</dict>
+</plist>

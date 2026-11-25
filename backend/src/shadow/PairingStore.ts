@@ -39,7 +39,19 @@ export interface PairApproval {
 }
 
 export type ApproveOutcome = "ok" | "not_found" | "already_used";
-export type PairStatus = "pending" | "approved" | "gone";
+export type PairStatus = "pending" | "approved" | "denied" | "gone";
+
+function constantTimeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const ab = enc.encode(a);
+  const bb = enc.encode(b);
+  const len = Math.max(ab.length, bb.length);
+  let diff = ab.length ^ bb.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (ab[i] ?? 0) ^ (bb[i] ?? 0);
+  }
+  return diff === 0;
+}
 
 export class PairingStore extends DurableObject<Env> {
   private async live(): Promise<PendingAuth | null> {
@@ -50,6 +62,14 @@ export class PairingStore extends DurableObject<Env> {
       return null;
     }
     return p;
+  }
+
+  private async isDecided(): Promise<{ approved: PairApproval | undefined; denied: boolean }> {
+    const [approved, denied] = await Promise.all([
+      this.ctx.storage.get<PairApproval>("approved"),
+      this.ctx.storage.get<boolean>("denied"),
+    ]);
+    return { approved, denied: Boolean(denied) };
   }
 
   /// False when the code is already held by another live authorization; the
@@ -70,23 +90,41 @@ export class PairingStore extends DurableObject<Env> {
   > {
     const p = await this.live();
     if (!p) return { outcome: "not_found" };
-    if (await this.ctx.storage.get<PairApproval>("approved")) return { outcome: "already_used" };
+    const { approved, denied } = await this.isDecided();
+    if (approved || denied) return { outcome: "already_used" };
     return { outcome: "ok", purpose: p.purpose ?? "connector", clientName: p.clientName, expiresAt: p.expiresAt };
   }
 
   /// Binds a user to the pending authorization. A code approves once: a
   /// second approval (by anyone) is refused so a code cannot be re-pointed.
-  /// `expectedPurpose` is what the user confirmed; a mismatch approves nothing.
+  /// `expectedPurpose` defaults to `"connector"` so a legacy caller without
+  /// confirmation can never silently approve a `"device"` sign-in.
   async approve(
     a: PairApproval,
+    expectedPurpose: "connector" | "device" = "connector",
+  ): Promise<{ outcome: ApproveOutcome; clientName?: string; purpose?: "connector" | "device" }> {
+    const p = await this.live();
+    if (!p) return { outcome: "not_found" };
+    const purpose = p.purpose ?? "connector";
+    if (expectedPurpose !== purpose) return { outcome: "not_found" };
+    const { approved, denied } = await this.isDecided();
+    if (approved || denied) return { outcome: "already_used" };
+    await this.ctx.storage.put("approved", a);
+    return { outcome: "ok", clientName: p.clientName, purpose };
+  }
+
+  /// Explicitly declines a pending authorization so the waiting client stops
+  /// polling right away instead of waiting for expiry.
+  async deny(
     expectedPurpose?: "connector" | "device",
   ): Promise<{ outcome: ApproveOutcome; clientName?: string; purpose?: "connector" | "device" }> {
     const p = await this.live();
     if (!p) return { outcome: "not_found" };
     const purpose = p.purpose ?? "connector";
     if (expectedPurpose && expectedPurpose !== purpose) return { outcome: "not_found" };
-    if (await this.ctx.storage.get<PairApproval>("approved")) return { outcome: "already_used" };
-    await this.ctx.storage.put("approved", a);
+    const { approved, denied } = await this.isDecided();
+    if (approved || denied) return { outcome: "already_used" };
+    await this.ctx.storage.put("denied", true);
     return { outcome: "ok", clientName: p.clientName, purpose };
   }
 
@@ -95,9 +133,26 @@ export class PairingStore extends DurableObject<Env> {
     purpose: "connector" | "device" = "connector",
   ): Promise<{ status: PairStatus; clientName?: string; redirectUri?: string }> {
     const p = await this.live();
-    if (!p || p.pendingId !== pendingId || (p.purpose ?? "connector") !== purpose) return { status: "gone" };
-    const approved = !!(await this.ctx.storage.get<PairApproval>("approved"));
+    if (!p || !constantTimeEqual(p.pendingId, pendingId) || (p.purpose ?? "connector") !== purpose) {
+      return { status: "gone" };
+    }
+    const { approved, denied } = await this.isDecided();
+    if (denied) return { status: "denied", clientName: p.clientName, redirectUri: p.redirectUri };
     return { status: approved ? "approved" : "pending", clientName: p.clientName, redirectUri: p.redirectUri };
+  }
+
+  /// One-shot: consumes a denied authorization and wipes the object.
+  async consumeDenied(
+    pendingId: string,
+    purpose: "connector" | "device" = "connector",
+  ): Promise<boolean> {
+    const p = await this.live();
+    if (!p || !constantTimeEqual(p.pendingId, pendingId) || (p.purpose ?? "connector") !== purpose) return false;
+    const { denied } = await this.isDecided();
+    if (!denied) return false;
+    await this.ctx.storage.deleteAll();
+    await this.ctx.storage.deleteAlarm();
+    return true;
   }
 
   /// One-shot: returns the approved authorization and wipes the object.
@@ -106,12 +161,12 @@ export class PairingStore extends DurableObject<Env> {
     purpose: "connector" | "device" = "connector",
   ): Promise<{ pending: PendingAuth; approval: PairApproval } | null> {
     const p = await this.live();
-    if (!p || p.pendingId !== pendingId || (p.purpose ?? "connector") !== purpose) return null;
-    const approval = await this.ctx.storage.get<PairApproval>("approved");
-    if (!approval) return null;
+    if (!p || !constantTimeEqual(p.pendingId, pendingId) || (p.purpose ?? "connector") !== purpose) return null;
+    const { approved, denied } = await this.isDecided();
+    if (!approved || denied) return null;
     await this.ctx.storage.deleteAll();
     await this.ctx.storage.deleteAlarm();
-    return { pending: p, approval };
+    return { pending: p, approval: approved };
   }
 
   override async alarm(): Promise<void> {

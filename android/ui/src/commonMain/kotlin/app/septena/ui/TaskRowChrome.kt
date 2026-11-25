@@ -23,15 +23,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -1618,6 +1621,123 @@ fun SeptenaGlyph(
                     Offset(cx + ca * outerR, cy + sa * outerR),
                     strokeWidth = stroke * 1.15f,
                     cap = StrokeCap.Round,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Review stage row following the agent prompt design (`docs/AGENT_PROMPT_SPEC.md`, #412):
+ * title, full untruncated review note, metadata line (`Area › Project · asked {ago}`),
+ * and full touch-target `Accept` (prominent) + `Send back` (bordered) on their own line.
+ * Tapping Send back opens the task page with the Send back field focused; never embeds a text field.
+ */
+@Composable
+fun ReviewTaskCardRow(
+    task: TaskListItem,
+    position: TaskCardPosition,
+    acceptTitle: String,
+    sendBackTitle: String,
+    isDark: Boolean,
+    hasActiveTexture: Boolean,
+    rowMenuGroups: List<List<TaskRowMenuAction>>,
+    rowMenuAccessibilityLabel: String,
+    selection: TaskSelection,
+    onOpenTask: (String) -> Unit,
+    onAccept: (String) -> Unit,
+    onSendBack: (String) -> Unit,
+    onTaskAction: (String, String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    val isSelected = task.id in selection.selectedIds
+    val secondaryInk = MaterialTheme.colorScheme.onSurfaceVariant
+
+    TaskCardSlice(
+        position = position,
+        isSelected = isSelected,
+        isDark = isDark,
+        hasActiveTexture = hasActiveTexture,
+        modifier = modifier,
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectableTaskRow(
+                            taskId = task.id,
+                            selection = selection,
+                            onOpen = onOpenTask,
+                            onMenu = { if (rowMenuGroups.isNotEmpty()) menuExpanded = true },
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = task.title,
+                        fontSize = 15.5.sp,
+                        lineHeight = 21.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    // Review question / endStateNote always shows in full, never truncated.
+                    task.reviewNote?.takeIf(String::isNotBlank)?.let { note ->
+                        Text(
+                            text = note,
+                            fontSize = 14.5.sp,
+                            lineHeight = 20.sp,
+                            color = secondaryInk,
+                        )
+                    }
+                    task.reviewMeta?.takeIf(String::isNotBlank)?.let { meta ->
+                        Text(
+                            text = meta,
+                            fontSize = 12.5.sp,
+                            lineHeight = 16.sp,
+                            color = secondaryInk,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+
+                // Same order on every surface: Accept first, Send back second.
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Button(
+                        onClick = { onAccept(task.id) },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) {
+                        Text(acceptTitle)
+                    }
+                    OutlinedButton(
+                        onClick = { onSendBack(task.id) },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) {
+                        Text(sendBackTitle)
+                    }
+                }
+            }
+
+            if (rowMenuGroups.isNotEmpty()) {
+                SeptenaContextMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                    isDark = isDark,
+                    groups = rowMenuGroups,
+                    isTaskStarred = task.isStarred,
+                    accessibilityLabel = rowMenuAccessibilityLabel,
+                    onAction = { actionId -> onTaskAction(task.id, actionId) },
                 )
             }
         }

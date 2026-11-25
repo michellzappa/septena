@@ -229,6 +229,27 @@ enum TaskUndo {
            redo: { current = rebuild() })
   }
 
+  /// Undo for a freshly created project heading (section divider, #209).
+  /// Undo purges the heading (dissolving any members); redo re-creates it in
+  /// the same project at its manual position so it lands back in place.
+  static func recordHeadingCreate(id: String,
+                                  title: String,
+                                  project: String,
+                                  position: Double? = nil,
+                                  mutator: TaskMutator) {
+    recordCreate(
+      name: RegistryActions.title("section.new"),
+      ids: [id],
+      mutator: mutator,
+      rebuild: { [mutator] in
+        guard let recreated = mutator.createHeading(title: title, project: project) else { return [] }
+        if let position, position != 0 {
+          mutator.reorder(id: recreated.id, toPosition: position)
+        }
+        return [recreated.id]
+      })
+  }
+
   // MARK: - Common single-value changes
   //
   // The three every surface needs. Each is a thin wrapper over `record` — the
@@ -794,6 +815,68 @@ enum TaskUndo {
            },
            redo: {
              if let next = store.removeForUndo(id: live.id) { live = next }
+           })
+  }
+
+  // MARK: - Project & area notes (proposals & history restore, #123)
+
+  static func recordProjectNotesRestore(id: String,
+                                        before: String?,
+                                        after: String?,
+                                        projects: ProjectsMutator) {
+    guard (before ?? "") != (after ?? "") else { return }
+    record(name: ContainerNotesCopy.undoRestoreName,
+           undo: { Task { @MainActor in try? await projects.setNotes(id: id, notes: before) } },
+           redo: { Task { @MainActor in try? await projects.setNotes(id: id, notes: after) } })
+  }
+
+  static func recordAreaNotesRestore(id: String,
+                                     before: String?,
+                                     after: String?,
+                                     areas: AreasMutator) {
+    guard (before ?? "") != (after ?? "") else { return }
+    record(name: ContainerNotesCopy.undoRestoreName,
+           undo: { Task { @MainActor in try? await areas.setContext(id: id, context: before) } },
+           redo: { Task { @MainActor in try? await areas.setContext(id: id, context: after) } })
+  }
+
+  static func recordProjectProposalDecision(id: String,
+                                            accepted: Bool,
+                                            beforeNotes: String?,
+                                            afterNotes: String?,
+                                            proposal: NotesProposal,
+                                            projects: ProjectsMutator) {
+    let name = accepted ? ContainerNotesCopy.undoAcceptProposalName : ContainerNotesCopy.undoRejectProposalName
+    record(name: name,
+           undo: {
+             Task { @MainActor in
+               try? await projects.restoreNotesState(id: id, notes: beforeNotes, proposal: proposal)
+             }
+           },
+           redo: {
+             Task { @MainActor in
+               try? await projects.restoreNotesState(id: id, notes: afterNotes, proposal: nil)
+             }
+           })
+  }
+
+  static func recordAreaProposalDecision(id: String,
+                                         accepted: Bool,
+                                         beforeNotes: String?,
+                                         afterNotes: String?,
+                                         proposal: NotesProposal,
+                                         areas: AreasMutator) {
+    let name = accepted ? ContainerNotesCopy.undoAcceptProposalName : ContainerNotesCopy.undoRejectProposalName
+    record(name: name,
+           undo: {
+             Task { @MainActor in
+               try? await areas.restoreNotesState(id: id, context: beforeNotes, proposal: proposal)
+             }
+           },
+           redo: {
+             Task { @MainActor in
+               try? await areas.restoreNotesState(id: id, context: afterNotes, proposal: nil)
+             }
            })
   }
 }

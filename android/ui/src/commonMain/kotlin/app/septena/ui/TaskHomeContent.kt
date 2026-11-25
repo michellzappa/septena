@@ -88,6 +88,10 @@ data class TaskListItem(
     val isRepeating: Boolean = false,
     val hasNotes: Boolean = false,
     val hasAttachments: Boolean = false,
+    /** Full untruncated agent review note (`endStateNote` or fallback) for Review list rows (#412). */
+    val reviewNote: String? = null,
+    /** Single-line Review metadata (`Area › Project · asked {ago} · artifact`). */
+    val reviewMeta: String? = null,
 )
 
 /**
@@ -190,6 +194,11 @@ fun TaskHomeContent(
     onReorderInboxRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
     onReorderTaskRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
     onReorderGroupHeader: ((ids: List<String>, targetLocationKey: String) -> Unit)? = null,
+    isReviewList: Boolean = false,
+    reviewAcceptTitle: String = "",
+    reviewSendBackTitle: String = "",
+    onAcceptReview: ((String) -> Unit)? = null,
+    onSendBackReview: ((String) -> Unit)? = null,
 ) {
     val orderedSelectionIds = if (selection.isActive) {
         (inboxTasks + tasks).map(TaskListItem::id).filter { it in selection.selectedIds }
@@ -383,6 +392,11 @@ fun TaskHomeContent(
                 orderedDragIds = orderedSelectionIds,
                 onReorderRow = onReorderTaskRow,
                 onReorderGroupHeader = onReorderGroupHeader,
+                isReviewList = isReviewList,
+                reviewAcceptTitle = reviewAcceptTitle,
+                reviewSendBackTitle = reviewSendBackTitle,
+                onAcceptReview = onAcceptReview,
+                onSendBackReview = onSendBackReview,
             )
         }
     }
@@ -415,6 +429,11 @@ private fun LazyListScope.taskCardRows(
     orderedDragIds: List<String> = emptyList(),
     onReorderRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
     onReorderGroupHeader: ((ids: List<String>, targetLocationKey: String) -> Unit)? = null,
+    isReviewList: Boolean = false,
+    reviewAcceptTitle: String = "",
+    reviewSendBackTitle: String = "",
+    onAcceptReview: ((String) -> Unit)? = null,
+    onSendBackReview: ((String) -> Unit)? = null,
 ) {
     // Compute contiguous card runs so each group paints continuous rounded glass card slices.
     val positions = computeCardPositions(tasks)
@@ -440,39 +459,57 @@ private fun LazyListScope.taskCardRows(
                 } else null,
             )
         }
-        TaskCardRow(
-            task = task,
-            position = positions[index],
-            completeTitle = completeTitle,
-            canComplete = canComplete,
-            todayTitle = todayTitle,
-            todayTint = todayTint,
-            fadedTitle = fadedTitle,
-            showTodayIndicator = showTodayIndicator,
-            showFadedIndicator = showFadedIndicator,
-            isDark = isDark,
-            hasActiveTexture = hasActiveTexture,
-            onComplete = onComplete,
-            onOpenTask = onOpenTask,
-            rowMenuGroups = rowMenuGroups,
-            rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-            selection = selection,
-            onTaskAction = onTaskAction,
-            canReorder = canReorder,
-            orderedDragIds = orderedDragIds,
-            dropModifier = Modifier
-                .magicPlusRowDrop(
-                    id = "mp-$keyPrefix-${task.id}",
-                    enabled = onDropRow != null,
-                    onDrop = { before -> onDropRow?.invoke(index, before) },
-                )
-                .taskReorderRowDrop(
-                    id = "reorder-$keyPrefix-${task.id}",
-                    taskId = task.id,
-                    enabled = canReorder && onReorderRow != null,
-                    onDrop = { ids, before -> onReorderRow?.invoke(ids, index, before) },
-                ),
-        )
+        if (isReviewList && onAcceptReview != null && onSendBackReview != null) {
+            ReviewTaskCardRow(
+                task = task,
+                position = positions[index],
+                acceptTitle = reviewAcceptTitle,
+                sendBackTitle = reviewSendBackTitle,
+                isDark = isDark,
+                hasActiveTexture = hasActiveTexture,
+                rowMenuGroups = rowMenuGroups,
+                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                selection = selection,
+                onOpenTask = onOpenTask,
+                onAccept = onAcceptReview,
+                onSendBack = onSendBackReview,
+                onTaskAction = onTaskAction,
+            )
+        } else {
+            TaskCardRow(
+                task = task,
+                position = positions[index],
+                completeTitle = completeTitle,
+                canComplete = canComplete,
+                todayTitle = todayTitle,
+                todayTint = todayTint,
+                fadedTitle = fadedTitle,
+                showTodayIndicator = showTodayIndicator,
+                showFadedIndicator = showFadedIndicator,
+                isDark = isDark,
+                hasActiveTexture = hasActiveTexture,
+                onComplete = onComplete,
+                onOpenTask = onOpenTask,
+                rowMenuGroups = rowMenuGroups,
+                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                selection = selection,
+                onTaskAction = onTaskAction,
+                canReorder = canReorder,
+                orderedDragIds = orderedDragIds,
+                dropModifier = Modifier
+                    .magicPlusRowDrop(
+                        id = "mp-$keyPrefix-${task.id}",
+                        enabled = onDropRow != null,
+                        onDrop = { before -> onDropRow?.invoke(index, before) },
+                    )
+                    .taskReorderRowDrop(
+                        id = "reorder-$keyPrefix-${task.id}",
+                        taskId = task.id,
+                        enabled = canReorder && onReorderRow != null,
+                        onDrop = { ids, before -> onReorderRow?.invoke(ids, index, before) },
+                    ),
+            )
+        }
     }
 }
 

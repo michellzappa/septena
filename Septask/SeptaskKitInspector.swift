@@ -312,7 +312,12 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     view = root
 
     rebuildKeyLoop()
-    show(nil)
+    // A task selected before the pane was first opened is already held in
+    // `task` (see `show`). Load it now that the form exists.
+    let held = task
+    task = nil
+    form.isHidden = true
+    show(held)
   }
 
   /// Explicit keyboard order through the pane: title → notes → the
@@ -528,6 +533,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// key equivalents (`KitShellWindow`). Returns false — and does nothing —
   /// when the keyboard is elsewhere, so the list's own ⌘↩ still works.
   func handleCommandReturn() -> Bool {
+    guard isViewLoaded else { return false }
     // ⌘↩ in the conversation's reply field sends the reply.
     if conversationView.handleCommandReturn() { return true }
     guard let responder = view.window?.firstResponder as? NSView,
@@ -568,7 +574,17 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// (`reloadTextIfIdle`). A live edit is never overwritten — the old
   /// unconditional reload reverted typing mid-word and then lost the edit,
   /// because `loadedTitle` was reset along with the field.
+  ///
+  /// AppKit loads a collapsed split-view pane only when it first opens, and
+  /// the form is empty until then. Until the view is loaded this only holds
+  /// the task; `loadView` shows it. Configuring the empty form raised in
+  /// `NSStackView.setCustomSpacing`, inside the shell window's `init`, so the
+  /// app ran with no window.
   func show(_ next: SeptenaTask?, isVisible: Bool = false) {
+    guard isViewLoaded else {
+      task = next
+      return
+    }
     guard next?.id != task?.id else {
       task = next
       if let next {
@@ -644,6 +660,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// the shown task and give it the keyboard. No-op when the shown task is
   /// not waiting for review.
   func openSendBack() {
+    loadViewIfNeeded()
     guard let task, !form.isHidden else { return }
     applyDepth(for: task)
     conversationView.openSendBack()
@@ -829,6 +846,8 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// Commit whatever is in the fields. Safe to call repeatedly — it only
   /// writes when a value actually differs from what was loaded.
   func flushPendingEdits() {
+    // No view yet means no fields, so nothing was typed.
+    guard isViewLoaded else { return }
     checklistView.flushPendingEdits()
     guard let current = task else { return }
     let beforeTitle = loadedTitle

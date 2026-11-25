@@ -12,7 +12,7 @@ import { planFor } from "../entitlement/entitlement.js";
 //
 // Distinct prefixes keep the three token kinds apart:
 //   sa1.  / sr1.   app session (session.ts)       — never accepted here
-//   sm1.  / smr1.  MCP task connector (this file)         — never accepted by /v1
+//   sm1.  / smr1.  MCP task connector (this file) — accepted by /mcp and /v1/agent/events/stream only
 // KV keys live under `v2:`, apart from the `token:`, `refresh:` and
 // `rtfamily:` records the retired CloudKit connector left (they expire by TTL).
 

@@ -110,6 +110,7 @@ fun TaskHomeScreen(
 ) {
     var openedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var openedTaskAttribute by rememberSaveable { mutableStateOf<String?>(null) }
+    var openedTaskSendBack by rememberSaveable { mutableStateOf(false) }
     var quickFindOpen by rememberSaveable { mutableStateOf(false) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     // On mobile, opens on Today with the Lists Homepage one Back away (Things / iOS `SeptaskRootView`).
@@ -171,6 +172,12 @@ fun TaskHomeScreen(
     val openTaskWithAttribute: (String, String?) -> Unit = { id, attribute ->
         openedTaskId = id
         openedTaskAttribute = attribute
+        openedTaskSendBack = false
+    }
+    val openTaskSendBack: (String) -> Unit = { id ->
+        openedTaskId = id
+        openedTaskAttribute = null
+        openedTaskSendBack = true
     }
     val onTaskAction: (String, String) -> Unit = { id, actionId ->
         when {
@@ -189,6 +196,7 @@ fun TaskHomeScreen(
             actionId == RegistryActionIds.TASK_DELETE -> homeViewModel.delete(id)
             actionId == RegistryActionIds.TASK_RESTORE -> homeViewModel.restore(id)
             actionId == RegistryActionIds.TASK_ACCEPT_REVIEW -> homeViewModel.acceptReview(id)
+            actionId == RegistryActionIds.TASK_SEND_BACK_REVIEW -> openTaskSendBack(id)
             actionId == RegistryActionIds.TASK_KEEP_FADED -> homeViewModel.keepFaded(id)
             actionId == RegistryActionIds.TASK_LET_GO_FADED -> homeViewModel.letGoFaded(id)
             actionId == RegistryActionIds.TASK_SELECT -> homeViewModel.toggleSelection(id)
@@ -217,7 +225,9 @@ fun TaskHomeScreen(
             )
             if (result == SnackbarResult.ActionPerformed) {
                 val undone = runCatching {
-                    withContext(Dispatchers.IO) { graph.taskUndoHistory.undo(graph.taskMutator) }
+                    withContext(Dispatchers.IO) {
+                        graph.taskUndoHistory.undo(graph.taskMutator, graph.conversationMutator)
+                    }
                 }.getOrDefault(false)
                 if (undone) {
                     graph.sync.noteLocalChange()
@@ -356,8 +366,9 @@ fun TaskHomeScreen(
                     TaskDetailScreen(
                         graph,
                         openedTaskId!!,
-                        onBack = { openedTaskId = null; openedTaskAttribute = null },
+                        onBack = { openedTaskId = null; openedTaskAttribute = null; openedTaskSendBack = false },
                         initialAttribute = openedTaskAttribute,
+                        openSendBackInitially = openedTaskSendBack,
                     )
                 } else {
                     TaskHomeScaffold(
@@ -382,6 +393,7 @@ fun TaskHomeScreen(
                         rowMenuGroups = rowMenuGroups,
                         rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                         onOpenTask = { openTaskWithAttribute(it, null) },
+                        onSendBackReview = openTaskSendBack,
                         onTaskAction = onTaskAction,
                         onToggleStarFilter = homeViewModel::toggleStarFilter,
                         onQuickFind = { quickFindOpen = true },
@@ -407,8 +419,9 @@ fun TaskHomeScreen(
                 TaskDetailScreen(
                     graph,
                     openedTaskId!!,
-                    onBack = { openedTaskId = null; openedTaskAttribute = null },
+                    onBack = { openedTaskId = null; openedTaskAttribute = null; openedTaskSendBack = false },
                     initialAttribute = openedTaskAttribute,
+                    openSendBackInitially = openedTaskSendBack,
                 )
             } else if (showingListsHome) {
                 ListsHomePage(
@@ -453,6 +466,7 @@ fun TaskHomeScreen(
                     rowMenuGroups = rowMenuGroups,
                     rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                     onOpenTask = { openTaskWithAttribute(it, null) },
+                    onSendBackReview = openTaskSendBack,
                     onTaskAction = onTaskAction,
                     onToggleStarFilter = homeViewModel::toggleStarFilter,
                     onQuickFind = { quickFindOpen = true },
@@ -763,6 +777,7 @@ private fun TaskHomeScaffold(
     rowMenuAccessibilityLabel: String,
     onComplete: (String) -> Unit,
     onOpenTask: (String) -> Unit,
+    onSendBackReview: (String) -> Unit,
     onTaskAction: (String, String) -> Unit,
     onToggleStarFilter: () -> Unit,
     onQuickFind: () -> Unit,
@@ -1061,6 +1076,15 @@ private fun TaskHomeScaffold(
                     )
                     is TaskHomeLocation.SmartList -> {
                         val isTodayList = location.destinationId == RegistryDestinationIds.TODAY
+                        val isReviewList = location.destinationId == RegistryDestinationIds.REVIEW
+                        val reviewAcceptTitle = remember(languageTag) {
+                            RegistryCatalog.actionTitle(RegistryActionIds.TASK_ACCEPT_REVIEW, languageTag = languageTag)
+                                ?.takeIf(String::isNotBlank) ?: "Accept"
+                        }
+                        val reviewSendBackTitle = remember(languageTag) {
+                            RegistryCatalog.actionTitle(RegistryActionIds.TASK_SEND_BACK_REVIEW, languageTag = languageTag)
+                                ?.takeIf(String::isNotBlank) ?: "Send back"
+                        }
                         val canReorderList = location.destinationId in setOf(
                             RegistryDestinationIds.TODAY,
                             RegistryDestinationIds.INBOX,
@@ -1171,6 +1195,11 @@ private fun TaskHomeScaffold(
                                     )
                                 }
                             } else null,
+                            isReviewList = isReviewList,
+                            reviewAcceptTitle = reviewAcceptTitle,
+                            reviewSendBackTitle = reviewSendBackTitle,
+                            onAcceptReview = if (isReviewList) homeViewModel::acceptReview else null,
+                            onSendBackReview = if (isReviewList) onSendBackReview else null,
                         )
                     }
                 }

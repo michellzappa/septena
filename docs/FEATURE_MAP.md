@@ -8,8 +8,8 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 53 | 54 | 54 | 0 | 45 | 0 | 1 |
-| partial | 1 | 1 | 1 | 0 | 3 | 0 | 3 |
+| ships | 53 | 54 | 54 | 0 | 46 | 0 | 1 |
+| partial | 1 | 1 | 1 | 0 | 2 | 0 | 3 |
 | planned | 0 | 0 | 0 | 51 | 5 | 54 | 1 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 53 |
 
@@ -17,7 +17,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 |---|---|---|---|---|---|---|---|---|
 | `lists.inbox` | Inbox band on Today | ships | ships | ships | planned | ships | planned | partial |
 | `lists.today` | Today | ships | ships | ships | planned | ships | planned | partial |
-| `lists.review` | Review (needs_verify) | ships | ships | ships | planned | partial | planned | - |
+| `lists.review` | Review (needs_verify) | ships | ships | ships | planned | ships | planned | - |
 | `lists.agent` | Agent (claimed and assigned work by stage) | ships | ships | ships | planned | ships | planned | - |
 | `lists.upcoming` | Upcoming | ships | ships | ships | planned | ships | planned | - |
 | `lists.anytime` | Anytime | ships | ships | ships | planned | ships | planned | - |

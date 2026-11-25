@@ -81,7 +81,7 @@ struct TodayView: View {
     if rows.isEmpty, store.connection == .notConnected, !store.sampleMode {
       NotConnectedView()
     } else if rows.isEmpty, store.today == nil {
-      ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+      LoadingList { await store.refreshNow(.today) }
     } else if rows.isEmpty {
       AllClearView()
     } else {

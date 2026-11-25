@@ -696,6 +696,8 @@ extension TaskSyncEngine {
     }
     take("title") { a.title = $0.stringValue ?? a.title }
     take("context") { a.context = $0.stringValue }
+    take("noteRev") { a.noteRev = Self.int($0) ?? 0 }
+    take("notesProposal") { a.notesProposal = Self.notesProposal(from: $0) }
     take("emoji") { a.emoji = $0.stringValue }
     take("position") { a.position = Self.int($0) ?? 0 }
     return applied
@@ -716,9 +718,21 @@ extension TaskSyncEngine {
     take("completedAt") { p.completedAt = $0.stringValue }
     take("notes") { p.notes = $0.stringValue }
     take("context") { p.context = $0.stringValue }
+    take("noteRev") { p.noteRev = Self.int($0) ?? 0 }
+    take("notesProposal") { p.notesProposal = Self.notesProposal(from: $0) }
     take("githubRepo") { p.githubRepo = $0.stringValue }
     take("position") { p.position = Self.int($0) ?? 0 }
     return applied
+  }
+
+  private static func notesProposal(from value: BackendJSON) -> NotesProposal? {
+    guard case .object(let obj) = value,
+          let body = obj["body"]?.stringValue,
+          let agent = obj["agent"]?.stringValue,
+          let at = obj["at"]?.stringValue else {
+      return nil
+    }
+    return NotesProposal(body: body, agent: agent, at: at, why: obj["why"]?.stringValue)
   }
 
   @discardableResult
