@@ -445,10 +445,11 @@ class TaskMutator(
         return updateFields(id, mapOf(RegistryEntityFields.Task.ACKNOWLEDGED_AT to JsonValue.StringValue(WireTimestamp.format(clock.now()))))
     }
 
-    /** Review ▸ Accept (as iOS): complete the task and clear the agent cue. */
+    /** Review ▸ Accept (as iOS): complete the task, clear the agent cue, and stamp the fade clock. */
     suspend fun acceptReview(id: String): TaskRecord? {
         val done = complete(id) ?: return null
         acknowledge(id)
+        touch(id)
         return done
     }
 
@@ -457,14 +458,7 @@ class TaskMutator(
      * the user touched the task, so its fade clock restarts and it returns
      * to its list.
      */
-    suspend fun keepFaded(id: String): TaskRecord? = updateFields(
-        id,
-        linkedMapOf(
-            RegistryEntityFields.Task.TOUCHED_AT to JsonValue.StringValue(WireTimestamp.format(clock.now())),
-            RegistryEntityFields.Task.DEFER_COUNT to JsonValue.IntegerValue(0),
-            RegistryEntityFields.Task.FADED_AT to JsonValue.Null,
-        ),
-    )
+    suspend fun keepFaded(id: String): TaskRecord? = touch(id)
 
     /** Faded ▸ Let Go (spec §5, as iOS dropFaded): cancel it with dropReason "faded"; it goes to the Logbook. */
     suspend fun letGoFaded(id: String): TaskRecord? {

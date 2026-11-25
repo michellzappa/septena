@@ -71,6 +71,7 @@ internal fun TaskConversationSection(
     isTaskOpen: Boolean,
     canWrite: Boolean,
     heading: String? = null,
+    openSendBackInitially: Boolean = false,
 ) {
     val dataVersion by graph.sync.dataVersion.collectAsStateWithLifecycle()
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
@@ -80,7 +81,7 @@ internal fun TaskConversationSection(
     var replyVisible by remember(taskId) { mutableStateOf(false) }
     var otherText by remember(taskId) { mutableStateOf("") }
     var replyText by remember(taskId) { mutableStateOf("") }
-    var sendBackVisible by remember(taskId) { mutableStateOf(false) }
+    var sendBackVisible by remember(taskId, openSendBackInitially) { mutableStateOf(openSendBackInitially) }
     var sendBackText by remember(taskId) { mutableStateOf("") }
     var busy by remember(taskId) { mutableStateOf(false) }
 
@@ -181,41 +182,15 @@ internal fun TaskConversationSection(
     }
 
     /**
-     * Accept = complete the task and clear the review, as iOS does
-     * (`TaskMutator.complete` + `acknowledge`): the task is done, the
-     * conversation leaves `needs_verify` for `agent_assisted_done` (the note
-     * stays for history), and an agent-added task is acknowledged.
+     * Accept = unified path shared with Review list rows (`AndroidAppGraph.acceptReview`, #415):
+     * completes, acknowledges, stamps fade clock, sets `agent_assisted_done`, and records undo.
      */
     fun acceptReview() {
         if (!canWrite || busy) return
         scope.launch {
             busy = true
             runCatching {
-                withContext(Dispatchers.IO) {
-                    graph.captureTaskEdit(taskId) {
-                        graph.taskMutator.complete(taskId)
-                        val task = graph.taskStore.record(RegistryEntityNames.TASK, taskId)
-                        val fields = task?.fields.orEmpty()
-                        if (fields[RegistryEntityFields.Task.SOURCE].stringValue() == RegistryEntityEnums.TaskSource.MCP &&
-                            fields[RegistryEntityFields.Task.ACKNOWLEDGED_AT].stringValue() == null
-                        ) {
-                            graph.taskMutator.updateFields(
-                                taskId,
-                                mapOf(
-                                    RegistryEntityFields.Task.ACKNOWLEDGED_AT to
-                                        JsonValue.StringValue(WireTimestamp.format(graph.clock.now())),
-                                ),
-                            )
-                        }
-                    }
-                    graph.conversationMutator.update(
-                        taskId,
-                        mapOf(
-                            RegistryEntityFields.Convo.END_STATE to
-                                JsonValue.StringValue(RegistryEntityEnums.ConvoEndState.AGENT_ASSISTED_DONE),
-                        ),
-                    )
-                }
+                withContext(Dispatchers.IO) { check(graph.acceptReview(taskId)) }
             }.onSuccess {
                 sendBackVisible = false
                 graph.sync.noteLocalChange()
@@ -226,9 +201,8 @@ internal fun TaskConversationSection(
     }
 
     /**
-     * Send back = the iOS `sendBackConvo` writes: a user turn with the note, then
-     * the conversation reopens for the agent (`endState` open, no note, not
-     * stopped, assigned to Claude).
+     * Send back = unified path (`AndroidAppGraph.sendBackReview`, #412/#415):
+     * appends user turn, reopens conversation for Claude, stamps fade clock, and records undo.
      */
     fun sendBack() {
         val clean = sendBackText.trim()
@@ -236,28 +210,7 @@ internal fun TaskConversationSection(
         scope.launch {
             busy = true
             runCatching {
-                withContext(Dispatchers.IO) {
-                    graph.conversationMutator.appendTurn(
-                        taskId,
-                        mapOf(
-                            "role" to JsonValue.StringValue(RegistryEntityEnums.ConvoTurnRole.USER),
-                            "step" to JsonValue.StringValue(RegistryEntityEnums.ConvoTurnStep.WORK),
-                            "note" to JsonValue.StringValue(clean),
-                            "ts" to JsonValue.StringValue(WireTimestamp.format(graph.clock.now())),
-                        ),
-                    )
-                    graph.conversationMutator.update(
-                        taskId,
-                        mapOf(
-                            RegistryEntityFields.Convo.END_STATE to
-                                JsonValue.StringValue(RegistryEntityEnums.ConvoEndState.OPEN),
-                            RegistryEntityFields.Convo.END_STATE_NOTE to JsonValue.Null,
-                            RegistryEntityFields.Convo.STOPPED_AT to JsonValue.Null,
-                            RegistryEntityFields.Convo.ASSIGNEE to
-                                JsonValue.StringValue(RegistryEntityEnums.ConvoAssignee.CLAUDE),
-                        ),
-                    )
-                }
+                withContext(Dispatchers.IO) { check(graph.sendBackReview(taskId, clean)) }
             }.onSuccess {
                 sendBackText = ""
                 sendBackVisible = false
@@ -483,7 +436,7 @@ private fun AgentPromptField(
 }
 
 /** "2 hours ago" from a wire timestamp, or null when it is missing or unreadable. */
-private fun relativeAgo(stamp: String?): String? {
+internal fun relativeAgo(stamp: String?): String? {
     if (stamp == null) return null
     val millis = runCatching { Instant.parse(stamp).toEpochMilli() }.getOrNull() ?: return null
     return DateUtils.getRelativeTimeSpanString(millis, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
