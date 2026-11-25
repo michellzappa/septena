@@ -207,7 +207,7 @@ describe("capture without duplicates (§6.2, #496)", () => {
   it("only closed tasks have the key: a new task with a follow_up reference", async () => {
     for (const closed of [{ status: "done" }, { status: "cancelled" }, { fadedAt: "2026-11-20T10:00:00Z" }]) {
       const h = await setup();
-      const old = await h.create();
+      const old = await h.create({ origin: "user_request" });
       h.set(old.id, closed);
       const next = await h.create();
       assert.equal(next.placement, "inbox_proposal");
@@ -223,7 +223,7 @@ describe("capture without duplicates (§6.2, #496)", () => {
 
   it("a deleted task gets no stamp and no follow_up", async () => {
     const h = await setup();
-    const old = await h.create();
+    const old = await h.create({ origin: "user_request" });
     h.push(HUMAN, { op: "delete", entity: "task", id: old.id });
     const next = await h.create();
     assert.equal(next.follow_up, undefined);
@@ -250,6 +250,107 @@ describe("capture without duplicates (§6.2, #496)", () => {
     h.push(HUMAN, { op: "upsert", entity: "setting", id: "agentsPaused", fields: { value: true } });
     assert.equal((await h.create()).placement, "existing");
     assert.equal(h.seen(id), null);
+  });
+});
+
+describe("turned-down proposals (#497)", () => {
+  type Created = { id: string; placement: string; matched_keys?: string[] };
+  const MAIL = { key: "email:<a@Example.com>", role: "from" };
+  const setup = async () => {
+    const h = await harness();
+    const create = async (args: Record<string, unknown> = {}) =>
+      await h.run("tasks_create", { title: "Answer", refs: [MAIL], ...args }) as unknown as Created;
+    const set = (id: string, fields: Record<string, unknown>) => h.push(HUMAN, { op: "upsert", entity: "task", id, fields });
+    const del = (id: string, actor = HUMAN) => h.push(actor, { op: "delete", entity: "task", id });
+    const dismissed = async () => (await h.findByRef(h.rpc, MAIL.key) as { dismissed?: boolean }).dismissed === true;
+    return { ...h, create, set, del, dismissed };
+  };
+
+  it("a deleted or dropped proposal is not proposed again", async () => {
+    for (const turnDown of ["delete", "drop"] as const) {
+      const h = await setup();
+      const { id } = await h.create();
+      assert.equal(await h.dismissed(), false);
+      if (turnDown === "delete") h.del(id); else h.set(id, { status: "cancelled" });
+      assert.equal(await h.dismissed(), true);
+      const again = await h.create({ title: "Other words" });
+      assert.equal(again.placement, "dismissed");
+      assert.equal(again.id, undefined);
+      assert.deepEqual(again.matched_keys, ["email:a@example.com"]);
+      assert.equal(h.store.readTasks("open", 10).total, 0);
+    }
+  });
+
+  it("a user request and allow_duplicate are never blocked; a person's capture neither", async () => {
+    const h = await setup();
+    h.del((await h.create()).id);
+    const asked = await h.create({ origin: "user_request" });
+    assert.equal(asked.placement, "committed");
+    h.set(asked.id, { status: "done" });
+    assert.equal((await h.create()).placement, "dismissed");
+    assert.equal((await h.create({ allow_duplicate: true })).placement, "inbox_proposal");
+    // The active task wins over the memory.
+    assert.equal((await h.create()).placement, "existing");
+    const { runWriteTool } = await import("../src/shadow/writes.ts");
+    const h2 = await setup();
+    h2.del((await h2.create()).id);
+    const own = await runWriteTool(
+      { store: h2.rpc, timeZone: "UTC", actor: HUMAN, source: { source: "app", sourceClient: "orb" } },
+      "tasks_create", { title: "Mine", refs: [MAIL] },
+    ) as Created;
+    assert.ok(own.id);
+    // A person added the key to a task: the memory is gone.
+    assert.equal(await h2.dismissed(), false);
+  });
+
+  it("only a person's refusal of an unaccepted proposal counts", async () => {
+    const accepted = await setup();
+    const a = await accepted.create();
+    accepted.set(a.id, { acknowledgedAt: "2026-11-25T10:00:00Z" });
+    accepted.set(a.id, { status: "cancelled" });
+    assert.equal(await accepted.dismissed(), false);
+    const done = await setup();
+    const d = await done.create();
+    done.set(d.id, { status: "done" });
+    done.del(d.id);
+    assert.equal(await done.dismissed(), false);
+    const agent = await setup();
+    const c = await agent.create();
+    await agent.run("tasks_update", { id: c.id, status: "cancelled" });
+    assert.equal(await agent.dismissed(), false);
+  });
+
+  it("reopening the task clears the memory", async () => {
+    const h = await setup();
+    const { id } = await h.create();
+    h.set(id, { status: "cancelled" });
+    h.set(id, { status: "open" });
+    assert.equal(await h.dismissed(), false);
+    assert.equal((await h.create()).placement, "existing");
+  });
+
+  it("holds through the purge of the deleted task, for a year, with the key and the time only", async () => {
+    const h = await setup();
+    h.del((await h.create()).id);
+    h.db.exec("UPDATE tasks SET deletedAt = '2020-01-01T00:00:00Z'; UPDATE task_refs SET deletedAt = '2020-01-01T00:00:00Z'");
+    await h.store.alarm();
+    assert.equal(h.db.prepare("SELECT COUNT(*) AS n FROM tasks").get()!.n, 0);
+    assert.equal((await h.create()).placement, "dismissed");
+    const cols = h.db.prepare("PRAGMA table_info(dismissed_refs)").all().map((r) => r.name);
+    assert.deepEqual(cols, ["key", "at"]);
+    h.db.exec("UPDATE dismissed_refs SET at = '2025-01-01T00:00:00Z'");
+    await h.store.alarm();
+    assert.equal((await h.create()).placement, "inbox_proposal");
+  });
+
+  it("a new message in a turned-down thread is a new item", async () => {
+    const h = await setup();
+    const thread = { key: "thread:root@example.com", role: "from" };
+    h.del((await h.create({ refs: [MAIL, thread] })).id);
+    const next = await h.create({ refs: [{ key: "email:b@example.com", role: "from" }, thread] });
+    assert.equal(next.placement, "inbox_proposal");
+    h.set(next.id, { status: "done" });
+    assert.equal((await h.create({ refs: [thread] })).placement, "dismissed");
   });
 });
 

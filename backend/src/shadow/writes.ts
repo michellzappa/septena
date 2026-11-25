@@ -60,7 +60,7 @@ const ORDER_GAP = 1024;
 /// declarations: the generated RPC stub type recurses too deep on JSON rows.
 type StoreMethod =
   | "readTasks" | "readReviewTasks" | "readOpenQuestions" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates" | "readTaskLinks"
-  | "readTaskRefs" | "findByRef" | "newRefId"
+  | "readTaskRefs" | "findByRef" | "isDismissed" | "newRefId"
   | "readChecklistItems" | "readChecklistItem" | "readChecklistCounts"
   | "readTags" | "readTagByName"
   | "readOrderTop" | "readSetting" | "push" | "captureTask" | "claim" | "release" | "agentEvents" | "history" | "head"
@@ -618,13 +618,20 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
   let followUp: { id: string; title: string } | null = null;
   if (fromKeys.length > 0) {
     const outcome = await store.captureTask(
-      mintOps(ops), ctx.actor ?? MCP_ACTOR, { taskId: id, fromKeys, allowDuplicate: input.allow_duplicate === true },
+      mintOps(ops), ctx.actor ?? MCP_ACTOR,
+      { taskId: id, fromKeys, allowDuplicate: input.allow_duplicate === true, suggestion: !plan.committed && !ctx.source },
     );
     if (outcome.existing) {
       const { id: existingId, title, status, area, project, keys } = outcome.existing;
       return {
         id: existingId, title, placement: "existing", status,
         ...(area ? { area } : {}), ...(project ? { project } : {}), matched_keys: keys,
+      };
+    }
+    if (outcome.dismissed) {
+      return {
+        title: input.title, placement: "dismissed", matched_keys: outcome.dismissed,
+        rule: "The user turned down a proposal made from this item. Do not propose it again.",
       };
     }
     results = outcome.results;

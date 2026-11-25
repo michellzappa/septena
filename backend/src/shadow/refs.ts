@@ -74,10 +74,11 @@ export function refsOut(rows: Row[]) {
   }));
 }
 
-/// `tasks_find_by_ref`: the tasks that point at a key, active first.
+/// `tasks_find_by_ref`: the tasks that point at a key, active first, and
+/// whether the user turned down a proposal made from it.
 export async function findByRef(store: StoreRpc, input: string, limit = 50) {
   const ref = parseRefArg(input, "key");
-  const { tasks, total } = await store.findByRef(ref.key, limit);
+  const [{ tasks, total }, dismissed] = await Promise.all([store.findByRef(ref.key, limit), store.isDismissed(ref.key)]);
   return {
     key: ref.key,
     kind: ref.kind,
@@ -89,5 +90,6 @@ export async function findByRef(store: StoreRpc, input: string, limit = 50) {
       role: t.role,
     })),
     total,
+    ...(dismissed ? { dismissed: true } : {}),
   };
 }

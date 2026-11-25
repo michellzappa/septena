@@ -208,14 +208,26 @@ single-writer transaction as the insert.
 
 The same check covers agents. `tasks_create` with a `from` reference whose key
 is on an active task returns that task and `placement: "existing"`. With
-`allow_duplicate: true` it creates the task. This part is #496, and an item
-whose proposal the user turned down is #497 (ADR 0038); neither waits for
+`allow_duplicate: true` it creates the task. This part is #496 (ADR 0038) and does not wait for
 forwarded mail. Duplicate checks apply to `from`
 references only, on the new task and on the existing one. A user who adds an
 `about` reference by hand is never blocked. `tasks_create` with a `thread` key
 that is on an active task returns that task and adds no reference to it: the
 added `email` reference and the reply mark belong to forwarded mail (#388) and
 §6.3.
+
+**Turned-down items (#497, ADR 0038).** When a person deletes or cancels an
+agent proposal they never accepted (`source` `mcp`, no `acknowledgedAt`), the
+store remembers its `from` keys: the key and the time, for 365 days
+*(default)*, through the purge of the deleted task. `tasks_create` with
+`origin: "agent_suggestion"` and such a key creates nothing and returns
+`placement: "dismissed"`. `allow_duplicate: true` overrides. A `user_request`
+and a person's own capture are never blocked. An active task with the key wins:
+the answer is `existing`. A `thread` key counts only when it is the only `from`
+key, because a new message in a thread is a new item *(default)*.
+`tasks_find_by_ref` returns `dismissed: true`. Reopening the task, or a person
+adding the key to a task, clears the memory. An expired proposal (ADR 0039)
+joins with #499.
 
 ### 6.3 Thread activity
 
