@@ -128,6 +128,7 @@ enum class SeptenaIconKind {
     RecentlyDeleted,
     Area,
     Project,
+    People,
     Settings,
 }
 
@@ -1279,6 +1280,28 @@ fun PersonSmallGlyph(tint: Color, size: Dp = 12.dp, modifier: Modifier = Modifie
     }
 }
 
+/** Two people (iOS `person.2.fill`, icons.json `project.shared`): the mark of a shared project. */
+@Composable
+fun PeopleGlyph(tint: Color, size: Dp = 14.dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        fun person(center: Float, scale: Float, color: Color) {
+            drawCircle(color, radius = w * 0.17f * scale, center = Offset(w * center, h * 0.34f))
+            val half = w * 0.30f * scale
+            val shoulders = Path().apply {
+                moveTo(w * center - half, h * 0.84f)
+                quadraticTo(w * center - half, h * 0.57f, w * center, h * 0.57f)
+                quadraticTo(w * center + half, h * 0.57f, w * center + half, h * 0.84f)
+                close()
+            }
+            drawPath(shoulders, color)
+        }
+        person(center = 0.71f, scale = 0.82f, color = tint.copy(alpha = tint.alpha * 0.6f))
+        person(center = 0.36f, scale = 1f, color = tint)
+    }
+}
+
 @Composable
 fun TagSmallGlyph(tint: Color, size: Dp = 14.dp, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.size(size)) {
@@ -1562,6 +1585,7 @@ fun SeptenaGlyph(
         SeptenaIconKind.Upcoming -> CalendarSmallGlyph(tint = tint, size = size, modifier = modifier)
         SeptenaIconKind.Repeating -> RepeatSmallGlyph(tint = tint, size = size, modifier = modifier)
         SeptenaIconKind.Agent -> AgentSparkleBubbleGlyph(tint = tint, size = size, modifier = modifier)
+        SeptenaIconKind.People -> PeopleGlyph(tint = tint, size = size, modifier = modifier)
         SeptenaIconKind.Logbook -> CheckmarkGlyph(tint = tint, size = size, modifier = modifier)
         SeptenaIconKind.Today -> Canvas(modifier = modifier.size(size)) {
             val cx = this.size.width / 2f
@@ -1782,7 +1806,8 @@ fun ReviewTaskCardRow(
                             color = secondaryInk,
                         )
                     }
-                    task.reviewMeta?.takeIf(String::isNotBlank)?.let { meta ->
+                    listOfNotNull(task.reviewMeta?.takeIf(String::isNotBlank), task.assigneeName)
+                        .joinToString(" · ").takeIf(String::isNotEmpty)?.let { meta ->
                         Text(
                             text = meta,
                             fontSize = 12.5.sp,

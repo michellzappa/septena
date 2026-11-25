@@ -3,13 +3,17 @@ package app.septena.android.ui
 import android.content.Context
 import android.content.Intent
 import android.text.format.DateUtils
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -26,7 +30,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,6 +55,7 @@ import app.septena.transport.AccessHttpException
 import app.septena.transport.SeptenaShareClient
 import app.septena.transport.ShareInvite
 import app.septena.transport.SharePreview
+import app.septena.ui.PeopleGlyph
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -431,6 +444,73 @@ internal fun JoinSharedProjectDialog(
     )
 }
 
+/** What an avatar shows: typed-in initials as they are, else the first letters (Swift `ProfileAvatar`). */
+private fun initials(name: String): String {
+    val words = name.trim().split(' ').filter(String::isNotEmpty)
+    if (words.size <= 1) {
+        val token = words.firstOrNull().orEmpty()
+        return (if (token.length <= 3) token else token.take(1)).uppercase()
+    }
+    return words.take(2).joinToString("") { it.take(1) }.uppercase()
+}
+
+/** The mark of a shared project in a list. TalkBack reads the members. */
+@Composable
+internal fun SharedProjectMark(share: ProjectShare, languageTag: String, tint: Color) {
+    val label = membersLabel(share, languageTag)
+    PeopleGlyph(tint = tint, size = 15.dp, modifier = Modifier.semantics { contentDescription = label })
+}
+
+/** The members' initials at the end of a shared project's title. A tap opens Share Project. */
+@Composable
+internal fun ShareMembersRow(
+    share: ProjectShare,
+    languageTag: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val label = membersLabel(share, languageTag)
+    val shown = share.members.take(MAX_AVATARS)
+    val more = share.members.size - shown.size
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier
+            .clip(CircleShape)
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp)
+            .clearAndSetSemantics {
+                contentDescription = label
+                role = Role.Button
+                onClick { onClick(); true }
+            },
+    ) {
+        shown.forEach { MemberCircle(initials(it.name)) }
+        if (more > 0) MemberCircle("+$more")
+    }
+}
+
+@Composable
+private fun MemberCircle(text: String) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(28.dp)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+        )
+    }
+}
+
+private fun membersLabel(share: ProjectShare, languageTag: String): String =
+    "${sharingCopy(SharingCopy.members, languageTag)}: ${share.members.joinToString(", ") { it.name }}"
+
 /** Assign To: nobody or one member of the task's shared project. */
 @Composable
 internal fun AssignTaskDialog(
@@ -508,6 +588,9 @@ private fun NameField(value: String, label: String, enabled: Boolean, onChange: 
 
 private fun memberLabel(member: ShareMember, notes: List<String>): String =
     if (notes.isEmpty()) member.name else "${member.name} (${notes.joinToString(", ")})"
+
+/** How many initials a project's title shows before "+n". */
+private const val MAX_AVATARS = 3
 
 /** The server's limit on a member's name. */
 private const val MAX_MEMBER_NAME = 80

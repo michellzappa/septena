@@ -107,6 +107,7 @@ internal fun ListsHomePage(
     onCreateArea: (String) -> Unit,
     onCreateProject: (String) -> Unit,
     onJoinShared: () -> Unit,
+    onShareProject: (String) -> Unit,
     onRefresh: (suspend () -> Unit)? = null,
 ) {
     val isDark = LocalSeptenaDarkTheme.current
@@ -193,6 +194,8 @@ internal fun ListsHomePage(
                         onSelect = onSelectLocation,
                         onSetAreaEmoji = onSetAreaEmoji,
                         onOpenSettings = onOpenSettings,
+                        onShareProject = onShareProject,
+                        onJoinShared = onJoinShared,
                         onMagicPlusDropLocation = { loc ->
                             onNewTask(
                                 when (loc) {
@@ -308,6 +311,8 @@ internal fun ListsHomeContent(
     onSelect: (TaskHomeLocation) -> Unit,
     onSetAreaEmoji: (String, String?) -> Unit,
     onOpenSettings: () -> Unit,
+    onShareProject: (String) -> Unit,
+    onJoinShared: () -> Unit,
     onMagicPlusDropLocation: ((TaskHomeLocation) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -412,6 +417,8 @@ internal fun ListsHomeContent(
                     isDark = isDark,
                     hasActiveTexture = hasActiveTexture,
                     onClick = { onSelect(item.location) },
+                    onShare = { onShareProject(proj.id) },
+                    languageTag = languageTag,
                     modifier = dropMod,
                 )
             }
@@ -464,6 +471,8 @@ internal fun ListsHomeContent(
                     isDark = isDark,
                     hasActiveTexture = hasActiveTexture,
                     onClick = { onSelect(projectItem.location) },
+                    onShare = { onShareProject(proj.id) },
+                    languageTag = languageTag,
                     modifier = dropMod,
                 )
             }
@@ -495,13 +504,26 @@ internal fun ListsHomeContent(
 
         // 5. Settings row on permanent tablet sidebar (mobile has Settings gear in the top bar).
         if (showSettingsRow) {
+            item(key = "sidebar-join-shared") {
+                CompactSidebarSmartRow(
+                    iconKind = SeptenaIconKind.People,
+                    iconTint = mutedIcon,
+                    title = RegistryCatalog.actionTitle(RegistryActionIds.SIDEBAR_JOIN_SHARED, languageTag = languageTag).orEmpty(),
+                    count = null,
+                    position = TaskCardPosition.Top,
+                    isSelected = false,
+                    isDark = isDark,
+                    hasActiveTexture = hasActiveTexture,
+                    onClick = onJoinShared,
+                )
+            }
             item(key = "sidebar-settings") {
                 CompactSidebarSmartRow(
                     iconKind = SeptenaIconKind.Settings,
                     iconTint = mutedIcon,
                     title = settingsTitle,
                     count = null,
-                    position = TaskCardPosition.Solo,
+                    position = TaskCardPosition.Bottom,
                     isSelected = false,
                     isDark = isDark,
                     hasActiveTexture = hasActiveTexture,
@@ -696,6 +718,7 @@ private fun CompactSidebarAreaRow(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CompactSidebarProjectRow(
     item: TaskHomeNavigationItem,
@@ -704,8 +727,12 @@ private fun CompactSidebarProjectRow(
     isDark: Boolean,
     hasActiveTexture: Boolean,
     onClick: () -> Unit,
+    onShare: () -> Unit,
+    languageTag: String,
     modifier: Modifier = Modifier,
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
     TaskCardSlice(
         position = position,
         isSelected = isSelected,
@@ -713,36 +740,50 @@ private fun CompactSidebarProjectRow(
         hasActiveTexture = hasActiveTexture,
         modifier = modifier,
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = SIDEBAR_ROW_HEIGHT)
-                .clickable(onClick = onClick)
-                .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 6.dp),
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.width(24.dp),
+        Box {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = SIDEBAR_ROW_HEIGHT)
+                    .combinedClickable(onClick = onClick, onLongClick = { menuExpanded = true })
+                    .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 6.dp),
             ) {
-                ProjectProgressRingGlyph(
-                    progress = item.progress,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
-                    size = 17.dp,
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.width(24.dp),
+                ) {
+                    ProjectProgressRingGlyph(
+                        progress = item.progress,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                        size = 17.dp,
+                    )
+                }
+                Text(
+                    text = item.title.orEmpty(),
+                    fontSize = 15.5.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                item.share?.let {
+                    SharedProjectMark(it, languageTag, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                }
+                SidebarCountText(item.count)
+            }
+            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                DropdownMenuItem(
+                    text = { Text(RegistryCatalog.actionTitle(RegistryActionIds.PROJECT_SHARE, languageTag = languageTag).orEmpty()) },
+                    onClick = {
+                        menuExpanded = false
+                        onShare()
+                    },
                 )
             }
-            Text(
-                text = item.title.orEmpty(),
-                fontSize = 15.5.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.Normal,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            SidebarCountText(item.count)
         }
     }
 }

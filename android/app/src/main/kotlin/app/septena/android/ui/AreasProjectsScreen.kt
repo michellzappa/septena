@@ -110,11 +110,16 @@ fun AreasProjectsScreen(
     var shareOpen by rememberSaveable(destination.key) { mutableStateOf(false) }
     var emojiPickerOpen by rememberSaveable(destination.key) { mutableStateOf(false) }
     var notesDraft by rememberSaveable(destination.key) { mutableStateOf("") }
+    // The text the draft was loaded from: what a save was made from (§5a of the sharing spec).
+    var notesBase by rememberSaveable(destination.key) { mutableStateOf("") }
     var notesFocused by remember(destination.key) { mutableStateOf(false) }
 
     LaunchedEffect(destination) { viewModel.select(destination) }
     LaunchedEffect(state.destination, state.notes) {
-        if (!notesFocused) notesDraft = state.notes
+        if (!notesFocused) {
+            notesDraft = state.notes
+            notesBase = state.notes
+        }
     }
     LaunchedEffect(newSectionTrigger) {
         if (newSectionTrigger > 0 && destination is AreasProjectsDestination.Project) {
@@ -123,11 +128,11 @@ fun AreasProjectsScreen(
     }
 
     val latestNotesDraft by rememberUpdatedState(notesDraft)
-    val latestSavedNotes by rememberUpdatedState(state.notes)
+    val latestNotesBase by rememberUpdatedState(notesBase)
     DisposableEffect(destination.key) {
         onDispose {
-            if (latestNotesDraft != latestSavedNotes) {
-                viewModel.saveNotes(latestNotesDraft)
+            if (latestNotesDraft != latestNotesBase) {
+                viewModel.saveNotes(latestNotesDraft, latestNotesBase)
             }
         }
     }
@@ -170,7 +175,11 @@ fun AreasProjectsScreen(
                 // Borderless glass Notes card (auto-saves on blur & leave, quiet Save link while dirty).
                 item(key = "place-notes") {
                     val notesLabel = surfaceText(RegistryTaskAttributeIds.NOTES, "label", languageTag)
-                    val notesDirty = notesDraft != state.notes
+                    val notesDirty = notesDraft != notesBase
+                    val saveNotes = {
+                        viewModel.saveNotes(notesDraft, notesBase)
+                        notesBase = notesDraft
+                    }
                     TaskCardSlice(
                         position = TaskCardPosition.Solo,
                         isSelected = false,
@@ -190,8 +199,14 @@ fun AreasProjectsScreen(
                                     languageTag = languageTag,
                                     focused = notesFocused,
                                     onFocusedChange = { focused ->
-                                        if (notesFocused && !focused && notesDraft != state.notes) {
-                                            viewModel.saveNotes(notesDraft)
+                                        if (notesFocused && !focused) {
+                                            if (notesDraft != notesBase) {
+                                                saveNotes()
+                                            } else {
+                                                // Nothing typed: show what came in meanwhile.
+                                                notesDraft = state.notes
+                                                notesBase = state.notes
+                                            }
                                         }
                                         notesFocused = focused
                                     },
@@ -209,7 +224,7 @@ fun AreasProjectsScreen(
                                         color = accent,
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(6.dp))
-                                            .clickable { viewModel.saveNotes(notesDraft) }
+                                            .clickable { saveNotes() }
                                             .padding(horizontal = 6.dp, vertical = 2.dp),
                                     )
                                 }
@@ -362,6 +377,7 @@ fun AreasProjectsScreen(
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.weight(1f),
                                     )
+                                    project.share?.let { SharedProjectMark(it, languageTag, tint = mutedInk.copy(alpha = 0.7f)) }
                                     if (project.openCount > 0) {
                                         Text(
                                             text = project.openCount.toString(),

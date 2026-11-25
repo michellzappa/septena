@@ -14,6 +14,7 @@ import app.septena.core.SyncWireCodec
 import app.septena.core.TaskStore
 import app.septena.core.WireTimestamp
 import app.septena.core.stringValue
+import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.store.db.SeptenaDatabase
 import app.septena.sharedcore.CoreException
@@ -450,8 +451,15 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
     private fun enqueueUpsert(operation: SyncOperation.Upsert, notBefore: Instant) {
         val last = queries.selectLastRowOperation(operation.entity, operation.id).executeAsOneOrNull()
         if (last != null && last.kind == "upsert" && last.sent == 0L) {
-            val mergedFields = parseObject(last.payloadJson) + operation.fields
-            val merged = operation.copy(clientOpId = last.clientOpId, fields = mergedFields)
+            val lastFields = parseObject(last.payloadJson)
+            val mergedFields = lastFields + operation.fields
+            // The queued write holds the notes the server knows; its base is the older one.
+            val base = if (RegistryEntityFields.Task.NOTES in lastFields) {
+                (SyncWireCodec.decodeOperation(last.operationJson) as? SyncOperation.Upsert)?.base
+            } else {
+                operation.base
+            }
+            val merged = operation.copy(clientOpId = last.clientOpId, fields = mergedFields, base = base)
             queries.updateUnsentOutbox(
                 op_json = SyncWireCodec.encodeOperation(merged).canonicalJson(),
                 payload_json = encodeObject(mergedFields),
