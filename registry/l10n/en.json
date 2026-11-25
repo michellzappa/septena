@@ -2267,6 +2267,12 @@
       "surfaces.prompts.text.conversationOther.title"
     ]
   },
+  "Overdue": {
+    "text": "Overdue",
+    "paths": [
+      "surfaces.taskDateBoard.overdue.label"
+    ]
+  },
   "Overdue app icon badge": {
     "text": "Overdue app icon badge",
     "paths": [
