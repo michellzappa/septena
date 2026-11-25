@@ -29,7 +29,8 @@ another task. Each pointer is a **reference**:
 
 Each client turns the key into "open it here".
 
-A task without references shows no reference UI.
+A task without references shows Add Reference on its task page, and the links
+of its text as suggestions (§8). It shows no other reference UI.
 
 ## 2. References and linked projects
 
@@ -304,17 +305,25 @@ thin clients (`backend/src/api/tasksRest.ts`) gets the same fields.
   attachments. The inline editor shows the rows above the pills, with no
   heading and no add row. One
   row per reference: kind icon, title, subtitle. A tap opens it. The context
-  menu has Open, Copy Link, Remove. The block is absent on a task with no
-  references, except through "Add Reference" in the task's menu.
+  menu has Open, Copy Link, Remove. The full task page always shows the block
+  with its Add Reference row (mz, 2026-11-25). A deleted task has no Add
+  Reference. The inline editor shows no row on a task with no references.
+- **Suggestions:** an open task shows each link of its title and notes that is
+  not a reference yet as a faint chip with a plus, after the rows, in the
+  inline editor and on the page. Android has the page only. One tap adds the
+  reference. At most 3 show (`taskReferences.add.suggestions.max`), and none
+  past the limit of the task. The chips follow the text after a pause in
+  typing. There is no dismiss: a link that stays in the text stays a suggestion.
 - An `email` and a `thread` reference to the same conversation show as one
   row.
 - **Task row:** one quiet icon when the task has a `from` reference, and the
   "New reply" mark. No chips in v1.
-- **Add:** paste a URL or a `message://` link into "Add Reference". The panel
-  first offers the links that are already in the task's title and notes, one
-  tap each. Septena never turns a link in the notes into a reference on its
-  own, and adding one leaves the notes as they are. On the Mac (R4), drag a
-  mail from Apple Mail, or a link from a browser, onto a task row or the page.
+- **Add:** "Add Reference" is in the task's menu and on the task page, on every
+  platform. Paste a URL or a `message://` link into it. The panel also offers
+  every link that is already in the task's title and notes, one tap each.
+  Septena never turns a link in the notes into a reference on its own, and
+  adding one leaves the notes as they are. On the Mac (R4), drag a mail from
+  Apple Mail, or a link from a browser, onto a task row or the page.
 - **Row title:** `snapshot.title`. Without one: `owner/repo#n` for an issue,
   host and path for a URL, the kind's label for the rest. The client never
   fetches a title from the network. Without a subtitle, the row shows the
