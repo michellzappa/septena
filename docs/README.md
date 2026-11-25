@@ -78,6 +78,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [GITHUB_SPEC.md](GITHUB_SPEC.md) | dropped (ADR 0033) |
 | [TASK_REFERENCES_SPEC.md](TASK_REFERENCES_SPEC.md) | building (ADR 0031, ADR 0033; first release #386, #387) |
 | [PROJECT_SHARING_SPEC.md](PROJECT_SHARING_SPEC.md) | accepted |
+| [PUBLIC_LINKS_SPEC.md](PUBLIC_LINKS_SPEC.md) | proposal (#22, phase S4 of project sharing) |
 | [TASK_FACTORY_SPEC.md](TASK_FACTORY_SPEC.md) | accepted |
 | [TASK_FADE_SPEC.md](TASK_FADE_SPEC.md) | accepted (§6 amended by ADR 0014) |
 | [INBOX_ZERO_MOTION_SPEC.md](INBOX_ZERO_MOTION_SPEC.md) | accepted (#298) |
