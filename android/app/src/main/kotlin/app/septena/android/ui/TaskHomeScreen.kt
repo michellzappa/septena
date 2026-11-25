@@ -67,11 +67,18 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.septena.android.AndroidAppGraph
+import app.septena.android.calendar.AndroidCalendarReader
+import app.septena.android.widgets.WidgetLaunchAction
+import app.septena.core.JsonValue
+import app.septena.core.generated.RegistrySettingKeys
+import app.septena.core.stringValue
+import app.septena.ui.CalendarAgendaRow
 import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryDestinationIds
+import app.septena.core.generated.RegistryNoticeIds
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.ui.CheckmarkGlyph
@@ -97,9 +104,14 @@ import kotlinx.coroutines.withContext
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun TaskHomeScreen(graph: AndroidAppGraph) {
+fun TaskHomeScreen(
+    graph: AndroidAppGraph,
+    launchAction: WidgetLaunchAction? = null,
+    onConsumeLaunchAction: () -> Unit = {},
+) {
     var openedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var openedTaskAttribute by rememberSaveable { mutableStateOf<String?>(null) }
+    var openedTaskSendBack by rememberSaveable { mutableStateOf(false) }
     var quickFindOpen by rememberSaveable { mutableStateOf(false) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     // On mobile, opens on Today with the Lists Homepage one Back away (Things / iOS `SeptaskRootView`).
@@ -111,6 +123,36 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
     val selectHomeLocation: (TaskHomeLocation) -> Unit = { location ->
         homeViewModel.select(location)
         showingListsHome = false
+    }
+    LaunchedEffect(launchAction) {
+        when (launchAction) {
+            null -> Unit
+            is WidgetLaunchAction.OpenDestination -> {
+                settingsOpen = false
+                quickFindOpen = false
+                openedTaskId = null
+                openedTaskAttribute = null
+                selectHomeLocation(TaskHomeLocation.SmartList(launchAction.destinationId))
+                onConsumeLaunchAction()
+            }
+            is WidgetLaunchAction.OpenTask -> {
+                settingsOpen = false
+                quickFindOpen = false
+                launchAction.destinationId?.let { selectHomeLocation(TaskHomeLocation.SmartList(it)) }
+                openedTaskId = launchAction.taskId
+                openedTaskAttribute = null
+                onConsumeLaunchAction()
+            }
+            is WidgetLaunchAction.QuickAdd -> {
+                settingsOpen = false
+                quickFindOpen = false
+                openedTaskId = null
+                openedTaskAttribute = null
+                showingListsHome = false
+                homeQuickAddDraft = QuickAddDraft(today = launchAction.today)
+                onConsumeLaunchAction()
+            }
+        }
     }
     val undoSnackbarHostState = remember { SnackbarHostState() }
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
@@ -131,6 +173,12 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
     val openTaskWithAttribute: (String, String?) -> Unit = { id, attribute ->
         openedTaskId = id
         openedTaskAttribute = attribute
+        openedTaskSendBack = false
+    }
+    val openTaskSendBack: (String) -> Unit = { id ->
+        openedTaskId = id
+        openedTaskAttribute = null
+        openedTaskSendBack = true
     }
     val onTaskAction: (String, String) -> Unit = { id, actionId ->
         when {
@@ -149,6 +197,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
             actionId == RegistryActionIds.TASK_DELETE -> homeViewModel.delete(id)
             actionId == RegistryActionIds.TASK_RESTORE -> homeViewModel.restore(id)
             actionId == RegistryActionIds.TASK_ACCEPT_REVIEW -> homeViewModel.acceptReview(id)
+            actionId == RegistryActionIds.TASK_SEND_BACK_REVIEW -> openTaskSendBack(id)
             actionId == RegistryActionIds.TASK_KEEP_FADED -> homeViewModel.keepFaded(id)
             actionId == RegistryActionIds.TASK_LET_GO_FADED -> homeViewModel.letGoFaded(id)
             actionId == RegistryActionIds.TASK_SELECT -> homeViewModel.toggleSelection(id)
@@ -177,7 +226,9 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
             )
             if (result == SnackbarResult.ActionPerformed) {
                 val undone = runCatching {
-                    withContext(Dispatchers.IO) { graph.taskUndoHistory.undo(graph.taskMutator) }
+                    withContext(Dispatchers.IO) {
+                        graph.taskUndoHistory.undo(graph.taskMutator, graph.conversationMutator)
+                    }
                 }.getOrDefault(false)
                 if (undone) {
                     graph.sync.noteLocalChange()
@@ -316,8 +367,10 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                     TaskDetailScreen(
                         graph,
                         openedTaskId!!,
-                        onBack = { openedTaskId = null; openedTaskAttribute = null },
+                        onBack = { openedTaskId = null; openedTaskAttribute = null; openedTaskSendBack = false },
                         initialAttribute = openedTaskAttribute,
+                        onOpenTask = { openTaskWithAttribute(it, null) },
+                        openSendBackInitially = openedTaskSendBack,
                     )
                 } else {
                     TaskHomeScaffold(
@@ -342,6 +395,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         rowMenuGroups = rowMenuGroups,
                         rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                         onOpenTask = { openTaskWithAttribute(it, null) },
+                        onSendBackReview = openTaskSendBack,
                         onTaskAction = onTaskAction,
                         onToggleStarFilter = homeViewModel::toggleStarFilter,
                         onQuickFind = { quickFindOpen = true },
@@ -367,8 +421,10 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                 TaskDetailScreen(
                     graph,
                     openedTaskId!!,
-                    onBack = { openedTaskId = null; openedTaskAttribute = null },
+                    onBack = { openedTaskId = null; openedTaskAttribute = null; openedTaskSendBack = false },
                     initialAttribute = openedTaskAttribute,
+                    onOpenTask = { openTaskWithAttribute(it, null) },
+                    openSendBackInitially = openedTaskSendBack,
                 )
             } else if (showingListsHome) {
                 ListsHomePage(
@@ -413,6 +469,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                     rowMenuGroups = rowMenuGroups,
                     rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                     onOpenTask = { openTaskWithAttribute(it, null) },
+                    onSendBackReview = openTaskSendBack,
                     onTaskAction = onTaskAction,
                     onToggleStarFilter = homeViewModel::toggleStarFilter,
                     onQuickFind = { quickFindOpen = true },
@@ -723,6 +780,7 @@ private fun TaskHomeScaffold(
     rowMenuAccessibilityLabel: String,
     onComplete: (String) -> Unit,
     onOpenTask: (String) -> Unit,
+    onSendBackReview: (String) -> Unit,
     onTaskAction: (String, String) -> Unit,
     onToggleStarFilter: () -> Unit,
     onQuickFind: () -> Unit,
@@ -734,9 +792,13 @@ private fun TaskHomeScaffold(
     var newSectionTrigger by remember { mutableIntStateOf(0) }
     var selectionPicker by remember { mutableStateOf<SelectionPicker?>(null) }
     var allOnToday by remember { mutableStateOf(false) }
+    var activeSweepItems by remember { mutableStateOf<List<FadeSweepItem>?>(null) }
     val magicPlusDrag = remember { MagicPlusDragState() }
     val reorderDrag = remember { TaskReorderDragState() }
     val context = LocalContext.current
+    val dataVersion by graph.sync.dataVersion.collectAsStateWithLifecycle()
+    val deviceSettingsVersion by graph.deviceSettings.changes.collectAsStateWithLifecycle()
+    var calendarEvents by remember { mutableStateOf<List<CalendarAgendaRow>>(emptyList()) }
     val isDark = LocalSeptenaDarkTheme.current
     val appearance = LocalAppearance.current
     val selecting = state.selectedIds.isNotEmpty()
@@ -764,6 +826,43 @@ private fun TaskHomeScaffold(
     LaunchedEffect(state.location) {
         if (!magicPlusDrag.isDragging) magicPlusDrag.reset()
         if (!reorderDrag.isDragging) reorderDrag.reset()
+    }
+    LaunchedEffect(destinationId, dataVersion, deviceSettingsVersion, languageTag) {
+        val isTodayOrUpcoming = destinationId == RegistryDestinationIds.TODAY ||
+            destinationId == RegistryDestinationIds.UPCOMING
+        if (!isTodayOrUpcoming || !AndroidCalendarReader.hasPermission(context)) {
+            calendarEvents = emptyList()
+            return@LaunchedEffect
+        }
+        calendarEvents = withContext(Dispatchers.IO) {
+            if (!graph.deviceSettings.bool(RegistrySettingKeys.TASKS_SHOW_CALENDAR_EVENTS)) {
+                return@withContext emptyList()
+            }
+            val hidden = (graph.syncedSettings.value(RegistrySettingKeys.CALENDAR_HIDDEN_TITLES) as? JsonValue.ArrayValue)
+                ?.values.orEmpty()
+                .mapNotNull { it.stringValue() }
+                .toSet()
+            val today = graph.clock.today(graph.clock.now())
+            if (destinationId == RegistryDestinationIds.TODAY) {
+                AndroidCalendarReader.loadAgendaRows(
+                    context = context,
+                    startDay = today,
+                    dayCount = 1,
+                    hiddenTitles = hidden,
+                    includeDayLabel = false,
+                    languageTag = languageTag,
+                )
+            } else {
+                AndroidCalendarReader.loadAgendaRows(
+                    context = context,
+                    startDay = today.plusDays(1),
+                    dayCount = 7,
+                    hiddenTitles = hidden,
+                    includeDayLabel = true,
+                    languageTag = languageTag,
+                )
+            }
+        }
     }
     BackHandler(enabled = selecting) { homeViewModel.clearSelection() }
 
@@ -829,6 +928,23 @@ private fun TaskHomeScaffold(
         null -> Unit
     }
 
+    activeSweepItems?.let { itemsToSweep ->
+        val keepLabel = remember(languageTag) {
+            RegistryCatalog.actionTitle(RegistryActionIds.TASK_KEEP_FADED, languageTag = languageTag).orEmpty()
+        }
+        TaskFadeSweepSheet(
+            items = itemsToSweep,
+            keepTitle = keepLabel,
+            languageTag = languageTag,
+            isDark = isDark,
+            hasActiveTexture = appearance.hasActiveTexture,
+            onKeep = homeViewModel::keepFaded,
+            onLetRestGo = homeViewModel::letGoFadedBatch,
+            onMarkCompleted = homeViewModel::markSweepCompleted,
+            onDismiss = { activeSweepItems = null },
+        )
+    }
+
     val sectionHeader: @Composable () -> Unit = {
         SectionTitleDropdownHeader(
             state = state,
@@ -838,6 +954,39 @@ private fun TaskHomeScaffold(
             onSelectLocation = onSelectHomeLocation,
             onOpenSettings = onOpenSettings,
         )
+        if (destinationId == RegistryDestinationIds.TODAY &&
+            state.showWeeklySweepBanner &&
+            state.weeklySweepItems.isNotEmpty()
+        ) {
+            val notice = remember(languageTag, state.weeklySweepItems.size) {
+                registryNoticeCopy(RegistryNoticeIds.WEEKLY_SWEEP, languageTag, state.weeklySweepItems.size)
+            }
+            val bannerMessage = listOf(notice.title, notice.detail).filter(String::isNotBlank).joinToString(". ")
+            FadeSweepBannerCard(
+                message = bannerMessage,
+                reviewLabel = notice.primaryTitle,
+                dismissLabel = fadeSweepText("dismissTitle", languageTag),
+                isDark = isDark,
+                hasActiveTexture = appearance.hasActiveTexture,
+                onReview = { activeSweepItems = state.weeklySweepItems },
+                onDismiss = homeViewModel::dismissWeeklySweepBanner,
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
+        } else if (destinationId == RegistryDestinationIds.FADED && state.fadedSweepItems.isNotEmpty()) {
+            val notice = remember(languageTag) {
+                registryNoticeCopy(RegistryNoticeIds.FADED_PILE, languageTag)
+            }
+            val bannerMessage = listOf(notice.title, notice.detail).filter(String::isNotBlank).joinToString(" · ")
+            FadeSweepBannerCard(
+                message = bannerMessage,
+                reviewLabel = notice.primaryTitle,
+                dismissLabel = null,
+                isDark = isDark,
+                hasActiveTexture = appearance.hasActiveTexture,
+                onReview = { activeSweepItems = state.fadedSweepItems },
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
+        }
     }
 
     // Grouped canvas background so translucent glass task cards lift gently off the
@@ -981,6 +1130,15 @@ private fun TaskHomeScaffold(
                     )
                     is TaskHomeLocation.SmartList -> {
                         val isTodayList = location.destinationId == RegistryDestinationIds.TODAY
+                        val isReviewList = location.destinationId == RegistryDestinationIds.REVIEW
+                        val reviewAcceptTitle = remember(languageTag) {
+                            RegistryCatalog.actionTitle(RegistryActionIds.TASK_ACCEPT_REVIEW, languageTag = languageTag)
+                                ?.takeIf(String::isNotBlank) ?: "Accept"
+                        }
+                        val reviewSendBackTitle = remember(languageTag) {
+                            RegistryCatalog.actionTitle(RegistryActionIds.TASK_SEND_BACK_REVIEW, languageTag = languageTag)
+                                ?.takeIf(String::isNotBlank) ?: "Send back"
+                        }
                         val canReorderList = location.destinationId in setOf(
                             RegistryDestinationIds.TODAY,
                             RegistryDestinationIds.INBOX,
@@ -1005,6 +1163,7 @@ private fun TaskHomeScaffold(
                             isToday = isTodayList,
                             inboxTasks = state.inboxTasks,
                             tasks = state.tasks,
+                            calendarEvents = calendarEvents,
                             canQuickAdd = state.canQuickAdd,
                             canComplete = state.canComplete,
                             errorMessage = state.errorMessage,
@@ -1091,6 +1250,11 @@ private fun TaskHomeScaffold(
                                 }
                             } else null,
                             onApplyFilingSuggestion = homeViewModel::applyFilingSuggestion,
+                            isReviewList = isReviewList,
+                            reviewAcceptTitle = reviewAcceptTitle,
+                            reviewSendBackTitle = reviewSendBackTitle,
+                            onAcceptReview = if (isReviewList) homeViewModel::acceptReview else null,
+                            onSendBackReview = if (isReviewList) onSendBackReview else null,
                         )
                     }
                 }

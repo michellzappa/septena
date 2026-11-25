@@ -20,6 +20,7 @@ object TaskPageBlockKinds {
     const val ATTRIBUTES: String = "attributes"
     const val CHECKLIST: String = "checklist"
     const val ATTACHMENTS: String = "attachments"
+    const val REFERENCES: String = "references"
     const val CONVERSATION: String = "conversation"
     const val PROVENANCE: String = "provenance"
     const val HISTORY: String = "history"

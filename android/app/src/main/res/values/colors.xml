@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_surface">#F2FFFFFF</color>
+    <color name="widget_border">#1A000000</color>
+    <color name="widget_text_primary">#1C1B1F</color>
+    <color name="widget_text_secondary">#737178</color>
+    <color name="widget_checkbox_stroke">#4A1C1B1F</color>
+    <color name="widget_accent">#D9643A</color>
+    <color name="widget_today_gold">#E2A400</color>
+    <color name="widget_overdue_red">#FF3B30</color>
+    <color name="widget_divider">#14000000</color>
+</resources>

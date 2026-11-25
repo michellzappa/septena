@@ -75,6 +75,18 @@ android {
         debug {
             signingConfig = signingConfigs.findByName("tester") ?: signingConfigs.getByName("debug")
         }
+        release {
+            // R8 shrinking + ART-friendly optimization makes cold boot and Compose
+            // scroll noticeably faster than debug. Signed with the same tester key so
+            // adb install -r updates an installed device build in place.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.findByName("tester") ?: signingConfigs.getByName("debug")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+        }
     }
 
     buildFeatures {

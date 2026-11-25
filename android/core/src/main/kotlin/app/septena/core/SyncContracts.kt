@@ -94,6 +94,7 @@ interface SyncTransport {
         includeSettings: Boolean = true,
         includeChecklists: Boolean = true,
         includeTags: Boolean = true,
+        includeRefs: Boolean = true,
     ): SyncPullPage
 }
 

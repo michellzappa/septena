@@ -8,16 +8,16 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 53 | 54 | 54 | 0 | 44 | 0 | 1 |
-| partial | 1 | 1 | 1 | 0 | 3 | 0 | 3 |
-| planned | 0 | 0 | 0 | 51 | 6 | 54 | 1 |
+| ships | 53 | 54 | 54 | 0 | 50 | 0 | 1 |
+| partial | 1 | 1 | 1 | 0 | 2 | 0 | 3 |
+| planned | 0 | 0 | 0 | 51 | 1 | 54 | 1 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 53 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|---|
 | `lists.inbox` | Inbox band on Today | ships | ships | ships | planned | ships | planned | partial |
 | `lists.today` | Today | ships | ships | ships | planned | ships | planned | partial |
-| `lists.review` | Review (needs_verify) | ships | ships | ships | planned | partial | planned | - |
+| `lists.review` | Review (needs_verify) | ships | ships | ships | planned | ships | planned | - |
 | `lists.agent` | Agent (claimed and assigned work by stage) | ships | ships | ships | planned | ships | planned | - |
 | `lists.upcoming` | Upcoming | ships | ships | ships | planned | ships | planned | - |
 | `lists.anytime` | Anytime | ships | ships | ships | planned | ships | planned | - |
@@ -33,7 +33,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `task.repeat` | Repeat from schedule or after completion, pause | ships | ships | ships | planned | ships | planned | - |
 | `task.notes` | Notes | ships | ships | ships | planned | ships | planned | - |
 | `task.attachments` | Attachments | ships | ships | ships | planned | ships | planned | - |
-| `task.references` | References: the email, link, issue or task that a task is about | ships | ships | ships | planned | planned | planned | - |
+| `task.references` | References: the email, link, issue or task that a task is about | ships | ships | ships | planned | ships | planned | - |
 | `task.history` | Per-task change history | ships | ships | ships | planned | ships | planned | - |
 | `task.provenance` | Who added a task: you or a named agent, on the row and the task page | ships | ships | ships | planned | ships | planned | - |
 | `task.aging` | Aging fade across open lists | ships | ships | ships | planned | ships | planned | - |
@@ -41,7 +41,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `task.tags` | Tags | ships | ships | ships | planned | ships | planned | - |
 | `task.share` | Share a task (title and notes) through the system share sheet | ships | ships | ships | planned | ships | planned | - |
 | `task.alerts` | Timed reminders | ships | ships | ships | planned | ships | planned | - |
-| `fade.sweep` | Fade pass, Faded pile and weekly sweep | ships | ships | ships | planned | planned | planned | - |
+| `fade.sweep` | Fade pass, Faded pile and weekly sweep | ships | ships | ships | planned | ships | planned | - |
 | `capture.quick-add` | Quick Add sheet | ships | ships | - | planned | ships | - | - |
 | `capture.share-target` | Share into Inbox | ships | ships | - | planned | ships | planned | - |
 | `capture.quick-entry` | Quick Entry global panel | - | - | ships | - | - | planned | - |
@@ -52,7 +52,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `task.page` | Task page (ADR 0029) | partial | partial | partial | planned | partial | planned | partial |
 | `mac.keyboard` | Keyboard-first shortcuts | - | ships | ships | planned | planned | planned | - |
 | `mac.updates` | In-app updates (Sparkle) | - | - | ships | - | - | planned | - |
-| `calendar.events` | Calendar events in Today and Upcoming | ships | ships | ships | planned | planned | planned | - |
+| `calendar.events` | Calendar events in Today and Upcoming | ships | ships | ships | planned | ships | planned | - |
 | `import.reminders` | Apple Reminders into Inbox | ships | ships | ships | - | - | - | - |
 | `import.things` | One-time Things import | ships | ships | ships | - | - | - | - |
 | `ai.discuss` | Discuss: conversation on one task | ships | ships | ships | planned | partial | planned | - |
@@ -63,8 +63,8 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `sync.backend` | Sync through api.septena.app | ships | ships | ships | planned | ships | planned | planned |
 | `account.delete` | Delete account | ships | ships | ships | planned | ships | planned | - |
 | `task.times` | Start time and duration on a task | ships | ships | ships | planned | ships | planned | - |
-| `calendar.feed` | Private read-only calendar feed (.ics) | ships | ships | ships | planned | planned | planned | - |
-| `widgets.tasks` | Today and Upcoming widgets | ships | ships | ships | - | planned | planned | - |
+| `calendar.feed` | Private read-only calendar feed (.ics) | ships | ships | ships | planned | ships | planned | - |
+| `widgets.tasks` | Today and Upcoming widgets | ships | ships | ships | - | ships | planned | - |
 | `watch.app` | Apple Watch app | - | - | - | - | - | - | ships |
 | `data.import-export` | Export as JSON, Markdown or CSV; import JSON with a preview | ships | ships | ships | planned | ships | planned | - |
 | `agents.list` | Connected agents: list, name, disconnect | ships | ships | ships | planned | ships | planned | - |

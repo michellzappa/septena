@@ -16,6 +16,7 @@
 		0279B66F04268EDFD7B9AC4A /* TaskUndoTicket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E6BA6F8865BD6A96D05C582 /* TaskUndoTicket.swift */; };
 		0334CA039B2F5D53DC0F845C /* TaskFilingSuggestions.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2E41573FA5B00CD2EE03D0C /* TaskFilingSuggestions.swift */; };
 		0375AEDBD582C916EF24AF0C /* TaskBackendMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 919763EDD2BA63D67D1DCDDA /* TaskBackendMapping.swift */; };
+		03874534601B525FE5CE78F5 /* InboxZeroMotionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848DDE187C15BD58B3C75DEB /* InboxZeroMotionTests.swift */; };
 		03C4CA87758EB04E25302339 /* FoundationModels.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9E48AFEC976A22FEF321AE70 /* FoundationModels.framework */; };
 		03FE984F48F40345769DC87C /* TaskSkeletonRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E4AE9CBCCAE88A87B1F4922 /* TaskSkeletonRows.swift */; };
 		040E2C3D6765F615206E242F /* SeptaskKitInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22F94B0225EF005138F2C466 /* SeptaskKitInspector.swift */; };
@@ -57,6 +58,7 @@
 		1AD3B538EE5A3CF7ADA305C8 /* TasksWidgetIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4E616A4E568573A7B74D78B /* TasksWidgetIntents.swift */; };
 		1BB8244B5CCC340A041A3703 /* TaskRefRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D79AB17B783575E9EBC41B7 /* TaskRefRows.swift */; };
 		1BFCE6DAA43439C3F60AFAEA /* ImportApplier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C242027E9C714DCFEC355188 /* ImportApplier.swift */; };
+		1C39D8D89439B9E8C7DFECF5 /* InboxZeroMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F953BF39B6F5DE399F5B433 /* InboxZeroMotion.swift */; };
 		1C4A9F66ED3956368E492E51 /* TaskHistorySection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F367B45111BCD92DD817039 /* TaskHistorySection.swift */; };
 		1CFEC78AD7FC12536E52B09A /* TasksTodayComplicationData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C06A1D1AB36E3778302425C /* TasksTodayComplicationData.swift */; };
 		1D8C6EEB0864DC1954680F28 /* AIModelTag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CE066849A08E248408104E3 /* AIModelTag.swift */; };
@@ -290,6 +292,7 @@
 		863CF29EE74C2A5927F3A143 /* FoundationModels.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9E48AFEC976A22FEF321AE70 /* FoundationModels.framework */; };
 		86A912D92FA28478C0CF3B22 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD038CA592ABBBE534D29BB /* SidebarView.swift */; };
 		86B10FA26DC181024D121B3C /* ResponseCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */; };
+		8717A679989DBAD819B58967 /* InboxZeroMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F953BF39B6F5DE399F5B433 /* InboxZeroMotion.swift */; };
 		8806DFB6B81DCE27EC7902EF /* SeptaskPushNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = C39970A193FE3B989D142F21 /* SeptaskPushNotifications.swift */; };
 		88790104556643072214C419 /* CalendarEventRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E76BB68C1E939296A1D7857C /* CalendarEventRow.swift */; };
 		887EB26661C20400EE20C802 /* SeptaskSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = A889F3FA8540DB935D2F2F55 /* SeptaskSignIn.swift */; };
@@ -413,6 +416,7 @@
 		C198BDE12989B374F22532AA /* TaskSyncApply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6066BCBF19FFC0F308332140 /* TaskSyncApply.swift */; };
 		C23DB117D9740A048D5DA42B /* TaskReads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBF0DAD74F9392D507229CE /* TaskReads.swift */; };
 		C249F4333211620355AC9D66 /* SelectionLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C376673AF35159635AFCE207 /* SelectionLanguage.swift */; };
+		C31CBC9B9DF95C63E343253E /* InboxZeroMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F953BF39B6F5DE399F5B433 /* InboxZeroMotion.swift */; };
 		C3282B1B49C4245691F48696 /* PlusStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B62E6FAA796EFF9D03C71C9 /* PlusStore.swift */; };
 		C340470EF235747D14DEE757 /* SeptaskPlusSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAD86E57EEA3D6BA34CFCD65 /* SeptaskPlusSheet.swift */; };
 		C3DF48E64A442CAD73FA1D2E /* SeptaskKitTaskList.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9FAB53CD698E384BCEB2D0E /* SeptaskKitTaskList.swift */; };
@@ -703,6 +707,7 @@
 		392BC172AFC4D18F54BD4F34 /* WatchPhoneLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchPhoneLink.swift; sourceTree = "<group>"; };
 		3B9559BEC76161CBDBE76A10 /* TaskConvo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskConvo.swift; sourceTree = "<group>"; };
 		3D79AB17B783575E9EBC41B7 /* TaskRefRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskRefRows.swift; sourceTree = "<group>"; };
+		3F953BF39B6F5DE399F5B433 /* InboxZeroMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxZeroMotion.swift; sourceTree = "<group>"; };
 		40D69E5B60F439D89D647DC6 /* TaskBackendWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskBackendWire.swift; sourceTree = "<group>"; };
 		40E3ED388D15D44A2ADAB124 /* AgentPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentPrompt.swift; sourceTree = "<group>"; };
 		42633764DDF43F00D2D74256 /* TextSizeScale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextSizeScale.swift; sourceTree = "<group>"; };
@@ -788,6 +793,7 @@
 		82B033F3BFB3BA4D616AA595 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		82BF482D659A5EF073C91300 /* SeptenaAppGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaAppGroup.swift; sourceTree = "<group>"; };
 		8396DF9C6AB70CD82CCCFEF2 /* SeptaskKitComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskKitComposer.swift; sourceTree = "<group>"; };
+		848DDE187C15BD58B3C75DEB /* InboxZeroMotionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxZeroMotionTests.swift; sourceTree = "<group>"; };
 		86E453108B9F824EF3A3F999 /* EmojiPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiPicker.swift; sourceTree = "<group>"; };
 		885D6BD88D7ECDFCC3C6B948 /* TaskChangeContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskChangeContractTests.swift; sourceTree = "<group>"; };
 		888ABAFEFC82F50DCAC891D5 /* RemindersInboxSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersInboxSection.swift; sourceTree = "<group>"; };
@@ -1308,6 +1314,7 @@
 				8D1971758FBB8958AFD5B0FC /* BackendLimitTests.swift */,
 				E9E713ED7497C52844672431 /* ConvoReviewTests.swift */,
 				A2E72A113E9D2B6BD889AEA1 /* DateParserTests.swift */,
+				848DDE187C15BD58B3C75DEB /* InboxZeroMotionTests.swift */,
 				6D2096824630260AC05FAA8E /* PlusAccountOwnershipTests.swift */,
 				E591D0F2883B2A7E11B8B23C /* RegistryConformanceTests.swift */,
 				AA78D92373F7363289EF6B4A /* SyncedSettingsTests.swift */,
@@ -1416,6 +1423,7 @@
 				FF00EC44C1E78BE7E1417CDF /* DemoSeedMode.swift */,
 				53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */,
 				6C3D30F4286EB9840D6C533D /* HeaderWashEngine.swift */,
+				3F953BF39B6F5DE399F5B433 /* InboxZeroMotion.swift */,
 				CAA820579EFB323F3CA111DD /* KeychainStore.swift */,
 				9833C23214C009852FAF97DE /* LaunchMigrators.swift */,
 				EE89901CA806AA91E0441236 /* Logging.swift */,
@@ -2071,6 +2079,7 @@
 				4D282E8091960C034A451196 /* ImportLegacyThingsLineage.swift in Sources */,
 				853DAA6667D6B31B960F90D1 /* ImportPlanner.swift in Sources */,
 				9789D2FB98DDEE500D638DD7 /* ImportSource.swift in Sources */,
+				1C39D8D89439B9E8C7DFECF5 /* InboxZeroMotion.swift in Sources */,
 				0A5DA9C8B27B81C26D86C1D6 /* KeyboardShortcutsView.swift in Sources */,
 				6E0EBEF6EEBE1D73251FF57C /* KeychainStore.swift in Sources */,
 				ED507929D4F485623446704C /* LaunchMigrators.swift in Sources */,
@@ -2255,6 +2264,8 @@
 				D7F582D7E0E7BF0DDE50CC13 /* ConvoReviewTests.swift in Sources */,
 				19CFF7FE8B9E2420FC965BC9 /* DateParser.swift in Sources */,
 				B08A83A13042A84398779AB4 /* DateParserTests.swift in Sources */,
+				8717A679989DBAD819B58967 /* InboxZeroMotion.swift in Sources */,
+				03874534601B525FE5CE78F5 /* InboxZeroMotionTests.swift in Sources */,
 				BAA83895EDC4FB41229111FA /* Logging.swift in Sources */,
 				7CBEE982A556337952529349 /* PlusAccountOwnership.swift in Sources */,
 				A6E361C47BE7A6468E4406E0 /* PlusAccountOwnershipTests.swift in Sources */,
@@ -2344,6 +2355,7 @@
 				2541B7BC5480CBDE18A3FD85 /* ImportLegacyThingsLineage.swift in Sources */,
 				F22049DC1F6D61554E8B98CD /* ImportPlanner.swift in Sources */,
 				B18FA926F83310946B5AC320 /* ImportSource.swift in Sources */,
+				C31CBC9B9DF95C63E343253E /* InboxZeroMotion.swift in Sources */,
 				C13DD2378BFE3A4F22E8906F /* KeyboardShortcutsView.swift in Sources */,
 				E9482D73D9F433F137D37A0B /* KeychainStore.swift in Sources */,
 				78E20168BCF87295F2C22310 /* LaunchMigrators.swift in Sources */,

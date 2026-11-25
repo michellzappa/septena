@@ -168,6 +168,8 @@ fun TaskDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     initialAttribute: String? = null,
+    onOpenTask: (String) -> Unit = {},
+    openSendBackInitially: Boolean = false,
 ) {
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val isDark = LocalSeptenaDarkTheme.current
@@ -190,6 +192,7 @@ fun TaskDetailScreen(
     // The attribute whose picker is folded open in its row on the page. One at a time.
     var openPicker by remember(taskId, initialAttribute) { mutableStateOf(initialAttribute) }
     var tagFilterDraft by remember(taskId) { mutableStateOf("") }
+    var showAddReferenceDialog by remember(taskId) { mutableStateOf(false) }
 
     LaunchedEffect(graph, taskId, dataVersion) {
         val loaded = withContext(Dispatchers.IO) { loadTaskDetail(graph, taskId) }
@@ -647,6 +650,21 @@ fun TaskDetailScreen(
                     },
                     actions = {
                         if (savedTask != null && !deleted) {
+                            val addRefTitle = remember(languageTag) {
+                                RegistryCatalog.actionTitle(RegistryActionIds.TASK_ADD_REFERENCE, languageTag = languageTag)
+                                    ?.takeIf(String::isNotBlank) ?: "Add Reference"
+                            }
+                            IconButton(
+                                onClick = { showAddReferenceDialog = true },
+                                enabled = canEdit,
+                                modifier = Modifier.semantics { contentDescription = addRefTitle },
+                            ) {
+                                Text(
+                                    text = "↗",
+                                    fontSize = 18.sp,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
                             IconButton(
                                 onClick = ::toggleStarred,
                                 enabled = canEdit,
@@ -1165,6 +1183,7 @@ fun TaskDetailScreen(
                                                     isTaskOpen = isTaskOpen,
                                                     canWrite = canEdit,
                                                     heading = discussHeading,
+                                                    openSendBackInitially = openSendBackInitially,
                                                 )
                                             }
                                         }
@@ -1276,6 +1295,7 @@ fun TaskDetailScreen(
                                                 isTaskOpen = isTaskOpen,
                                                 canWrite = canEdit,
                                                 heading = heading,
+                                                openSendBackInitially = openSendBackInitially,
                                             )
                                         }
                                     }
@@ -1288,6 +1308,18 @@ fun TaskDetailScreen(
                                         heading = heading,
                                         canEdit = canEdit,
                                         control = labels::control,
+                                    )
+                                }
+
+                                TaskPageBlockKinds.REFERENCES -> if (savedTask != null) {
+                                    TaskReferencesSection(
+                                        graph = graph,
+                                        taskId = taskId,
+                                        heading = heading,
+                                        canEdit = canEdit,
+                                        showAddDialog = showAddReferenceDialog,
+                                        onShowAddDialogChange = { showAddReferenceDialog = it },
+                                        onOpenTask = onOpenTask,
                                     )
                                 }
 

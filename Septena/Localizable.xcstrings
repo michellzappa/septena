@@ -1448,6 +1448,10 @@
     "All-day events" : {
 
     },
+    "Allow calendar access" : {
+      "comment" : "Generated from registry settings.copy.calendar_detail.devicePermissionAction.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Allow camera access for Septena in Settings, or enter the code instead." : {
       "comment" : "Generated from registry surfaces.prompts.items.cameraUnavailable.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -2846,6 +2850,10 @@
     "Developer" : {
 
     },
+    "Device calendars" : {
+      "comment" : "Generated from registry settings.copy.calendar_detail.deviceHeader.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Devices" : {
       "comment" : "Generated from registry settings.pages.devices_access.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -3285,6 +3293,10 @@
           }
         }
       }
+    },
+    "Faded Tasks" : {
+      "comment" : "Generated from registry surfaces.fadeSweep.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Fat" : {
       "localizations" : {
@@ -3981,6 +3993,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "A caixa de entrada está vazia"
+          }
+        }
+      }
+    },
+    "Inbox zero animation" : {
+      "comment" : "Generated from registry settings.pages.appearance.sections.appearance.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Animação ao esvaziar a caixa de entrada"
           }
         }
       }
@@ -5573,6 +5597,18 @@
       "comment" : "Generated from registry plans.levels.pro.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Play a short animation when you empty the Inbox." : {
+      "comment" : "Generated from registry settings.pages.appearance.sections.appearance.items.4.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reproduz uma animação curta quando você esvazia a caixa de entrada."
+          }
+        }
+      }
+    },
     "Plus" : {
       "comment" : "Generated from registry plans.shortName. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -5802,6 +5838,10 @@
           }
         }
       }
+    },
+    "Read-only agenda in Today and Upcoming" : {
+      "comment" : "Generated from registry settings.copy.calendar_detail.deviceToggleDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Read-only subscription feed for your scheduled tasks and deadlines. Anyone with the private URL can read titles and notes in the feed; rotate or disable it anytime." : {
       "comment" : "Generated from registry settings.copy.calendar_detail.feedFooter.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -6606,6 +6646,10 @@
     },
     "Show aging on Today" : {
 
+    },
+    "Show calendar events" : {
+      "comment" : "Generated from registry settings.copy.calendar_detail.deviceToggle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Show completed tasks" : {
       "comment" : "Generated from registry settings.rootGroups.lists_root.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

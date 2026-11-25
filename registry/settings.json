@@ -278,6 +278,14 @@
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
       "featureId": "settings.display"
     },
+    "inboxZeroMotionEnabled": {
+      "scope": "device",
+      "storageKey": "septena.ui.inboxZeroMotion",
+      "type": "bool",
+      "default": true,
+      "platforms": ["ios", "ipados", "macos"],
+      "featureId": "settings.display"
+    },
     "textSizeStep": {
       "scope": "device",
       "storageKey": "septena.display.textSizeStep",
@@ -486,6 +494,10 @@
       { "id": "clear", "label": "Clear sync issues" }
     ],
     "calendar_detail": [
+      { "id": "deviceHeader", "label": "Device calendars" },
+      { "id": "deviceToggle", "label": "Show calendar events" },
+      { "id": "deviceToggleDetail", "label": "Read-only agenda in Today and Upcoming" },
+      { "id": "devicePermissionAction", "label": "Allow calendar access" },
       { "id": "feedHeader", "label": "Calendar Feed (iCal)" },
       { "id": "feedSignIn", "label": "Sign in to Septena sync to create a private calendar feed URL for Apple Calendar, Google Calendar, or Outlook." },
       { "id": "feedToggle", "label": "Private iCal feed" },
@@ -813,6 +825,13 @@
               "kind": "setting",
               "key": "loggingAnimationsEnabled",
               "label": "Completion animations"
+            },
+            {
+              "kind": "setting",
+              "key": "inboxZeroMotionEnabled",
+              "label": "Inbox zero animation",
+              "detail": "Play a short animation when you empty the Inbox.",
+              "platforms": ["ios", "ipados", "macos"]
             }
           ]
         }

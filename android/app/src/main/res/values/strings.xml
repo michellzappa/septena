@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_today_name">Today</string>
+    <string name="widget_today_description">Today tasks with one-tap check-off.</string>
+    <string name="widget_upcoming_name">Upcoming</string>
+    <string name="widget_upcoming_description">Scheduled tasks coming up next.</string>
+    <string name="widget_add_task">New Task</string>
+    <string name="widget_complete_task">Complete task</string>
+</resources>

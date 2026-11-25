@@ -279,6 +279,12 @@
       "plans.outcomes.everywhere.rows.devices.cells.plus"
     ]
   },
+  "Allow calendar access": {
+    "text": "Allow calendar access",
+    "paths": [
+      "settings.copy.calendar_detail.devicePermissionAction.label"
+    ]
+  },
   "Allow camera access for Septena in Settings, or enter the code instead.": {
     "text": "Allow camera access for Septena in Settings, or enter the code instead.",
     "paths": [
@@ -1025,6 +1031,12 @@
       "actions.actions.task.selectAll.activeTitle"
     ]
   },
+  "Device calendars": {
+    "text": "Device calendars",
+    "paths": [
+      "settings.copy.calendar_detail.deviceHeader.label"
+    ]
+  },
   "Devices": {
     "text": "Devices",
     "paths": [
@@ -1273,6 +1285,12 @@
     "text": "Faded",
     "paths": [
       "destinations.destinations.faded.title"
+    ]
+  },
+  "Faded Tasks": {
+    "text": "Faded Tasks",
+    "paths": [
+      "surfaces.fadeSweep.title"
     ]
   },
   "Favorite": {
@@ -1606,6 +1624,12 @@
     "text": "Inbox is empty",
     "paths": [
       "destinations.destinations.inbox.emptyState.title"
+    ]
+  },
+  "Inbox zero animation": {
+    "text": "Inbox zero animation",
+    "paths": [
+      "settings.pages.appearance.sections.appearance.items.4.label"
     ]
   },
   "Include": {
@@ -2109,7 +2133,8 @@
   "Not now": {
     "text": "Not now",
     "paths": [
-      "surfaces.firstRun.steps.account.secondary.title"
+      "surfaces.firstRun.steps.account.secondary.title",
+      "surfaces.fadeSweep.dismissTitle"
     ]
   },
   "Not signed in": {
@@ -2428,6 +2453,12 @@
       "plans.levels.pro.detail"
     ]
   },
+  "Play a short animation when you empty the Inbox.": {
+    "text": "Play a short animation when you empty the Inbox.",
+    "paths": [
+      "settings.pages.appearance.sections.appearance.items.4.detail"
+    ]
+  },
   "Plus": {
     "text": "Plus",
     "paths": [
@@ -2599,6 +2630,12 @@
     "text": "Quick Find…",
     "paths": [
       "actions.actions.app.quickFind.title"
+    ]
+  },
+  "Read-only agenda in Today and Upcoming": {
+    "text": "Read-only agenda in Today and Upcoming",
+    "paths": [
+      "settings.copy.calendar_detail.deviceToggleDetail.label"
     ]
   },
   "Read-only subscription feed for your scheduled tasks and deadlines. Anyone with the private URL can read titles and notes in the feed; rotate or disable it anytime.": {
@@ -3131,6 +3168,12 @@
     "text": "Show Welcome Again",
     "paths": [
       "settings.pages.about.sections.actions.items.2.label"
+    ]
+  },
+  "Show calendar events": {
+    "text": "Show calendar events",
+    "paths": [
+      "settings.copy.calendar_detail.deviceToggle.label"
     ]
   },
   "Show completed tasks": {

@@ -86,7 +86,7 @@ internal fun SettingsCustomSurface(
             LaunchedEffect(env.signedIn) { env.plans.refresh(env.signedIn) }
             PlusOffer(env.plans, languageTag)
         }
-        "calendar_detail" -> CalendarFeedSection(env.graph, env.signedIn, languageTag)
+        "calendar_detail" -> CalendarFeedSection(env.graph, env.signedIn, env.values, env.onValueChange, languageTag)
         "sign_in_approval" -> SignInApprovalSection(env.graph, env.signedIn, languageTag)
         "claude_connector" -> ClaudeConnectorSection(env.graph, env.signedIn, languageTag)
         "import_export" -> DataTransferSection(env.graph, languageTag)
