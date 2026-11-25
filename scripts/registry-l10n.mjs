@@ -38,7 +38,7 @@ const FIELDS = {
   tokens: new Set(["name", "tag", "label"]),
   plans: new Set([
     "name", "shortName", "proName", "headline", "subhead", "notice", "title", "detail", "label", "priceLabel",
-    "footnote", "priceFootnote", "device", "account", "plus", "free", "trial", "trialEnds",
+    "footnote", "priceFootnote", "device", "account", "plus", "pro", "free", "trial", "trialEnds",
     "paidThrough", "proThrough", "subscribe", "restore", "manage", "notNow", "learnMore", "yourPlan", "planned", "included", "notIncluded",
     "seePlus", "startTrial", "trialStarted", "trialBilling", "welcomeBack", "cancelNote", "success", "pending",
     "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedGrantPro", "ownedOtherAccount", "done",

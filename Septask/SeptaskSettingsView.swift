@@ -741,8 +741,8 @@ private struct SeptaskAccountPane: View {
           LabeledContent {
             if let line = PlanStatus.shared.statusLine { Text(line) }
           } label: {
-            Label(RegistrySettings.pageById[RegistrySettings.PageID.plus]?.title ?? RegistryPlans.name,
-                  systemImage: RegistryIcons.sfSymbols["settings.plus"] ?? "plus.circle.fill")
+            Label(PlanStatus.shared.title,
+                  systemImage: RegistryIcons.sfSymbols[PlanStatus.shared.isPro ? RegistryPlans.proCard.icon : "settings.plus"] ?? "plus.circle.fill")
           }
         }
       }

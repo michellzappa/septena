@@ -22,7 +22,8 @@ a grant could give at most three agents once #445 enforces the limit.
 - **Pro is still not sold.** The website shows it as planned, with no buy
   button. The apps offer Free and Plus. An app shows "Pro" only on an account
   that has it.
-- **In the apps Pro is a Plus account with another name.** An older build reads
+- **In the apps Pro is a Plus account with another name.** Its plan page is
+  "Septena Pro" and compares Pro with Plus, without prices. An older build reads
   the same answer and says "Plus".
 - **The admin page gives plans.** A link carries Plus or Pro. An account row
   has Give and Take back, which write one row, `grant:admin`. The page still
