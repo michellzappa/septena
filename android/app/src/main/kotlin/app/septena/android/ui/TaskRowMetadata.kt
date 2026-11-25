@@ -91,7 +91,7 @@ internal fun buildTaskListItem(
         RegistryTaskAttributeIds.WHEN,
         languageTag = languageTag,
     ).firstOrNull { it.kind == DateBoardRowKinds.TOMORROW }?.label.orEmpty()
-    val overdueLabel = RegistryCatalog.localizedString("Overdue", languageTag).orEmpty()
+    val overdueLabel = RegistryCatalog.localizedString("Overdue", languageTag) ?: "Overdue"
 
     // Deadline / Scheduled / Completed date — matches iOS `TaskRow.trailingDate`.
     var deadlineText: String? = null
