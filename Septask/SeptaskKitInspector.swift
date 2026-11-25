@@ -27,6 +27,33 @@ import SwiftData
 final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate, NSTextFieldDelegate,
                                            KitInlineSurfaceHost {
 
+  /// Where the form sits: in the inspector pane, or on the Do screen
+  /// (SeptaskKitDoScreen.swift, docs/DO_SPEC.md §4). The Do screen shows
+  /// fewer blocks, with the same renderers.
+  enum Placement { case pane, doScreen }
+
+  /// The blocks on the Do screen. The conversation shows once it exists: the
+  /// first step question starts it there.
+  private static let doBlocks: Set<RegistryTaskPageBlockKind> = [
+    .header, .notes, .checklist, .attachments, .references, .conversation,
+  ]
+
+  private let placement: Placement
+  /// The Do screen's own parts above and under the blocks. Not in the form on
+  /// the pane.
+  let leadStack = NSStackView()
+  let footStack = NSStackView()
+  /// Starts a Do of the shown task (`task.do`).
+  private lazy var doButton = SeptaskKitDo.button(.taskDo, target: self, action: #selector(startDo))
+
+  init(placement: Placement = .pane) {
+    self.placement = placement
+    super.init(nibName: nil, bundle: nil)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
   private let titleField = NSTextField()
   /// The list (area › project), one read-only line under the title. Shown
   /// only at the review depth (docs/AGENT_PROMPT_SPEC.md "Review page"): the
@@ -136,11 +163,19 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   override func loadView() {
     let root = NSView()
 
-    titleField.font = .systemFont(ofSize: SeptenaTypeScale.size(.headline), weight: .semibold)
+    titleField.font = placement == .doScreen
+      ? .systemFont(ofSize: SeptenaTypeScale.size(.largeTitle), weight: .semibold)
+      : .systemFont(ofSize: SeptenaTypeScale.size(.headline), weight: .semibold)
     titleField.isBordered = false
     titleField.drawsBackground = false
     titleField.focusRingType = .none
     titleField.lineBreakMode = .byTruncatingTail
+    if placement == .doScreen {
+      titleField.lineBreakMode = .byWordWrapping
+      titleField.usesSingleLineMode = false
+      titleField.cell?.wraps = true
+      titleField.cell?.isScrollable = false
+    }
     titleField.delegate = self
     titleField.translatesAutoresizingMaskIntoConstraints = false
 
@@ -193,6 +228,17 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     // The registry owns which sections show and their order. No section
     // order is written here.
     let blocks = RegistrySurfaces.taskPageBlocks(.page, on: RegistryPlatform.current)
+      .filter { placement == .pane || Self.doBlocks.contains($0.kind) }
+    if placement == .doScreen {
+      for stack in [leadStack, footStack] {
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 4
+      }
+      form.addArrangedSubview(leadStack)
+      fillWidth(leadStack)
+      form.setCustomSpacing(14, after: leadStack)
+    }
     // Discuss holds the conversation (docs/TASK_PAGE_SPEC.md): when the
     // registry shows a conversation block, it sits directly under the
     // attribute rows, not as a separate section further down.
@@ -230,13 +276,19 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     let reviewKinds = Set(RegistrySurfaces.taskPageBlocks(.review, on: RegistryPlatform.current).map(\.kind))
     for block in blocks where !reviewKinds.contains(block.kind) {
       switch block.kind {
-      case .attributes: pageOnlyViews[.attributes] = orderedAttributeButtons
+      case .attributes: pageOnlyViews[.attributes] = orderedAttributeButtons + [doButton]
       case .checklist: pageOnlyViews[.checklist] = [checklistLabel, addChecklistButton, checklistView]
       case .attachments: pageOnlyViews[.attachments] = [attachmentsLabel, attachmentsView, attachFileButton]
       case .references: pageOnlyViews[.references] = [referencesLabel, referencesView, addReferenceButton]
       case .history: pageOnlyViews[.history] = [historyButton, historyView]
       case .header, .notes, .conversation, .provenance: break
       }
+    }
+
+    if placement == .doScreen {
+      form.addArrangedSubview(footStack)
+      fillWidth(footStack)
+      closeButton.isHidden = true
     }
 
     placeholder.textColor = SeptaskKitTheme.iconMuted
@@ -326,6 +378,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// with Full Keyboard Access on — AppKit skips them otherwise.)
   private func rebuildKeyLoop() {
     var loop: [NSView] = [titleField, notesView]
+    if doButton.superview != nil { loop.append(doButton) }
     for button in orderedAttributeButtons {
       loop.append(button)
       if button === foldAnchor, let entry = foldKeyView { loop.append(entry) }
@@ -357,7 +410,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     form.addArrangedSubview(titleField)
     // -52, not the -28 the notes field uses: the title shares its band with
     // the close button and must not run under it.
-    fillWidth(titleField, inset: -52)
+    fillWidth(titleField, inset: placement == .doScreen ? -28 : -52)
     reviewListLabel.font = SeptaskKitTheme.meta
     reviewListLabel.textColor = SeptaskKitTheme.inkSecondary
     reviewListLabel.lineBreakMode = .byTruncatingTail
@@ -387,6 +440,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     orderedAttributeButtons = RegistrySurfaces.taskAttributes
       .filter { $0.applies(to: RegistryPlatform.current) }
       .compactMap { attributeButtons[$0.id] }
+    if RegistryActions.isAvailableOnPlatform(.taskDo) {
+      doButton.bezelStyle = .rounded
+      form.addArrangedSubview(doButton)
+    }
     for button in orderedAttributeButtons { form.addArrangedSubview(button) }
     return orderedAttributeButtons.last
   }
@@ -524,6 +581,29 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
 
   private var formScroll: NSScrollView?
 
+  @objc private func startDo() {
+    guard let task else { return }
+    flushPendingEdits()
+    SeptaskKitDo.shared.begin(taskID: task.id)
+  }
+
+  /// Do shows for an open task that is not the current Do.
+  func refreshDoButton() {
+    guard isViewLoaded else { return }
+    let canStart = task.map {
+      $0.status == .open && $0.deletedAt == nil && !$0.isHeading && !DoStore.shared.isDoing($0.id)
+    } ?? false
+    doButton.isHidden = !canStart || showsReviewDepth
+  }
+
+  override func viewDidLayout() {
+    super.viewDidLayout()
+    guard placement == .doScreen else { return }
+    // A wrapping title needs its width to know its height.
+    let width = max(0, form.bounds.width - 28)
+    if titleField.preferredMaxLayoutWidth != width { titleField.preferredMaxLayoutWidth = width }
+  }
+
   /// ⌥⌘I / Show Info opened the pane from the keyboard: the title takes it,
   /// caret at the end. No-op with nothing selected.
   func focusTitle() {
@@ -645,6 +725,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// notes, the conversation (with Accept and Send back) and who added it.
   /// Same rule as the SwiftUI task page.
   private func applyDepth(for task: SeptenaTask) {
+    defer { refreshDoButton() }
+    // The Do screen is the user's own work, at one depth.
+    guard placement == .pane else { return }
     let review = task.conversation.needsHumanReview
     let listPath = review ? KitListPath.text(for: task, in: context) : nil
     reviewListLabel.stringValue = listPath ?? ""
@@ -890,11 +973,12 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   func controlTextDidBeginEditing(_ obj: Notification) {
     // Truncation fights the field-editor scroll and jumps the caret to the
     // far right while typing or arrowing through a long title.
+    guard placement == .pane else { return }
     titleField.lineBreakMode = .byClipping
   }
 
   func controlTextDidEndEditing(_ obj: Notification) {
-    titleField.lineBreakMode = .byTruncatingTail
+    if placement == .pane { titleField.lineBreakMode = .byTruncatingTail }
     flushPendingEdits()
   }
 

@@ -74,6 +74,10 @@ data class TaskHomeUiState(
     val canQuickAdd: Boolean = false,
     val canComplete: Boolean = false,
     val agentsPaused: Boolean = false,
+    /** Open agent requests: the rows of Review. */
+    val reviewCount: Int = 0,
+    /** When each open agent request (Review or question) came in. */
+    val agentRequestTimes: List<java.time.Instant> = emptyList(),
     /** Top-nav Star filter toggle: shows only starred tasks in the current list. */
     val starredOnly: Boolean = false,
     /** Task ids picked by a long-press; non-empty means the list is in selection mode. */
@@ -115,6 +119,9 @@ private data class LoadedTaskHome(
     val canQuickAdd: Boolean,
     val canComplete: Boolean,
     val agentsPaused: Boolean,
+    val reviewCount: Int = 0,
+    /** When each open agent request (Review or question) came in. */
+    val agentRequestTimes: List<java.time.Instant> = emptyList(),
     val fadedSweepItems: List<FadeSweepItem> = emptyList(),
     val weeklySweepItems: List<FadeSweepItem> = emptyList(),
     val showWeeklySweepBanner: Boolean = false,
@@ -162,6 +169,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             canQuickAdd = home.canQuickAdd,
             canComplete = home.canComplete,
             agentsPaused = home.agentsPaused,
+            reviewCount = home.reviewCount,
+            agentRequestTimes = home.agentRequestTimes,
             starredOnly = applyStar,
             selectedIds = selected,
             fadedSweepItems = home.fadedSweepItems,
@@ -262,7 +271,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
      * removes the new task in one step. Once the row exists the sheet closes,
      * also when a later field write fails: a retry would create it twice.
      */
-    fun quickAdd(draft: QuickAddDraft, onSaved: () -> Unit) {
+    fun quickAdd(draft: QuickAddDraft, onSaved: (taskId: String) -> Unit) {
         val title = draft.title.trim()
         if (title.isEmpty() || quickAddRunning) return
         quickAddRunning = true
@@ -291,13 +300,13 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         }
                     }
                     graph.taskUndoHistory.recordCreated(created.asSyncRecord())
-                    fields.exceptionOrNull()
+                    created.id to fields.exceptionOrNull()
                 }
             }
-                .onSuccess { fieldError ->
+                .onSuccess { (taskId, fieldError) ->
                     errorMessage.value = fieldError?.message
                     noteLocalChangeAndSync()
-                    onSaved()
+                    onSaved(taskId)
                 }
                 .onFailure { errorMessage.value = it.message }
             quickAddRunning = false
@@ -761,6 +770,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         var repeatingCount = 0
         var anytimeCount = 0
         var reviewCount = 0
+        val agentRequestTimes = mutableListOf<java.time.Instant>()
         var agentCount = 0
         var starredCount = 0
         var fadedCount = 0
@@ -794,6 +804,13 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     if (membership.matchesView[RegistryDestinationIds.ANYTIME] == true) anytimeCount += 1
                     if (TaskViewRules.matchesView(snapshot, membership, RegistryDestinationIds.REPEATING)) repeatingCount += 1
                     if (convoState?.needsHumanReview == true) reviewCount += 1
+                    val requestedAt = when {
+                        convoState?.needsHumanReview == true -> conversations[snapshot.id]?.endStateAt
+                        convoState?.awaitsHuman == true -> conversations[snapshot.id]?.lastTurnAt
+                        else -> null
+                    }
+                    requestedAt?.let { runCatching { java.time.OffsetDateTime.parse(it).toInstant() }.getOrNull() }
+                        ?.let(agentRequestTimes::add)
                     if (TaskFadeRules.isFaded(snapshot.fadedAt)) {
                         fadedCount += 1
                         val fadedInstant = snapshot.fadedAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
@@ -1221,6 +1238,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             canQuickAdd = canQuickAdd,
             canComplete = canComplete,
             agentsPaused = agentsPaused,
+            reviewCount = reviewCount,
+            agentRequestTimes = agentRequestTimes,
             fadedSweepItems = sortedFadedSweep,
             weeklySweepItems = currentWeekSweep,
             showWeeklySweepBanner = showSweepBanner,

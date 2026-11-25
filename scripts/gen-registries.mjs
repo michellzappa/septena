@@ -588,6 +588,16 @@ function validatePlaceNotes(surfaces, caps) {
   }
 }
 
+// Do (docs/DO_SPEC.md §3 to §5): the copy of the screen, the notice and the
+// history, and the lengths it offers.
+function validateDoing(surfaces, caps, entities) {
+  const d = surfaces.doing;
+  assert(d && d.featureId in caps.capabilities, "surfaces.json: doing needs a known featureId");
+  assert(d.lengths.length > 0 && d.lengths.every((m) => Number.isInteger(m) && m > 0 && m <= entities.limits.doPlannedMinutesMax), "surfaces.json: doing.lengths are minutes up to doPlannedMinutesMax");
+  assert(JSON.stringify(Object.keys(d.exits)) === JSON.stringify(entities.enums.doExit), "surfaces.json: doing.exits has one label per doExit, in order");
+  for (const [p, v] of stringsOf(d, "doing")) assert(!/[–—]/.test(v), `surfaces.json: ${p} contains an em or en dash`);
+}
+
 // References (docs/TASK_REFERENCES_SPEC.md §8): a label and an icon per key
 // kind, the fallback for a kind this build does not know, the labels of the
 // roles that show one, and the copy of Add Reference.
@@ -1798,6 +1808,30 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  // 8a. Do (surfaces.json `doing`, docs/DO_SPEC.md)
+  const doing = surfaces.doing;
+  lines.push("/// Do: one task now (`registry/surfaces.json` `doing`, docs/DO_SPEC.md §3 to §5).");
+  lines.push("enum RegistryDoing {");
+  lines.push("  /// The lengths offered, in minutes.");
+  lines.push(`  static let lengths: [Int] = [${doing.lengths.join(", ")}]`);
+  for (const [name, node, field] of [
+    ["lastTimeTitle", doing.screen.lastTime, "title"], ["firstStepTitle", doing.screen.firstStep, "title"],
+    ["lengthTitle", doing.screen.length, "title"], ["noLengthTitle", doing.screen.length.noneTitle, "title"],
+    ["stopNoteTitle", doing.stopNote, "title"], ["stopNoteSaveTitle", doing.stopNote, "confirmTitle"],
+    ["stopNoteSkipTitle", doing.stopNote, "dismissTitle"], ["openExitLabel", doing.openExit, "label"],
+  ]) lines.push(`  static let ${name}: String = ${L(node[field], node, field)}`);
+  for (const [name, node] of [
+    ["lengthOption", doing.screen.length.option], ["notice", doing.notice], ["stale", doing.stale],
+    ["plannedEnd", doing.plannedEnd], ["needsYou", doing.needsYou],
+  ]) {
+    const t = L10N.swiftTemplate(BY_KEY, tmplKey(node.format, node, "format"));
+    lines.push(`  static func ${name}(${t.params}) -> String { ${t.body} }`);
+  }
+  lines.push("  /// The label of an exit (`doExit`) in the history.");
+  lines.push(`  static let exitLabels: [String: String] = [${Object.entries(doing.exits).map(([id, e]) => `${swiftStr(id)}: ${L(e.label, e, "label")}`).join(", ")}]`);
+  lines.push("}");
+  lines.push("");
+
   // 8a. Project and area notes (surfaces.json `placeNotes`)
   const placeNotes = surfaces.placeNotes;
   lines.push("/// The notes on a project's or an area's page (`registry/surfaces.json` `placeNotes`).");
@@ -2513,6 +2547,7 @@ validateActions(actions, icons, caps, destIds);
 validateSurfaces(surfaces, icons, caps, plans);
 validateTaskReferences(surfaces, icons, caps, entities);
 validatePlaceNotes(surfaces, caps);
+validateDoing(surfaces, caps, entities);
 checkOpensAttribute({ actions, surfaces });
 checkTaskDateBoard({ surfaces, icons, caps, actions });
 validateFirstRun(surfaces, icons, caps, settings);

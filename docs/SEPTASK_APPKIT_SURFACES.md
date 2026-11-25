@@ -31,6 +31,8 @@ detail, and hosted SwiftUI windows hold forms (Settings, Welcome).
 | Move (multi-selection) | 2 | centered — there is no single row to point at |
 | Quick Find (⇧⌘F) | 2 | centered |
 | Quick Entry | 2 | screen, upper third |
+| Where did you stop? (Stop for Now on a Do) | 2 | centered; screen, upper third when Septena is not active |
+| Later on a Do | 1 | the Do screen's button, or the Do notice |
 | Delete area / project / section | 3 | — |
 | Reschedule a fixed repeat | 3 | — |
 | Rename area / project / section | inline | the row |

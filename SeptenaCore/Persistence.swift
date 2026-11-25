@@ -38,6 +38,9 @@ final class TaskEntity {
   /// Optional IANA time zone (nil = floating local time).
   var timeZone: String? = nil
   @Attribute(originalName: "due") var deadline: String?
+  /// The deadline the user planned past (docs/TASK_DATES_SPEC.md I8). Written
+  /// by the core's date actions; that deadline does not hold the task on Today.
+  var deferredDeadline: String? = nil
   var today: Bool
   /// Simple boolean Important / Star marker (docs/STAR_PRIORITY_SPEC.md, ST0).
   /// Default `= false` required for lightweight SwiftData migration.
@@ -617,6 +620,7 @@ extension SeptenaTask {
       durationMinutes: e.durationMinutes,
       timeZone: e.timeZone,
       deadline: e.deadline,
+      deferredDeadline: e.deferredDeadline,
       today: e.today,
       starred: e.starred,
       tags: e.tagIDs,
@@ -932,6 +936,7 @@ final class LocalStore {
                          TaskAttachmentEntity.self,
                          TaskChecklistItemEntity.self,
                          TaskRefEntity.self,
+                         DoSessionEntity.self,
                          TagEntity.self,
                          ProjectEntity.self,
                          AreaEntity.self,
@@ -1660,20 +1665,16 @@ enum LocalCache {
     }
   }
 
-  /// Count of open tasks whose hard deadline is today or in the past.
-  /// Drives the Today sidebar's red badge — matches the in-list red date
-  /// treatment exactly (only `due ≤ today` counts as overdue; scheduled-past
-  /// is residence, not lateness).
+  /// Count of tasks on Today whose hard deadline is today or in the past
+  /// (docs/TASK_DATES_SPEC.md R3, R10): the red rows of the Today list. A row
+  /// the user planned past (I8) is not on Today, so it does not count.
   @MainActor
   static func overdueCount(in context: ModelContext) -> Int {
-    // Must match `SeptenaTask.isOverdue` exactly: open + deadline <= today
-    // (a deadline of today counts as overdue), and scheduled dates never
-    // count. Keep these two definitions in lockstep.
     let today = SeptenaDate.today
     let rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>())
     return rows.reduce(0) { acc, e in
       guard e.deletedAt == nil, !e.pendingDeletion, !e.isHeading,
-            e.status == .open, !e.isFaded, let d = e.deadline, d <= today else { return acc }
+            e.status == .open, !e.isFaded, let d = e.deadline, d <= today, e.isOnToday else { return acc }
       return acc + 1
     }
   }

@@ -32,7 +32,7 @@ export const listTasksJsonSchema = {
       enum: ["today", "inbox", "review", "anytime", "upcoming", "completed", "faded"],
       default: "today",
       description:
-        "Which task list to read. 'today' = the whole Today page as the app shows it: the Inbox section first, then every task on Today. 'inbox' = only the Inbox section: tasks the user has not filed yet (no area or project) and your proposals they have not accepted. 'review' = open tasks awaiting the user's verification (`endState = needs_verify`). 'anytime' is the single home for open, dateless tasks. 'faded' = the Faded pile: open tasks nobody touched for the fade window, which no other list shows (an agent edit does not bring one back: the user keeps or drops it in the app). Rows carry `inbox: true` when they sit in the Inbox, and `daysOnToday: N` when they have carried over on Today undone for N days (the app darkens their checkbox; 7+ is long overdue for a decision).",
+        "Which task list to read. 'today' = the whole Today page as the app shows it: the Inbox section first, then every task on Today. 'inbox' = only the Inbox section: tasks the user has not filed yet (no area or project) and your proposals they have not accepted. 'review' = open tasks awaiting the user's verification (`endState = needs_verify`). 'anytime' is the single home for open, dateless tasks. 'faded' = the Faded pile: open tasks nobody touched for the fade window, which no other list shows (an agent edit does not bring one back, except a deadline: the user keeps or drops it in the app). Rows carry `inbox: true` when they sit in the Inbox, and `daysOnToday: N` when they have carried over on Today undone for N days (the app darkens their checkbox; 7+ is long overdue for a decision).",
     },
     limit: {
       type: "integer",
@@ -175,7 +175,7 @@ export const TASK_TOOLS: Tool[] = [
   {
     name: "tasks_defer",
     title: "Defer task",
-    description: "Set a task’s When to a future date (sets scheduled, clears today).",
+    description: "Set a task’s When to a future date (sets scheduled, clears today). The task leaves Today until that date. Its deadline does not change: a task that is due or overdue stays marked so in Upcoming.",
     inputSchema: deferTaskJsonSchema,
     annotations: { title: "Defer task", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
@@ -210,14 +210,14 @@ export const TASK_TOOLS: Tool[] = [
   {
     name: "tasks_set_endstate",
     title: "Set task conversation end state",
-    description: "Record the conversation's terminal end-state.",
+    description: "Hand the task to the user's Review (needs_verify, with a note that says what to check), or record that the work goes on elsewhere (decomposed). Only the user takes a task out of Review: they accept it or send it back. You may hand over again with a new note. Every other end state follows from what the user does (refused as human_ends).",
     inputSchema: setEndStateJsonSchema,
     annotations: { title: "Set task conversation end state", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
     name: "tasks_set_assignee",
     title: "Set task assignee",
-    description: "Route a task: me | local | claude, or null to let the router decide. Setting claude marks it for the reasoning queue.",
+    description: "Route a task: me | local | claude, or null to let the router decide. Setting claude marks it for the reasoning queue and makes it agent work: from then on only the user ends it or takes it back (refused as human_accepts, human_only:assignee).",
     inputSchema: setAssigneeJsonSchema,
     annotations: { title: "Set task assignee", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },

@@ -956,7 +956,7 @@ export class WebSyncEngine {
     const now = new Date().toISOString();
     const todayYMD = localTodayYMD();
     const convo = this.existingConvo(task.id);
-    const convoFields: Record<string, unknown> = { endState: "human_done" };
+    const convoFields: Record<string, unknown> = { endState: "agent_assisted_done" };
     const taskFields: Record<string, unknown> = {
       status: "done",
       completedAt: now,
@@ -990,6 +990,7 @@ export class WebSyncEngine {
       endState: "open",
       endStateNote: null,
       stoppedAt: null,
+      assignee: "claude",
     };
     const seq = this.nextTurnSeq(task.id);
     const turn: WireTurn = {

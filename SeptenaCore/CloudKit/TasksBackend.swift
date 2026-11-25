@@ -107,6 +107,7 @@ final class CloudKitTasksBackend {
   func commitAndPush(_ entity: TaskEntity, op: String, deletion: Bool = false) -> Bool {
     let id = entity.id
     let title = entity.title
+    let closed = deletion || entity.status != .open || entity.deletedAt != nil
     // An open task that left Today gives up its Today slot (#66), whichever
     // write moved it out, so it comes back at its list position next time
     // instead of at a stale slot. Done / cancelled rows keep it: reopening
@@ -129,6 +130,7 @@ final class CloudKitTasksBackend {
       engine.noteTaskChange(id: id)
       SeptenaLog.info("[CK] \(op) id=\(id) title=\"\(title)\" → engine.noteTaskChange")
     }
+    if closed { DoStore.shared.noteTasksClosed([id]) }
     TaskChange.post(id)
     return true
   }
@@ -643,6 +645,7 @@ final class CloudKitTasksBackend {
     purgeAttachments(taskID: id)
     purgeChecklistItems(taskID: id)
     purgeTaskRefs(taskID: id)
+    DoStore.shared.purge(taskID: id)
     let neverPushed = engine.taskNeverSynced(id: id, systemFields: entity.cloudKitSystemFields)
     let staged = entity     // capture before we tell SwiftData to remove
     context.delete(entity)
@@ -1346,6 +1349,13 @@ final class CloudKitTasksBackend {
     entity.deadline = SeptenaDate.format(date)
     entity.pendingSync = true
     commitAndPush(entity, op: "setDeadline")
+  }
+
+  func setDeferredDeadline(id: String, day: String?) {
+    guard let entity = fetch(id: id), entity.deferredDeadline != day else { return }
+    entity.deferredDeadline = day
+    entity.pendingSync = true
+    commitAndPush(entity, op: "setDeferredDeadline")
   }
 
   func setReminder(id: String, reminder: TaskReminder?) {

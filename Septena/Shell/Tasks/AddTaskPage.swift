@@ -105,6 +105,16 @@ struct AddTaskPage: View {
         .font(.footnote)
       }
 
+      // Work that is not on the list yet (docs/DO_SPEC.md §4.1).
+      if hostsTitleField, DoFlow.isAvailable {
+        Section {
+          Button { commit(title: trimmed, thenDo: true) } label: {
+            DoActionLabel(.doAddAndDo)
+          }
+          .disabled(trimmed.isEmpty || working)
+        }
+      }
+
       if !hostsTitleField, !trimmed.isEmpty {
         Section {
           Button { commit(title: trimmed) } label: {
@@ -179,7 +189,7 @@ struct AddTaskPage: View {
     trimmed.isEmpty || s.localizedCaseInsensitiveContains(trimmed)
   }
 
-  private func commit(title: String) {
+  private func commit(title: String, thenDo: Bool = false) {
     guard !working, !title.isEmpty else { return }
     working = true
     var draft = TaskDraft(filter: taskFilter)
@@ -192,6 +202,7 @@ struct AddTaskPage: View {
       rebuild: { [mutator] in [saved.create(via: mutator).id] })
     Haptics.commit()
     dismiss()
+    if thenDo { DoStore.shared.begin(taskID: created.id) }
   }
 
   private func pullToToday(_ task: SeptenaTask) {

@@ -15,6 +15,8 @@ class TaskMutator(
     private val store: TaskStore,
     private val clock: DayClock,
     private val ids: TaskIdGenerator,
+    /** Ends the open Do of a task that this mutator closes. Null in hosts without Do. */
+    private val doSessions: DoSessionMutator? = null,
 ) {
     suspend fun create(
         title: String,
@@ -120,7 +122,15 @@ class TaskMutator(
             updated.asSyncRecord(),
             SyncOperation.Upsert(ids.nextClientOpId(), RegistryEntityNames.TASK, id, changes),
         )
+        if (RegistryEntityFields.Task.STATUS in changes || RegistryEntityFields.Task.FADED_AT in changes) endDoIfClosed(updated)
         return updated
+    }
+
+    /** One write closed, deleted or faded the task: its open Do ends at once (docs/DO_SPEC.md §2.1). */
+    private suspend fun endDoIfClosed(task: TaskRecord) {
+        val faded = TaskFadeRules.isFaded(task.fields[RegistryEntityFields.Task.FADED_AT].stringValue())
+        if (task.status == TaskStatus.OPEN && task.deletedAt == null && !faded) return
+        doSessions?.taskClosed(task.id)
     }
 
     /** A user gesture on the task: stamps the fade clock (docs/TASK_FADE_SPEC.md §3, Swift `touch`). */
@@ -188,6 +198,7 @@ class TaskMutator(
             changes[name] = when (name) {
                 RegistryEntityFields.Task.SCHEDULED -> JsonValue.stringOrNull(f.scheduled)
                 RegistryEntityFields.Task.DEADLINE -> JsonValue.stringOrNull(f.deadline)
+                RegistryEntityFields.Task.DEFERRED_DEADLINE -> JsonValue.stringOrNull(f.deferredDeadline)
                 RegistryEntityFields.Task.TODAY -> JsonValue.BooleanValue(f.today)
                 RegistryEntityFields.Task.TODAY_SET_ON -> JsonValue.stringOrNull(f.todaySetOn)
                 RegistryEntityFields.Task.START_TIME -> JsonValue.stringOrNull(f.startTime)
@@ -303,6 +314,7 @@ class TaskMutator(
         source.fields[RegistryEntityFields.Task.TAGS]
             ?.let { extra[RegistryEntityFields.Task.TAGS] = it }
         for (field in listOf(
+            RegistryEntityFields.Task.DEFERRED_DEADLINE,
             RegistryEntityFields.Task.START_TIME,
             RegistryEntityFields.Task.DURATION_MINUTES,
             RegistryEntityFields.Task.TIME_ZONE,
@@ -340,6 +352,7 @@ class TaskMutator(
         val updated = existing.changing(changes)
         val operation = SyncOperation.Upsert(ids.nextClientOpId(), RegistryEntityNames.TASK, id, changes)
         store.writeLocalAndEnqueue(updated.asSyncRecord(), operation)
+        endDoIfClosed(updated)
         spawnNextOccurrence(existing)
         return updated
     }
@@ -539,6 +552,7 @@ class TaskMutator(
         val operation = SyncOperation.Delete(ids.nextClientOpId(), RegistryEntityNames.TASK, id)
         val grace = Duration.ofSeconds(app.septena.core.generated.RegistryRules.DELETE_GRACE_SECONDS)
         store.writeLocalAndEnqueue(updated.asSyncRecord(), operation, now.plus(grace))
+        endDoIfClosed(updated)
         return updated
     }
 
@@ -555,6 +569,7 @@ class TaskMutator(
     suspend fun purge(id: String): Boolean {
         store.record(RegistryEntityNames.TASK, id) ?: return false
         val operation = SyncOperation.Delete(ids.nextClientOpId(), RegistryEntityNames.TASK, id)
+        doSessions?.purge(id)
         store.purgeLocalAndEnqueue(RegistryEntityNames.TASK, id, operation)
         return true
     }

@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
     /** Opens live WebSocket nudges + foreground fallback polling and pulls immediately. */
     override fun onStart() {
         super.onStart()
+        graph.doing.requestRefresh()
         graph.liveSync.onActivityStarted()
     }
 
