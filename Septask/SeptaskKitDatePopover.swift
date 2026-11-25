@@ -1970,6 +1970,11 @@ private final class KitDateCell: NSView {
   private let radius: CGFloat
   private let action: () -> Void
   private var tracking: NSTrackingArea?
+  /// Where the pointer was when this cell came on screen. A cell that opens
+  /// under a still pointer is not a hover: after a mouse pick the next task
+  /// slides into the same row, its picker opens in the same place, and the
+  /// pointer would move the highlight to the day picked for the LAST task.
+  private var pointerOnAppear: NSPoint?
 
   var onHover: ((KitDateCell) -> Void)?
   var isFocused = false { didSet { needsDisplay = true } }
@@ -2120,13 +2125,27 @@ private final class KitDateCell: NSView {
     super.updateTrackingAreas()
     if let tracking { removeTrackingArea(tracking) }
     let area = NSTrackingArea(rect: bounds,
-                              options: [.mouseEnteredAndExited, .activeInKeyWindow],
+                              options: [.mouseEnteredAndExited, .mouseMoved, .activeInKeyWindow],
                               owner: self, userInfo: nil)
     addTrackingArea(area)
     tracking = area
   }
 
-  override func mouseEntered(with event: NSEvent) { onHover?(self) }
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    pointerOnAppear = window == nil ? nil : NSEvent.mouseLocation
+  }
+
+  override func mouseEntered(with event: NSEvent) { hover() }
+
+  /// A pointer that already rests on the cell sends no second `mouseEntered`,
+  /// so its first real move counts as the hover.
+  override func mouseMoved(with event: NSEvent) { hover() }
+
+  private func hover() {
+    guard !isFocused, NSEvent.mouseLocation != pointerOnAppear else { return }
+    onHover?(self)
+  }
 
   override func mouseUp(with event: NSEvent) { action() }
 

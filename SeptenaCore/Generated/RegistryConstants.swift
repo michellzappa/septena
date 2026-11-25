@@ -2275,6 +2275,7 @@ struct RegistryPlanRow: Sendable, Hashable, Identifiable {
   let planned: Bool
   let free: RegistryPlanCell
   let plus: RegistryPlanCell
+  let pro: RegistryPlanCell
 }
 
 struct RegistryPlanOutcome: Sendable, Hashable, Identifiable {
@@ -2312,22 +2313,24 @@ enum RegistryPlans {
     RegistryPlanCard(id: "free", title: RegistryL10n.t("Free"), icon: "plans.free", detail: RegistryL10n.t("The full task app on one device. You do not need an account."), footnote: nil, highlighted: false),
     RegistryPlanCard(id: "plus", title: RegistryL10n.t("Septena Plus"), icon: "settings.plus", detail: RegistryL10n.t("Your list on every device, updated live."), footnote: RegistryL10n.t("Everything in Free is included."), highlighted: true),
   ] }
+  /// Only for an account that has Pro: no store sells it (ADR 0037, ADR 0045).
+  static var proCard: RegistryPlanCard { RegistryPlanCard(id: "pro", title: RegistryL10n.t("Septena Pro"), icon: "plans.pro", detail: RegistryL10n.t("For people who run many agents on one list."), footnote: RegistryL10n.t("Everything in Plus is included."), highlighted: false) }
   static var outcomes: [RegistryPlanOutcome] { [
     RegistryPlanOutcome(id: "everywhere", icon: "onboarding.devices", title: RegistryL10n.t("Your list everywhere"), detail: RegistryL10n.t("The same tasks on your phone, tablet and Mac, updated as you type."), rows: [
-      RegistryPlanRow(id: "devices", label: RegistryL10n.t("Devices"), planned: false, free: .text(RegistryL10n.t("1")), plus: .text(RegistryL10n.t("All your devices"))),
-      RegistryPlanRow(id: "backup", label: RegistryL10n.t("Backup on our server"), planned: false, free: .included, plus: .included),
-      RegistryPlanRow(id: "new_device", label: RegistryL10n.t("Move to a new device"), planned: false, free: .included, plus: .included),
-      RegistryPlanRow(id: "beta", label: RegistryL10n.t("Early builds on TestFlight"), planned: false, free: .notIncluded, plus: .included),
+      RegistryPlanRow(id: "devices", label: RegistryL10n.t("Devices"), planned: false, free: .text(RegistryL10n.t("1")), plus: .text(RegistryL10n.t("All your devices")), pro: .text(RegistryL10n.t("All your devices"))),
+      RegistryPlanRow(id: "backup", label: RegistryL10n.t("Backup on our server"), planned: false, free: .included, plus: .included, pro: .included),
+      RegistryPlanRow(id: "new_device", label: RegistryL10n.t("Move to a new device"), planned: false, free: .included, plus: .included, pro: .included),
+      RegistryPlanRow(id: "beta", label: RegistryL10n.t("Early builds on TestFlight"), planned: false, free: .notIncluded, plus: .included, pro: .included),
     ]),
     RegistryPlanOutcome(id: "nothing_lost", icon: "plans.history", title: RegistryL10n.t("Nothing lost"), detail: RegistryL10n.t("See who changed what and bring back what you deleted. Your files open on every device."), rows: [
-      RegistryPlanRow(id: "history", label: RegistryL10n.t("Change history"), planned: false, free: .text(RegistryL10n.t("30 days")), plus: .text(RegistryL10n.t("365 days"))),
-      RegistryPlanRow(id: "deleted", label: RegistryL10n.t("Recently Deleted"), planned: false, free: .text(RegistryL10n.t("30 days")), plus: .text(RegistryL10n.t("30 days"))),
-      RegistryPlanRow(id: "files", label: RegistryL10n.t("Files"), planned: false, free: .text(RegistryL10n.t("On your device")), plus: .text(RegistryL10n.t("10 GB synced"))),
-      RegistryPlanRow(id: "export", label: RegistryL10n.t("Export as JSON"), planned: false, free: .included, plus: .included),
+      RegistryPlanRow(id: "history", label: RegistryL10n.t("Change history"), planned: false, free: .text(RegistryL10n.t("30 days")), plus: .text(RegistryL10n.t("365 days")), pro: .text(RegistryL10n.t("365 days"))),
+      RegistryPlanRow(id: "deleted", label: RegistryL10n.t("Recently Deleted"), planned: false, free: .text(RegistryL10n.t("30 days")), plus: .text(RegistryL10n.t("30 days")), pro: .text(RegistryL10n.t("30 days"))),
+      RegistryPlanRow(id: "files", label: RegistryL10n.t("Files"), planned: false, free: .text(RegistryL10n.t("On your device")), plus: .text(RegistryL10n.t("10 GB synced")), pro: .text(RegistryL10n.t("50 GB synced"))),
+      RegistryPlanRow(id: "export", label: RegistryL10n.t("Export as JSON"), planned: false, free: .included, plus: .included, pro: .included),
     ]),
     RegistryPlanOutcome(id: "agents", icon: "onboarding.agent", title: RegistryL10n.t("Help that keeps working"), detail: RegistryL10n.t("Connect Claude or another agent to your list. It asks before it acts, and you can stop it at any time."), rows: [
-      RegistryPlanRow(id: "connected", label: RegistryL10n.t("Agents"), planned: false, free: .text(RegistryL10n.t("1")), plus: .text(RegistryL10n.t("3"))),
-      RegistryPlanRow(id: "share", label: RegistryL10n.t("Shared projects"), planned: true, free: .text(RegistryL10n.t("Join")), plus: .text(RegistryL10n.t("Create and invite"))),
+      RegistryPlanRow(id: "connected", label: RegistryL10n.t("Agents"), planned: false, free: .text(RegistryL10n.t("1")), plus: .text(RegistryL10n.t("3")), pro: .text(RegistryL10n.t("No limit"))),
+      RegistryPlanRow(id: "share", label: RegistryL10n.t("Shared projects"), planned: true, free: .text(RegistryL10n.t("Join")), plus: .text(RegistryL10n.t("Create and invite")), pro: .text(RegistryL10n.t("Create and invite"))),
     ]),
   ] }
   static var promises: [RegistryPlanNote] { [
