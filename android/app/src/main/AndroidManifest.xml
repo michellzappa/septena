@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Device calendar events in Today & Upcoming (feature `calendar.events`, read-only). -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
 
     <application
         android:name=".SeptenaAndroidApp"

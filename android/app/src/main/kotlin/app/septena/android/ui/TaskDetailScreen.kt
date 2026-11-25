@@ -169,6 +169,7 @@ fun TaskDetailScreen(
     modifier: Modifier = Modifier,
     initialAttribute: String? = null,
     onOpenTask: (String) -> Unit = {},
+    openSendBackInitially: Boolean = false,
 ) {
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val isDark = LocalSeptenaDarkTheme.current
@@ -1182,6 +1183,7 @@ fun TaskDetailScreen(
                                                     isTaskOpen = isTaskOpen,
                                                     canWrite = canEdit,
                                                     heading = discussHeading,
+                                                    openSendBackInitially = openSendBackInitially,
                                                 )
                                             }
                                         }
@@ -1293,6 +1295,7 @@ fun TaskDetailScreen(
                                                 isTaskOpen = isTaskOpen,
                                                 canWrite = canEdit,
                                                 heading = heading,
+                                                openSendBackInitially = openSendBackInitially,
                                             )
                                         }
                                     }
