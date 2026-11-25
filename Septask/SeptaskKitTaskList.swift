@@ -109,11 +109,6 @@ final class SeptaskKitTaskListController: NSViewController {
     /// counterpart of SwiftUI's `QuickAddTriggerRow`. It carries no task, so
     /// `shouldSelectRow` already keeps it out of selection and arrow-nav.
     case newTask
-    /// Foot of a project page — the quiet "Add Section" line, the AppKit
-    /// counterpart of `TaskListView.addSectionButton`. Until this existed the
-    /// ONLY way to make a heading was a right-click on blank space below the
-    /// list, which a project with enough tasks to fill the window doesn't have.
-    case addSection
     /// "Import all N from Reminders" — a quiet action LINE inside the Inbox,
     /// shown only when more than one is waiting. A line rather than a header
     /// button because the Inbox header's trailing slot belongs to the `+`, and
@@ -149,7 +144,6 @@ final class SeptaskKitTaskListController: NSViewController {
       case .fadedFooter: return "faded-footer"
       case .loggedFooter: return "logged-footer"
       case .newTask: return "new-task"
-      case .addSection: return "add-section"
       case .reminder(let item, _): return "reminder:" + item.id
       case .notice(let notice): return "notice:" + notice.id.rawValue
       case .noticeStep(let step): return step.selectionID
@@ -182,7 +176,7 @@ final class SeptaskKitTaskListController: NSViewController {
     /// so they break the card run the same way a Today area/project header does.
     var isCardRow: Bool {
       switch self {
-      case .header, .screenTitle, .logbookBar, .tagFilterBar, .fadedFooter, .loggedFooter, .addSection, .notesProposal, .containerNotes: return false
+      case .header, .screenTitle, .logbookBar, .tagFilterBar, .fadedFooter, .loggedFooter, .notesProposal, .containerNotes: return false
       // A standalone notice sits on the page with its own card fill. A notice
       // with checklist steps (`Get started`) heads its steps' card so the
       // header and rows share one seamless frosted surface (matching iOS).
@@ -575,13 +569,13 @@ final class SeptaskKitTaskListController: NSViewController {
       // Only a TASK row has a task menu. A header, an event, the "New task"
       // line or a reminder used to get the full menu, with every command
       // aimed at whatever happened to be selected elsewhere. On a project
-      // page, right-clicking the page title, project notes, or Add Section
-      // row offers the same "New Section" menu as blank space below the list.
+      // page, right-clicking the page title or project notes offers the same
+      // "New Section" menu as blank space below the list.
       guard self.rows.indices.contains(row) else { return }
       guard self.rows[row].task != nil else {
         if case .project = self.filter {
           switch self.rows[row] {
-          case .screenTitle, .containerNotes, .addSection:
+          case .screenTitle, .containerNotes:
             self.buildBlankSpaceMenu().popUp(positioning: nil, at: point, in: tableView)
           default:
             break
@@ -825,6 +819,8 @@ final class SeptaskKitTaskListController: NSViewController {
     remeasureNotesRowIfWidthChanged()
   }
 
+  /// The areas and projects whose notes the user unfolded, in this window.
+  private var unfoldedNotes = Set<String>()
   /// The table width the notes row was last measured at.
   private var notesRowMeasuredWidth: CGFloat = 0
 
@@ -1904,7 +1900,7 @@ final class SeptaskKitTaskListController: NSViewController {
         continue
       case .task(let task, _, _):
         ids.insert(task.id)
-      case .header, .loggedFooter, .fadedFooter, .addSection,
+      case .header, .loggedFooter, .fadedFooter,
            .screenTitle, .logbookBar, .tagFilterBar, .projectTarget, .containerNotes,
            .notice, .noticeStep, .event, .notesProposal:
         return ids
@@ -2211,6 +2207,20 @@ final class SeptaskKitTaskListController: NSViewController {
     }
   }
 
+  /// Show more / Show less under the notes.
+  private func toggleNotesFold(id: String) {
+    if unfoldedNotes.remove(id) == nil { unfoldedNotes.insert(id) }
+    guard let row = rows.firstIndex(where: {
+      if case .containerNotes(_, id, _) = $0 { return true }
+      return false
+    }) else { return }
+    tableView.reloadData(forRowIndexes: [row], columnIndexes: [0])
+    NSAnimationContext.runAnimationGroup { ctx in
+      ctx.duration = KitMotion.composerAnimationDuration
+      tableView.noteHeightOfRows(withIndexesChanged: [row])
+    }
+  }
+
   /// Opens the notes editor anchored to the notes row; closing it saves
   /// through the same mutators the SwiftUI project and area pages use.
   private func editContainerNotes(isArea: Bool, id: String, text: String, anchor: NSView) {
@@ -2365,9 +2375,6 @@ final class SeptaskKitTaskListController: NSViewController {
       let members = open.filter { $0.heading == heading.id }
       result.append(contentsOf: members.map(unchipped))
     }
-    // Last, before the logged footer the caller appends — the same place
-    // `TaskListView.projectGroupedRows` puts `addSectionButton`.
-    result.append(.addSection)
     return result
   }
 
@@ -4057,7 +4064,8 @@ final class SeptaskKitTaskListController: NSViewController {
     // Also flush the cell's initial layout with animations disabled BEFORE
     // `animateComposerHeight` starts: otherwise its first Auto Layout pass
     // runs inside the implicit-animation context and visibly shifts the title.
-    if let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false)
+    // A row the reload has just made has no view yet, so make it here.
+    if let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: true)
         as? KitComposerCell {
       composerRowHeight = cell.expandedHeight
       NSAnimationContext.runAnimationGroup { ctx in
@@ -4077,6 +4085,12 @@ final class SeptaskKitTaskListController: NSViewController {
               as? KitComposerCell
       else { return }
       if focusNotes { cell.focusNotes() } else { cell.focusTitle() }
+      // The row can still hold the height it had before its cell existed.
+      if self.composerRowHeight != cell.expandedHeight
+          || self.tableView.rect(ofRow: freshRow).height < cell.expandedHeight - 1 {
+        self.composerRowHeight = cell.expandedHeight
+        self.animateComposerHeight(ofRow: freshRow)
+      }
     }
   }
 
@@ -5161,18 +5175,17 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     case .fadedFooter, .loggedFooter:
       return KitLoggedFooterCell.topGap + SeptenaTypeScale.size(.footnote) + 24
     case .newTask: return SeptaskKitTheme.rowHeight
-    // Same band as the logged footer — both are quiet meta-font page footers.
-    case .addSection: return SeptenaTypeScale.size(.footnote) + 24
     case .notesProposal(_, _, let currentNotes, let proposal):
       return KitNotesProposalLayout.height(
         currentNotes: currentNotes,
         proposal: proposal,
         rowWidth: tableView.bounds.width)
-    case .containerNotes(let isArea, _, let text):
+    case .containerNotes(let isArea, let id, let text):
       return KitContainerNotes.height(
         text: text,
         placeholder: isArea ? ContainerNotes.areaPlaceholder : ContainerNotes.projectPlaceholder,
-        rowWidth: tableView.bounds.width)
+        rowWidth: tableView.bounds.width,
+        expanded: unfoldedNotes.contains(id))
     // Reminder rows read as task rows (they become tasks on click); their
     // header sits on the page like every other group header.
     case .reminder: return SeptaskKitTheme.rowHeight
@@ -5817,13 +5830,6 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.onTap = { [weak self] in self?.createTask(inInbox: true) }
       return cell
 
-    case .addSection:
-      let identifier = NSUserInterfaceItemIdentifier("addSectionCell")
-      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitAddSectionCell
-        ?? KitAddSectionCell(identifier: identifier)
-      cell.onTap = { [weak self] in self?.menuNewSection() }
-      return cell
-
     case .notesProposal(let isArea, let id, let currentNotes, let proposal):
       let identifier = NSUserInterfaceItemIdentifier("notesProposalCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitNotesProposalCell
@@ -5842,7 +5848,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitContainerNotesCell
         ?? KitContainerNotesCell(identifier: identifier)
       cell.configure(text: text,
-                     placeholder: isArea ? ContainerNotes.areaPlaceholder : ContainerNotes.projectPlaceholder)
+                     placeholder: isArea ? ContainerNotes.areaPlaceholder : ContainerNotes.projectPlaceholder,
+                     expanded: unfoldedNotes.contains(id))
+      cell.onToggle = { [weak self] in self?.toggleNotesFold(id: id) }
       cell.onEdit = { [weak self] anchor in
         self?.editContainerNotes(isArea: isArea, id: id, text: text, anchor: anchor)
       }
@@ -7438,110 +7446,6 @@ struct KitContentColumnPin {
   }
 }
 
-// MARK: - Add-section cell
-
-/// Foot of a project page: the quiet "+ Add Section" line, the AppKit
-/// counterpart of `TaskListView.addSectionButton` — same copy, same meta font
-/// and secondary ink, left-aligned on the content column.
-///
-/// Clicks go to a transparent full-bleed `NSButton`, for the reason spelled
-/// out on `KitNewTaskCell`: `NSTableView` claims clicks on label and image
-/// content, so only a real `NSControl` reliably receives them.
-@MainActor
-final class KitAddSectionCell: NSTableCellView {
-  /// Keeps the overlay inside the content column — see `KitContentColumnPin`.
-  private var hitPin: KitContentColumnPin!
-  private let plus = NSImageView()
-  private let label = NSTextField(labelWithString: "")
-  private let hit = NSButton()
-  private var leadingConstraint: NSLayoutConstraint!
-  private var trailingConstraint: NSLayoutConstraint!
-  var onTap: (() -> Void)?
-
-  init(identifier: NSUserInterfaceItemIdentifier) {
-    super.init(frame: .zero)
-    self.identifier = identifier
-
-    let title = String(localized: "Add Section",
-                       comment: "Foot of a project page — create a section heading")
-
-    plus.translatesAutoresizingMaskIntoConstraints = false
-    plus.image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)?
-      .withSymbolConfiguration(.init(pointSize: SeptenaTypeScale.size(.footnote),
-                                     weight: .semibold))
-    plus.contentTintColor = SeptaskKitTheme.inkSecondary
-    plus.setContentHuggingPriority(.required, for: .horizontal)
-    plus.kitA11yIgnore()
-
-    label.translatesAutoresizingMaskIntoConstraints = false
-    label.font = SeptaskKitTheme.meta
-    label.textColor = SeptaskKitTheme.inkSecondary
-    label.stringValue = title
-    label.kitA11yIgnore()
-
-    hit.translatesAutoresizingMaskIntoConstraints = false
-    hit.isBordered = false
-    hit.isTransparent = true
-    hit.title = ""
-    hit.setButtonType(.momentaryChange)
-    hit.refusesFirstResponder = true
-    hit.target = self
-    hit.action = #selector(fire)
-    hit.kitA11yIgnore()
-
-    addSubview(plus)
-    addSubview(label)
-    // Last, so it layers above the content and takes every click in the row.
-    addSubview(hit)
-    textField = label
-    kitA11yButton(label: title)
-
-    // Same content-column origin as the logged footer, so the two page
-    // footers line up with each other and with the cards above them.
-    leadingConstraint = plus.leadingAnchor.constraint(
-      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
-    trailingConstraint = label.trailingAnchor.constraint(
-      lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
-    hitPin = KitContentColumnPin(hit, in: self)
-    NSLayoutConstraint.activate([
-      leadingConstraint,
-      plus.centerYAnchor.constraint(equalTo: centerYAnchor),
-      label.leadingAnchor.constraint(equalTo: plus.trailingAnchor, constant: 6),
-      label.centerYAnchor.constraint(equalTo: centerYAnchor),
-      trailingConstraint,
-      hit.topAnchor.constraint(equalTo: topAnchor),
-      hit.bottomAnchor.constraint(equalTo: bottomAnchor),
-    ] + hitPin.constraints + [
-    ])
-  }
-
-  required init?(coder: NSCoder) { fatalError("KitAddSectionCell is code-only") }
-
-  /// Same width-dependent centered-column margin as every other row.
-  override func layout() {
-    let inset = SeptaskKitLayout.inset(for: bounds.width)
-    leadingConstraint.constant = inset + 6
-    trailingConstraint.constant = -(inset + 8)
-    hitPin.update(width: bounds.width)
-    super.layout()
-  }
-
-  override func accessibilityPerformPress() -> Bool {
-    onTap?()
-    return true
-  }
-
-  override func resetCursorRects() {
-    // Scoped to the button, never the whole cell: a cursor rect does NOT go
-    // through hit-testing, so a whole-cell rect happily advertises the page
-    // padding as clickable when it is not. That false signal is what cost
-    // three rounds of debugging in the 2026-08-09 pass.
-    addCursorRect(hit.frame, cursor: .pointingHand)
-  }
-
-  @objc private func fire() { onTap?() }
-}
-
 // MARK: - Reminders inbox cells
 
 /// "Import all N from Reminders" — a quiet action line at the foot of the
@@ -7549,8 +7453,7 @@ final class KitAddSectionCell: NSTableCellView {
 ///
 /// A LINE, not a header button: the Inbox header's trailing slot belongs to
 /// the `+`, and this action is consequential enough to want a full row and a
-/// sentence rather than a glyph. Same shape as the "Add Section" footer —
-/// the shell's established vocabulary for a quiet in-list action.
+/// sentence rather than a glyph.
 ///
 /// The subtitle says what it costs, because importing DELETES the originals
 /// from Apple Reminders and undo cannot reach them. That is the only place in

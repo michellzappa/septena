@@ -167,7 +167,7 @@ final class NavigationState {
   /// so these stay false there.
   var shouldCreateProject = false
   var shouldCreateArea = false
-  /// One-shot trigger for the active Project's "Add Section" heading prompt
+  /// One-shot trigger for the active Project's "New Section" heading prompt
   /// (used by the iPhone Magic Plus quick menu when viewing a project).
   var shouldCreateHeading = false
 
