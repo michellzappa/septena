@@ -156,6 +156,12 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// count, Next, and the badge.
   var isFaded: Bool { status == .open && fadedAt != nil }
 
+  /// The one Review group an open task shows in, or nil.
+  var reviewGroup: ReviewGroup? {
+    guard status == .open, deletedAt == nil, !isHeading else { return nil }
+    return conversation.reviewGroup ?? (isFaded ? .faded : nil)
+  }
+
   /// Countdown progress (0…1) toward the 14-day fade window (`TaskFade.fadeFill`).
   /// Drives whole-row opacity in every open task list.
   func fadeFill(today: String = SeptenaDate.today, now: Date = Date()) -> Double? {

@@ -134,14 +134,6 @@ extension TaskConvo {
   }
 }
 
-extension SeptenaTask {
-  /// The one Review group an open task shows in, or nil.
-  var reviewGroup: ReviewGroup? {
-    guard status == .open, deletedAt == nil, !isHeading else { return nil }
-    return conversation.reviewGroup ?? (isFaded ? .faded : nil)
-  }
-}
-
 extension TaskConvo {
   /// The agent's move, or an agent holds the task now: such a task never fades.
   func isAgentTurn(at now: Date) -> Bool {
