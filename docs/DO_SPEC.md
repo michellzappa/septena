@@ -1,6 +1,6 @@
 # Do: one task now
 
-Status: building (2026-11-25; D0 to D2, #515 to #517).
+Status: building (2026-11-25; D0 to D2 and the float of §4.2 are on `main`. Open: D3 to D8, see §10).
 **Decision:** [ADR 0041](adr/0041-do-is-one-task-now-on-every-screen.md).
 **Builds on:** [ADR 0006](adr/0006-tasks-fade-by-default.md) (no guilt, stuck
 question), [ADR 0008](adr/0008-agent-loop-rules-live-in-the-store.md) (rules in
