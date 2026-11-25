@@ -20,6 +20,7 @@ that host gets `410 Gone`. LEARNINGS.md is mostly about that connector.
 |---|---|
 | `src/index.ts` | Routes. |
 | `src/api/` | `/v1` API, Sign in with Apple, app sessions. |
+| `src/admin/` | The admin page at `/admin` (ADR 0043): counts only, behind Cloudflare Access. `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` in `wrangler.toml` turn it on. |
 | `src/store/` | `TaskStore` Durable Object (SQLite), columns, ops. `ProjectStore`: one per shared project. |
 | `src/shadow/` | The MCP connector: handler, pairing OAuth, tokens, writes, agent loop. |
 | `src/tools/` | Task tool definitions (`taskTools.ts`), view rules (`taskShared.ts`), pure write logic (`writeTasks.ts`). |

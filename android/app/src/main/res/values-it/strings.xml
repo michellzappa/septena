@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_today_name">Oggi</string>
+    <string name="widget_today_description">Attività di oggi, da completare con un tocco.</string>
+    <string name="widget_upcoming_name">In arrivo</string>
+    <string name="widget_upcoming_description">Attività pianificate in arrivo.</string>
+    <string name="widget_add_task">Nuova attività</string>
+    <string name="widget_complete_task">Completa attività</string>
+    <string name="shortcut_inbox_label">Posta in arrivo</string>
+    <string name="process_text_add_to_septena">Aggiungi a Septena</string>
+    <string name="tile_quick_add_label">Aggiungi attività</string>
+</resources>

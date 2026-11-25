@@ -29,6 +29,12 @@ export interface Env {
   SESSION_SIGNING_KEY_PREVIOUS?: string;
   /// Optional. Unset = the /v1/admin routes answer 404. Grants entitlements.
   ADMIN_TOKEN?: string;
+  /// The admin page at /admin (src/admin/). It answers 404 until all three are
+  /// set: the Cloudflare Access team domain, the Access application's audience
+  /// tag, and the comma-separated emails that may open it.
+  ACCESS_TEAM_DOMAIN?: string;
+  ACCESS_AUD?: string;
+  ADMIN_EMAILS?: string;
   /// "true" issues the signed tokens of ADR 0040 (src/api/session.ts). Anything
   /// else still issues the KV tokens, and accepts both.
   SIGNED_SESSIONS?: string;
@@ -55,6 +61,8 @@ export interface Env {
   /// One object per shared project (ADR 0004). Optional so isolated unit tests
   /// need not wire it.
   PROJECT_STORE?: DurableObjectNamespace<ProjectStore>;
+  /// Website signups (septena-site). The admin page reads it; nothing here writes.
+  SIGNUPS?: D1Database;
   ATTACHMENTS: R2Bucket;                         // attachment bytes, u/{userId}/att/{id}
   PAIRING: DurableObjectNamespace<PairingStore>; // one object per pending app-pairing code (src/shadow/)
 }

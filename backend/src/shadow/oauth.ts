@@ -31,7 +31,7 @@ import { AGENT_NAME_MAX, MCP_CLIENT_PREFIX, MCP_GRANT_SCOPE, MCP_SCOPES, issueMc
 const CLIENT_PREFIX = MCP_CLIENT_PREFIX;
 const CODE_PREFIX = "v2:code:";
 const CODE_TTL_S = 300;
-const PAIR_TTL_MS = 10 * 60 * 1000;
+export const PAIR_TTL_MS = 10 * 60 * 1000;
 const PAIR_COOKIE = "septena_pair";
 /// Wrong codes a user may enter per window before approve/inspect/deny answers 429.
 export const PAIR_MAX_FAILURES = 5;
@@ -83,7 +83,7 @@ export function normalizePairCode(input: string): string | null {
   return CODE_RE.test(code) ? code : null;
 }
 
-function pairingFor(env: Env, code: string) {
+export function pairingFor(env: Env, code: string) {
   return env.PAIRING.get(env.PAIRING.idFromName(`pair:${code}`));
 }
 
@@ -295,47 +295,61 @@ export type DeviceStartOutcome =
   | { ok: false; status: 429; error: "too_many_attempts" }
   | { ok: false; status: 503; error: "pairing_unavailable" };
 
-export async function startDevicePairing(
+/// Opens a code that a signed-in app approves. `secret` stays with whoever
+/// started it and is needed to finish.
+export async function openApprovalCode(
   env: Env,
-  body: z.infer<typeof zDeviceStartBody>,
+  purpose: "device" | "plus",
+  clientName: string,
   clientIp?: string | null,
-): Promise<DeviceStartOutcome> {
+): Promise<{ ok: true; code: string; secret: string } | { ok: false; reason: "rate_limited" | "unavailable" }> {
   if (clientIp && (await ipRateCount(env, "rl:devstart", clientIp)) >= DEVICE_START_MAX_PER_IP) {
-    logEvent("device_pair_start", { ok: false, reason: "rate_limited" });
-    return { ok: false, status: 429, error: "too_many_attempts" };
+    return { ok: false, reason: "rate_limited" };
   }
   if (clientIp) await noteIpRateEvent(env, "rl:devstart", clientIp);
 
-  const pollSecret = randomId(24);
+  const secret = randomId(24);
   const expiresAt = Date.now() + PAIR_TTL_MS;
   for (let i = 0; i < 4; i++) {
-    const candidate = newPairCode();
-    const created = await pairingFor(env, candidate).create({
-      purpose: "device",
-      pendingId: pollSecret,
-      clientId: "device",
-      clientName: body.clientName,
+    const code = newPairCode();
+    const created = await pairingFor(env, code).create({
+      purpose,
+      pendingId: secret,
+      clientId: purpose,
+      clientName,
       redirectUri: "",
       oauthState: "",
       codeChallenge: "",
       expiresAt,
     });
-    if (created) {
-      logEvent("device_pair_start", { ok: true, client: body.clientName });
-      return {
-        ok: true,
-        data: {
-          code: candidate,
-          pollSecret,
-          expiresIn: PAIR_TTL_MS / 1000,
-          interval: 3,
-          qr: pairQrMatrix(pairApproveUrl(env.API_PUBLIC_URL, candidate)),
-        },
-      };
-    }
+    if (created) return { ok: true, code, secret };
   }
-  logEvent("device_pair_start", { ok: false });
-  return { ok: false, status: 503, error: "pairing_unavailable" };
+  return { ok: false, reason: "unavailable" };
+}
+
+export async function startDevicePairing(
+  env: Env,
+  body: z.infer<typeof zDeviceStartBody>,
+  clientIp?: string | null,
+): Promise<DeviceStartOutcome> {
+  const opened = await openApprovalCode(env, "device", body.clientName, clientIp);
+  if (!opened.ok) {
+    logEvent("device_pair_start", { ok: false, reason: opened.reason });
+    return opened.reason === "rate_limited"
+      ? { ok: false, status: 429, error: "too_many_attempts" }
+      : { ok: false, status: 503, error: "pairing_unavailable" };
+  }
+  logEvent("device_pair_start", { ok: true, client: body.clientName });
+  return {
+    ok: true,
+    data: {
+      code: opened.code,
+      pollSecret: opened.secret,
+      expiresIn: PAIR_TTL_MS / 1000,
+      interval: 3,
+      qr: pairQrMatrix(pairApproveUrl(env.API_PUBLIC_URL, opened.code)),
+    },
+  };
 }
 
 export type DevicePollResult =
