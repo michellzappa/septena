@@ -62,15 +62,15 @@ pub struct ConversationState {
     /// A live claim: `claim_until` is after `now`. The host passes
     /// `claim_until` only when the claim has a claimant.
     pub is_claimed: bool,
-    /// The Agent smart list stage (`queued`, `working`, `yourTurn`, `review`,
-    /// `done`), or none when the task is not agent work.
+    /// The Agent smart list stage (`queued`, `working`, `yourTurn`, `stopped`,
+    /// `review`, `done`), or none when the task is not agent work.
     pub agent_stage: Option<String>,
 }
 
 /// The predicates and the Agent-list stage of a conversation
 /// (`docs/TASK_FACTORY_SPEC.md` §3). Review and Done win over a stale
-/// assignee; a stop counts as Your turn, because only the human can resume it
-/// (ADR 0008).
+/// assignee; a stop wins over an open question, because only the human can
+/// resume it (ADR 0008).
 #[cfg_attr(feature = "ffi", uniffi::export)]
 pub fn conversation_state(conversation: TaskConversation, now: String) -> Result<ConversationState, CoreError> {
     let now = instant(&now, "now")?;
@@ -83,7 +83,9 @@ pub fn conversation_state(conversation: TaskConversation, now: String) -> Result
             Some("review")
         } else if facts.is_terminal {
             Some("done")
-        } else if facts.open_question || conversation.stopped_at.is_some() {
+        } else if conversation.stopped_at.is_some() {
+            Some("stopped")
+        } else if facts.open_question {
             Some("yourTurn")
         } else if facts.is_claimed {
             Some("working")
@@ -98,6 +100,13 @@ pub fn conversation_state(conversation: TaskConversation, now: String) -> Result
         has_started: facts.has_started,
         is_claimed: facts.is_claimed,
         agent_stage: agent_stage.map(str::to_string),
+        review_group: if facts.needs_review {
+            Some("finished".to_string())
+        } else if facts.open_question && !facts.is_terminal && conversation.stopped_at.is_none() {
+            Some("questions".to_string())
+        } else {
+            None
+        },
     })
 }
 
