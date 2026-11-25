@@ -67,6 +67,7 @@
     "convoHandoffActionType": ["open_url", "compose", "call", "none"],
     "convoTurnRole": ["user", "provider"],
     "convoTurnStep": ["confirm", "ground", "scope", "decide", "work"],
+    "doExit": ["done", "stopped", "later", "replaced", "closed"],
     "taskRefRole": ["about", "from", "blocked_by", "follow_up"],
     "telemetryLevel": ["none", "minimal", "balanced", "full"],
     "appearanceMode": ["system", "light", "dark"],

@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "description": "Golden vectors for Do (docs/DO_SPEC.md §2): which open row stays open, how each other one ends, and which of two ends wins. Run in the shared core (ADR 0025).",
+  "now": "2026-11-25T12:00:00Z",
+  "resolve": [
+    { "name": "no rows", "sessions": [], "expected": { "ends": [], "current": null } },
+    {
+      "name": "one open row counts up",
+      "sessions": [{ "id": "a", "startedAt": "2026-11-25T11:30:00Z", "taskStatus": "open" }],
+      "expected": {
+        "ends": [],
+        "current": { "id": "a", "startedMs": 1795606200000, "plannedEndMs": null, "staleAtMs": 1795620600000, "isStale": false }
+      }
+    },
+    {
+      "name": "a planned length has an end and does not end the Do",
+      "sessions": [{ "id": "a", "startedAt": "2026-11-25T11:30:00Z", "plannedMinutes": 25, "taskStatus": "open" }],
+      "expected": {
+        "ends": [],
+        "current": { "id": "a", "startedMs": 1795606200000, "plannedEndMs": 1795607700000, "staleAtMs": 1795620600000, "isStale": false }
+      }
+    },
+    {
+      "name": "the latest start stays open, whatever the order of the rows",
+      "sessions": [
+        { "id": "b", "startedAt": "2026-11-25T11:30:00Z", "taskStatus": "open" },
+        { "id": "a", "startedAt": "2026-11-25T10:00:00Z", "taskStatus": "open" }
+      ],
+      "expected": {
+        "ends": [{ "id": "a", "endedAt": "2026-11-25T11:30:00Z", "exit": "replaced", "lapsed": false }],
+        "current": { "id": "b", "startedMs": 1795606200000, "plannedEndMs": null, "staleAtMs": 1795620600000, "isStale": false }
+      }
+    },
+    {
+      "name": "equal starts: the greater id stays open",
+      "sessions": [
+        { "id": "b", "startedAt": "2026-11-25T11:30:00Z", "taskStatus": "open" },
+        { "id": "a", "startedAt": "2026-11-25T12:30:00+01:00", "taskStatus": "open" }
+      ],
+      "expected": {
+        "ends": [{ "id": "a", "endedAt": "2026-11-25T11:30:00Z", "exit": "replaced", "lapsed": false }],
+        "current": { "id": "b", "startedMs": 1795606200000, "plannedEndMs": null, "staleAtMs": 1795620600000, "isStale": false }
+      }
+    },
+    {
+      "name": "a late offline start ends where the next Do started, though that one is closed",
+      "sessions": [
+        { "id": "a", "startedAt": "2026-11-25T10:00:00Z", "taskStatus": "open" },
+        { "id": "b", "startedAt": "2026-11-25T11:00:00Z", "endedAt": "2026-11-25T11:20:00Z", "taskStatus": "open" }
+      ],
+      "expected": {
+        "ends": [{ "id": "a", "endedAt": "2026-11-25T11:00:00Z", "exit": "replaced", "lapsed": false }],
+        "current": null
+      }
+    },
+    {
+      "name": "a Do replaced after it was stale has an unknown length",
+      "sessions": [
+        { "id": "a", "startedAt": "2026-11-25T06:00:00Z", "taskStatus": "open" },
+        { "id": "b", "startedAt": "2026-11-25T11:30:00Z", "taskStatus": "open" }
+      ],
+      "expected": {
+        "ends": [{ "id": "a", "endedAt": "2026-11-25T11:30:00Z", "exit": "replaced", "lapsed": true }],
+        "current": { "id": "b", "startedMs": 1795606200000, "plannedEndMs": null, "staleAtMs": 1795620600000, "isStale": false }
+      }
+    },
+    {
+      "name": "completing the task ends its Do",
+      "sessions": [{ "id": "a", "startedAt": "2026-11-25T11:30:00Z", "taskStatus": "done" }],
+      "expected": {
+        "ends": [{ "id": "a", "endedAt": "2026-11-25T12:00:00Z", "exit": "done", "lapsed": false }],
+        "current": null
+      }
+    },
+    {
+      "name": "cancelling the task closes its Do",
+      "sessions": [{ "id": "a", "startedAt": "2026-11-25T11:30:00Z", "taskStatus": "cancelled" }],
+      "expected": {
+        "ends": [{ "id": "a", "endedAt": "2026-11-25T12:00:00Z", "exit": "closed", "lapsed": false }],
+        "current": null
+      }
+    },
+    {
+      "name": "a task that is gone closes its Do",
+      "sessions": [{ "id": "a", "startedAt": "2026-11-25T11:30:00Z" }],
+      "expected": {
+        "ends": [{ "id": "a", "endedAt": "2026-11-25T12:00:00Z", "exit": "closed", "lapsed": false }],
+        "current": null
+      }
+    },
+    {
+      "name": "an end is never before the start",
+      "sessions": [{ "id": "a", "startedAt": "2026-11-25T12:05:00Z", "taskStatus": "done" }],
+      "expected": {
+        "ends": [{ "id": "a", "endedAt": "2026-11-25T12:05:00Z", "exit": "done", "lapsed": false }],
+        "current": null
+      }
+    },
+    {
+      "name": "stale after four hours",
+      "sessions": [{ "id": "a", "startedAt": "2026-11-25T08:00:00Z", "taskStatus": "open" }],
+      "expected": {
+        "ends": [],
+        "current": { "id": "a", "startedMs": 1795593600000, "plannedEndMs": null, "staleAtMs": 1795608000000, "isStale": true }
+      }
+    },
+    {
+      "name": "Still on it moves the stale limit",
+      "sessions": [{ "id": "a", "startedAt": "2026-11-25T06:00:00Z", "confirmedAt": "2026-11-25T10:30:00Z", "taskStatus": "open" }],
+      "expected": {
+        "ends": [],
+        "current": { "id": "a", "startedMs": 1795586400000, "plannedEndMs": null, "staleAtMs": 1795617000000, "isStale": false }
+      }
+    },
+    {
+      "name": "a forgotten Do ends at its stale limit after a day",
+      "sessions": [{ "id": "a", "startedAt": "2026-11-24T08:00:00Z", "taskStatus": "open" }],
+      "expected": {
+        "ends": [{ "id": "a", "endedAt": "2026-11-24T12:00:00.000Z", "exit": "stopped", "lapsed": true }],
+        "current": null
+      }
+    },
+    {
+      "name": "closed rows alone change nothing",
+      "sessions": [{ "id": "a", "startedAt": "2026-11-25T08:00:00Z", "endedAt": "2026-11-25T08:30:00Z", "taskStatus": "open" }],
+      "expected": { "ends": [], "current": null }
+    },
+    {
+      "name": "a start that is not an instant is an error",
+      "sessions": [{ "id": "a", "startedAt": "2026-11-25", "taskStatus": "open" }],
+      "expected": { "error": "`startedAt` is not an ISO-8601 instant: 2026-11-25" }
+    }
+  ],
+  "endWins": [
+    { "name": "an open row takes any end", "input": { "incoming": "2026-11-25T11:00:00Z" }, "expected": true },
+    { "name": "an earlier end wins", "input": { "current": "2026-11-25T11:00:00Z", "incoming": "2026-11-25T10:05:00Z" }, "expected": true },
+    { "name": "a later end loses", "input": { "current": "2026-11-25T10:05:00Z", "incoming": "2026-11-25T11:00:00Z" }, "expected": false },
+    { "name": "an equal end loses, in any zone", "input": { "current": "2026-11-25T11:00:00Z", "incoming": "2026-11-25T12:00:00+01:00" }, "expected": false }
+  ]
+}

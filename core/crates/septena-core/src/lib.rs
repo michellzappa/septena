@@ -17,6 +17,7 @@ mod generated {
 mod conformance;
 mod convo;
 mod date;
+mod do_session;
 mod error;
 mod fade;
 mod json;

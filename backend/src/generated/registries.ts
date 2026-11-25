@@ -48,6 +48,7 @@ export const ENTITY_ENUMS = {
   convoHandoffActionType: ["open_url","compose","call","none"] as const,
   convoTurnRole: ["user","provider"] as const,
   convoTurnStep: ["confirm","ground","scope","decide","work"] as const,
+  doExit: ["done","stopped","later","replaced","closed"] as const,
   taskRefRole: ["about","from","blocked_by","follow_up"] as const,
   telemetryLevel: ["none","minimal","balanced","full"] as const,
   appearanceMode: ["system","light","dark"] as const,
@@ -77,6 +78,8 @@ export const DOMAIN_RULES = {
   clientOpTtlDays: 30,
   changeLogTtlDays: 365,
   deleteGraceSeconds: 120,
+  doStaleHours: 4,
+  doLapseHours: 24,
 } as const;
 
 export const SYNCED_SETTING_KEYS = ["welcomeName","telemetryLevel","calendarHiddenTitles","rolledInDismissedOn","homeTimezone","agentsPaused","getStartedDismissed","getStartedSteps","upsellsSeen","onboardedAt","accentColor","canvasTexture","textureIntensity","textureMotion","smartListOrder","smartListHidden","smartListPlacement"] as const;
