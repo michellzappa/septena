@@ -1255,7 +1255,20 @@ final class KitPillButton: NSButton {
 
   override func layout() {
     super.layout()
+    keepGlassAtBack()
     applyCapsule()
+  }
+
+  /// AppKit makes the button's image view after `init` and puts it at the
+  /// back, under the glass, where the icon cannot be seen. `sortSubviews`
+  /// moves the glass without dropping its constraints.
+  private func keepGlassAtBack() {
+    guard subviews.first !== glass else { return }
+    sortSubviews({ a, b, glass in
+      if Unmanaged.passUnretained(a).toOpaque() == glass { return .orderedAscending }
+      if Unmanaged.passUnretained(b).toOpaque() == glass { return .orderedDescending }
+      return .orderedSame
+    }, context: Unmanaged.passUnretained(glass).toOpaque())
   }
 
   override func viewDidChangeEffectiveAppearance() {
