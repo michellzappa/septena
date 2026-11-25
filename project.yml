@@ -566,6 +566,9 @@ targets:
       - path: SeptenaCore/SharedCoreBridge.swift
       - path: SeptenaCore/TasksWidgetWire.swift
       - path: SeptenaCore/TaskBackend/TaskBackendLimits.swift
+      - path: SeptenaCore/TaskBackend/TaskBackendWire.swift
+      - path: SeptenaCore/TaskBackend/TaskSyncSettings.swift
+      - path: SeptenaCore/AppSettings.swift
       - path: SeptenaCore/Generated/RegistryConstants.swift
     dependencies:
       - package: SeptenaSharedCore
