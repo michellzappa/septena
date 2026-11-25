@@ -4,7 +4,16 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlin.math.hypot
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -379,12 +388,16 @@ fun TaskCardRow(
     selection: TaskSelection,
     onTaskAction: (String, String) -> Unit,
     dropModifier: Modifier = Modifier,
+    canReorder: Boolean = false,
+    orderedDragIds: List<String> = emptyList(),
 ) {
     val showTodayPill = showTodayIndicator && task.isOnToday && !task.isCompleted && !task.isFaded
     val showFadedPill = showFadedIndicator && task.isFaded && !task.isCompleted
     var menuExpanded by remember(task.id) { mutableStateOf(false) }
     val selecting = selection.isActive
     val selected = task.id in selection.selectedIds
+    val reorderDrag = LocalTaskReorderDrag.current
+    val isBeingDragged = reorderDrag != null && reorderDrag.isDragging && task.id in reorderDrag.draggedIds
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.80f)
     val overdueRed = if (isDark) Color(0xFFFF453A) else Color(0xFFFF3B30)
     val showSubtitleLine = task.subtitle != null || task.tagNames.isNotEmpty()
@@ -398,16 +411,29 @@ fun TaskCardRow(
         modifier = dropModifier,
     ) {
         Box {
+            val rowInteraction = if (canReorder && reorderDrag != null) {
+                Modifier.draggableTaskRow(
+                    taskId = task.id,
+                    taskTitle = task.title,
+                    selection = selection,
+                    orderedDragIds = orderedDragIds,
+                    drag = reorderDrag,
+                    onOpen = onOpenTask,
+                    onMenu = { if (rowMenuGroups.isNotEmpty()) menuExpanded = true },
+                )
+            } else {
+                Modifier.selectableTaskRow(
+                    taskId = task.id,
+                    selection = selection,
+                    onOpen = onOpenTask,
+                    onMenu = { if (rowMenuGroups.isNotEmpty()) menuExpanded = true },
+                )
+            }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .alpha(task.opacity)
-                    .selectableTaskRow(
-                        taskId = task.id,
-                        selection = selection,
-                        onOpen = onOpenTask,
-                        onMenu = { if (rowMenuGroups.isNotEmpty()) menuExpanded = true },
-                    )
+                    .alpha(if (isBeingDragged) 0.32f else task.opacity)
+                    .then(rowInteraction)
                     .padding(
                         horizontal = TaskCardMetrics.ContentInset,
                         vertical = 10.dp,
@@ -663,6 +689,99 @@ fun TaskCardRow(
             }
         }
     }
+}
+
+@Composable
+private fun Modifier.draggableTaskRow(
+    taskId: String,
+    taskTitle: String,
+    selection: TaskSelection,
+    orderedDragIds: List<String>,
+    drag: TaskReorderDragState,
+    onOpen: (String) -> Unit,
+    onMenu: () -> Unit,
+): Modifier {
+    val density = LocalDensity.current.density
+    val dragSlopPx = with(LocalDensity.current) { 10.dp.toPx() }
+    val haptics = LocalHapticFeedback.current
+    var rowOrigin by remember(taskId) { mutableStateOf(Offset.Zero) }
+    val hapticTick: () -> Unit = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+    val dragIds = if (selection.isActive && taskId in selection.selectedIds && orderedDragIds.isNotEmpty()) {
+        orderedDragIds
+    } else {
+        listOf(taskId)
+    }
+
+    return this
+        .onGloballyPositioned { coords -> rowOrigin = coords.positionInRoot() }
+        .pointerInput(taskId, taskTitle, selection.isActive, dragIds, drag) {
+            val touchSlop = viewConfiguration.touchSlop
+            val longPressTimeout = viewConfiguration.longPressTimeoutMillis
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                val downPos = down.position
+                var longPressed = false
+                var dragging = false
+
+                // Phase 1: wait for long-press timeout; vertical scroll wins immediately on movement.
+                val beforeLongPress = withTimeoutOrNull(longPressTimeout) {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: return@withTimeoutOrNull "cancel"
+                        if (!change.pressed) return@withTimeoutOrNull "tap"
+                        if (hypot(change.position.x - downPos.x, change.position.y - downPos.y) > touchSlop) {
+                            return@withTimeoutOrNull "scroll"
+                        }
+                    }
+                }
+                when (beforeLongPress) {
+                    "tap" -> {
+                        if (selection.isActive) selection.onToggle(taskId) else onOpen(taskId)
+                        return@awaitEachGesture
+                    }
+                    "scroll", "cancel" -> return@awaitEachGesture
+                    null -> {
+                        // Long-press timeout elapsed while finger held stationary!
+                        longPressed = true
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
+                }
+
+                // Phase 2: finger held past long-press. Slide > dragSlop to drag-reorder; lift stationary to open menu.
+                try {
+                    while (longPressed) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) {
+                            if (dragging) {
+                                change.consume()
+                                drag.endDrag(rowOrigin + change.position, density)
+                            } else {
+                                if (selection.isActive) selection.onToggle(taskId) else onMenu()
+                            }
+                            break
+                        }
+                        val moved = hypot(change.position.x - downPos.x, change.position.y - downPos.y)
+                        if (!dragging && moved >= dragSlopPx) {
+                            dragging = true
+                            drag.beginDrag(
+                                ids = dragIds,
+                                primaryTitle = taskTitle,
+                                location = rowOrigin + change.position,
+                                density = density,
+                                onHapticTick = hapticTick,
+                            )
+                        }
+                        if (dragging) {
+                            change.consume()
+                            drag.updateDrag(rowOrigin + change.position, density, hapticTick)
+                        }
+                    }
+                } finally {
+                    if (dragging && drag.isDragging) drag.cancel()
+                }
+            }
+        }
 }
 
 @Composable

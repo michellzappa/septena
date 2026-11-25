@@ -28,6 +28,9 @@ sealed interface MagicPlusDropKind {
 
     /** Under a section, band, or heading header (inserts first in that section). */
     data object TaskSection : MagicPlusDropKind
+
+    /** A full container target (e.g. a Lists Homepage smart-list pill, Area, or Project row). */
+    data object Container : MagicPlusDropKind
 }
 
 data class MagicPlusActiveTarget(
@@ -50,6 +53,8 @@ class MagicPlusDragState {
         val kind: MagicPlusDropKind,
         val topY: Float,
         val bottomY: Float,
+        val leftX: Float = Float.NEGATIVE_INFINITY,
+        val rightX: Float = Float.POSITIVE_INFINITY,
         val onDrop: (before: Boolean) -> Unit,
     )
 
@@ -85,10 +90,20 @@ class MagicPlusDragState {
         kind: MagicPlusDropKind,
         topY: Float,
         bottomY: Float,
+        leftX: Float = Float.NEGATIVE_INFINITY,
+        rightX: Float = Float.POSITIVE_INFINITY,
         onDrop: (before: Boolean) -> Unit,
     ) {
         if (bottomY <= topY) return
-        zones[id] = Zone(id = id, kind = kind, topY = topY, bottomY = bottomY, onDrop = onDrop)
+        zones[id] = Zone(
+            id = id,
+            kind = kind,
+            topY = topY,
+            bottomY = bottomY,
+            leftX = leftX,
+            rightX = rightX,
+            onDrop = onDrop,
+        )
     }
 
     fun unregister(id: String) {
@@ -151,6 +166,19 @@ class MagicPlusDragState {
         }
         isOverCancelSocket = false
 
+        val containerHit = zones.values.firstOrNull { zone ->
+            zone.kind == MagicPlusDropKind.Container &&
+                location.x in zone.leftX..zone.rightX &&
+                location.y in zone.topY..zone.bottomY
+        }
+        if (containerHit != null) {
+            if (activeTarget?.id != containerHit.id) {
+                onHapticTick()
+                activeTarget = MagicPlusActiveTarget(containerHit.id, MagicPlusDropKind.Container, before = true)
+            }
+            return
+        }
+
         val gaps = insertionPoints(density)
         if (gaps.isEmpty()) {
             activeTarget = null
@@ -190,6 +218,7 @@ class MagicPlusDragState {
                 MagicPlusDropKind.TaskSection -> {
                     points += Gap(zone.bottomY, zone.id, zone.kind, before = true, rank = 1)
                 }
+                MagicPlusDropKind.Container -> Unit
             }
         }
         points.sortBy(Gap::y)
@@ -290,6 +319,38 @@ fun Modifier.magicPlusSectionDrop(
             drag.register(id, MagicPlusDropKind.TaskSection, rect.top, rect.bottom) { _ -> onDrop() }
         }
         .drawInsertionMark(tint, markAlpha, atTop = false, visible = isTargeted)
+}
+
+/**
+ * Registers a container tile/row (e.g. a Lists Homepage smart-list pill, Area, or Project)
+ * as a Magic Plus drop target and returns whether it is currently hovered so the caller can
+ * highlight it with `SELECTION_WASH_ALPHA`.
+ */
+@androidx.compose.runtime.Composable
+fun rememberMagicPlusContainerDrop(
+    id: String,
+    enabled: Boolean,
+    onDrop: () -> Unit,
+): Pair<Modifier, Boolean> {
+    val drag = LocalMagicPlusDrag.current
+    if (drag == null || !enabled) return Modifier to false
+
+    DisposableEffect(drag, id) {
+        onDispose { drag.unregister(id) }
+    }
+    val isTargeted = drag.isDragging && drag.activeTarget?.id == id
+    val mod = Modifier.onGloballyPositioned { coords ->
+        val rect = coords.boundsInRoot()
+        drag.register(
+            id = id,
+            kind = MagicPlusDropKind.Container,
+            topY = rect.top,
+            bottomY = rect.bottom,
+            leftX = rect.left,
+            rightX = rect.right,
+        ) { _ -> onDrop() }
+    }
+    return mod to isTargeted
 }
 
 private fun Modifier.drawInsertionMark(

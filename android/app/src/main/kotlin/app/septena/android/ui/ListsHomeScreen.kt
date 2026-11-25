@@ -36,6 +36,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,6 +65,8 @@ import app.septena.core.generated.RegistryPromptIds
 import app.septena.core.stringValue
 import app.septena.ui.AreaDotGlyph
 import app.septena.ui.ChevronRightGlyph
+import app.septena.ui.LocalMagicPlusDrag
+import app.septena.ui.MagicPlusDragState
 import app.septena.ui.ProjectProgressRingGlyph
 import app.septena.ui.SELECTION_WASH_ALPHA
 import app.septena.ui.SeptenaGlyph
@@ -72,6 +75,7 @@ import app.septena.ui.TaskCardMetrics
 import app.septena.ui.TaskCardPosition
 import app.septena.ui.TaskCardSlice
 import app.septena.ui.cardPosition
+import app.septena.ui.rememberMagicPlusContainerDrop
 
 private val SIDEBAR_ROW_HEIGHT = 42.dp
 private val TILE_GUTTER = 10.dp
@@ -96,7 +100,7 @@ internal fun ListsHomePage(
     onSetAreaEmoji: (String, String?) -> Unit,
     onQuickFind: () -> Unit,
     onOpenSettings: () -> Unit,
-    onNewTask: () -> Unit,
+    onNewTask: (QuickAddDraft) -> Unit,
     onCreateArea: (String) -> Unit,
     onCreateProject: (String) -> Unit,
 ) {
@@ -109,6 +113,8 @@ internal fun ListsHomePage(
     }
     var createMenuOpen by remember { mutableStateOf(false) }
     var promptMode by remember { mutableStateOf<HomeCreatePrompt?>(null) }
+    val magicPlusDrag = remember { MagicPlusDragState() }
+    magicPlusDrag.fallbackDrop = { onNewTask(QuickAddDraft(today = true)) }
 
     val newTaskTitle = RegistryCatalog.actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag = languageTag)
         ?.takeIf(String::isNotBlank) ?: quickAddTitle
@@ -117,92 +123,112 @@ internal fun ListsHomePage(
     val newAreaTitle = RegistryCatalog.actionTitle(RegistryActionIds.SIDEBAR_NEW_AREA, languageTag = languageTag)
         .orEmpty()
 
-    Box(modifier = Modifier.fillMaxSize().background(canvasBackground)) {
-        HeaderWashBackdrop()
-        Scaffold(
-            containerColor = Color.Transparent,
-            topBar = {
-                TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        scrolledContainerColor = Color.Transparent,
-                    ),
-                    title = {},
-                    actions = {
-                        IconButton(
-                            onClick = onQuickFind,
-                            modifier = Modifier.semantics { contentDescription = quickFindTitle },
-                        ) {
-                            SearchGlyph(tint = MaterialTheme.colorScheme.onSurface)
-                        }
-                        IconButton(
-                            onClick = onOpenSettings,
-                            modifier = Modifier.semantics { contentDescription = settingsTitle },
-                        ) {
-                            SeptenaGlyph(
-                                kind = SeptenaIconKind.Settings,
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                size = 21.dp,
-                            )
-                        }
+    CompositionLocalProvider(LocalMagicPlusDrag provides magicPlusDrag) {
+        Box(modifier = Modifier.fillMaxSize().background(canvasBackground)) {
+            HeaderWashBackdrop()
+            Scaffold(
+                containerColor = Color.Transparent,
+                topBar = {
+                    TopAppBar(
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                            scrolledContainerColor = Color.Transparent,
+                        ),
+                        title = {},
+                        actions = {
+                            IconButton(
+                                onClick = onQuickFind,
+                                modifier = Modifier.semantics { contentDescription = quickFindTitle },
+                            ) {
+                                SearchGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                            }
+                            IconButton(
+                                onClick = onOpenSettings,
+                                modifier = Modifier.semantics { contentDescription = settingsTitle },
+                            ) {
+                                SeptenaGlyph(
+                                    kind = SeptenaIconKind.Settings,
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    size = 21.dp,
+                                )
+                            }
+                        },
+                    )
+                },
+            ) { contentPadding ->
+                ListsHomeContent(
+                    state = state,
+                    languageTag = languageTag,
+                    settingsTitle = settingsTitle,
+                    isDark = isDark,
+                    hasActiveTexture = appearance.hasActiveTexture,
+                    highlightSelection = false,
+                    showSettingsRow = false,
+                    onSelect = onSelectLocation,
+                    onSetAreaEmoji = onSetAreaEmoji,
+                    onOpenSettings = onOpenSettings,
+                    onMagicPlusDropLocation = { loc ->
+                        onNewTask(
+                            when (loc) {
+                                is TaskHomeLocation.Area -> QuickAddDraft(areaId = loc.id)
+                                is TaskHomeLocation.Project -> QuickAddDraft(projectId = loc.id)
+                                is TaskHomeLocation.SmartList -> when (loc.destinationId) {
+                                    RegistryDestinationIds.TODAY -> QuickAddDraft(today = true)
+                                    RegistryDestinationIds.STARRED -> QuickAddDraft(starred = true)
+                                    else -> QuickAddDraft()
+                                }
+                            },
+                        )
                     },
+                    modifier = Modifier.padding(contentPadding),
                 )
-            },
-        ) { contentPadding ->
-            ListsHomeContent(
-                state = state,
-                languageTag = languageTag,
-                settingsTitle = settingsTitle,
-                isDark = isDark,
-                hasActiveTexture = appearance.hasActiveTexture,
-                highlightSelection = false,
-                showSettingsRow = false,
-                onSelect = onSelectLocation,
-                onSetAreaEmoji = onSetAreaEmoji,
-                onOpenSettings = onOpenSettings,
-                modifier = Modifier.padding(contentPadding),
-            )
-        }
+            }
 
-        // Round Magic Plus button on the Lists Homepage: opens New Task / New Project / New Area.
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .navigationBarsPadding()
-                .padding(end = 16.dp, bottom = 16.dp),
-        ) {
-            HomeCreateOrb(
-                accessibilityLabel = quickAddTitle,
-                onClick = { createMenuOpen = true },
-            )
-            DropdownMenu(
-                expanded = createMenuOpen,
-                onDismissRequest = { createMenuOpen = false },
+            // Round Magic Plus orb on the Lists Homepage: tap opens New Task / New Project / New Area;
+            // drag-and-drop onto Today / Favorites / any Area or Project opens Quick Add pre-filed there.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(end = 16.dp, bottom = 16.dp),
             ) {
-                DropdownMenuItem(
-                    text = { Text(newTaskTitle) },
-                    onClick = {
-                        createMenuOpen = false
-                        onNewTask()
-                    },
+                MagicPlusOrb(
+                    drag = magicPlusDrag,
+                    isViewingProject = false,
+                    accessibilityLabel = quickAddTitle,
+                    languageTag = languageTag,
+                    onNewTask = { createMenuOpen = true },
+                    onNewSection = {},
                 )
-                if (newProjectTitle.isNotEmpty()) {
+                DropdownMenu(
+                    expanded = createMenuOpen,
+                    onDismissRequest = { createMenuOpen = false },
+                ) {
                     DropdownMenuItem(
-                        text = { Text(newProjectTitle) },
+                        text = { Text(newTaskTitle) },
                         onClick = {
                             createMenuOpen = false
-                            promptMode = HomeCreatePrompt.Project
+                            onNewTask(QuickAddDraft(today = true))
                         },
                     )
-                }
-                if (newAreaTitle.isNotEmpty()) {
-                    DropdownMenuItem(
-                        text = { Text(newAreaTitle) },
-                        onClick = {
-                            createMenuOpen = false
-                            promptMode = HomeCreatePrompt.Area
-                        },
-                    )
+                    if (newProjectTitle.isNotEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text(newProjectTitle) },
+                            onClick = {
+                                createMenuOpen = false
+                                promptMode = HomeCreatePrompt.Project
+                            },
+                        )
+                    }
+                    if (newAreaTitle.isNotEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text(newAreaTitle) },
+                            onClick = {
+                                createMenuOpen = false
+                                promptMode = HomeCreatePrompt.Area
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -246,6 +272,7 @@ internal fun ListsHomeContent(
     onSelect: (TaskHomeLocation) -> Unit,
     onSetAreaEmoji: (String, String?) -> Unit,
     onOpenSettings: () -> Unit,
+    onMagicPlusDropLocation: ((TaskHomeLocation) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val todayTint = MaterialTheme.colorScheme.secondary
@@ -301,16 +328,27 @@ internal fun ListsHomeContent(
                                 val title = RegistryCatalog.destinationTitle(loc.destinationId, languageTag).orEmpty()
                                 val kind = destinationIconKind(loc.destinationId)
                                 val iconTint = if (loc.destinationId == RegistryDestinationIds.TODAY) todayTint else mutedIcon
+                                val canDrop = onMagicPlusDropLocation != null && loc.destinationId in setOf(
+                                    RegistryDestinationIds.TODAY,
+                                    RegistryDestinationIds.INBOX,
+                                    RegistryDestinationIds.ANYTIME,
+                                    RegistryDestinationIds.STARRED,
+                                )
+                                val (dropMod, isDropTargeted) = rememberMagicPlusContainerDrop(
+                                    id = "mp-home-smart-${loc.destinationId}",
+                                    enabled = canDrop,
+                                    onDrop = { onMagicPlusDropLocation?.invoke(loc) },
+                                )
                                 SmartListPillTile(
                                     iconKind = kind,
                                     iconTint = iconTint,
                                     title = title,
                                     count = item.count,
-                                    isSelected = highlightSelection && state.location == loc,
+                                    isSelected = (highlightSelection && state.location == loc) || isDropTargeted,
                                     isDark = isDark,
                                     hasActiveTexture = hasActiveTexture,
                                     onClick = { onSelect(loc) },
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.weight(1f).then(dropMod),
                                 )
                             }
                             if (pair.size == 1) {
@@ -325,13 +363,20 @@ internal fun ListsHomeContent(
         // 2. Standalone top-level projects card (if any).
         if (standaloneProjects.isNotEmpty()) {
             itemsIndexed(standaloneProjects, key = { _, it -> "loose-project:${(it.location as TaskHomeLocation.Project).id}" }) { index, item ->
+                val proj = item.location as TaskHomeLocation.Project
+                val (dropMod, isDropTargeted) = rememberMagicPlusContainerDrop(
+                    id = "mp-home-project-${proj.id}",
+                    enabled = onMagicPlusDropLocation != null,
+                    onDrop = { onMagicPlusDropLocation?.invoke(proj) },
+                )
                 CompactSidebarProjectRow(
                     item = item,
                     position = cardPosition(index, standaloneProjects.size),
-                    isSelected = highlightSelection && state.location == item.location,
+                    isSelected = (highlightSelection && state.location == item.location) || isDropTargeted,
                     isDark = isDark,
                     hasActiveTexture = hasActiveTexture,
                     onClick = { onSelect(item.location) },
+                    modifier = dropMod,
                 )
             }
         }
@@ -345,10 +390,15 @@ internal fun ListsHomeContent(
             val cardRowCount = 1 + visibleChildren.size
 
             item(key = "area:${area.id}") {
+                val (dropMod, isDropTargeted) = rememberMagicPlusContainerDrop(
+                    id = "mp-home-area-${area.id}",
+                    enabled = onMagicPlusDropLocation != null,
+                    onDrop = { onMagicPlusDropLocation?.invoke(area) },
+                )
                 CompactSidebarAreaRow(
                     item = areaItem,
                     position = cardPosition(0, cardRowCount),
-                    isSelected = highlightSelection && state.location == area,
+                    isSelected = (highlightSelection && state.location == area) || isDropTargeted,
                     isDark = isDark,
                     hasActiveTexture = hasActiveTexture,
                     hasProjects = childProjects.isNotEmpty(),
@@ -360,17 +410,25 @@ internal fun ListsHomeContent(
                         collapsedAreaIds = if (collapsed) collapsedAreaIds - area.id else collapsedAreaIds + area.id
                     },
                     onOpenEmojiPicker = { emojiTargetArea = area.id to areaItem.emoji },
+                    modifier = dropMod,
                 )
             }
 
             itemsIndexed(visibleChildren, key = { _, it -> "area-project:${(it.location as TaskHomeLocation.Project).id}" }) { index, projectItem ->
+                val proj = projectItem.location as TaskHomeLocation.Project
+                val (dropMod, isDropTargeted) = rememberMagicPlusContainerDrop(
+                    id = "mp-home-project-${proj.id}",
+                    enabled = onMagicPlusDropLocation != null,
+                    onDrop = { onMagicPlusDropLocation?.invoke(proj) },
+                )
                 CompactSidebarProjectRow(
                     item = projectItem,
                     position = cardPosition(index + 1, cardRowCount),
-                    isSelected = highlightSelection && state.location == projectItem.location,
+                    isSelected = (highlightSelection && state.location == projectItem.location) || isDropTargeted,
                     isDark = isDark,
                     hasActiveTexture = hasActiveTexture,
                     onClick = { onSelect(projectItem.location) },
+                    modifier = dropMod,
                 )
             }
         }
@@ -519,6 +577,7 @@ private fun CompactSidebarAreaRow(
     onClick: () -> Unit,
     onToggleCollapse: () -> Unit,
     onOpenEmojiPicker: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -527,6 +586,7 @@ private fun CompactSidebarAreaRow(
         isSelected = isSelected,
         isDark = isDark,
         hasActiveTexture = hasActiveTexture,
+        modifier = modifier,
     ) {
         Box {
             Row(
@@ -608,12 +668,14 @@ private fun CompactSidebarProjectRow(
     isDark: Boolean,
     hasActiveTexture: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     TaskCardSlice(
         position = position,
         isSelected = isSelected,
         isDark = isDark,
         hasActiveTexture = hasActiveTexture,
+        modifier = modifier,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -710,33 +772,6 @@ private fun SidebarCountText(count: Int?) {
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
         maxLines = 1,
     )
-}
-
-@Composable
-private fun HomeCreateOrb(
-    accessibilityLabel: String,
-    onClick: () -> Unit,
-) {
-    val magic = LocalMagicPlusColors.current
-    val fill = if (magic.fill == Color.Unspecified) MaterialTheme.colorScheme.primary else magic.fill
-    val ink = if (magic.ink == Color.Unspecified) MaterialTheme.colorScheme.onPrimary else magic.ink
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(58.dp)
-            .clip(CircleShape)
-            .background(fill, CircleShape)
-            .semantics { contentDescription = accessibilityLabel }
-            .clickable(onClick = onClick),
-    ) {
-        Text(
-            text = "+",
-            fontSize = 28.sp,
-            lineHeight = 28.sp,
-            fontWeight = FontWeight.Light,
-            color = ink,
-        )
-    }
 }
 
 private enum class HomeCreatePrompt { Area, Project }

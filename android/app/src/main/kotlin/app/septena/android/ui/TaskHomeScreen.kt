@@ -78,11 +78,15 @@ import app.septena.ui.CheckmarkGlyph
 import app.septena.ui.ChevronDownGlyph
 import app.septena.ui.ChevronLeftGlyph
 import app.septena.ui.LocalMagicPlusDrag
+import app.septena.ui.LocalTaskReorderDrag
 import app.septena.ui.MagicPlusDragState
 import app.septena.ui.SeptenaGlyph
 import app.septena.ui.SeptenaIconKind
 import app.septena.ui.StarGlyph
 import app.septena.ui.TaskCardMetrics
+import app.septena.ui.TaskDragStackOverlay
+import app.septena.ui.TaskReorderDragState
+import app.septena.ui.reorderPositions
 import app.septena.ui.TaskHomeContent
 import app.septena.ui.TaskMenuActionIcon
 import app.septena.ui.TaskRowMenuAction
@@ -100,7 +104,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     // On mobile, opens on Today with the Lists Homepage one Back away (Things / iOS `SeptaskRootView`).
     var showingListsHome by rememberSaveable { mutableStateOf(false) }
-    var homeQuickAddOpen by rememberSaveable { mutableStateOf(false) }
+    var homeQuickAddDraft by remember { mutableStateOf<QuickAddDraft?>(null) }
     val factory = remember(graph) { TaskHomeViewModelFactory(graph) }
     val homeViewModel: TaskHomeViewModel = viewModel(factory = factory)
     val state by homeViewModel.state.collectAsStateWithLifecycle()
@@ -264,16 +268,16 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
     val isDark = LocalSeptenaDarkTheme.current
     val appearance = LocalAppearance.current
 
-    if (homeQuickAddOpen) {
+    homeQuickAddDraft?.let { initialDraft ->
         QuickAddSheet(
             today = graph.clock.today(graph.clock.now()),
             errorMessage = state.errorMessage,
             areas = state.areas,
             projects = state.projects,
             languageTag = languageTag,
-            initialDraft = QuickAddDraft(today = true),
-            onDismiss = { homeQuickAddOpen = false },
-            onAdd = { draft -> homeViewModel.quickAdd(draft) { homeQuickAddOpen = false } },
+            initialDraft = initialDraft,
+            onDismiss = { homeQuickAddDraft = null },
+            onAdd = { draft -> homeViewModel.quickAdd(draft) { homeQuickAddDraft = null } },
         )
     }
 
@@ -377,7 +381,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                     onSetAreaEmoji = homeViewModel::setAreaEmoji,
                     onQuickFind = { quickFindOpen = true },
                     onOpenSettings = { settingsOpen = true },
-                    onNewTask = { homeQuickAddOpen = true },
+                    onNewTask = { draft -> homeQuickAddDraft = draft },
                     onCreateArea = { title ->
                         homeViewModel.createArea(title) { created -> selectHomeLocation(created) }
                     },
@@ -731,6 +735,7 @@ private fun TaskHomeScaffold(
     var selectionPicker by remember { mutableStateOf<SelectionPicker?>(null) }
     var allOnToday by remember { mutableStateOf(false) }
     val magicPlusDrag = remember { MagicPlusDragState() }
+    val reorderDrag = remember { TaskReorderDragState() }
     val context = LocalContext.current
     val isDark = LocalSeptenaDarkTheme.current
     val appearance = LocalAppearance.current
@@ -756,7 +761,10 @@ private fun TaskHomeScaffold(
         onToggle = homeViewModel::toggleSelection,
     )
     LaunchedEffect(state.selectedIds) { allOnToday = homeViewModel.allOnToday(state.selectedIds) }
-    LaunchedEffect(state.location) { if (!magicPlusDrag.isDragging) magicPlusDrag.reset() }
+    LaunchedEffect(state.location) {
+        if (!magicPlusDrag.isDragging) magicPlusDrag.reset()
+        if (!reorderDrag.isDragging) reorderDrag.reset()
+    }
     BackHandler(enabled = selecting) { homeViewModel.clearSelection() }
 
     val openDefaultQuickAdd: () -> Unit = {
@@ -840,7 +848,10 @@ private fun TaskHomeScaffold(
         MaterialTheme.colorScheme.surfaceContainerLow
     }
 
-    CompositionLocalProvider(LocalMagicPlusDrag provides magicPlusDrag) {
+    CompositionLocalProvider(
+        LocalMagicPlusDrag provides magicPlusDrag,
+        LocalTaskReorderDrag provides reorderDrag,
+    ) {
         Box(modifier = Modifier.fillMaxSize().background(canvasBackground)) {
             HeaderWashBackdrop()
             Scaffold(
@@ -970,6 +981,12 @@ private fun TaskHomeScaffold(
                     )
                     is TaskHomeLocation.SmartList -> {
                         val isTodayList = location.destinationId == RegistryDestinationIds.TODAY
+                        val canReorderList = location.destinationId in setOf(
+                            RegistryDestinationIds.TODAY,
+                            RegistryDestinationIds.INBOX,
+                            RegistryDestinationIds.ANYTIME,
+                            RegistryDestinationIds.STARRED,
+                        )
                         val inboxPositions = state.inboxTasks.map { it.position }
                         val taskPositions = state.tasks.map { it.position }
                         TaskHomeContent(
@@ -1023,6 +1040,56 @@ private fun TaskHomeScaffold(
                                     )
                                 }
                             } else null,
+                            canReorder = canReorderList,
+                            onReorderInboxHeader = if (isTodayList) {
+                                { ids ->
+                                    val topPos = inboxPositions.firstOrNull() ?: 0.0
+                                    val newPositions = List(ids.size) { i -> topPos - (ids.size - i).toDouble() }
+                                    homeViewModel.reorderTasks(
+                                        ids = ids,
+                                        positions = newPositions,
+                                        useTodayPosition = false,
+                                        moveToInbox = true,
+                                    )
+                                }
+                            } else null,
+                            onReorderInboxRow = if (isTodayList) {
+                                { ids, index, before ->
+                                    val newPositions = reorderPositions(inboxPositions, index, before, ids.size)
+                                    homeViewModel.reorderTasks(
+                                        ids = ids,
+                                        positions = newPositions,
+                                        useTodayPosition = false,
+                                        moveToInbox = true,
+                                    )
+                                }
+                            } else null,
+                            onReorderTaskRow = if (canReorderList) {
+                                { ids, index, before ->
+                                    val targetGroup = state.tasks.getOrNull(index)?.group?.targetLocationKey
+                                    val newPositions = reorderPositions(taskPositions, index, before, ids.size)
+                                    homeViewModel.reorderTasks(
+                                        ids = ids,
+                                        positions = newPositions,
+                                        useTodayPosition = isTodayList,
+                                        targetGroupKey = targetGroup,
+                                    )
+                                }
+                            } else null,
+                            onReorderGroupHeader = if (canReorderList) {
+                                { ids, targetLocationKey ->
+                                    val firstInGroupPos = state.tasks
+                                        .firstOrNull { it.group?.targetLocationKey == targetLocationKey }
+                                        ?.position ?: 0.0
+                                    val newPositions = List(ids.size) { i -> firstInGroupPos - (ids.size - i).toDouble() }
+                                    homeViewModel.reorderTasks(
+                                        ids = ids,
+                                        positions = newPositions,
+                                        useTodayPosition = isTodayList,
+                                        targetGroupKey = targetLocationKey,
+                                    )
+                                }
+                            } else null,
                         )
                     }
                 }
@@ -1031,7 +1098,7 @@ private fun TaskHomeScaffold(
             // Round Magic Plus orb (matches iPhone `MagicPlusOrb`): visible on
             // creatable smart lists, areas and projects; hides during multi-select,
             // while a snackbar is up, or when the software keyboard is showing.
-            if (canCreateHere && !selecting && !snackbarVisible && !imeVisible) {
+            if (canCreateHere && !selecting && !snackbarVisible && !imeVisible && !reorderDrag.isDragging) {
                 MagicPlusOrb(
                     drag = magicPlusDrag,
                     isViewingProject = state.location is TaskHomeLocation.Project,
@@ -1045,6 +1112,12 @@ private fun TaskHomeScaffold(
                         .padding(end = 16.dp, bottom = 16.dp),
                 )
             }
+
+            TaskDragStackOverlay(
+                drag = reorderDrag,
+                isDark = isDark,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
