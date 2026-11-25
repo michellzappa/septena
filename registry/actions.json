@@ -258,6 +258,13 @@
       "availability": { "selection": "any", "onlyDestinations": ["recentlyDeleted"] },
       "featureId": "lists.recently-deleted"
     },
+    "task.emptyTrash": {
+      "title": "Empty Trash",
+      "icon": "action.delete",
+      "role": "destructive",
+      "availability": { "selection": "none", "onlyDestinations": ["recentlyDeleted"] },
+      "featureId": "lists.recently-deleted"
+    },
     "task.keepFaded": { "title": "Keep", "icon": "action.restore", "role": "default", "availability": { "selection": "any", "onlyDestinations": ["faded"] }, "featureId": "fade.sweep" },
     "task.letGoFaded": { "title": "Let Go", "icon": "action.let_go", "role": "default", "availability": { "selection": "any", "onlyDestinations": ["faded"] }, "featureId": "fade.sweep" },
     "place.saveNotes": {

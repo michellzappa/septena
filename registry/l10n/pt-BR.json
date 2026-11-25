@@ -150,6 +150,10 @@
   "Delete Section": "Apagar seção",
   "Delete Tasks": "Apagar tarefas",
   "Delete account": "Excluir conta",
+  "Delete all {count} deleted tasks permanently?": {
+    "one": "Apagar 1 tarefa apagada permanentemente?",
+    "other": "Apagar todas as {count} tarefas apagadas permanentemente?"
+  },
   "Delete this section?": "Apagar esta seção?",
   "Delete your account?": "Excluir sua conta?",
   "Delete {count} tasks permanently?": {
@@ -183,6 +187,7 @@
   "Elevation": "Elevação",
   "Email": "E-mail",
   "Email thread": "Conversa por e-mail",
+  "Empty Trash": "Esvaziar lixeira",
   "Enter the code from the other device. If you're connecting Claude, the code is in your browser.": "Digite o código do outro dispositivo. Se estiver conectando o Claude, o código aparece no navegador.",
   "Error": "Erro",
   "Every new account starts with 14 days of Plus": "Toda conta nova começa com 14 dias de Plus",

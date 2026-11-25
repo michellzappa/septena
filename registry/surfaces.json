@@ -126,6 +126,14 @@
         "featureId": "lists.recently-deleted"
       },
       {
+        "id": "emptyTrash",
+        "kind": "destructive",
+        "title": { "one": "Delete 1 deleted task permanently?", "other": "Delete all {count} deleted tasks permanently?" },
+        "message": "You can’t undo this.",
+        "confirmTitle": "Empty Trash",
+        "featureId": "lists.recently-deleted"
+      },
+      {
         "id": "deleteSection",
         "kind": "destructive",
         "title": "Delete this section?",

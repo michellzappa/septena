@@ -344,10 +344,10 @@ function validateDestinations(dests, icons, caps) {
   for (const d of dests.destinations) {
     assert(!seenIds.has(d.id), `destinations.json: duplicate id "${d.id}"`);
     seenIds.add(d.id);
-    // A band (Inbox on Today) has no sidebar row, so no sidebarOrder or sidebarSection.
-    if (d.visibility === "todayBand") {
-      assert(d.sidebarOrder === undefined, `destinations.json: ${d.id} is a todayBand and cannot have a sidebarOrder`);
-      assert(d.sidebarSection === undefined, `destinations.json: ${d.id} is a todayBand and cannot have a sidebarSection`);
+    // Embedded destinations (Inbox on Today, Deleted inside Logbook) have no sidebar row.
+    if (d.visibility === "todayBand" || d.visibility === "logbookTab") {
+      assert(d.sidebarOrder === undefined, `destinations.json: ${d.id} is ${d.visibility} and cannot have a sidebarOrder`);
+      assert(d.sidebarSection === undefined, `destinations.json: ${d.id} is ${d.visibility} and cannot have a sidebarSection`);
     } else {
       assert(d.sidebarOrder > lastOrder, `destinations.json: sidebarOrder must strictly increase at "${d.id}"`);
       lastOrder = d.sidebarOrder;

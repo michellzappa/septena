@@ -37,7 +37,6 @@ struct SidebarRootView: View {
   @State private var agentCount: Int = 0
   @State private var starredCount: Int = 0
   @State private var fadedCount: Int = 0
-  @State private var recentlyDeletedCount: Int = 0
   /// Repeating badge. Filled by `load()` from the roll-up pass; `body` used
   /// to fetch the list on every render.
   @State private var repeatingCount: Int = 0
@@ -661,7 +660,6 @@ struct SidebarRootView: View {
     if agentCount > 0 || isSelected(.filter(.agent)) { ids.insert("agent") }
     if starredCount > 0 { ids.insert("starred") }
     if fadedCount > 0 { ids.insert("faded") }
-    if recentlyDeletedCount > 0 { ids.insert("recentlyDeleted") }
     return ids
   }
 
@@ -720,7 +718,6 @@ struct SidebarRootView: View {
     case .filter(.logbook):         return doneTodayCount > 0 ? doneTodayCount : nil
     case .filter(.starred):         return starredCount > 0 ? starredCount : nil
     case .filter(.faded):           return fadedCount > 0 ? fadedCount : nil
-    case .filter(.recentlyDeleted): return recentlyDeletedCount > 0 ? recentlyDeletedCount : nil
     default:                        return nil
     }
   }
@@ -1350,7 +1347,6 @@ struct SidebarRootView: View {
     var agg = Self.aggregate(tasks: LocalCache.liveAggregateEntities(in: modelContext), today: clock.today)
     agg.counts = stats.counts
     agg.doneTodayCount = stats.history.daily.last?.done ?? 0
-    let deleted = LocalCache.recentlyDeletedCount(in: modelContext)
     guard !StoreHealth.readsFailed(since: token) else {
       SeptenaLog.error("[Sidebar] load aborted — a store read failed; keeping the last good counts")
       return
@@ -1359,7 +1355,6 @@ struct SidebarRootView: View {
     projects = structure.projects
     apply(aggregate: agg)
     SidebarSeed.aggregate = agg
-    recentlyDeletedCount = deleted
     reconcileSidebarSelection()
   }
 
@@ -1462,8 +1457,8 @@ struct SidebarRootView: View {
 // MARK: - Sidebar primitives
 
 /// The muted trailing count shown on every sidebar row (smart lists, areas,
-/// projects, Recently Deleted). One definition so all the numbers read
-/// identically — never restyle a count inline.
+/// projects). One definition so all the numbers read identically — never
+/// restyle a count inline.
 struct SidebarCount: View {
   let count: Int
 
