@@ -130,7 +130,7 @@ struct ConversationCard: View {
         choices: (q.options ?? []).map { option in
           AgentPromptChoice(id: option, title: option) { choose(option, replyTo: q.seq, step: q.step) }
         },
-        freeText: RegistryPrompts.text["conversationOther"].map { prompt in
+        freeText: RegistryPrompts.text[.conversationOther].map { prompt in
           AgentPromptFreeText(buttonTitle: prompt.title, prompt: prompt) { text in
             submitOther(text, replyTo: q.seq, step: q.step)
           }
@@ -152,14 +152,14 @@ struct ConversationCard: View {
         Label("Agent work stopped", systemImage: "stop.circle")
           .font(.caption).foregroundStyle(.secondary)
         Spacer(minLength: 0)
-        Button(RegistryActions.title("task.conversation.stop", .active)) { setStopped(false) }
+        Button(RegistryActions.title(.taskConversationStop, .active)) { setStopped(false) }
           .font(.caption).buttonStyle(.borderless)
       } else {
         Label(convo.isClaimed(at: DayClock.appNow) ? "Claude is working…" : "Waiting for Claude",
               systemImage: "ellipsis.bubble")
           .font(.caption).foregroundStyle(.secondary)
         Spacer(minLength: 0)
-        Button(RegistryActions.title("task.conversation.stop"), role: .destructive) { setStopped(true) }
+        Button(RegistryActions.title(.taskConversationStop), role: .destructive) { setStopped(true) }
           .font(.caption).buttonStyle(.borderless)
       }
     }
@@ -173,11 +173,11 @@ struct ConversationCard: View {
         kicker: convo.reviewKicker(now: DayClock.appNow),
         question: reviewQuestion,
         choices: [
-          AgentPromptChoice(id: "accept", title: RegistryActions.title("task.acceptReview"),
+          AgentPromptChoice(id: "accept", title: RegistryActions.title(.taskAcceptReview),
                             isPrimary: true, action: acceptReview),
         ],
-        freeText: RegistryPrompts.text["sendBackReview"].map { prompt in
-          AgentPromptFreeText(buttonTitle: RegistryActions.title("task.sendBackReview"),
+        freeText: RegistryPrompts.text[.sendBackReview].map { prompt in
+          AgentPromptFreeText(buttonTitle: RegistryActions.title(.taskSendBackReview),
                               prompt: prompt, onSend: submitSendBack)
         },
         freeTextOpen: $showSendBack
@@ -207,12 +207,12 @@ struct ConversationCard: View {
   }
 
   @ViewBuilder private var followUpBlock: some View {
-    if showReply, let prompt = RegistryPrompts.text["conversationReply"] {
+    if showReply, let prompt = RegistryPrompts.text[.conversationReply] {
       AgentReplyField(prompt: prompt, onSend: submitReply,
                       onCancel: { a11yAnimate { showReply = false } })
     } else {
       Button { a11yAnimate { showReply = true } } label: {
-        Label(RegistryPrompts.text["conversationReply"]?.title ?? "", systemImage: "arrowshape.turn.up.left")
+        Label(RegistryPrompts.text[.conversationReply]?.title ?? "", systemImage: "arrowshape.turn.up.left")
       }
       .buttonStyle(.bordered)
       .controlSize(.taskAction)

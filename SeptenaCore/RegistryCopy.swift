@@ -8,7 +8,7 @@ import SwiftData
 
 extension RegistryPromptCopy {
   /// A fork prompt's choice title by option id.
-  func optionTitle(_ id: String) -> String {
+  func optionTitle(_ id: RegistryPromptOptionID) -> String {
     guard let option = options.first(where: { $0.id == id }) else {
       preconditionFailure("registry prompt \(self.id) has no option \(id)")
     }
@@ -18,13 +18,13 @@ extension RegistryPromptCopy {
 
 extension RegistryPrompts {
   /// A text prompt (New / Rename Section, Area, Project) by id.
-  static func textPrompt(_ id: String) -> RegistryTextPrompt {
+  static func textPrompt(_ id: RegistryPromptID) -> RegistryTextPrompt {
     guard let row = text[id] else { preconditionFailure("registry/surfaces.json has no text prompt \(id)") }
     return row
   }
 
   /// A prompt with fixed copy (Delete Section, Delete Account, …) by id.
-  static func prompt(_ id: String) -> RegistryPromptCopy {
+  static func prompt(_ id: RegistryPromptID) -> RegistryPromptCopy {
     guard let row = fixed[id] else { preconditionFailure("registry/surfaces.json has no prompt \(id)") }
     return row
   }

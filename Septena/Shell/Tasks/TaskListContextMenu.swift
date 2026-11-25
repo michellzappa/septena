@@ -155,7 +155,7 @@ struct TaskListModalPresenter: ViewModifier {
 /// the task already repeats. Both shells read it.
 enum TaskRepeatLabel {
   static func title(_ recurrence: Recurrence?) -> String {
-    guard let recurrence else { return RegistryActions.title("task.repeat") }
+    guard let recurrence else { return RegistryActions.title(.taskRepeat) }
     return String(localized: "Repeat: \(recurrence.shortLabel)")
   }
 }
@@ -248,79 +248,79 @@ struct TaskListRowContextMenu: View {
 
   var body: some View {
     RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
-      RegistryActions.menu("task.row"), bind: bind, slot: slot))
+      RegistryActions.menu(.taskRow), bind: bind, slot: slot))
   }
 
-  private func bind(_ id: String) -> RegistryActionBinding? {
+  private func bind(_ id: RegistryActionID) -> RegistryActionBinding? {
     let tasks = target.tasks
     let plural: RegistryTitleVariant = count > 1 ? .plural : .base
     switch id {
-    case "task.open", "task.editDetails":
+    case .taskOpen, .taskEditDetails:
       guard let task = single else { return nil }
       return .init { onOpenDetail(task) }
-    case "task.share":
+    case .taskShare:
       guard let onShare else { return nil }
       return .init { onShare(target) }
-    case "task.acceptReview":
+    case .taskAcceptReview:
       guard let task = single, task.conversation.needsHumanReview,
             let onAcceptReview else { return nil }
       return .init { onAcceptReview(task) }
-    case "task.sendBackReview":
+    case .taskSendBackReview:
       guard let task = single, task.conversation.needsHumanReview,
             let onSendBackReview else { return nil }
       return .init { onSendBackReview(task) }
-    case "task.duplicate":
+    case .taskDuplicate:
       return .init(variant: plural) { onDuplicate(target) }
-    case "task.select":
+    case .taskSelect:
       guard let task = single, let onSelect else { return nil }
       return .init { onSelect(task) }
-    case "task.toggleComplete":
+    case .taskToggleComplete:
       // Several tasks only: one task completes from its checkbox
       // (docs/TASK_ROW_MENU_SPEC.md). ⌘K and the menu bar still do one.
       guard count > 1, let onToggleComplete else { return nil }
       return .init { onToggleComplete(target.ids) }
-    case "task.cancel":
+    case .taskCancel:
       return .init(variant: plural) { onCancel(target.ids) }
-    case "task.delete":
+    case .taskDelete:
       return .init(variant: plural) { onDelete(target) }
-    case "task.toggleToday":
+    case .taskToggleToday:
       switch todayAction {
       case .add: return .init(variant: .add) { onMoveToToday(target.ids, true) }
       case .remove: return .init(variant: .remove) { onMoveToToday(target.ids, false) }
       case nil: return nil
       }
-    case "task.toggleStar":
+    case .taskToggleStar:
       guard let onToggleStar else { return nil }
       let allStarred = !tasks.isEmpty && tasks.allSatisfy(\.starred)
       return .init(variant: allStarred ? .remove : .add) { onToggleStar(target.ids, !allStarred) }
-    case "task.tags":
+    case .taskTags:
       guard let onOpenTags else { return nil }
       return .init { onOpenTags(target) }
-    case "task.addReference":
+    case .taskAddReference:
       guard let task = single, let onAddReference else { return nil }
       return .init { onAddReference(task) }
-    case "task.when":
+    case .taskWhen:
       return .init { onOpenWhen(target) }
-    case "task.deadline":
+    case .taskDeadline:
       return .init { onOpenDeadline(target) }
-    case "task.reminder":
+    case .taskReminder:
       guard let task = single, let onOpenReminder else { return nil }
       return .init { onOpenReminder(task) }
-    case "task.clearSchedule":
+    case .taskClearSchedule:
       guard let onClearSchedule,
             tasks.contains(where: { $0.isOnToday || $0.scheduled != nil || $0.deadline != nil })
       else { return nil }
       return .init { onClearSchedule(target.ids) }
-    case "task.move":
+    case .taskMove:
       return .init { onOpenMove(target) }
-    case "task.repeat":
+    case .taskRepeat:
       guard let task = single else { return nil }
       return .init { onOpenRepeat(task) }
-    case "task.pauseResumeRepeat":
+    case .taskPauseResumeRepeat:
       guard !tasks.isEmpty, tasks.allSatisfy({ $0.recurrence != nil }) else { return nil }
       let paused = tasks.allSatisfy(\.recurrencePaused)
       return .init(variant: paused ? .active : .base) { onSetRepeatPaused(target.ids, !paused) }
-    case "task.createNextCopy":
+    case .taskCreateNextCopy:
       guard let task = single, task.recurrence != nil else { return nil }
       return .init { onCreateNextCopy(task) }
     default:

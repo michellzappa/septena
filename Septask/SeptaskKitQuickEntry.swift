@@ -112,7 +112,7 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
 
     let panel = KitSurfacePanel.make(
       size: NSSize(width: 560, height: 78),
-      a11yTitle: RegistryActions.title("app.quickEntry"))
+      a11yTitle: RegistryActions.title(.appQuickEntry))
     panel.install(body)
     panel.delegate = self
     panel.onCommandReturn = { [weak self] in self?.save(today: true) }

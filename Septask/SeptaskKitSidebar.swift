@@ -32,7 +32,7 @@ enum KitSidebarDestination: Equatable {
   /// order — read from `TaskDestinations.sidebarRoutes(in:nonEmptyIDs:)`, which
   /// reads `SmartListPreferences.shared` over `registry/destinations.json`.
   @MainActor static func smartLists(in section: SmartListSection,
-                                    nonEmptyIDs: Set<String>) -> [KitSidebarDestination] {
+                                    nonEmptyIDs: Set<RegistryDestinationID>) -> [KitSidebarDestination] {
     TaskDestinations.sidebarRoutes(in: section, nonEmptyIDs: nonEmptyIDs)
       .compactMap(KitSidebarDestination.init(route:))
   }
@@ -43,7 +43,7 @@ enum KitSidebarDestination: Equatable {
       .compactMap(KitSidebarDestination.init(route:))
   }
 
-  @MainActor static func smartLists(nonEmptyIDs: Set<String>) -> [KitSidebarDestination] {
+  @MainActor static func smartLists(nonEmptyIDs: Set<RegistryDestinationID>) -> [KitSidebarDestination] {
     TaskDestinations.sidebarRoutes(nonEmptyIDs: nonEmptyIDs).compactMap(KitSidebarDestination.init(route:))
   }
 
@@ -546,17 +546,17 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // size rides on Today's count so nothing about it is hidden.
     // Set + order come from `SmartListPreferences.shared` over
     // `registry/destinations.json`, shared across both sidebars and title menus.
-    var nonEmptyIDs = Set<String>()
+    var nonEmptyIDs = Set<RegistryDestinationID>()
     // Review and Agent also stay while selected, so accepting the last item
     // does not yank the row away.
     if reviewCount > 0 || key == KitSidebarDestination.key(for: .filter(.review)) {
-      nonEmptyIDs.insert("review")
+      nonEmptyIDs.insert(.review)
     }
     if agentCount > 0 || key == KitSidebarDestination.key(for: .filter(.agent)) {
-      nonEmptyIDs.insert("agent")
+      nonEmptyIDs.insert(.agent)
     }
-    if starredCount > 0 { nonEmptyIDs.insert("starred") }
-    if fadedCount > 0 { nonEmptyIDs.insert("faded") }
+    if starredCount > 0 { nonEmptyIDs.insert(.starred) }
+    if fadedCount > 0 { nonEmptyIDs.insert(.faded) }
     let makeViewNode: (KitSidebarDestination) -> Node = { destination in
       Node(destination.nodeContent, count: self.smartListCount(destination,
                                                                counts: smartCounts,
@@ -767,7 +767,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     switch action {
     case .today:
       TaskUndo.recordScheduleChange(
-        name: RegistryActions.title("task.toggleToday", .add),
+        name: RegistryActions.title(.taskToggleToday, .add),
         before: scheduleBefore, context: context, mutator: mutator)
     case .scheduleTomorrow, .anytime:
       TaskUndo.recordScheduleChange(
@@ -823,14 +823,15 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     case .filter(let filter, _, _):
       guard let destID = filter.destinationID else { return nil }
       let pbItem = NSPasteboardItem()
-      pbItem.setString(destID, forType: .septaskSmartListItem)
+      pbItem.setString(destID.rawValue, forType: .septaskSmartListItem)
       return pbItem
     }
   }
 
-  private func draggedSmartListID(from info: NSDraggingInfo) -> String? {
+  private func draggedSmartListID(from info: NSDraggingInfo) -> RegistryDestinationID? {
     (info.draggingPasteboard.pasteboardItems ?? [])
       .first?.string(forType: .septaskSmartListItem)
+      .flatMap(RegistryDestinationID.init(rawValue:))
   }
 
   /// Smart lists live in two dedicated "special" clusters framing Areas &
@@ -838,7 +839,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// (`bottomStartIndex...roots.count`). They can reorder within a cluster or
   /// move between top and bottom (when `canMoveSection` is true), but can
   /// never drop inside Areas & Projects.
-  private func smartListDropTarget(movedID: String, index: Int) -> (section: SmartListSection, localIndex: Int)? {
+  private func smartListDropTarget(movedID: RegistryDestinationID, index: Int) -> (section: SmartListSection, localIndex: Int)? {
     guard index >= 0, index <= roots.count else { return nil }
     let canMove = SmartListPreferences.sidebarById[movedID]?.canMoveSection ?? false
     let hasOrganize = bottomStartIndex > organizeStartIndex
@@ -857,7 +858,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     return nil
   }
 
-  private func validateSmartListReorder(movedID: String,
+  private func validateSmartListReorder(movedID: RegistryDestinationID,
                                         proposedItem item: Any?,
                                         proposedChildIndex index: Int) -> NSDragOperation {
     guard item == nil,
@@ -878,7 +879,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let slice = target.section == .top
       ? roots[0..<organizeStartIndex]
       : roots[bottomStartIndex..<roots.count]
-    let targetVisibleIDs: [String] = slice.compactMap { node in
+    let targetVisibleIDs: [RegistryDestinationID] = slice.compactMap { node in
       guard case .filter(let f, _, _) = node.content else { return nil }
       return f.destinationID
     }
@@ -1369,24 +1370,24 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let menu: NSMenu
     switch node?.content {
     case .area:
-      menu = KitRegistryMenu.build(RegistryActions.menu("sidebar.area")) { [weak self] id in
+      menu = KitRegistryMenu.build(RegistryActions.menu(.sidebarArea)) { [weak self] id in
         guard let self else { return nil }
         switch id {
-        case "area.newProject": return .init { self.newProjectInSelectedArea() }
-        case "area.rename": return .init { self.renameSelected() }
-        case "area.changeEmoji": return .init { self.changeEmojiOfSelectedArea() }
-        case "area.delete": return .init { self.deleteSelected() }
+        case .areaNewProject: return .init { self.newProjectInSelectedArea() }
+        case .areaRename: return .init { self.renameSelected() }
+        case .areaChangeEmoji: return .init { self.changeEmojiOfSelectedArea() }
+        case .areaDelete: return .init { self.deleteSelected() }
         default: return nil
         }
       }
     case .project(let project, _):
-      menu = KitRegistryMenu.build(RegistryActions.menu("sidebar.project"), bind: { [weak self] id in
+      menu = KitRegistryMenu.build(RegistryActions.menu(.sidebarProject), bind: { [weak self] id in
         guard let self else { return nil }
         switch id {
-        case "project.rename": return .init { self.renameSelected() }
-        case "project.markDone": return .init { self.markSelectedProjectDone() }
-        case "project.cancel": return .init { self.cancelSelectedProject() }
-        case "project.delete": return .init { self.deleteSelected() }
+        case .projectRename: return .init { self.renameSelected() }
+        case .projectMarkDone: return .init { self.markSelectedProjectDone() }
+        case .projectCancel: return .init { self.cancelSelectedProject() }
+        case .projectDelete: return .init { self.deleteSelected() }
         default: return nil
         }
       }, slot: { [weak self] id in
@@ -1394,11 +1395,11 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         return self.areaDestinationNodes(for: project)
       })
     case .filter(_, _, _), .none:
-      menu = KitRegistryMenu.build(RegistryActions.menu("sidebar.empty")) { [weak self] id in
+      menu = KitRegistryMenu.build(RegistryActions.menu(.sidebarEmpty)) { [weak self] id in
         guard let self else { return nil }
         switch id {
-        case "sidebar.newArea": return .init { self.newArea() }
-        case "sidebar.newProject": return .init { self.newProjectLoose() }
+        case .sidebarNewArea: return .init { self.newArea() }
+        case .sidebarNewProject: return .init { self.newProjectLoose() }
         default: return nil
         }
       }
@@ -1439,7 +1440,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   @objc private func toggleSmartListSection(_ sender: NSMenuItem) {
-    guard let destID = sender.representedObject as? String else { return }
+    guard let destID = sender.representedObject as? RegistryDestinationID else { return }
     let prefs = SmartListPreferences.shared
     let before = prefs.snapshot()
     let target: SmartListSection = prefs.section(for: destID) == .top ? .bottom : .top
@@ -1454,7 +1455,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   @objc private func hideSmartList(_ sender: NSMenuItem) {
-    guard let destID = sender.representedObject as? String else { return }
+    guard let destID = sender.representedObject as? RegistryDestinationID else { return }
     let prefs = SmartListPreferences.shared
     let before = prefs.snapshot()
     let wasSelected = selectedKey() == "filter:\(TaskFilter(destinationID: destID)?.navigationKey ?? "")"
@@ -1520,7 +1521,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     Task { [weak self] in
       guard let self,
             let area = try? await self.areasMutator.create(
-              title: RegistryActions.title("sidebar.newArea"))
+              title: RegistryActions.title(.sidebarNewArea))
       else { return }
       self.recordAreaCreate(area)
       self.rebuild(preserving: "area:\(area.id)")
@@ -1534,7 +1535,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   private func recordAreaCreate(_ area: Area) {
     let mutator = areasMutator
     recordStructure(
-      name: RegistryActions.title("sidebar.newArea"),
+      name: RegistryActions.title(.sidebarNewArea),
       undo: { Task { try? await mutator.delete(id: area.id) } },
       redo: { Task { _ = try? await mutator.createWithExplicitID(id: area.id, title: area.title) } })
   }
@@ -1542,7 +1543,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   private func recordProjectCreate(_ project: Project) {
     let mutator = projectsMutator
     recordStructure(
-      name: RegistryActions.title("sidebar.newProject"),
+      name: RegistryActions.title(.sidebarNewProject),
       undo: { Task { try? await mutator.delete(id: project.id) } },
       redo: {
         Task {
@@ -1565,7 +1566,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     Task { [weak self] in
       guard let self,
             let project = try? await self.projectsMutator.create(
-              title: RegistryActions.title("sidebar.newProject"),
+              title: RegistryActions.title(.sidebarNewProject),
               area: areaId)
       else { return }
       self.recordProjectCreate(project)
@@ -1624,7 +1625,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       cell.beginRename(onCommit: { [weak self] title in
         Task { try? await mutator.rename(id: area.id, to: title) }
         self?.recordStructure(
-          name: RegistryPrompts.textPrompt("renameArea").title,
+          name: RegistryPrompts.textPrompt(.renameArea).title,
           undo: { Task { try? await mutator.rename(id: area.id, to: area.title) } },
           redo: { Task { try? await mutator.rename(id: area.id, to: title) } })
       }, onEnd: onEnd)
@@ -1633,7 +1634,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       cell.beginRename(onCommit: { [weak self] title in
         Task { try? await mutator.rename(id: project.id, to: title) }
         self?.recordStructure(
-          name: RegistryPrompts.textPrompt("renameProject").title,
+          name: RegistryPrompts.textPrompt(.renameProject).title,
           undo: { Task { try? await mutator.rename(id: project.id, to: project.title) } },
           redo: { Task { try? await mutator.rename(id: project.id, to: title) } })
       }, onEnd: onEnd)

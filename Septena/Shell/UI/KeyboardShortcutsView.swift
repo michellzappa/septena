@@ -110,7 +110,7 @@ struct KeyboardShortcutsView: View {
           }
         }
       }
-      .navigationTitle(RegistryActions.title("app.keyboardShortcuts"))
+      .navigationTitle(RegistryActions.title(.appKeyboardShortcuts))
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif

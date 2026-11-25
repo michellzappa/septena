@@ -27,39 +27,39 @@ struct TaskActions {
 
   /// The registry actions this type can serve, in shortcuts-sheet order. The
   /// iPad hidden shortcut buttons render these.
-  static let rowCommandIds: [String] = {
-    var seen = Set<String>()
+  static let rowCommandIds: [RegistryActionID] = {
+    var seen = Set<RegistryActionID>()
     return RegistryActions.shortcutsTaskList
-      .map(\.id)
+      .map(\.actionId)
       .filter { supports($0) && seen.insert($0).inserted }
   }()
 
   /// True when the SwiftUI task list has a handler slot for `actionId`.
-  static func supports(_ actionId: String) -> Bool {
+  static func supports(_ actionId: RegistryActionID) -> Bool {
     slot(for: actionId) != nil
   }
 
   /// The handler for a registry action ID. nil when nothing is selected that
   /// it can act on (the menu item disables) or when the list has no such
   /// command (`supports` is false).
-  func handler(for actionId: String) -> (() -> Void)? {
+  func handler(for actionId: RegistryActionID) -> (() -> Void)? {
     guard let slot = Self.slot(for: actionId) else { return nil }
     return self[keyPath: slot]
   }
 
-  private static func slot(for actionId: String) -> KeyPath<TaskActions, (() -> Void)?>? {
+  private static func slot(for actionId: RegistryActionID) -> KeyPath<TaskActions, (() -> Void)?>? {
     switch actionId {
-    case "task.editDetails": return \.editDetails
-    case "task.copy": return \.copy
-    case "task.duplicate": return \.duplicate
-    case "task.toggleComplete": return \.toggleComplete
-    case "task.cancel": return \.cancel
-    case "task.toggleToday": return \.toggleToday
-    case "task.when": return \.openWhen
-    case "task.deadline": return \.openDeadline
-    case "task.move": return \.openMove
-    case "task.clearSchedule": return \.clearSchedule
-    case "task.delete": return \.delete
+    case .taskEditDetails: return \.editDetails
+    case .taskCopy: return \.copy
+    case .taskDuplicate: return \.duplicate
+    case .taskToggleComplete: return \.toggleComplete
+    case .taskCancel: return \.cancel
+    case .taskToggleToday: return \.toggleToday
+    case .taskWhen: return \.openWhen
+    case .taskDeadline: return \.openDeadline
+    case .taskMove: return \.openMove
+    case .taskClearSchedule: return \.clearSchedule
+    case .taskDelete: return \.delete
     default: return nil
     }
   }

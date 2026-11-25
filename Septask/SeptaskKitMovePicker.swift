@@ -35,7 +35,7 @@ final class SeptaskKitMovePicker {
   private lazy var surface: KitFilterSurface = {
     let surface = KitFilterSurface(
       size: NSSize(width: 420, height: 340),
-      a11yTitle: RegistryActions.title("task.move", .short),
+      a11yTitle: RegistryActions.title(.taskMove, .short),
       fieldA11yTitle: String(localized: "Filter destinations",
                              comment: "SeptaskKit: move picker search field a11y"))
     surface.rowCount = { [weak self] in self?.rows.count ?? 0 }

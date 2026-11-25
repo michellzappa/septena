@@ -789,7 +789,7 @@ struct RecurrencePickerSheet: View {
               paused.toggle()
               onPauseChanged(paused)
             } label: {
-              Label(paused ? RegistryActions.title("task.pauseResumeRepeat", .active) : RegistryActions.title("task.pauseResumeRepeat"),
+              Label(paused ? RegistryActions.title(.taskPauseResumeRepeat, .active) : RegistryActions.title(.taskPauseResumeRepeat),
                     systemImage: paused ? "play.circle" : "pause.circle")
             }
             .buttonStyle(.bordered)

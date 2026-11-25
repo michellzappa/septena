@@ -44,21 +44,21 @@ final class SmartListPreferences {
   static let shared = SmartListPreferences()
 
   struct Snapshot: Equatable {
-    let order: [String]
-    let hidden: [String]
-    let placement: [String: String]
+    let order: [RegistryDestinationID]
+    let hidden: [RegistryDestinationID]
+    let placement: [RegistryDestinationID: String]
   }
 
   /// Sanitized user-defined order of canonical `RegistryDestination.id`s.
   /// Empty means canonical registry `sidebarOrder`.
-  private(set) var order: [String]
+  private(set) var order: [RegistryDestinationID]
 
   /// Sanitized list of hidden `RegistryDestination.id`s.
-  private(set) var hidden: [String]
+  private(set) var hidden: [RegistryDestinationID]
 
   /// Sanitized per-destination section overrides (`id -> "top" | "bottom"`).
   /// Only entries differing from the registry default are stored.
-  private(set) var placement: [String: String]
+  private(set) var placement: [RegistryDestinationID: String]
 
   /// Monotonically incremented on every change so `@Observable` SwiftUI views
   /// reading `SmartListPreferences.shared` always invalidate.
@@ -72,8 +72,8 @@ final class SmartListPreferences {
     let savedOrder = ud.stringArray(forKey: RegistrySettings.StorageKey.smartListOrder) ?? []
     let savedHidden = ud.stringArray(forKey: RegistrySettings.StorageKey.smartListHidden) ?? []
     let savedPlacement = ud.dictionary(forKey: RegistrySettings.StorageKey.smartListPlacement) as? [String: String] ?? [:]
-    self.order = Self.sanitizeOrder(savedOrder)
-    self.hidden = Self.sanitizeHidden(savedHidden)
+    self.order = Self.sanitizeOrder(savedOrder.compactMap(RegistryDestinationID.init(rawValue:)))
+    self.hidden = Self.sanitizeHidden(savedHidden.compactMap(RegistryDestinationID.init(rawValue:)))
     self.placement = Self.sanitizePlacement(savedPlacement)
 
     syncObserver = NotificationCenter.default.addObserver(
@@ -96,7 +96,7 @@ final class SmartListPreferences {
         && $0.visibility != "logbookTab"
         && $0.applies(to: RegistryPlatform.current)
     }
-  static let sidebarById: [String: RegistryDestination] =
+  static let sidebarById: [RegistryDestinationID: RegistryDestination] =
     Dictionary(uniqueKeysWithValues: sidebarDestinations.map { ($0.id, $0) })
 
   /// All canonical sidebar smart-list destinations from `registry/destinations.json`,
@@ -106,7 +106,7 @@ final class SmartListPreferences {
     _ = revision
     let known = Self.sidebarById
     var result: [RegistryDestination] = []
-    var seen = Set<String>()
+    var seen = Set<RegistryDestinationID>()
     for id in order {
       if let dest = known[id], seen.insert(id).inserted {
         result.append(dest)
@@ -119,7 +119,7 @@ final class SmartListPreferences {
   }
 
   /// Resolved sidebar section (`.top` above Areas & Projects, `.bottom` below).
-  func section(for destinationID: String) -> SmartListSection {
+  func section(for destinationID: RegistryDestinationID) -> SmartListSection {
     _ = revision
     guard let dest = Self.sidebarById[destinationID] else { return .top }
     let defaultSection = SmartListSection(rawValue: dest.sidebarSection) ?? .top
@@ -137,7 +137,7 @@ final class SmartListPreferences {
 
   /// True when the destination is hidden by the user. Destinations marked
   /// `canHide == false` in `registry/destinations.json` are never hidden.
-  func isHidden(_ destinationID: String) -> Bool {
+  func isHidden(_ destinationID: RegistryDestinationID) -> Bool {
     _ = revision
     guard let dest = Self.sidebarById[destinationID], dest.canHide else {
       return false
@@ -147,7 +147,7 @@ final class SmartListPreferences {
 
   /// All visible special smart-list destinations in display order, honoring
   /// both user show/hide choices and registry `whenNonEmpty` visibility.
-  func visibleDestinations(nonEmptyIDs: Set<String>) -> [RegistryDestination] {
+  func visibleDestinations(nonEmptyIDs: Set<RegistryDestinationID>) -> [RegistryDestination] {
     orderedDestinations.filter { dest in
       guard !isHidden(dest.id) else { return false }
       if dest.visibility == "whenNonEmpty" {
@@ -159,7 +159,7 @@ final class SmartListPreferences {
 
   /// Visible special smart-list destinations in a specific zone (`.top` or `.bottom`).
   func visibleDestinations(in targetSection: SmartListSection,
-                           nonEmptyIDs: Set<String>) -> [RegistryDestination] {
+                           nonEmptyIDs: Set<RegistryDestinationID>) -> [RegistryDestination] {
     visibleDestinations(nonEmptyIDs: nonEmptyIDs).filter { section(for: $0.id) == targetSection }
   }
 
@@ -173,7 +173,7 @@ final class SmartListPreferences {
   /// Digit shortcut per destination ID (⌘1, ⌘2, …): counts the enabled lists
   /// down the sidebar. `whenNonEmpty` lists take no digit. They come and go
   /// with their rows, and would renumber the lists below them.
-  var digitShortcuts: [String: RegistryShortcut] {
+  var digitShortcuts: [RegistryDestinationID: RegistryShortcut] {
     let numbered = enabledDestinations
       .filter { $0.visibility == RegistryDestinations.digitShortcutVisibility }
     return Dictionary(uniqueKeysWithValues:
@@ -200,7 +200,7 @@ final class SmartListPreferences {
                placement: Self.sanitizePlacement(snap.placement))
   }
 
-  func setHidden(_ shouldHide: Bool, for destinationID: String) {
+  func setHidden(_ shouldHide: Bool, for destinationID: RegistryDestinationID) {
     guard let dest = Self.sidebarById[destinationID], dest.canHide else { return }
     var next = hidden
     if shouldHide {
@@ -211,7 +211,7 @@ final class SmartListPreferences {
     applyLocal(order: order, hidden: Self.sanitizeHidden(next), placement: placement)
   }
 
-  func setSection(_ targetSection: SmartListSection, for destinationID: String) {
+  func setSection(_ targetSection: SmartListSection, for destinationID: RegistryDestinationID) {
     guard let dest = Self.sidebarById[destinationID], dest.canMoveSection else { return }
     var next = placement
     if targetSection.rawValue == dest.sidebarSection {
@@ -222,7 +222,7 @@ final class SmartListPreferences {
     applyLocal(order: order, hidden: hidden, placement: Self.sanitizePlacement(next))
   }
 
-  func reorder(orderedIDs: [String]) {
+  func reorder(orderedIDs: [RegistryDestinationID]) {
     var full = Self.sanitizeOrder(orderedIDs)
     let seen = Set(full)
     for dest in Self.sidebarDestinations where !seen.contains(dest.id) {
@@ -247,7 +247,7 @@ final class SmartListPreferences {
     // Splice the reordered section back into the global order while keeping
     // the other section's items untouched in their slots.
     var iter = sectionIDs.makeIterator()
-    let rebuilt = orderedDestinations.map { dest -> String in
+    let rebuilt = orderedDestinations.map { dest -> RegistryDestinationID in
       if section(for: dest.id) == targetSection, let next = iter.next() {
         return next
       }
@@ -259,9 +259,9 @@ final class SmartListPreferences {
   /// Sidebar drag-reorder supporting both intra-section reordering and moving
   /// a smart list across Areas & Projects between `.top` and `.bottom`.
   /// Preserves relative positions of hidden or empty `whenNonEmpty` lists.
-  func reorderVisible(movedID: String,
+  func reorderVisible(movedID: RegistryDestinationID,
                       toSection targetSection: SmartListSection,
-                      targetVisibleIDs: [String],
+                      targetVisibleIDs: [RegistryDestinationID],
                       toVisibleIndex: Int) {
     guard let dest = Self.sidebarById[movedID] else { return }
     let currentSection = section(for: movedID)
@@ -336,18 +336,18 @@ final class SmartListPreferences {
     defer { isAdoptingSynced = false }
     var changed = false
     if let remoteOrder = settings.smartListOrder {
-      let clean = Self.sanitizeOrder(remoteOrder)
+      let clean = Self.sanitizeOrder(remoteOrder.compactMap(RegistryDestinationID.init(rawValue:)))
       if clean != order {
         order = clean
-        UserDefaults.standard.set(clean, forKey: RegistrySettings.StorageKey.smartListOrder)
+        UserDefaults.standard.set(clean.map(\.rawValue), forKey: RegistrySettings.StorageKey.smartListOrder)
         changed = true
       }
     }
     if let remoteHidden = settings.smartListHidden {
-      let clean = Self.sanitizeHidden(remoteHidden)
+      let clean = Self.sanitizeHidden(remoteHidden.compactMap(RegistryDestinationID.init(rawValue:)))
       if clean != hidden {
         hidden = clean
-        UserDefaults.standard.set(clean, forKey: RegistrySettings.StorageKey.smartListHidden)
+        UserDefaults.standard.set(clean.map(\.rawValue), forKey: RegistrySettings.StorageKey.smartListHidden)
         changed = true
       }
     }
@@ -355,24 +355,24 @@ final class SmartListPreferences {
       let clean = Self.sanitizePlacement(remotePlacement)
       if clean != placement {
         placement = clean
-        UserDefaults.standard.set(clean, forKey: RegistrySettings.StorageKey.smartListPlacement)
+        UserDefaults.standard.set(Self.rawPlacement(clean), forKey: RegistrySettings.StorageKey.smartListPlacement)
         changed = true
       }
     }
     if changed { notifyChanged() }
   }
 
-  private func applyLocal(order newOrder: [String],
-                          hidden newHidden: [String],
-                          placement newPlacement: [String: String]) {
+  private func applyLocal(order newOrder: [RegistryDestinationID],
+                          hidden newHidden: [RegistryDestinationID],
+                          placement newPlacement: [RegistryDestinationID: String]) {
     guard newOrder != order || newHidden != hidden || newPlacement != placement else { return }
     order = newOrder
     hidden = newHidden
     placement = newPlacement
     let ud = UserDefaults.standard
-    ud.set(newOrder, forKey: RegistrySettings.StorageKey.smartListOrder)
-    ud.set(newHidden, forKey: RegistrySettings.StorageKey.smartListHidden)
-    ud.set(newPlacement, forKey: RegistrySettings.StorageKey.smartListPlacement)
+    ud.set(newOrder.map(\.rawValue), forKey: RegistrySettings.StorageKey.smartListOrder)
+    ud.set(newHidden.map(\.rawValue), forKey: RegistrySettings.StorageKey.smartListHidden)
+    ud.set(Self.rawPlacement(newPlacement), forKey: RegistrySettings.StorageKey.smartListPlacement)
     pushSynced()
     notifyChanged()
   }
@@ -381,10 +381,14 @@ final class SmartListPreferences {
     guard !isAdoptingSynced else { return }
     let context = LocalStore.shared.container.mainContext
     var s = SettingsMirror.loadSettings(context: context) ?? SeptaskSyncedSettings.empty
-    s.smartListOrder = order
-    s.smartListHidden = hidden
-    s.smartListPlacement = placement
+    s.smartListOrder = order.map(\.rawValue)
+    s.smartListHidden = hidden.map(\.rawValue)
+    s.smartListPlacement = Self.rawPlacement(placement)
     SettingsMirror.upsert(settings: s, context: context, engine: nil)
+  }
+
+  private static func rawPlacement(_ typed: [RegistryDestinationID: String]) -> [String: String] {
+    Dictionary(uniqueKeysWithValues: typed.map { ($0.key.rawValue, $0.value) })
   }
 
   private func notifyChanged() {
@@ -394,20 +398,20 @@ final class SmartListPreferences {
 
   // MARK: - Sanitization
 
-  private static func sanitizeOrder(_ raw: [String]) -> [String] {
+  private static func sanitizeOrder(_ raw: [RegistryDestinationID]) -> [RegistryDestinationID] {
     let known = Self.sidebarById
-    var out: [String] = []
-    var seen = Set<String>()
+    var out: [RegistryDestinationID] = []
+    var seen = Set<RegistryDestinationID>()
     for id in raw where known[id] != nil && seen.insert(id).inserted {
       out.append(id)
     }
     return out
   }
 
-  private static func sanitizeHidden(_ raw: [String]) -> [String] {
+  private static func sanitizeHidden(_ raw: [RegistryDestinationID]) -> [RegistryDestinationID] {
     let known = Self.sidebarById
-    var out: [String] = []
-    var seen = Set<String>()
+    var out: [RegistryDestinationID] = []
+    var seen = Set<RegistryDestinationID>()
     for id in raw {
       guard let dest = known[id], dest.canHide, seen.insert(id).inserted else { continue }
       out.append(id)
@@ -415,9 +419,9 @@ final class SmartListPreferences {
     return out
   }
 
-  private static func sanitizePlacement(_ raw: [String: String]) -> [String: String] {
+  private static func sanitizePlacement(_ raw: [RegistryDestinationID: String]) -> [RegistryDestinationID: String] {
     let known = Self.sidebarById
-    var out: [String: String] = [:]
+    var out: [RegistryDestinationID: String] = [:]
     for (id, sec) in raw {
       guard let dest = known[id], dest.canMoveSection,
             sec == SmartListSection.top.rawValue || sec == SmartListSection.bottom.rawValue,
@@ -426,5 +430,15 @@ final class SmartListPreferences {
       out[id] = sec
     }
     return out
+  }
+
+  private static func sanitizePlacement(_ raw: [String: String]) -> [RegistryDestinationID: String] {
+    var typed: [RegistryDestinationID: String] = [:]
+    for (rawID, sec) in raw {
+      if let id = RegistryDestinationID(rawValue: rawID) {
+        typed[id] = sec
+      }
+    }
+    return sanitizePlacement(typed)
   }
 }

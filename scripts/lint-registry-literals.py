@@ -9,11 +9,13 @@ literal in `Septena/Shell/` or `Septask/` whose text is exactly one of them.
 Read the generated value instead (`RegistryActions.title`, `RegistrySettings.
 label`, `RegistryPrompts.prompt`, ...).
 
-The Android UI (`android/app`, `android/ui`, ADR 0028, #283) gets the same
-check, plus `registry-id-literal`: a Kotlin literal that equals a registry
-action, destination or surface ID fails. `RegistryCatalog` looks these up at
-run time, so a literal ID that the registry renames compiles and shows an
-empty string. Pass the generated constant (`RegistryActionIds`,
+The Swift (`Septena/Shell`, `Septask`, `SeptenaCore`, ADR 0028, #287) and
+Android (`android/app`, `android/ui`, ADR 0028, #283) UIs also get
+`registry-id-literal`: a string literal that equals a registry action,
+destination or surface ID fails. Pass the generated typed ID enum on Swift
+(`RegistryActionID`, `RegistryDestinationID`, `RegistryPromptID`,
+`RegistryNoticeID`, `RegistryTaskAttributeID`, `RegistryFirstRunStepID`, ...)
+or the generated constant on Kotlin (`RegistryActionIds`,
 `RegistryDestinationIds`, `RegistryPromptIds`, `RegistryPlacesScreenIds`,
 `RegistryNoticeIds`, `RegistryTaskDetail`, ...).
 
@@ -33,6 +35,7 @@ import sys
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 DIRS = ["Septena/Shell", "Septask"]
+SWIFT_ID_DIRS = ["Septena/Shell", "Septask", "SeptenaCore"]
 KOTLIN_DIRS = ["android/app/src/main", "android/ui/src"]
 RULE = "septena-lint:allow registry-owned-literal"
 ID_RULE = "septena-lint:allow registry-id-literal"
@@ -88,7 +91,7 @@ def scan(dirs, ext, check):
     """Yield (rel, line_no, text) for each literal in `dirs` that `check` flags."""
     for d in dirs:
         for dirpath, dirnames, files in os.walk(os.path.join(ROOT, d)):
-            dirnames[:] = [x for x in dirnames if x not in ("generated", "build")]
+            dirnames[:] = [x for x in dirnames if x.lower() not in ("generated", "build")]
             for name in sorted(files):
                 if not name.endswith(ext):
                     continue
@@ -145,10 +148,8 @@ def main():
     ids = registry_ids()
     copy = lambda text, line: RULE not in line and text in owned
     hits = list(scan(DIRS, ".swift", copy)) + list(scan(KOTLIN_DIRS, ".kt", copy))
-    id_hits = [
-        (rel, n, text)
-        for rel, n, text in scan(KOTLIN_DIRS, ".kt", lambda text, line: ID_RULE not in line and text in ids)
-    ]
+    id_check = lambda text, line: ID_RULE not in line and text in ids
+    id_hits = list(scan(SWIFT_ID_DIRS, ".swift", id_check)) + list(scan(KOTLIN_DIRS, ".kt", id_check))
 
     entries = allowlist()
     allowed = {(e["file"], e["literal"]) for e in entries}

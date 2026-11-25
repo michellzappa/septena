@@ -260,7 +260,7 @@ final class KitConversationView: NSView {
       replyBox.configure(prompt)
       block.addArrangedSubview(replyBox)
     } else {
-      let title = mode == .sendBack ? RegistryActions.title("task.sendBackReview") : prompt.title
+      let title = mode == .sendBack ? RegistryActions.title(.taskSendBackReview) : prompt.title
       block.addArrangedSubview(KitPromptChoiceButton(title: title) { [weak self] in
         self?.openReply(mode)
       })
@@ -275,7 +275,7 @@ final class KitConversationView: NSView {
   /// The registry copy for a free-text choice (`surfaces.json`
   /// `prompts.text`).
   private static func textPrompt(for mode: ReplyMode) -> RegistryTextPrompt {
-    let id = mode == .sendBack ? "sendBackReview" : "conversationOther"
+    let id: RegistryPromptID = mode == .sendBack ? .sendBackReview : .conversationOther
     return RegistryPrompts.text[id]
       ?? RegistryTextPrompt(id: id, title: "", placeholder: "", confirmTitle: RegistryPrompts.errorConfirmTitle)
   }
@@ -329,8 +329,8 @@ final class KitConversationView: NSView {
     label.font = SeptaskKitTheme.chip
     label.textColor = SeptaskKitTheme.inkSecondary
     let title = stopped
-      ? RegistryActions.title("task.conversation.stop", .active)
-      : RegistryActions.title("task.conversation.stop")
+      ? RegistryActions.title(.taskConversationStop, .active)
+      : RegistryActions.title(.taskConversationStop)
     let button = NSButton(title: title, target: self, action: #selector(toggleStopped))
     button.bezelStyle = .rounded
     button.controlSize = .small
@@ -370,7 +370,7 @@ final class KitConversationView: NSView {
     let question = note.isEmpty
       ? RegistrySurfaces.agentPromptReviewFallback
       : note
-    let accept = KitPromptChoiceButton(title: RegistryActions.title("task.acceptReview"),
+    let accept = KitPromptChoiceButton(title: RegistryActions.title(.taskAcceptReview),
                                        primary: true) { [weak self] in
       self?.acceptReview()
     }

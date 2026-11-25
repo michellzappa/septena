@@ -20,7 +20,7 @@ enum TaskRefActions {
 
   /// Add Reference shows only in a build whose core reads a key.
   static var canAdd: Bool {
-    TaskRefCore.isAvailable && RegistryActions.isAvailableOnPlatform("task.addReference")
+    TaskRefCore.isAvailable && RegistryActions.isAvailableOnPlatform(.taskAddReference)
   }
 
   static func add(_ input: String, to taskID: String) -> TaskRefAddResult {
@@ -87,15 +87,15 @@ enum TaskRefActions {
   }
 
   /// The row's context menu (registry `task.reference`), for both shells.
-  static func bind(_ id: String, row: TaskRefRow, navigation: NavigationState?) -> RegistryActionBinding? {
+  static func bind(_ id: RegistryActionID, row: TaskRefRow, navigation: NavigationState?) -> RegistryActionBinding? {
     switch id {
-    case "task.reference.open":
+    case .taskReferenceOpen:
       guard row.target != nil else { return nil }
       return .init { open(row, navigation: navigation) }
-    case "task.reference.copyLink":
+    case .taskReferenceCopyLink:
       guard row.link != nil else { return nil }
       return .init { copyLink(row) }
-    case "task.reference.remove":
+    case .taskReferenceRemove:
       return .init { remove(row) }
     default:
       return nil
@@ -166,7 +166,7 @@ struct TaskReferencesPanel: View {
         .buttonStyle(.plain)
         .contextMenu {
           RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
-            RegistryActions.menu("task.reference"),
+            RegistryActions.menu(.taskReference),
             bind: { TaskRefActions.bind($0, row: row, navigation: navigation) }))
         }
         if addAction != nil || row.id != rows.last?.id {
@@ -180,7 +180,7 @@ struct TaskReferencesPanel: View {
               .font(.septenaSidebarRow)
               .foregroundStyle(Theme.inkSecondary)
               .frame(width: 22)
-            Text(RegistryActions.title("task.addReference"))
+            Text(RegistryActions.title(.taskAddReference))
               .font(.septenaSidebarRow)
               .foregroundStyle(Theme.inkPrimary)
             Spacer(minLength: 8)
@@ -272,7 +272,7 @@ struct AddReferenceSheet: View {
           a11yAnimate { proxy.scrollTo(id) }
         }
       }
-      .navigationTitle(RegistryActions.title("task.addReference", .short))
+      .navigationTitle(RegistryActions.title(.taskAddReference, .short))
       .septenaInlineTitle()
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {

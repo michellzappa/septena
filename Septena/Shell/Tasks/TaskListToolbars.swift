@@ -87,7 +87,7 @@ struct TaskListNewTaskButton: View {
     }
     .glassProminentButtonStyleCompat()
     .tint(AdaptiveColor.fillForWhiteInk(theme.color(for: "tasks")))
-    .accessibilityLabel(RegistryActions.title("app.newTask"))
+    .accessibilityLabel(RegistryActions.title(.appNewTask))
   }
 }
 
@@ -131,17 +131,17 @@ struct TaskListNewMenuButton: View {
       Button {
         if let onNewTask { onNewTask() } else { nav.requestNewTask() }
       } label: {
-        Label(RegistryActions.title("app.newTask"), systemImage: "checkmark.circle")
+        Label(RegistryActions.title(.appNewTask), systemImage: "checkmark.circle")
       }
       Button(action: onNewSection) {
-        Label(RegistryActions.title("section.new"), systemImage: "rectangle.split.1x2")
+        Label(RegistryActions.title(.sectionNew), systemImage: "rectangle.split.1x2")
       }
     } label: {
       Image(systemName: "plus")
     }
     .glassProminentButtonStyleCompat()
     .tint(AdaptiveColor.fillForWhiteInk(theme.color(for: "tasks")))
-    .accessibilityLabel(RegistryActions.title("app.newTask"))
+    .accessibilityLabel(RegistryActions.title(.appNewTask))
   }
 }
 

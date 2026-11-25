@@ -55,7 +55,7 @@ final class KitReviewTaskCell: NSTableCellView {
     textStack.translatesAutoresizingMaskIntoConstraints = false
     textStack.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-    acceptButton.title = RegistryActions.title("task.acceptReview")
+    acceptButton.title = RegistryActions.title(.taskAcceptReview)
     acceptButton.bezelStyle = .rounded
     acceptButton.controlSize = .small
     // Primary look without a Return key equivalent: a default button would
@@ -66,7 +66,7 @@ final class KitReviewTaskCell: NSTableCellView {
     // Space in a selected row must never trigger a row button (CLAUDE.md).
     acceptButton.refusesFirstResponder = true
 
-    sendBackButton.title = RegistryActions.title("task.sendBackReview")
+    sendBackButton.title = RegistryActions.title(.taskSendBackReview)
     sendBackButton.bezelStyle = .rounded
     sendBackButton.controlSize = .small
     sendBackButton.target = self

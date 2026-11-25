@@ -567,12 +567,12 @@ struct SidebarRootView: View {
       showingNewArea = true
       newAreaName = ""
     } label: {
-      Label(RegistryActions.title("sidebar.newArea"), systemImage: "square.stack.3d.up")
+      Label(RegistryActions.title(.sidebarNewArea), systemImage: "square.stack.3d.up")
     }
     Button {
       showingNewProject = true
     } label: {
-      Label(RegistryActions.title("sidebar.newProject"), systemImage: "number")
+      Label(RegistryActions.title(.sidebarNewProject), systemImage: "number")
     }
     Divider()
     Button {
@@ -652,14 +652,14 @@ struct SidebarRootView: View {
     let count: Int?
   }
 
-  private var nonEmptySmartListIDs: Set<String> {
-    var ids = Set<String>()
+  private var nonEmptySmartListIDs: Set<RegistryDestinationID> {
+    var ids = Set<RegistryDestinationID>()
     // Review and Agent also stay while selected, so accepting the last item
     // does not pull the row out from under the user.
-    if reviewCount > 0 || isSelected(.filter(.review)) { ids.insert("review") }
-    if agentCount > 0 || isSelected(.filter(.agent)) { ids.insert("agent") }
-    if starredCount > 0 { ids.insert("starred") }
-    if fadedCount > 0 { ids.insert("faded") }
+    if reviewCount > 0 || isSelected(.filter(.review)) { ids.insert(.review) }
+    if agentCount > 0 || isSelected(.filter(.agent)) { ids.insert(.agent) }
+    if starredCount > 0 { ids.insert(.starred) }
+    if fadedCount > 0 { ids.insert(.faded) }
     return ids
   }
 
@@ -1150,27 +1150,27 @@ struct SidebarRootView: View {
     let siblings = projects.filter { $0.area == project.area && $0.status == .active }
     let idx = siblings.firstIndex(where: { $0.id == project.id })
     return RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
-      RegistryActions.menu("sidebar.project"),
+      RegistryActions.menu(.sidebarProject),
       bind: { id in
         switch id {
-        case "project.rename":
+        case .projectRename:
           return .init {
             renameDraft = project.title
             renameProjectTarget = project
           }
-        case "project.moveUp":
+        case .projectMoveUp:
           guard let idx else { return nil }
           return .init(perform: idx == 0 ? nil : {
             reorderProject(project.id, before: siblings[idx - 1].id, parent: project.area)
           })
-        case "project.moveDown":
+        case .projectMoveDown:
           guard let idx else { return nil }
           return .init(perform: idx == siblings.count - 1 ? nil : {
             reorderProject(siblings[idx + 1].id, before: project.id, parent: project.area)
           })
-        case "project.markDone": return .init { setProjectStatus(project, to: .done) }
-        case "project.cancel": return .init { setProjectStatus(project, to: .cancelled) }
-        case "project.delete": return .init { deleteProjectTarget = project }
+        case .projectMarkDone: return .init { setProjectStatus(project, to: .done) }
+        case .projectCancel: return .init { setProjectStatus(project, to: .cancelled) }
+        case .projectDelete: return .init { deleteProjectTarget = project }
         default: return nil
         }
       },
@@ -1202,32 +1202,32 @@ struct SidebarRootView: View {
   private func areaMenu(_ area: Area) -> some View {
     let idx = areas.firstIndex(where: { $0.id == area.id })
     return RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
-      RegistryActions.menu("sidebar.area")) { id in
+      RegistryActions.menu(.sidebarArea)) { id in
         switch id {
-        case "area.newProject":
+        case .areaNewProject:
           return .init {
             newProjectInArea = area.id
             showingNewProject = true
           }
-        case "area.rename":
+        case .areaRename:
           return .init {
             renameDraft = area.title
             renameAreaTarget = area
           }
-        case "area.changeEmoji":
+        case .areaChangeEmoji:
           return .init {
             emojiDraft = area.emoji ?? ""
             emojiAreaTarget = area
           }
-        case "area.moveUp":
+        case .areaMoveUp:
           guard let idx else { return nil }
           return .init(perform: idx == 0 ? nil : { reorderArea(area.id, before: areas[idx - 1].id) })
-        case "area.moveDown":
+        case .areaMoveDown:
           guard let idx else { return nil }
           return .init(perform: idx == areas.count - 1 ? nil : {
             reorderArea(areas[idx + 1].id, before: area.id)
           })
-        case "area.delete": return .init { deleteAreaTarget = area }
+        case .areaDelete: return .init { deleteAreaTarget = area }
         default: return nil
         }
       })
@@ -1845,7 +1845,7 @@ struct NewProjectSheet: View {
     NavigationStack {
       Form {
         Section {
-          TextField(RegistryPrompts.textPrompt("newProject").placeholder, text: $title)
+          TextField(RegistryPrompts.textPrompt(.newProject).placeholder, text: $title)
         }
         Section("Area") {
           Button { selectedAreaId = nil } label: {
@@ -1864,14 +1864,14 @@ struct NewProjectSheet: View {
       // (default-styled Forms report no flexible height) — same rule the
       // shared AdaptiveEditScaffold applies to its sheet branch.
       .formStyle(.grouped)
-      .navigationTitle(RegistryPrompts.textPrompt("newProject").title)
+      .navigationTitle(RegistryPrompts.textPrompt(.newProject).title)
       .septenaInlineTitle()
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           DrawerCloseButton { dismiss() }
         }
         ToolbarItem(placement: .confirmationAction) {
-          Button(RegistryPrompts.textPrompt("newProject").confirmTitle) {
+          Button(RegistryPrompts.textPrompt(.newProject).confirmTitle) {
             onCreate(title, selectedAreaId)
             dismiss()
           }
@@ -1925,8 +1925,8 @@ private struct RightClickAlerts: ViewModifier {
   let areaDeleteCopy: (Area) -> RegistryPromptCopy
 
   func body(content: Content) -> some View {
-    let renameProject = RegistryPrompts.textPrompt("renameProject")
-    let renameArea = RegistryPrompts.textPrompt("renameArea")
+    let renameProject = RegistryPrompts.textPrompt(.renameProject)
+    let renameArea = RegistryPrompts.textPrompt(.renameArea)
     return content
       .alert(renameProject.title,
              isPresented: Binding(
@@ -2000,9 +2000,9 @@ private struct SidebarSheets: ViewModifier {
   func body(content: Content) -> some View {
     content
       .confirmationDialog("Create", isPresented: $showingCreateMenu, titleVisibility: .hidden) {
-        Button(RegistryActions.title("app.newTask"))   { onNewTodo() }
-        Button(RegistryActions.title("sidebar.newProject")) { showingNewProject = true }
-        Button(RegistryActions.title("sidebar.newArea"))    { newAreaName = ""; showingNewArea = true }
+        Button(RegistryActions.title(.appNewTask))   { onNewTodo() }
+        Button(RegistryActions.title(.sidebarNewProject)) { showingNewProject = true }
+        Button(RegistryActions.title(.sidebarNewArea))    { newAreaName = ""; showingNewArea = true }
         Button(RegistryPrompts.cancelTitle, role: .cancel) {}
       }
       .sheet(isPresented: $showingNewProject, onDismiss: { newProjectInArea = nil }) {
@@ -2012,9 +2012,9 @@ private struct SidebarSheets: ViewModifier {
           .presentationDetents([.medium])
           .septenaSheetChrome()
       }
-      .alert(RegistryPrompts.textPrompt("newArea").title, isPresented: $showingNewArea) {
-        TextField(RegistryPrompts.textPrompt("newArea").placeholder, text: $newAreaName)
-        Button(RegistryPrompts.textPrompt("newArea").confirmTitle) { onCreateArea() }
+      .alert(RegistryPrompts.textPrompt(.newArea).title, isPresented: $showingNewArea) {
+        TextField(RegistryPrompts.textPrompt(.newArea).placeholder, text: $newAreaName)
+        Button(RegistryPrompts.textPrompt(.newArea).confirmTitle) { onCreateArea() }
         Button(RegistryPrompts.cancelTitle, role: .cancel) { newAreaName = "" }
       }
       .alert(RegistryPrompts.errorTitle, isPresented: Binding(
@@ -2268,7 +2268,7 @@ private struct SidebarMagicDraftRow: View {
   @FocusState private var focused: Bool
 
   var body: some View {
-    let prompt = RegistryPrompts.textPrompt(isArea ? "newArea" : "newProject")
+    let prompt = RegistryPrompts.textPrompt(isArea ? .newArea : .newProject)
     HStack(spacing: Theme.sidebarRowSpacing) {
       Group {
         if isArea {

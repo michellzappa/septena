@@ -59,10 +59,10 @@ struct ReviewTaskRow: View {
 
       // Same order as the task page's agent prompt: Accept, then Send back.
       HStack(spacing: 8) {
-        Button(RegistryActions.title("task.acceptReview"), action: onAccept)
+        Button(RegistryActions.title(.taskAcceptReview), action: onAccept)
           .buttonStyle(.borderedProminent)
           .controlSize(.taskAction)
-        Button(RegistryActions.title("task.sendBackReview"), action: onSendBack)
+        Button(RegistryActions.title(.taskSendBackReview), action: onSendBack)
           .buttonStyle(.bordered)
           .controlSize(.taskAction)
       }

@@ -91,13 +91,13 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// An attribute row asks for its picker: the attribute id and the row to
   /// anchor to. The shell routes it to the task list, which opens the same
   /// picker the row menu opens for that attribute's action.
-  var onOpenPicker: ((String, KitSurfaceAnchor) -> Void)?
+  var onOpenPicker: ((RegistryTaskAttributeID, KitSurfaceAnchor) -> Void)?
 
   /// The attribute rows the inspector shows, by registry attribute id. The
   /// form places them in `RegistrySurfaces.taskAttributes` order.
-  private lazy var attributeButtons: [String: KitInspectorAttributeButton] = [
-    "when": whenButton, "deadline": deadlineButton, "reminder": reminderButton,
-    "repeat": repeatButton, "star": starButton, "list": listButton, "tags": tagsButton,
+  private lazy var attributeButtons: [RegistryTaskAttributeID: KitInspectorAttributeButton] = [
+    .when: whenButton, .deadline: deadlineButton, .reminder: reminderButton,
+    .repeat: repeatButton, .star: starButton, .list: listButton, .tags: tagsButton,
   ]
   /// Attribute rows in registry order, for the form and the key-view loop.
   private var orderedAttributeButtons: [NSButton] = []
@@ -166,7 +166,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       button.target = self
       button.action = #selector(attributeRowClicked(_:))
       button.alignment = .left
-      button.identifier = NSUserInterfaceItemIdentifier(id)
+      button.identifier = NSUserInterfaceItemIdentifier(id.rawValue)
     }
     for (button, action) in [(addChecklistButton, #selector(addChecklistStep)),
                              (attachFileButton, #selector(attachFile)),
@@ -179,7 +179,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     }
     addChecklistButton.title = String(localized: "Add Checklist…", comment: "SeptaskKit: inspector add checklist")
     attachFileButton.title = String(localized: "Attach File…", comment: "SeptaskKit: inspector attach file")
-    let historyAttr = RegistrySurfaces.taskAttribute("history")
+    let historyAttr = RegistrySurfaces.taskAttribute(.history)
     historyButton.title = historyAttr.label
     historyButton.image = NSImage(systemSymbolName: historyAttr.sfSymbol, accessibilityDescription: nil)
     historyButton.imagePosition = .imageLeading
@@ -432,7 +432,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private func addReferencesBlock(_ block: RegistryTaskPageBlock) -> NSView {
     styleHeading(referencesLabel, block)
     referencesView.translatesAutoresizingMaskIntoConstraints = false
-    addReferenceButton.title = RegistryActions.title("task.addReference")
+    addReferenceButton.title = RegistryActions.title(.taskAddReference)
     form.addArrangedSubview(referencesLabel)
     form.addArrangedSubview(referencesView)
     form.addArrangedSubview(addReferenceButton)
@@ -461,7 +461,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// way the iOS task page draws it inside the Discuss card.
   private func addConversationBlock(_ block: RegistryTaskPageBlock) -> NSView {
     styleHeading(conversationLabel, block)
-    conversationLabel.stringValue = RegistrySurfaces.taskAttribute("discuss").label
+    conversationLabel.stringValue = RegistrySurfaces.taskAttribute(.discuss).label
     conversationView.translatesAutoresizingMaskIntoConstraints = false
     // A reply appends a turn, which posts a task change; re-read so the new
     // turn lands in the transcript the same way an agent turn would.
@@ -730,15 +730,15 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       TaskFilter.unscheduled.title
     }
     let when = next.timeSlotLabel.map { "\(whenBase) · \($0)" } ?? whenBase
-    whenButton.title = Self.field("when", when)
+    whenButton.title = Self.field(.when, when)
     let deadlineValue = next.deadline.map(KitDayFormat.display)
       ?? String(localized: "None", comment: "No deadline")
-    deadlineButton.title = Self.field("deadline", deadlineValue)
+    deadlineButton.title = Self.field(.deadline, deadlineValue)
     if let badge = next.reminder?.badgeText() {
-      reminderButton.title = Self.field("reminder", badge.text)
+      reminderButton.title = Self.field(.reminder, badge.text)
     } else {
-      reminderButton.title = RegistryActions.alternateTitles["task.reminder"]?["addTitle"]
-        ?? RegistrySurfaces.taskAttribute("reminder").label
+      reminderButton.title = RegistryActions.alternateTitles[.taskReminder]?["addTitle"]
+        ?? RegistrySurfaces.taskAttribute(.reminder).label
     }
     updateListButton(for: next)
 
@@ -748,21 +748,21 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
         : ""
       return "\(rule.shortLabel)\(paused)"
     } ?? String(localized: "None", comment: "No repeat")
-    repeatButton.title = Self.field("repeat", repeatValue)
-    let starTitles = RegistryActions.alternateTitles["task.toggleStar"] ?? [:]
-    let starLabel = RegistrySurfaces.taskAttribute("star").label
+    repeatButton.title = Self.field(.repeat, repeatValue)
+    let starTitles = RegistryActions.alternateTitles[.taskToggleStar] ?? [:]
+    let starLabel = RegistrySurfaces.taskAttribute(.star).label
     starButton.title = next.starred
       ? starTitles["removeTitle"] ?? starLabel
       : starTitles["addTitle"] ?? starLabel
     let resolvedTags = LocalCache.resolvedTags(for: next, tagsByID: LocalCache.tagsByID(in: context))
     tagsButton.title = resolvedTags.isEmpty
       ? String(localized: "Add Tags…", comment: "SeptaskKit: inspector add tags")
-      : Self.field("tags", resolvedTags.map(\.name).joined(separator: ", "))
+      : Self.field(.tags, resolvedTags.map(\.name).joined(separator: ", "))
   }
 
   /// "Label: value" for an inspector row, the label from the registry's
   /// `taskAttributes` (ADR 0020) so it matches the composer pill.
-  private static func field(_ id: String, _ value: String) -> String {
+  private static func field(_ id: RegistryTaskAttributeID, _ value: String) -> String {
     "\(RegistrySurfaces.taskAttribute(id).label): \(value)"
   }
 
@@ -834,7 +834,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
                                 comment: "SeptaskKit: inspector list affiliation")
       return
     }
-    listButton.image = KitGlyph.symbol(RegistrySurfaces.taskAttribute("list").sfSymbol,
+    listButton.image = KitGlyph.symbol(RegistrySurfaces.taskAttribute(.list).sfSymbol,
                                        color: SeptaskKitTheme.iconMuted,
                                        cacheTag: "iconMuted",
                                        size: 14)
@@ -963,14 +963,16 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// composer pill (ADR 0029). The picker folds open under the row
   /// (`foldOpen`). A second click on the row folds it closed: Cancel.
   @objc private func attributeRowClicked(_ sender: NSButton) {
-    guard task != nil, let id = sender.identifier?.rawValue else { return }
+    guard task != nil,
+          let raw = sender.identifier?.rawValue,
+          let id = RegistryTaskAttributeID(rawValue: raw) else { return }
     if let fold, foldAnchor === sender {
       fold.cancel()
       return
     }
     // One fold at a time.
     fold?.cancel()
-    if id == "star" {
+    if id == .star {
       toggleStar()
       return
     }
@@ -1025,7 +1027,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     return made
   }
 
-  func inlineAnchor(forAttribute attributeId: String) -> KitSurfaceAnchor? {
+  func inlineAnchor(forAttribute attributeId: RegistryTaskAttributeID) -> KitSurfaceAnchor? {
     guard let button = attributeButtons[attributeId],
           orderedAttributeButtons.contains(where: { $0 === button }) else { return nil }
     return .rect(button.bounds, button)
@@ -1075,8 +1077,8 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     mutator.setStarred(id: current.id, starred: nextStarred)
     TaskUndo.recordScheduleChange(
       name: nextStarred
-        ? RegistryActions.title("task.toggleStar", .add)
-        : RegistryActions.title("task.toggleStar", .remove),
+        ? RegistryActions.title(.taskToggleStar, .add)
+        : RegistryActions.title(.taskToggleStar, .remove),
       before: before, context: context, mutator: mutator)
     NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     refresh()

@@ -80,7 +80,7 @@ struct SeptaskAgentsPane: View {
 struct SeptaskAgentsSections: View {
   private var roster: AgentRoster { .shared }
   private static let section = RegistrySettings.section("agents", page: RegistrySettings.PageID.agents)
-  private static let renamePrompt = RegistryPrompts.text["renameAgent"]
+  private static let renamePrompt = RegistryPrompts.text[.renameAgent]
 
   @State private var renaming: BackendAccess.Connection?
   @State private var draftName = ""

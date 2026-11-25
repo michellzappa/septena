@@ -38,7 +38,7 @@ private struct ClassicWindowCommand: View {
   @Environment(\.openWindow) private var openWindow
 
   var body: some View {
-    Button(RegistryActions.title("app.classicWindow")) { openWindow(id: "main") }
+    Button(RegistryActions.title(.appClassicWindow)) { openWindow(id: "main") }
       .keyboardShortcut("0", modifiers: [.command, .option])
   }
 }
@@ -68,7 +68,7 @@ private struct SeptaskTaskMenu: View {
 
   var body: some View {
     let nodes = RegistryMenuResolver.resolve(
-      RegistryActions.menuBarMenu("task")?.items ?? [], bind: bind)
+      RegistryActions.menuBarMenu(.task)?.items ?? [], bind: bind)
     RegistryMenuContent(nodes: nodes)
     #if os(macOS)
     // NSMenuItem has one visible key-equivalent slot. Alternate bindings
@@ -86,11 +86,11 @@ private struct SeptaskTaskMenu: View {
     #endif
   }
 
-  private func bind(_ id: String) -> RegistryActionBinding? {
+  private func bind(_ id: RegistryActionID) -> RegistryActionBinding? {
     switch id {
-    case "sidebar.newProject":
+    case .sidebarNewProject:
       return .init(perform: canNavigate ? newProject : nil)
-    case "sidebar.newArea":
+    case .sidebarNewArea:
       return .init(perform: canNavigate ? newArea : nil)
     default:
       break
@@ -103,7 +103,7 @@ private struct SeptaskTaskMenu: View {
     #endif
     guard TaskActions.supports(id) else { return nil }
     let action = taskActions?.handler(for: id)
-      ?? (id == "task.toggleComplete" ? nextActions?.toggleComplete : nil)
+      ?? (id == .taskToggleComplete ? nextActions?.toggleComplete : nil)
     #if os(iOS)
     // iPad: the task list can't publish `\.taskActions` (a focused scene
     // value from the split-view detail SIGKILLs iPad, see TaskListView), so
@@ -153,9 +153,11 @@ private struct SeptaskTaskMenu: View {
         switch node {
         case .item(let entry):
           shown.insert(entry.id)
-          for (index, alternate) in (RegistryActions.shortcut(for: entry.id)?.alternates ?? []).enumerated() {
-            out.append(HiddenBinding(id: "\(entry.id).alt\(index)", title: entry.title,
-                                     shortcut: alternate, perform: entry.perform))
+          if let actionID = RegistryActionID(rawValue: entry.id) {
+            for (index, alternate) in (RegistryActions.shortcut(for: actionID)?.alternates ?? []).enumerated() {
+              out.append(HiddenBinding(id: "\(entry.id).alt\(index)", title: entry.title,
+                                       shortcut: alternate, perform: entry.perform))
+            }
           }
         case .submenu(_, _, _, let children):
           walk(children)
@@ -165,35 +167,35 @@ private struct SeptaskTaskMenu: View {
       }
     }
     walk(nodes)
-    for id in TaskActions.rowCommandIds where !shown.contains(id) {
+    for id in TaskActions.rowCommandIds where !shown.contains(id.rawValue) {
       guard let shortcut = RegistryActions.shortcut(for: id) else { continue }
-      out.append(HiddenBinding(id: id, title: RegistryActions.title(id), shortcut: shortcut,
+      out.append(HiddenBinding(id: id.rawValue, title: RegistryActions.title(id), shortcut: shortcut,
                                perform: taskActions?.handler(for: id)))
     }
     return out
   }
 
   /// The AppKit shell's row command for a registry action.
-  private static func kitCommand(for id: String) -> SeptaskKitWindowController.RowCommand? {
+  private static func kitCommand(for id: RegistryActionID) -> SeptaskKitWindowController.RowCommand? {
     switch id {
-    case "task.editDetails": return .rename
-    case "task.open": return .open
-    case "task.duplicate": return .duplicate
-    case "task.toggleComplete": return .toggleComplete
-    case "task.cancel": return .cancel
-    case "task.delete": return .delete
-    case "task.toggleToday": return .toggleToday
-    case "task.toggleStar": return .toggleStar
-    case "task.tags": return .editTags
-    case "task.addChecklistItem": return .addChecklistItem
-    case "task.addReference": return TaskRefActions.canAdd ? .addReference : nil
-    case "task.when": return .when
-    case "task.deadline": return .deadline
-    case "task.reminder": return .reminder
-    case "task.move": return .move
-    case "task.clearSchedule": return .clearSchedule
-    case "task.repeat": return .repeatEditor
-    case "task.createNextCopy": return .createNextCopy
+    case .taskEditDetails: return .rename
+    case .taskOpen: return .open
+    case .taskDuplicate: return .duplicate
+    case .taskToggleComplete: return .toggleComplete
+    case .taskCancel: return .cancel
+    case .taskDelete: return .delete
+    case .taskToggleToday: return .toggleToday
+    case .taskToggleStar: return .toggleStar
+    case .taskTags: return .editTags
+    case .taskAddChecklistItem: return .addChecklistItem
+    case .taskAddReference: return TaskRefActions.canAdd ? .addReference : nil
+    case .taskWhen: return .when
+    case .taskDeadline: return .deadline
+    case .taskReminder: return .reminder
+    case .taskMove: return .move
+    case .taskClearSchedule: return .clearSchedule
+    case .taskRepeat: return .repeatEditor
+    case .taskCreateNextCopy: return .createNextCopy
     default: return nil
     }
   }
@@ -287,7 +289,7 @@ struct SeptaskCommandMenus: Commands {
 
   /// The registry's Go menu (`registry/actions.json` `menuBar`).
   private static let goMenu: RegistryMenu = {
-    guard let menu = RegistryActions.menuBar.first(where: { $0.id == "go" }) else {
+    guard let menu = RegistryActions.menuBarMenu(.go) else {
       preconditionFailure("registry/actions.json has no go menu")
     }
     return menu
@@ -343,26 +345,26 @@ struct SeptaskCommandMenus: Commands {
   }
 
   /// One registry `menuBar` menu, resolved against `bind`.
-  private func menuBar(_ id: String, slot: (String) -> [RegistryMenuNode] = { _ in [] }) -> RegistryMenuContent {
+  private func menuBar(_ id: RegistryMenuBarID, slot: (String) -> [RegistryMenuNode] = { _ in [] }) -> RegistryMenuContent {
     RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
       RegistryActions.menuBarMenu(id)?.items ?? [], bind: bind, slot: slot))
   }
 
   // MARK: - Bindings (App, File, View, Help)
 
-  private func bind(_ id: String) -> RegistryActionBinding? {
+  private func bind(_ id: RegistryActionID) -> RegistryActionBinding? {
     switch id {
-    case "app.settings":
+    case .appSettings:
       return .init(perform: canOpenSettings ? showSettings : nil)
 
-    case "app.newTask":
+    case .appNewTask:
       return newTaskBinding
 
-    case "app.quickAdd":
+    case .appQuickAdd:
       // The registry gates Quick Add off macOS (Quick Entry covers capture).
       return .init(perform: actions.map { actions in { actions.showQuickAdd() } })
 
-    case "app.keyboardShortcuts":
+    case .appKeyboardShortcuts:
       #if os(macOS)
       // SwiftUI-window only: the AppKit shell has no shortcuts sheet, and a
       // permanently disabled item is worse than none.
@@ -372,29 +374,29 @@ struct SeptaskCommandMenus: Commands {
       return .init(perform: actions.map { actions in { actions.showKeyboardShortcuts() } })
       #endif
 
-    case "app.toggleSidebar":
+    case .appToggleSidebar:
       // ⌃⌘S is macOS only: the registry excludes it on iOS, where the system
       // already owns ⌃⌘S and UIKit aborts the app on a duplicate shortcut.
       return .init(variant: sidebarIsHidden ? .add : .remove,
                    perform: canNavigate ? toggleSidebar : nil)
 
     #if os(macOS)
-    case "task.toggleInfo":
+    case .taskToggleInfo:
       return .init(variant: inspectorVisible ? .active : .base,
                    perform: actions == nil && SeptaskKitCommands.canHandle
                      ? { SeptaskKitCommands.showInspector() } : nil)
 
-    case "app.toggleSidebarCounts":
+    case .appToggleSidebarCounts:
       // AppKit-shell-only (the SwiftUI sidebar has no count-hiding toggle).
       return .init(variant: sidebarCountsHidden ? .base : .active,
                    perform: SeptaskKitCommands.canHandle ? { SeptaskKitCommands.toggleSidebarCounts() } : nil)
     #endif
 
-    case "app.textSizeIncrease":
+    case .appTextSizeIncrease:
       return .init(perform: TextSizeStep.resolve(textSizeRaw) == .xLarge ? nil : { adjustTextSize(by: 1) })
-    case "app.textSizeDecrease":
+    case .appTextSizeDecrease:
       return .init(perform: TextSizeStep.resolve(textSizeRaw) == .xSmall ? nil : { adjustTextSize(by: -1) })
-    case "app.textSizeReset":
+    case .appTextSizeReset:
       return .init(perform: TextSizeStep.resolve(textSizeRaw) == .normal
                    ? nil : { textSizeSelection.wrappedValue = TextSizeStep.normal.rawValue })
 
@@ -452,7 +454,7 @@ struct SeptaskCommandMenus: Commands {
 
       Divider()
 
-      Button(RegistryActions.title("app.quickFind")) { showQuickFind() }
+      Button(RegistryActions.title(.appQuickFind)) { showQuickFind() }
         .keyboardShortcut("f", modifiers: [.command, .shift])
         .disabled(!canNavigate)
 
@@ -462,25 +464,25 @@ struct SeptaskCommandMenus: Commands {
       // The AppKit shell is the default window on macOS; this reopens it if
       // it was closed. No shortcut: ⌘0 is Reset Text Size, ⌘-digits are
       // the lists, and the Dock icon reopens the window too.
-      Button(RegistryActions.title("app.septenaWindow")) { SeptaskKitWindowController.show() }
+      Button(RegistryActions.title(.appSeptenaWindow)) { SeptaskKitWindowController.show() }
       ClassicWindowCommand()
 
       // Shows the global hotkey `SeptaskKitQuickEntry.installHotKey()`
       // registers (⌃⌥Space), so the combination is discoverable here.
       // Not a task-row binding: it carries two modifiers and opens the
       // capture panel, so it cannot reach a row checkbox.
-      Button(RegistryActions.title("app.quickEntry")) { SeptaskKitQuickEntry.show() }
+      Button(RegistryActions.title(.appQuickEntry)) { SeptaskKitQuickEntry.show() }
         .keyboardShortcut(.space, modifiers: [.control, .option]) // septena-lint:allow task-space-binding — global ⌃⌥Space capture hotkey, not a row key
       #endif
     }
 
-    CommandMenu(RegistryActions.menuBarMenu("task")?.title ?? "Task") {
+    CommandMenu(RegistryActions.menuBarMenu(.task)?.title ?? "Task") {
       SeptaskTaskMenu(navigation: actions, canNavigate: canNavigate)
     }
 
     CommandGroup(after: .sidebar) {
       // Registry View menu: sidebar, Info, sidebar counts, Text Size ▸.
-      menuBar("view", slot: textSizeSteps)
+      menuBar(.view, slot: textSizeSteps)
 
       // View options for the lists themselves. Not shell-gated: it writes a
       // stored preference both shells read, and on iPadOS this same group is
@@ -489,15 +491,15 @@ struct SeptaskCommandMenus: Commands {
       TaskViewOptions()
     }
 
-    CommandGroup(replacing: .newItem) { menuBar("file") }
+    CommandGroup(replacing: .newItem) { menuBar(.file) }
 
     #if os(macOS)
     CommandGroup(replacing: .undoRedo) { SeptaskUndoRedoCommands() }
     #endif
 
-    CommandGroup(replacing: .appSettings) { menuBar("app") }
+    CommandGroup(replacing: .appSettings) { menuBar(.app) }
 
-    CommandGroup(after: .help) { menuBar("help") }
+    CommandGroup(after: .help) { menuBar(.help) }
 
     #if os(macOS)
     SeptaskMacAppCommands()
@@ -538,7 +540,7 @@ private struct SeptaskUndoRedoCommands: View {
 
   var body: some View {
     Group {
-      Button(undoName.isEmpty ? RegistryActions.title("app.undo") : "\(RegistryActions.title("app.undo")) \(undoName)") { perform(undo: true) }
+      Button(undoName.isEmpty ? RegistryActions.title(.appUndo) : "\(RegistryActions.title(.appUndo)) \(undoName)") { perform(undo: true) }
         .keyboardShortcut("z", modifiers: .command)
       Button(redoName.isEmpty ? "Redo" : "Redo \(redoName)") { perform(undo: false) }
         .keyboardShortcut("z", modifiers: [.command, .shift])

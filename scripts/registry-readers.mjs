@@ -230,13 +230,19 @@ function checkShipsClaims(repo, allowed) {
   // App sources only: a test that names an ID does not make the feature ship.
   const swiftApp = readAll(["Septena", "Septask", "SeptenaCore", "ShareExtension"]
     .flatMap((d) => walk(path.join(repo, d), [".swift"])));
+  const swiftGen = fs.readFileSync(path.join(repo, "SeptenaCore/Generated/RegistryConstants.swift"), "utf8");
+  const swiftCases = {};
+  for (const m of swiftGen.matchAll(/^\s*case `?(\w+)`? = "([^"]+)"/gm)) (swiftCases[m[2]] ??= []).push(m[1]);
+  for (const m of swiftGen.matchAll(/RegistryTaskPageBlock\(id: "([^"]+)", kind: \.(\w+)/g)) (swiftCases[m[1]] ??= []).push(m[2]);
   const ktApp = readAll(walk(path.join(repo, "android"), [".kt"]).filter((f) => !f.includes(`${path.sep}test${path.sep}`)));
   const ktGen = fs.readFileSync(path.join(repo, "android/core/src/main/kotlin/app/septena/core/generated/RegistryConstants.kt"), "utf8");
   const ktConstants = {};
   for (const m of ktGen.matchAll(/val (\w+)(?::[^=]+)? = "([^"]+)"/g)) (ktConstants[m[2]] ??= []).push(m[1]);
   const quoted = (src, id) => src.includes(`"${id}"`);
   const readers = {
-    swift: (id) => quoted(swiftApp, id) || (/^\w+$/.test(id) && new RegExp(`(?:\\bcase |\\.)${id}\\b`).test(swiftApp)),
+    swift: (id) => quoted(swiftApp, id)
+      || (/^\w+$/.test(id) && new RegExp(`(?:\\bcase |\\.)${id}\\b`).test(swiftApp))
+      || (swiftCases[id] ?? []).some((n) => new RegExp(`\\.${esc(n)}\\b`).test(swiftApp)),
     kotlin: (id) => quoted(ktApp, id) || (ktConstants[id] ?? []).some((n) => new RegExp(`\\.${esc(n)}\\b`).test(ktApp)),
   };
   const seen = new Set();

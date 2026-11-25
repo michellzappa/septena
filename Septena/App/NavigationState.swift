@@ -73,7 +73,7 @@ extension Route {
 @MainActor
 enum TaskDestinations {
   /// Visible special smart lists across both sections, in user order.
-  static func sidebarRoutes(nonEmptyIDs: Set<String>) -> [Route] {
+  static func sidebarRoutes(nonEmptyIDs: Set<RegistryDestinationID>) -> [Route] {
     SmartListPreferences.shared
       .visibleDestinations(nonEmptyIDs: nonEmptyIDs)
       .compactMap { TaskFilter(destinationID: $0.id).map(Route.filter) }
@@ -82,19 +82,19 @@ enum TaskDestinations {
   /// Visible special smart lists in a specific sidebar zone (`.top` above
   /// Areas & Projects, or `.bottom` below Areas & Projects).
   static func sidebarRoutes(in section: SmartListSection,
-                            nonEmptyIDs: Set<String>) -> [Route] {
+                            nonEmptyIDs: Set<RegistryDestinationID>) -> [Route] {
     SmartListPreferences.shared
       .visibleDestinations(in: section, nonEmptyIDs: nonEmptyIDs)
       .compactMap { TaskFilter(destinationID: $0.id).map(Route.filter) }
   }
 
   /// Convenience for menus/dropdowns that don't already have precomputed counts.
-  static func nonEmptySmartListIDs(in context: ModelContext) -> Set<String> {
-    var nonEmpty = Set<String>()
-    if !LocalCache.tasks(in: context, filter: .review).isEmpty { nonEmpty.insert("review") }
-    if !LocalCache.tasks(in: context, filter: .agent).isEmpty { nonEmpty.insert("agent") }
-    if !LocalCache.tasks(in: context, filter: .starred).isEmpty { nonEmpty.insert("starred") }
-    if !LocalCache.tasks(in: context, filter: .faded).isEmpty { nonEmpty.insert("faded") }
+  static func nonEmptySmartListIDs(in context: ModelContext) -> Set<RegistryDestinationID> {
+    var nonEmpty = Set<RegistryDestinationID>()
+    if !LocalCache.tasks(in: context, filter: .review).isEmpty { nonEmpty.insert(.review) }
+    if !LocalCache.tasks(in: context, filter: .agent).isEmpty { nonEmpty.insert(.agent) }
+    if !LocalCache.tasks(in: context, filter: .starred).isEmpty { nonEmpty.insert(.starred) }
+    if !LocalCache.tasks(in: context, filter: .faded).isEmpty { nonEmpty.insert(.faded) }
     return nonEmpty
   }
 

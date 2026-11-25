@@ -785,6 +785,20 @@ const L = (s, obj, field) => L10N.swiftLookup(BY_KEY, s, obj?.l10nKeys?.[field] 
 const LOpt = (s, obj, field) => (s === undefined || s === null ? "nil" : L(s, obj, field));
 const swiftOptStr = (s) => (s === undefined || s === null ? "nil" : JSON.stringify(s));
 const camelId = (s) => s.replace(/[._-]+([a-zA-Z0-9])/g, (_, c) => c.toUpperCase());
+const SWIFT_KEYWORDS = new Set([
+  "associatedtype", "class", "deinit", "enum", "extension", "fileprivate", "func", "import",
+  "init", "inout", "internal", "let", "open", "operator", "private", "precedencegroup",
+  "protocol", "public", "rethrows", "static", "struct", "subscript", "typealias", "var",
+  "break", "case", "catch", "continue", "default", "defer", "do", "else", "fallthrough",
+  "for", "guard", "if", "in", "repeat", "return", "throw", "switch", "where", "while",
+  "as", "false", "is", "nil", "self", "Self", "super", "throws", "true", "try",
+]);
+const swiftCaseName = (id) => camelId(id);
+const swiftCaseDecl = (id) => {
+  const name = swiftCaseName(id);
+  return SWIFT_KEYWORDS.has(name) ? `\`${name}\`` : name;
+};
+const swiftCaseRef = (id) => `.${swiftCaseName(id)}`;
 
 function appleKeycaps(sc) {
   const caps = [];
@@ -1157,9 +1171,24 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("");
 
   // 6. Destinations
+  const emitIdEnum = (typeName, doc, ids) => {
+    lines.push(`/// ${doc}`);
+    lines.push(`enum ${typeName}: String, CaseIterable, Hashable, Sendable {`);
+    const seen = new Set();
+    for (const id of ids) {
+      const name = swiftCaseName(id);
+      assert(!seen.has(name), `${typeName}: IDs collide after Swift case conversion at ${id}`);
+      seen.add(name);
+      lines.push(`  case ${swiftCaseDecl(id)} = ${swiftStr(id)}`);
+    }
+    lines.push("}");
+    lines.push("");
+  };
+
+  emitIdEnum("RegistryDestinationID", "Canonical smart-list IDs (`registry/destinations.json`).", dests.destinations.map((d) => d.id));
   lines.push("/// Canonical smart-list metadata (`registry/destinations.json`).");
   lines.push("struct RegistryDestination: Sendable, Hashable, Identifiable {");
-  lines.push("  let id: String");
+  lines.push("  let id: RegistryDestinationID");
   lines.push("  let navigationKey: String");
   lines.push("  let serverView: String");
   lines.push("  let title: String");
@@ -1194,12 +1223,12 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static let all: [RegistryDestination] = [");
   for (const d of dests.destinations) {
     lines.push(
-      `    RegistryDestination(id: ${swiftStr(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, sidebarSection: ${swiftStr(d.sidebarSection ?? "top")}, visibility: ${swiftStr(d.visibility)}, canHide: ${d.canHide ? "true" : "false"}, canMoveSection: ${d.canMoveSection ? "true" : "false"}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}, featureId: ${swiftStr(d.featureId)}),`
+      `    RegistryDestination(id: ${swiftCaseRef(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, sidebarSection: ${swiftStr(d.sidebarSection ?? "top")}, visibility: ${swiftStr(d.visibility)}, canHide: ${d.canHide ? "true" : "false"}, canMoveSection: ${d.canMoveSection ? "true" : "false"}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}, featureId: ${swiftStr(d.featureId)}),`
     );
   }
   lines.push("  ]");
   lines.push("");
-  lines.push("  static let byId: [String: RegistryDestination] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })");
+  lines.push("  static let byId: [RegistryDestinationID: RegistryDestination] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })");
   lines.push("  static let byNavigationKey: [String: RegistryDestination] = Dictionary(uniqueKeysWithValues: all.map { ($0.navigationKey, $0) })");
   lines.push("");
   lines.push("  /// Digit shortcuts in order (`digitShortcuts` in destinations.json): the first");
@@ -1214,10 +1243,10 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`  static let digitShortcutVisibility: String = ${swiftStr(dests.digitShortcuts.visibility)}`);
   lines.push("");
   lines.push("  /// Ordered row groups per destination id (`groups` in destinations.json).");
-  lines.push("  static let groups: [String: [RegistryDestinationGroup]] = [");
+  lines.push("  static let groups: [RegistryDestinationID: [RegistryDestinationGroup]] = [");
   for (const d of dests.destinations) {
     if (!d.groups) continue;
-    lines.push(`    ${swiftStr(d.id)}: [`);
+    lines.push(`    ${swiftCaseRef(d.id)}: [`);
     for (const g of d.groups) {
       lines.push(`      RegistryDestinationGroup(id: ${swiftStr(g.id)}, title: ${L(g.title, g, "title")}, iconId: ${swiftStr(g.icon)}, sfSymbol: ${swiftStr(icons.icons[g.icon].sfSymbol)}),`);
     }
@@ -1234,9 +1263,13 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("");
 
   // 7. Actions & Shortcuts Sheet
+  emitIdEnum("RegistryActionID", "Canonical action IDs (`registry/actions.json` `actions`).", Object.keys(actions.actions));
+  emitIdEnum("RegistryContextMenuID", "Canonical context-menu IDs (`registry/actions.json` `contextMenus`).", Object.keys(actions.contextMenus));
+  emitIdEnum("RegistryMenuBarID", "Canonical menu-bar menu IDs (`registry/actions.json` `menuBar`).", actions.menuBar.map((m) => m.id));
   lines.push("/// Generated shortcut-sheet entry (`registry/actions.json`).");
   lines.push("struct RegistryShortcutEntry: Sendable, Hashable, Identifiable {");
   lines.push("  let id: String");
+  lines.push("  let actionId: RegistryActionID");
   lines.push("  let label: String");
   lines.push("  let keycaps: [String]");
   lines.push("  let excludePlatforms: [String]");
@@ -1257,8 +1290,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("struct RegistryActionAvailability: Sendable, Hashable {");
   lines.push("  let selection: String");
   lines.push("  let platforms: [String]");
-  lines.push("  let excludeDestinations: [String]");
-  lines.push("  let onlyDestinations: [String]");
+  lines.push("  let excludeDestinations: [RegistryDestinationID]");
+  lines.push("  let onlyDestinations: [RegistryDestinationID]");
   lines.push("  let requiresRecurrence: Bool");
   lines.push("  /// The action's capability (`featureId`); a menu hides it where it does not ship.");
   lines.push("  let featureId: String");
@@ -1269,6 +1302,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("struct RegistryMenuItem: Sendable, Hashable, Identifiable {");
   lines.push("  let kind: String");
   lines.push("  let id: String");
+  lines.push("  let actionId: RegistryActionID?");
   lines.push("  let title: String?");
   lines.push("  let sfSymbol: String?");
   lines.push("  let items: [RegistryMenuItem]");
@@ -1276,7 +1310,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("");
   lines.push("/// One menu-bar menu. `system` names the platform menu it merges into (app, file, view, help).");
   lines.push("struct RegistryMenu: Sendable, Hashable, Identifiable {");
-  lines.push("  let id: String");
+  lines.push("  let id: RegistryMenuBarID");
   lines.push("  let title: String");
   lines.push("  let system: String?");
   lines.push("  let items: [RegistryMenuItem]");
@@ -1287,82 +1321,83 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     if (item.kind === "action") {
       const a = actions.actions[item.id];
       const field = item.titleField ?? "title";
-      return `RegistryMenuItem(kind: "action", id: ${swiftStr(item.id)}, title: ${L(a[field], a, field)}, sfSymbol: ${swiftStr(icons.icons[a.icon].sfSymbol)}, items: [])`;
+      return `RegistryMenuItem(kind: "action", id: ${swiftStr(item.id)}, actionId: ${swiftCaseRef(item.id)}, title: ${L(a[field], a, field)}, sfSymbol: ${swiftStr(icons.icons[a.icon].sfSymbol)}, items: [])`;
     }
     if (item.kind === "destination") {
       const d = destById.get(item.id);
-      return `RegistryMenuItem(kind: "destination", id: ${swiftStr(item.id)}, title: ${L(d.title, d, "title")}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, items: [])`;
+      return `RegistryMenuItem(kind: "destination", id: ${swiftStr(item.id)}, actionId: nil, title: ${L(d.title, d, "title")}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, items: [])`;
     }
     if (item.kind === "submenu") {
-      return `RegistryMenuItem(kind: "submenu", id: ${swiftStr(item.id)}, title: ${L(item.title, item, "title")}, sfSymbol: ${swiftStr(icons.icons[item.icon].sfSymbol)}, items: [${item.items.map(menuItem).join(", ")}])`;
+      return `RegistryMenuItem(kind: "submenu", id: ${swiftStr(item.id)}, actionId: nil, title: ${L(item.title, item, "title")}, sfSymbol: ${swiftStr(icons.icons[item.icon].sfSymbol)}, items: [${item.items.map(menuItem).join(", ")}])`;
     }
-    if (item.kind === "slot") return `RegistryMenuItem(kind: "slot", id: ${swiftStr(item.slot)}, title: nil, sfSymbol: nil, items: [])`;
-    return `RegistryMenuItem(kind: "divider", id: ${swiftStr(`divider.${idx}`)}, title: nil, sfSymbol: nil, items: [])`;
+    if (item.kind === "slot") return `RegistryMenuItem(kind: "slot", id: ${swiftStr(item.slot)}, actionId: nil, title: nil, sfSymbol: nil, items: [])`;
+    return `RegistryMenuItem(kind: "divider", id: ${swiftStr(`divider.${idx}`)}, actionId: nil, title: nil, sfSymbol: nil, items: [])`;
   };
   lines.push("enum RegistryActions {");
-  lines.push("  static let titles: [String: String] = [");
+  lines.push("  static let titles: [RegistryActionID: String] = [");
   for (const [id, a] of Object.entries(actions.actions)) {
-    lines.push(`    ${swiftStr(id)}: ${L(a.title, a, "title")},`);
+    lines.push(`    ${swiftCaseRef(id)}: ${L(a.title, a, "title")},`);
   }
   lines.push("  ]");
   lines.push("");
-  lines.push("  static let sfSymbols: [String: String] = [");
+  lines.push("  static let sfSymbols: [RegistryActionID: String] = [");
   for (const [id, a] of Object.entries(actions.actions)) {
-    lines.push(`    ${swiftStr(id)}: ${swiftStr(icons.icons[a.icon].sfSymbol)},`);
+    lines.push(`    ${swiftCaseRef(id)}: ${swiftStr(icons.icons[a.icon].sfSymbol)},`);
   }
   lines.push("  ]");
   lines.push("");
   const altFields = ["desktopTitle", "activeTitle", "pluralTitle", "addTitle", "removeTitle", "shortTitle"];
   lines.push("  /// Other titles of an action: `desktopTitle`, `activeTitle` (state on), `pluralTitle`, `addTitle`, `removeTitle`, `shortTitle` (swipe buttons).");
-  lines.push("  static let alternateTitles: [String: [String: String]] = [");
+  lines.push("  static let alternateTitles: [RegistryActionID: [String: String]] = [");
   for (const [id, a] of Object.entries(actions.actions)) {
     const pairs = altFields.filter((f) => typeof a[f] === "string").map((f) => `${swiftStr(f)}: ${L(a[f], a, f)}`);
-    if (pairs.length) lines.push(`    ${swiftStr(id)}: [${pairs.join(", ")}],`);
+    if (pairs.length) lines.push(`    ${swiftCaseRef(id)}: [${pairs.join(", ")}],`);
   }
   lines.push("  ]");
   lines.push("");
-  lines.push("  static let shortcuts: [String: RegistryShortcut] = [");
+  lines.push("  static let shortcuts: [RegistryActionID: RegistryShortcut] = [");
   for (const [id, a] of Object.entries(actions.actions)) {
     if (!a.shortcut) continue;
     const sc = a.shortcut;
     const excl = `[${(sc.excludePlatforms ?? []).map(swiftStr).join(", ")}]`;
     const one = (k) => `RegistryShortcut(key: ${swiftStr(k.key)}, modifiers: [${k.modifiers.map(swiftStr).join(", ")}], keycaps: [${appleKeycaps(k).map(swiftStr).join(", ")}], excludePlatforms: ${excl}`;
     const alts = (sc.alternates ?? []).map((k) => `${one(k)})`);
-    lines.push(`    ${swiftStr(id)}: ${one(sc)}${alts.length ? `, alternates: [${alts.join(", ")}]` : ""}),`);
+    lines.push(`    ${swiftCaseRef(id)}: ${one(sc)}${alts.length ? `, alternates: [${alts.join(", ")}]` : ""}),`);
   }
   lines.push("  ]");
   lines.push("");
   lines.push("  /// The task attribute whose picker an action opens (`opensAttribute`, ADR 0029).");
   lines.push("  /// Every entry point for an attribute (pill, page row, context menu, menu bar,");
   lines.push("  /// shortcut) runs this action, so all of them open the same picker.");
-  lines.push("  static let opensAttribute: [String: String] = [");
+  lines.push("  static let opensAttribute: [RegistryActionID: RegistryTaskAttributeID] = [");
   for (const [id, a] of Object.entries(actions.actions)) {
-    if (a.opensAttribute !== undefined) lines.push(`    ${swiftStr(id)}: ${swiftStr(a.opensAttribute)},`);
+    if (a.opensAttribute !== undefined) lines.push(`    ${swiftCaseRef(id)}: ${swiftCaseRef(a.opensAttribute)},`);
   }
   lines.push("  ]");
   lines.push("  /// The action that opens the picker for `attributeId`, or nil for an attribute with no picker.");
-  lines.push("  static func action(opening attributeId: String) -> String? {");
+  lines.push("  static func action(opening attributeId: RegistryTaskAttributeID) -> RegistryActionID? {");
   lines.push("    opensAttribute.first(where: { $0.value == attributeId })?.key");
   lines.push("  }");
   lines.push("");
   lines.push("  /// Actions whose `role` is `destructive` (red in menus and swipes).");
-  lines.push("  static let destructive: Set<String> = [");
+  lines.push("  static let destructive: Set<RegistryActionID> = [");
   for (const [id, a] of Object.entries(actions.actions)) {
-    if (a.role === "destructive") lines.push(`    ${swiftStr(id)},`);
+    if (a.role === "destructive") lines.push(`    ${swiftCaseRef(id)},`);
   }
   lines.push("  ]");
   lines.push("");
-  lines.push("  static let availability: [String: RegistryActionAvailability] = [");
+  lines.push("  static let availability: [RegistryActionID: RegistryActionAvailability] = [");
   for (const [id, a] of Object.entries(actions.actions)) {
     const av = a.availability ?? {};
     const arr = (v) => `[${(v ?? []).map(swiftStr).join(", ")}]`;
-    lines.push(`    ${swiftStr(id)}: RegistryActionAvailability(selection: ${swiftStr(av.selection ?? "any")}, platforms: ${arr(av.platforms)}, excludeDestinations: ${arr(av.excludeDestinations)}, onlyDestinations: ${arr(av.onlyDestinations)}, requiresRecurrence: ${av.requiresRecurrence === true}, featureId: ${swiftStr(a.featureId)}),`);
+    const destArr = (v) => `[${(v ?? []).map(swiftCaseRef).join(", ")}]`;
+    lines.push(`    ${swiftCaseRef(id)}: RegistryActionAvailability(selection: ${swiftStr(av.selection ?? "any")}, platforms: ${arr(av.platforms)}, excludeDestinations: ${destArr(av.excludeDestinations)}, onlyDestinations: ${destArr(av.onlyDestinations)}, requiresRecurrence: ${av.requiresRecurrence === true}, featureId: ${swiftStr(a.featureId)}),`);
   }
   lines.push("  ]");
   lines.push("");
-  lines.push("  static let contextMenus: [String: [RegistryMenuItem]] = [");
+  lines.push("  static let contextMenus: [RegistryContextMenuID: [RegistryMenuItem]] = [");
   for (const [name, items] of Object.entries(actions.contextMenus)) {
-    lines.push(`    ${swiftStr(name)}: [`);
+    lines.push(`    ${swiftCaseRef(name)}: [`);
     items.forEach((it, i) => lines.push(`      ${menuItem(it, i)},`));
     lines.push("    ],");
   }
@@ -1370,7 +1405,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("");
   lines.push("  static let menuBar: [RegistryMenu] = [");
   for (const m of actions.menuBar) {
-    lines.push(`    RegistryMenu(id: ${swiftStr(m.id)}, title: ${L(m.title, m, "title")}, system: ${swiftOptStr(m.system)}, items: [`);
+    lines.push(`    RegistryMenu(id: ${swiftCaseRef(m.id)}, title: ${L(m.title, m, "title")}, system: ${swiftOptStr(m.system)}, items: [`);
     m.items.forEach((it, i) => lines.push(`      ${menuItem(it, i)},`));
     lines.push("    ]),");
   }
@@ -1383,10 +1418,10 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
       if (!a.shortcut) continue;
       const excl = (a.shortcut.excludePlatforms ?? []).map(swiftStr).join(", ");
       const primaryCaps = appleKeycaps(a.shortcut).map(swiftStr).join(", ");
-      lines.push(`    RegistryShortcutEntry(id: ${swiftStr(actionId)}, label: ${L(a.title, a, "title")}, keycaps: [${primaryCaps}], excludePlatforms: [${excl}]),`);
+      lines.push(`    RegistryShortcutEntry(id: ${swiftStr(actionId)}, actionId: ${swiftCaseRef(actionId)}, label: ${L(a.title, a, "title")}, keycaps: [${primaryCaps}], excludePlatforms: [${excl}]),`);
       for (const [idx, alt] of (a.shortcut.alternates ?? []).entries()) {
         const altCaps = appleKeycaps(alt).map(swiftStr).join(", ");
-        lines.push(`    RegistryShortcutEntry(id: ${swiftStr(`${actionId}.alt${idx}`)}, label: ${L(a.title, a, "title")}, keycaps: [${altCaps}], excludePlatforms: [${excl}]),`);
+        lines.push(`    RegistryShortcutEntry(id: ${swiftStr(`${actionId}.alt${idx}`)}, actionId: ${swiftCaseRef(actionId)}, label: ${L(a.title, a, "title")}, keycaps: [${altCaps}], excludePlatforms: [${excl}]),`);
       }
     }
     lines.push("  ]");
@@ -1406,10 +1441,11 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   /** Swift expression for a field that may be a template, with Swift locals named like its placeholders. */
   const expr = (v, obj, field) => (isTmpl(v) ? L10N.swiftTemplate(BY_KEY, tmplKey(v, obj, field)).body : L(v, obj, field));
 
+  emitIdEnum("RegistryNoticeID", "Canonical notice IDs (`registry/surfaces.json` `notices`).", surfaces.notices.items.map((n) => n.id));
   lines.push("/// One notice in a task list (`registry/surfaces.json` `notices`). A notice whose");
   lines.push("/// title has a count gets a title function in `RegistryNotices` instead of `title`.");
   lines.push("struct RegistryNotice: Sendable, Hashable, Identifiable {");
-  lines.push("  let id: String");
+  lines.push("  let id: RegistryNoticeID");
   lines.push("  let kind: String");
   lines.push("  let priority: Int");
   lines.push("  let iconId: String");
@@ -1451,19 +1487,22 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const n of surfaces.notices.items) {
     const title = n.title === undefined || isTmpl(n.title) ? "nil" : L(n.title, n, "title");
     const steps = (n.steps ?? []).map((st) => `RegistryNoticeStep(id: ${swiftStr(st.id)}, title: ${L(st.title, st, "title")}, detail: ${L(st.detail, st, "detail")}, platformDetails: ${platformMap(st)})`).join(", ");
-    lines.push(`    RegistryNotice(id: ${swiftStr(n.id)}, kind: ${swiftStr(n.kind)}, priority: ${n.priority}, iconId: ${swiftStr(n.icon)}, sfSymbol: ${swiftStr(icons.icons[n.icon].sfSymbol)}, dismissScope: ${swiftStr(n.dismissScope)}, dismissible: ${Boolean(n.dismissible)}, explainerSlot: ${Boolean(n.explainerSlot)}, featureId: ${swiftStr(n.featureId)}, title: ${title}, detail: ${LOpt(n.detail, n, "detail")}, platformDetails: ${platformMap(n)}, primaryTitle: ${LOpt(n.primaryTitle, n, "primaryTitle")}, upsellId: ${n.upsell === undefined ? "nil" : swiftStr(n.upsell)}, steps: [${steps}]),`);
+    lines.push(`    RegistryNotice(id: ${swiftCaseRef(n.id)}, kind: ${swiftStr(n.kind)}, priority: ${n.priority}, iconId: ${swiftStr(n.icon)}, sfSymbol: ${swiftStr(icons.icons[n.icon].sfSymbol)}, dismissScope: ${swiftStr(n.dismissScope)}, dismissible: ${Boolean(n.dismissible)}, explainerSlot: ${Boolean(n.explainerSlot)}, featureId: ${swiftStr(n.featureId)}, title: ${title}, detail: ${LOpt(n.detail, n, "detail")}, platformDetails: ${platformMap(n)}, primaryTitle: ${LOpt(n.primaryTitle, n, "primaryTitle")}, upsellId: ${n.upsell === undefined ? "nil" : swiftStr(n.upsell)}, steps: [${steps}]),`);
   }
   lines.push("  ]");
-  lines.push("  static let byId: [String: RegistryNotice] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })");
+  lines.push("  static let byId: [RegistryNoticeID: RegistryNotice] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })");
   for (const n of surfaces.notices.items) {
     if (n.title !== undefined && isTmpl(n.title)) lines.push(tmplFn(`${n.id}Title`, tmplKey(n.title, n, "title")));
   }
   lines.push("}");
   lines.push("");
 
+  const pr = surfaces.prompts;
+  emitIdEnum("RegistryPromptID", "Canonical prompt IDs (`registry/surfaces.json` `prompts`).", [...pr.items, ...pr.text].map((p) => p.id));
+  emitIdEnum("RegistryPromptOptionID", "Canonical fork-prompt option IDs (`registry/surfaces.json` `prompts.items[].options`).", [...new Set(pr.items.flatMap((p) => (p.options ?? []).map((o) => o.id)))]);
   lines.push("/// Destructive and fork confirmation copy (`registry/surfaces.json` `prompts`).");
   lines.push("struct RegistryPromptCopy: Sendable, Hashable {");
-  lines.push("  let id: String");
+  lines.push("  let id: RegistryPromptID");
   lines.push("  let title: String");
   lines.push("  let message: String");
   lines.push("  let confirmTitle: String?");
@@ -1472,37 +1511,36 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
   lines.push("struct RegistryPromptOption: Sendable, Hashable, Identifiable {");
-  lines.push("  let id: String");
+  lines.push("  let id: RegistryPromptOptionID");
   lines.push("  let title: String");
   lines.push("}");
   lines.push("");
   lines.push("/// A prompt that asks for a name (`registry/surfaces.json` `prompts.text`).");
   lines.push("struct RegistryTextPrompt: Sendable, Hashable, Identifiable {");
-  lines.push("  let id: String");
+  lines.push("  let id: RegistryPromptID");
   lines.push("  let title: String");
   lines.push("  let placeholder: String");
   lines.push("  let confirmTitle: String");
   lines.push("}");
   lines.push("");
-  const pr = surfaces.prompts;
   const promptCopy = (p, title, message) => {
-    const opts = (p.options ?? []).map((o) => `RegistryPromptOption(id: ${swiftStr(o.id)}, title: ${L(o.title, o, "title")})`).join(", ");
-    return `RegistryPromptCopy(id: ${swiftStr(p.id)}, title: ${title}, message: ${message}, confirmTitle: ${LOpt(p.confirmTitle, p, "confirmTitle")}, options: [${opts}])`;
+    const opts = (p.options ?? []).map((o) => `RegistryPromptOption(id: ${swiftCaseRef(o.id)}, title: ${L(o.title, o, "title")})`).join(", ");
+    return `RegistryPromptCopy(id: ${swiftCaseRef(p.id)}, title: ${title}, message: ${message}, confirmTitle: ${LOpt(p.confirmTitle, p, "confirmTitle")}, options: [${opts}])`;
   };
   lines.push("enum RegistryPrompts {");
   lines.push(`  static let cancelTitle: String = ${L(pr.cancelTitle, pr, "cancelTitle")}`);
   lines.push(`  static let errorTitle: String = ${L(pr.error.title, pr.error, "title")}`);
   lines.push(`  static let errorConfirmTitle: String = ${L(pr.error.confirmTitle, pr.error, "confirmTitle")}`);
   lines.push("  /// Prompts with fixed copy. Prompts with counts or names are functions below.");
-  lines.push("  static let fixed: [String: RegistryPromptCopy] = [");
+  lines.push("  static let fixed: [RegistryPromptID: RegistryPromptCopy] = [");
   for (const p of pr.items) {
     if (p.variants || isTmpl(p.title) || isTmpl(p.message)) continue;
-    lines.push(`    ${swiftStr(p.id)}: ${promptCopy(p, L(p.title, p, "title"), L(p.message, p, "message"))},`);
+    lines.push(`    ${swiftCaseRef(p.id)}: ${promptCopy(p, L(p.title, p, "title"), L(p.message, p, "message"))},`);
   }
   lines.push("  ]");
-  lines.push("  static let text: [String: RegistryTextPrompt] = [");
+  lines.push("  static let text: [RegistryPromptID: RegistryTextPrompt] = [");
   for (const t of pr.text) {
-    lines.push(`    ${swiftStr(t.id)}: RegistryTextPrompt(id: ${swiftStr(t.id)}, title: ${L(t.title, t, "title")}, placeholder: ${L(t.placeholder, t, "placeholder")}, confirmTitle: ${L(t.confirmTitle, t, "confirmTitle")}),`);
+    lines.push(`    ${swiftCaseRef(t.id)}: RegistryTextPrompt(id: ${swiftCaseRef(t.id)}, title: ${L(t.title, t, "title")}, placeholder: ${L(t.placeholder, t, "placeholder")}, confirmTitle: ${L(t.confirmTitle, t, "confirmTitle")}),`);
   }
   lines.push("  ]");
   for (const cp of pr.countPhrases) lines.push(tmplFn(`${camelId(cp.id)}Phrase`, tmplKey(cp.label, cp, "label")));
@@ -1551,12 +1589,13 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  emitIdEnum("RegistryTaskAttributeID", "Canonical task attribute IDs (`registry/surfaces.json` `taskAttributes`).", surfaces.taskAttributes.map((a) => a.id));
   lines.push("/// One task attribute (`registry/surfaces.json` `taskAttributes`): a composer");
   lines.push("/// pill, an inspector row and a picker title. `surfaceTier` `field` is an");
   lines.push("/// always-visible field (notes), not a pill. `chip` is a transient composer");
   lines.push("/// chip shown only on a blank new task (Paste), not a pill. `editOnly` needs a saved task.");
   lines.push("struct RegistryTaskAttribute: Sendable, Hashable, Identifiable {");
-  lines.push("  let id: String");
+  lines.push("  let id: RegistryTaskAttributeID");
   lines.push("  let label: String");
   lines.push("  let iconId: String");
   lines.push("  let sfSymbol: String");
@@ -1576,7 +1615,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("enum RegistrySurfaces {");
   lines.push("  static let taskAttributes: [RegistryTaskAttribute] = [");
   for (const a of surfaces.taskAttributes) {
-    lines.push(`    RegistryTaskAttribute(id: ${swiftStr(a.id)}, label: ${L(a.label, a, "label")}, iconId: ${swiftStr(a.icon)}, sfSymbol: ${swiftStr(icons.icons[a.icon].sfSymbol)}, commitContract: ${swiftStr(a.commitContract)}, surfaceTier: ${swiftStr(a.surfaceTier)}, featureId: ${swiftStr(a.featureId)}, editOnly: ${a.editOnly === true}, workingLabel: ${LOpt(a.workingLabel, a, "workingLabel")}),`);
+    lines.push(`    RegistryTaskAttribute(id: ${swiftCaseRef(a.id)}, label: ${L(a.label, a, "label")}, iconId: ${swiftStr(a.icon)}, sfSymbol: ${swiftStr(icons.icons[a.icon].sfSymbol)}, commitContract: ${swiftStr(a.commitContract)}, surfaceTier: ${swiftStr(a.surfaceTier)}, featureId: ${swiftStr(a.featureId)}, editOnly: ${a.editOnly === true}, workingLabel: ${LOpt(a.workingLabel, a, "workingLabel")}),`);
   }
   lines.push("  ]");
   lines.push("  /// The pills that show on `platform`, in rail order (every attribute except");
@@ -1584,17 +1623,17 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static func taskAttributePills(on platform: String) -> [RegistryTaskAttribute] {");
   lines.push("    taskAttributes.filter { $0.isPill && $0.applies(to: platform) }");
   lines.push("  }");
-  lines.push("  /// The attribute with `id`. Traps on an unknown id: the ids are a closed set.");
-  lines.push("  static func taskAttribute(_ id: String) -> RegistryTaskAttribute {");
+  lines.push("  /// The attribute with `id`.");
+  lines.push("  static func taskAttribute(_ id: RegistryTaskAttributeID) -> RegistryTaskAttribute {");
   lines.push("    guard let a = taskAttributes.first(where: { $0.id == id }) else { preconditionFailure(\"unknown task attribute \\(id)\") }");
   lines.push("    return a");
   lines.push("  }");
   lines.push("  /// Count text for a pill value (`countLabel`), or nil when the attribute has none.");
-  lines.push("  static func taskAttributeCount(_ id: String, count: Int) -> String? {");
+  lines.push("  static func taskAttributeCount(_ id: RegistryTaskAttributeID, count: Int) -> String? {");
   lines.push("    switch id {");
   for (const a of surfaces.taskAttributes) {
     if (a.countLabel === undefined) continue;
-    lines.push(`    case ${swiftStr(a.id)}: return ${L10N.swiftTemplate(BY_KEY, tmplKey(a.countLabel, a, "countLabel")).body}`);
+    lines.push(`    case ${swiftCaseRef(a.id)}: return ${L10N.swiftTemplate(BY_KEY, tmplKey(a.countLabel, a, "countLabel")).body}`);
   }
   lines.push("    default: return nil");
   lines.push("    }");
@@ -1605,7 +1644,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static let taskPageBlocks: [RegistryTaskPageBlock] = [");
   for (const b of surfaces.taskPage.blocks) {
     const label = b.label !== undefined ? L(b.label, b, "label") : b.attribute !== undefined ? attrLabel.get(b.attribute) : "nil";
-    lines.push(`    RegistryTaskPageBlock(id: ${swiftStr(b.id)}, kind: .${b.kind}, depths: [${b.depths.map((d) => "." + d).join(", ")}], label: ${label}, attributeId: ${b.attribute === undefined ? "nil" : swiftStr(b.attribute)}, featureId: ${swiftStr(b.featureId)}, editOnly: ${b.editOnly === true}),`);
+    lines.push(`    RegistryTaskPageBlock(id: ${swiftStr(b.id)}, kind: .${b.kind}, depths: [${b.depths.map((d) => "." + d).join(", ")}], label: ${label}, attributeId: ${b.attribute === undefined ? "nil" : swiftCaseRef(b.attribute)}, featureId: ${swiftStr(b.featureId)}, editOnly: ${b.editOnly === true}),`);
   }
   lines.push("  ]");
   lines.push("  /// The blocks a host renders at `depth` on `platform`, in order. A create");
@@ -1699,7 +1738,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let kind: RegistryTaskPageBlockKind");
   lines.push("  let depths: [RegistryTaskPageDepth]");
   lines.push("  let label: String?");
-  lines.push("  let attributeId: String?");
+  lines.push("  let attributeId: RegistryTaskAttributeID?");
   lines.push("  let featureId: String");
   lines.push("  let editOnly: Bool");
   lines.push("  /// The block shows on `platform` when its capability ships there (ADR 0015).");
@@ -1751,11 +1790,13 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
 
   // 8b. First run (surfaces.json `firstRun`)
   const fr = surfaces.firstRun;
-  const frButton = (b) => (b === undefined ? "nil" : `RegistryFirstRunButton(title: ${L(b.title, b, "title")}, action: ${swiftStr(b.action)})`);
+  emitIdEnum("RegistryFirstRunStepID", "Canonical first-run step IDs (`registry/surfaces.json` `firstRun.steps`).", fr.steps.map((s) => s.id));
+  emitIdEnum("RegistryFirstRunActionID", "Canonical first-run button action IDs (`registry/surfaces.json` `firstRun.steps`).", [...FIRST_RUN_ACTIONS]);
+  const frButton = (b) => (b === undefined ? "nil" : `RegistryFirstRunButton(title: ${L(b.title, b, "title")}, action: ${swiftCaseRef(b.action)})`);
   lines.push("/// One button in the first run. `action` is one of a closed set the client implements.");
   lines.push("struct RegistryFirstRunButton: Sendable, Hashable {");
   lines.push("  let title: String");
-  lines.push("  let action: String");
+  lines.push("  let action: RegistryFirstRunActionID");
   lines.push("}");
   lines.push("");
   lines.push("struct RegistryFirstRunPoint: Sendable, Hashable {");
@@ -1769,13 +1810,13 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let icon: String");
   lines.push("  let title: String");
   lines.push("  let detail: String");
-  lines.push("  let action: String");
+  lines.push("  let action: RegistryFirstRunActionID");
   lines.push("  let platforms: [String]");
   lines.push("}");
   lines.push("");
   lines.push("/// One first-run step (`registry/surfaces.json` `firstRun.steps`). `kind` picks the view.");
   lines.push("struct RegistryFirstRunStep: Sendable, Hashable, Identifiable {");
-  lines.push("  let id: String");
+  lines.push("  let id: RegistryFirstRunStepID");
   lines.push("  let kind: String");
   lines.push("  let icon: String");
   lines.push("  let title: String");
@@ -1809,9 +1850,9 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static let steps: [RegistryFirstRunStep] = [");
   for (const st of fr.steps) {
     const points = (st.points ?? []).map((pt) => `RegistryFirstRunPoint(icon: ${swiftStr(pt.icon)}, title: ${L(pt.title, pt, "title")}, detail: ${L(pt.detail, pt, "detail")})`).join(", ");
-    const choices = (st.choices ?? []).map((ch) => `RegistryFirstRunChoice(id: ${swiftStr(ch.id)}, icon: ${swiftStr(ch.icon)}, title: ${L(ch.title, ch, "title")}, detail: ${L(ch.detail, ch, "detail")}, action: ${swiftStr(ch.action)}, platforms: [${(ch.platforms ?? []).map(swiftStr).join(", ")}])`).join(", ");
+    const choices = (st.choices ?? []).map((ch) => `RegistryFirstRunChoice(id: ${swiftStr(ch.id)}, icon: ${swiftStr(ch.icon)}, title: ${L(ch.title, ch, "title")}, detail: ${L(ch.detail, ch, "detail")}, action: ${swiftCaseRef(ch.action)}, platforms: [${(ch.platforms ?? []).map(swiftStr).join(", ")}])`).join(", ");
     const instructions = (st.instructions ?? []).map((s) => L(s)).join(", ");
-    lines.push(`    RegistryFirstRunStep(id: ${swiftStr(st.id)}, kind: ${swiftStr(st.kind)}, icon: ${swiftStr(st.icon)}, title: ${L(st.title, st, "title")}, body: ${st.body === undefined ? '""' : L(st.body, st, "body")}, footnote: ${LOpt(st.footnote, st, "footnote")}, returningTitle: ${LOpt(st.returningTitle, st, "returningTitle")}, returningBody: ${LOpt(st.returningBody, st, "returningBody")}, skipWhen: ${swiftOptStr(st.skipWhen)}, requires: ${swiftOptStr(st.requires)}, completesGetStartedStep: ${swiftOptStr(st.completesGetStartedStep)}, platforms: [${(st.platforms ?? []).map(swiftStr).join(", ")}], featureId: ${swiftOptStr(st.featureId)}, points: [${points}], choices: [${choices}], instructions: [${instructions}], primary: ${frButton(st.primary)}, secondary: ${frButton(st.secondary)}, tertiary: ${frButton(st.tertiary)}, afterDone: ${frButton(st.afterDone)}),`);
+    lines.push(`    RegistryFirstRunStep(id: ${swiftCaseRef(st.id)}, kind: ${swiftStr(st.kind)}, icon: ${swiftStr(st.icon)}, title: ${L(st.title, st, "title")}, body: ${st.body === undefined ? '""' : L(st.body, st, "body")}, footnote: ${LOpt(st.footnote, st, "footnote")}, returningTitle: ${LOpt(st.returningTitle, st, "returningTitle")}, returningBody: ${LOpt(st.returningBody, st, "returningBody")}, skipWhen: ${swiftOptStr(st.skipWhen)}, requires: ${swiftOptStr(st.requires)}, completesGetStartedStep: ${swiftOptStr(st.completesGetStartedStep)}, platforms: [${(st.platforms ?? []).map(swiftStr).join(", ")}], featureId: ${swiftOptStr(st.featureId)}, points: [${points}], choices: [${choices}], instructions: [${instructions}], primary: ${frButton(st.primary)}, secondary: ${frButton(st.secondary)}, tertiary: ${frButton(st.tertiary)}, afterDone: ${frButton(st.afterDone)}),`);
   }
   lines.push("  ]");
   lines.push("}");

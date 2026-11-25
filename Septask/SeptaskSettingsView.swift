@@ -1045,7 +1045,7 @@ private struct SeptaskSmartListsPane: View {
     HStack(spacing: 12) {
       Image(systemName: dest.sfSymbol)
         .font(.body.weight(.semibold))
-        .foregroundStyle(dest.id == "today" ? AppearancePreferences.shared.glyphSwiftUIColor(dest.iconId) : .secondary)
+        .foregroundStyle(dest.id == .today ? AppearancePreferences.shared.glyphSwiftUIColor(dest.iconId) : .secondary)
         .frame(width: 24, alignment: .center)
       VStack(alignment: .leading, spacing: 2) {
         Text(dest.title)

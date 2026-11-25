@@ -62,7 +62,7 @@ enum KitPrompt {
   /// A fork with more than two answers — the reschedule-repeating question is
   /// the shell's only one. Returns the id of the chosen option, or nil when
   /// the user cancelled. Cancel is appended here so no caller can forget it.
-  static func choice(_ copy: RegistryPromptCopy) -> String? {
+  static func choice(_ copy: RegistryPromptCopy) -> RegistryPromptOptionID? {
     let alert = NSAlert()
     alert.messageText = copy.title
     alert.informativeText = copy.message
