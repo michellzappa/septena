@@ -19,8 +19,12 @@ struct BackendEntitlement: Decodable, Sendable {
     let expiresAt: Double?
     let status: String
     let active: Bool
+    /// The plan the row gives; nil means Plus (ADR 0044).
+    let plan: String?
   }
   let active: Bool
+  /// The plan the account is on: `free`, `plus` or `pro`.
+  let plan: String?
   let entitlements: [Row]
   /// The token every App Store purchase carries (spec §5). Optional so an
   /// older server answer still decodes.
@@ -77,6 +81,9 @@ final class PlanStatus {
   /// nil until the first answer from the server. Views show nothing for an
   /// unknown plan rather than guess.
   private(set) var plan: Plan?
+  /// The account is on Pro (ADR 0044). Pro has every Plus limit or more, so
+  /// `plan` is `.plus` and `isPlus` is true too. Only the words differ.
+  private(set) var isPro = false
   private(set) var lastError: String?
   /// From the last answer. Purchases need it; nil until the first read.
   private(set) var appAccountToken: UUID?
@@ -148,8 +155,10 @@ final class PlanStatus {
     case .device: return RegistryPlans.Status.device
     case .free: return RegistryPlans.Status.free
     case .trial(let end): return RegistryPlans.Status.trialEnds(date: Self.day(end))
-    case .plus(let through?, _): return RegistryPlans.Status.paidThrough(date: Self.day(through))
-    case .plus(nil, _): return RegistryPlans.Status.plus
+    case .plus(let through?, _):
+      let date = Self.day(through)
+      return isPro ? RegistryPlans.Status.proThrough(date: date) : RegistryPlans.Status.paidThrough(date: date)
+    case .plus(nil, _): return isPro ? RegistryPlans.proName : RegistryPlans.Status.plus
     case nil: return nil
     }
   }
@@ -165,6 +174,7 @@ final class PlanStatus {
     defer { if noticeInputs != before { NotificationCenter.default.post(name: .septenaTasksChanged, object: nil) } }
     guard TaskBackendClient.hasSession else {
       plan = .device
+      isPro = false
       appAccountToken = nil
       lastError = nil
       enforced = false
@@ -179,6 +189,7 @@ final class PlanStatus {
     do {
       let answer = try await TaskBackendClient.shared.entitlement()
       plan = Self.plan(from: answer)
+      isPro = answer.plan == "pro"
       appAccountToken = answer.appAccountToken.flatMap(UUID.init(uuidString:))
       enforced = answer.enforced ?? false
       limits = answer.limits
@@ -285,7 +296,8 @@ final class PlanStatus {
     guard answer.active, !live.isEmpty else {
       return .free(lapsed: answer.entitlements.contains { $0.source != "trial" })
     }
-    let paid = live.filter { $0.source != "trial" }
+    // The words name the plan the account is on, so its rows give the date.
+    let paid = live.filter { answer.plan == "pro" ? $0.plan == "pro" : $0.source != "trial" }
     guard let first = paid.first else {
       // Only the trial is active. The server reports its end; fall back to
       // the row's expiry for an older server.

@@ -2716,7 +2716,23 @@
   "Pro": {
     "text": "Pro",
     "paths": [
+      "plans.proName",
       "plans.levels.pro.title"
+    ]
+  },
+  "Pro is on for this account.": {
+    "text": "Pro is on for this account.",
+    "paths": [
+      "plans.paywall.ownedGrantPro"
+    ]
+  },
+  "Pro through {date}": {
+    "text": "Pro through {date}",
+    "placeholders": [
+      "date"
+    ],
+    "paths": [
+      "plans.status.proThrough"
     ]
   },
   "Project": {

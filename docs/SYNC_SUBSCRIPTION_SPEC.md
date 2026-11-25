@@ -213,7 +213,8 @@ row per source of access: `id` (`apple:<originalTransactionId>` or
 `grant:<name>`), `source`, `productId`, `expiresAt` (ms; null = no expiry),
 `originalTransactionId`, `status` (`active` / `grace` / `billing_retry` /
 `expired` / `revoked`), `environment`, `note`, `signedAt`, `updatedAt`. The
-user is on Plus when any row is active. An older Apple payload (`signedDate`)
+user is on Pro when any active row has `plan` = `pro` (grants only, ADR 0044),
+else on Plus when any row is active. An older Apple payload (`signedDate`)
 never overwrites a newer one. KV `TOKENS` maps `ent-otx:<originalTransactionId>`
 and `ent-aat:<appAccountToken>` to the user, so a webhook finds its user.
 Account deletion removes the rows with the rest of the Durable Object.
@@ -232,11 +233,12 @@ does not cut sync); `grace` until the grace period end + 24 h;
 | `POST /v1/entitlement/device` | bearer | moves the sync slot to the calling device (P1.5, §6.3) |
 | `POST /v1/entitlement/apple` | bearer | body `{signedTransaction, signedRenewalInfo?}`; verifies, checks `appAccountToken`, bundle, environment, product; writes the row |
 | `POST /v1/webhooks/apple` | Apple JWS | App Store Server Notifications V2 `{signedPayload}`; 200 for any verified payload |
-| `POST /v1/admin/grants` | `X-Admin-Token` | body `{userId, name, note?, expiresAt?}`; writes `grant:<name>` |
+| `POST /v1/admin/grants` | `X-Admin-Token` | body `{userId, name, plan?, note?, expiresAt?}`; writes `grant:<name>` |
 | `DELETE /v1/admin/grants/:userId/:name` | `X-Admin-Token` | removes a grant |
 
-Plus links (ADR 0043) are the way to give Plus to people: make one at
-`https://api.septena.app/admin`. A claim writes a `grant:link-…` row. The
+The admin page `https://api.septena.app/admin` gives plans (ADR 0043, ADR
+0044). A link's claim writes a `grant:link-…` row; Give on an account writes
+`grant:admin`. The
 `X-Admin-Token` routes stay for scripts.
 
 The admin routes answer 404 while the `ADMIN_TOKEN` secret is unset.
@@ -319,7 +321,8 @@ Run from `~/Dev/septena/backend` after this code is deployed.
 ### 6.3 Plan table and free-account limits (P1.5, `backend/`)
 
 **Plan table.** `PLAN_TABLE` in `backend/src/entitlement/entitlement.ts`
-maps `free` → `PLAN_LIMITS.account` and `plus` → `PLAN_LIMITS.plus`
+maps `free` → `PLAN_LIMITS.account`, `plus` → `PLAN_LIMITS.plus` and `pro` →
+`PLAN_LIMITS.pro`
 (generated from `registry/plans.json` `limits`; null = no cap).
 `resolvePlan` gives `plus` when any entitlement row is active, else `free`.
 `planFor` reads the rows and the usage counters a gate needs in one call to

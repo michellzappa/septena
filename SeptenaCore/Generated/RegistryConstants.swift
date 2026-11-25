@@ -2228,6 +2228,7 @@ struct RegistryPlanNote: Sendable, Hashable, Identifiable {
 enum RegistryPlans {
   static var name: String { RegistryL10n.t("Septena Plus") }
   static var shortName: String { RegistryL10n.t("Plus") }
+  static var proName: String { RegistryL10n.t("Pro") }
   static var headline: String { RegistryL10n.t("Free on one device. Plus on all of them.") }
   static var subhead: String { RegistryL10n.t("Every task feature is free on the device you use. A free account adds a backup and lets you connect one agent. Plus covers all your devices, three agents, synced files and a longer history.") }
   static let checkoutOpen = false
@@ -2305,6 +2306,7 @@ enum RegistryPlans {
     static var plus: String { RegistryL10n.t("Plus") }
     static func trialEnds(date: String) -> String { RegistryL10n.format("Plus trial until %@", english: "Plus trial until %@", args: [date]) }
     static func paidThrough(date: String) -> String { RegistryL10n.format("Plus through %@", english: "Plus through %@", args: [date]) }
+    static func proThrough(date: String) -> String { RegistryL10n.format("Pro through %@", english: "Pro through %@", args: [date]) }
   }
 
   enum Paywall {
@@ -2322,6 +2324,7 @@ enum RegistryPlans {
     static var ownedWeb: String { RegistryL10n.t("You have Plus through the web. Manage it at septena.app.") }
     static var ownedGoogle: String { RegistryL10n.t("You have Plus through Google Play. Manage it in Google Play.") }
     static var ownedGrant: String { RegistryL10n.t("Plus is on for this account.") }
+    static var ownedGrantPro: String { RegistryL10n.t("Pro is on for this account.") }
     static var ownedOtherAccount: String { RegistryL10n.t("This Apple ID's Plus belongs to another Septena account. Sign in to that account to use it.") }
     static var syncThisDeviceFailed: String { RegistryL10n.t("Septena could not reach the server. Try again in a moment.") }
     static var done: String { RegistryL10n.t("Done") }

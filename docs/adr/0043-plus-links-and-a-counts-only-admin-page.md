@@ -3,6 +3,8 @@
 - Status: accepted (2026-11-25)
 - Date: 2026-11-25
 - Deciders: mz (product), agent (mechanism)
+- Amended by: [ADR 0044](0044-pro-is-a-real-plan-that-is-only-given.md) (a link
+  carries a plan, and the page can give one account a plan)
 - Amends: [ADR 0016](0016-sign-in-beyond-apple.md) (how a sign-in subject is
   stored). Implements #198, with one change: the page stores a summary per
   account.
