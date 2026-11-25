@@ -65,12 +65,16 @@ jobs:
             echo "::warning::No tester key: this APK has the runner's debug key and cannot update an installed app."
           fi
 
-      - name: Assemble debug APK
+      - name: Assemble debug and release APKs
         env:
           ORG_GRADLE_PROJECT_septenaTesterStorePassword: ${{ secrets.ANDROID_TESTER_KEYSTORE_PASSWORD }}
         run: |
-          ./gradlew --no-daemon :app:assembleDebug -PseptenaBuildNumber="$(git rev-list --count HEAD)" ${SIGN:-}
-          rm -f "$RUNNER_TEMP/tester.p12"
+          BUILD_NUM="$(git rev-list --count HEAD)"
+          ./gradlew --no-daemon :app:assembleDebug :app:assembleRelease -PseptenaBuildNumber="$BUILD_NUM" ${SIGN:-}
+
+      - name: Clean up tester signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/tester.p12"
 
       # The shared conformance vectors on the JVM, through the core's Linux
       # natives (F3, #344). :core:test runs them.
@@ -90,4 +94,11 @@ jobs:
         with:
           name: septena-android-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 2
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: septena-android-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
           retention-days: 2

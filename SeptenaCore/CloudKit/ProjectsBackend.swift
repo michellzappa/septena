@@ -10,6 +10,9 @@ protocol ProjectsBackend: AnyObject {
   func create(title: String, area: String?) async throws -> Project
   func rename(id: String, to title: String) async throws
   func setNotes(id: String, notes: String?) async throws
+  func acceptNotesProposal(id: String) async throws
+  func rejectNotesProposal(id: String) async throws
+  func restoreNotesState(id: String, notes: String?, proposal: NotesProposal?) async throws
   func setStatus(id: String, status: ProjectStatus) async throws
   func setArea(id: String, area: String?) async throws
   func setGithubRepo(id: String, repo: String?) async throws
@@ -57,6 +60,15 @@ final class ProjectsMutator: ProjectsBackend {
   }
   func setNotes(id: String, notes: String?) async throws {
     try await requireBackend().setNotes(id: id, notes: notes)
+  }
+  func acceptNotesProposal(id: String) async throws {
+    try await requireBackend().acceptNotesProposal(id: id)
+  }
+  func rejectNotesProposal(id: String) async throws {
+    try await requireBackend().rejectNotesProposal(id: id)
+  }
+  func restoreNotesState(id: String, notes: String?, proposal: NotesProposal?) async throws {
+    try await requireBackend().restoreNotesState(id: id, notes: notes, proposal: proposal)
   }
   func setStatus(id: String, status: ProjectStatus) async throws {
     try await requireBackend().setStatus(id: id, status: status)
@@ -248,6 +260,27 @@ final class CloudKitProjectsBackend: ProjectsBackend {
     guard let entity = fetch(id: id) else { return }
     entity.notes = (notes?.isEmpty == true) ? nil : notes
     commitAndPush(entity, op: "setNotes")
+  }
+
+  func acceptNotesProposal(id: String) async throws {
+    guard let entity = fetch(id: id), let proposal = entity.notesProposal else { return }
+    let merged = ContainerNotes.replacingBrief(in: entity.notes, with: proposal.body)
+    entity.notes = merged.isEmpty ? nil : merged
+    entity.notesProposal = nil
+    commitAndPush(entity, op: "acceptNotesProposal")
+  }
+
+  func rejectNotesProposal(id: String) async throws {
+    guard let entity = fetch(id: id), entity.notesProposal != nil else { return }
+    entity.notesProposal = nil
+    commitAndPush(entity, op: "rejectNotesProposal")
+  }
+
+  func restoreNotesState(id: String, notes: String?, proposal: NotesProposal?) async throws {
+    guard let entity = fetch(id: id) else { return }
+    entity.notes = (notes?.isEmpty == true) ? nil : notes
+    entity.notesProposal = proposal
+    commitAndPush(entity, op: "restoreNotesState")
   }
 
   func setStatus(id: String, status: ProjectStatus) async throws {

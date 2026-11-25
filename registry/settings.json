@@ -278,6 +278,14 @@
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
       "featureId": "settings.display"
     },
+    "inboxZeroMotionEnabled": {
+      "scope": "device",
+      "storageKey": "septena.ui.inboxZeroMotion",
+      "type": "bool",
+      "default": true,
+      "platforms": ["ios", "ipados", "macos"],
+      "featureId": "settings.display"
+    },
     "textSizeStep": {
       "scope": "device",
       "storageKey": "septena.display.textSizeStep",
@@ -792,6 +800,13 @@
               "kind": "setting",
               "key": "loggingAnimationsEnabled",
               "label": "Completion animations"
+            },
+            {
+              "kind": "setting",
+              "key": "inboxZeroMotionEnabled",
+              "label": "Inbox zero animation",
+              "detail": "Play a short animation when you empty the Inbox.",
+              "platforms": ["ios", "ipados", "macos"]
             }
           ]
         }

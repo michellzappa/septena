@@ -150,3 +150,89 @@ describe("TaskStore notes migration (notesV1)", () => {
     assert.equal(again.readNote("project", "m1")?.noteRev, 2);
   });
 });
+
+describe("GET /v1/notes/history", () => {
+  async function routeHarness() {
+    const { store } = await createTestTaskStore();
+    const { Hono } = await import("hono");
+    const { notesHistoryRest } = await import("../src/api/notesHistoryRest.ts");
+    const { signAccessToken, verifyAccessToken } = await import("../src/api/session.ts");
+    const key = Buffer.alloc(32, 7).toString("base64");
+    const env = {
+      SESSION_SIGNING_KEY: key,
+      TASK_STORE: {
+        idFromName: (name: string) => name,
+        get: () => store,
+      },
+    } as never;
+    const app = new Hono<{ Bindings: typeof env; Variables: { userId: string; actor: string } }>();
+    app.use("/notes/*", async (c, next) => {
+      const header = c.req.header("Authorization") ?? "";
+      const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+      const claims = token ? await verifyAccessToken(c.env, token) : null;
+      if (!claims) return c.json({ error: "unauthorized" }, 401);
+      c.set("userId", claims.userId);
+      c.set("actor", "app:septask-mac");
+      await next();
+    });
+    app.route("/notes", notesHistoryRest);
+    const token = await signAccessToken(env, "u_test_user_12345678901234", "00000000-0000-4000-8000-000000000001");
+    const get = (path: string, auth: string | null = token) =>
+      app.fetch(
+        new Request(`https://api.septena.app${path}`, {
+          headers: auth ? { Authorization: `Bearer ${auth}`, "X-Septena-Client": "septask-mac" } : {},
+        }),
+        env,
+      );
+    return { store, get };
+  }
+
+  it("requires authentication and validates parameters", async () => {
+    const { get } = await routeHarness();
+    assert.equal((await get("/notes/history?container=project&id=p1", null)).status, 401);
+    assert.equal((await get("/notes/history?container=task&id=p1")).status, 400);
+    assert.equal((await get("/notes/history?container=project&id=missing")).status, 404);
+  });
+
+  it("returns project and area note revisions newest first with paging", async () => {
+    const { store, get } = await routeHarness();
+    upsert(store, HUMAN, "project", "p1", { title: "P", status: "active", notes: "v1" });
+    upsert(store, AGENT, "project", "p1", { notes: "v1\n## Log\n### 2026-11-24 · claude\nNote" }, 1);
+    upsert(store, HUMAN, "project", "p1", { notes: "v3" });
+    upsert(store, HUMAN, "area", "a1", { title: "Work", context: "Area v1" });
+
+    const res = await get("/notes/history?container=project&id=p1&limit=2");
+    assert.equal(res.status, 200);
+    const page1 = (await res.json()) as {
+      container: string;
+      id: string;
+      noteRev: number;
+      revisions: Array<{ rev: number; actor: string; body?: string | null }>;
+    };
+    assert.equal(page1.container, "project");
+    assert.equal(page1.id, "p1");
+    assert.equal(page1.noteRev, 3);
+    assert.deepEqual(page1.revisions.map((r) => r.rev), [3, 2]);
+    assert.equal(page1.revisions[0].body, "v3");
+    assert.equal(page1.revisions[1].actor, AGENT);
+
+    const res2 = await get("/notes/history?container=project&id=p1&before=2&includeBody=0");
+    assert.equal(res2.status, 200);
+    const page2 = (await res2.json()) as {
+      revisions: Array<{ rev: number; body?: string | null }>;
+    };
+    assert.deepEqual(page2.revisions.map((r) => r.rev), [1]);
+    assert.equal(page2.revisions[0].body, undefined);
+
+    const areaRes = await get("/notes/history?container=area&id=a1");
+    assert.equal(areaRes.status, 200);
+    const areaBody = (await areaRes.json()) as {
+      container: string;
+      noteRev: number;
+      revisions: Array<{ rev: number; body?: string | null }>;
+    };
+    assert.equal(areaBody.container, "area");
+    assert.equal(areaBody.noteRev, 1);
+    assert.equal(areaBody.revisions[0].body, "Area v1");
+  });
+});

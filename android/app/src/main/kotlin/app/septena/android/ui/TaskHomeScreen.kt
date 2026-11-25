@@ -67,6 +67,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.septena.android.AndroidAppGraph
+import app.septena.android.widgets.WidgetLaunchAction
 import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
@@ -97,7 +98,11 @@ import kotlinx.coroutines.withContext
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun TaskHomeScreen(graph: AndroidAppGraph) {
+fun TaskHomeScreen(
+    graph: AndroidAppGraph,
+    launchAction: WidgetLaunchAction? = null,
+    onConsumeLaunchAction: () -> Unit = {},
+) {
     var openedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var openedTaskAttribute by rememberSaveable { mutableStateOf<String?>(null) }
     var openedTaskSendBack by rememberSaveable { mutableStateOf(false) }
@@ -112,6 +117,36 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
     val selectHomeLocation: (TaskHomeLocation) -> Unit = { location ->
         homeViewModel.select(location)
         showingListsHome = false
+    }
+    LaunchedEffect(launchAction) {
+        when (launchAction) {
+            null -> Unit
+            is WidgetLaunchAction.OpenDestination -> {
+                settingsOpen = false
+                quickFindOpen = false
+                openedTaskId = null
+                openedTaskAttribute = null
+                selectHomeLocation(TaskHomeLocation.SmartList(launchAction.destinationId))
+                onConsumeLaunchAction()
+            }
+            is WidgetLaunchAction.OpenTask -> {
+                settingsOpen = false
+                quickFindOpen = false
+                launchAction.destinationId?.let { selectHomeLocation(TaskHomeLocation.SmartList(it)) }
+                openedTaskId = launchAction.taskId
+                openedTaskAttribute = null
+                onConsumeLaunchAction()
+            }
+            is WidgetLaunchAction.QuickAdd -> {
+                settingsOpen = false
+                quickFindOpen = false
+                openedTaskId = null
+                openedTaskAttribute = null
+                showingListsHome = false
+                homeQuickAddDraft = QuickAddDraft(today = launchAction.today)
+                onConsumeLaunchAction()
+            }
+        }
     }
     val undoSnackbarHostState = remember { SnackbarHostState() }
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()

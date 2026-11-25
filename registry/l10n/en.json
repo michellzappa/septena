@@ -1510,6 +1510,12 @@
       "destinations.destinations.inbox.emptyState.title"
     ]
   },
+  "Inbox zero animation": {
+    "text": "Inbox zero animation",
+    "paths": [
+      "settings.pages.appearance.sections.appearance.items.4.label"
+    ]
+  },
   "Include": {
     "text": "Include",
     "paths": [
@@ -2328,6 +2334,12 @@
     "text": "Planned: €120 a year or €14 a month",
     "paths": [
       "plans.levels.pro.detail"
+    ]
+  },
+  "Play a short animation when you empty the Inbox.": {
+    "text": "Play a short animation when you empty the Inbox.",
+    "paths": [
+      "settings.pages.appearance.sections.appearance.items.4.detail"
     ]
   },
   "Plus": {
@@ -3478,6 +3490,12 @@
     "text": "Thinking…",
     "paths": [
       "surfaces.taskAttributes.discuss.workingLabel"
+    ]
+  },
+  "This Apple ID's Plus belongs to another Septena account. Sign in to that account to use it.": {
+    "text": "This Apple ID's Plus belongs to another Septena account. Sign in to that account to use it.",
+    "paths": [
+      "plans.paywall.ownedOtherAccount"
     ]
   },
   "This account is already set up. Your tasks are syncing to this device.": {
