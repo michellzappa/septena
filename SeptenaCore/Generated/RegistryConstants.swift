@@ -225,6 +225,7 @@ enum RegistryIcons {
     "settings.import": "square.and.arrow.down",
     "settings.backend": "arrow.up.doc",
     "settings.animations": "party.popper",
+    "settings.help": "questionmark.circle",
     "settings.feedback": "paperplane",
     "settings.open_source": "chevron.left.forwardslash.chevron.right",
     "settings.paste": "doc.on.clipboard",
@@ -421,6 +422,8 @@ struct RegistrySettingsPage: Sendable, Hashable, Identifiable {
 
 /// Unified task-app settings keys, defaults, synced-key list, and taxonomy (`registry/settings.json`).
 enum RegistrySettings {
+  /// The help center. Help rows and menu items open it or a page below it.
+  static let helpURL = URL(string: "https://septena.app/help")!
   static let syncedKeys: [String] = ["welcomeName", "telemetryLevel", "calendarHiddenTitles", "rolledInDismissedOn", "homeTimezone", "agentsPaused", "getStartedDismissed", "getStartedSteps", "upsellsSeen", "onboardedAt", "accentColor", "canvasTexture", "textureIntensity", "textureMotion", "smartListOrder", "smartListHidden", "smartListPlacement"]
 
   enum StorageKey {
@@ -662,6 +665,7 @@ enum RegistrySettings {
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "open_source", label: RegistryL10n.t("Open source"), detail: RegistryL10n.t("MIT License"), iconId: "settings.open_source", sfSymbol: "chevron.left.forwardslash.chevron.right", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
       RegistrySettingsSection(id: "actions", header: nil, footer: nil, platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "open_help", label: RegistryL10n.t("Help"), detail: nil, iconId: "settings.help", sfSymbol: "questionmark.circle", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "check_updates", label: RegistryL10n.t("Check for Updates…"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["macos", "windows"], featureId: "mac.updates"),
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_get_started", label: RegistryL10n.t("Show Get Started Again"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_first_run", label: RegistryL10n.t("Show Welcome Again"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "onboarding.first-run"),
@@ -1020,6 +1024,7 @@ enum RegistryActionID: String, CaseIterable, Hashable, Sendable {
   case appUndo = "app.undo"
   case accountSignOut = "account.signOut"
   case settingsSave = "settings.save"
+  case appHelp = "app.help"
   case appKeyboardShortcuts = "app.keyboardShortcuts"
   case appToggleSidebarCounts = "app.toggleSidebarCounts"
   case appTextSizeIncrease = "app.textSizeIncrease"
@@ -1192,6 +1197,7 @@ enum RegistryActions {
     .appUndo: RegistryL10n.t("Undo"),
     .accountSignOut: RegistryL10n.t("Sign out"),
     .settingsSave: RegistryL10n.t("Save"),
+    .appHelp: RegistryL10n.t("Septena Help"),
     .appKeyboardShortcuts: RegistryL10n.t("Keyboard Shortcuts"),
     .appToggleSidebarCounts: RegistryL10n.t("Show Sidebar Counts"),
     .appTextSizeIncrease: RegistryL10n.t("Increase Text Size"),
@@ -1288,6 +1294,7 @@ enum RegistryActions {
     .appUndo: "arrow.uturn.backward",
     .accountSignOut: "xmark.circle",
     .settingsSave: "checkmark.circle",
+    .appHelp: "questionmark.circle",
     .appKeyboardShortcuts: "info.circle",
     .appToggleSidebarCounts: "number",
     .appTextSizeIncrease: "textformat.size",
@@ -1474,6 +1481,7 @@ enum RegistryActions {
     .appUndo: RegistryActionAvailability(selection: "none", platforms: ["android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "edit.undo"),
     .accountSignOut: RegistryActionAvailability(selection: "none", platforms: ["android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "sync.backend"),
     .settingsSave: RegistryActionAvailability(selection: "none", platforms: ["android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "settings.display"),
+    .appHelp: RegistryActionAvailability(selection: "none", platforms: ["macos", "ipados", "web", "windows"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "settings.display"),
     .appKeyboardShortcuts: RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "mac.keyboard"),
     .appToggleSidebarCounts: RegistryActionAvailability(selection: "none", platforms: ["macos", "ipados", "web", "windows"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "settings.display"),
     .appTextSizeIncrease: RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "settings.display"),
@@ -1625,6 +1633,7 @@ enum RegistryActions {
       RegistryMenuItem(kind: "action", id: "task.delete", actionId: .taskDelete, title: RegistryL10n.t("Delete"), sfSymbol: "trash", items: []),
     ]),
     RegistryMenu(id: .help, title: RegistryL10n.t("Help"), system: "help", items: [
+      RegistryMenuItem(kind: "action", id: "app.help", actionId: .appHelp, title: RegistryL10n.t("Septena Help"), sfSymbol: "questionmark.circle", items: []),
       RegistryMenuItem(kind: "action", id: "app.keyboardShortcuts", actionId: .appKeyboardShortcuts, title: RegistryL10n.t("Keyboard Shortcuts"), sfSymbol: "info.circle", items: []),
     ]),
   ]

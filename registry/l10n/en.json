@@ -598,7 +598,7 @@
   "Check for Updates…": {
     "text": "Check for Updates…",
     "paths": [
-      "settings.pages.about.sections.actions.items.0.label"
+      "settings.pages.about.sections.actions.items.1.label"
     ]
   },
   "Checking the code…": {
@@ -1594,6 +1594,7 @@
   "Help": {
     "text": "Help",
     "paths": [
+      "settings.pages.about.sections.actions.items.0.label",
       "actions.menuBar.help.title"
     ]
   },
@@ -3267,13 +3268,19 @@
   "Send feedback": {
     "text": "Send feedback",
     "paths": [
-      "settings.pages.about.sections.actions.items.3.label"
+      "settings.pages.about.sections.actions.items.4.label"
     ]
   },
   "Septena": {
     "text": "Septena",
     "paths": [
       "actions.menuBar.app.title"
+    ]
+  },
+  "Septena Help": {
+    "text": "Septena Help",
+    "paths": [
+      "actions.actions.app.help.title"
     ]
   },
   "Septena Plus": {
@@ -3409,7 +3416,7 @@
   "Show Get Started Again": {
     "text": "Show Get Started Again",
     "paths": [
-      "settings.pages.about.sections.actions.items.1.label"
+      "settings.pages.about.sections.actions.items.2.label"
     ]
   },
   "Show Info": {
@@ -3439,7 +3446,7 @@
   "Show Welcome Again": {
     "text": "Show Welcome Again",
     "paths": [
-      "settings.pages.about.sections.actions.items.2.label"
+      "settings.pages.about.sections.actions.items.3.label"
     ]
   },
   "Show calendar events": {

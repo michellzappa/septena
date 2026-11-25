@@ -41,6 +41,7 @@ import {
   DESIGN_TOKENS,
   DESTINATIONS,
   FIRST_RUN,
+  HELP_URL,
   REGISTRY_LANGUAGES,
   registryText,
 } from "@/lib/generated/registries";
@@ -1553,6 +1554,16 @@ export function SettingsModal({
                 </section>
 
                 <section className="divide-y divide-[var(--border-subtle)] rounded-xl border border-[var(--border-subtle)] text-xs">
+                  <a
+                    href={HELP_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+                  >
+                    <BookOpen className="h-4 w-4 text-[var(--text-muted)]" />
+                    <span>{registryText("Help", lang)}</span>
+                    <ExternalLink className="ml-auto h-3.5 w-3.5 text-[var(--text-muted)]" />
+                  </a>
                   <button
                     type="button"
                     onClick={() => {
