@@ -38,7 +38,6 @@ import { MAX_AGENT_WEBHOOKS, validateWebhookUrl } from "./agentWake.js";
 import {
   TRIAL_ROW_ID,
   appAccountTokenFor,
-  attachmentQuotaBytes,
   decide,
   grantRow,
   historyCutoff,
@@ -67,6 +66,8 @@ import {
   type NotificationV2,
 } from "../entitlement/appleJws.js";
 import { appleRow, rejectReason } from "../entitlement/apple.js";
+import { attachmentKey, attachmentRefusal } from "./attachments.js";
+import { agentUpload } from "../shadow/attachments.js";
 import { notesHistoryRest } from "./notesHistoryRest.js";
 import { shares } from "./shares.js";
 import { projectStoreFor } from "../store/ProjectStore.js";
@@ -107,10 +108,6 @@ const zClientName = z.string().regex(/^[\w .()-]{1,40}$/);
 function clientVersion(c: Ctx): string | null {
   const sent = zClientName.safeParse(c.req.header("X-Septena-Version"));
   return sent.success ? sent.data : null;
-}
-
-function attachmentKey(userId: string, id: string): string {
-  return `u/${userId}/att/${id}`;
 }
 
 async function parse<T extends z.ZodTypeAny>(c: Ctx, schema: T): Promise<z.infer<T> | Response> {
@@ -498,6 +495,10 @@ api.route("/notes", notesHistoryRest);
 
 // ---- attachments (bytes proxied through the Worker; §10 limits) ----
 
+// An agent's file. Its own token is the only credential, so this sits outside
+// requireUser (src/shadow/attachments.ts).
+api.put("/agent/upload", apiHostOnly, agentUpload);
+
 api.put("/attachments/:id", async (c) => {
   const id = zId.safeParse(c.req.param("id"));
   if (!id.success) return c.json({ error: "invalid_id" }, 400);
@@ -506,16 +507,8 @@ api.put("/attachments/:id", async (c) => {
   if (length > MAX_ATTACHMENT_BYTES) return c.json({ error: "too_large", max: MAX_ATTACHMENT_BYTES }, 413);
   const userId = c.get("userId");
   const store = storeFor(c.env, userId);
-  // Server attachments are a plan limit: none on the free account (files
-  // stay on the device that added them), a quota on Plus.
-  const plan = c.get("plan");
-  const quota = plan ? attachmentQuotaBytes(plan.limits) : null;
-  if (plan && quota !== null && (quota === 0 || (await store.attachmentBytes()) + length > quota)) {
-    const breach: LimitBreach = { limit: "attachmentsGB", upsell: "file_elsewhere" };
-    if (decide(c.env, userId, "attachment_upload", plan, breach) === "block") {
-      return limitRefusal(c, quota === 0 ? "attachments_not_in_plan" : "attachment_quota", breach);
-    }
-  }
+  const refused = await attachmentRefusal(c.env, userId, c.get("plan"), length, async () => store.attachmentBytes());
+  if (refused) return limitRefusal(c, refused.error, refused.breach);
   const problem = await store.checkUpload(id.data, length);
   if (problem === "not_found") return c.json({ error: "push_metadata_first" }, 404);
   if (problem === "size_mismatch") return c.json({ error: "size_mismatch" }, 409);

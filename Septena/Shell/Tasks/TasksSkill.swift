@@ -37,6 +37,8 @@ enum TasksSkill {
               inputs: "required: id, acceptance"),
         SectionSkill.Tool("tasks_set_artifact",  "Attach what you PRODUCED (comparison/draft/summary) — renders as a block (agent_assisted)",
               inputs: "required: id, artifact{title} · optional in artifact: kind, body, refs[]"),
+        SectionSkill.Tool("tasks_attachment_add", "Attach a file of up to 10 MB to a task. For a file on disk, pass neither text nor base64 and run the returned upload command. You cannot read or remove files",
+              inputs: "required: task_id, filename, content_type · optional: text or base64"),
         SectionSkill.Tool("tasks_set_handoff",   "The human's last-mile action, rendered as a tappable button (open_url|compose|call|none)",
               inputs: "required: id, handoff{instruction} · optional in handoff: actionType, payload"),
         SectionSkill.Tool("tasks_set_endstate",  "Record the conversation's end-state (agent_done|human_done|agent_assisted_done|needs_verify|decomposed|reminder_set|promoted_to_today|wont_do|open). Setting needs_verify releases your claim and hands the task to the user's Review list",

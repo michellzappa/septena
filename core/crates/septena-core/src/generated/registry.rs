@@ -31,7 +31,7 @@ pub mod limits {
     pub const ATTACHMENT_POINTER_MAX: i64 = 4000;
     pub const STAMP_MAX: i64 = 40;
     pub const MAX_ATTACHMENT_BYTES: i64 = 26214400;
-    pub const MAX_USER_ATTACHMENT_BYTES: i64 = 2147483648;
+    pub const MAX_USER_ATTACHMENT_BYTES: i64 = 53687091200;
     pub const MAX_OPS_PER_PUSH: i64 = 500;
     pub const MAX_PULL: i64 = 1000;
     pub const MAX_CHECKLIST_ITEMS_PER_TASK: i64 = 200;

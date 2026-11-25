@@ -16,7 +16,7 @@ export const ENTITY_LIMITS = {
   attachmentPointerMax: 4000,
   stampMax: 40,
   maxAttachmentBytes: 26214400,
-  maxUserAttachmentBytes: 2147483648,
+  maxUserAttachmentBytes: 53687091200,
   maxOpsPerPush: 500,
   maxPull: 1000,
   maxChecklistItemsPerTask: 200,
