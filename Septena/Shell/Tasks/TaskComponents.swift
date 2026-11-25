@@ -23,8 +23,22 @@ struct TaskDragIDs: Codable, Hashable, Transferable {
   }
 }
 
+/// The payload of a section heading's drag. Every drop target reads it as
+/// `TaskDragIDs`. The second type only tells a hovered row that headings, not
+/// tasks, are dragged: a `DropDelegate` sees the types before the drop, never
+/// the data.
+struct HeadingDragIDs: Codable, Transferable {
+  let ids: [String]
+
+  static var transferRepresentation: some TransferRepresentation {
+    CodableRepresentation(contentType: .septenaTaskDragIDs)
+    CodableRepresentation(contentType: .septenaHeadingDragIDs)
+  }
+}
+
 extension UTType {
   static let septenaTaskDragIDs = UTType(exportedAs: "com.septena.task-drag-ids")
+  static let septenaHeadingDragIDs = UTType(exportedAs: "com.septena.heading-drag-ids")
 }
 
 /// Row-level reorder target for manually-ordered lists — the in-list
@@ -39,6 +53,9 @@ extension UTType {
 /// for the insertion side) and the drop proposal (`.move`, so the cursor
 /// doesn't wear the green copy badge).
 struct TaskReorderDrop: ViewModifier {
+  /// On a heading row only a heading can land above it. A task goes under the
+  /// heading, so its mark is always below.
+  var isHeading = false
   let perform: ((_ ids: [String], _ before: Bool) -> Bool)?
   /// nil = no drag hovering; true = would insert above this row; false = below.
   @State private var hoverBefore: Bool? = nil
@@ -52,6 +69,7 @@ struct TaskReorderDrop: ViewModifier {
         .onDrop(of: [.septenaTaskDragIDs],
                 delegate: TaskReorderDropDelegate(hoverBefore: $hoverBefore,
                                                   rowHeight: { rowHeight },
+                                                  isHeading: isHeading,
                                                   perform: perform))
     } else {
       content
@@ -62,6 +80,7 @@ struct TaskReorderDrop: ViewModifier {
 private struct TaskReorderDropDelegate: DropDelegate {
   @Binding var hoverBefore: Bool?
   let rowHeight: () -> CGFloat
+  let isHeading: Bool
   let perform: (_ ids: [String], _ before: Bool) -> Bool
 
   func validateDrop(info: DropInfo) -> Bool {
@@ -95,7 +114,8 @@ private struct TaskReorderDropDelegate: DropDelegate {
 
   /// Which side of the row the pointer is on.
   private func update(_ info: DropInfo) {
-    hoverBefore = info.location.y < rowHeight() / 2
+    let canLandAbove = !isHeading || info.hasItemsConforming(to: [.septenaHeadingDragIDs])
+    hoverBefore = canLandAbove && info.location.y < rowHeight() / 2
   }
 }
 

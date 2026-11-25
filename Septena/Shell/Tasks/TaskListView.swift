@@ -3053,7 +3053,7 @@ struct TaskListView: View {
     .contentShape(Rectangle())
     .asListRow()
     .selectionDisabled()
-    .draggable(TaskDragIDs(ids: [heading.id])) {
+    .draggable(HeadingDragIDs(ids: [heading.id])) {
       Text(heading.title)
         .scaledFont(size: 13, weight: .medium)
         .lineLimit(1)
@@ -3061,7 +3061,7 @@ struct TaskListView: View {
         .padding(.vertical, 6)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
     }
-    .modifier(TaskReorderDrop(perform: { ids, before in
+    .modifier(TaskReorderDrop(isHeading: true, perform: { ids, before in
       handleHeadingDrop(ids: ids, targetHeading: heading, before: before)
     }))
     .magicPlusSectionDrop(id: "mp-heading-\(heading.id)",
