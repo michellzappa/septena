@@ -50,11 +50,6 @@ class TaskUndoHistory {
 
     val state: StateFlow<TaskUndoState> = mutableState
 
-    /** Called by a foreground gesture after its mutator write succeeds. */
-    suspend fun recordEdit(before: SyncRecord?, after: SyncRecord?) {
-        recordEdits(listOf(before to after))
-    }
-
     /**
      * Records task + conversation mutations (such as Review Accept or Send back)
      * as ONE undo entry so Undo restores both the task and the conversation state.

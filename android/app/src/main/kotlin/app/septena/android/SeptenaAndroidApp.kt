@@ -13,15 +13,20 @@ import app.septena.core.ConversationRules
 import app.septena.core.JsonValue
 import app.septena.core.RecurrenceRules
 import app.septena.core.RegistryEntityMutator
+import app.septena.core.ReviewGroupIds
 import app.septena.core.SyncRecord
 import app.septena.core.SyncedSettings
 import app.septena.core.SyncedSettingsMutator
 import app.septena.core.SystemDayClock
 import app.septena.core.TaskConversation
 import app.septena.core.TaskMutator
+import app.septena.core.TaskRefAddResult
 import app.septena.core.TaskRefLookup
 import app.septena.core.TaskRefMutator
+import app.septena.core.TaskSnapshot
 import app.septena.core.TaskSyncEngine
+import app.septena.core.TaskTouchRules
+import app.septena.core.TaskViewRules
 import app.septena.core.UuidTaskIdGenerator
 import app.septena.core.WireTimestamp
 import app.septena.core.booleanValue
@@ -149,14 +154,18 @@ class AndroidAppGraph(application: Application) {
         val changed = moveFadeSettingToAccount() || uploads
         val day = clock.today(clock.now()).toString()
         if (lastFadePassDay == day || !fadesInactiveTasks()) return changed
+        val faded = taskMutator.runFadePass(conversations())
+        lastFadePassDay = day
+        return changed || faded > 0
+    }
+
+    /** Every task's conversation, by task id. */
+    suspend fun conversations(): Map<String, TaskConversation> {
         val turnsByTask = taskStore.allTurnsByTask()
-        val conversations = taskStore.records(RegistryEntityNames.CONVO)
+        return taskStore.records(RegistryEntityNames.CONVO)
             .filter { it.deletedAt == null }
             .mapNotNull { r -> runCatching { r.id to TaskConversation.from(r, turnsByTask[r.id].orEmpty()) }.getOrNull() }
             .toMap()
-        val faded = taskMutator.runFadePass(conversations)
-        lastFadePassDay = day
-        return changed || faded > 0
     }
 
     /**
@@ -197,15 +206,57 @@ class AndroidAppGraph(application: Application) {
         }
     }
 
+    init {
+        // Another account must not inherit this one's fade pass day or sweep state.
+        appScope.launch {
+            credentials.signedIn.collect { signedIn ->
+                if (!signedIn) {
+                    lastFadePassDay = null
+                    fadeSweepStore.forgetAccount()
+                }
+            }
+        }
+    }
+
     /**
-     * Wraps a user gesture's task write so undo captures only that local edit.
-     * Sync and background code call mutators directly and never enter this path.
+     * Wraps a user gesture's task write: it stamps the fade clock, and undo captures the edit and the
+     * stamp as one step. Sync and background code call mutators directly and never enter this path.
      */
-    suspend fun captureTaskEdit(taskId: String, mutation: suspend () -> Unit) {
-        val before = taskStore.record(RegistryEntityNames.TASK, taskId)
-        mutation()
-        val after = taskStore.record(RegistryEntityNames.TASK, taskId)
-        taskUndoHistory.recordEdit(before, after)
+    suspend fun captureTaskEdit(taskId: String, touches: Boolean = true, mutation: suspend () -> Unit) =
+        captureTaskEdits(listOf(taskId), touches) { mutation() }
+
+    /**
+     * A user gesture that Android does not undo (checklist, references, attachments, a conversation
+     * turn): it stamps the fade clock and records nothing, so Undo never takes back only the stamp.
+     */
+    suspend fun touchTask(taskId: String) {
+        taskMutator.touch(taskId)
+    }
+
+    /** The user adds a reference to a task that exists. */
+    suspend fun addTaskRef(taskId: String, input: String): TaskRefAddResult {
+        val result = taskRefMutator.add(taskId, input)
+        if (result is TaskRefAddResult.Added) touchTask(taskId)
+        return result
+    }
+
+    /** The fade clock of an edit that began at [before]; see [TaskTouchRules]. */
+    private suspend fun stampTouch(before: SyncRecord?) {
+        val after = before?.let { taskStore.record(RegistryEntityNames.TASK, it.id) } ?: return
+        if (TaskTouchRules.stamps(before, after)) {
+            taskMutator.touch(before.id, deferred = TaskTouchRules.isDefer(before, after))
+        }
+    }
+
+    /**
+     * Opening a faded task keeps it (docs/TASK_FADE_SPEC.md §4), as Faded ▸ Keep. False when the task
+     * is not faded.
+     */
+    suspend fun keepFadedOnOpen(taskId: String): Boolean {
+        val task = taskStore.record(RegistryEntityNames.TASK, taskId)?.let { TaskSnapshot.from(it) } ?: return false
+        if (TaskViewRules.reviewGroup(task, conversationGroup = null) != ReviewGroupIds.FADED) return false
+        captureTaskEdit(taskId) { taskMutator.keepFaded(taskId) }
+        return true
     }
 
     init {
@@ -219,8 +270,7 @@ class AndroidAppGraph(application: Application) {
     /**
      * Every way a user completes a task (checkbox, menu, selection, notification, widget, task page)
      * ends here, as one undo step. A task in Review is accepted (docs/REVIEW_SPEC.md §4): that also
-     * acknowledges any MCP provenance, stamps the fade clock and moves the conversation to
-     * `agent_assisted_done`. The store sets that end state on a plain completion too, so only a
+     * acknowledges any MCP provenance and moves the conversation to `agent_assisted_done`. The store sets that end state on a plain completion too, so only a
      * conversation write here lets Undo put the task back in Review. False when nothing was open.
      */
     suspend fun completeTasks(taskIds: Collection<String>): Boolean {
@@ -255,11 +305,12 @@ class AndroidAppGraph(application: Application) {
 
     suspend fun completeTask(taskId: String): Boolean = completeTasks(listOf(taskId))
 
-    /** The task and its conversation around [write]; null when [write] did nothing. */
+    /** The task, with its fade clock, and its conversation around [write]; null when [write] did nothing. */
     private suspend fun captureTaskAndConvo(taskId: String, write: suspend () -> Boolean): TaskUndoHistory.Edit? {
         val beforeTask = taskStore.record(RegistryEntityNames.TASK, taskId) ?: return null
         val beforeConvo = taskStore.record(RegistryEntityNames.CONVO, taskId)
         if (!write()) return null
+        stampTouch(beforeTask)
         return TaskUndoHistory.Edit(
             taskId = taskId,
             beforeTask = beforeTask,
@@ -306,16 +357,21 @@ class AndroidAppGraph(application: Application) {
     }
 
     /**
-     * Runs one gesture's write on each of [taskIds] and records the lot as one
-     * undo step. A write that throws stops the batch; the tasks already
+     * Runs one gesture's write on each of [taskIds], stamps their fade clocks and records the lot as
+     * one undo step. [touches] is false for Let Go, which drops the task instead of keeping it. A write that throws stops the batch; the tasks already
      * written stay recorded, so Undo still reverts them.
      */
-    suspend fun captureTaskEdits(taskIds: Collection<String>, mutation: suspend (String) -> Unit) {
+    suspend fun captureTaskEdits(
+        taskIds: Collection<String>,
+        touches: Boolean = true,
+        mutation: suspend (String) -> Unit,
+    ) {
         val edits = mutableListOf<Pair<SyncRecord?, SyncRecord?>>()
         try {
             for (taskId in taskIds) {
                 val before = taskStore.record(RegistryEntityNames.TASK, taskId)
                 mutation(taskId)
+                if (touches) stampTouch(before)
                 edits += before to taskStore.record(RegistryEntityNames.TASK, taskId)
             }
         } finally {

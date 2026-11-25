@@ -123,15 +123,23 @@ class TaskMutator(
         return updated
     }
 
-    /** A user gesture on the task: stamps the fade clock (docs/TASK_FADE_SPEC.md §3, Swift `touch`). */
-    suspend fun touch(id: String): TaskRecord? = updateFields(
-        id,
-        mapOf(
-            RegistryEntityFields.Task.TOUCHED_AT to JsonValue.StringValue(WireTimestamp.format(clock.now())),
-            RegistryEntityFields.Task.DEFER_COUNT to JsonValue.IntegerValue(0),
-            RegistryEntityFields.Task.FADED_AT to JsonValue.Null,
-        ),
-    )
+    /**
+     * A user gesture on the task: stamps the fade clock (docs/TASK_FADE_SPEC.md §3, Swift `touch`). A
+     * defer adds 1 to `deferCount`; any other gesture resets it. Only the gesture layer calls this:
+     * the other mutators also run for background work.
+     */
+    suspend fun touch(id: String, deferred: Boolean = false): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id) ?: return null
+        val defers = if (deferred) (existing.fields[RegistryEntityFields.Task.DEFER_COUNT].longValue() ?: 0L) + 1L else 0L
+        return updateFields(
+            id,
+            mapOf(
+                RegistryEntityFields.Task.TOUCHED_AT to JsonValue.StringValue(WireTimestamp.format(clock.now())),
+                RegistryEntityFields.Task.DEFER_COUNT to JsonValue.IntegerValue(defers),
+                RegistryEntityFields.Task.FADED_AT to JsonValue.Null,
+            ),
+        )
+    }
 
     /** A1 when [enabled], else A3 (Remove from Today): the core decides the fields. */
     suspend fun setToday(id: String, enabled: Boolean): TaskRecord? =
@@ -453,11 +461,10 @@ class TaskMutator(
         return updateFields(id, mapOf(RegistryEntityFields.Task.ACKNOWLEDGED_AT to JsonValue.StringValue(WireTimestamp.format(clock.now()))))
     }
 
-    /** Review ▸ Accept (as iOS): complete the task, clear the agent cue, and stamp the fade clock. */
+    /** Review ▸ Accept (as iOS): complete the task and clear the agent cue. */
     suspend fun acceptReview(id: String): TaskRecord? {
         val done = complete(id) ?: return null
         acknowledge(id)
-        touch(id)
         return done
     }
 

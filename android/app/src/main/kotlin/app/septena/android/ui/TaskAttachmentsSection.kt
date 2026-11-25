@@ -125,7 +125,10 @@ internal fun TaskAttachmentsSection(
     }
 
     fun remove(record: SyncRecord) = launchAction({ control(RegistryTaskDetail.Controls.SAVE_ERROR) }) {
-        withContext(Dispatchers.IO) { graph.attachments.remove(record) }
+        withContext(Dispatchers.IO) {
+            graph.attachments.remove(record)
+            graph.touchTask(taskId)
+        }
         graph.sync.noteLocalChange()
         graph.sync.requestSync()
     }

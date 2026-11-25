@@ -23,10 +23,7 @@ data class ConversationSnapshotState(
     val agentStage: String?,
     /** The Review group an open task is in because of its conversation ([ReviewGroupIds]), or null. */
     val reviewGroup: String?,
-) {
-    /** Matches core `deriveConversation(...).badge == "working"`. */
-    val isAgentWorking: Boolean get() = agentStage == "working"
-}
+)
 
 data class TaskConversation(
     val confirmedIntent: String? = null,
@@ -73,9 +70,9 @@ data class TaskConversation(
     /** The Agent list stage (queued, working, yourTurn, stopped, review, done), or null when not agent work. */
     fun agentStage(now: Instant = Instant.now()): String? = state(now).agentStage
 
-    /** The agent holds the turn (the row shows "working"): it does not fade. */
+    /** The agent holds the turn (the row shows "working") or a live claim: the task does not fade. */
     fun isAgentTurn(now: Instant = Instant.now()): Boolean =
-        deriveConversation(toCore(), now.toString()).badge == "working"
+        isClaimed(now) || deriveConversation(toCore(), now.toString()).badge == "working"
 
     fun isPendingReasoning(now: Instant = Instant.now()): Boolean =
         deriveConversation(toCore(), now.toString()).pendingReasoning
