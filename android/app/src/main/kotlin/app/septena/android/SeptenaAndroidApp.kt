@@ -17,6 +17,7 @@ import app.septena.core.SyncedSettingsMutator
 import app.septena.core.SystemDayClock
 import app.septena.core.TaskConversation
 import app.septena.core.TaskMutator
+import app.septena.core.TaskRefMutator
 import app.septena.core.TaskSyncEngine
 import app.septena.core.UuidTaskIdGenerator
 import app.septena.core.generated.RegistryEntityNames
@@ -65,6 +66,7 @@ class AndroidAppGraph(application: Application) {
     val taskUndoHistory = TaskUndoHistory()
     val deviceSettings = app.septena.android.ui.AndroidDeviceSettings(application)
     val registryEntityMutator = RegistryEntityMutator(taskStore, clock, ids)
+    val taskRefMutator = TaskRefMutator(taskStore, clock, ids)
     val conversationMutator = ConversationMutator(taskStore, ids)
     val recurrenceRules = RecurrenceRules
     val conversationRules = ConversationRules
@@ -105,6 +107,7 @@ class AndroidAppGraph(application: Application) {
                 taskStore.records(RegistryEntityNames.CONVO)
                 taskStore.allTurnsByTask()
                 taskStore.records(RegistryEntityNames.CHECKLIST_ITEM)
+                taskStore.records(RegistryEntityNames.TASK_REF)
                 taskStore.records(RegistryEntityNames.TAG)
             }
         }

@@ -318,6 +318,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                         openedTaskId!!,
                         onBack = { openedTaskId = null; openedTaskAttribute = null },
                         initialAttribute = openedTaskAttribute,
+                        onOpenTask = { openTaskWithAttribute(it, null) },
                     )
                 } else {
                     TaskHomeScaffold(
@@ -369,6 +370,7 @@ fun TaskHomeScreen(graph: AndroidAppGraph) {
                     openedTaskId!!,
                     onBack = { openedTaskId = null; openedTaskAttribute = null },
                     initialAttribute = openedTaskAttribute,
+                    onOpenTask = { openTaskWithAttribute(it, null) },
                 )
             } else if (showingListsHome) {
                 ListsHomePage(

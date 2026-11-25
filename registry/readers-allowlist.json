@@ -205,16 +205,12 @@
       "reason": "Android has no undo toast yet.",
       "issue": "#241"
     },
-    "RegistryEntityEnums.TaskRefRole.*": {
-      "reason": "Android gets task references in R4.",
+    "RegistryEntityFields.TaskRef.CREATED_BY": {
+      "reason": "Server-owned audit column not rendered on Android.",
       "issue": "#390"
     },
-    "RegistryEntityFields.TaskRef.*": {
-      "reason": "Android gets task references in R4.",
-      "issue": "#390"
-    },
-    "RegistryEntityNames.TASK_REF": {
-      "reason": "Android gets task references in R4.",
+    "RegistryEntityFields.TaskRef.LAST_SEEN_AT": {
+      "reason": "Server-owned re-capture timestamp rendered in task history.",
       "issue": "#390"
     }
   }
