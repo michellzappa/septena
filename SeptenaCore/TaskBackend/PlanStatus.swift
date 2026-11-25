@@ -119,6 +119,16 @@ final class PlanStatus {
     }
   }
 
+  /// Given by hand, so there is no subscription to manage.
+  var isGranted: Bool {
+    if case .plus(_, "grant") = plan { return true }
+    return false
+  }
+
+  /// The name of the plan page and its Settings row: Plus is the offer, and an
+  /// account on Pro sees its own plan.
+  var title: String { isPro ? RegistryPlans.proCard.title : RegistryPlans.name }
+
   /// The account may buy Plus here: signed in, not already paying from
   /// any source, and this Apple ID does not already hold Plus for another
   /// Septena account. The trial may buy; billing then starts that day.
