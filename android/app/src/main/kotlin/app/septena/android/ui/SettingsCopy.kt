@@ -33,6 +33,13 @@ internal fun promptCancelTitle(languageTag: String): String {
     return registryText(prompts?.fields?.get("cancelTitle").stringValue(), languageTag)
 }
 
+/** The plain confirm of a message: surfaces.json `prompts.error.confirmTitle`. */
+internal fun promptConfirmTitle(languageTag: String): String {
+    val prompts = RegistryCatalog.document("surfaces").fields["prompts"] as? JsonValue.ObjectValue
+    val error = prompts?.fields?.get("error") as? JsonValue.ObjectValue
+    return registryText(error?.fields?.get("confirmTitle").stringValue(), languageTag)
+}
+
 /** A localized registry string (the English text is the key); empty for null. */
 internal fun registryText(english: String?, languageTag: String): String =
     english?.let { RegistryCatalog.localizedString(it, languageTag) ?: it }.orEmpty()

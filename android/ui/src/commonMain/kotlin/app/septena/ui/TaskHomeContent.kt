@@ -52,6 +52,10 @@ data class TaskListItem(
     val id: String,
     val title: String,
     val agentName: String? = null,
+    /** The task is in a shared project, so its row menu offers Assign To. */
+    val canAssign: Boolean = false,
+    /** Who does the task, when that is another member of its shared project. */
+    val assigneeName: String? = null,
     val subtitle: String? = null,
     val isCompleted: Boolean = false,
     val isOnToday: Boolean = false,
@@ -148,6 +152,7 @@ enum class TaskMenuActionIcon {
     Restore,
     Check,
     Cancel,
+    Assign,
 }
 
 data class TaskRowMenuAction(
@@ -156,6 +161,8 @@ data class TaskRowMenuAction(
     val isDestructive: Boolean = false,
     val selectedTitle: String? = null,
     val unselectedTitle: String? = null,
+    /** Shows only on a task that can be assigned ([TaskListItem.canAssign]). */
+    val needsAssignees: Boolean = false,
     val icon: TaskMenuActionIcon = TaskMenuActionIcon.None,
 )
 

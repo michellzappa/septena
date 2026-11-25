@@ -262,7 +262,8 @@ class SeptenaAccessClient(
         )
     }
 
-    private suspend fun request(path: String, method: String, body: String?): String {
+    /** Also the transport of [SeptenaShareClient]. */
+    internal suspend fun request(path: String, method: String, body: String?): String {
         val firstToken = credentials.accessToken() ?: throw SyncAuthenticationException()
         val first = JsonHttp.send(baseUrl, path, method, body, clientVersion, bearer = firstToken)
         val final = if (first.statusCode == HttpURLConnection.HTTP_UNAUTHORIZED) {

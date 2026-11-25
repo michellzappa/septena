@@ -142,6 +142,12 @@ class TaskMutator(
         mapOf(RegistryEntityFields.Task.STARRED to JsonValue.BooleanValue(starred)),
     )
 
+    /** Who does the task in a shared project: a member id, or null for nobody. */
+    suspend fun assign(id: String, memberId: String?): TaskRecord? = updateFields(
+        id,
+        mapOf(RegistryEntityFields.Task.ASSIGNED_TO to JsonValue.stringOrNull(memberId)),
+    )
+
     /** A2 for a day (a day on or before today is A1), A5 for none. */
     suspend fun schedule(id: String, day: String?): TaskRecord? = setWhen(id, day)
 

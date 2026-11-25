@@ -13,6 +13,7 @@ import app.septena.android.MainActivity
 import app.septena.android.R
 import app.septena.android.SeptenaAndroidApp
 import app.septena.core.generated.RegistryDestinationIds
+import app.septena.transport.SeptenaShareClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -23,6 +24,9 @@ sealed interface WidgetLaunchAction {
     data class OpenDestination(val destinationId: String) : WidgetLaunchAction
     data class OpenTask(val taskId: String, val destinationId: String?) : WidgetLaunchAction
     data class QuickAdd(val today: Boolean) : WidgetLaunchAction
+
+    /** An invite link (`septask://join/<token>`): asks before it joins. */
+    data class JoinShare(val token: String) : WidgetLaunchAction
 }
 
 object SeptenaWidgetIntents {
@@ -33,6 +37,7 @@ object SeptenaWidgetIntents {
 
     fun parseLaunchAction(intent: Intent?): WidgetLaunchAction? {
         if (intent == null) return null
+        intent.dataString?.let(SeptenaShareClient::inviteToken)?.let { return WidgetLaunchAction.JoinShare(it) }
         val taskId = intent.getStringExtra(EXTRA_TASK_ID)
         val destId = intent.getStringExtra(EXTRA_DESTINATION_ID)
         if (!taskId.isNullOrBlank()) {
