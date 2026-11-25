@@ -9,7 +9,7 @@ import { zPushBody, type Op } from "../store/ops.js";
 import type { ChangeEntry } from "../store/TaskStore.js";
 import { USER_ID_RE, accountStoreFor } from "../store/AccountStore.js";
 import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from "./appleIdentity.js";
-import { accountAlreadyDeleted, authenticate, issueSession, refreshSession, revokeSession, storeFor, withSession } from "./session.js";
+import { HANDOFF_TTL_S, accountAlreadyDeleted, authenticate, issueSession, refreshSession, revokeSession, storeFor, withSession } from "./session.js";
 import { SESSION_HEADER } from "../store/sessions.js";
 import {
   clearRefreshCookie,
@@ -551,11 +551,12 @@ api.post("/pair/inspect", async (c) => {
 /// A signed-in app mints a SEPARATE session for a device it hands it to over
 /// a private channel (WatchConnectivity). Refresh tokens are single-use and
 /// rotate, so two devices can never share one: each would sign the other out.
+/// The first token lives 7 days, and each renewal gives a full one.
 /// The new session is a sibling, revocable on its own through /auth/signout.
 api.post("/auth/device", async (c) => {
   const userId = c.get("userId");
   logEvent("api_device_session", { by: c.get("actor") });
-  return c.json(await issueSession(c.env, userId));
+  return c.json(await issueSession(c.env, userId, HANDOFF_TTL_S));
 });
 
 // ---- APNs device push tokens (F1b #213, docs/TASK_FACTORY_SPEC.md §8) ----

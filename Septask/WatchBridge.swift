@@ -210,7 +210,10 @@ final class WatchBridge: NSObject {
         } else {
           session.transferUserInfo(message)
         }
-        UserDefaults.standard.set(s.userId, forKey: Self.deliveredKey)
+        // The same value the check above reads: `userID` is not `s.userId` for
+        // an account signed in before `lastUserKey`, and a mismatch minted a
+        // new session at every publish.
+        UserDefaults.standard.set(userID, forKey: Self.deliveredKey)
         lastHandoff = .now
         lastError = nil
         UserDefaults.standard.set(lastHandoff, forKey: "septena.watch.lastHandoff")
