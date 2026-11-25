@@ -218,6 +218,7 @@ enum RegistryIcons {
     "settings.paste": "doc.on.clipboard",
     "settings.plus": "plus.circle.fill",
     "plans.free": "iphone",
+    "plans.pro": "infinity",
     "plans.history": "clock.arrow.circlepath",
     "notice.sign_in": "person.crop.circle.badge.exclamationmark",
     "notice.rolled_in": "arrow.down.circle",
