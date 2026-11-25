@@ -65,6 +65,9 @@ pub struct ConversationState {
     /// The Agent smart list stage (`queued`, `working`, `yourTurn`, `stopped`,
     /// `review`, `done`), or none when the task is not agent work.
     pub agent_stage: Option<String>,
+    /// The Review group this conversation puts an open task in: `questions`,
+    /// `finished`, or none (`docs/REVIEW_SPEC.md` §1).
+    pub review_group: Option<String>,
 }
 
 /// The predicates and the Agent-list stage of a conversation
