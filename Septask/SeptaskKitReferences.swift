@@ -12,17 +12,22 @@ import SwiftData
 /// The rows of one task's references. The host hides the block when it is empty.
 @MainActor
 final class KitReferencesView: NSView {
+  /// `rows` in the inspector; `chips` in the composer, drawn as its attachments are.
+  enum Style { case rows, chips }
+
+  private let style: Style
   private let stack = NSStackView()
   private var rows: [TaskRefRow] = []
   var isEmpty: Bool { rows.isEmpty }
   /// The rows' height, for a host that computes its own (the composer).
   var preferredHeight: CGFloat { rows.isEmpty ? 0 : ceil(stack.fittingSize.height) }
 
-  override init(frame frameRect: NSRect) {
-    super.init(frame: frameRect)
+  init(style: Style = .rows) {
+    self.style = style
+    super.init(frame: .zero)
     stack.orientation = .vertical
     stack.alignment = .leading
-    stack.spacing = 2
+    stack.spacing = style == .chips ? 4 : 2
     stack.translatesAutoresizingMaskIntoConstraints = false
     addSubview(stack)
     NSLayoutConstraint.activate([
@@ -38,7 +43,8 @@ final class KitReferencesView: NSView {
   func configure(rows next: [TaskRefRow]) {
     guard next != rows else { return }
     rows = next
-    stack.kitReplaceArrangedSubviews(with: rows.map { KitReferenceRowView(row: $0) })
+    stack.kitReplaceArrangedSubviews(with: rows.map { KitReferenceRowView(row: $0, isChip: style == .chips) },
+                                     fillsWidth: style == .rows)
   }
 }
 
@@ -53,7 +59,8 @@ private final class KitReferenceRowView: NSView {
   private let hit = KitReferenceHitButton()
 
   /// `isHighlighted` marks the row of a key that the task has already.
-  init(row: TaskRefRow, isInteractive: Bool = true, isHighlighted: Bool = false) {
+  init(row: TaskRefRow, isInteractive: Bool = true, isHighlighted: Bool = false,
+       isChip: Bool = false) {
     self.row = row
     self.isInteractive = isInteractive
     super.init(frame: .zero)
@@ -62,6 +69,13 @@ private final class KitReferenceRowView: NSView {
       wantsLayer = true
       layer?.cornerRadius = 6
       layer?.backgroundColor = SeptaskKitTheme.listSelectionFill(emphasized: true).cgColor
+    }
+
+    if isChip {
+      wantsLayer = true
+      layer?.cornerRadius = 6
+      layer?.borderWidth = 0.75
+      layer?.borderColor = NSColor.secondaryLabelColor.withAlphaComponent(0.25).cgColor
     }
 
     let icon = NSImageView()
@@ -85,9 +99,9 @@ private final class KitReferenceRowView: NSView {
       label.lineBreakMode = .byTruncatingMiddle
       label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     }
-    labels.orientation = .vertical
-    labels.alignment = .leading
-    labels.spacing = 1
+    labels.orientation = isChip ? .horizontal : .vertical
+    labels.alignment = isChip ? .firstBaseline : .leading
+    labels.spacing = isChip ? 6 : 1
     labels.translatesAutoresizingMaskIntoConstraints = false
 
     addSubview(icon)
@@ -97,7 +111,8 @@ private final class KitReferenceRowView: NSView {
       icon.centerYAnchor.constraint(equalTo: centerYAnchor),
       icon.widthAnchor.constraint(equalToConstant: 18),
       labels.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
-      labels.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -4),
+      isChip ? labels.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8)
+        : labels.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -4),
       labels.topAnchor.constraint(equalTo: topAnchor, constant: 3),
       labels.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3),
     ])
@@ -162,16 +177,17 @@ private final class KitReferenceHitButton: NSButton {
 }
 
 private extension NSStackView {
-  /// Full-width rows in place of what the stack showed.
-  func kitReplaceArrangedSubviews(with views: [NSView]) {
+  /// Rows in place of what the stack showed: full width, or no wider than it.
+  func kitReplaceArrangedSubviews(with views: [NSView], fillsWidth: Bool = true) {
     for view in arrangedSubviews {
       removeArrangedSubview(view)
       view.removeFromSuperview()
     }
     for view in views {
       addArrangedSubview(view)
-      view.widthAnchor.constraint(equalTo: widthAnchor, constant: -edgeInsets.left - edgeInsets.right)
-        .isActive = true
+      let inset = -edgeInsets.left - edgeInsets.right
+      (fillsWidth ? view.widthAnchor.constraint(equalTo: widthAnchor, constant: inset)
+        : view.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, constant: inset)).isActive = true
     }
   }
 }

@@ -314,7 +314,8 @@ thin clients (`backend/src/api/tasksRest.ts`) gets the same fields.
   mail from Apple Mail, or a link from a browser, onto a task row or the page.
 - **Row title:** `snapshot.title`. Without one: `owner/repo#n` for an issue,
   host and path for a URL, the kind's label for the rest. The client never
-  fetches a title from the network.
+  fetches a title from the network. Without a subtitle, the row shows the
+  kind's label ("GitHub issue").
 - **Wrong input:** text that does not parse shows one line under the field and
   adds nothing. A key that the task has already only highlights its row.
 - **Watch and widgets:** nothing in v1.
