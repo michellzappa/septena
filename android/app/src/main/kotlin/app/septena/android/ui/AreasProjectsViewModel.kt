@@ -7,7 +7,6 @@ import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.TaskFadeRules
-import app.septena.core.TaskProvenance
 import app.septena.core.TaskSnapshot
 import app.septena.core.TaskViewRules
 import app.septena.core.generated.RegistryEntityEnums
@@ -315,6 +314,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         val today = graph.clock.today(now)
         val metadataCatalog = TaskRowMetadataCatalog.load(graph.taskStore)
         val showAging = graph.fadesInactiveTasks()
+        val conversations = graph.conversations()
         val allTaskRecords = graph.taskStore.records(RegistryEntityNames.TASK)
             .asSequence()
             .filter { it.deletedAt == null }
@@ -337,36 +337,13 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 now = now,
                 showTodayIndicator = true,
             ).copy(position = pos)
-            val opacity = if (showAging) {
-                val fill = runCatching {
-                    TaskFadeRules.fadeFill(
-                        isOpen = true,
-                        isHeading = false,
-                        isDeleted = false,
-                        isFaded = base.isFaded,
-                        deadline = task.deadline,
-                        scheduled = task.scheduled,
-                        hasRecurrence = task.recurrenceUnit != null,
-                        isAgentTurn = false,
-                        isAssignedToClaude = false,
-                        showsAgentCue = false,
-                        touchedAt = task.touchedAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() },
-                        createdAt = task.createdAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() },
-                        created = task.created,
-                        now = now,
-                        today = today.toString(),
-                        isAwaitingHuman = false,
-                        isProposal = TaskProvenance.isProposal(task.source, task.acknowledgedAt),
-                    )
-                }.getOrNull()
-                TaskFadeRules.rowOpacity(fill).toFloat()
-            } else 1f
+                .withFade(task, conversations[record.id], now, today, showAging)
             return PlaceTaskRow(
                 id = record.id,
                 title = task.title,
                 isStarred = task.starred,
                 position = pos,
-                item = base.copy(opacity = opacity),
+                item = base,
             )
         }
 

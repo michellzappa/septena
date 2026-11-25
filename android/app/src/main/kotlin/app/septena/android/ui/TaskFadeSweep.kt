@@ -234,6 +234,11 @@ class FadeSweepStore(
         syncedSettingsMutator.set(RegistrySettingKeys.FADE_SWEEP_DISMISSED_ON, JsonValue.StringValue(anchor))
     }
 
+    /** Drops this device's copy of the sweep state at sign-out. The Faded group's fold is the device's and stays. */
+    fun forgetAccount() {
+        prefs.edit().remove(KEY_LAST_SWEEP_MS).remove(KEY_DISMISSED_WEEK).apply()
+    }
+
     companion object {
         private const val KEY_LAST_SWEEP_MS = "last_sweep_at_ms"
         private const val KEY_DISMISSED_WEEK = "dismissed_sweep_week"

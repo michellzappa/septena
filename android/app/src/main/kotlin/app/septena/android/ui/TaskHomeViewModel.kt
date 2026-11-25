@@ -13,7 +13,6 @@ import app.septena.core.SmartListSection
 import app.septena.core.SyncRecord
 import app.septena.core.TaskConversation
 import app.septena.core.TaskFadeRules
-import app.septena.core.TaskProvenance
 import app.septena.core.TaskSnapshot
 import app.septena.core.TaskViewRules
 import app.septena.core.asSyncRecord
@@ -524,7 +523,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     fun keepFaded(id: String) = editTask(id) { graph.taskMutator.keepFaded(id) }
 
-    fun letGoFaded(id: String) = editTask(id) { graph.taskMutator.letGoFaded(id) }
+    fun letGoFaded(id: String) = editTask(id, touches = false) { graph.taskMutator.letGoFaded(id) }
 
     /** One-tap filing from an Inbox suggestion capsule (`edit.filing-suggestion`, #368). */
     fun applyFilingSuggestion(id: String) {
@@ -548,7 +547,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    graph.captureTaskEdits(ids) { id -> graph.taskMutator.letGoFaded(id) }
+                    graph.captureTaskEdits(ids, touches = false) { id -> graph.taskMutator.letGoFaded(id) }
                 }
             }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
                 .onFailure { errorMessage.value = it.message; noteLocalChangeAndSync() }
@@ -574,11 +573,11 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     }
 
     /** One undoable task edit off the main thread, then a sync. */
-    private fun editTask(id: String, edit: suspend () -> Any?) {
+    private fun editTask(id: String, touches: Boolean = true, edit: suspend () -> Any?) {
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    graph.captureTaskEdit(id) { check(edit() != null) }
+                    graph.captureTaskEdit(id, touches) { check(edit() != null) }
                 }
             }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
                 .onFailure { errorMessage.value = it.message }
@@ -1068,7 +1067,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         now = now,
                         showTodayIndicator = resolvedLocation.destinationId != RegistryDestinationIds.TODAY && !inTodayInbox,
                         isLogbook = resolvedLocation.destinationId == RegistryDestinationIds.LOGBOOK,
-                    ).withFade(snapshot, conversation, convoState, now, today, showAging)
+                    ).withFade(snapshot, conversation, now, today, showAging)
                         .let { base ->
                             if (suggestedTarget != null) base.copy(filingSuggestionLabel = suggestedTarget.title) else base
                         }
@@ -1153,7 +1152,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                             today = today,
                             now = now,
                             showTodayIndicator = true,
-                        ).withFade(snapshot, conversations[snapshot.id], convoStates[snapshot.id], now, today, showAging),
+                        ).withFade(snapshot, conversations[snapshot.id], now, today, showAging),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
                 }
@@ -1171,7 +1170,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                             today = today,
                             now = now,
                             showTodayIndicator = true,
-                        ).withFade(snapshot, conversations[snapshot.id], convoStates[snapshot.id], now, today, showAging),
+                        ).withFade(snapshot, conversations[snapshot.id], now, today, showAging),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
                 }
@@ -1295,46 +1294,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             showTodayIndicator = showTodayIndicator,
             isLogbook = isLogbook,
         )
-    }
-
-    /**
-     * Row opacity from the core's fade fill (fade.rs), as on iOS: an
-     * untouched open task fades over the fade window. Agent work, waiting
-     * conversations, dated, deadline and repeating tasks never fade.
-     */
-    private fun TaskListItem.withFade(
-        snapshot: TaskSnapshot,
-        conversation: TaskConversation?,
-        convoState: app.septena.core.ConversationSnapshotState?,
-        now: java.time.Instant,
-        today: java.time.LocalDate,
-        showAging: Boolean,
-    ): TaskListItem {
-        // Settings ▸ Lists ▸ "Fade inactive tasks" (tasksShowAging) off: rows stay at full strength.
-        if (!showAging) return this
-        val isProposal = TaskProvenance.isProposal(snapshot.source, snapshot.acknowledgedAt)
-        val fill = runCatching {
-            TaskFadeRules.fadeFill(
-                isOpen = snapshot.status == RegistryEntityEnums.TaskStatus.OPEN,
-                isHeading = snapshot.isHeading,
-                isDeleted = snapshot.deletedAt != null,
-                isFaded = TaskFadeRules.isFaded(snapshot.fadedAt),
-                deadline = snapshot.deadline,
-                scheduled = snapshot.scheduled,
-                hasRecurrence = snapshot.recurrenceUnit != null,
-                isAgentTurn = convoState?.isAgentWorking == true,
-                isAssignedToClaude = conversation?.assignee == RegistryEntityEnums.ConvoAssignee.CLAUDE,
-                showsAgentCue = isProposal,
-                touchedAt = snapshot.touchedAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() },
-                createdAt = snapshot.createdAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() },
-                created = snapshot.created,
-                now = now,
-                today = today.toString(),
-                isAwaitingHuman = convoState?.awaitsHuman == true,
-                isProposal = isProposal,
-            )
-        }.getOrNull()
-        return copy(opacity = TaskFadeRules.rowOpacity(fill).toFloat())
     }
 
     /** The group headers of a destination by group id, in the order registry/destinations.json lists them. */
