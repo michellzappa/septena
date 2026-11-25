@@ -33,8 +33,32 @@ const CODE_PREFIX = "v2:code:";
 const CODE_TTL_S = 300;
 const PAIR_TTL_MS = 10 * 60 * 1000;
 const PAIR_COOKIE = "septena_pair";
-/// Wrong codes a user may enter per window before approve answers 429.
+/// Wrong codes a user may enter per window before approve/inspect/deny answers 429.
 export const PAIR_MAX_FAILURES = 5;
+/// Device sign-in starts allowed per IP in one pairing window.
+export const DEVICE_START_MAX_PER_IP = 20;
+/// Failed device polls (unknown/wrong secret/wrong purpose) allowed per IP per window.
+export const DEVICE_POLL_MAX_FAILURES_PER_IP = PAIR_MAX_FAILURES;
+
+async function ipRateKey(prefix: string, ip: string): Promise<string> {
+  const bucket = Math.floor(Date.now() / PAIR_TTL_MS);
+  const ipHash = await sha256Base64Url(ip.trim());
+  return `${prefix}:${ipHash}:${bucket}`;
+}
+
+async function ipRateCount(env: Env, prefix: string, ip: string): Promise<number> {
+  const raw = await env.STATE.get(await ipRateKey(prefix, ip));
+  const n = raw ? Number.parseInt(raw, 10) : 0;
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+async function noteIpRateEvent(env: Env, prefix: string, ip: string): Promise<number> {
+  const key = await ipRateKey(prefix, ip);
+  const prev = await env.STATE.get(key);
+  const next = (prev ? Number.parseInt(prev, 10) || 0 : 0) + 1;
+  await env.STATE.put(key, String(next), { expirationTtl: PAIR_TTL_MS / 1000 });
+  return next;
+}
 
 // No 0/O, 1/I/L: the code is read off one screen and typed into another.
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -174,9 +198,13 @@ export async function pairContinue(c: Context<{ Bindings: Env }>) {
     return messagePage(c, "This sign-in has no pairing code. Go back to Claude and connect again.", 400);
   }
   const pairing = pairingFor(c.env, code);
-  const s = await pairing.status(pendingId);
+  const s = await pairing.status(pendingId, "connector");
   if (s.status === "gone") {
     return messagePage(c, "This code expired. Go back to Claude and connect again.", 400, true);
+  }
+  if (s.status === "denied") {
+    await pairing.consumeDenied(pendingId, "connector");
+    return messagePage(c, "This sign-in was declined. Go back to Claude and connect again.", 400, true);
   }
   if (s.status === "pending") {
     return pairPage(c, {
@@ -186,7 +214,7 @@ export async function pairContinue(c: Context<{ Bindings: Env }>) {
     });
   }
 
-  const taken = await pairing.take(pendingId);
+  const taken = await pairing.take(pendingId, "connector");
   if (!taken) return messagePage(c, "This code expired. Go back to Claude and connect again.", 400, true);
   const { pending, approval } = taken;
 
@@ -259,10 +287,22 @@ export type DeviceStartResult = {
   qr: { size: number; modules: string };
 };
 
+export type DeviceStartOutcome =
+  | { ok: true; data: DeviceStartResult }
+  | { ok: false; status: 429; error: "too_many_attempts" }
+  | { ok: false; status: 503; error: "pairing_unavailable" };
+
 export async function startDevicePairing(
   env: Env,
   body: z.infer<typeof zDeviceStartBody>,
-): Promise<DeviceStartResult | null> {
+  clientIp?: string | null,
+): Promise<DeviceStartOutcome> {
+  if (clientIp && (await ipRateCount(env, "rl:devstart", clientIp)) >= DEVICE_START_MAX_PER_IP) {
+    logEvent("device_pair_start", { ok: false, reason: "rate_limited" });
+    return { ok: false, status: 429, error: "too_many_attempts" };
+  }
+  if (clientIp) await noteIpRateEvent(env, "rl:devstart", clientIp);
+
   const pollSecret = randomId(24);
   const expiresAt = Date.now() + PAIR_TTL_MS;
   for (let i = 0; i < 4; i++) {
@@ -280,37 +320,68 @@ export async function startDevicePairing(
     if (created) {
       logEvent("device_pair_start", { ok: true, client: body.clientName });
       return {
-        code: candidate,
-        pollSecret,
-        expiresIn: PAIR_TTL_MS / 1000,
-        interval: 3,
-        qr: pairQrMatrix(pairApproveUrl(env.API_PUBLIC_URL, candidate)),
+        ok: true,
+        data: {
+          code: candidate,
+          pollSecret,
+          expiresIn: PAIR_TTL_MS / 1000,
+          interval: 3,
+          qr: pairQrMatrix(pairApproveUrl(env.API_PUBLIC_URL, candidate)),
+        },
       };
     }
   }
   logEvent("device_pair_start", { ok: false });
-  return null;
+  return { ok: false, status: 503, error: "pairing_unavailable" };
 }
 
 export type DevicePollResult =
   | { status: "pending" }
+  | { status: "denied" }
   | { status: "gone" }
+  | { status: "rate_limited" }
   | { status: "approved"; userId: string };
 
-/// One-shot on approval: the caller issues the session; a second poll is gone.
-export async function pollDevicePairing(env: Env, body: z.infer<typeof zDevicePollBody>): Promise<DevicePollResult> {
+/// One-shot on approval (or denial): the caller issues the session; a second
+/// poll is gone. Failed polls (unknown code, wrong secret, wrong purpose)
+/// count toward the per-IP failure limit.
+export async function pollDevicePairing(
+  env: Env,
+  body: z.infer<typeof zDevicePollBody>,
+  clientIp?: string | null,
+): Promise<DevicePollResult> {
+  if (clientIp && (await ipRateCount(env, "rl:devpoll", clientIp)) >= DEVICE_POLL_MAX_FAILURES_PER_IP) {
+    logEvent("device_pair_poll", { ok: false, reason: "rate_limited" });
+    return { status: "rate_limited" };
+  }
   const code = normalizePairCode(body.code);
-  if (!code) return { status: "gone" };
+  if (!code) {
+    if (clientIp) await noteIpRateEvent(env, "rl:devpoll", clientIp);
+    return { status: "gone" };
+  }
   const pairing = pairingFor(env, code);
   const s = await pairing.status(body.pollSecret, "device");
-  if (s.status !== "approved") return { status: s.status };
+  if (s.status === "pending") return { status: "pending" };
+  if (s.status === "denied") {
+    const consumed = await pairing.consumeDenied(body.pollSecret, "device");
+    if (!consumed) return { status: "gone" };
+    logEvent("device_pair_denied", { client: s.clientName });
+    return { status: "denied" };
+  }
+  if (s.status !== "approved") {
+    if (clientIp) await noteIpRateEvent(env, "rl:devpoll", clientIp);
+    return { status: "gone" };
+  }
   const taken = await pairing.take(body.pollSecret, "device");
-  if (!taken) return { status: "gone" };
+  if (!taken) {
+    if (clientIp) await noteIpRateEvent(env, "rl:devpoll", clientIp);
+    return { status: "gone" };
+  }
   logEvent("device_pair_finished", { client: taken.pending.clientName });
   return { status: "approved", userId: taken.approval.userId };
 }
 
-// ---- POST /v1/pair/approve (called by the app, bearer-authenticated) ----
+// ---- POST /v1/pair/approve & /v1/pair/deny (called by the app, bearer-authenticated) ----
 
 export const zPairKind = z.enum(["connector", "device"]);
 
@@ -320,8 +391,9 @@ export const zAgentName = z.string().trim().min(1).max(AGENT_NAME_MAX).regex(/^[
 export const zPairApproveBody = z.object({
   code: z.string().min(1).max(32),
   timeZone: z.string().max(64).optional(),
-  /// The kind the user confirmed after /v1/pair/inspect. Optional: app builds
-  /// from before 2026-11-22 approve without the confirm step.
+  /// The kind the user confirmed after /v1/pair/inspect. Optional only for
+  /// legacy connector-only app builds from before 2026-11-22 (defaults to
+  /// "connector"; a "device" code always requires explicit kind: "device").
   kind: zPairKind.optional(),
   /// Connector codes: the name the user gives the agent. Absent = the
   /// client's registered name.
@@ -333,6 +405,11 @@ export const zPairApproveBody = z.object({
 
 export const zPairInspectBody = z.object({
   code: z.string().min(1).max(32),
+}).strict();
+
+export const zPairDenyBody = z.object({
+  code: z.string().min(1).max(32),
+  kind: zPairKind.optional(),
 }).strict();
 
 type PairFailure = { ok: false; status: 404 | 409 | 429; error: "invalid_code" | "code_used" | "too_many_attempts" };
@@ -388,11 +465,14 @@ export async function approvePairing(
   }
   const code = normalizePairCode(body.code);
   const timeZone = body.timeZone && isValidTz(body.timeZone) ? body.timeZone : undefined;
+  // Omitting `kind` is accepted only for legacy connector-only app builds: a
+  // device sign-in code must always be confirmed with `kind: "device"`.
+  const expectedKind = body.kind ?? "connector";
   // The name and replacement only mean something for an agent; a device
   // code ignores them (it never reaches the token exchange).
-  const agent = body.kind === "device" ? {} : { label: body.name, replaces: body.replaces };
+  const agent = expectedKind === "device" ? {} : { label: body.name, replaces: body.replaces };
   const res = code
-    ? await pairingFor(env, code).approve({ userId, timeZone, ...agent }, body.kind)
+    ? await pairingFor(env, code).approve({ userId, timeZone, ...agent }, expectedKind)
     : { outcome: "not_found" as const, clientName: undefined, purpose: undefined };
   if (res.outcome === "ok") {
     const kind = res.purpose ?? "connector";
@@ -401,6 +481,32 @@ export async function approvePairing(
   }
   await store.notePairFailure();
   logEvent("preview_pair_approve", { ok: false, reason: res.outcome });
+  return res.outcome === "already_used"
+    ? { ok: false, status: 409, error: "code_used" }
+    : { ok: false, status: 404, error: "invalid_code" };
+}
+
+export async function denyPairing(
+  env: Env,
+  userId: string,
+  body: z.infer<typeof zPairDenyBody>,
+): Promise<PairApproveResult> {
+  const store = storeFor(env, userId);
+  if ((await store.pairFailures()) >= PAIR_MAX_FAILURES) {
+    logEvent("pair_deny", { ok: false, reason: "rate_limited" });
+    return { ok: false, status: 429, error: "too_many_attempts" };
+  }
+  const code = normalizePairCode(body.code);
+  const res = code
+    ? await pairingFor(env, code).deny(body.kind)
+    : { outcome: "not_found" as const, clientName: undefined, purpose: undefined };
+  if (res.outcome === "ok") {
+    const kind = res.purpose ?? "connector";
+    logEvent("pair_deny", { ok: true, kind });
+    return { ok: true, client: res.clientName ?? (kind === "device" ? "A new device" : "Claude"), kind };
+  }
+  await store.notePairFailure();
+  logEvent("pair_deny", { ok: false, reason: res.outcome });
   return res.outcome === "already_used"
     ? { ok: false, status: 409, error: "code_used" }
     : { ok: false, status: 404, error: "invalid_code" };
