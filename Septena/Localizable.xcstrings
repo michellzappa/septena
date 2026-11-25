@@ -2751,6 +2751,42 @@
         }
       }
     },
+    "Already a task" : {
+      "comment" : "Generated from registry surfaces.taskReferences.alreadyTask.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Al een taak"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Já é uma tarefa"
+          }
+        }
+      }
+    },
+    "Also in %@" : {
+      "comment" : "Generated from registry surfaces.taskReferences.alsoIn.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ook in %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Também em %@"
+          }
+        }
+      }
+    },
     "Always shown" : {
       "comment" : "Generated from registry settings.copy.smart_lists_editor.alwaysShown.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
