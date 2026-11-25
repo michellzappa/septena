@@ -5,7 +5,7 @@ compatibility_date = "2024-11-01"
 # Open-source template. Replace placeholders before deploying your own worker.
 account_id = "1d2ed1f57832a528b7f197b5a9d68d39"
 # Keep the *.workers.dev URL off: the worker must only be reachable through the
-# custom domain, where Cloudflare Access sits in front of /admin.
+# custom domain.
 workers_dev = false
 
 # Custom domain the app's CommunityClient defaults to. Wrangler provisions the
@@ -43,15 +43,6 @@ id = "4b24aa6a1dbf4b568a69b204286a1248"
 ATTEST_MODE = "enforce"
 APP_ATTEST_APP_ID = "992N457T8D.com.septena.cloud,992N457T8D.com.septena.cloud.mac"
 APP_ATTEST_ENV = "production"
-ADMIN_EMAILS = "mz@centaur-labs.io"
-
-# Cloudflare Access sign-in for /admin. The worker validates the
-# CF-Access-Jwt-Assertion JWT against the team's public keys; both values are
-# required or the Access path stays disabled (only the dashboard token works).
-# Team domain: Zero Trust ▸ Settings ▸ Custom Pages. AUD tag: the Access
-# application's "Application Audience (AUD) Tag".
-# ACCESS_TEAM_DOMAIN = "yourteam.cloudflareaccess.com"
-# ACCESS_AUD = "your-access-application-aud-tag"
 
 # Sign in with Apple accepts these identity-token `aud` values. Derived from
 # APP_ATTEST_APP_ID (team prefix stripped) when unset; set explicitly to override.
@@ -60,7 +51,6 @@ ADMIN_EMAILS = "mz@centaur-labs.io"
 # Set as a secret in production:
 #   npx wrangler secret put USER_HASH_SALT
 #   npx wrangler secret put TELEMETRY_HASH_SALT
-#   npx wrangler secret put ADMIN_DASHBOARD_TOKEN
 #   npx wrangler secret put SESSION_SIGNING_KEY   # signs Sign in with Apple
 #                                                 # sessions; falls back to
 #                                                 # USER_HASH_SALT if unset

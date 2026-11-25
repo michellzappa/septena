@@ -102,6 +102,12 @@ const zAppleBody = z.object({
 const zRefreshBody = z.object({ refreshToken: z.string().min(20).max(400) }).strict();
 const zClientName = z.string().regex(/^[\w .()-]{1,40}$/);
 
+/// The app version behind a call, for the device list on the admin page.
+function clientVersion(c: Ctx): string | null {
+  const sent = zClientName.safeParse(c.req.header("X-Septena-Version"));
+  return sent.success ? sent.data : null;
+}
+
 function attachmentKey(userId: string, id: string): string {
   return `u/${userId}/att/${id}`;
 }
@@ -325,7 +331,7 @@ async function requireSyncDevice(c: Ctx, next: Next) {
   // A token from before session ids names no device; it refreshes within
   // the hour and carries one from then on.
   if (plan && sid) {
-    const { syncing } = await storeFor(c.env, c.get("userId")).deviceAccess(sid, c.get("client"), plan.limits.devices);
+    const { syncing } = await storeFor(c.env, c.get("userId")).deviceAccess(sid, c.get("client"), plan.limits.devices, Date.now(), clientVersion(c));
     const breach: LimitBreach | null = syncing ? null : { limit: "devices", upsell: "second_device" };
     if (decide(c.env, c.get("userId"), "sync_device", plan, breach) === "block") return limitRefusal(c, "device_not_syncing", breach!);
   }
