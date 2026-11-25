@@ -24,6 +24,8 @@ shared; the spec made them private.
   ProjectStore and a local id in each member's store.
 - **The invite is a link** for one person, not an email address.
 - **Conversations stay private** to each member.
+- **Notes merge; a replica is never deleted with something on it that exists
+  nowhere else** (mz, 2026-11-25: never lose data). Spec §5a.
 
 ## Consequences
 

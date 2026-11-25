@@ -7,6 +7,11 @@ import { DELETABLE_ENTITIES, ENTITY_ENUMS, ENTITY_LIMITS, ENTITY_PATTERNS } from
 
 const zClientOpId = z.string().regex(new RegExp(ENTITY_PATTERNS.clientOpId));
 
+/// The notes a write was made from. With it, two people (or two devices) who
+/// edit the same notes at once both keep their words (`mergeText.ts`).
+const zBase = z.object({ notes: z.string().max(ENTITY_LIMITS.notesMax).nullable() }).strict();
+const hasNotes = (entity: string): boolean => entity === "task" || entity === "project";
+
 const upsertOps = ENTITY_NAMES.filter((name) => name !== "setting").map((name) =>
   z.object({
     clientOpId: zClientOpId,
@@ -14,6 +19,7 @@ const upsertOps = ENTITY_NAMES.filter((name) => name !== "setting").map((name) =
     entity: z.literal(name),
     id: zId,
     fields: z.object(pushableFields(ENTITIES[name])).partial().strict(),
+    ...(hasNotes(name) ? { base: zBase.optional() } : {}),
   }).strict(),
 );
 
@@ -75,6 +81,7 @@ export type Op =
       /// write that changes a project's or an area's notes. Not on the wire:
       /// only server-side callers (the MCP connector) set it.
       baseNoteRev?: number;
+      base?: { notes: string | null };
     }
   | { clientOpId: string; op: "delete"; entity: Exclude<EntityName, "convo" | "setting">; id: string }
   | { clientOpId: string; op: "appendTurn"; taskId: string; turn: Turn };
