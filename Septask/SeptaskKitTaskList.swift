@@ -2594,15 +2594,10 @@ final class SeptaskKitTaskListController: NSViewController {
         tableView.insertRows(at: [offset], withAnimation: insertAnimation)
       }
     }
-    tableView.endUpdates()
-    // The insert/remove/move above can change which SURVIVING rows are now
-    // first/last in their card — refresh every on-screen row's geometry
-    // directly rather than relying on the content-diff below, which only
-    // catches a row whose own `Row` value changed (see the doc comment on
-    // `refreshCardGeometry`).
-    refreshCardGeometry()
-
-    // Surviving rows whose content changed (rename, date, today flag).
+    // Surviving rows whose content changed (rename, date, today flag). Their
+    // heights join THIS batch: noted after `endUpdates`, they started a second
+    // row animation on top of the first (a header's count or ring changes with
+    // every completion), and the rows no longer moved as one.
     let oldByKey = Dictionary(old.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
     var changed = IndexSet()
     for index in new.indices where !isPreserved(index) {
@@ -2610,9 +2605,16 @@ final class SeptaskKitTaskListController: NSViewController {
         changed.insert(index)
       }
     }
+    // Same cached-height rule as the equal-keys path above.
+    if !changed.isEmpty { tableView.noteHeightOfRows(withIndexesChanged: changed) }
+    tableView.endUpdates()
+    // The insert/remove/move above can change which SURVIVING rows are now
+    // first/last in their card — refresh every on-screen row's geometry
+    // directly rather than relying on the content-diff below, which only
+    // catches a row whose own `Row` value changed (see the doc comment on
+    // `refreshCardGeometry`).
+    refreshCardGeometry()
     if !changed.isEmpty {
-      // Same cached-height rule as the equal-keys path above.
-      tableView.noteHeightOfRows(withIndexesChanged: changed)
       tableView.reloadData(forRowIndexes: changed, columnIndexes: [0])
     }
   }

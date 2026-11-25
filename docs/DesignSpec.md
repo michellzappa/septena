@@ -218,6 +218,13 @@ Any animation a user can trigger repeatedly — and every celebratory flourish (
 
 The two sanctioned exceptions are `LogCommit.swift` and `CommitMotion.swift`, which gate once at the overlay so the primitives inside them can animate freely; both say so in a comment at the call site. Everything else is enforced by `scripts/lint-design.sh` (§14).
 
+**A task list moves as whole rows.** When a row leaves, arrives or folds, the title, the checkbox and the card surface of every other row move as one piece, on one curve:
+
+- SwiftUI: everything that can shift in a task list carries `.geometryGroup()` (`taskCardChrome`, `asListRow`, `plainListChrome` and the group headers have it). Without it every leaf animates its own position and the titles drift away from their rows. A row or header leaves with `TaskListRowExit`.
+- Checking a row never changes its layout: the trailing cluster stays until the row leaves (`TaskRow.isSettling`).
+- AppKit: one `beginUpdates`/`endUpdates` batch per reload, height changes included. A height noted after the batch starts a second animation.
+- Android: every `LazyColumn` item that can move carries `taskListMotion()`, and a group header is its own item. An item without it jumps while its neighbors slide.
+
 **Haptics have one vocabulary.** Call a `Haptics` verb by what the gesture means (`press`, `selection`, `commit`, `threshold`, `success`, `warning`, or `play` for a composed pattern); local view state uses `.sensoryFeedback`. The table and the rules are in [HAPTICS_SPEC.md](HAPTICS_SPEC.md).
 
 ## 10. Data-viz primitives

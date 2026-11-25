@@ -45,6 +45,7 @@ import app.septena.ui.TaskCardMetrics
 import app.septena.ui.TaskCardPosition
 import app.septena.ui.TaskCardSlice
 import app.septena.ui.cardPosition
+import app.septena.ui.taskListMotion
 import java.time.DayOfWeek
 import java.time.Duration
 import java.time.Instant
@@ -357,6 +358,7 @@ internal fun TaskFadeSweepSheet(
                             isSelected = false,
                             isDark = isDark,
                             hasActiveTexture = hasActiveTexture,
+                            modifier = taskListMotion(),
                         ) {
                             Row(
                                 modifier = Modifier
