@@ -128,10 +128,12 @@ scan whole-store-id-lookup error \
 # came from the early Things 3 copy and left the same action with two names
 # (the menu said New Task, the shortcuts sheet said New to-do). "To-do" stays
 # only in App Store and site search keywords, which this rule does not scan.
+# Portuguese and Spanish recurrence words ("todos los lunes", "every monday")
+# are parser input, not copy.
 scan vocab-task-not-todo error \
   '"[^"]*[Tt]o-?[Dd]os?\b[^"]*"' \
   'Say "task", never "to-do", in user-facing copy and prompts (DesignSpec §6.6).' \
-  'Microsoft To Do|[Tt]odoist|TODO|newTodos'
+  'Microsoft To Do|[Tt]odoist|TODO|newTodos|"todos? [^"]*", "every '
 
 # ── AppKit transient surfaces (docs/SEPTASK_APPKIT_SURFACES.md) ─────────────
 # Every popover, floating panel and filter list in the Septask AppKit shell is
