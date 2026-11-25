@@ -8,9 +8,9 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 55 | 56 | 56 | 33 | 52 | 0 | 1 |
-| partial | 1 | 1 | 1 | 4 | 2 | 0 | 3 |
-| planned | 0 | 0 | 0 | 16 | 1 | 56 | 2 |
+| ships | 55 | 56 | 56 | 49 | 52 | 0 | 1 |
+| partial | 1 | 1 | 1 | 1 | 2 | 0 | 3 |
+| planned | 0 | 0 | 0 | 3 | 1 | 56 | 2 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 54 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
@@ -32,7 +32,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `task.when-deadline` | When and Deadline as separate dates | ships | ships | ships | ships | ships | planned | - |
 | `task.repeat` | Repeat from schedule or after completion, pause | ships | ships | ships | ships | ships | planned | - |
 | `task.notes` | Notes | ships | ships | ships | ships | ships | planned | - |
-| `task.attachments` | Attachments | ships | ships | ships | partial | ships | planned | - |
+| `task.attachments` | Attachments | ships | ships | ships | ships | ships | planned | - |
 | `task.do` | Do: one task now, on every screen | ships | ships | ships | planned | ships | planned | planned |
 | `task.references` | References: the email, link, issue or task that a task is about | ships | ships | ships | ships | ships | planned | - |
 | `task.history` | Per-task change history | ships | ships | ships | ships | ships | planned | - |
@@ -40,38 +40,38 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `task.aging` | Aging fade across open lists | ships | ships | ships | ships | ships | planned | - |
 | `task.checklists` | Checklists inside a task | ships | ships | ships | ships | ships | planned | - |
 | `task.tags` | Tags | ships | ships | ships | ships | ships | planned | - |
-| `task.share` | Share a task (title and notes) through the system share sheet | ships | ships | ships | planned | ships | planned | - |
-| `task.alerts` | Timed reminders | ships | ships | ships | planned | ships | planned | - |
-| `fade.sweep` | Fade pass, Faded pile and weekly sweep | ships | ships | ships | planned | ships | planned | - |
-| `capture.quick-add` | Quick Add sheet | ships | ships | - | planned | ships | - | - |
+| `task.share` | Share a task (title and notes) through the system share sheet | ships | ships | ships | ships | ships | planned | - |
+| `task.alerts` | Timed reminders | ships | ships | ships | ships | ships | planned | - |
+| `fade.sweep` | Fade pass, Faded pile and weekly sweep | ships | ships | ships | ships | ships | planned | - |
+| `capture.quick-add` | Quick Add sheet | ships | ships | - | ships | ships | - | - |
 | `sharing.projects` | Share a project with other people (invite link, members, assign) | ships | ships | ships | planned | ships | planned | - |
-| `capture.share-target` | Share into Inbox | ships | ships | - | planned | ships | planned | - |
+| `capture.share-target` | Share into Inbox | ships | ships | - | ships | ships | planned | - |
 | `capture.quick-entry` | Quick Entry global panel | - | - | ships | - | - | planned | - |
 | `edit.filing-suggestion` | On-device filing suggestion | ships | ships | ships | - | ships | planned | - |
 | `edit.undo` | Shared undo history | ships | ships | ships | ships | ships | planned | - |
-| `edit.multi-select` | Select multiple tasks | ships | ships | ships | planned | ships | planned | - |
+| `edit.multi-select` | Select multiple tasks | ships | ships | ships | ships | ships | planned | - |
 | `find.quick-find` | Quick Find | ships | ships | ships | ships | ships | planned | - |
 | `task.page` | Task page (ADR 0029) | partial | partial | partial | partial | partial | planned | partial |
-| `mac.keyboard` | Keyboard-first shortcuts | - | ships | ships | partial | planned | planned | - |
+| `mac.keyboard` | Keyboard-first shortcuts | - | ships | ships | ships | planned | planned | - |
 | `mac.updates` | In-app updates (Sparkle) | - | - | ships | - | - | planned | - |
 | `calendar.events` | Calendar events in Today and Upcoming | ships | ships | ships | planned | ships | planned | - |
 | `import.reminders` | Apple Reminders into Inbox | ships | ships | ships | - | - | - | - |
 | `import.things` | One-time Things import | ships | ships | ships | - | - | - | - |
 | `ai.discuss` | Discuss: conversation on one task | ships | ships | ships | ships | partial | planned | - |
-| `ai.reach-dial` | Where AI runs | ships | ships | ships | planned | ships | planned | - |
-| `agents.connector` | Official MCP connector at api.septena.app/mcp | ships | ships | ships | planned | ships | planned | - |
-| `onboarding.first-run` | First run: welcome, account, move in, connect Claude | ships | ships | ships | planned | ships | planned | - |
+| `ai.reach-dial` | Where AI runs | ships | ships | ships | ships | ships | planned | - |
+| `agents.connector` | Official MCP connector at api.septena.app/mcp | ships | ships | ships | ships | ships | planned | - |
+| `onboarding.first-run` | First run: welcome, account, move in, connect Claude | ships | ships | ships | ships | ships | planned | - |
 | `agents.stop-pause` | Stop one task, pause all agents | ships | ships | ships | ships | ships | planned | - |
 | `sync.backend` | Sync through api.septena.app | ships | ships | ships | ships | ships | planned | planned |
-| `account.delete` | Delete account | ships | ships | ships | planned | ships | planned | - |
+| `account.delete` | Delete account | ships | ships | ships | ships | ships | planned | - |
 | `task.times` | Start time and duration on a task | ships | ships | ships | ships | ships | planned | - |
-| `calendar.feed` | Private read-only calendar feed (.ics) | ships | ships | ships | planned | ships | planned | - |
+| `calendar.feed` | Private read-only calendar feed (.ics) | ships | ships | ships | ships | ships | planned | - |
 | `widgets.tasks` | Today and Upcoming widgets | ships | ships | ships | - | ships | planned | - |
 | `watch.app` | Apple Watch app | - | - | - | - | - | - | ships |
-| `data.import-export` | Export as JSON, Markdown or CSV; import JSON with a preview | ships | ships | ships | partial | ships | planned | - |
+| `data.import-export` | Export as JSON, Markdown or CSV; import JSON with a preview | ships | ships | ships | ships | ships | planned | - |
 | `agents.list` | Connected agents: list, name, disconnect | ships | ships | ships | ships | ships | planned | - |
-| `settings.display` | Display, badge and privacy preferences | ships | ships | ships | planned | ships | planned | - |
+| `settings.display` | Display, badge and privacy preferences | ships | ships | ships | ships | ships | planned | - |
 | `appearance.accents` | Accent colors (Colorful and the fruit accents) | ships | ships | ships | ships | ships | planned | - |
-| `appearance.textures` | Header textures with intensity and slow drift | ships | ships | ships | planned | ships | planned | - |
+| `appearance.textures` | Header textures with intensity and slow drift | ships | ships | ships | ships | ships | planned | - |
 | `appearance.mode` | Light, dark or system appearance | ships | ships | ships | ships | ships | planned | - |
 | `appearance.text-size` | Text size | ships | ships | ships | ships | ships | planned | - |
