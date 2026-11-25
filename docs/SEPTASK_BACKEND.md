@@ -87,7 +87,10 @@ iOS / Mac / Watch apps                 Claude (web, mobile, Code, agents)
   /v1/attachments/:id`), not signed URLs: no S3 credentials to manage, and
   the 25 MB limit is under the Worker's request-body cap. The client pushes
   the attachment row first, then uploads bytes whose length must equal its
-  `byteCount`.
+  `byteCount`. An agent adds a file (10 MB at most) with
+  `tasks_attachment_add`, in the call or with a one-time signed token on
+  `PUT /v1/agent/upload`; it cannot read or delete files
+  (`backend/src/shadow/attachments.ts`).
 - **Stack:** Workers + Hono + Durable Objects (SQLite) + R2, Zod at every
   boundary. Matches the gateway, which is already a Worker.
 
