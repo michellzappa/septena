@@ -155,7 +155,9 @@ private struct TaskCardChrome: ViewModifier {
   func body(content: Content) -> some View {
     let shape = effectiveShape
     content
-      .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+      // Top, not center: while the row's height animates, its content stays on
+      // the top edge instead of drifting with the middle (`geometryGroup`).
+      .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
       .clipShape(shape)
       .environment(\.rowHInset, TaskCardMetrics.contentInset)
       .background(alignment: .bottom) {
@@ -222,6 +224,10 @@ private struct TaskCardChrome: ViewModifier {
       }
       .padding(.horizontal, TaskCardMetrics.margin)
       .padding(.bottom, position.trailingGap)
+      // Title, checkbox and card surface move as ONE piece when the list
+      // shifts. Without it every leaf animates its own position, and the
+      // titles drift away from their rows.
+      .geometryGroup()
       #if os(macOS)
       .onHover { hovered = $0 }
       #endif
@@ -286,7 +292,8 @@ extension View {
   /// footer spacing. A custom `SelectableScrollList` needs no native List
   /// separator/inset overrides.
   func asListRow() -> some View {
-    frame(maxWidth: .infinity, alignment: .leading)
+    frame(maxWidth: .infinity, alignment: .topLeading)
+      .geometryGroup()
   }
 
   /// Selectable task-row chrome and interaction routing.
@@ -296,7 +303,47 @@ extension View {
 
   /// Non-interactive decorative content within a task list.
   func plainListChrome() -> some View {
-    frame(maxWidth: .infinity, alignment: .leading)
+    frame(maxWidth: .infinity, alignment: .topLeading)
+      .geometryGroup()
+  }
+}
+
+// MARK: - Row exit
+
+/// How a row (or a group header) leaves a task list. The rows below slide up on
+/// the same transaction, and the leaving row's bottom edge rises on that same
+/// curve, so the two edges stay together: no gap opens in the card, and the old
+/// title never shows through the row that slides over it.
+///
+/// A row that is alone in its card, and a header, also fade: nothing slides
+/// over them from the same card. Arrivals fade in.
+struct TaskListRowExit: Transition {
+  var fades = false
+
+  func body(content: Content, phase: TransitionPhase) -> some View {
+    content
+      .clipShape(TaskListRowExitClip(remaining: phase == .didDisappear ? 0 : 1))
+      .opacity(phase == .willAppear || (fades && phase == .didDisappear) ? 0 : 1)
+  }
+}
+
+/// Clips the bottom edge only. The other edges sit far outside the row, so the
+/// insertion mark and the open editor's shadow are never cut.
+private struct TaskListRowExitClip: Shape {
+  var remaining: CGFloat
+  private static let outset: CGFloat = 200
+
+  var animatableData: CGFloat {
+    get { remaining }
+    set { remaining = newValue }
+  }
+
+  func path(in rect: CGRect) -> Path {
+    let bottom = remaining >= 1 ? rect.height + Self.outset : rect.height * max(0, remaining)
+    return Path(CGRect(x: rect.minX - Self.outset,
+                       y: rect.minY - Self.outset,
+                       width: rect.width + Self.outset * 2,
+                       height: bottom + Self.outset))
   }
 }
 

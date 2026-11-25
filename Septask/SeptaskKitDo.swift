@@ -6,8 +6,9 @@ import SwiftData
 // the state and every write. This file owns what the Mac surfaces share: one
 // observation of the store, one minute clock, the gestures and their menu,
 // and the "Where did you stop?" panel. The Do screen
-// (SeptaskKitDoScreen.swift), the notice row (SeptaskKitTaskList.swift) and
-// the menu bar item (SeptaskKitDoStatusItem.swift) all read from here.
+// (SeptaskKitDoScreen.swift), the notice row (SeptaskKitTaskList.swift),
+// the menu bar item (SeptaskKitDoStatusItem.swift) and the floating panel
+// (SeptaskKitDoFloat.swift) all read from here.
 @MainActor
 final class SeptaskKitDo {
   static let shared = SeptaskKitDo()
@@ -37,6 +38,7 @@ final class SeptaskKitDo {
     observe()
     scheduleTick()
     SeptaskKitDoStatusItem.shared.sync()
+    SeptaskKitDoFloat.shared.start()
     NSWorkspace.shared.notificationCenter.addObserver(
       forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
     ) { [weak self] _ in
@@ -73,6 +75,7 @@ final class SeptaskKitDo {
     last = next
     scheduleTick()
     SeptaskKitDoStatusItem.shared.sync()
+    SeptaskKitDoFloat.shared.sync()
     NotificationCenter.default.post(name: Self.changed, object: nil)
   }
 
@@ -120,6 +123,7 @@ final class SeptaskKitDo {
   private func tick() {
     scheduleTick()
     SeptaskKitDoStatusItem.shared.sync()
+    SeptaskKitDoFloat.shared.sync()
     NotificationCenter.default.post(name: Self.ticked, object: nil)
   }
 

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -26,6 +27,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -152,6 +154,35 @@ internal fun DoScreen(
 
     if (pickingLater) {
         DoLaterSheet(graph, doing, languageTag, onDismiss = { pickingLater = false })
+    }
+}
+
+/** The floating Do (docs/DO_SPEC.md §4.2): the title and the time, in picture-in-picture. */
+@Composable
+internal fun DoFloat(graph: AndroidAppGraph) {
+    val ui by graph.doing.ui.collectAsStateWithLifecycle()
+    val doing = ui.current?.takeIf { ui.isFullHere }
+    val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
+    val copy = remember(languageTag) { DoCopy(languageTag) }
+    Surface(modifier = Modifier.fillMaxSize()) {
+        if (doing != null) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+            ) {
+                Text(
+                    text = doing.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = copy.length(doing.minutes(doNow(graph, doing))),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 

@@ -35,6 +35,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -79,9 +81,21 @@ fun QuickAddSheet(
     val submit: () -> Unit = { if (canAdd) onAdd(draft) }
     val toggle: (String) -> Unit = { id -> openAttribute = if (openAttribute == id) null else id }
 
-    LaunchedEffect(Unit) { runCatching { titleFocus.requestFocus() } }
+    var titleFocused by remember { mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        // The sheet is its own window. The title can take focus only from inside
+        // it, and the keyboard opens only after that window has focus. Once, so
+        // closing the list picker does not pull focus back to the title.
+        val windowFocused = LocalWindowInfo.current.isWindowFocused
+        val keyboard = LocalSoftwareKeyboardController.current
+        LaunchedEffect(windowFocused) {
+            if (windowFocused && !titleFocused) {
+                titleFocused = true
+                titleFocus.requestFocus()
+                keyboard?.show()
+            }
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
