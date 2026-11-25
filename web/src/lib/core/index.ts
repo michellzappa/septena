@@ -236,6 +236,8 @@ export interface CoreFadeInput {
   isAssignedToClaude: boolean;
   isAwaitingHuman?: boolean;
   showsAgentCue?: boolean;
+  /** An agent added the task and the user has not accepted it (ADR 0039). */
+  isProposal?: boolean;
   touchedAt?: string | null;
   createdAt?: string | null;
   created?: string | null;
@@ -284,7 +286,7 @@ export interface CoreProjection {
   pendingReasoning: boolean;
 }
 
-export type AgentStage = "queued" | "working" | "yourTurn" | "review" | "done" | null;
+export type AgentStage = "queued" | "working" | "yourTurn" | "stopped" | "review" | "done" | null;
 
 export interface CoreConversationState {
   isTerminal: boolean;
@@ -294,6 +296,8 @@ export interface CoreConversationState {
   hasStarted: boolean;
   isClaimed: boolean;
   agentStage: AgentStage;
+  /** The Review group this conversation puts an open task in (docs/REVIEW_SPEC.md §1). */
+  reviewGroup: "questions" | "finished" | null;
 }
 
 export function deriveConversation(conversation: CoreConversation, now: string): CoreProjection {
