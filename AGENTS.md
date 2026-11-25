@@ -444,6 +444,17 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   `docs/LAUNCH_PERF.md` ("Interaction performance"). The id-lookup form is
   enforced by the `whole-store-id-lookup` lint rule. The rest is not
   greppable, so this note is the guardrail.
+- **AppKit does not load a collapsed split-view pane.** A view controller in a
+  collapsed `NSSplitViewItem` has no view until the pane first opens, so its
+  stack views are empty. `NSStackView.setCustomSpacing(_:after:)` raises for a
+  view that is not in the stack. AppKit swallows the exception inside event
+  handling: the app stays alive, with a menu bar and no window (2026-11-24:
+  `SeptaskKitInspectorController.show` during the shell window's `init`).
+  Guard every entry point that is called from outside the pane with
+  `isViewLoaded`, hold the state, and apply it in `loadView`. Not greppable;
+  this note is the guardrail. To find a swallowed exception:
+  `/usr/bin/log show --last 1h --predicate 'process == "Septena" AND
+  eventMessage CONTAINS "uncaught exception"'`.
 - **A deep SwiftUI view type overflows the iOS main-thread stack at launch.**
   The crash is `EXC_BAD_ACCESS` in `swift_getTypeByMangledName`, before any
   view draws. `TaskListView.taskListRows` hit it: a large `@ViewBuilder`
