@@ -702,6 +702,7 @@
         { "kind": "action", "id": "sidebar.newProject" },
         { "kind": "action", "id": "sidebar.newArea" },
         { "kind": "divider" },
+        { "kind": "action", "id": "task.do" },
         { "kind": "action", "id": "task.toggleToday" },
         { "kind": "action", "id": "task.when" },
         { "kind": "action", "id": "task.clearSchedule" },
