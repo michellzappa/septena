@@ -101,7 +101,7 @@ existing Today tenure clock (`todayTenureFill`, days carried on Today, full
 at a week); P2 moves it to `touchedAt` against the fade window in every list.
 Touching the task restores full strength.
 
-**The Faded pile.** A sidebar smart list, "Faded", with a count. Rows are
+**The Faded pile.** The Faded group of Review (`docs/REVIEW_SPEC.md`), with a count. Rows are
 standard task rows. Opening or editing a faded task keeps it (clears
 `fadedAt`, stamps `touchedAt`).
 
