@@ -9,8 +9,8 @@ installWorkerTestHooks();
 const {
   GLOBAL_ACCOUNT_STORE_NAME,
   USER_ID_RE,
-  identityKey,
   newUserId,
+  storedSubject,
 } = await import("../src/store/AccountStore.ts");
 const { userIdForAppleSub } = await import("../src/api/appleIdentity.ts");
 const { api } = await import("../src/api/routes.ts");
@@ -208,7 +208,7 @@ describe("AccountStore identity table", () => {
     const t1 = 1_700_000_000_000;
     const t2 = t1 + 60_000;
 
-    const first = store.resolveOrCreateIdentity("email", "Alice@Example.COM", undefined, t1);
+    const first = await store.resolveOrCreateIdentity("email", "Alice@Example.COM", undefined, t1);
     assert.equal(first.created, true);
     assert.match(first.userId, USER_ID_RE);
     assert.equal(first.row.key, "email:alice@example.com");
@@ -218,17 +218,17 @@ describe("AccountStore identity table", () => {
     assert.equal(first.row.updatedAt, t1);
 
     // Subsequent lookup with different whitespace/casing resolves to the exact same userId.
-    const second = store.resolveOrCreateIdentity("email", "  alice@example.com ", undefined, t2);
+    const second = await store.resolveOrCreateIdentity("email", "  alice@example.com ", undefined, t2);
     assert.equal(second.created, false);
     assert.equal(second.userId, first.userId);
     assert.equal(second.row.createdAt, t1);
     assert.equal(second.row.updatedAt, t2);
 
-    const readBack = store.resolveIdentity("email", "ALICE@example.com");
+    const readBack = await store.resolveIdentity("email", "ALICE@example.com");
     assert.deepEqual(readBack, second.row);
 
     // Another email address gets its own distinct random u_ id.
-    const bob = store.resolveOrCreateIdentity("email", "bob@example.com", undefined, t2);
+    const bob = await store.resolveOrCreateIdentity("email", "bob@example.com", undefined, t2);
     assert.equal(bob.created, true);
     assert.match(bob.userId, USER_ID_RE);
     assert.notEqual(bob.userId, first.userId);
@@ -239,8 +239,8 @@ describe("AccountStore identity table", () => {
     const appleUserId = await userIdForAppleSub("000123.abcdef.4567");
     const otherUserId = newUserId();
 
-    store.resolveOrCreateIdentity("apple", "000123.abcdef.4567", appleUserId, 1_000);
-    const linked = store.linkIdentity("email", "Recovery@Example.com", appleUserId, 2_000);
+    await store.resolveOrCreateIdentity("apple", "000123.abcdef.4567", appleUserId, 1_000);
+    const linked = await store.linkIdentity("email", "Recovery@Example.com", appleUserId, 2_000);
     assert.equal(linked.ok, true);
     if (linked.ok) {
       assert.equal(linked.created, true);
@@ -249,7 +249,7 @@ describe("AccountStore identity table", () => {
     }
 
     // Re-linking the same identity to the same user is idempotent.
-    const relinked = store.linkIdentity("email", "recovery@example.com", appleUserId, 3_000);
+    const relinked = await store.linkIdentity("email", "recovery@example.com", appleUserId, 3_000);
     assert.equal(relinked.ok, true);
     if (relinked.ok) {
       assert.equal(relinked.created, false);
@@ -257,29 +257,46 @@ describe("AccountStore identity table", () => {
     }
 
     // Another account cannot claim an identity already belonging to appleUserId.
-    const conflict = store.linkIdentity("email", "recovery@example.com", otherUserId, 4_000);
+    const conflict = await store.linkIdentity("email", "recovery@example.com", otherUserId, 4_000);
     assert.deepEqual(conflict, { ok: false, reason: "already_linked" });
-    assert.equal(store.resolveIdentity("email", "recovery@example.com")?.userId, appleUserId);
+    assert.equal((await store.resolveIdentity("email", "recovery@example.com"))?.userId, appleUserId);
 
     assert.deepEqual(
       store.listIdentitiesForUser(appleUserId).map((r) => r.key),
-      ["apple:000123.abcdef.4567", "email:recovery@example.com"],
+      [`apple:${await storedSubject("apple", "000123.abcdef.4567")}`, "email:recovery@example.com"],
     );
   });
 
   it("persists identity rows across DO restarts and validates inputs", async () => {
     const { store, db } = await createTestAccountStore();
-    const created = store.resolveOrCreateIdentity("email", "persist@example.com", undefined, 5_000);
+    const created = await store.resolveOrCreateIdentity("email", "persist@example.com", undefined, 5_000);
 
     // Re-open AccountStore on the same SQLite database (simulates DO eviction + restart).
     const { store: reopened } = await createTestAccountStore(db);
-    assert.equal(reopened.resolveIdentity("email", "persist@example.com")?.userId, created.userId);
+    assert.equal((await reopened.resolveIdentity("email", "persist@example.com"))?.userId, created.userId);
 
-    assert.equal(identityKey("Apple", "  sub-123  "), "apple:sub-123");
-    assert.throws(() => identityKey("bad provider!", "x"));
-    assert.throws(() => identityKey("email", "   "));
-    assert.throws(() => reopened.resolveOrCreateIdentity("apple", "sub-1", "not_a_valid_user_id"));
-    assert.throws(() => reopened.linkIdentity("email", "x@y.com", "short"));
+    assert.equal(await storedSubject("Apple", "  sub-123  "), await storedSubject("apple", "sub-123"));
+    await assert.rejects(() => storedSubject("bad provider!", "x"));
+    await assert.rejects(() => storedSubject("email", "   "));
+    await assert.rejects(async () => reopened.resolveOrCreateIdentity("apple", "sub-1", "not_a_valid_user_id"));
+    await assert.rejects(async () => reopened.linkIdentity("email", "x@y.com", "short"));
+  });
+});
+
+describe("AccountStore subject hashing", () => {
+  it("hashes rows from before subjects were hashed, once, and leaves email alone", async () => {
+    const { store, db } = await createTestAccountStore();
+    const userId = await userIdForAppleSub("001.raw.sub");
+    db.prepare("INSERT INTO identities VALUES ('apple:001.raw.sub', 'apple', '001.raw.sub', ?, 1, 1)").run(userId);
+    await store.resolveOrCreateIdentity("email", "h_x@example.com", undefined, 1);
+    for (let i = 0; i < 2; i++) {
+      const { store: reopened } = await createTestAccountStore(db);
+      await new Promise((r) => setTimeout(r, 5));
+      assert.equal((await reopened.resolveIdentity("apple", "001.raw.sub"))?.userId, userId);
+      assert.ok(await reopened.resolveIdentity("email", "h_x@example.com"));
+      const dump = JSON.stringify(db.prepare("SELECT * FROM identities").all());
+      assert.ok(!dump.includes("001.raw.sub"));
+    }
   });
 });
 
@@ -305,9 +322,10 @@ describe("auth and account deletion routes with AccountStore", () => {
 
       // Identity row is written in the global AccountStore DO.
       assert.deepEqual(h.accountStoreIdsSeen, [GLOBAL_ACCOUNT_STORE_NAME]);
-      const row1 = h.accountStore.resolveIdentity("apple", sub);
+      const row1 = await h.accountStore.resolveIdentity("apple", sub);
       assert.ok(row1, "apple:<sub> row exists in AccountStore");
-      assert.equal(row1.key, `apple:${sub}`);
+      assert.equal(row1.key, `apple:${await storedSubject("apple", sub)}`);
+      assert.ok(!JSON.stringify(row1).includes(sub), "the Apple id itself is never stored");
       assert.equal(row1.userId, expectedUserId);
 
       // Re-signing in with the same apple:<sub> resolves to the exact same userId with one row.
@@ -324,7 +342,7 @@ describe("auth and account deletion routes with AccountStore", () => {
 
       const rows = h.accountStore.listIdentitiesForUser(expectedUserId);
       assert.equal(rows.length, 1);
-      assert.equal(rows[0].key, `apple:${sub}`);
+      assert.equal(rows[0].key, row1.key);
       assert.equal(rows[0].createdAt, row1.createdAt);
       assert.ok(rows[0].updatedAt >= row1.updatedAt);
     });
@@ -381,8 +399,8 @@ describe("auth and account deletion routes with AccountStore", () => {
       assert.equal(resB.status, 200);
 
       // Attach secondary email identities to both users so we prove ALL rows for userA are wiped.
-      assert.equal(h.accountStore.linkIdentity("email", "a@example.com", userA).ok, true);
-      assert.equal(h.accountStore.linkIdentity("email", "b@example.com", userB).ok, true);
+      assert.equal((await h.accountStore.linkIdentity("email", "a@example.com", userA)).ok, true);
+      assert.equal((await h.accountStore.linkIdentity("email", "b@example.com", userB)).ok, true);
       assert.equal(h.accountStore.listIdentitiesForUser(userA).length, 2);
       assert.equal(h.accountStore.listIdentitiesForUser(userB).length, 2);
       assert.equal(h.tokens.map.get(ent.trialUsedKey(userA)), "1");
@@ -396,13 +414,13 @@ describe("auth and account deletion routes with AccountStore", () => {
 
       // All of User A's identity rows are gone.
       assert.deepEqual(h.accountStore.listIdentitiesForUser(userA), []);
-      assert.equal(h.accountStore.resolveIdentity("apple", subA), null);
-      assert.equal(h.accountStore.resolveIdentity("email", "a@example.com"), null);
+      assert.equal(await h.accountStore.resolveIdentity("apple", subA), null);
+      assert.equal(await h.accountStore.resolveIdentity("email", "a@example.com"), null);
 
       // User B's identity rows are completely untouched.
       assert.deepEqual(
         h.accountStore.listIdentitiesForUser(userB).map((r) => r.key),
-        [`apple:${subB}`, "email:b@example.com"],
+        [`apple:${await storedSubject("apple", subB)}`, "email:b@example.com"],
       );
 
       // #262's trial-used:<userId> KV marker survives account deletion.
@@ -421,7 +439,7 @@ describe("auth and account deletion routes with AccountStore", () => {
       assert.equal(reSignRes.status, 200);
       const reSignBody = await reSignRes.json() as { userId: string };
       assert.equal(reSignBody.userId, userA);
-      assert.equal(h.accountStore.resolveIdentity("apple", subA)?.userId, userA);
+      assert.equal((await h.accountStore.resolveIdentity("apple", subA))?.userId, userA);
       assert.deepEqual((await h.ensureTaskStore(userA)).entitlements(), []);
     });
   });
