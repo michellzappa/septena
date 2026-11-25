@@ -205,7 +205,8 @@ class AndroidAppGraph(application: Application) {
         sync = sync,
         reminders = reminders,
         scope = appScope,
-        captureTaskEdit = ::captureTaskEdit,
+        captureTaskEdit = { id, write -> captureTaskEdit(id, mutation = write) },
+        completeTask = ::completeTask,
     ).also { it.start() }
 
     /** Runs a write that must outlive the screen that asked for it. */
