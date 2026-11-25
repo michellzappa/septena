@@ -79,6 +79,7 @@ struct SeptaskRootView: View {
       // Same as RootTabView: resolve the push-vs-sheet rule once at the
       // shell root and publish `\.usesPushNavigation` to every surface.
       .resolvesAdaptiveNavigation()
+      .doFlowSheets()
       // The app-global modals, one `.sheet(item:)` like RootTabView — the
       // subset with a Septask surface. The mood check-in and new-meal sheets
       // left with the Next page (2026-11-19). Anything else ever set shows
@@ -136,15 +137,30 @@ struct SeptaskRootView: View {
       #endif
   }
 
-  @ViewBuilder
+  /// The lists, or the Do screen in their place (docs/DO_SPEC.md §4): no list
+  /// is behind it, so no list command can run. A ZStack always exists, so the
+  /// root's lifecycle modifiers do not run again when the two change places.
   private var rootLayout: some View {
-    #if os(iOS)
-    Group {
-      if usesSplitLayout {
-        ContentView()
+    ZStack {
+      if DoFlow.isAvailable, DoStore.shared.isFullHere, let doing = DoStore.shared.current {
+        DoScreen(doing: doing)
+          .id(doing.sessionID)
+          .transition(.opacity)
       } else {
-        compactStack
+        lists
+          .transition(.opacity)
       }
+    }
+    .a11yAnimation(.easeInOut(duration: 0.25), value: DoStore.shared.isFullHere)
+  }
+
+  @ViewBuilder
+  private var lists: some View {
+    #if os(iOS)
+    if usesSplitLayout {
+      ContentView()
+    } else {
+      compactStack
     }
     #else
     ContentView()
@@ -254,6 +270,9 @@ struct SeptaskRootView: View {
 private struct MagicPlusOrb: View {
   let drag: MagicPlusDragState
   @State private var showingMenu = false
+  /// New Task was picked in the menu. The task starts when the popover is gone:
+  /// a popover that closes takes the keyboard away from the new title field.
+  @State private var newTaskAfterMenu = false
   /// Finger-down state: the orb sinks while touched, so the press reads as
   /// received before the tap even ends.
   @GestureState private var isPressed = false
@@ -364,6 +383,11 @@ private struct MagicPlusOrb: View {
     .popover(isPresented: $showingMenu, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
       quickMenu
         .presentationCompactAdaptation(.popover)
+        .onDisappear {
+          guard newTaskAfterMenu else { return }
+          newTaskAfterMenu = false
+          onNewTask()
+        }
     }
   }
 
@@ -401,8 +425,8 @@ private struct MagicPlusOrb: View {
         }
       } else {
         menuRow(title: RegistryActions.title(.appNewTask), icon: "checkmark.circle") {
+          newTaskAfterMenu = true
           showingMenu = false
-          onNewTask()
         }
       }
       if isViewingProject {

@@ -135,6 +135,8 @@ targets:
           - pt-BR
           - nl
         ITSAppUsesNonExemptEncryption: false
+        # The floating Do (docs/DO_SPEC.md §4.2).
+        NSSupportsLiveActivities: true
         # A blank launch screen: only the system background (white / black,
         # Septask/Assets.xcassets/LaunchBackground). No glyph, so the first
         # frame replaces an empty screen instead of a logo (docs/LAUNCH_PERF.md).
@@ -285,6 +287,7 @@ targets:
       - path: SeptenaCore/TasksWidgetWire.swift
       - path: SeptenaCore/TasksWidgetSnapshotStore.swift
       - path: SeptenaCore/TasksWidgetIntents.swift
+      - path: SeptenaCore/DoActivityAttributes.swift
     info:
       path: SeptaskWidgets/Info-iOS.plist
       properties:

@@ -83,9 +83,13 @@ possible choice. The loop is `confirm → ground → (scope if epic) → decide 
   action, rendered as a tappable button (`open_url`/`compose`/`call`/`none`). Use for
   `agent_assisted`: you did the work, the user does the final step.
 - **`tasks_set_acceptance(id, line)`** — the **agent-done** bar (your deliverable). Distinct
-  from task completion, which is the **human-done** bar. Set `tasks_set_endstate` (e.g.
-  `agent_done`, `needs_verify`, `decomposed`, `reminder_set`) when the conversation is
-  terminal; the task itself stays open until the human acts.
+  from task completion, which is the **human-done** bar.
+- **`tasks_set_endstate(id, "needs_verify", note)`** — your one way to finish. It puts the task
+  in the user's **Review**. The note is required: say what to check. Only the user takes a task
+  out of Review (Accept or Send back); you may hand over again with a new note. Use
+  `decomposed` only when the work goes on as an issue or smaller tasks. Every other end state is
+  refused (`human_ends`), and so is done, cancel or delete on agent work (`human_accepts`), also
+  after you release the claim. To suggest a cancel, hand over with the reason in the note.
 - **`tasks_set_assignee(id, "claude"|"local"|"me"|null)`** — routing. `claude` marks a task
   for your queue; `null` lets the router decide.
 - This mirrors the in-app on-device provider exactly (same shape, same verbs). Keep behavior

@@ -163,14 +163,28 @@ saves and closes the open row. Quick Entry gets **Add and Do** for work that is
 not on the list yet. Starting while another Do is open replaces it without a
 dialog.
 
+### 4.2 Floating
+
+When the user leaves the app on the device that shows the Do screen, the Do
+floats: the title and the time, small, over the other apps. A tap returns to the
+Do screen. There is no button and no setting. Other devices keep the notice.
+
+| Platform | How |
+|---|---|
+| Android | Picture-in-picture, entered when the user leaves the app |
+| iPhone, iPad | A local Live Activity (Lock Screen, Dynamic Island). It counts up, also with a length set. System picture-in-picture is for video. An end on another device clears it when the app next runs: the push is D5 |
+| Mac | A small panel while Septena is not the active app. A drag moves it, a right click has the Do menu |
+
+Show the list turns it off: the Do is then a notice here too.
+
 ## 5. The notice
 
 Every signed-in device that does not show the Do screen.
 
 | Surface | What it shows |
 |---|---|
-| iPhone, iPad, Android | One line at the top of the list root: "Doing *title*" and the time |
-| Mac | The same line in the window, and a menu bar item while a Do is open. The menu bar item also shows on the Mac with the Do screen |
+| iPhone, iPad, Android | One line at the top of every list: "Doing *title*" and the time |
+| Mac | The same line at the top of every list, and a menu bar item while a Do is open. The menu bar item also shows on the Mac with the Do screen |
 | Watch | One row at the top of Today and the complication. No takeover |
 | Web, Windows | Built with the client's own first version of Do |
 | Locked iPhone (D5) | Live Activity |

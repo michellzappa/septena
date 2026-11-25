@@ -1,8 +1,9 @@
 #if os(macOS)
 import AppKit
 
-// The inspector's History panel: who changed the task and what, newest
-// first, from the task backend's change log (`TaskHistory`, SeptenaCore).
+// The inspector's History panel: the task's Do sessions (docs/DO_SPEC.md §8,
+// from this device's rows), then who changed the task and what, newest first,
+// from the task backend's change log (`TaskHistory`, SeptenaCore).
 // The inspector's History button opens it (registry `taskAttributes`
 // `history`, the same attribute as the SwiftUI History pill). Closed by
 // default. The log loads only while the panel is open, and again for each
@@ -13,6 +14,7 @@ final class KitHistoryView: NSStackView {
   /// Names an area or project id for "Moved to …"; nil when unknown.
   var listTitle: (String) -> String? = { _ in nil }
 
+  private let sessions = NSStackView()
   private let rows = NSStackView()
   private let status = NSTextField(wrappingLabelWithString: "")
   private var taskID: String?
@@ -27,15 +29,19 @@ final class KitHistoryView: NSStackView {
     alignment = .leading
     spacing = 8
 
-    rows.orientation = .vertical
-    rows.alignment = .leading
-    rows.spacing = 10
+    for stack in [sessions, rows] {
+      stack.orientation = .vertical
+      stack.alignment = .leading
+      stack.spacing = 10
+    }
     status.font = SeptaskKitTheme.meta
     status.textColor = SeptaskKitTheme.inkSecondary
 
+    addArrangedSubview(sessions)
     addArrangedSubview(status)
     addArrangedSubview(rows)
     // Full width, so the wrapping labels wrap at the pane edge.
+    sessions.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
     rows.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
     status.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
     isHidden = true
@@ -45,14 +51,18 @@ final class KitHistoryView: NSStackView {
   @available(*, unavailable)
   required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
-  /// Points the panel at a task. Returns false where the backend does not
-  /// own tasks: there is no log to read, and the History button hides.
+  /// Points the panel at a task. Returns false where there is nothing to
+  /// read, and the History button hides: the backend does not own tasks (no
+  /// change log) and the task has no Do session.
   @discardableResult
   func configure(taskID: String) -> Bool {
-    guard TaskHistory.isAvailable else {
+    let doSessions = DoStore.shared.history(taskID: taskID)
+    guard TaskHistory.isAvailable || !doSessions.isEmpty else {
       isHidden = true
       return false
     }
+    isHidden = !expanded
+    if expanded { renderSessions(doSessions) }
     if taskID != self.taskID {
       self.taskID = taskID
       loaded = nil
@@ -71,11 +81,15 @@ final class KitHistoryView: NSStackView {
     loaded = nil
     loadTask?.cancel()
     render(nil)
+    if open, let taskID { renderSessions(DoStore.shared.history(taskID: taskID)) }
     if open { loadIfNeeded() }
   }
 
   private func loadIfNeeded() {
-    guard let id = taskID, loaded != id else { return }
+    guard TaskHistory.isAvailable, let id = taskID, loaded != id else {
+      if !TaskHistory.isAvailable { status.isHidden = true }
+      return
+    }
     loaded = id
     status.stringValue = String(localized: "Loading…", comment: "SeptaskKit: history loading")
     status.isHidden = false
@@ -159,12 +173,34 @@ final class KitHistoryView: NSStackView {
     SeptaskPlusSheet.present(upsellID: edgeUpsellID ?? "history_edge", from: presenter)
   }
 
+  /// One row per Do session: how it ended, the note, and "day · length". A
+  /// lapsed session has no length.
+  private func renderSessions(_ items: [DoSession]) {
+    sessions.arrangedSubviews.forEach { $0.removeFromSuperview() }
+    sessions.isHidden = items.isEmpty
+    for item in items {
+      let exit = item.exit.map { RegistryDoing.exitLabels[$0.rawValue] ?? $0.rawValue }
+        ?? RegistryDoing.openExitLabel
+      let day = item.startedAt.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
+      let byline = [day, item.length.map(DoState.lengthText)].compactMap { $0 }.joined(separator: " · ")
+      let row = Self.rowView(lines: [exit, item.note].compactMap { $0 }, byline: byline, strong: false)
+      sessions.addArrangedSubview(row)
+      row.widthAnchor.constraint(equalTo: sessions.widthAnchor).isActive = true
+    }
+  }
+
   private static func rowView(_ item: TaskHistoryRow, now: Date) -> NSView {
+    // Claude's changes carry a heavier label, not a second color.
+    rowView(lines: item.lines, byline: "\(item.who) · \(TaskHistory.relative(item.date, now: now))",
+            strong: item.byClaude)
+  }
+
+  private static func rowView(lines: [String], byline text: String, strong: Bool) -> NSView {
     let stack = NSStackView()
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.spacing = 2
-    for line in item.lines {
+    for line in lines {
       let label = NSTextField(wrappingLabelWithString: line)
       label.font = SeptaskKitTheme.meta
       label.textColor = SeptaskKitTheme.inkPrimary
@@ -173,9 +209,8 @@ final class KitHistoryView: NSStackView {
       stack.addArrangedSubview(label)
       label.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
     }
-    let byline = NSTextField(labelWithString: "\(item.who) · \(TaskHistory.relative(item.date, now: now))")
-    // Claude's changes carry a heavier label, not a second color.
-    byline.font = item.byClaude ? SeptaskKitTheme.metaStrong : SeptaskKitTheme.meta
+    let byline = NSTextField(labelWithString: text)
+    byline.font = strong ? SeptaskKitTheme.metaStrong : SeptaskKitTheme.meta
     byline.textColor = SeptaskKitTheme.inkSecondary
     stack.addArrangedSubview(byline)
     return stack

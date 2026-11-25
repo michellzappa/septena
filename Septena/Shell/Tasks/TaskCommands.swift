@@ -22,6 +22,8 @@ struct TaskActions {
   var delete: (() -> Void)?
   var clearSchedule: (() -> Void)?
   var editDetails: (() -> Void)?
+  /// Do: exactly one selected open task.
+  var doTask: (() -> Void)?
   var duplicate: (() -> Void)?
   var copy: (() -> Void)?
 
@@ -50,6 +52,7 @@ struct TaskActions {
   private static func slot(for actionId: RegistryActionID) -> KeyPath<TaskActions, (() -> Void)?>? {
     switch actionId {
     case .taskEditDetails: return \.editDetails
+    case .taskDo: return \.doTask
     case .taskCopy: return \.copy
     case .taskDuplicate: return \.duplicate
     case .taskToggleComplete: return \.toggleComplete

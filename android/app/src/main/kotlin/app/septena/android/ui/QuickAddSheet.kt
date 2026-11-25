@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -34,6 +35,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -45,6 +48,7 @@ import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryTaskAttributeIds
 import app.septena.core.generated.RegistryTaskDetail
 import app.septena.core.stringValue
+import app.septena.ui.DoGlyph
 import java.time.LocalDate
 
 /**
@@ -64,6 +68,8 @@ fun QuickAddSheet(
     initialDraft: QuickAddDraft = QuickAddDraft(),
     onDismiss: () -> Unit,
     onAdd: (QuickAddDraft) -> Unit,
+    /** Add and Do, for work that is not on the list yet. Null hides it. */
+    onAddAndDo: ((QuickAddDraft) -> Unit)? = null,
 ) {
     val labels = remember(languageTag) { TaskFormLabels.fromRegistry(languageTag) }
     val attributes = remember(languageTag) { RegistryCatalog.taskAttributes(languageTag).filterNot { it.editOnly } }
@@ -75,9 +81,21 @@ fun QuickAddSheet(
     val submit: () -> Unit = { if (canAdd) onAdd(draft) }
     val toggle: (String) -> Unit = { id -> openAttribute = if (openAttribute == id) null else id }
 
-    LaunchedEffect(Unit) { runCatching { titleFocus.requestFocus() } }
+    var titleFocused by remember { mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        // The sheet is its own window. The title can take focus only from inside
+        // it, and the keyboard opens only after that window has focus. Once, so
+        // closing the list picker does not pull focus back to the title.
+        val windowFocused = LocalWindowInfo.current.isWindowFocused
+        val keyboard = LocalSoftwareKeyboardController.current
+        LaunchedEffect(windowFocused) {
+            if (windowFocused && !titleFocused) {
+                titleFocused = true
+                titleFocus.requestFocus()
+                keyboard?.show()
+            }
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -173,6 +191,19 @@ fun QuickAddSheet(
                     )
                     // Paste, reminder and repeat have no draft editor on Android yet.
                     else -> Unit
+                }
+            }
+            onAddAndDo?.let { addAndDo ->
+                val title = remember(languageTag) {
+                    RegistryCatalog.actionTitle(RegistryActionIds.DO_ADD_AND_DO, languageTag = languageTag).orEmpty()
+                }
+                TextButton(
+                    onClick = { addAndDo(draft) },
+                    enabled = canAdd,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                ) {
+                    DoGlyph(tint = LocalContentColor.current, size = 18.dp)
+                    Text(title, modifier = Modifier.padding(start = 8.dp))
                 }
             }
         }

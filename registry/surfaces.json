@@ -469,6 +469,75 @@
       "failed": { "message": "Couldn’t add the reference." }
     }
   },
+  "doing": {
+    "id": "doing",
+    "featureId": "task.do",
+    "lengths": [
+      10,
+      25,
+      50
+    ],
+    "screen": {
+      "lastTime": {
+        "title": "Where you stopped"
+      },
+      "firstStep": {
+        "title": "What’s the first step?"
+      },
+      "length": {
+        "title": "Length",
+        "noneTitle": {
+          "title": "No length"
+        },
+        "option": {
+          "format": "{count} min"
+        }
+      }
+    },
+    "notice": {
+      "format": "Doing {title}"
+    },
+    "stale": {
+      "format": "Still on {title}?"
+    },
+    "stopNote": {
+      "title": "Where did you stop?",
+      "confirmTitle": "Save",
+      "dismissTitle": "Skip"
+    },
+    "plannedEnd": {
+      "format": {
+        "one": "1 minute is up.",
+        "other": "{count} minutes are up."
+      }
+    },
+    "needsYou": {
+      "format": {
+        "one": "1 thing needs you",
+        "other": "{count} things need you"
+      }
+    },
+    "exits": {
+      "done": {
+        "label": "Done"
+      },
+      "stopped": {
+        "label": "Stopped for now"
+      },
+      "later": {
+        "label": "Moved to later"
+      },
+      "replaced": {
+        "label": "Switched to another task"
+      },
+      "closed": {
+        "label": "Ended"
+      }
+    },
+    "openExit": {
+      "label": "Doing now"
+    }
+  },
   "placeNotes": {
     "id": "placeNotes",
     "featureId": "places.projects",

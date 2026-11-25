@@ -172,7 +172,14 @@ export const AGENT_WRITE_RULES: Record<string, string> = {
   "retired:context": "Project context is retired (ADR 0012). Write the project's notes instead.",
   human_only_do: "Only the user starts, changes or ends a Do.",
   human_accepts:
-    "Only the user marks an agent-worked task done. Call tasks_set_endstate with endState \"needs_verify\" and a note describing what to check.",
+    "Only the user ends an agent-worked task: not done, not cancelled, not deleted by you. Call tasks_set_endstate with endState \"needs_verify\" and a note describing what to check, or why you suggest to cancel it.",
+  human_ends:
+    "You may set \"needs_verify\" (hand over to Review) or \"decomposed\" (the work goes on as an issue or smaller tasks). Every other end state follows from what the user does.",
+  in_review:
+    "This task is in the user's Review. You may hand it over again with \"needs_verify\" and a new note. Only the user takes it out of Review.",
+  note_required: "A hand-off needs a note that says what to check. Send it in the same call.",
+  closed: "The user closed this task, so there is nothing to hand over.",
+  "human_only:assignee": "Only the user takes a task back from you. Ask in the conversation, or hand it over with \"needs_verify\".",
 };
 
 /// Lease bounds for a claim. An agent that stops writing loses the task when
@@ -384,7 +391,23 @@ export class TaskStore extends DurableObject<Env> {
     );
     if (!changeCols.has("diff")) this.sql.exec("ALTER TABLE changes ADD COLUMN diff TEXT");
     if (!changeCols.has("reason")) this.sql.exec("ALTER TABLE changes ADD COLUMN reason TEXT");
+    const convoCols = new Set(
+      this.sql.exec<{ name: string }>("PRAGMA table_info(convos)").toArray().map((r) => r.name),
+    );
+    if (!convoCols.has("agentWorkAt")) this.sql.exec("ALTER TABLE convos ADD COLUMN agentWorkAt TEXT");
+    if (this.meta("reviewUnfadeV1") === 0) {
+      this.ctx.storage.transactionSync(() => {
+        this.unfadeWaiting();
+        this.setMeta("reviewUnfadeV1", 1);
+      });
+    }
     if (this.meta("notesV1") === 0) this.ctx.storage.transactionSync(() => this.migrateNotesV1());
+    if (this.meta("staleFadesV1") === 0) {
+      this.ctx.storage.transactionSync(() => {
+        this.endStaleFades();
+        this.setMeta("staleFadesV1", 1);
+      });
+    }
     if (this.meta("issueRefsV1") === 0) {
       // A store must open even when this fails. The next start tries again.
       try {
@@ -396,6 +419,30 @@ export class TaskStore extends DurableObject<Env> {
         logEvent("issue_refs_backfill_failed", { error: e instanceof CoreInputError ? e.message : "unexpected" });
       }
     }
+  }
+
+  /// True when an open row is marked faded and may not be
+  /// (docs/TASK_FADE_SPEC.md §4.1): it has a deadline, or a touch is newer
+  /// than the fade. The second case is a device that pushes an old fade over
+  /// a task the human touched since.
+  private fadeEnds(task: Record<string, unknown>): boolean {
+    if (!task.fadedAt || task.status !== "open") return false;
+    if (task.deadline) return true;
+    return !!task.touchedAt && Date.parse(task.touchedAt as string) > Date.parse(task.fadedAt as string);
+  }
+
+  /// One time: ends the fade of every row `fadeEnds` is true for, so rows
+  /// written before the rule come back on every device.
+  endStaleFades(): number {
+    const now = new Date().toISOString();
+    const rows = this.sql.exec("SELECT * FROM tasks WHERE fadedAt IS NOT NULL AND deletedAt IS NULL").toArray()
+      .filter((r) => this.fadeEnds(r));
+    for (const r of rows) {
+      const rev = this.nextRev();
+      this.sql.exec("UPDATE tasks SET fadedAt = NULL, rev = ?, updatedAt = ? WHERE id = ?", rev, now, r.id);
+      this.log(rev, "task", r.id as string, "upsert", ["fadedAt"], null, "system:migration", now, { fadedAt: [r.fadedAt, null] });
+    }
+    return rows.length;
   }
 
   /// One time (docs/TASK_REFERENCES_SPEC.md §6.6, ADR 0033): every task whose
@@ -884,13 +931,21 @@ export class TaskStore extends DurableObject<Env> {
     }
 
     // `endStateAt` (server-owned) records when `endState` last changed, so
-    // Review can show how long a hand-off has waited.
-    if (op.entity === "convo" && "endState" in op.fields) {
+    // Review can show how long a hand-off has waited. An agent that changes
+    // what it handed over moves it too: an Accept of the earlier one is stale.
+    if (op.entity === "convo") {
       const previous = (row?.endState as string | null | undefined) ?? null;
-      if (((op.fields.endState as string | null | undefined) ?? null) !== previous) {
+      const changed = "endState" in op.fields && ((op.fields.endState as string | null | undefined) ?? null) !== previous;
+      const revised = isAgentActor(actor) && previous === "needs_verify" && this.handoffChanges(row as Record<string, unknown>, op.fields);
+      if (changed || revised) {
         op.fields.endStateAt = now;
         names.push("endStateAt");
       }
+    }
+
+    if (op.entity === "task" && this.fadeEnds({ ...row, ...op.fields })) {
+      if (!names.includes("fadedAt")) names.push("fadedAt");
+      op.fields.fadedAt = null;
     }
 
     const rev = this.nextRev();
@@ -936,6 +991,15 @@ export class TaskStore extends DurableObject<Env> {
     if (isAgentActor(actor) && op.entity === "convo" && op.fields.endState === "needs_verify") {
       // Handing off to Review puts the ball in the human's court, so the claim ends.
       this.writeConvoServerFields(op.id, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
+    }
+    if (op.entity === "convo" && op.fields.endState === "needs_verify") this.unfadeForReview(op.id, actor, now);
+    if (op.entity === "convo" && (op.fields.assignee === "claude" || (isAgentActor(actor) && op.fields.endState === "needs_verify"))) {
+      this.setAgentWork(op.id, now);
+    } else if (op.entity === "convo" && "assignee" in op.fields && !isAgentActor(actor)) {
+      this.setAgentWork(op.id, null);
+    }
+    if (op.entity === "task" && !isAgentActor(actor) && (op.fields.status === "done" || op.fields.status === "cancelled")) {
+      this.endReview(op.id, actor, now);
     }
     if (sharing) this.shareOut(op.entity, op.id, names);
     return { clientOpId: op.clientOpId, status: "applied", rev };
@@ -1249,6 +1313,8 @@ export class TaskStore extends DurableObject<Env> {
         Object.assign(next, { project: projectId, source: "app", acknowledgedAt: now, touchedAt: now, status: next.status ?? "open" });
       }
     }
+    // Another member's deadline ends the fade here too.
+    if (entity === "task" && before && this.fadeEnds({ ...before, ...next })) next.fadedAt = null;
     const names = Object.keys(next);
     if (!names.length) return;
     const rev = this.nextRev();
@@ -1269,6 +1335,7 @@ export class TaskStore extends DurableObject<Env> {
     this.log(rev, entity, id, "upsert", names, null, actor, now, this.diffFor(before, next));
     // Another member closed the task: the Do of it here ends too (docs/DO_SPEC.md §2.1).
     if (entity === "task" && "status" in next) this.resolveDo(actor, now);
+    if (entity === "task" && (next.status === "done" || next.status === "cancelled")) this.endReview(id, actor, now);
     if (entity === "project" && "notes" in next) {
       this.recordNoteRevision("project", id, (next.notes as string | null) ?? null, actor, now, (before?.noteRev as number | null) ?? 0, null);
     }
@@ -1329,10 +1396,44 @@ export class TaskStore extends DurableObject<Env> {
       : op.entity === "taskRef" ? this.taskRefTaskId(op)
       : null;
     if (taskId && this.convoStopped(taskId)) return "stopped";
-    if (op.op === "upsert" && op.entity === "task" && op.fields.status === "done" && this.convoRequiresHumanAccept(op.id)) {
-      return "human_accepts";
+    if (op.op !== "appendTurn" && op.entity === "task") {
+      const ends = op.op === "delete" || op.fields.status === "done" || op.fields.status === "cancelled";
+      if (ends && this.convoRequiresHumanAccept(op.id)) return "human_accepts";
     }
+    if (op.op === "upsert" && op.entity === "convo") return this.agentHandoffRefusal(op.id, op.fields);
     return null;
+  }
+
+  /// The hand-off rules of an agent write (docs/REVIEW_SPEC.md): an agent puts
+  /// work into Review, and never takes it out or ends it.
+  private agentHandoffRefusal(taskId: string, fields: Record<string, unknown>): string | null {
+    const row = this.sql.exec<{ endState: string | null; endStateNote: string | null; assignee: string | null }>(
+      "SELECT endState, endStateNote, assignee FROM convos WHERE id = ? AND deletedAt IS NULL", taskId,
+    ).toArray()[0];
+    if ("assignee" in fields && row?.assignee === "claude" && fields.assignee !== "claude") return "human_only:assignee";
+    const inReview = row?.endState === "needs_verify";
+    const next = "endState" in fields ? (fields.endState as string | null) ?? "open" : row?.endState ?? "open";
+    if (next !== "needs_verify") {
+      if (inReview) return "in_review";
+      // `decomposed` ends no work: the task goes on as an issue or smaller tasks.
+      const free = ["open", "decomposed"];
+      const current = row?.endState ?? "open";
+      return next === current || (free.includes(next) && free.includes(current)) ? null : "human_ends";
+    }
+    if (!("endState" in fields) && !("endStateNote" in fields)) return null;
+    const note = "endStateNote" in fields ? fields.endStateNote : row?.endStateNote;
+    if (typeof note !== "string" || !note.trim()) return "note_required";
+    const status = this.sql.exec<{ status: string }>("SELECT status FROM tasks WHERE id = ?", taskId).toArray()[0]?.status;
+    return status && status !== "open" ? "closed" : null;
+  }
+
+  /// True when an agent write changes the note, the artifact or the handoff
+  /// action of work that is in Review.
+  private handoffChanges(row: Record<string, unknown>, fields: Record<string, unknown>): boolean {
+    const before = decodeRow(ENTITIES.convo, row) as Record<string, unknown>;
+    return ["endStateNote", "artifact", "handoff"].some(
+      (f) => f in fields && JSON.stringify(fields[f] ?? null) !== JSON.stringify(before[f] ?? null),
+    );
   }
 
   private convoStopped(taskId: string): boolean {
@@ -1340,18 +1441,59 @@ export class TaskStore extends DurableObject<Env> {
   }
 
   /// True when an agent must hand the task to Review (`needs_verify`) rather
-  /// than closing it directly: assigned to an agent (`claude`), already waiting
-  /// in Review (`needs_verify`), or currently held under a live agent claim.
+  /// than ending it: assigned to an agent (`claude`), waiting in Review, or
+  /// agent work since a claim. `agentWorkAt` outlives the claim, so an agent
+  /// cannot release the task and then close it.
   private convoRequiresHumanAccept(taskId: string): boolean {
-    const row = this.sql.exec<{
-      assignee: string | null; endState: string | null; claimedBy: string | null; claimUntil: string | null;
-    }>(
-      "SELECT assignee, endState, claimedBy, claimUntil FROM convos WHERE id = ? AND deletedAt IS NULL",
+    const row = this.sql.exec<{ assignee: string | null; endState: string | null; agentWorkAt: string | null }>(
+      "SELECT assignee, endState, agentWorkAt FROM convos WHERE id = ? AND deletedAt IS NULL",
       taskId,
     ).toArray()[0];
-    if (!row) return false;
-    if (row.assignee === "claude" || row.endState === "needs_verify") return true;
-    return !!row.claimedBy && !!row.claimUntil && Date.parse(row.claimUntil) > Date.now();
+    return !!row && (row.assignee === "claude" || row.endState === "needs_verify" || !!row.agentWorkAt);
+  }
+
+  /// Marks a task as agent work, or ends that mark. A store column, never
+  /// synced: no client can set it.
+  private setAgentWork(taskId: string, at: string | null): void {
+    this.sql.exec("UPDATE convos SET agentWorkAt = ? WHERE id = ? AND deletedAt IS NULL", at, taskId);
+  }
+
+  /// A task that waits for the user is never in the Faded pile: an agent may
+  /// hand over, or ask about, a task that faded before.
+  private unfadeForReview(taskId: string, actor: string, now: string): void {
+    const row = this.sql.exec<{ fadedAt: string | null }>(
+      "SELECT fadedAt FROM tasks WHERE id = ? AND deletedAt IS NULL AND status = 'open'", taskId,
+    ).toArray()[0];
+    if (!row?.fadedAt) return;
+    const rev = this.nextRev();
+    this.sql.exec("UPDATE tasks SET fadedAt = NULL, rev = ?, updatedAt = ? WHERE id = ?", rev, now, taskId);
+    this.log(rev, "task", taskId, "upsert", ["fadedAt"], null, actor, now, { fadedAt: [row.fadedAt, null] });
+  }
+
+  /// One time: every faded task that waits for the user comes back.
+  private unfadeWaiting(): void {
+    const now = new Date().toISOString();
+    const rows = this.sql.exec<{ id: string; endState: string | null }>(
+      `SELECT t.id AS id, c.endState AS endState FROM tasks t LEFT JOIN convos c ON c.id = t.id AND c.deletedAt IS NULL
+       WHERE t.fadedAt IS NOT NULL AND t.deletedAt IS NULL AND t.status = 'open'`,
+    ).toArray();
+    for (const r of rows) {
+      if (r.endState === "needs_verify" || this.awaitsHuman(r.id)) this.unfadeForReview(r.id, "system:migration", now);
+    }
+  }
+
+  /// A task the user closed leaves Review, whichever button closed it, so
+  /// opening it again does not put it back.
+  private endReview(taskId: string, actor: string, now: string): void {
+    this.setAgentWork(taskId, null);
+    const row = this.sql.exec<{ endState: string | null }>(
+      "SELECT endState FROM convos WHERE id = ? AND deletedAt IS NULL", taskId,
+    ).toArray()[0];
+    if (row?.endState !== "needs_verify") return;
+    const status = this.sql.exec<{ status: string }>("SELECT status FROM tasks WHERE id = ?", taskId).toArray()[0]?.status;
+    this.writeConvoServerFields(
+      taskId, { endState: status === "done" ? "agent_assisted_done" : "wont_do", endStateAt: now }, "upsert", actor, now,
+    );
   }
 
   private liveTask(id: string): boolean {
@@ -1675,6 +1817,7 @@ export class TaskStore extends DurableObject<Env> {
       // The agent asked: the ball is in the human's court, so the claim ends
       // and we alert the user's Apple devices via APNs (F1b #213).
       this.writeConvoServerFields(taskId, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
+      this.unfadeForReview(taskId, actor, now);
       agentQuestions.push({
         taskId,
         taskTitle: task.title ?? "",
@@ -1749,6 +1892,7 @@ export class TaskStore extends DurableObject<Env> {
       this.reason = reason;
       try {
         this.writeConvoServerFields(taskId, { claimedBy: holder, claimUntil, runsSinceUser: runs }, renewed ? "renew" : "claim", actor, new Date(nowMs).toISOString());
+        this.setAgentWork(taskId, new Date(nowMs).toISOString());
       } finally {
         this.reason = null;
       }
