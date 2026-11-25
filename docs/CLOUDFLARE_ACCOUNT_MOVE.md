@@ -9,7 +9,7 @@ Account ids, token values and secret values never go in this file.
 | Worker (repo path) | Domains | Storage | Secrets |
 |---|---|---|---|
 | `septena-mcp-gateway` (`backend/`) | `api.septena.app` | KV `STATE`, `TOKENS`, `CLIENTS`; Durable Objects `TaskStore` (one per user), `PairingStore`; R2 `septena-attachments` | `SESSION_SIGNING_KEY`, plus any set only as vars |
-| `septena-community` (`community-worker/`) | `community.septena.app` | D1 `septena-community`; KV `ATTEST`, `CHALLENGES`, `RL` | `ADMIN_DASHBOARD_TOKEN`, `TELEMETRY_HASH_SALT`, `USER_HASH_SALT` |
+| `septena-community` (`community-worker/`) | `community.septena.app` | D1 `septena-community`; KV `ATTEST`, `CHALLENGES`, `RL` | `TELEMETRY_HASH_SALT`, `USER_HASH_SALT` |
 | `septena-site` (`../septena-site`) | `septena.app`, `www.septena.app` | static assets only | none |
 | Zone `septena.app` | all of the above | DNS records, including Gandi mail (MX, SPF) | none |
 

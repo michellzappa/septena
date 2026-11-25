@@ -3,6 +3,8 @@
 - Status: accepted (2026-11-21)
 - Date: 2026-11-21
 - Deciders: mz
+- Amended by: [ADR 0043](0043-plus-links-and-a-counts-only-admin-page.md)
+  (every subject except an email address is stored hashed)
 
 ## Context
 

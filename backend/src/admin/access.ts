@@ -1,3 +1,5 @@
+import { fromBase64Url } from "../util.js";
+
 /**
  * Cloudflare Access JWT verification.
  *
@@ -9,8 +11,7 @@
  * (https://<team-domain>/cdn-cgi/access/certs). The email is read from the
  * verified JWT payload, never from the header.
  *
- * Both vars must be set for this path to work; unset = the Access path is
- * disabled (fail closed) and only the dashboard token authorizes /admin.
+ * Both vars must be set; unset = no admin page (fail closed).
  */
 
 export interface AccessEnv {
@@ -71,7 +72,7 @@ export async function verifyAccessJwt(
     if (!key) return { ok: false, reason: "unknown kid" };
     const data = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
     const valid = await crypto.subtle.verify(
-      "RSASSA-PKCS1-v1_5", key, b64urlToBytes(parts[2]), data,
+      "RSASSA-PKCS1-v1_5", key, fromBase64Url(parts[2]), data,
     );
     if (!valid) return { ok: false, reason: "sig" };
 
@@ -107,13 +108,5 @@ function findKey(keys: AccessJwk[], kid?: string): AccessJwk | null {
 }
 
 function decodeSegment(b64url: string): string {
-  return new TextDecoder().decode(b64urlToBytes(b64url));
-}
-
-function b64urlToBytes(s: string): Uint8Array {
-  const norm = s.replace(/-/g, "+").replace(/_/g, "/");
-  const bin = atob(norm);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
+  return new TextDecoder().decode(fromBase64Url(b64url));
 }

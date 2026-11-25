@@ -1,7 +1,10 @@
 import { Hono } from "hono";
 import type { Env } from "./env.js";
 import { api } from "./api/routes.js";
+import { plusContinue, plusLanding, plusStart } from "./api/plusLinks.js";
 import { joinLanding } from "./api/shares.js";
+import { admin } from "./admin/routes.js";
+import { sweepAccounts } from "./admin/accounts.js";
 import * as oauth from "./shadow/oauth.js";
 import { previewMcpHandler } from "./shadow/mcp.js";
 import { ONBOARD_MARKDOWN } from "./shadow/prompts.js";
@@ -71,6 +74,10 @@ app.get("/oauth/pair/continue", oauth.pairContinue);
 app.get("/pair/:code", oauth.pairLanding);
 // Where an invite to a shared project opens (src/api/shares.ts).
 app.get("/join/:token", joinLanding);
+// Where a Plus link opens (src/api/plusLinks.ts).
+app.get("/plus/:token", plusLanding);
+app.post("/plus/:token/start", plusStart);
+app.get("/plus/:token/continue", plusContinue);
 app.post("/oauth/token", oauth.token);
 app.post("/oauth/revoke", oauth.revoke);
 
@@ -88,4 +95,12 @@ app.on(["GET", "DELETE"], "/mcp", (c) =>
 // Task backend API (docs/SEPTASK_BACKEND.md in the app repo).
 app.route("/v1", api);
 
-export default { fetch: app.fetch };
+// The admin page (src/admin/), behind Cloudflare Access.
+app.route("/admin", admin);
+
+export default {
+  fetch: app.fetch,
+  async scheduled(_event, env) {
+    if (env.MAINTENANCE !== "true") await sweepAccounts(env);
+  },
+} satisfies ExportedHandler<Env>;
