@@ -212,10 +212,6 @@
     "RegistryEntityFields.TaskRef.*": {
       "reason": "Android gets task references in R4.",
       "issue": "#390"
-    },
-    "RegistryEntityNames.TASK_REF": {
-      "reason": "Android gets task references in R4.",
-      "issue": "#390"
     }
   }
 }

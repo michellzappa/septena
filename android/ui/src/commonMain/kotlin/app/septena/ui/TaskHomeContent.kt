@@ -72,6 +72,8 @@ data class TaskListItem(
     val isRepeating: Boolean = false,
     val hasNotes: Boolean = false,
     val hasAttachments: Boolean = false,
+    /** On-device filing suggestion target title shown as a one-tap capsule on Inbox rows (#368). */
+    val filingSuggestionLabel: String? = null,
 )
 
 /**
@@ -173,6 +175,7 @@ fun TaskHomeContent(
     onReorderInboxRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
     onReorderTaskRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
     onReorderGroupHeader: ((ids: List<String>, targetLocationKey: String) -> Unit)? = null,
+    onApplyFilingSuggestion: ((String) -> Unit)? = null,
 ) {
     val orderedSelectionIds = if (selection.isActive) {
         (inboxTasks + tasks).map(TaskListItem::id).filter { it in selection.selectedIds }
@@ -246,6 +249,7 @@ fun TaskHomeContent(
                     orderedDragIds = orderedSelectionIds,
                     onReorderRow = onReorderInboxRow,
                     onReorderGroupHeader = null,
+                    onApplyFilingSuggestion = onApplyFilingSuggestion,
                 )
             }
 
@@ -299,6 +303,7 @@ fun TaskHomeContent(
                 orderedDragIds = orderedSelectionIds,
                 onReorderRow = onReorderTaskRow,
                 onReorderGroupHeader = onReorderGroupHeader,
+                onApplyFilingSuggestion = onApplyFilingSuggestion,
             )
         }
     }
@@ -331,6 +336,7 @@ private fun LazyListScope.taskCardRows(
     orderedDragIds: List<String> = emptyList(),
     onReorderRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
     onReorderGroupHeader: ((ids: List<String>, targetLocationKey: String) -> Unit)? = null,
+    onApplyFilingSuggestion: ((String) -> Unit)? = null,
 ) {
     // Compute contiguous card runs so each group paints continuous rounded glass card slices.
     val positions = computeCardPositions(tasks)
@@ -376,6 +382,7 @@ private fun LazyListScope.taskCardRows(
             onTaskAction = onTaskAction,
             canReorder = canReorder,
             orderedDragIds = orderedDragIds,
+            onApplyFilingSuggestion = onApplyFilingSuggestion,
             dropModifier = Modifier
                 .magicPlusRowDrop(
                     id = "mp-$keyPrefix-${task.id}",

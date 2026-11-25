@@ -1090,6 +1090,7 @@ private fun TaskHomeScaffold(
                                     )
                                 }
                             } else null,
+                            onApplyFilingSuggestion = homeViewModel::applyFilingSuggestion,
                         )
                     }
                 }

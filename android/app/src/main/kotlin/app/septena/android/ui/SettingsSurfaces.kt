@@ -53,7 +53,7 @@ internal val SETTINGS_SURFACES = setOf(
     "about_header", "send_feedback", "privacy_explainer", "ai_explainer",
     "mcp_skills", "sync_diagnostics", "smart_lists_editor", "plus_offer", "calendar_detail",
     "reset_first_run", DELETE_ACCOUNT,
-    "sign_in_approval", "claude_connector",
+    "sign_in_approval", "claude_connector", "import_export",
 )
 
 @Composable
@@ -89,6 +89,7 @@ internal fun SettingsCustomSurface(
         "calendar_detail" -> CalendarFeedSection(env.graph, env.signedIn, languageTag)
         "sign_in_approval" -> SignInApprovalSection(env.graph, env.signedIn, languageTag)
         "claude_connector" -> ClaudeConnectorSection(env.graph, env.signedIn, languageTag)
+        "import_export" -> DataTransferSection(env.graph, languageTag)
     }
 }
 

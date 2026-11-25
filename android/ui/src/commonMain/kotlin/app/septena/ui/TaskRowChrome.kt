@@ -390,6 +390,7 @@ fun TaskCardRow(
     dropModifier: Modifier = Modifier,
     canReorder: Boolean = false,
     orderedDragIds: List<String> = emptyList(),
+    onApplyFilingSuggestion: ((String) -> Unit)? = null,
 ) {
     val showTodayPill = showTodayIndicator && task.isOnToday && !task.isCompleted && !task.isFaded
     val showFadedPill = showFadedIndicator && task.isFaded && !task.isCompleted
@@ -400,7 +401,7 @@ fun TaskCardRow(
     val isBeingDragged = reorderDrag != null && reorderDrag.isDragging && task.id in reorderDrag.draggedIds
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.80f)
     val overdueRed = if (isDark) Color(0xFFFF453A) else Color(0xFFFF3B30)
-    val showSubtitleLine = task.subtitle != null || task.tagNames.isNotEmpty()
+    val showSubtitleLine = task.subtitle != null || task.tagNames.isNotEmpty() || task.filingSuggestionLabel != null
     val hasLeadingSlot = selecting || canComplete || task.isCompleted
 
     TaskCardSlice(
@@ -662,6 +663,27 @@ fun TaskCardRow(
                         val overflowCount = (task.tagNames.size - visibleTags.size).coerceAtLeast(0)
                         visibleTags.forEach { tag ->
                             TagOutlineChip(text = tag, tint = mutedInk)
+                        }
+                        if (task.filingSuggestionLabel != null && onApplyFilingSuggestion != null && !selecting) {
+                            val accent = MaterialTheme.colorScheme.primary
+                            Surface(
+                                shape = RoundedCornerShape(999.dp),
+                                color = accent.copy(alpha = if (isDark) 0.18f else 0.11f),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .clickable { onApplyFilingSuggestion(task.id) },
+                            ) {
+                                Text(
+                                    text = "→ ${task.filingSuggestionLabel}",
+                                    fontSize = 11.5.sp,
+                                    lineHeight = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = accent,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                )
+                            }
                         }
                         if (overflowCount > 0) {
                             Text(

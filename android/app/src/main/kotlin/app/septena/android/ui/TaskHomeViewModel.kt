@@ -115,6 +115,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private val starredOnly = MutableStateFlow(false)
     private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
     private val errorMessage = MutableStateFlow<String?>(null)
+    @Volatile private var filingSuggestionsByTask: Map<String, FilingSuggestion> = emptyMap()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val loaded: StateFlow<LoadedTaskHome> = combine(
@@ -460,6 +461,22 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     fun letGoFaded(id: String) = editTask(id) { graph.taskMutator.letGoFaded(id) }
 
+    /** One-tap filing from an Inbox suggestion capsule (`edit.filing-suggestion`, #368). */
+    fun applyFilingSuggestion(id: String) {
+        val suggestion = filingSuggestionsByTask[id] ?: return
+        val changes = when (suggestion.kind) {
+            FilingSuggestion.Kind.AREA -> mapOf(
+                RegistryEntityFields.Task.AREA to JsonValue.StringValue(suggestion.id),
+                RegistryEntityFields.Task.PROJECT to JsonValue.Null,
+            )
+            FilingSuggestion.Kind.PROJECT -> mapOf(
+                RegistryEntityFields.Task.AREA to JsonValue.Null,
+                RegistryEntityFields.Task.PROJECT to JsonValue.StringValue(suggestion.id),
+            )
+        }
+        editTask(id) { graph.taskMutator.updateFields(id, changes) }
+    }
+
     /** One undoable task edit off the main thread, then a sync. */
     private fun editTask(id: String, edit: suspend () -> Any?) {
         viewModelScope.launch {
@@ -782,6 +799,34 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
         val inbox = mutableListOf<PositionedTask>()
         val visible = mutableListOf<PositionedTask>()
+        val currentDestinationId = (resolvedLocation as? TaskHomeLocation.SmartList)?.destinationId
+        val filingSuggestionsEnabled = graph.deviceSettings.bool(RegistrySettingKeys.TASKS_FILING_SUGGESTIONS)
+        val shouldSuggestInline = filingSuggestionsEnabled && (
+            currentDestinationId == RegistryDestinationIds.TODAY ||
+                currentDestinationId == RegistryDestinationIds.INBOX
+            )
+        val nextSuggestions = linkedMapOf<String, FilingSuggestion>()
+        if (shouldSuggestInline && (areaRecords.isNotEmpty() || projectRecords.isNotEmpty())) {
+            val training = allSnapshots.map { (rec, snap) ->
+                FilingTrainingTask(
+                    id = snap.id,
+                    title = snap.title,
+                    notes = rec.fields[RegistryEntityFields.Task.NOTES].stringValue(),
+                    areaId = snap.area,
+                    projectId = snap.project,
+                    isCancelled = snap.status == RegistryEntityEnums.TaskStatus.CANCELLED,
+                )
+            }
+            val areaTargets = areaRecords.mapNotNull { item ->
+                val a = item.location as? TaskHomeLocation.Area ?: return@mapNotNull null
+                FilingTarget(FilingSuggestion.Kind.AREA, a.id, a.title)
+            }
+            val projectTargets = projectRecords.mapNotNull { item ->
+                val p = item.location as? TaskHomeLocation.Project ?: return@mapNotNull null
+                FilingTarget(FilingSuggestion.Kind.PROJECT, p.id, p.title)
+            }
+            graph.filingSuggestions.prepare(training, areaTargets, projectTargets)
+        }
         for ((record, snapshot) in allSnapshots) {
             val membership = memberships[snapshot.id] ?: TaskViewRules.INACTIVE_MEMBERSHIP
             when (resolvedLocation) {
@@ -801,6 +846,25 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     }
                     if (!listed) continue
                     val inTodayInbox = resolvedLocation.destinationId == RegistryDestinationIds.TODAY && membership.inTodayInbox
+                    val isLooseTodayCapture = resolvedLocation.destinationId == RegistryDestinationIds.TODAY &&
+                        snapshot.status == RegistryEntityEnums.TaskStatus.OPEN &&
+                        snapshot.scheduled == null &&
+                        snapshot.deadline == null &&
+                        snapshot.area == null &&
+                        snapshot.project == null &&
+                        snapshot.today
+                    val suggestedTarget = if (shouldSuggestInline &&
+                        snapshot.project == null &&
+                        (inTodayInbox || isLooseTodayCapture || resolvedLocation.destinationId == RegistryDestinationIds.INBOX)
+                    ) {
+                        graph.filingSuggestions.suggest(
+                            title = snapshot.title,
+                            notes = record.fields[RegistryEntityFields.Task.NOTES].stringValue(),
+                        )?.takeUnless { s ->
+                            (s.kind == FilingSuggestion.Kind.AREA && snapshot.area == s.id) ||
+                                (s.kind == FilingSuggestion.Kind.PROJECT && snapshot.project == s.id)
+                        }?.also { nextSuggestions[snapshot.id] = it }
+                    } else null
                     val item = taskListItem(
                         record = record,
                         snapshot = snapshot,
@@ -814,6 +878,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         showTodayIndicator = resolvedLocation.destinationId != RegistryDestinationIds.TODAY && !inTodayInbox,
                         isLogbook = resolvedLocation.destinationId == RegistryDestinationIds.LOGBOOK,
                     ).withFade(snapshot, conversation, convoState, now, today, showAging)
+                        .let { base ->
+                            if (suggestedTarget != null) base.copy(filingSuggestionLabel = suggestedTarget.title) else base
+                        }
                     val rowPosition = record.fields[positionField(resolvedLocation.destinationId)].numberValue()
                         ?: record.fields[RegistryEntityFields.Task.POSITION].numberValue()
                     val positioned = PositionedTask(
@@ -930,6 +997,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 }
             }
         }
+        filingSuggestionsByTask = nextSuggestions
         return LoadedTaskHome(
             hasLoaded = true,
             location = resolvedLocation,

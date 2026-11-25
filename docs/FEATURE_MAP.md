@@ -8,9 +8,9 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 53 | 54 | 54 | 0 | 42 | 0 | 1 |
+| ships | 53 | 54 | 54 | 0 | 44 | 0 | 1 |
 | partial | 1 | 1 | 1 | 0 | 3 | 0 | 3 |
-| planned | 0 | 0 | 0 | 51 | 8 | 54 | 1 |
+| planned | 0 | 0 | 0 | 51 | 6 | 54 | 1 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 53 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
@@ -45,7 +45,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `capture.quick-add` | Quick Add sheet | ships | ships | - | planned | ships | - | - |
 | `capture.share-target` | Share into Inbox | ships | ships | - | planned | ships | planned | - |
 | `capture.quick-entry` | Quick Entry global panel | - | - | ships | - | - | planned | - |
-| `edit.filing-suggestion` | On-device filing suggestion | ships | ships | ships | - | planned | planned | - |
+| `edit.filing-suggestion` | On-device filing suggestion | ships | ships | ships | - | ships | planned | - |
 | `edit.undo` | Shared undo history | ships | ships | ships | planned | ships | planned | - |
 | `edit.multi-select` | Select multiple tasks | ships | ships | ships | planned | ships | planned | - |
 | `find.quick-find` | Quick Find | ships | ships | ships | planned | ships | planned | - |
@@ -66,7 +66,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `calendar.feed` | Private read-only calendar feed (.ics) | ships | ships | ships | planned | planned | planned | - |
 | `widgets.tasks` | Today and Upcoming widgets | ships | ships | ships | - | planned | planned | - |
 | `watch.app` | Apple Watch app | - | - | - | - | - | - | ships |
-| `data.import-export` | Export as JSON, Markdown or CSV; import JSON with a preview | ships | ships | ships | planned | planned | planned | - |
+| `data.import-export` | Export as JSON, Markdown or CSV; import JSON with a preview | ships | ships | ships | planned | ships | planned | - |
 | `agents.list` | Connected agents: list, name, disconnect | ships | ships | ships | planned | ships | planned | - |
 | `settings.display` | Display, badge and privacy preferences | ships | ships | ships | planned | ships | planned | - |
 | `appearance.accents` | Accent colors (Colorful and the fruit accents) | ships | ships | ships | planned | ships | planned | - |
