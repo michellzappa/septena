@@ -268,7 +268,7 @@
       "sharedAppGroup": true,
       "type": "bool",
       "default": false,
-      "platforms": ["ios", "ipados", "macos", "android", "windows"],
+      "platforms": ["macos"],
       "featureId": "settings.display"
     },
     "loggingAnimationsEnabled": {
@@ -712,7 +712,8 @@
         {
           "kind": "setting",
           "key": "badgeShowOverdue",
-          "label": "Overdue app icon badge"
+          "label": "Overdue app icon badge",
+          "platforms": ["macos"]
         }
       ]
     },
