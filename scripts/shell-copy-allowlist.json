@@ -69,11 +69,6 @@
     },
     {
       "file": "Septena/Shell/Settings/ConnectedAppsDetails.swift",
-      "literal": "Show calendar events",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Settings/ConnectedAppsDetails.swift",
       "literal": "Show your calendar events in Today and Upcoming. Hidden calendars stay untouched in Calendar.",
       "reasonId": "predates-rule"
     },
@@ -585,11 +580,6 @@
     {
       "file": "Septask/SeptaskDataTransfer.swift",
       "literal": "Ready to import",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskDataTransfer.swift",
-      "literal": "Import",
       "reasonId": "predates-rule"
     },
     {

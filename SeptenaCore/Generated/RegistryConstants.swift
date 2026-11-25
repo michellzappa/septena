@@ -1907,6 +1907,8 @@ enum RegistrySurfaces {
   static let agentPromptReviewKicker: String = RegistryL10n.t("Review requested")
   static let agentPromptReviewFallback: String = RegistryL10n.t("Ready for review")
   static let agentPromptAcceptedLabel: String = RegistryL10n.t("Accepted")
+  /// The weekly fade sweep's title (`surfaces.json` `fadeSweep`).
+  static let fadeSweepTitle: String = RegistryL10n.t("Faded Tasks")
   /// Quick Find copy (`surfaces.json` `quickFind`).
   static let quickFindPlaceholder: String = RegistryL10n.t("Search tasks, projects, areas…")
   static let quickFindEmptyTitle: String = RegistryL10n.t("Search Tasks")

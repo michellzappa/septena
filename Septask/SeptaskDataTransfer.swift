@@ -1387,7 +1387,7 @@ struct SeptaskImportExportPane: View {
           .foregroundStyle(.secondary)
       }
       HStack(spacing: 12) {
-        Button("Import") { applyImport(doc) }
+        Button(RegistrySettings.copy("import_export", "importConfirm")) { applyImport(doc) }
           .buttonStyle(.borderedProminent)
           .disabled(doc.supportedRowCount == 0)
         Button("Cancel", role: .cancel) { importDoc = nil }

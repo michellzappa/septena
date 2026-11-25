@@ -113,7 +113,8 @@ object TaskDataTransferCodec {
                 area != null && proj != null -> "$area › $proj"
                 proj != null -> proj
                 area != null -> area
-                else -> "Inbox"
+                // The exported file is English on every device, as the Apple export is.
+                else -> "Inbox" // septena-lint:allow registry-owned-literal
             }
         }
         for ((section, rows) in grouped) {

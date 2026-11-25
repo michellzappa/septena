@@ -44,7 +44,7 @@ struct TaskFadeSweepSheet: View {
         Divider()
         footer
       }
-      .navigationTitle(String(localized: "Faded Tasks", comment: "Sweep sheet title"))
+      .navigationTitle(RegistrySurfaces.fadeSweepTitle)
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif

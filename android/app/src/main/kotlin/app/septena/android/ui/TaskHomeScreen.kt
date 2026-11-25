@@ -1139,12 +1139,10 @@ private fun TaskHomeScaffold(
                         val isTodayList = location.destinationId == RegistryDestinationIds.TODAY
                         val isReviewList = location.destinationId == RegistryDestinationIds.REVIEW
                         val reviewAcceptTitle = remember(languageTag) {
-                            RegistryCatalog.actionTitle(RegistryActionIds.TASK_ACCEPT_REVIEW, languageTag = languageTag)
-                                ?.takeIf(String::isNotBlank) ?: "Accept"
+                            RegistryCatalog.actionTitle(RegistryActionIds.TASK_ACCEPT_REVIEW, languageTag = languageTag).orEmpty()
                         }
                         val reviewSendBackTitle = remember(languageTag) {
-                            RegistryCatalog.actionTitle(RegistryActionIds.TASK_SEND_BACK_REVIEW, languageTag = languageTag)
-                                ?.takeIf(String::isNotBlank) ?: "Send back"
+                            RegistryCatalog.actionTitle(RegistryActionIds.TASK_SEND_BACK_REVIEW, languageTag = languageTag).orEmpty()
                         }
                         val canReorderList = location.destinationId in setOf(
                             RegistryDestinationIds.TODAY,

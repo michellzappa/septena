@@ -128,22 +128,17 @@ internal fun TaskReferencesSection(
 
     val kindsMap = (surface["kinds"] as? JsonValue.ObjectValue)?.fields.orEmpty()
     val otherKindLabel = registryText((surface["otherKind"] as? JsonValue.ObjectValue)?.fields?.get("label").stringValue(), languageTag)
-        .ifBlank { "Reference" }
     val addTitle = remember(languageTag) {
-        RegistryCatalog.actionTitle(RegistryActionIds.TASK_ADD_REFERENCE, languageTag = languageTag)
-            ?.takeIf(String::isNotBlank) ?: "Add Reference"
+        RegistryCatalog.actionTitle(RegistryActionIds.TASK_ADD_REFERENCE, languageTag = languageTag).orEmpty()
     }
     val openTitle = remember(languageTag) {
-        RegistryCatalog.actionTitle(RegistryActionIds.TASK_REFERENCE_OPEN, languageTag = languageTag)
-            ?.takeIf(String::isNotBlank) ?: "Open"
+        RegistryCatalog.actionTitle(RegistryActionIds.TASK_REFERENCE_OPEN, languageTag = languageTag).orEmpty()
     }
     val copyLinkTitle = remember(languageTag) {
-        RegistryCatalog.actionTitle(RegistryActionIds.TASK_REFERENCE_COPY_LINK, languageTag = languageTag)
-            ?.takeIf(String::isNotBlank) ?: "Copy Link"
+        RegistryCatalog.actionTitle(RegistryActionIds.TASK_REFERENCE_COPY_LINK, languageTag = languageTag).orEmpty()
     }
     val removeTitle = remember(languageTag) {
-        RegistryCatalog.actionTitle(RegistryActionIds.TASK_REFERENCE_REMOVE, languageTag = languageTag)
-            ?.takeIf(String::isNotBlank) ?: "Remove"
+        RegistryCatalog.actionTitle(RegistryActionIds.TASK_REFERENCE_REMOVE, languageTag = languageTag).orEmpty()
     }
 
     if (showAddDialog) {
@@ -198,12 +193,12 @@ internal fun TaskReferencesSection(
                 ((surface["roles"] as? JsonValue.ObjectValue)?.fields?.get("blocked_by") as? JsonValue.ObjectValue)
                     ?.fields?.get("label").stringValue(),
                 languageTag,
-            ).ifBlank { "Blocked by" }
+            )
             RegistryEntityEnums.TaskRefRole.FOLLOW_UP -> registryText(
                 ((surface["roles"] as? JsonValue.ObjectValue)?.fields?.get("follow_up") as? JsonValue.ObjectValue)
                     ?.fields?.get("label").stringValue(),
                 languageTag,
-            ).ifBlank { "Follow-up to" }
+            )
             RegistryEntityEnums.TaskRefRole.FROM -> registryText(
                 (surface["createdFrom"] as? JsonValue.ObjectValue)?.fields?.get("format").stringValue(),
                 languageTag,
@@ -423,17 +418,14 @@ internal fun AddReferenceDialog(
 
     val addObj = (surface["add"] as? JsonValue.ObjectValue)?.fields.orEmpty()
     val offersTitle = registryText((addObj["offers"] as? JsonValue.ObjectValue)?.fields?.get("title").stringValue(), languageTag)
-    val placeholder = registryText(addObj["placeholder"].stringValue(), languageTag).ifBlank { "Paste a link" }
-    val confirmTitle = registryText(addObj["confirmTitle"].stringValue(), languageTag).ifBlank { "Add" }
+    val placeholder = registryText(addObj["placeholder"].stringValue(), languageTag)
+    val confirmTitle = registryText(addObj["confirmTitle"].stringValue(), languageTag)
     val invalidMsg = registryText((addObj["invalid"] as? JsonValue.ObjectValue)?.fields?.get("message").stringValue(), languageTag)
-        .ifBlank { "Septena can’t add this. Paste a web link or a mail link." }
     val limitMsg = registryText((addObj["limitReached"] as? JsonValue.ObjectValue)?.fields?.get("format").stringValue(), languageTag)
         .replace("{count}", RegistryEntityLimits.MAX_REFS_PER_TASK.toString())
         .ifBlank { "This task already has ${RegistryEntityLimits.MAX_REFS_PER_TASK} references." }
     val failedMsg = registryText((addObj["failed"] as? JsonValue.ObjectValue)?.fields?.get("message").stringValue(), languageTag)
-        .ifBlank { "Couldn’t add the reference." }
-    val title = RegistryCatalog.actionTitle(RegistryActionIds.TASK_ADD_REFERENCE, languageTag = languageTag)
-        ?.takeIf(String::isNotBlank) ?: "Add Reference"
+    val title = RegistryCatalog.actionTitle(RegistryActionIds.TASK_ADD_REFERENCE, languageTag = languageTag).orEmpty()
     val cancelLabel = RegistryCatalog.localizedString("Cancel", languageTag) ?: "Cancel"
 
     fun submit(text: String = input) {
