@@ -992,10 +992,10 @@
         {
           "id": "move_in",
           "header": "Move from another app",
-          "footer": "Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import.",
+          "footer": "You can undo an import.",
           "platforms": ["ios", "ipados", "macos"],
           "items": [
-            { "kind": "customSurface", "surface": "things_import", "label": "Import from Things", "icon": "settings.import", "platforms": ["ios", "ipados", "macos"], "featureId": "import.things" }
+            { "kind": "customSurface", "surface": "import_sources", "label": "Move from another app", "icon": "settings.import", "platforms": ["ios", "ipados", "macos"], "featureId": "import.things" }
           ]
         },
         {

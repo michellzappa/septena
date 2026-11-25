@@ -73,14 +73,17 @@ matters; the engine renumbers.
 
 An adapter conforms to `ImportSource`:
 
-- `descriptor`: catalog id, display name, input kind (`file`, `localLibrary`,
-  `account`), and **coverage**: for every bundle field, `mapped`,
+- `id`: the source's id in `registry/import-sources.json`, which holds its
+  name, status and input kind (`file`, `localLibrary`, `account`).
+- **coverage**: for every bundle field, `mapped`,
   `preserved` (kept in originals only) or `unsupported`.
 - `read(...) async throws -> ImportBundle`.
 
-The catalog (`ImportSourceCatalog`) lists every known source with its state
-(`available`, `planned`, `assisted`). The moving-in UI and the site's
-`/moving-in` table read the same list.
+The catalog is `registry/import-sources.json`: every known source with its
+status (`ships`, `planned`, `assisted`), in the order people see. The app reads
+it through `ImportSourceCatalog`, the site through `lib/moving-in.ts`. No copy
+names importers by hand. Apple Reminders ships through its own Inbox screen,
+not the engine.
 
 Rules:
 

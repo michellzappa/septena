@@ -17,11 +17,28 @@ struct ImportSourcesSection: View {
   var body: some View {
     Section {
       ForEach(ImportSourceCatalog.all) { source in
-        if source.state == .available, ImportSourceCatalog.adapter(id: source.id) != nil {
+        if source.state == .available {
           NavigationLink {
-            ImportFlowView(sourceID: source.id)
+            // A library on this device keeps its own screen: its items wait in
+            // the Inbox instead of going through the engine.
+            if source.inputKind == .localLibrary {
+              RemindersInboxDetail()
+            } else {
+              ImportFlowView(sourceID: source.id)
+            }
           } label: {
-            Label(source.displayName, systemImage: RegistryIcons.sfSymbols["settings.import"] ?? "square.and.arrow.down")
+            Label {
+              VStack(alignment: .leading, spacing: 2) {
+                Text(source.displayName)
+                if let detail = source.detail {
+                  Text(detail)
+                    .font(.septenaCaption)
+                    .foregroundStyle(.secondary)
+                }
+              }
+            } icon: {
+              Image(systemName: RegistryIcons.sfSymbols["settings.import"] ?? "square.and.arrow.down")
+            }
           }
         } else {
           LabeledContent {
@@ -71,7 +88,7 @@ struct ImportFlowView: View {
   @State private var pickedName: String?
 
   private var descriptor: ImportSourceDescriptor? {
-    ImportSourceCatalog.all.first { $0.id == sourceID }
+    ImportSourceCatalog.descriptor(id: sourceID)
   }
 
   private var displayName: String { descriptor?.displayName ?? sourceID }
@@ -442,7 +459,7 @@ struct ImportBatchListView: View {
 
   @ViewBuilder
   private func batchRow(_ batch: ImportLedgerBatch) -> some View {
-    let name = ImportSourceCatalog.all.first { $0.id == batch.source.app }?.displayName ?? batch.source.app
+    let name = ImportSourceCatalog.descriptor(id: batch.source.app)?.displayName ?? batch.source.app
     VStack(alignment: .leading, spacing: 4) {
       Text(name).font(.headline)
       if batch.isLegacy {

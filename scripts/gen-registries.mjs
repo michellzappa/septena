@@ -649,7 +649,31 @@ function stringsOf(node, p, out = []) {
   return out;
 }
 
-function validatePlans(plans, icons, caps) {
+function validateImportSources(file, caps) {
+  assert(file.version === 1, "import-sources.json: version must be 1");
+  const ids = new Set();
+  for (const s of file.sources) {
+    assert(/^[a-z][a-z-]*$/.test(s.id) && !ids.has(s.id), `import-sources.json: bad or duplicate id "${s.id}"`);
+    ids.add(s.id);
+    assert(typeof s.name === "string" && s.name.length > 0, `import-sources.json: ${s.id} needs a name`);
+    assert(file.statuses.includes(s.status), `import-sources.json: ${s.id} unknown status "${s.status}"`);
+    assert(file.inputs.includes(s.input), `import-sources.json: ${s.id} unknown input "${s.input}"`);
+    assert(Number.isInteger(s.issue) && s.issue > 0, `import-sources.json: ${s.id} needs an issue`);
+    assert(!/[–—]/.test(s.detail ?? ""), `import-sources.json: ${s.id} detail contains an em or en dash`);
+    // "ships" here and in the capability ledger must be the same claim.
+    if (s.status === "ships") {
+      const cap = caps.capabilities[s.featureId];
+      assert(cap && caps.platforms.some((p) => cap[p] === "ships"), `import-sources.json: ${s.id} ships, but capability "${s.featureId}" ships on no platform`);
+      assert(s.detail, `import-sources.json: ${s.id} ships and needs a detail`);
+    } else {
+      assert(!s.featureId || !caps.platforms.some((p) => caps.capabilities[s.featureId]?.[p] === "ships"), `import-sources.json: ${s.id} is ${s.status}, but its capability ships`);
+    }
+  }
+  const listed = new Set(file.sources.map((s) => s.featureId).filter(Boolean));
+  for (const id of Object.keys(caps.capabilities)) assert(!id.startsWith("import.") || listed.has(id), `import-sources.json: capability "${id}" has no source`);
+}
+
+function validatePlans(plans, icons, caps, importSources) {
   assert(plans.version === 1, "plans.json: version must be 1");
   assert(plans.featureId in caps.capabilities, `plans.json: unknown featureId "${plans.featureId}"`);
   for (const f of ["name", "shortName", "headline", "subhead", "ladderHeadline", "accountNote", "agentNote"]) assert(typeof plans[f] === "string" && plans[f].length > 0, `plans.json: ${f} missing`);
@@ -720,6 +744,10 @@ function validatePlans(plans, icons, caps) {
   }
   for (const id of plans.cardRows) assert(rowIds.has(id), `plans.json: cardRows names unknown row "${id}"`);
   assert(plans.fullApp?.title && plans.fullApp.points?.length > 0, "plans.json: fullApp needs title and points");
+  for (const p of plans.fullApp.points) assert(p.id && p.title, "plans.json: every fullApp point needs an id and a title");
+  // The site adds the importers to this line from import-sources.json. No plan copy names one.
+  assert(plans.fullApp.points.some((p) => p.id === "import"), "plans.json: fullApp needs the import point");
+  for (const [p, v] of stringsOf(plans, "plans")) for (const s of importSources.sources) assert(!v.includes(s.name), `plans.json: ${p} names ${s.name}; importers are listed only in import-sources.json`);
   for (const list of ["promises", "upsells"]) {
     const ids = new Set();
     for (const n of plans[list]) {
@@ -772,7 +800,7 @@ function appleKeycaps(sc) {
 function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans }) {
   const lines = [];
   lines.push("// GENERATED FILE — DO NOT EDIT BY HAND.");
-  lines.push("// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces,plans}.json");
+  lines.push("// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces,plans,import-sources}.json");
   lines.push("// Regenerate: node scripts/gen-registries.mjs");
   lines.push("");
   lines.push("import Foundation");
@@ -1900,6 +1928,23 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  lines.push("/// One app Septena imports from, or plans to (`registry/import-sources.json`).");
+  lines.push("struct RegistryImportSource: Sendable, Hashable {");
+  lines.push("  let id: String");
+  lines.push("  let name: String");
+  lines.push("  let status: String");
+  lines.push("  let input: String");
+  lines.push("  let issue: Int");
+  lines.push("  let detail: String?");
+  lines.push("}");
+  lines.push("");
+  lines.push("enum RegistryImportSources {");
+  lines.push("  static var all: [RegistryImportSource] { [");
+  for (const s of bundle.importSources.sources) lines.push(`    RegistryImportSource(id: ${swiftStr(s.id)}, name: ${swiftStr(s.name)}, status: ${swiftStr(s.status)}, input: ${swiftStr(s.input)}, issue: ${s.issue}, detail: ${LOpt(s.detail, s, "detail")}),`);
+  lines.push("  ] }");
+  lines.push("}");
+  lines.push("");
+
   // 9. Capabilities parity ledger
   lines.push("/// Canonical capability parity ledger (`registry/capabilities.json`, ADR 0013 / ADR 0015).");
   lines.push("enum RegistryCapabilities {");
@@ -2374,6 +2419,7 @@ const dests = readJSON("registry/destinations.json");
 const actions = readJSON("registry/actions.json");
 const surfaces = readJSON("registry/surfaces.json");
 const plans = readJSON("registry/plans.json");
+const importSources = readJSON("registry/import-sources.json");
 
 validateEntities(entities);
 validateRules(rules);
@@ -2388,7 +2434,8 @@ validateTaskReferences(surfaces, icons, caps, entities);
 checkOpensAttribute({ actions, surfaces });
 checkTaskDateBoard({ surfaces, icons, caps, actions });
 validateFirstRun(surfaces, icons, caps, settings);
-validatePlans(plans, icons, caps);
+validateImportSources(importSources, caps);
+validatePlans(plans, icons, caps, importSources);
 validateConformance();
 // Marketing content only: no generated bindings, no localized strings (ADR 0030).
 validateCast(
@@ -2398,7 +2445,7 @@ validateCast(
   assert,
 );
 
-BY_KEY = L10N.collectStrings({ settings, destinations: dests, actions, surfaces, tokens, plans }, assert);
+BY_KEY = L10N.collectStrings({ settings, destinations: dests, actions, surfaces, tokens, plans, importSources }, assert);
 
 const CATALOG_PATH = "Septena/Localizable.xcstrings";
 const catalog = readJSON(CATALOG_PATH);
@@ -2421,7 +2468,7 @@ const conformance = Object.fromEntries(
     .map((name) => [name.replace(/\.json$/, ""), readJSON(`registry/conformance/${name}`)]),
 );
 const bundle = {
-  entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans, conformance,
+  entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans, importSources, conformance,
   translations: { en: JSON.parse(L10N.englishFile(BY_KEY)), ...TRANSLATIONS },
 };
 /**

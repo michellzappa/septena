@@ -532,6 +532,11 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   fights the framework (and that we then chase across sessions). When the
   idiomatic API genuinely can't do it, say so plainly and pick the closest
   standard behavior — don't invent.
+- **Never write a list of instances into copy.** Importers, agents, platforms,
+  lists and languages each have one canonical list (`registry/import-sources.json`,
+  `capabilities.json`, `destinations.json`). Copy either says the general thing
+  ("Import from other task apps") or is built from that list, with its status.
+  A hand-written "Import from X and Y" goes stale when Z ships (mz, 2026-11-25).
 - **Same behavior on every platform.** iPhone, iPad, Mac and Android do
   the same thing for the same feature. A platform-specific behavior needs a
   strong reason (a platform rule, a missing API, a different input device),

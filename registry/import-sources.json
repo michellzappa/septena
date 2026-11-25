@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "description": "Every app Septena imports from, or plans to (ADR 0021, docs/MOVING_IN_SPEC.md §3). The one list: the app's move-in rows and the site's pricing, moving-in and support pages read it, so no copy names importers by hand. `status`: ships (works now, `featureId` names the capability), planned (an importer is on the roadmap), assisted (planned as a guided manual path). `detail` says what moving in does; a ships source needs it. Order is the order people see.",
+  "statuses": ["ships", "planned", "assisted"],
+  "inputs": ["file", "localLibrary", "account"],
+  "sources": [
+    { "id": "things", "name": "Things", "status": "ships", "input": "file", "issue": 99, "featureId": "import.things", "detail": "Copies your areas, projects and tasks. Things stays as it is." },
+    { "id": "reminders", "name": "Apple Reminders", "status": "ships", "input": "localLibrary", "issue": 99, "featureId": "import.reminders", "detail": "Moves reminders into your Inbox. Each one you import leaves Reminders." },
+    { "id": "microsoft-todo", "name": "Microsoft To Do", "status": "planned", "input": "account", "issue": 52 },
+    { "id": "todoist", "name": "Todoist", "status": "planned", "input": "account", "issue": 100 },
+    { "id": "ticktick", "name": "TickTick", "status": "planned", "input": "account", "issue": 100 },
+    { "id": "omnifocus", "name": "OmniFocus", "status": "planned", "input": "file", "issue": 102 },
+    { "id": "superlist", "name": "Superlist", "status": "planned", "input": "file", "issue": 101 },
+    { "id": "anydo", "name": "Any.do", "status": "assisted", "input": "file", "issue": 102 }
+  ]
+}

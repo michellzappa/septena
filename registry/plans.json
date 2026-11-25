@@ -51,12 +51,12 @@
   "fullApp": {
     "title": "Every plan has the full task app",
     "points": [
-      "Today with its Inbox, Upcoming, Anytime, Faded and Logbook",
-      "Areas, projects, sections, notes and attachments",
-      "When dates, deadlines and repeats",
-      "Task conversations with the on-device model",
-      "Import from Things and Apple Reminders",
-      "Export everything as plain JSON"
+      { "id": "lists", "title": "Every list, from Today to the Logbook" },
+      { "id": "structure", "title": "Areas, projects, sections, notes and attachments" },
+      { "id": "dates", "title": "When dates, deadlines and repeats" },
+      { "id": "discuss", "title": "Task conversations with the on-device model" },
+      { "id": "import", "title": "Import from other task apps" },
+      { "id": "export", "title": "Export everything as plain JSON" }
     ]
   },
   "cards": [
@@ -65,7 +65,7 @@
       "title": "Free",
       "icon": "plans.free",
       "priceLabel": "€0",
-      "detail": "The full task app on one iPhone, iPad or Mac. You do not need an account."
+      "detail": "The full task app on one device. You do not need an account."
     },
     {
       "id": "plus",
