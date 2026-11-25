@@ -32,7 +32,6 @@ mod views;
 
 pub use conformance::*;
 pub use convo::*;
-pub use do_session::*;
 pub use error::*;
 pub use fade::*;
 pub use json::*;
