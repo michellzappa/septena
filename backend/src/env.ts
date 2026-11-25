@@ -25,6 +25,9 @@ export interface Env {
   SESSION_SIGNING_KEY_PREVIOUS?: string;
   /// Optional. Unset = the /v1/admin routes answer 404. Grants entitlements.
   ADMIN_TOKEN?: string;
+  /// "true" issues the signed tokens of ADR 0040 (src/api/session.ts). Anything
+  /// else still issues the KV tokens, and accepts both.
+  SIGNED_SESSIONS?: string;
   /// Optional APNs provider key (.p8 PEM) and identifiers for agent question pushes (F1b #213).
   /// When any of APNS_KEY / APNS_KEY_ID / APNS_TEAM_ID is unset, pushes no-op cleanly.
   APNS_KEY?: string;

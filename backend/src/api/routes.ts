@@ -9,7 +9,7 @@ import { zPushBody, type Op } from "../store/ops.js";
 import type { ChangeEntry } from "../store/TaskStore.js";
 import { USER_ID_RE, accountStoreFor } from "../store/AccountStore.js";
 import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from "./appleIdentity.js";
-import { authenticate, issueSession, refreshSession, revokeSession, storeFor, withSession } from "./session.js";
+import { accountAlreadyDeleted, authenticate, issueSession, refreshSession, revokeSession, storeFor, withSession } from "./session.js";
 import { SESSION_HEADER } from "../store/sessions.js";
 import {
   approvePairing,
@@ -166,6 +166,7 @@ api.post("/auth/device/poll", async (c) => {
   if (res.status === "denied") return c.json({ error: "denied" }, 410, { "Cache-Control": "no-store" });
   if (res.status === "rate_limited") return c.json({ error: "too_many_attempts" }, 429, { "Cache-Control": "no-store" });
   if (res.status === "gone") return c.json({ error: "expired_or_unknown" }, 410, { "Cache-Control": "no-store" });
+  if (!(await storeFor(c.env, res.userId).hasAppSession())) return c.json({ error: "expired_or_unknown" }, 410, { "Cache-Control": "no-store" });
   return c.json(await issueSession(c.env, res.userId), 200, { "Cache-Control": "no-store" });
 });
 
@@ -274,7 +275,13 @@ async function apiHostOnly(c: Ctx, next: Next) {
 
 api.use("/sync/*", requireUser, loadPlan("open", "sync"), requireSyncDevice);
 api.use("/attachments/*", requireUser, loadPlan("closed", "attachments"), requireSyncDevice);
-api.use("/account", requireUser);
+api.use("/account", async (c, next) => {
+  const header = c.req.header("Authorization") ?? "";
+  if (c.req.method === "DELETE" && header.startsWith("Bearer ") && await accountAlreadyDeleted(c.env, header.slice(7))) {
+    return c.body(null, 204);
+  }
+  await next();
+}, requireUser);
 api.use("/devices/*", requireUser);
 api.use("/ical/settings", requireUser);
 api.use("/changes", requireUser, loadPlan("open", "changes"), requireSyncDevice);
@@ -1043,7 +1050,8 @@ api.delete("/account", async (c) => {
   // Preserve `trial-used:<userId>` in KV across account deletion so re-signing
   // up with the same Apple id never starts a second trial (spec §6.4 finding 4).
   if (entitlements.some((r) => r.id === TRIAL_ROW_ID)) await markTrialUsed(c.env, userId);
-  await store.deleteAccount();
+  // The store goes last: it holds the session, so a failure above it can be
+  // retried with the same token. Every step repeats safely.
   const accounts = accountStoreFor(c.env);
   if (accounts) await accounts.deleteIdentitiesForUser(userId);
   const prefix = `u/${userId}/`;
@@ -1053,6 +1061,7 @@ api.delete("/account", async (c) => {
     if (page.objects.length) await c.env.ATTACHMENTS.delete(page.objects.map((o) => o.key));
     cursor = page.truncated ? page.cursor : undefined;
   } while (cursor);
+  await store.deleteAccount();
   logEvent("api_account_deleted", {});
   // The store held every session, so no token of this account works now.
   return c.body(null, 204);

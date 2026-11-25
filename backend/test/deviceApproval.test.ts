@@ -247,7 +247,7 @@ describe("Sign-in S3: device approval flow (ADR 0016, #170)", () => {
     assert.equal(session.userId, userId);
     assert.equal(session.expiresIn, 3600);
     assert.ok(session.accessToken.startsWith("sa1."));
-    assert.ok(session.refreshToken.startsWith("sr2."));
+    assert.ok(session.refreshToken.startsWith("sr1."));
 
     const claims = await verifyAccessToken(h.env, session.accessToken);
     assert.ok(claims);

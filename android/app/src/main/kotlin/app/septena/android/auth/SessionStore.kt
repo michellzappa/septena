@@ -28,9 +28,15 @@ class SessionStore(context: Context) {
 
     /** False when the write failed: the previous session is still the stored one. */
     @Synchronized
-    fun save(refreshToken: String, userId: String): Boolean =
+    fun save(refreshToken: String, userId: String): Boolean {
+        val oldRefresh = prefs.getString(KEY_REFRESH, null)
+        val oldUser = prefs.getString(KEY_USER, null)
         // commit(), not apply(): the token must be on disk before its access token is used.
-        prefs.edit().putString(KEY_REFRESH, encrypt(refreshToken)).putString(KEY_USER, userId).commit()
+        if (prefs.edit().putString(KEY_REFRESH, encrypt(refreshToken)).putString(KEY_USER, userId).commit()) return true
+        // A failed commit leaves the new values in memory. Memory must match the disk.
+        prefs.edit().putString(KEY_REFRESH, oldRefresh).putString(KEY_USER, oldUser).commit()
+        return false
+    }
 
     @Synchronized
     fun clear() {

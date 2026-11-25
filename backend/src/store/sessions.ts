@@ -13,8 +13,12 @@
 /// of one connector) settle inside this window. After it, reuse is theft.
 export const SESSION_LEEWAY_MS = 30_000;
 /// A used access token may outlive its retired refresh token by its own hour.
-/// Retired rows stay a little longer than that.
+/// Retired rows stay a little longer than that. The first row of a session
+/// stays as long as the session: a token from before ADR 0040 carries no
+/// session id, so its row is the only thing that tells reuse from noise.
 const RETIRED_TTL_MS = 2 * 60 * 60 * 1000;
+/// Longer than the 30 days an agent token from before ADR 0040 can live.
+const ENDED_TTL_MS = 31 * 24 * 60 * 60 * 1000;
 /// Unused children one parent may have (replies lost in a row).
 const MAX_UNUSED_CHILDREN = 8;
 
@@ -69,6 +73,7 @@ export class SessionBook {
       if (!have.has(name)) this.sql.exec(`ALTER TABLE sessions ADD COLUMN ${name} ${type}`);
     }
     this.sql.exec("CREATE INDEX IF NOT EXISTS sessions_sid ON sessions(sid)");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS ended_sessions (sid TEXT PRIMARY KEY, at INTEGER NOT NULL)");
   }
 
   create(hash: string, expiresAt: number, sid: string, grant: SessionGrant | null = null, now = Date.now()): void {
@@ -103,7 +108,7 @@ export class SessionBook {
       "UPDATE sessions SET retiredAt = ? WHERE hash IN (SELECT hash FROM sessions WHERE parent = ? AND usedAt IS NULL AND retiredAt IS NULL ORDER BY createdAt DESC, rowid DESC LIMIT -1 OFFSET ?)",
       now, hash, MAX_UNUSED_CHILDREN,
     );
-    this.sql.exec("DELETE FROM sessions WHERE sid = ? AND retiredAt < ?", sid, now - RETIRED_TTL_MS);
+    this.sql.exec("DELETE FROM sessions WHERE sid = ? AND parent IS NOT NULL AND retiredAt < ?", sid, now - RETIRED_TTL_MS);
     return { ok: true, grant };
   }
 
@@ -139,15 +144,31 @@ export class SessionBook {
     return this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM sessions WHERE sid = ?", sid).one().n > 0;
   }
 
-  /// Deletes the session. Returns its refresh hashes.
-  end(sid: string): string[] {
+  isAgent(sid: string): boolean {
+    return this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM sessions WHERE sid = ? AND grantJson IS NOT NULL", sid).one().n > 0;
+  }
+
+  hasAppSession(now = Date.now()): boolean {
+    return this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM sessions WHERE grantJson IS NULL AND retiredAt IS NULL AND expiresAt >= ?", now).one().n > 0;
+  }
+
+  hasEnded(sid: string): boolean {
+    return this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM ended_sessions WHERE sid = ?", sid).one().n > 0;
+  }
+
+  /// Deletes the session and remembers that it ended. Returns its refresh hashes.
+  end(sid: string, now = Date.now()): string[] {
+    this.sql.exec("INSERT INTO ended_sessions (sid, at) VALUES (?, ?) ON CONFLICT(sid) DO UPDATE SET at = excluded.at", sid, now);
     const hashes = this.sql.exec<{ hash: string }>("SELECT hash FROM sessions WHERE sid = ?", sid).toArray().map((r) => r.hash);
     this.sql.exec("DELETE FROM sessions WHERE sid = ?", sid);
     return hashes;
   }
 
   purge(now: number): void {
-    this.sql.exec("DELETE FROM sessions WHERE expiresAt < ? OR retiredAt < ?", now, now - RETIRED_TTL_MS);
+    this.sql.exec("DELETE FROM sessions WHERE expiresAt < ? OR (parent IS NOT NULL AND retiredAt < ?)", now, now - RETIRED_TTL_MS);
+    // A lone retired first row is no session.
+    this.sql.exec("DELETE FROM sessions WHERE retiredAt IS NOT NULL AND sid NOT IN (SELECT sid FROM sessions WHERE retiredAt IS NULL AND sid IS NOT NULL)");
+    this.sql.exec("DELETE FROM ended_sessions WHERE at < ?", now - ENDED_TTL_MS);
   }
 
   /// First use of a token: everything else in the session retires, except a

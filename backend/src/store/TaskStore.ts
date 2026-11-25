@@ -1695,12 +1695,47 @@ export class TaskStore extends DurableObject<Env> {
     return this.sessions.revokeAccess(sid, hash);
   }
 
-  /// Adopts an agent's refresh token from KV (issued before ADR 0040). Only
-  /// for an agent that is still connected and has no session here yet, so a
-  /// disconnected agent never comes back.
-  adoptSession(hash: string, expiresAt: number, sid: string, grant: SessionGrant): void {
-    const connected = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM connections WHERE familyId = ?", sid).one().n > 0;
-    if (connected && !this.sessions.exists(sid)) this.sessions.create(hash, expiresAt, sid, grant);
+  /// May an agent token that KV holds (from before ADR 0040) still work? Not
+  /// after its family ended, and not when the account was deleted since.
+  legacyAgentAllowed(familyId: string, issuedAt: number): boolean {
+    return issuedAt > this.meta("deletedAt") && !this.sessions.hasEnded(familyId);
+  }
+
+  /// Moves an agent's refresh token from KV into this store.
+  adoptSession(hash: string, issuedAt: number, expiresAt: number, sid: string, grant: SessionGrant): void {
+    if (this.legacyAgentAllowed(sid, issuedAt) && !this.sessions.exists(sid)) this.sessions.create(hash, expiresAt, sid, grant);
+  }
+
+  /// A pairing approved before an account deletion must not bring it back.
+  hasAppSession(): boolean {
+    return this.sessions.hasAppSession();
+  }
+
+  wasDeleted(): boolean {
+    return this.meta("deletedAt") > 0;
+  }
+
+  /// True once an agent's session lives here instead of in KV.
+  ownsMovedAgent(familyId: string): boolean {
+    return this.sessions.isAgent(familyId);
+  }
+
+  ownsAgent(familyId: string): boolean {
+    return this.sessions.isAgent(familyId)
+      || this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM connections WHERE familyId = ?", familyId).one().n > 0;
+  }
+
+  /// Ends one connected agent. False when it is not in this store.
+  endAgent(familyId: string): boolean {
+    if (!this.ownsAgent(familyId)) return false;
+    this.endSession(familyId);
+    return true;
+  }
+
+  /// `recordConnection` for an agent whose session is here. A disconnect that
+  /// lands in the middle of a renewal wins.
+  noteAgent(familyId: string, clientId: string, clientName: string, scope: string, now = Date.now(), label: string | null = null): void {
+    if (this.sessions.exists(familyId)) this.recordConnection(familyId, clientId, clientName, scope, now, label);
   }
 
   /// Sign-out with a refresh token. Any token the session ever issued ends it.
@@ -2400,19 +2435,24 @@ export class TaskStore extends DurableObject<Env> {
     // This instance may serve the next request: an empty store refuses every
     // token, a store without tables would answer 500 to the same request.
     this.migrate();
+    this.setMeta("deletedAt", Date.now());
   }
 
   // ---- live nudge (§6.3) & agent event stream (docs/TASK_FACTORY_SPEC.md §8) ----
 
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    // The session may have ended between the Worker's check and this call.
+    const sid = request.headers.get(SESSION_HEADER);
+    if (sid && (this.sessions.hasEnded(sid) || (this.wasDeleted() && !this.sessions.exists(sid) && !this.ownsAgent(sid)))) {
+      return new Response("session ended", { status: 401 });
+    }
     if (url.pathname.endsWith("/agent/events/stream")) {
       return this.handleAgentEventsStream(request, url);
     }
     if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
       return new Response("expected websocket", { status: 426 });
     }
-    const sid = request.headers.get(SESSION_HEADER);
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1], sid ? [sessionTag(sid)] : []);
     pair[1].send(JSON.stringify({ rev: this.meta("rev") }));

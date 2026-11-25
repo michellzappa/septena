@@ -555,6 +555,11 @@ export async function token(c: Context<{ Bindings: Env }>) {
     return c.json({ error: "invalid_grant" }, 400);
   }
 
+  if (!(await storeFor(c.env, stored.userId).hasAppSession())) {
+    logEvent("preview_oauth_token", { ok: false, grantType, clientId, reason: "no_app_session" });
+    return c.json({ error: "invalid_grant" }, 400);
+  }
+
   const familyId = randomId(16);
   const tokens = await issueMcpTokens(c.env, {
     userId: stored.userId,

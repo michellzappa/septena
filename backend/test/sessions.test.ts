@@ -37,7 +37,7 @@ async function harness() {
   const env = {
     API_PUBLIC_URL: "https://api.septena.app", APPLE_AUDIENCES: "com.septena.tasks", ENTITLEMENT_ENFORCE: "false",
     APPLE_IAP_BUNDLE_IDS: "com.septena.tasks", APPLE_IAP_ENVIRONMENTS: "Production,Sandbox",
-    SESSION_SIGNING_KEY: KEY, SESSION_SIGNING_KEY_PREVIOUS: undefined as string | undefined,
+    SIGNED_SESSIONS: "true", SESSION_SIGNING_KEY: KEY, SESSION_SIGNING_KEY_PREVIOUS: undefined as string | undefined,
     TOKENS: tokens, STATE: memoryKv(), CLIENTS: memoryKv(), ATTACHMENTS: {},
     TASK_STORE: {
       idFromName: (name: string) => name,
@@ -220,6 +220,16 @@ describe("ending a session", () => {
     assert.equal(res.status, 401);
   });
 
+  it("refuses a stream for an ended session", async () => {
+    const h = await harness();
+    const s0 = await session.issueSession(h.e, USER);
+    const claims = await session.verifyAccessToken(h.e, s0.accessToken);
+    assert.ok(claims);
+    h.store.endSession(claims.sid);
+    const res = await h.store.fetch(session.withSession(new Request("https://api.septena.app/v1/agent/events/stream"), claims.sid, SESSION_HEADER));
+    assert.equal(res.status, 401);
+  });
+
   it("stamps the stream's session itself", () => {
     const req = session.withSession(new Request("https://api.septena.app/x", { headers: { [SESSION_HEADER]: "someone-else" } }), "mine", SESSION_HEADER);
     assert.equal(req.headers.get(SESSION_HEADER), "mine");
@@ -274,6 +284,9 @@ describe("agent tokens", () => {
     assert.equal(await mcp.revokeMcpToken(h.e, t1.tokens.refresh_token), "refresh");
     assert.equal(await mcp.verifyMcpAccess(h.e, t1.tokens.access_token), null);
 
+    h.store.noteAgent("family-0001", "client-a", "Claude", "tasks:read");
+    assert.equal(h.store.accessSummary(null, null).connections.length, 0, "a late note brings no row back");
+
     const u0 = await mcp.issueMcpTokens(h.e, grant, "family-0002");
     assert.equal(await mcp.disconnectFamily(h.e, USER, "family-0002"), true);
     assert.equal(await mcp.verifyMcpAccess(h.e, u0.access_token), null);
@@ -284,10 +297,9 @@ describe("agent tokens", () => {
     const h = await harness();
     const old = "smr1.refresh_from_before_the_change";
     const hash = await sha256Base64Url(old);
-    const rec = { ...grant, familyId: "family-old1", expiresAt: Date.now() + DAY };
+    const rec = { ...grant, familyId: "family-old1", expiresAt: Date.now() + 20 * DAY };
     h.tokens.map.set(`v2:refresh:${hash}`, JSON.stringify(rec));
-    assert.equal((await mcp.redeemMcpRefresh(h.e, old, "client-a")).ok, false, "not connected");
-    h.store.recordConnection("family-old1", "client-a", "Claude", grant.scope);
+    // No `connections` row: the agent last refreshed before that list existed.
     assert.ok((await mcp.redeemMcpRefresh(h.e, old, "client-a")).ok);
     const again = await mcp.redeemMcpRefresh(h.e, old, "client-a");
     assert.ok(again.ok, "lost reply");
@@ -297,7 +309,76 @@ describe("agent tokens", () => {
   });
 });
 
+describe("rollout", () => {
+  it("accepts signed tokens before it issues them, and after a rollback", async () => {
+    const h = await harness();
+    const grant = { userId: USER, clientId: "client-a", scope: "tasks:read" };
+    const app2 = await session.issueSession(h.e, USER);
+    const agent2 = await mcp.issueMcpTokens(h.e, grant, "family-0002");
+    h.env.SIGNED_SESSIONS = "false";
+    assert.ok(await h.uses(app2.accessToken) && await mcp.verifyMcpAccess(h.e, agent2.access_token));
+    const app1 = await h.refresh(app2.refreshToken);
+    assert.ok(app1?.refreshToken.startsWith("sr1.") && await h.uses(app1.accessToken));
+    assert.ok((await mcp.redeemMcpRefresh(h.e, agent2.refresh_token, "client-a")).ok);
+
+    const agent1 = await mcp.issueMcpTokens(h.e, grant, "family-0001");
+    assert.ok(agent1.refresh_token.startsWith("smr1.") && await mcp.verifyMcpAccess(h.e, agent1.access_token));
+    const r = await mcp.redeemMcpRefresh(h.e, agent1.refresh_token, "client-a");
+    assert.ok(r.ok && r.tokens.refresh_token.startsWith("smr1."));
+    h.env.SIGNED_SESSIONS = "true";
+    const moved = await mcp.redeemMcpRefresh(h.e, r.tokens.refresh_token, "client-a");
+    assert.ok(moved.ok && moved.tokens.refresh_token.startsWith("smr2.") && await mcp.verifyMcpAccess(h.e, moved.tokens.access_token));
+    const back = await h.refresh(app1.refreshToken);
+    assert.ok(back?.refreshToken.startsWith("sr2."));
+  });
+
+  it("knows a stolen token from before ADR 0040, after days of silence", async () => {
+    const h = await harness();
+    const old = "sr1.token_from_before_the_change";
+    const hash = await sha256Base64Url(old);
+    h.tokens.map.set(`api-refresh:${hash}`, USER);
+    h.db.prepare("INSERT INTO sessions (hash, createdAt, expiresAt, sid) VALUES (?, ?, ?, ?)").run(hash, Date.now(), Date.now() + 90 * DAY, "sid-old");
+    const thief = await h.refresh(old);
+    assert.ok(thief && await h.uses(thief.accessToken));
+    age(h.db, 2 * DAY);
+    await h.store.alarm();
+    const thief2 = await h.refresh(thief.refreshToken);
+    assert.ok(thief2 && await h.uses(thief2.accessToken));
+    assert.equal(await h.refresh(old), null);
+    assert.equal(await h.uses(thief2.accessToken), false);
+  });
+});
+
 describe("account deletion", () => {
+  it("can be retried after a failure and after a lost reply", async () => {
+    const h = await harness();
+    const s0 = await session.issueSession(h.e, USER);
+    let fail = true;
+    (h.env as Record<string, unknown>).ATTACHMENTS = { list: async () => { if (fail) throw new Error("r2 down"); return { objects: [], truncated: false }; }, delete: async () => {} };
+    const del = () => api.request("https://api.septena.app/account", { method: "DELETE", headers: { Authorization: `Bearer ${s0.accessToken}` } }, h.e);
+    assert.equal((await del()).status, 500);
+    fail = false;
+    assert.equal((await del()).status, 204);
+    assert.equal((await del()).status, 204, "the first 204 was lost");
+    const again = await session.issueSession(h.e, USER);
+    assert.equal((await del()).status, 401, "an old token never deletes the new account");
+    assert.ok(await h.uses(again.accessToken));
+  });
+
+  it("kills the agent tokens KV still holds", async () => {
+    const h = await harness();
+    h.env.SIGNED_SESSIONS = "false";
+    await session.issueSession(h.e, USER);
+    const agent = await mcp.issueMcpTokens(h.e, { userId: USER, clientId: "c", scope: "tasks:read" }, "family-0001");
+    await new Promise((r) => setTimeout(r, 5));
+    await h.store.deleteAccount();
+    assert.equal(await mcp.verifyMcpAccess(h.e, agent.access_token), null);
+    assert.equal((await mcp.redeemMcpRefresh(h.e, agent.refresh_token, "c")).ok, false);
+    await new Promise((r) => setTimeout(r, 5));
+    const next = await mcp.issueMcpTokens(h.e, { userId: USER, clientId: "c", scope: "tasks:read" }, "family-0009");
+    assert.ok(await mcp.verifyMcpAccess(h.e, next.access_token), "the account's next life is not affected");
+  });
+
   it("refuses every token of the account", async () => {
     const h = await harness();
     const app = await session.issueSession(h.e, USER);

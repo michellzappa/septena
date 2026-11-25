@@ -1,7 +1,7 @@
 import type { Env } from "../env.js";
 import { logEvent, randomId, sha256Base64Url } from "../util.js";
 import { getClient } from "../storage.js";
-import { logRenewal, mintRefresh, readRefresh, signAccessToken, storeFor, verifyAccessToken, type MintedRefresh } from "../api/session.js";
+import { issuesSignedTokens, logRenewal, mintRefresh, readRefresh, signAccessToken, storeFor, verifyAccessToken, type MintedRefresh } from "../api/session.js";
 import type { SessionGrant } from "../store/sessions.js";
 import { planFor } from "../entitlement/entitlement.js";
 
@@ -16,8 +16,9 @@ import { planFor } from "../entitlement/entitlement.js";
 //   sa1.  / sr2.   app session (session.ts)       — never accepted here
 //   sm2.  / smr2.  MCP task connector (this file) — accepted by /mcp and /v1/agent/events/stream only
 // Tokens from before ADR 0040 (`sm1.`, `smr1.`) lived in KV under `v2:`. They
-// still work: an `smr1.` moves into the store on its next renewal. Remove that
-// path after 2026-12-26, when the last one has expired.
+// still work. Until SIGNED_SESSIONS they are also still issued; after it an
+// `smr1.` moves into the store on its next renewal. Remove both paths 31 days
+// after the switch, when the last one has expired.
 
 export const MCP_READ_SCOPE = "tasks:read";
 export const MCP_WRITE_SCOPE = "tasks:write";
@@ -101,7 +102,43 @@ async function tokenResponse(env: Env, userId: string, familyId: string, scope: 
 
 const sessionGrant = (g: McpGrant): SessionGrant => ({ clientId: g.clientId, scope: g.scope, timeZone: g.timeZone });
 
+/// The KV tokens, until SIGNED_SESSIONS.
+async function issueLegacyTokens(env: Env, grant: McpGrant, familyId: string): Promise<McpTokenResponse> {
+  const access = `${LEGACY_ACCESS_PREFIX}${randomId(32)}`;
+  const refresh = `${LEGACY_REFRESH_PREFIX}${randomId(32)}`;
+  const now = Date.now();
+  const base: McpGrant = { userId: grant.userId, clientId: grant.clientId, scope: grant.scope, timeZone: grant.timeZone };
+  const aKey = await accessKey(access);
+  const rKey = await refreshKey(refresh);
+  const accessRec: AccessRecord = { ...base, familyId, expiresAt: now + ACCESS_TTL_S * 1000 };
+  const refreshRec: RefreshRecord = { ...base, familyId, expiresAt: now + REFRESH_TTL_S * 1000 };
+  const fam: FamilyRecord = { refreshKey: rKey, accessKey: aKey };
+  await Promise.all([
+    env.TOKENS.put(aKey, JSON.stringify(accessRec), { expirationTtl: ACCESS_TTL_S }),
+    env.TOKENS.put(rKey, JSON.stringify(refreshRec), { expirationTtl: REFRESH_TTL_S }),
+    env.TOKENS.put(familyKey(familyId), JSON.stringify(fam), { expirationTtl: REFRESH_TTL_S }),
+  ]);
+  await noteConnection(env, { ...base, label: grant.label }, familyId);
+  return { access_token: access, refresh_token: refresh, token_type: "Bearer", expires_in: ACCESS_TTL_S, scope: grant.scope };
+}
+
+/// Renews a KV token with KV tokens, until SIGNED_SESSIONS.
+async function rotateLegacy(env: Env, legacy: LegacyRefresh): Promise<McpTokenResponse> {
+  const { rec, key } = legacy;
+  const tokens = await issueLegacyTokens(env, rec, rec.familyId);
+  const spent: RefreshRecord = { ...rec, rotatedAt: Date.now() };
+  // KV refuses an expiration under 60s out; a token that close to expiry
+  // needs no replay marker.
+  if (rec.expiresAt - Date.now() > 61_000) {
+    await env.TOKENS.put(key, JSON.stringify(spent), { expiration: Math.ceil(rec.expiresAt / 1000) });
+  } else {
+    await env.TOKENS.delete(key);
+  }
+  return tokens;
+}
+
 export async function issueMcpTokens(env: Env, grant: McpGrant, familyId = randomId(16)): Promise<McpTokenResponse> {
+  if (!issuesSignedTokens(env)) return issueLegacyTokens(env, grant, familyId);
   const refresh = await mintRefresh(env, REFRESH_PREFIX, grant.userId, familyId, REFRESH_TTL_S);
   await storeFor(env, grant.userId).createSession(refresh.hash, refresh.expiresAt, familyId, sessionGrant(grant));
   await noteConnection(env, grant, familyId);
@@ -122,13 +159,15 @@ export async function verifyMcpAccess(env: Env, raw: string): Promise<McpGrant |
 async function verifyLegacyAccess(env: Env, raw: string): Promise<McpGrant | null> {
   const rec = await env.TOKENS.get(await accessKey(raw));
   if (!rec) return null;
+  let a: AccessRecord;
   try {
-    const a = JSON.parse(rec) as AccessRecord;
-    if (typeof a.userId !== "string" || Date.now() > a.expiresAt) return null;
-    return { userId: a.userId, clientId: a.clientId, scope: a.scope, timeZone: a.timeZone, familyId: a.familyId };
+    a = JSON.parse(rec) as AccessRecord;
   } catch {
     return null;
   }
+  if (typeof a.userId !== "string" || Date.now() > a.expiresAt) return null;
+  if (!(await storeFor(env, a.userId).legacyAgentAllowed(a.familyId, a.expiresAt - ACCESS_TTL_S * 1000))) return null;
+  return { userId: a.userId, clientId: a.clientId, scope: a.scope, timeZone: a.timeZone, familyId: a.familyId };
 }
 
 /// Lists the family in Settings > AI & Agents > Agents. The index never
@@ -138,7 +177,9 @@ async function noteConnection(env: Env, grant: McpGrant, familyId: string): Prom
     const client = await getClient(env, grant.clientId, MCP_CLIENT_PREFIX);
     const name = client?.name?.trim().slice(0, 60) || "Claude";
     const label = grant.label?.trim().slice(0, AGENT_NAME_MAX) || null;
-    await storeFor(env, grant.userId).recordConnection(familyId, grant.clientId, name, grant.scope, Date.now(), label);
+    const store = storeFor(env, grant.userId);
+    if (issuesSignedTokens(env)) await store.noteAgent(familyId, grant.clientId, name, grant.scope, Date.now(), label);
+    else await store.recordConnection(familyId, grant.clientId, name, grant.scope, Date.now(), label);
   } catch (e) {
     logEvent("mcp_connection_index_failed", { error: String(e) });
   }
@@ -178,18 +219,17 @@ export async function settleNewAgent(
 /// False when the family is not in this user's store.
 export async function disconnectFamily(env: Env, userId: string, familyId: string): Promise<boolean> {
   const store = storeFor(env, userId);
-  const had = await store.forgetConnection(familyId);
-  if (had) {
-    await store.endSession(familyId);
-    await revokeLegacyFamily(env, familyId);
-  }
-  return had;
+  // Each step repeats safely, and the last one drops the row: a disconnect
+  // that failed halfway can be retried.
+  if (!(await store.ownsAgent(familyId))) return false;
+  await revokeLegacyFamily(env, familyId);
+  return store.endAgent(familyId);
 }
 
 /// Ends a family whether or not it has a list row.
 async function endFamily(env: Env, userId: string, familyId: string): Promise<void> {
-  await storeFor(env, userId).endSession(familyId);
   await revokeLegacyFamily(env, familyId);
+  await storeFor(env, userId).endSession(familyId);
 }
 
 async function revokeLegacyFamily(env: Env, familyId: string): Promise<void> {
@@ -232,8 +272,16 @@ export async function redeemMcpRefresh(env: Env, raw: string, clientId: string):
       return { ok: false, reason: "replayed" };
     }
     if (legacy.rec.clientId !== clientId) return { ok: false, reason: "client_mismatch" };
+    if (Date.now() > legacy.rec.expiresAt) return { ok: false, reason: "expired" };
     ref = legacy.ref;
-    await storeFor(env, ref.userId).adoptSession(ref.hash, legacy.rec.expiresAt, ref.sid, sessionGrant(legacy.rec));
+    const store = storeFor(env, ref.userId);
+    const issuedAt = legacy.rec.expiresAt - REFRESH_TTL_S * 1000;
+    if (!(await store.legacyAgentAllowed(ref.sid, issuedAt))) return { ok: false, reason: "not_found" };
+    // A family that already moved stays in the store, also after a rollback.
+    if (!issuesSignedTokens(env) && !(await store.ownsMovedAgent(ref.sid))) {
+      return { ok: true, tokens: await rotateLegacy(env, legacy) };
+    }
+    await store.adoptSession(ref.hash, issuedAt, legacy.rec.expiresAt, ref.sid, sessionGrant(legacy.rec));
   }
   if (!ref) return { ok: false, reason: "not_found" };
 

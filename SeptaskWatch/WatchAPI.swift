@@ -102,6 +102,8 @@ actor WatchAPI {
     guard status == 200, let s = try? JSONDecoder().decode(Session.self, from: data) else {
       throw WatchAPIError.server(status)
     }
+    // A sign-out, or a session the phone handed over while we waited, wins.
+    guard WatchKeychain.load() == token else { throw WatchAPIError.network("the session changed") }
     // Store the new token first. Using the access token retires the old one
     // (ADR 0040), so a token that was not stored must stay unused.
     guard WatchKeychain.store(s.refreshToken) else { throw WatchAPIError.network("keychain unavailable") }

@@ -29,7 +29,8 @@ A renewal mints a child, and the parent stays good until the child is used, as
 a refresh token or through its access token. First use retires everything else
 in the session. A retired token that comes back after 30 seconds means two
 holders, so the whole session ends. Inside 30 seconds, two holders that raced
-from one parent both continue, for one generation.
+from one parent both continue, for one generation. The second must use its
+token inside those 30 seconds.
 
 Every request asks the object whether its session is alive. Ending a session
 takes effect on the next request and closes its open sockets. A store error
@@ -49,7 +50,9 @@ it on that device only, and signs out only on a 401 that says
 - A phone restored from a backup to new hardware asks for sign-in again.
 - A copy of an old token, for example in an old backup, ends that session.
 - Tokens from before this decision keep working and move over on their next
-  renewal.
+  renewal. The rollout has two steps (`SIGNED_SESSIONS`): the first version
+  reads the new tokens, the second issues them. A rollback signs nobody out.
+- Account deletion empties the store last, and a repeated deletion answers 204.
 
 ## Links
 

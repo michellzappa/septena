@@ -20,6 +20,12 @@ export const ACCESS_TTL_S = 60 * 60;
 const REFRESH_TTL_S = 180 * 24 * 60 * 60;
 const ACCESS_PREFIX = "sa1";
 const REFRESH_PREFIX = "sr2";
+const LEGACY_REFRESH_PREFIX = "sr1";
+
+/// Two-step rollout: a version that accepts the ADR 0040 tokens ships first,
+/// and issues them only after the switch, so no Worker in flight, and no
+/// rollback, ever meets a token it cannot read. Remove with the KV tokens.
+export const issuesSignedTokens = (env: Env) => env.SIGNED_SESSIONS === "true";
 
 async function hmacKey(secret: string): Promise<CryptoKey> {
   const raw = Uint8Array.from(atob(secret), (c) => c.charCodeAt(0));
@@ -110,6 +116,14 @@ export async function mintRefresh(env: Env, prefix: string, userId: string, sid:
   return { token, hash: await sha256Base64Url(token), expiresAt: Date.now() + ttlSeconds * 1000 };
 }
 
+async function mintAppRefresh(env: Env, userId: string, sid: string): Promise<MintedRefresh> {
+  if (issuesSignedTokens(env)) return mintRefresh(env, REFRESH_PREFIX, userId, sid, REFRESH_TTL_S);
+  const token = `${LEGACY_REFRESH_PREFIX}.${randomId(32)}`;
+  const hash = await sha256Base64Url(token);
+  await env.TOKENS.put(`api-refresh:${hash}`, userId, { expirationTtl: REFRESH_TTL_S });
+  return { token, hash, expiresAt: Date.now() + REFRESH_TTL_S * 1000 };
+}
+
 export interface RefreshRef {
   userId: string;
   sid: string;
@@ -135,7 +149,7 @@ async function issued(env: Env, userId: string, sid: string, refresh: MintedRefr
 
 export async function issueSession(env: Env, userId: string): Promise<IssuedSession> {
   const sid = crypto.randomUUID();
-  const refresh = await mintRefresh(env, REFRESH_PREFIX, userId, sid, REFRESH_TTL_S);
+  const refresh = await mintAppRefresh(env, userId, sid);
   await storeFor(env, userId).createSession(refresh.hash, refresh.expiresAt, sid);
   return issued(env, userId, sid, refresh);
 }
@@ -143,7 +157,7 @@ export async function issueSession(env: Env, userId: string): Promise<IssuedSess
 /// A refresh token from before ADR 0040 (`sr1.`): a KV entry names the user.
 /// The entry stays until it expires; the store alone says if the token is good.
 async function readLegacyRefresh(env: Env, token: string): Promise<RefreshRef | null> {
-  if (!token.startsWith("sr1.")) return null;
+  if (!token.startsWith(`${LEGACY_REFRESH_PREFIX}.`)) return null;
   const hash = await sha256Base64Url(token);
   const userId = await env.TOKENS.get(`api-refresh:${hash}`);
   const sid = userId ? await storeFor(env, userId).sessionIdFor(hash) : null;
@@ -156,7 +170,7 @@ const resolveRefresh = async (env: Env, token: string) =>
 export async function refreshSession(env: Env, refreshToken: string): Promise<IssuedSession | null> {
   const ref = await resolveRefresh(env, refreshToken);
   if (!ref) return null;
-  const next = await mintRefresh(env, REFRESH_PREFIX, ref.userId, ref.sid, REFRESH_TTL_S);
+  const next = await mintAppRefresh(env, ref.userId, ref.sid);
   const res = await storeFor(env, ref.userId).renewSession(ref.hash, next.hash, next.expiresAt, ref.sid);
   logRenewal("app", ref.userId, res);
   return res.ok ? issued(env, ref.userId, ref.sid, next) : null;
@@ -165,6 +179,15 @@ export async function refreshSession(env: Env, refreshToken: string): Promise<Is
 export async function revokeSession(env: Env, refreshToken: string): Promise<void> {
   const ref = await resolveRefresh(env, refreshToken);
   if (ref) await storeFor(env, ref.userId).revokeSession(ref.hash, ref.sid);
+}
+
+/// An access token whose account is already deleted: a repeated `DELETE
+/// /v1/account` (the first reply was lost) has nothing left to do.
+export async function accountAlreadyDeleted(env: Env, token: string): Promise<boolean> {
+  const claims = await verifyAccessToken(env, token);
+  if (!claims) return false;
+  const store = storeFor(env, claims.userId);
+  return (await store.wasDeleted()) && !(await store.hasAppSession());
 }
 
 /// The request with the session that opened it, for a stream the store holds
