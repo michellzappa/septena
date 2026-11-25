@@ -15,9 +15,7 @@ import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
-import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.core.generated.RegistryTaskAttributeIds
-import app.septena.core.stringValue
 import java.time.Instant
 import java.time.LocalDate
 import java.util.Locale
@@ -51,12 +49,10 @@ internal object SeptenaWidgetLoader {
         val now = clock.now()
         val today = clock.today(now)
         val todayLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag)
-            ?.takeIf(String::isNotBlank).orEmpty()
-        val overdueLabel = (RegistryCatalog.surface(RegistrySurfaceIds.TASK_DATE_BOARD)?.fields?.get("overdue") as? JsonValue.ObjectValue)
-            ?.fields?.get("label")
-            .stringValue()
-            ?.let { RegistryCatalog.localizedString(it, languageTag) ?: it }
-            .orEmpty()
+            ?.takeIf(String::isNotBlank)
+            ?: RegistryCatalog.localizedString("Today", languageTag)?.takeIf(String::isNotBlank)
+            ?: "Today"
+        val overdueLabel = RegistryCatalog.localizedString("Overdue", languageTag) ?: "Overdue"
         val emptyLabel = RegistryCatalog.destinationEmptyTitle(RegistryDestinationIds.TODAY, languageTag)
             ?.takeIf(String::isNotBlank) ?: "All clear for today"
 
@@ -115,13 +111,19 @@ internal object SeptenaWidgetLoader {
         val now = clock.now()
         val today = clock.today(now)
         val upcomingTitle = RegistryCatalog.destinationTitle(RegistryDestinationIds.UPCOMING, languageTag)
-            ?.takeIf(String::isNotBlank).orEmpty()
+            ?.takeIf(String::isNotBlank)
+            ?: RegistryCatalog.localizedString("Upcoming", languageTag)?.takeIf(String::isNotBlank)
+            ?: "Upcoming"
         val todayLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag)
-            ?.takeIf(String::isNotBlank).orEmpty()
+            ?.takeIf(String::isNotBlank)
+            ?: RegistryCatalog.localizedString("Today", languageTag)?.takeIf(String::isNotBlank)
+            ?: "Today"
         val tomorrowLabel = RegistryCatalog.dateBoardRows(
             RegistryTaskAttributeIds.WHEN,
             languageTag = languageTag,
-        ).firstOrNull { it.kind == DateBoardRowKinds.TOMORROW }?.label.orEmpty()
+        ).firstOrNull { it.kind == DateBoardRowKinds.TOMORROW }?.label?.takeIf(String::isNotBlank)
+            ?: RegistryCatalog.localizedString("Tomorrow", languageTag)?.takeIf(String::isNotBlank)
+            ?: "Tomorrow"
         val emptyLabel = RegistryCatalog.destinationEmptyTitle(RegistryDestinationIds.UPCOMING, languageTag)
             ?.takeIf(String::isNotBlank) ?: "Nothing scheduled"
 
