@@ -95,7 +95,6 @@ enum TaskDestinations {
     if !LocalCache.tasks(in: context, filter: .agent).isEmpty { nonEmpty.insert("agent") }
     if !LocalCache.tasks(in: context, filter: .starred).isEmpty { nonEmpty.insert("starred") }
     if !LocalCache.tasks(in: context, filter: .faded).isEmpty { nonEmpty.insert("faded") }
-    if !LocalCache.tasks(in: context, filter: .recentlyDeleted).isEmpty { nonEmpty.insert("recentlyDeleted") }
     return nonEmpty
   }
 

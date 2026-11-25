@@ -31,7 +31,7 @@ object SmartListResolver {
         return list.mapNotNull { raw ->
             val obj = raw as? JsonValue.ObjectValue ?: return@mapNotNull null
             val visibility = obj.fields["visibility"].stringValue() ?: return@mapNotNull null
-            if (visibility == "todayBand") return@mapNotNull null
+            if (visibility == "todayBand" || visibility == "logbookTab") return@mapNotNull null
             val id = obj.fields["id"].stringValue() ?: return@mapNotNull null
             val section = SmartListSection.fromWire(obj.fields["sidebarSection"].stringValue())
                 ?: SmartListSection.TOP
