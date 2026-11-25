@@ -74,9 +74,15 @@ class MainActivity : ComponentActivity() {
         SeptenaWidgetIntents.parseLaunchAction(intent)?.let { pendingWidgetAction.value = it }
     }
 
-    /** Foreground fetch is the refresh path (no push yet), as on Apple. */
+    /** Opens live WebSocket nudges + foreground fallback polling and pulls immediately. */
     override fun onStart() {
         super.onStart()
-        if (graph.credentials.signedIn.value) graph.sync.requestSync()
+        graph.liveSync.onActivityStarted()
+    }
+
+    /** Closes the live socket and pauses polling while backgrounded (with a brief rotation grace window). */
+    override fun onStop() {
+        graph.liveSync.onActivityStopped()
+        super.onStop()
     }
 }
