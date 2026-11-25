@@ -71,7 +71,7 @@ const VISUAL = {
   "agent-result": {
     fruit: "carambola", texture: "stippleDrift",
     shot: { ring: { element: "task-review-1" } },
-    card: { kind: "review", element: "task-review-1", top: 2110 },
+    card: { kind: "review", element: "task-review-1", top: 1840 },
   },
   // Slide 6: the list that lets go (T4). The Faded list, and the weekly
   // notice from the registry, counted from the screen.
