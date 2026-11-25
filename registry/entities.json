@@ -36,6 +36,8 @@
     "maxRefsPerTask": 20,
     "refKeyMax": 1000,
     "refSnapshotMax": 2048,
+    "doPlannedMinutesMax": 240,
+    "doNoteMax": 500,
     "maxArtifactRefs": 100,
     "turnProviderMax": 32,
     "turnQuestionMax": 10000,
@@ -217,6 +219,23 @@
         "name": { "kind": "text", "max": 64, "nullable": false },
         "color": { "kind": "text", "max": 32, "nullable": true },
         "position": { "kind": "int", "nullable": true }
+      }
+    },
+    "doSession": {
+      "table": "do_sessions",
+      "deletable": true,
+      "requiredOnInsert": ["taskId", "startedAt"],
+      "updatable": ["plannedMinutes", "confirmedAt", "endedAt", "exit", "lapsed", "note"],
+      "columns": {
+        "taskId": { "kind": "text", "format": "id", "nullable": false },
+        "startedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": false },
+        "plannedMinutes": { "kind": "int", "min": 1, "max": 240, "nullable": true },
+        "confirmedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "endedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "exit": { "kind": "text", "enum": "doExit", "nullable": true },
+        "lapsed": { "kind": "bool", "default": 0 },
+        "note": { "kind": "text", "max": 500, "nullable": true },
+        "sourceClient": { "kind": "text", "max": 64, "nullable": true }
       }
     },
     "convo": {

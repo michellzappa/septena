@@ -10,7 +10,7 @@
         "fr" : { "stringUnit" : { "state" : "translated", "value" : "Septena affiche les événements de calendrier du jour au-dessus de votre liste de tâches." } },
         "it" : { "stringUnit" : { "state" : "translated", "value" : "Septena mostra gli eventi del calendario di oggi sopra l’elenco delle tue attività." } },
         "nl" : { "stringUnit" : { "state" : "translated", "value" : "Septena toont de agenda-items van vandaag boven je takenlijst." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena mostra os eventos de hoje acima da sua lista de tarefas." } }
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O app Septena mostra os eventos de hoje acima da sua lista de tarefas." } }
       }
     },
     "NSCalendarsUsageDescription" : {
@@ -22,7 +22,7 @@
         "fr" : { "stringUnit" : { "state" : "translated", "value" : "Septena affiche les événements de calendrier du jour au-dessus de votre liste de tâches." } },
         "it" : { "stringUnit" : { "state" : "translated", "value" : "Septena mostra gli eventi del calendario di oggi sopra l’elenco delle tue attività." } },
         "nl" : { "stringUnit" : { "state" : "translated", "value" : "Septena toont de agenda-items van vandaag boven je takenlijst." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena mostra os eventos de hoje acima da sua lista de tarefas." } }
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O app Septena mostra os eventos de hoje acima da sua lista de tarefas." } }
       }
     },
     "NSCameraUsageDescription" : {
@@ -34,7 +34,7 @@
         "fr" : { "stringUnit" : { "state" : "translated", "value" : "Septena utilise l’appareil photo pour scanner les codes de connexion de vos autres appareils." } },
         "it" : { "stringUnit" : { "state" : "translated", "value" : "Septena usa la fotocamera per scansionare i codici di accesso dagli altri dispositivi." } },
         "nl" : { "stringUnit" : { "state" : "translated", "value" : "Septena gebruikt de camera om aanmeldcodes van je andere apparaten te scannen." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena usa a câmera para ler códigos de acesso dos seus outros dispositivos." } }
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O app Septena usa a câmera para escanear os códigos de acesso dos seus outros dispositivos." } }
       }
     },
     "NSRemindersFullAccessUsageDescription" : {
@@ -46,7 +46,7 @@
         "fr" : { "stringUnit" : { "state" : "translated", "value" : "Septena déplace les rappels de vos listes Rappels vers la boîte de réception et les supprime de Rappels." } },
         "it" : { "stringUnit" : { "state" : "translated", "value" : "Septena sposta i promemoria dai tuoi elenchi nella Posta in arrivo e li elimina da Promemoria." } },
         "nl" : { "stringUnit" : { "state" : "translated", "value" : "Septena verplaatst herinneringen uit je Herinneringen-lijsten naar je Postvak IN en verwijdert ze uit Herinneringen." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena move lembretes das suas listas do Lembretes para a Entrada e os apaga do Lembretes." } }
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O app Septena move os lembretes das suas listas no app Lembretes para a Caixa de entrada e os apaga do app Lembretes." } }
       }
     },
     "NSRemindersUsageDescription" : {
@@ -58,7 +58,7 @@
         "fr" : { "stringUnit" : { "state" : "translated", "value" : "Septena déplace les rappels de vos listes Rappels vers la boîte de réception et les supprime de Rappels." } },
         "it" : { "stringUnit" : { "state" : "translated", "value" : "Septena sposta i promemoria dai tuoi elenchi nella Posta in arrivo e li elimina da Promemoria." } },
         "nl" : { "stringUnit" : { "state" : "translated", "value" : "Septena verplaatst herinneringen uit je Herinneringen-lijsten naar je Postvak IN en verwijdert ze uit Herinneringen." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena move lembretes das suas listas do Lembretes para a Entrada e os apaga do Lembretes." } }
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O app Septena move os lembretes das suas listas no app Lembretes para a Caixa de entrada e os apaga do app Lembretes." } }
       }
     }
   },

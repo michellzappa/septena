@@ -16,6 +16,8 @@ export interface TaskOut {
   status: string;
   today: boolean;
   starred?: boolean;
+  /// The user does this task now (docs/DO_SPEC.md §6).
+  doing?: true;
   tags?: string[];
   scheduled?: string;
   startTime?: string;
