@@ -612,7 +612,7 @@ export function SeptenaApp() {
       if (membership.matchesView.today) counts.today++;
       const reviewGroup = reviewGroupOf(task, convoState);
       if (reviewGroup && reviewGroup !== "faded") counts.review++;
-      if (agentGroupOf(convoState)) counts.agent++;
+      if (agentGroupOf(task, convoState)) counts.agent++;
       if (membership.matchesView.upcoming) counts.upcoming++;
       if (task.recurrenceUnit) counts.repeating++;
       if (membership.matchesView.anytime) counts.anytime++;
@@ -700,7 +700,7 @@ export function SeptenaApp() {
         switch (destination.id) {
           case "today": return membership.matchesView.today;
           case "review": return reviewGroupOf(task, convoState) !== null;
-          case "agent": return agentGroupOf(convoState) !== null;
+          case "agent": return agentGroupOf(task, convoState) !== null;
           case "upcoming": return membership.matchesView.upcoming;
           case "repeating": return Boolean(task.recurrenceUnit);
           case "anytime": return membership.matchesView.anytime;
@@ -845,7 +845,7 @@ export function SeptenaApp() {
     return destinationGroups("agent")
       .map((group) => ({
         ...group,
-        items: listedTasks.filter((i) => agentGroupOf(i.convoState) === group.id),
+        items: listedTasks.filter((i) => agentGroupOf(i.task, i.convoState) === group.id),
       }))
       .filter((g) => g.items.length > 0);
   }, [destination, listedTasks]);
@@ -955,6 +955,31 @@ export function SeptenaApp() {
       });
     },
     [engine, undoStack],
+  );
+
+  // Open a task in the list or on its page. Opening a faded task keeps it
+  // (docs/TASK_FADE_SPEC.md §4). A kept row leaves the Faded group, so from
+  // Review it opens on the page, which stays.
+  const openTask = useCallback(
+    (task: TaskRow, surface: "inline" | "page" = "inline") => {
+      const faded = task.status === "open" && !task.deletedAt && Boolean(task.fadedAt);
+      if (faded) void keepFaded(task);
+      const onReview = destination.kind === "smart" && destination.id === "review";
+      if (surface === "page" || (faded && onReview)) {
+        setTaskPageId(task.id);
+      } else {
+        setExpandedTaskId(task.id);
+      }
+    },
+    [destination, keepFaded],
+  );
+
+  const toggleExpanded = useCallback(
+    (task: TaskRow) => {
+      if (expandedTaskId === task.id) setExpandedTaskId(null);
+      else openTask(task);
+    },
+    [expandedTaskId, openTask],
   );
 
   const letGoFaded = useCallback(
@@ -1263,12 +1288,13 @@ export function SeptenaApp() {
         }
         if (primary && e.altKey && key === "i") {
           e.preventDefault();
-          setTaskPageId((prev) => (prev === single.id ? null : single.id));
+          if (taskPageId === single.id) setTaskPageId(null);
+          else openTask(single, "page");
           return;
         }
         if (primary && !e.shiftKey && !e.altKey && key === "r") {
           e.preventDefault();
-          setExpandedTaskId(single.id);
+          openTask(single);
           return;
         }
         if (primary && e.shiftKey && e.key === ".") {
@@ -1309,7 +1335,8 @@ export function SeptenaApp() {
         }
       } else if (e.key === "Enter" && selectedTaskId) {
         e.preventDefault();
-        setExpandedTaskId((prev) => (prev === selectedTaskId ? null : selectedTaskId));
+        const selected = visibleTasks.find((v) => v.task.id === selectedTaskId);
+        if (selected) toggleExpanded(selected.task);
       } else if (e.key === "Escape") {
         setExpandedTaskId(null);
         setSelectedTaskId(null);
@@ -1330,6 +1357,7 @@ export function SeptenaApp() {
     handleChangePref,
     handleCopyTasks,
     navigateTo,
+    openTask,
     prefs.textSizeStep,
     quickAddOpen,
     quickFindOpen,
@@ -1339,7 +1367,9 @@ export function SeptenaApp() {
     showToast,
     sidebarDestinations.all,
     sweepTasks,
+    taskPageId,
     toggleDone,
+    toggleExpanded,
     undoStack,
     visibleTasks,
   ]);
@@ -1603,7 +1633,7 @@ export function SeptenaApp() {
         }
         setSelectedIds(new Set([task.id]));
         setSelectedTaskId(task.id);
-        setExpandedTaskId((prev) => (prev === task.id ? null : task.id));
+        toggleExpanded(task);
       },
       onContextMenu: (e) => {
         e.preventDefault();
@@ -1685,13 +1715,13 @@ export function SeptenaApp() {
               kind: "item",
               label: "Open Task Page",
               shortcut: "⌘⌥I",
-              onSelect: () => setTaskPageId(task.id),
+              onSelect: () => openTask(task, "page"),
             },
             {
               kind: "item",
               label: "Rename / Edit",
               shortcut: "⌘R",
-              onSelect: () => setExpandedTaskId(task.id),
+              onSelect: () => openTask(task),
             },
             {
               kind: "item",
@@ -1751,7 +1781,7 @@ export function SeptenaApp() {
         e.preventDefault();
         void handleDropOnTask(task.id);
       },
-      onOpenTaskPage: () => setTaskPageId(task.id),
+      onOpenTaskPage: () => openTask(task, "page"),
       onCollapse: () => setExpandedTaskId(null),
       onToggleDone: () => void toggleDone(task),
       onToggleToday: async () => {
@@ -2449,7 +2479,7 @@ export function SeptenaApp() {
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => setTaskPageId(dueReminderTask.id)}
+                    onClick={() => openTask(dueReminderTask, "page")}
                     className="rounded-md bg-[var(--bg-hover)] px-2 py-1 font-medium text-[var(--text-primary)]"
                   >
                     Open
@@ -3080,7 +3110,7 @@ export function SeptenaApp() {
           }
           setSelectedTaskId(task.id);
           setSelectedIds(new Set([task.id]));
-          setExpandedTaskId(task.id);
+          openTask(task);
         }}
         onSelectTagFilter={(tid) => {
           setDestination({ kind: "smart", id: "anytime" });

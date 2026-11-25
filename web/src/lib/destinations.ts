@@ -58,8 +58,12 @@ export function reviewGroupOf(
 
 const AGENT_GROUP_IDS = new Set(destinationGroups("agent").map((g) => g.id));
 
-/** The Agent group of a conversation. What waits on the user is in Review instead. */
-export function agentGroupOf(convoState: Pick<CoreConversationState, "agentStage"> | null): string | null {
+/** The Agent group a task is in, or null. A faded task and what waits on the user are in Review instead. */
+export function agentGroupOf(
+  task: Pick<TaskRow, "fadedAt">,
+  convoState: Pick<CoreConversationState, "agentStage"> | null,
+): string | null {
+  if (task.fadedAt) return null;
   const stage = convoState?.agentStage;
   return stage && AGENT_GROUP_IDS.has(stage) ? stage : null;
 }

@@ -26,10 +26,11 @@ test("a task is in one Review group", () => {
 
 test("Agent shows work in progress only", () => {
   for (const stage of ["working", "queued", "stopped", "done"] as const) {
-    assert.equal(agentGroupOf({ agentStage: stage }), stage);
+    assert.equal(agentGroupOf(task(), { agentStage: stage }), stage);
   }
-  for (const stage of ["yourTurn", "review", null] as const) assert.equal(agentGroupOf({ agentStage: stage }), null);
-  assert.equal(agentGroupOf(null), null);
+  for (const stage of ["yourTurn", "review", null] as const) assert.equal(agentGroupOf(task(), { agentStage: stage }), null);
+  assert.equal(agentGroupOf(task(), null), null);
+  assert.equal(agentGroupOf(task({ fadedAt: "2026-11-20T10:00:00Z" }), { agentStage: "queued" }), null);
 });
 
 test("the fade input marks an unaccepted proposal", () => {
