@@ -64,6 +64,7 @@ type StoreMethod =
   | "readChecklistItems" | "readChecklistItem" | "readChecklistCounts"
   | "readTags" | "readTagByName"
   | "readOrderTop" | "readSetting" | "push" | "captureTask" | "claim" | "release" | "agentEvents" | "history" | "head"
+  | "readDoing" | "readDoSession" | "readDoSessions"
   | "addUsage" | "connectionName"
   | "readNote" | "noteRevisions" | "readContainer" | "readContainerTasks";
 export type StoreRpc = {
@@ -319,6 +320,15 @@ export async function runWriteTool(ctx: WriteContext, name: WriteToolName, args:
 async function push(store: StoreRpc, actor: string | undefined, ops: NewOp[]): Promise<OpResult[]> {
   const { result } = await store.push(mintOps(ops), actor ?? MCP_ACTOR);
   return result.results;
+}
+
+/// One push by a person's client. Throws when an op was refused.
+export async function pushOps(ctx: WriteContext, ops: NewOp[]): Promise<void> {
+  const results = await push(ctx.store, ctx.actor, ops);
+  for (const r of results) {
+    if (r.status === "rejected") throw new Error(/unknown_task|missing_required/.test(r.reason) ? "Task not found" : r.reason);
+    if (r.status === "dropped") throw new Error("Task not found");
+  }
 }
 
 /// The ops with their clientOpIds, checked.

@@ -45,6 +45,8 @@ enum RegistryEntityLimits {
   static let maxRefsPerTask: Int = 20
   static let refKeyMax: Int = 1000
   static let refSnapshotMax: Int = 2048
+  static let doPlannedMinutesMax: Int = 240
+  static let doNoteMax: Int = 500
   static let maxArtifactRefs: Int = 100
   static let turnProviderMax: Int = 32
   static let turnQuestionMax: Int = 10000
@@ -84,8 +86,8 @@ enum RegistryEntityEnums {
   static let appIconFinish: [String] = ["obsidian", "ceramic", "framed"]
   static let canvasTexture: [String] = ["none", "topography", "fieldMatrix", "stippleDrift", "ridges", "washiPaper"]
   static let textureMotion: [String] = ["still", "slowDrift"]
-  static let entityNames: [String] = ["task", "area", "project", "attachment", "checklistItem", "taskRef", "tag", "convo", "setting"]
-  static let deletableEntities: [String] = ["task", "area", "project", "attachment", "checklistItem", "taskRef", "tag"]
+  static let entityNames: [String] = ["task", "area", "project", "attachment", "checklistItem", "taskRef", "tag", "doSession", "convo", "setting"]
+  static let deletableEntities: [String] = ["task", "area", "project", "attachment", "checklistItem", "taskRef", "tag", "doSession"]
 }
 
 /// Canonical conversation turn fields shared with the backend (`registry/entities.json`).

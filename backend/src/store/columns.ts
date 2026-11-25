@@ -36,6 +36,8 @@ const zIanaTz = z.string().max(64).refine(isValidTz, "unknown time zone").nullab
 // (yyyy-MM-dd'T'HH:mm:ss, no zone) also passes.
 const zStamp = z.string().regex(new RegExp(ENTITY_PATTERNS.stamp), "expected ISO time").max(ENTITY_LIMITS.stampMax).nullable();
 const stamp = (): Column => ({ kind: "text", zod: zStamp });
+// A stamp with its zone: the core reads it as an instant.
+const zInstant = z.string().datetime({ offset: true }).max(ENTITY_LIMITS.stampMax);
 
 // An agent's proposed new brief for a project's or an area's notes (ADR 0012).
 // The user accepts or rejects it in the app, which clears it with null.
@@ -311,6 +313,25 @@ export const ENTITIES = {
     },
     requiredOnInsert: ["name"],
     updatable: ["name", "color", "position"],
+  },
+  // One Do of a task (docs/DO_SPEC.md §2, ADR 0041). The open row is the
+  // current Do; the closed rows are the history. TaskStore.resolveDo keeps the
+  // rules of §2.1 with the shared core.
+  doSession: {
+    table: "do_sessions",
+    columns: {
+      taskId: { kind: "text", zod: zId },
+      startedAt: { kind: "text", zod: zInstant },
+      plannedMinutes: { kind: "int", zod: z.number().int().min(1).max(ENTITY_LIMITS.doPlannedMinutesMax).nullable() },
+      confirmedAt: { kind: "text", zod: zInstant.nullable() },
+      endedAt: { kind: "text", zod: zInstant.nullable() },
+      exit: { kind: "text", zod: z.enum(ENTITY_ENUMS.doExit).nullable() },
+      lapsed: bool(),
+      note: text(ENTITY_LIMITS.doNoteMax),
+      sourceClient: text(64),
+    },
+    requiredOnInsert: ["taskId", "startedAt"],
+    updatable: ["plannedMinutes", "confirmedAt", "endedAt", "exit", "lapsed", "note"],
   },
   // The non-turn half of `TaskConvo` (SeptenaCore/TaskConvo.swift), keyed by
   // the task id. Turns are their own append-only table (§5.3).

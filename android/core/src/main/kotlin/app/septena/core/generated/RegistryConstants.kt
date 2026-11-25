@@ -36,6 +36,8 @@ object RegistryEntityLimits {
     const val MAX_REFS_PER_TASK: Long = 20L
     const val REF_KEY_MAX: Long = 1000L
     const val REF_SNAPSHOT_MAX: Long = 2048L
+    const val DO_PLANNED_MINUTES_MAX: Long = 240L
+    const val DO_NOTE_MAX: Long = 500L
     const val MAX_ARTIFACT_REFS: Long = 100L
     const val TURN_PROVIDER_MAX: Long = 32L
     const val TURN_QUESTION_MAX: Long = 10000L
@@ -60,6 +62,8 @@ object RegistryEntityLimits {
         "maxRefsPerTask" to MAX_REFS_PER_TASK,
         "refKeyMax" to REF_KEY_MAX,
         "refSnapshotMax" to REF_SNAPSHOT_MAX,
+        "doPlannedMinutesMax" to DO_PLANNED_MINUTES_MAX,
+        "doNoteMax" to DO_NOTE_MAX,
         "maxArtifactRefs" to MAX_ARTIFACT_REFS,
         "turnProviderMax" to TURN_PROVIDER_MAX,
         "turnQuestionMax" to TURN_QUESTION_MAX,
@@ -1259,6 +1263,113 @@ object RegistryEntities {
                 ),
             ),
         ),
+        "doSession" to RegistryEntitySpec(
+            table = "do_sessions",
+            deletable = true,
+            requiredOnInsert = setOf("taskId", "startedAt"),
+            updatable = setOf("plannedMinutes", "confirmedAt", "endedAt", "exit", "lapsed", "note"),
+            columns = linkedMapOf(
+                "taskId" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "id",
+                    enumName = null,
+                    nullable = false,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "startedAt" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "stamp",
+                    enumName = null,
+                    nullable = false,
+                    min = null,
+                    max = 40L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "plannedMinutes" to RegistryColumnSpec(
+                    kind = "int",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = 1.0,
+                    max = 240L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "confirmedAt" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "stamp",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 40L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "endedAt" to RegistryColumnSpec(
+                    kind = "text",
+                    format = "stamp",
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 40L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "exit" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = "doExit",
+                    nullable = true,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "lapsed" to RegistryColumnSpec(
+                    kind = "bool",
+                    format = null,
+                    enumName = null,
+                    nullable = null,
+                    min = null,
+                    max = null,
+                    maxJsonLength = null,
+                    defaultJson = "0",
+                    serverOwned = false,
+                ),
+                "note" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 500L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+                "sourceClient" to RegistryColumnSpec(
+                    kind = "text",
+                    format = null,
+                    enumName = null,
+                    nullable = true,
+                    min = null,
+                    max = 64L,
+                    maxJsonLength = null,
+                    defaultJson = null,
+                    serverOwned = false,
+                ),
+            ),
+        ),
         "convo" to RegistryEntitySpec(
             table = "convos",
             deletable = false,
@@ -1536,6 +1647,17 @@ object RegistryEntityFields {
         const val COLOR: String = "color"
         const val POSITION: String = "position"
     }
+    object DoSession {
+        const val TASK_ID: String = "taskId"
+        const val STARTED_AT: String = "startedAt"
+        const val PLANNED_MINUTES: String = "plannedMinutes"
+        const val CONFIRMED_AT: String = "confirmedAt"
+        const val ENDED_AT: String = "endedAt"
+        const val EXIT: String = "exit"
+        const val LAPSED: String = "lapsed"
+        const val NOTE: String = "note"
+        const val SOURCE_CLIENT: String = "sourceClient"
+    }
     object Convo {
         const val CONFIRMED_INTENT: String = "confirmedIntent"
         const val ACCEPTANCE: String = "acceptance"
@@ -1564,10 +1686,11 @@ object RegistryEntityNames {
     const val CHECKLIST_ITEM: String = "checklistItem"
     const val TASK_REF: String = "taskRef"
     const val TAG: String = "tag"
+    const val DO_SESSION: String = "doSession"
     const val CONVO: String = "convo"
     const val SETTING: String = "setting"
-    val all: List<String> = listOf("task", "area", "project", "attachment", "checklistItem", "taskRef", "tag", "convo", "setting")
-    val deletable: Set<String> = setOf("task", "area", "project", "attachment", "checklistItem", "taskRef", "tag")
+    val all: List<String> = listOf("task", "area", "project", "attachment", "checklistItem", "taskRef", "tag", "doSession", "convo", "setting")
+    val deletable: Set<String> = setOf("task", "area", "project", "attachment", "checklistItem", "taskRef", "tag", "doSession")
 }
 
 /** Numeric domain constants shared with the backend and Apple clients. */
@@ -2667,7 +2790,7 @@ object RegistryCapabilities {
 /** Complete canonical registry documents for Kotlin/JVM clients. */
 object RegistryDocuments {
     val entitiesJson: String = listOf(
-        "{\"version\":1,\"turnFields\":[\"role\",\"step\",\"provider\",\"confidence\",\"question\",\"options\",\"chosen\",\"otherText\",\"inReplyTo\",\"note\",\"ts\"],\"patterns\":{\"id\":\"^[A-Za-z0-9._:-]{1,128}\$\",\"clientOpId\":\"^[A-Za-z0-9_-]{8,64}\$\",\"day\":\"^\\\\d{4}-\\\\d{2}-\\\\d{2}\$\",\"time24\":\"^([01]\\\\d|2[0-3]):[0-5]\\\\d\$\",\"stamp\":\"^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}\"},\"limits\":{\"textMax\":2000,\"notesMax\":100000,\"attachmentPointerMax\":4000,\"stampMax\":40,\"maxAttachmentBytes\":26214400,\"maxUserAttachmentBytes\":2147483648,\"maxOpsPerPush\":500,\"maxPull\":1000,\"maxChecklistItemsPerTask\":200,\"maxTagsPerTask\":20,\"tagNameMax\":64,\"maxSubtasks\":500,\"maxRefsPerTask\":20,\"refKeyMax\":1000,\"refSnapshotMax\":2048,\"maxArtifactRefs\":100,\"turnProviderMax\":32,\"turnQuestionMax\":10000,\"turnOptionMax\":500,\"turnMaxOptions\":20,\"turnChosenMax\":500,\"turnOtherTextMax\":10000,\"turnNoteMax\":100000},\"enums\":{\"taskStatus\":[\"open\",\"done\",\"cancelled\"],\"taskSource\":[\"app\",\"mcp\"],\"projectStatus\":[\"active\",\"done\",\"cancelled\"],\"taskKind\":[\"heading\"],\"recurrenceUnit\":[\"day\",\"week\",\"month\",\"year\"],\"reminderMode\":[\"floating\",\"fixed\"],\"convoAssignee\":[\"me\",\"local\",\"claude\"],\"convoEndState\":[\"agent_done\",\"human_done\",\"agent_assisted_done\",\"needs_verify\",\"decomposed\",\"reminder_set\",\"promoted_to_today\",\"wont_do\",\"open\"],\"convoHandoffActionType\":[\"open_url\",\"compose\",\"call\",\"none\"],\"convoTurnRole\":[\"user\",\"provider\"],\"convoTurnStep\":[\"confirm\",\"ground\",\"scope\",\"decide\",\"work\"],\"doExit\":[\"done\",\"stopped\",\"later\",\"replaced\",\"closed\"],\"taskRefRole\":[\"about\",\"from\",\"blocked_by\",\"follow_up\"],\"telemetryLevel\":[\"none\",\"minimal\",\"balanced\",\"full\"],\"appearanceMode\":[\"system\",\"light\",\"dark\"],\"accentColor\":[\"colorful\",\"tamarillo\",\"persimmon\",\"yuzu\",\"carambola\",\"haskap\",\"acai\",\"pitaya\",\"jabuticaba\"],\"appIconFinish\":[\"obsidian\",\"ceramic\",\"framed\"],\"canvasTexture\":[\"none\",\"topography\",\"fieldMatrix\",\"stippleDrift\",\"ridges\",\"washiPaper\"],\"textureMotion\":[\"still\",\"slowDrift\"]},\"entities\":{\"task\":{\"table\":\"tasks\",\"deletable\":true,\"requiredOnInsert\":[\"title\",\"status\"],\"columns\":{\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":true},\"status\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"kind\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"heading\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"area\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"project\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"created\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"scheduled\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"startTime\":{\"kind\":\"text\",\"format\":\"time24\",\"max\":5,\"nullable\":true},\"durationMinutes\":{\"kind\":\"int\",\"min\":5,\"max\":1440,\"nullable\":true},\"timeZone\":{\"kind\":\"text\",\"max\":64,\"nullable\":true},\"deadline\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"today\":{\"kind\":\"bool\",\"default\":0},\"starred\":{\"kind\":\"bool\",\"default\":0},\"tags\":{\"kind\":\"json\",\"maxJsonLength\":4000,\"nullable\":true},\"todaySetOn\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"completedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"notes\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"position\":{\"kind\":\"real\",\"nullable\":true},\"todayPosition\":{\"kind\":\"real\",\"nullable\":true},\"recurrenceUnit\":{\"kind\":\"text\",\"max\":16,\"nullable\":true},\"recurrenceInterval\":{\"kind\":\"int\",\"nullable\":true},\"recurrenceAfterCompletion\":{\"kind\":\"bool\",\"default\":0},\"recurrencePaused\":{\"kind\":\"bool\",\"default\":0},\"recurrenceSeriesID\":{\"kind\":\"text\",\"max\":128,\"nullable\":true},\"recurrenceAnchorDate\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"recurrenceWeekdays\":{\"kind\":\"json\",\"nullable\":true},\"recurrenceMonthDay\":{\"kind\":\"int\",\"min\":-1,\"max\":31,\"nullable\":true},\"recurrenceOrdinalWeekday\":{\"kind\":\"json\",\"nullable\":true},\"reminderAt\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"reminderMode\":{\"kind\":\"text\",\"enum\":\"reminderMode\",\"nullable\":true},\"reminderSnoozedUntil\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"reminderDismissedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"source\":{\"kind\":\"text\",\"max\":64,\"nullable\":true},\"sourceClient\":{\"kind\":\"text\",\"max\":64,\"nullable\":true},\"acknowledgedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"touchedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"deferCount\":{\"kind\":\"int\",\"min\":0,\"default\":0},\"fadedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"dropReason\":{\"kind\":\"text\",\"max\":16,\"nullable\":true},\"effort\":{\"kind\":\"text\",\"max\":16,\"nullable\":true},\"assignedTo\":{\"kind\":\"text\",\"max\":64,\"nullable\":true}}},\"area\":{\"table\":\"areas\",\"deletable\":true,\"requiredOnInsert\":[\"title\"],\"columns\":{\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":true},\"context\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"noteRev\":{\"kind\":\"int\",\"serverOwned\":true},\"notesProposal\":{\"kind\":\"json\",\"maxJsonLength\":101000,\"nullable\":true},\"emoji\":{\"kind\":\"text\",\"max\":16,\"nullable\":true},\"attachment\":{\"kind\":\"json\",\"maxJsonLength\":4000,\"nullable\":true},\"position\":{\"kind\":\"int\",\"nullable\":true}}},\"project\":{\"table\":\"projects\",\"deletable\":true,\"requiredOnInsert\":[\"title\",\"status\"],\"columns\":{\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":true},\"status\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"area\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"created\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"completedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"notes\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"context\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"noteRev\":{\"kind\":\"int\",\"serverOwned\":true},\"notesProposal\":{\"kind\":\"json\",\"maxJsonLength\":101000,\"nullable\":true},\"githubRepo\":{\"kind\":\"text\",\"max\":200,\"nullable\":true},\"attachment\":{\"kind\":\"json\",\"maxJsonLength\":4000,\"nullable\":true},\"position\":{\"kind\":\"int\",\"nullable\":true},\"share\":{\"kind\":\"json\",\"serverOwned\":true}}},\"attachment\":{\"table\":\"attachments\",\"deletable\":true,\"requiredOnInsert\":[\"taskId\",\"filename\",\"contentType\",\"byteCount\"],\"updatable\":[\"filename\",\"position\"],\"columns\":{\"taskId\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":false},\"filename\":{\"kind\":\"text\",\"max\":512,\"nullable\":true},\"contentType\":{\"kind\":\"text\",\"max\":200,\"nullable\":true},\"byteCount\":{\"kind\":\"int\",\"min\":0,\"max\":26214400,\"nullable\":false},\"position\":{\"kind\":\"real\",\"nullable\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"uploadedAt\":{\"kind\":\"text\",\"serverOwned\":true}}},\"checklistItem\":{\"table\":\"checklist_items\",\"deletable\":true,\"requiredOnInsert\":[\"taskId\",\"title\"],\"updatable\":[\"title\",\"checked\",\"checkedAt\",\"position\"],\"columns\":{\"taskId\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":false},\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":false},\"checked\":{\"kind\":\"bool\",\"default\":0},\"checkedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"position\":{\"kind\":\"real\",\"nullable\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true}}},\"taskRef\":{\"table\":\"task_refs\",\"deletable\":true,\"requiredOnInsert\":[\"taskId\",\"key\"],\"updatable\":[\"role\",\"snapshot\",\"position\"],\"columns\":{\"taskId\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":false},\"key\":{\"kind\":\"text\",\"max\":1000,\"nullable\":false},\"kind\":{\"kind\":\"text\",\"max\":32,\"serverOwned\":true},\"role\":{\"kind\":\"text\",\"enum\":\"taskRefRole\",\"default\":\"about\"},\"snapshot\":{\"kind\":\"json\",\"maxJsonLength\":2048,\"nullable\":true},\"position\":{\"kind\":\"real\",\"nullable\":true},\"createdBy\":{\"kind\":\"text\",\"serverOwned\":true},\"lastSeenAt\":{\"kind\":\"text\",\"serverOwned\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true}}},\"tag\":{\"table\":\"tags\",\"deletable\":true,\"requiredOnInsert\":[\"name\"],\"updatable\":[\"name\",\"color\",\"position\"],\"columns\":{\"name\":{\"kind\":\"text\",\"max\":64,\"nullable\":false},\"color\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"position\":{\"kind\":\"int\",\"nullable\":true}}},\"convo\":{\"table\":\"convos\",\"deletable\":false,\"requiredOnInsert\":[],\"columns\":{\"confirmedIntent\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"acceptance\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"subtasks\":{\"kind\":\"json\",\"nullable\":true},\"artifact\":{\"kind\":\"json\",\"nullable\":true},\"handoff\":{\"kind\":\"json\",\"nullable\":true},\"endState\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"endStateNote\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"assignee\":{\"kind\":\"text\",\"enum\":\"convoAssignee\",\"nullable\":true},\"stoppedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"claimedBy\":{\"kind\":\"text\",\"serverOwned\":true},\"claimUntil\":{\"kind\":\"text\",\"serverOwned\":true},\"endStateAt\":{\"kind\":\"text\",\"serverOwned\":true},\"runsSinceUser\":{\"kind\":\"int\",\"serverOwned\":true}}},\"setting\":{\"table\":\"settings\",\"deletable\":false,\"requiredOnInsert\":[],\"columns\":{\"value\":{\"kind\":\"json\",\"nullable\":true}}}}}",
+        "{\"version\":1,\"turnFields\":[\"role\",\"step\",\"provider\",\"confidence\",\"question\",\"options\",\"chosen\",\"otherText\",\"inReplyTo\",\"note\",\"ts\"],\"patterns\":{\"id\":\"^[A-Za-z0-9._:-]{1,128}\$\",\"clientOpId\":\"^[A-Za-z0-9_-]{8,64}\$\",\"day\":\"^\\\\d{4}-\\\\d{2}-\\\\d{2}\$\",\"time24\":\"^([01]\\\\d|2[0-3]):[0-5]\\\\d\$\",\"stamp\":\"^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}\"},\"limits\":{\"textMax\":2000,\"notesMax\":100000,\"attachmentPointerMax\":4000,\"stampMax\":40,\"maxAttachmentBytes\":26214400,\"maxUserAttachmentBytes\":2147483648,\"maxOpsPerPush\":500,\"maxPull\":1000,\"maxChecklistItemsPerTask\":200,\"maxTagsPerTask\":20,\"tagNameMax\":64,\"maxSubtasks\":500,\"maxRefsPerTask\":20,\"refKeyMax\":1000,\"refSnapshotMax\":2048,\"doPlannedMinutesMax\":240,\"doNoteMax\":500,\"maxArtifactRefs\":100,\"turnProviderMax\":32,\"turnQuestionMax\":10000,\"turnOptionMax\":500,\"turnMaxOptions\":20,\"turnChosenMax\":500,\"turnOtherTextMax\":10000,\"turnNoteMax\":100000},\"enums\":{\"taskStatus\":[\"open\",\"done\",\"cancelled\"],\"taskSource\":[\"app\",\"mcp\"],\"projectStatus\":[\"active\",\"done\",\"cancelled\"],\"taskKind\":[\"heading\"],\"recurrenceUnit\":[\"day\",\"week\",\"month\",\"year\"],\"reminderMode\":[\"floating\",\"fixed\"],\"convoAssignee\":[\"me\",\"local\",\"claude\"],\"convoEndState\":[\"agent_done\",\"human_done\",\"agent_assisted_done\",\"needs_verify\",\"decomposed\",\"reminder_set\",\"promoted_to_today\",\"wont_do\",\"open\"],\"convoHandoffActionType\":[\"open_url\",\"compose\",\"call\",\"none\"],\"convoTurnRole\":[\"user\",\"provider\"],\"convoTurnStep\":[\"confirm\",\"ground\",\"scope\",\"decide\",\"work\"],\"doExit\":[\"done\",\"stopped\",\"later\",\"replaced\",\"closed\"],\"taskRefRole\":[\"about\",\"from\",\"blocked_by\",\"follow_up\"],\"telemetryLevel\":[\"none\",\"minimal\",\"balanced\",\"full\"],\"appearanceMode\":[\"system\",\"light\",\"dark\"],\"accentColor\":[\"colorful\",\"tamarillo\",\"persimmon\",\"yuzu\",\"carambola\",\"haskap\",\"acai\",\"pitaya\",\"jabuticaba\"],\"appIconFinish\":[\"obsidian\",\"ceramic\",\"framed\"],\"canvasTexture\":[\"none\",\"topography\",\"fieldMatrix\",\"stippleDrift\",\"ridges\",\"washiPaper\"],\"textureMotion\":[\"still\",\"slowDrift\"]},\"entities\":{\"task\":{\"table\":\"tasks\",\"deletable\":true,\"requiredOnInsert\":[\"title\",\"status\"],\"columns\":{\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":true},\"status\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"kind\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"heading\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"area\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"project\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"created\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"scheduled\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"startTime\":{\"kind\":\"text\",\"format\":\"time24\",\"max\":5,\"nullable\":true},\"durationMinutes\":{\"kind\":\"int\",\"min\":5,\"max\":1440,\"nullable\":true},\"timeZone\":{\"kind\":\"text\",\"max\":64,\"nullable\":true},\"deadline\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"today\":{\"kind\":\"bool\",\"default\":0},\"starred\":{\"kind\":\"bool\",\"default\":0},\"tags\":{\"kind\":\"json\",\"maxJsonLength\":4000,\"nullable\":true},\"todaySetOn\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"completedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"notes\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"position\":{\"kind\":\"real\",\"nullable\":true},\"todayPosition\":{\"kind\":\"real\",\"nullable\":true},\"recurrenceUnit\":{\"kind\":\"text\",\"max\":16,\"nullable\":true},\"recurrenceInterval\":{\"kind\":\"int\",\"nullable\":true},\"recurrenceAfterCompletion\":{\"kind\":\"bool\",\"default\":0},\"recurrencePaused\":{\"kind\":\"bool\",\"default\":0},\"recurrenceSeriesID\":{\"kind\":\"text\",\"max\":128,\"nullable\":true},\"recurrenceAnchorDate\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"recurrenceWeekdays\":{\"kind\":\"json\",\"nullable\":true},\"recurrenceMonthDay\":{\"kind\":\"int\",\"min\":-1,\"max\":31,\"nullable\":true},\"recurrenceOrdinalWeekday\":{\"kind\":\"json\",\"nullable\":true},\"reminderAt\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"reminderMode\":{\"kind\":\"text\",\"enum\":\"reminderMode\",\"nullable\":true},\"reminderSnoozedUntil\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"reminderDismissedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"source\":{\"kind\":\"text\",\"max\":64,\"nullable\":true},\"sourceClient\":{\"kind\":\"text\",\"max\":64,\"nullable\":true},\"acknowledgedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"touchedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"deferCount\":{\"kind\":\"int\",\"min\":0,\"default\":0},\"fadedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"dropReason\":{\"kind\":\"text\",\"max\":16,\"nullable\":true},\"effort\":{\"kind\":\"text\",\"max\":16,\"nullable\":true},\"assignedTo\":{\"kind\":\"text\",\"max\":64,\"nullable\":true}}},\"area\":{\"table\":\"areas\",\"deletable\":true,\"requiredOnInsert\":[\"title\"],\"columns\":{\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":true},\"context\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"noteRev\":{\"kind\":\"int\",\"serverOwned\":true},\"notesProposal\":{\"kind\":\"json\",\"maxJsonLength\":101000,\"nullable\":true},\"emoji\":{\"kind\":\"text\",\"max\":16,\"nullable\":true},\"attachment\":{\"kind\":\"json\",\"maxJsonLength\":4000,\"nullable\":true},\"position\":{\"kind\":\"int\",\"nullable\":true}}},\"project\":{\"table\":\"projects\",\"deletable\":true,\"requiredOnInsert\":[\"title\",\"status\"],\"columns\":{\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":true},\"status\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"area\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":true},\"created\":{\"kind\":\"text\",\"format\":\"day\",\"nullable\":true},\"completedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"notes\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"context\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"noteRev\":{\"kind\":\"int\",\"serverOwned\":true},\"notesProposal\":{\"kind\":\"json\",\"maxJsonLength\":101000,\"nullable\":true},\"githubRepo\":{\"kind\":\"text\",\"max\":200,\"nullable\":true},\"attachment\":{\"kind\":\"json\",\"maxJsonLength\":4000,\"nullable\":true},\"position\":{\"kind\":\"int\",\"nullable\":true},\"share\":{\"kind\":\"json\",\"serverOwned\":true}}},\"attachment\":{\"table\":\"attachments\",\"deletable\":true,\"requiredOnInsert\":[\"taskId\",\"filename\",\"contentType\",\"byteCount\"],\"updatable\":[\"filename\",\"position\"],\"columns\":{\"taskId\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":false},\"filename\":{\"kind\":\"text\",\"max\":512,\"nullable\":true},\"contentType\":{\"kind\":\"text\",\"max\":200,\"nullable\":true},\"byteCount\":{\"kind\":\"int\",\"min\":0,\"max\":26214400,\"nullable\":false},\"position\":{\"kind\":\"real\",\"nullable\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"uploadedAt\":{\"kind\":\"text\",\"serverOwned\":true}}},\"checklistItem\":{\"table\":\"checklist_items\",\"deletable\":true,\"requiredOnInsert\":[\"taskId\",\"title\"],\"updatable\":[\"title\",\"checked\",\"checkedAt\",\"position\"],\"columns\":{\"taskId\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":false},\"title\":{\"kind\":\"text\",\"max\":2000,\"nullable\":false},\"checked\":{\"kind\":\"bool\",\"default\":0},\"checkedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"position\":{\"kind\":\"real\",\"nullable\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true}}},\"taskRef\":{\"table\":\"task_refs\",\"deletable\":true,\"requiredOnInsert\":[\"taskId\",\"key\"],\"updatable\":[\"role\",\"snapshot\",\"position\"],\"columns\":{\"taskId\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":false},\"key\":{\"kind\":\"text\",\"max\":1000,\"nullable\":false},\"kind\":{\"kind\":\"text\",\"max\":32,\"serverOwned\":true},\"role\":{\"kind\":\"text\",\"enum\":\"taskRefRole\",\"default\":\"about\"},\"snapshot\":{\"kind\":\"json\",\"maxJsonLength\":2048,\"nullable\":true},\"position\":{\"kind\":\"real\",\"nullable\":true},\"createdBy\":{\"kind\":\"text\",\"serverOwned\":true},\"lastSeenAt\":{\"kind\":\"text\",\"serverOwned\":true},\"createdAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true}}},\"tag\":{\"table\":\"tags\",\"deletable\":true,\"requiredOnInsert\":[\"name\"],\"updatable\":[\"name\",\"color\",\"position\"],\"columns\":{\"name\":{\"kind\":\"text\",\"max\":64,\"nullable\":false},\"color\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"position\":{\"kind\":\"int\",\"nullable\":true}}},\"doSession\":{\"table\":\"do_sessions\",\"deletable\":true,\"requiredOnInsert\":[\"taskId\",\"startedAt\"],\"updatable\":[\"plannedMinutes\",\"confirmedAt\",\"endedAt\",\"exit\",\"lapsed\",\"note\"],\"columns\":{\"taskId\":{\"kind\":\"text\",\"format\":\"id\",\"nullable\":false},\"startedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":false},\"plannedMinutes\":{\"kind\":\"int\",\"min\":1,\"max\":240,\"nullable\":true},\"confirmedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"endedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"exit\":{\"kind\":\"text\",\"enum\":\"doExit\",\"nullable\":true},\"lapsed\":{\"kind\":\"bool\",\"default\":0},\"note\":{\"kind\":\"text\",\"max\":500,\"nullable\":true},\"sourceClient\":{\"kind\":\"text\",\"max\":64,\"nullable\":true}}},\"convo\":{\"table\":\"convos\",\"deletable\":false,\"requiredOnInsert\":[],\"columns\":{\"confirmedIntent\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"acceptance\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"subtasks\":{\"kind\":\"json\",\"nullable\":true},\"artifact\":{\"kind\":\"json\",\"nullable\":true},\"handoff\":{\"kind\":\"json\",\"nullable\":true},\"endState\":{\"kind\":\"text\",\"max\":32,\"nullable\":true},\"endStateNote\":{\"kind\":\"text\",\"max\":100000,\"nullable\":true},\"assignee\":{\"kind\":\"text\",\"enum\":\"convoAssignee\",\"nullable\":true},\"stoppedAt\":{\"kind\":\"text\",\"format\":\"stamp\",\"max\":40,\"nullable\":true},\"claimedBy\":{\"kind\":\"text\",\"serverOwned\":true},\"claimUntil\":{\"kind\":\"text\",\"serverOwned\":true},\"endStateAt\":{\"kind\":\"text\",\"serverOwned\":true},\"runsSinceUser\":{\"kind\":\"int\",\"serverOwned\":true}}},\"setting\":{\"table\":\"settings\",\"deletable\":false,\"requiredOnInsert\":[],\"columns\":{\"value\":{\"kind\":\"json\",\"nullable\":true}}}}}",
     ).joinToString("")
     val rulesJson: String = listOf(
         "{\"version\":1,\"cueDecayDays\":7,\"fadeWindowDays\":14,\"fadeGraceDays\":1,\"fadeMinOpacity\":0.55,\"fadeSweepWeekday\":1,\"recentlyDeletedDays\":30,\"upcomingCalendarDays\":30,\"toastDurationSeconds\":7,\"agentRunBudget\":5,\"claimTtlDefaultSeconds\":1800,\"claimTtlMaxSeconds\":14400,\"tombstoneTtlDays\":90,\"clientOpTtlDays\":30,\"changeLogTtlDays\":365,\"deleteGraceSeconds\":120,\"doStaleHours\":4,\"doLapseHours\":24}",
