@@ -658,6 +658,7 @@ export function taskOut(r: Row, tagMap?: Map<string, string>): TaskOut {
     ...(typeof r.durationMinutes === "number" ? { durationMinutes: r.durationMinutes } : {}),
     ...(str(r.timeZone) ? { timeZone: str(r.timeZone) } : {}),
     deadline: str(r.deadline),
+    ...(str(r.deferredDeadline) ? { deferredDeadline: str(r.deferredDeadline) } : {}),
     area: str(r.area),
     project: str(r.project),
     completedAt: str(r.completedAt),
@@ -732,9 +733,9 @@ function turnOut(r: Row): ConvoTurn {
   return t as unknown as ConvoTurn;
 }
 
-/// `created` / `todaySetOn` feed `daysOnToday` and are not part of the
-/// `tasks_list` result shape.
-function stripDays({ created: _c, todaySetOn: _t, ...t }: TaskOut): TaskOut {
+/// `created` / `todaySetOn` feed `daysOnToday` and `deferredDeadline` feeds
+/// list membership. They are not part of the `tasks_list` result shape.
+function stripDays({ created: _c, todaySetOn: _t, deferredDeadline: _d, ...t }: TaskOut): TaskOut {
   return t;
 }
 

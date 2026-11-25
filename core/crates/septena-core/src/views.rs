@@ -26,6 +26,8 @@ pub struct TaskSnapshot {
     pub created_at: Option<String>,
     pub scheduled: Option<String>,
     pub deadline: Option<String>,
+    /// The deadline the user planned past (spec §2, I8).
+    pub deferred_deadline: Option<String>,
     pub today: bool,
     pub today_set_on: Option<String>,
     pub source: Option<String>,
@@ -78,7 +80,16 @@ pub(crate) struct DateFacts {
     pub active: bool,
     pub scheduled: Option<Day>,
     pub deadline: Option<Day>,
+    /// The deadline that can put the task on Today: none when the user
+    /// planned past it.
+    pub holding_deadline: Option<Day>,
     pub is_on_today: bool,
+}
+
+/// I8: the user planned past this deadline. Without a When date to bring the
+/// task back, or with another deadline, the deferral does not count.
+pub(crate) fn is_deferred(deferred: Option<Day>, scheduled: Option<Day>, deadline: Option<Day>) -> bool {
+    scheduled.is_some() && deadline.is_some() && deferred == deadline
 }
 
 pub(crate) fn date_facts(task: &TaskSnapshot, today: Day) -> DateFacts {
@@ -87,12 +98,14 @@ pub(crate) fn date_facts(task: &TaskSnapshot, today: Day) -> DateFacts {
     let active = open && !is_heading && task.deleted_at.is_none() && task.faded_at.is_none();
     let scheduled = parse_day(&task.scheduled);
     let deadline = parse_day(&task.deadline);
+    let holding_deadline = deadline.filter(|_| !is_deferred(parse_day(&task.deferred_deadline), scheduled, deadline));
     let is_on_today =
-        active && (task.today || scheduled.is_some_and(|d| d <= today) || deadline.is_some_and(|d| d <= today));
+        active && (task.today || scheduled.is_some_and(|d| d <= today) || holding_deadline.is_some_and(|d| d <= today));
     DateFacts {
         active,
         scheduled,
         deadline,
+        holding_deadline,
         is_on_today,
     }
 }
@@ -109,6 +122,7 @@ pub fn task_view_membership(task: TaskSnapshot, today: String, now: String) -> R
         active,
         scheduled,
         deadline,
+        holding_deadline,
         is_on_today,
     } = date_facts(&task, today);
     let unfiled = task.area.is_none() && task.project.is_none();
@@ -134,7 +148,7 @@ pub fn task_view_membership(task: TaskSnapshot, today: String, now: String) -> R
         };
     let in_today_inbox = in_triage_band || (is_inbox && is_on_today);
     let has_agent_cue = is_mcp && task.acknowledged_at.is_none() && fresh_proposal;
-    let days_on_today = carried_days(&task, today, open, is_on_today, has_agent_cue);
+    let days_on_today = carried_days(&task, holding_deadline, today, open, is_on_today, has_agent_cue);
 
     let due_state = match deadline {
         Some(d) if active && d < today => Some(DUE_OVERDUE.to_string()),
@@ -151,7 +165,7 @@ pub fn task_view_membership(task: TaskSnapshot, today: String, now: String) -> R
         && !task.today
         && !is_mcp
         && created_before_today
-        && (scheduled == Some(today) || deadline == Some(today));
+        && (scheduled == Some(today) || holding_deadline == Some(today));
 
     Ok(TaskViewMembership {
         is_unfiled: unfiled,
@@ -175,7 +189,14 @@ pub fn task_view_membership(task: TaskSnapshot, today: String, now: String) -> R
 pub const DUE_OVERDUE: &str = "overdue";
 pub const DUE_TODAY: &str = "dueToday";
 
-fn carried_days(task: &TaskSnapshot, today: Day, open: bool, is_on_today: bool, has_agent_cue: bool) -> i64 {
+fn carried_days(
+    task: &TaskSnapshot,
+    holding_deadline: Option<Day>,
+    today: Day,
+    open: bool,
+    is_on_today: bool,
+    has_agent_cue: bool,
+) -> i64 {
     if !open || !is_on_today || has_agent_cue {
         return 0;
     }
@@ -184,7 +205,7 @@ fn carried_days(task: &TaskSnapshot, today: Day, open: bool, is_on_today: bool, 
         landed.extend(parse_day(&task.today_set_on));
     }
     landed.extend(parse_day(&task.scheduled).filter(|d| *d <= today));
-    landed.extend(parse_day(&task.deadline).filter(|d| *d <= today));
+    landed.extend(holding_deadline.filter(|d| *d <= today));
     let Some(landed) = landed.into_iter().min() else {
         return 0;
     };

@@ -100,6 +100,7 @@ extension TaskEntity {
       createdAt: createdAt == .distantPast ? nil : SharedCoreValues.instant(createdAt),
       scheduled: scheduled,
       deadline: deadline,
+      deferredDeadline: deferredDeadline,
       today: today,
       todaySetOn: todaySetOn,
       source: source,
@@ -126,6 +127,7 @@ extension TaskEntity {
       switch name {
       case "scheduled": scheduled = f.scheduled
       case "deadline": deadline = f.deadline
+      case "deferredDeadline": deferredDeadline = f.deferredDeadline
       case "today": today = f.today
       case "todaySetOn": todaySetOn = f.todaySetOn
       case "startTime": startTime = f.startTime

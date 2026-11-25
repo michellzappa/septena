@@ -29,7 +29,7 @@ enum TaskListRules {
 
   static func snapshot(id: String, title: String, status: String, kind: String, area: String?,
                        project: String?, created: String?, createdAt: Date, scheduled: String?,
-                       deadline: String?, today: Bool, todaySetOn: String?, source: String?,
+                       deadline: String?, deferredDeadline: String?, today: Bool, todaySetOn: String?, source: String?,
                        acknowledgedAt: Date?, starred: Bool, recurrence: Recurrence?,
                        deletedAt: String?, fadedAt: Date?) -> SeptenaSharedCore.TaskSnapshot {
     SeptenaSharedCore.TaskSnapshot(
@@ -37,7 +37,8 @@ enum TaskListRules {
       kind: kind.isEmpty ? nil : kind,
       area: area, project: project, created: created,
       createdAt: createdAt == .distantPast ? nil : SharedCoreValues.instant(createdAt),
-      scheduled: scheduled, deadline: deadline, today: today, todaySetOn: todaySetOn,
+      scheduled: scheduled, deadline: deadline, deferredDeadline: deferredDeadline,
+      today: today, todaySetOn: todaySetOn,
       source: source, acknowledgedAt: acknowledgedAt.map(SharedCoreValues.instant),
       starred: starred, recurrenceUnit: recurrence?.unit.rawValue,
       deletedAt: deletedAt, fadedAt: fadedAt.map(SharedCoreValues.instant),
@@ -54,7 +55,7 @@ extension SeptenaTask {
       TaskListRules.snapshot(
         id: id, title: title, status: status.rawValue, kind: kind, area: area, project: project,
         created: created, createdAt: createdAt, scheduled: scheduled, deadline: deadline,
-        today: self.today, todaySetOn: todaySetOn, source: source, acknowledgedAt: acknowledgedAt,
+        deferredDeadline: deferredDeadline, today: self.today, todaySetOn: todaySetOn, source: source, acknowledgedAt: acknowledgedAt,
         starred: starred, recurrence: recurrence, deletedAt: deletedAt, fadedAt: fadedAt),
       today: today, now: now)
   }
@@ -67,7 +68,7 @@ extension TaskEntity {
       TaskListRules.snapshot(
         id: id, title: title, status: statusRaw, kind: kind, area: area, project: project,
         created: created, createdAt: createdAt, scheduled: scheduled, deadline: deadline,
-        today: self.today, todaySetOn: todaySetOn, source: source, acknowledgedAt: acknowledgedAt,
+        deferredDeadline: deferredDeadline, today: self.today, todaySetOn: todaySetOn, source: source, acknowledgedAt: acknowledgedAt,
         starred: starred, recurrence: recurrence, deletedAt: deletedAt, fadedAt: fadedAt),
       today: today, now: now)
   }
