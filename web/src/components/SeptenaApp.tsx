@@ -59,6 +59,7 @@ import type {
   SmartDestination,
   TaskRow,
 } from "@/lib/types";
+import { nextIsoDay } from "@/lib/upcomingGroups";
 import { QuickFindModal } from "./QuickFindModal";
 import { SettingsModal } from "./SettingsModal";
 import { SignInScreen } from "./SignInScreen";
@@ -702,6 +703,7 @@ export function SeptenaApp() {
     if (tagFilterId) opts.tags = [tagFilterId];
     if (destination.kind === "smart") {
       if (destination.id === "today") opts.today = true;
+      else if (destination.id === "upcoming") opts.scheduled = nextIsoDay(todayYMD);
       else if (destination.id === "starred") opts.starred = true;
     } else if (destination.kind === "area") {
       opts.area = destination.id;

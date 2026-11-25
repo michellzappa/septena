@@ -93,6 +93,7 @@ import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryNoticeIds
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistryPromptIds
+import app.septena.core.generated.RegistryRules
 import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.ui.CheckmarkGlyph
 import app.septena.ui.ChevronDownGlyph
@@ -995,7 +996,7 @@ private fun TaskHomeScaffold(
                 AndroidCalendarReader.loadAgendaRows(
                     context = context,
                     startDay = today.plusDays(1),
-                    dayCount = 7,
+                    dayCount = RegistryRules.UPCOMING_CALENDAR_DAYS.toInt(),
                     hiddenTitles = hidden,
                     includeDayLabel = true,
                     languageTag = languageTag,
@@ -1335,6 +1336,7 @@ private fun TaskHomeScaffold(
                         )
                         is TaskHomeLocation.SmartList -> {
                             val isTodayList = location.destinationId == RegistryDestinationIds.TODAY
+                            val isUpcomingList = location.destinationId == RegistryDestinationIds.UPCOMING
                             val isReviewList = location.destinationId == RegistryDestinationIds.REVIEW
                             val showingDeletedTab = location.destinationId == RegistryDestinationIds.LOGBOOK &&
                                 logbookShowingDeleted
@@ -1348,6 +1350,7 @@ private fun TaskHomeScaffold(
                             val canReorderList = location.destinationId in setOf(
                                 RegistryDestinationIds.TODAY,
                                 RegistryDestinationIds.INBOX,
+                                RegistryDestinationIds.UPCOMING,
                                 RegistryDestinationIds.ANYTIME,
                                 RegistryDestinationIds.STARRED,
                             )
@@ -1367,6 +1370,15 @@ private fun TaskHomeScaffold(
                                 headerContent = sectionHeader,
                                 hasLoaded = state.hasLoaded,
                                 isToday = isTodayList,
+                                isUpcoming = isUpcomingList,
+                                upcomingDayLabelForIso = if (isUpcomingList) {
+                                    { iso ->
+                                        val todayDay = graph.clock.today(graph.clock.now())
+                                        runCatching { java.time.LocalDate.parse(iso) }.getOrNull()
+                                            ?.let { formatUpcomingDayHeader(it, todayDay, languageTag) }
+                                            ?: iso
+                                    }
+                                } else null,
                                 inboxTasks = state.inboxTasks,
                                 tasks = displayedTasks,
                                 calendarEvents = calendarEvents,
@@ -1397,29 +1409,39 @@ private fun TaskHomeScaffold(
                                     )
                                 }
                             } else null,
-                            onDropTaskRow = if (state.canQuickAdd) {
+                            onDropTaskRow = if (state.canQuickAdd || isUpcomingList) {
                                 { index, before ->
+                                    val dayIso = if (isUpcomingList) {
+                                        displayedTasks.getOrNull(index)?.group?.key?.removePrefix("day:")
+                                    } else null
                                     quickAddDraft = defaultQuickAddDraft(location).copy(
-                                        position = insertionPosition(taskPositions, index, before),
+                                        whenDay = dayIso,
+                                        position = if (isUpcomingList) null else insertionPosition(taskPositions, index, before),
                                         useTodayPosition = isTodayList,
                                     )
                                 }
                             } else null,
-                            onDropGroupHeader = if (state.canQuickAdd) {
+                            onDropGroupHeader = if (state.canQuickAdd || isUpcomingList) {
                                 { targetLocationKey ->
-                                    val firstInGroupPos = displayedTasks
-                                        .firstOrNull { it.group?.targetLocationKey == targetLocationKey }
-                                        ?.position
-                                    val areaId = targetLocationKey.removePrefix("area:")
-                                        .takeIf { targetLocationKey.startsWith("area:") }
-                                    val projectId = targetLocationKey.removePrefix("project:")
-                                        .takeIf { targetLocationKey.startsWith("project:") }
-                                    quickAddDraft = defaultQuickAddDraft(location).copy(
-                                        areaId = areaId,
-                                        projectId = projectId,
-                                        position = firstInGroupPos?.let { it - 1.0 },
-                                        useTodayPosition = isTodayList,
-                                    )
+                                    if (targetLocationKey.startsWith("day:")) {
+                                        quickAddDraft = QuickAddDraft(
+                                            whenDay = targetLocationKey.removePrefix("day:"),
+                                        )
+                                    } else {
+                                        val firstInGroupPos = displayedTasks
+                                            .firstOrNull { it.group?.targetLocationKey == targetLocationKey }
+                                            ?.position
+                                        val areaId = targetLocationKey.removePrefix("area:")
+                                            .takeIf { targetLocationKey.startsWith("area:") }
+                                        val projectId = targetLocationKey.removePrefix("project:")
+                                            .takeIf { targetLocationKey.startsWith("project:") }
+                                        quickAddDraft = defaultQuickAddDraft(location).copy(
+                                            areaId = areaId,
+                                            projectId = projectId,
+                                            position = firstInGroupPos?.let { it - 1.0 },
+                                            useTodayPosition = isTodayList,
+                                        )
+                                    }
                                 }
                             } else null,
                             canReorder = canReorderList,
@@ -1448,28 +1470,36 @@ private fun TaskHomeScaffold(
                             } else null,
                             onReorderTaskRow = if (canReorderList) {
                                 { ids, index, before ->
-                                    val targetGroup = state.tasks.getOrNull(index)?.group?.targetLocationKey
-                                    val newPositions = reorderPositions(taskPositions, index, before, ids.size)
-                                    homeViewModel.reorderTasks(
-                                        ids = ids,
-                                        positions = newPositions,
-                                        useTodayPosition = isTodayList,
-                                        targetGroupKey = targetGroup,
-                                    )
+                                    val targetGroup = displayedTasks.getOrNull(index)?.group?.targetLocationKey
+                                    if (isUpcomingList && targetGroup != null && targetGroup.startsWith("day:")) {
+                                        homeViewModel.rescheduleToDay(ids, targetGroup.removePrefix("day:"))
+                                    } else {
+                                        val newPositions = reorderPositions(taskPositions, index, before, ids.size)
+                                        homeViewModel.reorderTasks(
+                                            ids = ids,
+                                            positions = newPositions,
+                                            useTodayPosition = isTodayList,
+                                            targetGroupKey = targetGroup,
+                                        )
+                                    }
                                 }
                             } else null,
                             onReorderGroupHeader = if (canReorderList) {
                                 { ids, targetLocationKey ->
-                                    val firstInGroupPos = state.tasks
-                                        .firstOrNull { it.group?.targetLocationKey == targetLocationKey }
-                                        ?.position ?: 0.0
-                                    val newPositions = List(ids.size) { i -> firstInGroupPos - (ids.size - i).toDouble() }
-                                    homeViewModel.reorderTasks(
-                                        ids = ids,
-                                        positions = newPositions,
-                                        useTodayPosition = isTodayList,
-                                        targetGroupKey = targetLocationKey,
-                                    )
+                                    if (isUpcomingList && targetLocationKey.startsWith("day:")) {
+                                        homeViewModel.rescheduleToDay(ids, targetLocationKey.removePrefix("day:"))
+                                    } else {
+                                        val firstInGroupPos = displayedTasks
+                                            .firstOrNull { it.group?.targetLocationKey == targetLocationKey }
+                                            ?.position ?: 0.0
+                                        val newPositions = List(ids.size) { i -> firstInGroupPos - (ids.size - i).toDouble() }
+                                        homeViewModel.reorderTasks(
+                                            ids = ids,
+                                            positions = newPositions,
+                                            useTodayPosition = isTodayList,
+                                            targetGroupKey = targetLocationKey,
+                                        )
+                                    }
                                 }
                             } else null,
                             onApplyFilingSuggestion = homeViewModel::applyFilingSuggestion,

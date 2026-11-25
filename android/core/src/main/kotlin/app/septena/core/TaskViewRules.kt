@@ -86,6 +86,8 @@ data class TaskViewMembership(
     val dueState: String? = null,
     /** Core R4: true when the deadline renders in red. */
     val deadlineRed: Boolean = false,
+    /** Core upcoming bucket day (`YYYY-MM-DD`) when the task matches Upcoming, else null. */
+    val upcomingDay: String? = null,
 )
 
 /**
@@ -138,6 +140,7 @@ object TaskViewRules {
             ),
             dueState = m.dueState,
             deadlineRed = m.deadlineRed,
+            upcomingDay = m.upcomingDay,
         )
     }
 
