@@ -593,5 +593,22 @@
     ],
     "featureId": "task.notes"
   },
-  "quickFind": {"id":"quickFind","featureId":"find.quick-find","placeholder":"Search tasks, projects, areas…","emptyState":{"title":"Search Tasks","detail":"Find any task, project, or area."},"noResults":{"title":"No matches","detail":"No tasks, projects, or areas match your search."},"completed":{"label":"Completed"},"controls":{"back":"Back"}}
+  "quickFind": {"id":"quickFind","featureId":"find.quick-find","placeholder":"Search tasks, projects, areas…","emptyState":{"title":"Search Tasks","detail":"Find any task, project, or area."},"noResults":{"title":"No matches","detail":"No tasks, projects, or areas match your search."},"completed":{"label":"Completed"},"controls":{"back":"Back"}},
+  "fadeSweep": {
+    "id": "fadeSweep",
+    "featureId": "fade.sweep",
+    "title": "Faded Tasks",
+    "dismissTitle": "Not now",
+    "intro": "Choose Keep for anything you still need. The rest move to your Logbook as let go, never deleted.",
+    "keptAllTitle": "You kept everything.",
+    "emptyTitle": "No faded tasks to check.",
+    "keptAllDetail": "Kept tasks are back in their lists.",
+    "remainingOne": "1 task remaining",
+    "remainingOther": "{count} tasks remaining",
+    "letRestGoTitle": "Let the rest go",
+    "doneTitle": "Done",
+    "daysWithoutActivity": "{days} days without activity",
+    "pastDate": "Past date",
+    "noDate": "No date"
+  }
 }

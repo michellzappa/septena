@@ -72,6 +72,7 @@ import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryDestinationIds
+import app.septena.core.generated.RegistryNoticeIds
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.ui.CheckmarkGlyph
@@ -832,12 +833,12 @@ private fun TaskHomeScaffold(
 
     activeSweepItems?.let { itemsToSweep ->
         val keepLabel = remember(languageTag) {
-            RegistryCatalog.actionTitle(RegistryActionIds.TASK_KEEP_FADED, languageTag = languageTag)
-                ?.takeIf(String::isNotBlank) ?: "Keep"
+            RegistryCatalog.actionTitle(RegistryActionIds.TASK_KEEP_FADED, languageTag = languageTag).orEmpty()
         }
         TaskFadeSweepSheet(
             items = itemsToSweep,
             keepTitle = keepLabel,
+            languageTag = languageTag,
             isDark = isDark,
             hasActiveTexture = appearance.hasActiveTexture,
             onKeep = homeViewModel::keepFaded,
@@ -860,16 +861,14 @@ private fun TaskHomeScaffold(
             state.showWeeklySweepBanner &&
             state.weeklySweepItems.isNotEmpty()
         ) {
-            val count = state.weeklySweepItems.size
-            val bannerMessage = if (count == 1) {
-                "1 task faded this week. Still want it?"
-            } else {
-                "$count tasks faded this week. Still want any of them?"
+            val notice = remember(languageTag, state.weeklySweepItems.size) {
+                registryNoticeCopy(RegistryNoticeIds.WEEKLY_SWEEP, languageTag, state.weeklySweepItems.size)
             }
+            val bannerMessage = listOf(notice.title, notice.detail).filter(String::isNotBlank).joinToString(". ")
             FadeSweepBannerCard(
                 message = bannerMessage,
-                reviewLabel = "Review",
-                dismissLabel = "Not now",
+                reviewLabel = notice.primaryTitle,
+                dismissLabel = fadeSweepText("dismissTitle", languageTag),
                 isDark = isDark,
                 hasActiveTexture = appearance.hasActiveTexture,
                 onReview = { activeSweepItems = state.weeklySweepItems },
@@ -877,15 +876,13 @@ private fun TaskHomeScaffold(
                 modifier = Modifier.padding(bottom = 10.dp),
             )
         } else if (destinationId == RegistryDestinationIds.FADED && state.fadedSweepItems.isNotEmpty()) {
-            val count = state.fadedSweepItems.size
-            val bannerMessage = if (count == 1) {
-                "1 faded task. Keep what you still need or let it go."
-            } else {
-                "$count faded tasks. Keep what you still need or let the rest go."
+            val notice = remember(languageTag) {
+                registryNoticeCopy(RegistryNoticeIds.FADED_PILE, languageTag)
             }
+            val bannerMessage = listOf(notice.title, notice.detail).filter(String::isNotBlank).joinToString(" · ")
             FadeSweepBannerCard(
                 message = bannerMessage,
-                reviewLabel = "Review",
+                reviewLabel = notice.primaryTitle,
                 dismissLabel = null,
                 isDark = isDark,
                 hasActiveTexture = appearance.hasActiveTexture,

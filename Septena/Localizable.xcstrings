@@ -3250,6 +3250,10 @@
         }
       }
     },
+    "Faded Tasks" : {
+      "comment" : "Generated from registry surfaces.fadeSweep.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Fat" : {
       "localizations" : {
         "pt-BR" : {

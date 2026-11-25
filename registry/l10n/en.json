@@ -1227,6 +1227,12 @@
       "destinations.destinations.faded.title"
     ]
   },
+  "Faded Tasks": {
+    "text": "Faded Tasks",
+    "paths": [
+      "surfaces.fadeSweep.title"
+    ]
+  },
   "Favorite": {
     "text": "Favorite",
     "paths": [
@@ -2011,7 +2017,8 @@
   "Not now": {
     "text": "Not now",
     "paths": [
-      "surfaces.firstRun.steps.account.secondary.title"
+      "surfaces.firstRun.steps.account.secondary.title",
+      "surfaces.fadeSweep.dismissTitle"
     ]
   },
   "Not signed in": {

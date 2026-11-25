@@ -33,7 +33,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.septena.core.JsonValue
+import app.septena.core.RegistryCatalog
+import app.septena.core.generated.RegistryNoticeIds
 import app.septena.core.generated.RegistryRules
+import app.septena.core.stringValue
 import app.septena.ui.CheckmarkGlyph
 import app.septena.ui.TaskCardMetrics
 import app.septena.ui.TaskCardPosition
@@ -121,6 +125,7 @@ object FadeSweepRules {
         scheduled: String?,
         now: Instant,
         inboxLabel: String = "Inbox",
+        languageTag: String = "en",
         zoneId: ZoneId = ZoneId.systemDefault(),
     ): String {
         val parts = mutableListOf<String>()
@@ -129,12 +134,50 @@ object FadeSweepRules {
             ?: created?.take(10)?.let { runCatching { LocalDate.parse(it).atStartOfDay(zoneId).toInstant() }.getOrNull() }
         if (clock != null) {
             val days = max(RegistryRules.FADE_WINDOW_DAYS.toInt(), Duration.between(clock, now).toDays().toInt())
-            parts += "$days days without activity"
+            val fmt = fadeSweepText("daysWithoutActivity", languageTag).ifBlank { "{days} days without activity" }
+            parts += fmt.replace("{days}", days.toString())
         }
-        parts += if (!scheduled.isNullOrBlank()) "Past date" else "No date"
+        parts += if (!scheduled.isNullOrBlank()) {
+            fadeSweepText("pastDate", languageTag).ifBlank { "Past date" }
+        } else {
+            fadeSweepText("noDate", languageTag).ifBlank { "No date" }
+        }
         parts += listName?.takeIf(String::isNotBlank) ?: inboxLabel
         return parts.joinToString(" · ")
     }
+}
+
+/** Reads a localized string from the `fadeSweep` surface in `registry/surfaces.json`. */
+internal fun fadeSweepText(field: String, languageTag: String): String {
+    val raw = RegistryCatalog.surface("fadeSweep")?.fields?.get(field).stringValue()
+    return registryText(raw, languageTag)
+}
+
+/** Reads localized title, detail, and primaryTitle for a notice in `registry/surfaces.json` `notices.items`. */
+internal data class RegistryNoticeCopy(
+    val title: String,
+    val detail: String,
+    val primaryTitle: String,
+)
+
+internal fun registryNoticeCopy(noticeId: String, languageTag: String, count: Int = 1): RegistryNoticeCopy {
+    val notices = RegistryCatalog.document("surfaces").fields["notices"] as? JsonValue.ObjectValue
+    val items = (notices?.fields?.get("items") as? JsonValue.ArrayValue)?.values.orEmpty()
+    val entry = items.firstOrNull { (it as? JsonValue.ObjectValue)?.fields?.get("id").stringValue() == noticeId }
+        as? JsonValue.ObjectValue
+    val fields = entry?.fields.orEmpty()
+    val rawTitle = when (val t = fields["title"]) {
+        is JsonValue.StringValue -> t.value
+        is JsonValue.ObjectValue -> {
+            val key = if (count == 1) "one" else "other"
+            t.fields[key].stringValue() ?: t.fields["other"].stringValue()
+        }
+        else -> null
+    }
+    val title = registryText(rawTitle, languageTag).replace("{count}", count.toString())
+    val detail = registryText(fields["detail"].stringValue(), languageTag).replace("{count}", count.toString())
+    val primary = registryText(fields["primaryTitle"].stringValue(), languageTag)
+    return RegistryNoticeCopy(title = title, detail = detail, primaryTitle = primary)
 }
 
 /** Device-local sweep timestamps matching Apple `TaskFade.lastSweepAt` / `dismissedSweepWeek`. */
@@ -231,6 +274,7 @@ internal fun FadeSweepBannerCard(
 internal fun TaskFadeSweepSheet(
     items: List<FadeSweepItem>,
     keepTitle: String,
+    languageTag: String,
     isDark: Boolean,
     hasActiveTexture: Boolean,
     onKeep: (String) -> Unit,
@@ -241,6 +285,7 @@ internal fun TaskFadeSweepSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val remaining = remember(items) { mutableStateListOf<FadeSweepItem>().apply { addAll(items) } }
     var keptCount by remember(items) { mutableIntStateOf(0) }
+    fun copy(field: String) = fadeSweepText(field, languageTag)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -258,13 +303,13 @@ internal fun TaskFadeSweepSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Faded Tasks",
+                    text = copy("title"),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
                 TextButton(onClick = onDismiss) {
-                    Text("Not now")
+                    Text(copy("dismissTitle"))
                 }
             }
 
@@ -281,12 +326,12 @@ internal fun TaskFadeSweepSheet(
                         size = 32.dp,
                     )
                     Text(
-                        text = if (keptCount > 0) "You kept everything." else "No faded tasks to check.",
+                        text = copy(if (keptCount > 0) "keptAllTitle" else "emptyTitle"),
                         style = MaterialTheme.typography.titleMedium,
                     )
                     if (keptCount > 0) {
                         Text(
-                            text = "Kept tasks are back in their lists.",
+                            text = copy("keptAllDetail"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -294,7 +339,7 @@ internal fun TaskFadeSweepSheet(
                 }
             } else {
                 Text(
-                    text = "Choose Keep for anything you still need. The rest move to your Logbook as let go, never deleted.",
+                    text = copy("intro"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -363,8 +408,13 @@ internal fun TaskFadeSweepSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (remaining.isNotEmpty()) {
+                    val remText = if (remaining.size == 1) {
+                        copy("remainingOne")
+                    } else {
+                        copy("remainingOther").replace("{count}", remaining.size.toString())
+                    }
                     Text(
-                        text = if (remaining.size == 1) "1 task remaining" else "${remaining.size} tasks remaining",
+                        text = remText,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
@@ -376,7 +426,7 @@ internal fun TaskFadeSweepSheet(
                             onDismiss()
                         },
                     ) {
-                        Text("Let the rest go")
+                        Text(copy("letRestGoTitle"))
                     }
                 } else {
                     Spacer(modifier = Modifier.weight(1f))
@@ -386,7 +436,7 @@ internal fun TaskFadeSweepSheet(
                             onDismiss()
                         },
                     ) {
-                        Text("Done")
+                        Text(copy("doneTitle"))
                     }
                 }
             }
