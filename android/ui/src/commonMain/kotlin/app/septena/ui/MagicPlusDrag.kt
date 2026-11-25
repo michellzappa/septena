@@ -353,7 +353,13 @@ fun rememberMagicPlusContainerDrop(
     return mod to isTargeted
 }
 
-private fun Modifier.drawInsertionMark(
+/**
+ * The insertion mark: the ONE landing mark in a task list, for a Magic Plus
+ * drag and for a task drag (`docs/DRAG_AND_DROP.md`, "One landing mark").
+ * Mirrors iOS `taskInsertionMark`: the mark above a row covers the last points
+ * of the row before it, so "above B" and "below A" are the same place.
+ */
+internal fun Modifier.drawInsertionMark(
     tint: Color,
     alpha: Float,
     atTop: Boolean,
@@ -362,9 +368,9 @@ private fun Modifier.drawInsertionMark(
     drawContent()
     if (!visible || alpha <= 0.01f || tint == Color.Unspecified) return@drawWithContent
     val heightPx = INSERTION_MARK_HEIGHT_DP.dp.toPx()
-    val marginPx = INSERTION_MARK_MARGIN_DP.dp.toPx()
+    val marginPx = TaskCardMetrics.Margin.toPx()
     val widthPx = (size.width - marginPx * 2f).coerceAtLeast(0f)
-    val y = if (atTop) -heightPx / 2f else size.height - heightPx / 2f
+    val y = if (atTop) -heightPx else size.height - heightPx
     val radius = heightPx / 2f
     drawRoundRect(
         color = tint.copy(alpha = alpha),
@@ -375,4 +381,3 @@ private fun Modifier.drawInsertionMark(
 }
 
 private const val INSERTION_MARK_HEIGHT_DP = 6f
-private const val INSERTION_MARK_MARGIN_DP = 16f
