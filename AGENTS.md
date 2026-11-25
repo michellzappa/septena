@@ -447,14 +447,18 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
 - **AppKit does not load a collapsed split-view pane.** A view controller in a
   collapsed `NSSplitViewItem` has no view until the pane first opens, so its
   stack views are empty. `NSStackView.setCustomSpacing(_:after:)` raises for a
-  view that is not in the stack. AppKit swallows the exception inside event
-  handling: the app stays alive, with a menu bar and no window (2026-11-24:
+  view that is not in the stack. AppKit swallowed the exception inside event
+  handling: the app stayed alive, with a menu bar and no window (2026-11-24:
   `SeptaskKitInspectorController.show` during the shell window's `init`).
+  `SeptaskApp.init` now registers `NSApplicationCrashOnExceptions`, so an
+  exception ends the Mac app with a crash report, as on iOS and Android.
   Guard every entry point that is called from outside the pane with
   `isViewLoaded`, hold the state, and apply it in `loadView`. Not greppable;
-  this note is the guardrail. To find a swallowed exception:
-  `/usr/bin/log show --last 1h --predicate 'process == "Septena" AND
-  eventMessage CONTAINS "uncaught exception"'`.
+  this note is the guardrail.
+- **No launch or load state without an exit.** A gate or spinner must end on
+  success, failure and timeout. Android's first-run gate waited on a sync with
+  no limit; the watch lists kept their spinner after a failed fetch. Bound the
+  wait, and show the failure with a Try Again.
 - **A deep SwiftUI view type overflows the iOS main-thread stack at launch.**
   The crash is `EXC_BAD_ACCESS` in `swift_getTypeByMangledName`, before any
   view draws. `TaskListView.taskListRows` hit it: a large `@ViewBuilder`

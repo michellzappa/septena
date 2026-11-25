@@ -38,7 +38,7 @@ struct ListsView: View {
         }
       }
 
-      if store.structure == nil, store.connection == .connected {
+      if store.structure == nil, store.connection == .connected, !store.loadFailed {
         Section {
           HStack {
             Spacer()
@@ -135,7 +135,7 @@ struct UpcomingView: View {
       if rows.isEmpty, store.upcoming != nil {
         EmptyList(symbol: "calendar", text: String(localized: "Nothing scheduled."))
       } else if rows.isEmpty {
-        ProgressView()
+        LoadingList { await store.refreshNow(.upcoming) }
       } else {
         List {
           ForEach(days, id: \.self) { day in
@@ -174,7 +174,7 @@ struct AnytimeView: View {
       if rows.isEmpty, store.anytime != nil {
         EmptyList(symbol: "square.stack", text: String(localized: "No undated tasks."))
       } else if rows.isEmpty {
-        ProgressView()
+        LoadingList { await store.refreshNow(.anytime) }
       } else {
         List {
           ForEach(rows) { task in
@@ -199,7 +199,7 @@ struct RepeatingView: View {
       if rows.isEmpty, store.repeating != nil {
         EmptyList(symbol: "arrow.clockwise", text: String(localized: "No repeating tasks."))
       } else if rows.isEmpty {
-        ProgressView()
+        LoadingList { await store.refreshNow(.repeating) }
       } else {
         List {
           ForEach(rows) { task in
@@ -244,7 +244,7 @@ struct SmartView: View {
       if rows.isEmpty, loaded {
         EmptyList(symbol: symbol, text: emptyText)
       } else if rows.isEmpty {
-        ProgressView()
+        LoadingList { await store.refreshNow(view) }
       } else {
         List {
           ForEach(rows) { task in
@@ -268,7 +268,7 @@ struct LogbookView: View {
       if rows.isEmpty, store.logbook != nil {
         EmptyList(symbol: "checkmark", text: String(localized: "Logbook is empty."))
       } else if rows.isEmpty {
-        ProgressView()
+        LoadingList { await store.refreshNow(.completed) }
       } else {
         List {
           ForEach(rows) { task in
@@ -312,7 +312,7 @@ struct ContainerTasksView: View {
       if rows.isEmpty, loaded {
         EmptyList(symbol: projectID != nil ? "number" : "folder", text: String(localized: "No open tasks."))
       } else if rows.isEmpty {
-        ProgressView()
+        LoadingList { await store.refreshContainer(area: areaID, project: projectID) }
       } else {
         List {
           ForEach(rows) { task in
@@ -344,6 +344,37 @@ private struct LaterRow: View {
         Button { store.moveToToday(task) } label: { Label("Today", systemImage: "star") }
           .tint(.yellow)
       }
+  }
+}
+
+/// An empty list that has not loaded yet: a spinner while the fetch runs, and
+/// a way out when it fails or the watch is not connected.
+struct LoadingList: View {
+  let retry: () async -> Void
+  private var store: WatchStore { .shared }
+
+  var body: some View {
+    if store.connection == .notConnected {
+      NotConnectedView()
+    } else if store.loadFailed {
+      ScrollView {
+        VStack(spacing: 8) {
+          if store.offline {
+            Label("Offline", systemImage: "wifi.slash")
+          } else {
+            Text(store.lastError ?? String(localized: "Unexpected reply from the server"))
+          }
+          Button("Try Again") { Task { await retry() } }
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 12)
+      }
+    } else {
+      ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
   }
 }
 

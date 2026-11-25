@@ -1181,7 +1181,6 @@ struct TaskComposerCard: View {
                                        mutator: mutator)
         }
         convertedToHeading = true
-        AddInfoSection.tasks.notifyTilesChanged()
         return true
       }
       applyPendingTokens()
@@ -1202,7 +1201,6 @@ struct TaskComposerCard: View {
           mutator.purge(id: task.id)
           convertedToHeading = true
           recordedCreateUndo = true
-          AddInfoSection.tasks.notifyTilesChanged()
           return true
         }
         // Same create pipeline as the drawer, except the inline host already

@@ -85,6 +85,9 @@ final class WatchStore {
   private(set) var containers: [String: WatchTaskList] = [:]
   private(set) var connection: WatchConnection = WatchAPI.hasSession ? .connected : .notConnected
   private(set) var isRefreshing = false
+  /// The last list fetch failed. An empty list then offers Try Again instead of
+  /// a spinner that never ends.
+  private(set) var loadFailed = false
   private(set) var lastError: String?
   private(set) var lastSyncedAt: Date?
   private(set) var offline = false
@@ -189,12 +192,20 @@ final class WatchStore {
       offline = false
     } catch let error as WatchAPIError {
       handle(error)
-    } catch {}
+      noteLoadFailed()
+    } catch {
+      noteLoadFailed()
+    }
   }
 
   func refreshContainer(area: String? = nil, project: String? = nil) async {
     guard !sampleMode else { return }
-    guard WatchAPI.hasSession else { return }
+    guard WatchAPI.hasSession else {
+      connection = .notConnected
+      WatchPhoneLink.shared.requestSession()
+      return
+    }
+    loadFailed = false
     let key = project.map { "project:\($0)" } ?? area.map { "area:\($0)" } ?? ""
     guard !key.isEmpty else { return }
     await flush()
@@ -204,7 +215,10 @@ final class WatchStore {
       offline = false
     } catch let error as WatchAPIError {
       handle(error)
-    } catch {}
+      noteLoadFailed()
+    } catch {
+      noteLoadFailed()
+    }
   }
 
   /// Fetches a view. Silent: the cached rows stay on screen meanwhile.
@@ -219,6 +233,7 @@ final class WatchStore {
       WatchPhoneLink.shared.requestSession()
       return
     }
+    loadFailed = false
     await flush()
     isRefreshing = true
     defer { isRefreshing = false }
@@ -233,7 +248,15 @@ final class WatchStore {
       }
     } catch let error as WatchAPIError {
       handle(error)
-    } catch {}
+      noteLoadFailed()
+    } catch {
+      noteLoadFailed()
+    }
+  }
+
+  /// A fetch cancelled because its screen closed is not a failure.
+  private func noteLoadFailed() {
+    if !Task.isCancelled { loadFailed = true }
   }
 
   private func apply(_ list: WatchTaskList) {
