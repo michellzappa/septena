@@ -289,7 +289,7 @@ fun Modifier.magicPlusRowDrop(
     this
         .onGloballyPositioned { coords ->
             val rect = coords.boundsInRoot()
-            drag.register(id, MagicPlusDropKind.TaskRow, rect.top, rect.bottom, onDrop)
+            drag.register(id, MagicPlusDropKind.TaskRow, rect.top, rect.bottom, onDrop = onDrop)
         }
         .drawInsertionMark(tint, markAlpha, atTop = hoveredBefore == true, visible = hoveredBefore != null)
 }
