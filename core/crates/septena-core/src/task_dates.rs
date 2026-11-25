@@ -470,9 +470,21 @@ fn patch(before: &TaskDateFields, after: TaskDateFields) -> TaskDatePatch {
         ("startTime", &before.start_time, &after.start_time),
         ("timeZone", &before.time_zone, &after.time_zone),
         ("reminderAt", &before.reminder_at, &after.reminder_at),
-        ("reminderSnoozedUntil", &before.reminder_snoozed_until, &after.reminder_snoozed_until),
-        ("reminderDismissedAt", &before.reminder_dismissed_at, &after.reminder_dismissed_at),
-        ("recurrenceAnchorDate", &before.recurrence_anchor_date, &after.recurrence_anchor_date),
+        (
+            "reminderSnoozedUntil",
+            &before.reminder_snoozed_until,
+            &after.reminder_snoozed_until,
+        ),
+        (
+            "reminderDismissedAt",
+            &before.reminder_dismissed_at,
+            &after.reminder_dismissed_at,
+        ),
+        (
+            "recurrenceAnchorDate",
+            &before.recurrence_anchor_date,
+            &after.recurrence_anchor_date,
+        ),
         ("acknowledgedAt", &before.acknowledged_at, &after.acknowledged_at),
     ];
     let mut changed: Vec<String> = texts
