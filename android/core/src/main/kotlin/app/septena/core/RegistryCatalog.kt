@@ -208,6 +208,11 @@ object RegistryCatalog {
     fun surface(id: String): JsonValue.ObjectValue? =
         surfaceById[id] ?: findObjectWithId(document("surfaces"), id)?.also { surfaceById[id] = it }
 
+    fun taskDateBoardOverdueLabel(languageTag: String = "en"): String =
+        requireNotNull(surface(TASK_DATE_BOARD_KEY)?.objectAt("overdue")?.stringAt("label")) {
+            "Missing task date board overdue label"
+        }.let { localizedString(it, languageTag) ?: it }
+
     /**
      * The task attributes in registry order, with localized labels. The task page
      * `attributes` block renders these; it holds no list of its own (ADR 0029).
@@ -319,7 +324,8 @@ object RegistryCatalog {
             is JsonValue.ObjectValue -> value.stringAt("text")
             else -> null
         }
-        return text(selected?.fields?.get(key)) ?: text(translations.objectAt("en")?.fields?.get(key))
+        return text(selected?.fields?.get(key))?.takeIf(String::isNotBlank)
+            ?: text(translations.objectAt("en")?.fields?.get(key))?.takeIf(String::isNotBlank)
     }
 
     private fun JsonValue.ObjectValue.objectAt(key: String): JsonValue.ObjectValue? =

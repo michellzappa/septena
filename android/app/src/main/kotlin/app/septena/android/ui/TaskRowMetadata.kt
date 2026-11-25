@@ -86,17 +86,12 @@ internal fun buildTaskListItem(
     val isFaded = TaskFadeRules.isFaded(snapshot.fadedAt)
 
     val todayLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag)
-        ?.takeIf(String::isNotBlank)
-        ?: RegistryCatalog.localizedString("Today", languageTag)?.takeIf(String::isNotBlank)
-        ?: "Today"
+        ?.takeIf(String::isNotBlank).orEmpty()
     val tomorrowLabel = RegistryCatalog.dateBoardRows(
         RegistryTaskAttributeIds.WHEN,
         languageTag = languageTag,
-    ).firstOrNull { it.kind == DateBoardRowKinds.TOMORROW }?.label?.takeIf(String::isNotBlank)
-        ?: RegistryCatalog.localizedString("Tomorrow", languageTag)?.takeIf(String::isNotBlank)
-        ?: "Tomorrow"
-    val overdueLabel = RegistryCatalog.localizedString("Overdue", languageTag)
-        ?.takeIf(String::isNotBlank) ?: "Overdue"
+    ).firstOrNull { it.kind == DateBoardRowKinds.TOMORROW }?.label?.takeIf(String::isNotBlank).orEmpty()
+    val overdueLabel = RegistryCatalog.taskDateBoardOverdueLabel(languageTag)
 
     // Deadline / Scheduled / Completed date — matches iOS `TaskRow.trailingDate`.
     var deadlineText: String? = null

@@ -132,6 +132,7 @@ targets:
           - de
           - es
           - pt-BR
+          - nl
         ITSAppUsesNonExemptEncryption: false
         # A blank launch screen: only the system background (white / black,
         # Septask/Assets.xcassets/LaunchBackground). No glyph, so the first
@@ -408,6 +409,7 @@ targets:
           - de
           - es
           - pt-BR
+          - nl
         ITSAppUsesNonExemptEncryption: false
         CFBundleIconFile: AppIcon
         SUFeedURL: https://septena.app/mac/appcast.xml

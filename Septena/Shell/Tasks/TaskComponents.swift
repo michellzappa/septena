@@ -855,7 +855,7 @@ struct TaskRow: View {
           .font(.septenaMeta.weight(.semibold))
           .foregroundStyle(Theme.overdueRed)
       case .overdue:
-        Text(String(localized: "Overdue", comment: "Deadline label: past due"))
+        Text(RegistrySurfaces.taskDateBoardOverdueLabel)
           .font(.septenaMeta.weight(.semibold))
           .foregroundStyle(Theme.overdueRed)
       case .none, .later:

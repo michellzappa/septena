@@ -1664,6 +1664,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static func dateBoardRows(for attribute: RegistryDateBoardAttribute, on platform: String) -> [RegistryDateBoardRow] {");
   lines.push("    dateBoardRows.filter { $0.applies(to: attribute, on: platform) }");
   lines.push("  }");
+  lines.push(`  static let taskDateBoardOverdueLabel: String = ${L(surfaces.taskDateBoard.overdue.label, surfaces.taskDateBoard.overdue, "label")}`);
   const cal = surfaces.taskDateBoard.rows.find((r) => r.kind === "calendar");
   lines.push("  /// The calendar row when the task has a date past the day strip.");
   lines.push(tmplFn("dateBoardCalendarLabel", tmplKey(cal.valueLabel, cal, "valueLabel")));

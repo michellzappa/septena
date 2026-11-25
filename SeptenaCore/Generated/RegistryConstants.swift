@@ -1892,6 +1892,7 @@ enum RegistrySurfaces {
   static func dateBoardRows(for attribute: RegistryDateBoardAttribute, on platform: String) -> [RegistryDateBoardRow] {
     dateBoardRows.filter { $0.applies(to: attribute, on: platform) }
   }
+  static let taskDateBoardOverdueLabel: String = RegistryL10n.t("Overdue")
   /// The calendar row when the task has a date past the day strip.
   static func dateBoardCalendarLabel(date: String) -> String { RegistryL10n.format("Pick another date (%@)", english: "Pick another date (%@)", args: [date]) }
   /// The word for the day after today, in the date board and in date labels.

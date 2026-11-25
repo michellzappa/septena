@@ -6589,7 +6589,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
           ofSize: SeptenaTypeScale.size(.footnote), weight: .semibold)
         detail.textColor = SeptaskKitTheme.overdueRed
         detail.stringValue = state == .overdue
-          ? String(localized: "Overdue", comment: "Deadline label: past due")
+          ? RegistrySurfaces.taskDateBoardOverdueLabel
           : String(localized: "Today", comment: "Deadline label: due today")
       } else {
         configureScheduleGlyph(named: "flag.fill", color: SeptaskKitTheme.inkSecondary)

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_today_name">Vandaag</string>
+    <string name="widget_today_description">Taken voor vandaag, met één tik af te vinken.</string>
+    <string name="widget_upcoming_name">Binnenkort</string>
+    <string name="widget_upcoming_description">Binnenkort geplande taken.</string>
+    <string name="widget_add_task">Nieuwe taak</string>
+    <string name="widget_complete_task">Taak voltooien</string>
+</resources>

@@ -669,6 +669,7 @@
   "Your turn": "Sua vez",
   "Your turn: a question is waiting": "Sua vez: há uma pergunta aguardando",
   "You’re all set": "Tudo pronto",
+  "Overdue": "Em atraso",
   "Yuzu": "Yuzu",
   "iPhone or iPad": "iPhone ou iPad",
   "{app}’s servers never run AI on your tasks. AI runs on your device, or in your own Claude when you connect it. Turn AI off and the app works the same, without conversations.": "Os servidores do {app} nunca executam IA nas suas tarefas. A IA funciona no seu dispositivo ou no seu Claude quando você o conecta. Desative a IA e o app continuará funcionando da mesma forma, sem conversas.",
