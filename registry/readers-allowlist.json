@@ -154,8 +154,8 @@
       "issue": "#244"
     },
     "RegistryEntityEnums.TelemetryLevel.*": {
-      "reason": "Privacy settings are not on Android yet.",
-      "issue": "#244"
+      "reason": "Retired setting (#436): the backend still accepts it from older builds, no client reads it.",
+      "issue": "#436"
     },
     "RegistryEntityEnums.ConvoAssignee.*": {
       "reason": "Task conversations are not on Android yet.",

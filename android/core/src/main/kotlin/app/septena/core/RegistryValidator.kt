@@ -22,11 +22,16 @@ object RegistryValidator {
         if (issues.isNotEmpty()) throw RegistryValidationException(issues)
     }
 
+    /**
+     * [insert] is null when the caller cannot know: an outbox upsert can create
+     * the row on the server or change it. Then the server checks the fields
+     * that only an insert may set.
+     */
     fun validateUpsert(
         entityName: String,
         id: String,
         fields: Map<String, JsonValue>,
-        insert: Boolean,
+        insert: Boolean?,
     ): List<RegistryValidationIssue> {
         val issues = mutableListOf<RegistryValidationIssue>()
         issues += validateId(id)
@@ -36,7 +41,7 @@ object RegistryValidator {
             return issues + RegistryValidationIssue("entity", "unknown entity '$entityName'")
         }
 
-        if (insert) {
+        if (insert == true) {
             for (required in entity.requiredOnInsert) {
                 if (required !in fields) {
                     issues += RegistryValidationIssue("fields.$required", "required on insert")
@@ -55,7 +60,7 @@ object RegistryValidator {
                 issues += RegistryValidationIssue(path, "field is owned by the server")
                 continue
             }
-            if (entity.updatable != null && fieldName !in entity.updatable) {
+            if (insert == false && entity.updatable != null && fieldName !in entity.updatable) {
                 issues += RegistryValidationIssue(path, "field is not updatable")
                 continue
             }
@@ -128,7 +133,7 @@ object RegistryValidator {
         return issues
     }
 
-    fun requireValidUpsert(entityName: String, id: String, fields: Map<String, JsonValue>, insert: Boolean) {
+    fun requireValidUpsert(entityName: String, id: String, fields: Map<String, JsonValue>, insert: Boolean?) {
         val issues = validateUpsert(entityName, id, fields, insert)
         if (issues.isNotEmpty()) throw RegistryValidationException(issues)
     }
