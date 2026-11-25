@@ -8,6 +8,7 @@
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Septena zeigt die heutigen Kalenderereignisse über deiner Aufgabenliste an." } },
         "es" : { "stringUnit" : { "state" : "translated", "value" : "Septena muestra los eventos del calendario de hoy encima de tu lista de tareas." } },
         "fr" : { "stringUnit" : { "state" : "translated", "value" : "Septena affiche les événements de calendrier du jour au-dessus de votre liste de tâches." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Septena mostra gli eventi del calendario di oggi sopra l’elenco delle tue attività." } },
         "nl" : { "stringUnit" : { "state" : "translated", "value" : "Septena toont de agenda-items van vandaag boven je takenlijst." } },
         "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena mostra os eventos de hoje acima da sua lista de tarefas." } }
       }
@@ -19,6 +20,7 @@
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Septena zeigt die heutigen Kalenderereignisse über deiner Aufgabenliste an." } },
         "es" : { "stringUnit" : { "state" : "translated", "value" : "Septena muestra los eventos del calendario de hoy encima de tu lista de tareas." } },
         "fr" : { "stringUnit" : { "state" : "translated", "value" : "Septena affiche les événements de calendrier du jour au-dessus de votre liste de tâches." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Septena mostra gli eventi del calendario di oggi sopra l’elenco delle tue attività." } },
         "nl" : { "stringUnit" : { "state" : "translated", "value" : "Septena toont de agenda-items van vandaag boven je takenlijst." } },
         "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena mostra os eventos de hoje acima da sua lista de tarefas." } }
       }
@@ -30,6 +32,7 @@
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Septena verwendet die Kamera, um Anmeldecodes von deinen anderen Geräten zu scannen." } },
         "es" : { "stringUnit" : { "state" : "translated", "value" : "Septena usa la cámara para escanear códigos de inicio de sesión de tus otros dispositivos." } },
         "fr" : { "stringUnit" : { "state" : "translated", "value" : "Septena utilise l’appareil photo pour scanner les codes de connexion de vos autres appareils." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Septena usa la fotocamera per scansionare i codici di accesso dagli altri dispositivi." } },
         "nl" : { "stringUnit" : { "state" : "translated", "value" : "Septena gebruikt de camera om aanmeldcodes van je andere apparaten te scannen." } },
         "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena usa a câmera para ler códigos de acesso dos seus outros dispositivos." } }
       }
@@ -41,6 +44,7 @@
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Septena verschiebt Erinnerungen aus deinen Erinnerungslisten in den Eingang und löscht sie aus Erinnerungen." } },
         "es" : { "stringUnit" : { "state" : "translated", "value" : "Septena mueve los recordatorios de tus listas a la bandeja de entrada y los elimina de Recordatorios." } },
         "fr" : { "stringUnit" : { "state" : "translated", "value" : "Septena déplace les rappels de vos listes Rappels vers la boîte de réception et les supprime de Rappels." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Septena sposta i promemoria dai tuoi elenchi nella Posta in arrivo e li elimina da Promemoria." } },
         "nl" : { "stringUnit" : { "state" : "translated", "value" : "Septena verplaatst herinneringen uit je Herinneringen-lijsten naar je Postvak IN en verwijdert ze uit Herinneringen." } },
         "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena move lembretes das suas listas do Lembretes para a Entrada e os apaga do Lembretes." } }
       }
@@ -52,6 +56,7 @@
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Septena verschiebt Erinnerungen aus deinen Erinnerungslisten in den Eingang und löscht sie aus Erinnerungen." } },
         "es" : { "stringUnit" : { "state" : "translated", "value" : "Septena mueve los recordatorios de tus listas a la bandeja de entrada y los elimina de Recordatorios." } },
         "fr" : { "stringUnit" : { "state" : "translated", "value" : "Septena déplace les rappels de vos listes Rappels vers la boîte de réception et les supprime de Rappels." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Septena sposta i promemoria dai tuoi elenchi nella Posta in arrivo e li elimina da Promemoria." } },
         "nl" : { "stringUnit" : { "state" : "translated", "value" : "Septena verplaatst herinneringen uit je Herinneringen-lijsten naar je Postvak IN en verwijdert ze uit Herinneringen." } },
         "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena move lembretes das suas listas do Lembretes para a Entrada e os apaga do Lembretes." } }
       }

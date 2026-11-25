@@ -1,6 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "../env.js";
-import { randomId } from "../util.js";
+import { randomId, sha256Base64Url } from "../util.js";
+import type { AccountSummary } from "./TaskStore.js";
+import { PlusLinks, type PlusLink, type PlusLinkClaim, type PlusLinkInput, type PlusLinkUse } from "./plusLinks.js";
 
 // AccountStore — global Durable Object (SQLite) holding the identity table
 // (ADR 0016, issue #168). Maps `provider:subject` (e.g. `apple:<sub>`,
@@ -10,6 +12,9 @@ import { randomId } from "../util.js";
 // `/v1/auth/apple` records `apple:<sub>` here on sign-in. Accounts created
 // from non-Apple providers get a random `u_` id minted by `newUserId()`.
 // Deleting an account wipes all of its rows here (`deleteIdentitiesForUser`).
+//
+// It also holds what the admin page reads (ADR 0043, src/admin/): the index of
+// accounts with a daily summary of counts, and the Plus links.
 
 /// Canonical backend user id shape — shared with the `/v1/admin/*` validators.
 export const USER_ID_RE = /^u_[A-Za-z0-9_-]{20,64}$/;
@@ -20,6 +25,26 @@ const PROVIDER_RE = /^[a-z][a-z0-9_-]{0,31}$/;
 export const GLOBAL_ACCOUNT_STORE_NAME = "global";
 
 export type IdentityProvider = "apple" | "email" | (string & {});
+
+/// The subject as stored. An id from a sign-in provider (Apple, and any added
+/// later) is opaque, so a hash finds the account as well as the id does and
+/// the id itself is never kept. An email address stays readable: ADR 0016
+/// sends codes and recovery mail to it.
+export async function storedSubject(provider: string, subject: string): Promise<string> {
+  const p = normalizeProvider(provider);
+  const s = normalizeSubject(p, subject);
+  return p === "email" ? s : `h_${await sha256Base64Url(`${p}:${s}`)}`;
+}
+
+/// One account on the admin page.
+export interface AccountIndexRow {
+  userId: string;
+  createdAt: number;
+  refreshedAt: number;
+  providers: string[];
+  summary: AccountSummary | null;
+  plusLinks: { id: string; label: string }[];
+}
 
 export interface IdentityRow {
   key: string;
@@ -60,12 +85,6 @@ export function normalizeSubject(provider: string, subject: string): string {
   return provider === "email" ? trimmed.toLowerCase() : trimmed;
 }
 
-export function identityKey(provider: string, subject: string): string {
-  const p = normalizeProvider(provider);
-  const s = normalizeSubject(p, subject);
-  return `${p}:${s}`;
-}
-
 /// Returns the global `AccountStore` stub, or null when the binding is absent
 /// (e.g. in unit tests that exercise unrelated routes without binding it).
 export function accountStoreFor(env: Env): DurableObjectStub<AccountStore> | null {
@@ -75,12 +94,15 @@ export function accountStoreFor(env: Env): DurableObjectStub<AccountStore> | nul
 
 export class AccountStore extends DurableObject<Env> {
   private sql: SqlStorage;
+  private links: PlusLinks;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.sql = ctx.storage.sql;
+    this.links = new PlusLinks(this.sql);
     ctx.blockConcurrencyWhile(async () => {
       this.migrate();
+      await this.hashSubjects();
     });
   }
 
@@ -95,7 +117,26 @@ export class AccountStore extends DurableObject<Env> {
         updatedAt INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_identities_userId ON identities(userId);
+      CREATE TABLE IF NOT EXISTS account_index (
+        userId      TEXT PRIMARY KEY,
+        createdAt   INTEGER NOT NULL,
+        refreshedAt INTEGER NOT NULL DEFAULT 0,
+        summary     TEXT
+      );
+      CREATE TABLE IF NOT EXISTS store_meta (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
     `);
+    this.links.migrate();
+  }
+
+  /// Rows written before subjects were hashed (2026-11-24 to 25).
+  private async hashSubjects(): Promise<void> {
+    const raw = this.sql.exec<{ key: string; provider: string; subject: string }>(
+      "SELECT key, provider, subject FROM identities WHERE provider != 'email' AND subject NOT LIKE 'h\\_%' ESCAPE '\\'",
+    ).toArray();
+    for (const r of raw) {
+      const subject = await storedSubject(r.provider, r.subject);
+      this.sql.exec("UPDATE identities SET key = ?, subject = ? WHERE key = ?", `${r.provider}:${subject}`, subject, r.key);
+    }
   }
 
   private selectByKey(key: string): IdentityRow | null {
@@ -116,22 +157,22 @@ export class AccountStore extends DurableObject<Env> {
   }
 
   /// Read-only lookup for `provider:subject`.
-  resolveIdentity(provider: string, subject: string): IdentityRow | null {
-    return this.selectByKey(identityKey(provider, subject));
+  async resolveIdentity(provider: string, subject: string): Promise<IdentityRow | null> {
+    return this.selectByKey(`${normalizeProvider(provider)}:${await storedSubject(provider, subject)}`);
   }
 
   /// Resolves `provider:subject` to its `userId`, inserting a row on first
   /// sign-in. Pass `preferredUserId` when an existing deterministic id must be
   /// preserved (Apple's derived `u_` id); omit it for non-Apple providers so a
   /// fresh random `u_` id is minted on creation.
-  resolveOrCreateIdentity(
+  async resolveOrCreateIdentity(
     provider: string,
     subject: string,
     preferredUserId?: string,
     now = Date.now(),
-  ): ResolveIdentityResult {
+  ): Promise<ResolveIdentityResult> {
     const p = normalizeProvider(provider);
-    const s = normalizeSubject(p, subject);
+    const s = await storedSubject(p, subject);
     const key = `${p}:${s}`;
     if (preferredUserId !== undefined && !USER_ID_RE.test(preferredUserId)) {
       throw new Error("invalid userId");
@@ -163,12 +204,12 @@ export class AccountStore extends DurableObject<Env> {
   /// Attaches `provider:subject` to an existing signed-in `userId` (e.g.
   /// adding an email recovery identity to an Apple account). Refuses if the
   /// identity already belongs to a different account.
-  linkIdentity(provider: string, subject: string, userId: string, now = Date.now()): LinkIdentityResult {
+  async linkIdentity(provider: string, subject: string, userId: string, now = Date.now()): Promise<LinkIdentityResult> {
     if (!USER_ID_RE.test(userId)) {
       throw new Error("invalid userId");
     }
     const p = normalizeProvider(provider);
-    const s = normalizeSubject(p, subject);
+    const s = await storedSubject(p, subject);
     const key = `${p}:${s}`;
 
     return this.ctx.storage.transactionSync(() => {
@@ -210,8 +251,112 @@ export class AccountStore extends DurableObject<Env> {
     }));
   }
 
-  /// Removes every identity row for `userId` (called by `DELETE /v1/account`).
+  /// Removes everything this store holds about `userId` (called by `DELETE
+  /// /v1/account`). Returns how many identity rows went.
   deleteIdentitiesForUser(userId: string): number {
-    return this.sql.exec("DELETE FROM identities WHERE userId = ?", userId).rowsWritten;
+    return this.ctx.storage.transactionSync(() => {
+      this.sql.exec("DELETE FROM account_index WHERE userId = ?", userId);
+      this.links.forgetUser(userId);
+      return this.sql.exec("DELETE FROM identities WHERE userId = ?", userId).rowsWritten;
+    });
+  }
+
+  // ---- account index (ADR 0043, src/admin/accounts.ts) ----
+
+  /// True until the accounts from before the identity table are in the index.
+  needsSeed(): boolean {
+    return this.sql.exec("SELECT 1 FROM store_meta WHERE key = 'accountsSeeded'").toArray().length === 0;
+  }
+
+  seedAccounts(userIds: string[], now = Date.now()): void {
+    this.ctx.storage.transactionSync(() => {
+      for (const id of userIds) {
+        if (USER_ID_RE.test(id)) this.sql.exec("INSERT OR IGNORE INTO account_index (userId, createdAt) VALUES (?, ?)", id, now);
+      }
+      this.sql.exec("INSERT OR REPLACE INTO store_meta (key, value) VALUES ('accountsSeeded', ?)", now);
+    });
+  }
+
+  /// The accounts whose summary is older than `before`, oldest first.
+  accountsToRefresh(before: number, limit: number): string[] {
+    this.sql.exec(
+      "INSERT OR IGNORE INTO account_index (userId, createdAt) SELECT userId, MIN(createdAt) FROM identities GROUP BY userId",
+    );
+    return this.sql.exec<{ userId: string }>(
+      "SELECT userId FROM account_index WHERE refreshedAt < ? ORDER BY refreshedAt, userId LIMIT ?", before, limit,
+    ).toArray().map((r) => r.userId);
+  }
+
+  /// An update only: an account deleted while its summary was on the way stays
+  /// deleted. A null summary is an empty store; without an identity it is not
+  /// an account (any more).
+  saveSummaries(rows: { userId: string; summary: AccountSummary | null }[], now = Date.now()): void {
+    this.ctx.storage.transactionSync(() => {
+      for (const { userId, summary } of rows) {
+        this.sql.exec(
+          "UPDATE account_index SET summary = ?, refreshedAt = ? WHERE userId = ?",
+          summary === null ? null : JSON.stringify(summary), now, userId,
+        );
+        if (summary === null) {
+          this.sql.exec("DELETE FROM account_index WHERE userId = ? AND userId NOT IN (SELECT userId FROM identities)", userId);
+        }
+      }
+    });
+  }
+
+  listAccounts(): AccountIndexRow[] {
+    const providers = new Map<string, Set<string>>();
+    for (const r of this.sql.exec<{ userId: string; provider: string }>("SELECT userId, provider FROM identities ORDER BY createdAt").toArray()) {
+      providers.set(r.userId, (providers.get(r.userId) ?? new Set()).add(r.provider));
+    }
+    const labels = new Map(this.links.list().map((l) => [l.id, l.label]));
+    const links = new Map<string, { id: string; label: string }[]>();
+    for (const u of this.links.uses()) {
+      if (u.revokedAt !== null) continue;
+      links.set(u.userId, [...(links.get(u.userId) ?? []), { id: u.linkId, label: labels.get(u.linkId) ?? u.linkId }]);
+    }
+    return this.sql.exec<{ userId: string; createdAt: number; refreshedAt: number; summary: string | null }>(
+      "SELECT userId, createdAt, refreshedAt, summary FROM account_index ORDER BY createdAt DESC, userId",
+    ).toArray().map((r) => {
+      const summary = r.summary === null ? null : JSON.parse(r.summary) as AccountSummary;
+      return {
+        userId: r.userId,
+        createdAt: summary?.firstSeen ? Math.min(r.createdAt, summary.firstSeen) : r.createdAt,
+        refreshedAt: r.refreshedAt,
+        providers: [...(providers.get(r.userId) ?? [])],
+        summary,
+        plusLinks: links.get(r.userId) ?? [],
+      };
+    });
+  }
+
+  // ---- Plus links (src/store/plusLinks.ts) ----
+
+  createPlusLink(tokenHash: string, input: PlusLinkInput, now = Date.now()): PlusLink {
+    return this.links.create(tokenHash, input, now);
+  }
+
+  listPlusLinks(): { links: PlusLink[]; uses: PlusLinkUse[] } {
+    return { links: this.links.list(), uses: this.links.uses() };
+  }
+
+  openPlusLink(tokenHash: string): PlusLink | null {
+    return this.links.open(tokenHash);
+  }
+
+  claimPlusLink(tokenHash: string, userId: string, now = Date.now()): PlusLinkClaim {
+    return this.ctx.storage.transactionSync(() => this.links.claim(tokenHash, userId, now));
+  }
+
+  plusLinkIsLive(linkId: string, userId: string): boolean {
+    return this.links.isLive(linkId, userId);
+  }
+
+  closePlusLink(id: string, now = Date.now()): boolean {
+    return this.links.close(id, now);
+  }
+
+  revokePlusLink(id: string, userId: string | null, now = Date.now()): string[] | null {
+    return this.ctx.storage.transactionSync(() => this.links.revoke(id, userId, now));
   }
 }

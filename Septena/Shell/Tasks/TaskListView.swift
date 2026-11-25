@@ -73,6 +73,8 @@ struct TaskListView: View {
   @State private var itemsStorage: [SeptenaTask] = []
   @State private var triageStorage: [SeptenaTask] = []
   @State private var fadedScopeStorage: [SeptenaTask] = []
+  /// Section headings of the current project (`projectHeadingList`).
+  @State private var headingsStorage: [SeptenaTask] = []
   @State private var storageFilter: TaskFilter? = nil
   /// Store reads for the current filter before `hydrateFilterStorageIfNeeded`
   /// copies them into the storage above. The first `body` pass of a new list
@@ -187,6 +189,14 @@ struct TaskListView: View {
     preHydration.reset(for: filter)
     if preHydration.triage == nil { _ = preHydrationItems() }
     return preHydration.triage ?? []
+  }
+
+  private func preHydrationHeadings() -> [SeptenaTask] {
+    preHydration.reset(for: filter)
+    if let cached = preHydration.headings { return cached }
+    let fresh = storedProjectHeadings()
+    preHydration.headings = fresh
+    return fresh
   }
 
   private func preHydrationFaded() -> [SeptenaTask] {
@@ -904,7 +914,11 @@ struct TaskListView: View {
       titleVisibility: .visible
     ) {
       Button(RegistryPrompts.prompt(.deleteSection).confirmTitle ?? "", role: .destructive) {
-        if let h = headingDeleteTarget { mutator.delete(id: h.id); Task { await load() } }
+        if let h = headingDeleteTarget {
+          mutator.delete(id: h.id)
+          refreshProjectHeadings()
+          Task { await load() }
+        }
         headingDeleteTarget = nil
       }
       Button(RegistryPrompts.cancelTitle, role: .cancel) { headingDeleteTarget = nil }
@@ -1325,6 +1339,7 @@ struct TaskListView: View {
       return
     }
     itemsStorage = preHydrationItems()
+    headingsStorage = preHydrationHeadings()
     triageStorage = preHydrationTriage()
     fadedScopeStorage = (showFadedInLists && scopeLoggedFilterId != nil) ? preHydrationFaded() : []
     logbookDeletedCount = filter == .logbook ? LocalCache.recentlyDeletedCount(in: modelContext) : 0
@@ -2974,9 +2989,26 @@ struct TaskListView: View {
 
   /// The section-divider rows for the current project, in manual order. Empty
   /// for every non-project filter (headings only live inside a project).
+  ///
+  /// `body` and every row's menu read this, so it reads `headingsStorage`, not
+  /// the store. `load()` refreshes it with the rows; a heading gesture on this
+  /// page also refreshes it at once (`refreshProjectHeadings`), so drop logic
+  /// never sees headings older than the store.
   private var projectHeadingList: [SeptenaTask] {
+    guard isProjectFilter else { return [] }
+    return storageFilter == filter ? headingsStorage : preHydrationHeadings()
+  }
+
+  private func storedProjectHeadings() -> [SeptenaTask] {
     guard case .project(let pid) = filter else { return [] }
-    return LocalCache.headings(inProject: pid, in: LocalStore.shared.container.mainContext)
+    return LocalCache.headings(inProject: pid, in: modelContext)
+  }
+
+  /// Not before hydration: until then `preHydration` owns the headings, and
+  /// `hydrateFilterStorageIfNeeded` copies them.
+  private func refreshProjectHeadings() {
+    guard storageFilter == filter else { return }
+    headingsStorage = storedProjectHeadings()
   }
 
   private var projectHeadingIds: Set<String> { Set(projectHeadingList.map(\.id)) }
@@ -3141,6 +3173,7 @@ struct TaskListView: View {
       let undoBefore = TaskUndo.positions(of: remaining.map(\.id) + ids, in: modelContext)
       applyManualOrder(ids: ids, into: remaining, at: before ? ti : ti + 1)
       TaskUndo.recordReorder(before: undoBefore, context: modelContext, mutator: mutator)
+      refreshProjectHeadings()
     } else {
       // Tasks dropped onto the label → file under this heading, above its first member.
       let members = visibleItems.filter { $0.heading == targetHeading.id && !dragged.contains($0.id) }
@@ -3167,6 +3200,7 @@ struct TaskListView: View {
                                    project: project, position: created.position,
                                    mutator: mutator)
     }
+    refreshProjectHeadings()
     Task { await load() }
   }
 
@@ -3176,6 +3210,7 @@ struct TaskListView: View {
     if mutator.update(id: heading.id, title: trimmed, notes: nil) {
       TaskUndo.recordRename(id: heading.id, before: heading.title, after: trimmed, mutator: mutator)
     }
+    refreshProjectHeadings()
     Task { await load() }
   }
 
@@ -5655,6 +5690,8 @@ struct TaskListView: View {
                              animateArrivals: loadedFilters.contains(filter),
                              ownCreations: ownCreateExclusions(),
                              openSettleWindow: openSettleWindow)
+    // `items` marks the storage as this filter's, so headings go first.
+    headingsStorage = storedProjectHeadings()
     applyMerge(outcome) { items = $0 }
     loadedFilters.insert(filter)
     // Projects + areas live in SwiftData (mirrored by CKSyncEngine), so
@@ -5794,6 +5831,12 @@ struct TaskListView: View {
     guard let ids = note.changedTaskIDs else { return true }
     let visible = Set((triageItems + items).map(\.id))
     if !visible.isDisjoint(with: ids) { return true }
+    // `taskMatches` excludes headings. Check the drawn ones (renamed, deleted)
+    // and the stored ones (created, restored by undo).
+    if isProjectFilter {
+      let headingIds = projectHeadingIds.union(storedProjectHeadings().map(\.id))
+      if !headingIds.isDisjoint(with: ids) { return true }
+    }
     return ids.contains {
       LocalCache.taskMatches(id: $0, filter: activeFilter, in: modelContext)
         || (filter == .logbook && LocalCache.taskMatches(id: $0, filter: .recentlyDeleted, in: modelContext))
@@ -5866,6 +5909,7 @@ private final class PreHydrationReads {
   var items: [SeptenaTask]?
   var triage: [SeptenaTask]?
   var faded: [SeptenaTask]?
+  var headings: [SeptenaTask]?
 
   /// Forget reads made for another filter.
   func reset(for filter: TaskFilter) {
@@ -5881,5 +5925,6 @@ private final class PreHydrationReads {
     items = nil
     triage = nil
     faded = nil
+    headings = nil
   }
 }
