@@ -47,6 +47,7 @@ import app.septena.core.RegistryCatalog
 import app.septena.core.TaskRefAddResult
 import app.septena.core.TaskRefOffer
 import app.septena.core.TaskRefOffers
+import app.septena.core.TaskRefOther
 import app.septena.core.TaskRefRecord
 import app.septena.core.TaskRefResolver
 import app.septena.core.TaskRefTarget
@@ -96,6 +97,7 @@ internal fun TaskReferencesSection(
     var refs by remember(taskId) { mutableStateOf<List<TaskRefRecord>>(emptyList()) }
     var loaded by remember(taskId) { mutableStateOf(false) }
     var suggestions by remember(taskId) { mutableStateOf<List<TaskRefOffer>>(emptyList()) }
+    var others by remember(taskId) { mutableStateOf<List<TaskRefOther>>(emptyList()) }
     var liveTaskIds by remember(taskId) { mutableStateOf<Set<String>>(emptySet()) }
 
     LaunchedEffect(graph, taskId, dataVersion) {
@@ -117,12 +119,17 @@ internal fun TaskReferencesSection(
     val suggestionFormat = registryText(suggestionCopy["format"].stringValue(), languageTag)
     val maxSuggestions = suggestionCopy["max"].longValue()?.toInt() ?: 0
 
-    LaunchedEffect(refs, loaded, taskTitle, taskNotes, maxSuggestions) {
+    val alsoInFormat = registryText((surface["alsoIn"] as? JsonValue.ObjectValue)?.fields?.get("format").stringValue(), languageTag)
+
+    LaunchedEffect(refs, loaded, taskTitle, taskNotes, maxSuggestions, dataVersion) {
         if (!loaded) return@LaunchedEffect
         // A half-typed link is not a suggestion: wait for a pause.
         delay(SUGGESTION_PAUSE_MS)
         suggestions = withContext(Dispatchers.Default) {
             TaskRefOffers.suggestions(taskTitle, taskNotes, refs, maxSuggestions)
+        }
+        others = withContext(Dispatchers.IO) {
+            graph.taskRefLookup.alsoIn(taskId, taskTitle, taskNotes, maxSuggestions)
         }
     }
 
@@ -151,13 +158,13 @@ internal fun TaskReferencesSection(
         )
     }
 
-    if (refs.isEmpty() && !canEdit) return
+    if (refs.isEmpty() && others.isEmpty() && !canEdit) return
 
     val accent = MaterialTheme.colorScheme.primary
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
     val canAddMore = canEdit && refs.size < RegistryEntityLimits.MAX_REFS_PER_TASK.toInt()
     val shownSuggestions = if (canAddMore) suggestions.filter { offer -> refs.none { it.key == offer.key } } else emptyList()
-    val totalSlices = refs.size + shownSuggestions.size + if (canAddMore) 1 else 0
+    val totalSlices = refs.size + shownSuggestions.size + others.size + if (canAddMore) 1 else 0
 
     fun takeSuggestion(offer: TaskRefOffer) {
         scope.launch {
@@ -345,9 +352,42 @@ internal fun TaskReferencesSection(
         }
     }
 
+    others.forEachIndexed { index, other ->
+        TaskCardSlice(
+            position = cardPosition(refs.size + shownSuggestions.size + index, totalSlices),
+            isSelected = false,
+            isDark = isDark,
+            hasActiveTexture = hasActiveTexture,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .combinedClickable(onClick = { onOpenTask(other.id) })
+                    .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 12.dp),
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
+                ) {
+                    Text(text = kindGlyph("task"), fontSize = 14.sp, color = mutedInk)
+                }
+                Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
+                Text(
+                    text = alsoInFormat.replace("{name}", other.title),
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = mutedInk,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+
     if (canAddMore) {
         TaskCardSlice(
-            position = cardPosition(refs.size + shownSuggestions.size, totalSlices),
+            position = cardPosition(refs.size + shownSuggestions.size + others.size, totalSlices),
             isSelected = false,
             isDark = isDark,
             hasActiveTexture = hasActiveTexture,

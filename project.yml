@@ -222,6 +222,10 @@ targets:
       - path: ShareExtension/ShareViewController.swift
       - path: ShareExtension/PrivacyInfo.xcprivacy
       - path: SeptenaCore/SharedTaskCapture.swift
+      - path: Septena/Localizable.xcstrings
+    dependencies:
+      # The key grammar of a shared link (TASK_REFERENCES_SPEC.md §6.4).
+      - package: SeptenaSharedCore
     info:
       path: ShareExtension/SeptaskShare-Info.plist
       properties:
@@ -229,6 +233,13 @@ targets:
         CFBundleName: Septena
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleLocalizations:
+          - en
+          - fr
+          - de
+          - es
+          - pt-BR
+          - nl
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
@@ -267,6 +278,7 @@ targets:
           - "**/.DS_Store"
           - "**/*.entitlements"
           - "**/*.plist"
+      - path: Septena/Localizable.xcstrings
       - path: SeptenaCore/SeptenaAppGroup.swift
       - path: SeptenaCore/TasksWidgetWire.swift
       - path: SeptenaCore/TasksWidgetSnapshotStore.swift
@@ -278,6 +290,13 @@ targets:
         CFBundleName: Septena
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleLocalizations:
+          - en
+          - fr
+          - de
+          - es
+          - pt-BR
+          - nl
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     postBuildScripts:
@@ -314,6 +333,7 @@ targets:
           - "**/.DS_Store"
           - "**/*.entitlements"
           - "**/*.plist"
+      - path: Septena/Localizable.xcstrings
       - path: SeptenaCore/SeptenaAppGroup.swift
       - path: SeptenaCore/TasksWidgetWire.swift
       - path: SeptenaCore/TasksWidgetSnapshotStore.swift
@@ -325,6 +345,13 @@ targets:
         CFBundleName: Septena
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleLocalizations:
+          - en
+          - fr
+          - de
+          - es
+          - pt-BR
+          - nl
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     postBuildScripts:
@@ -467,6 +494,7 @@ targets:
       # The watch wire (docs/WATCH.md). Foundation only: the watch is a thin
       # client of the backend's /v1/tasks views and compiles no task model.
       - path: SeptenaCore/TasksWatchWire.swift
+      - path: Septena/Localizable.xcstrings
     dependencies:
       - target: SeptaskWatchComplication
         embed: true
@@ -478,6 +506,13 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDisplayName: Septena
         CFBundleName: Septena
+        CFBundleLocalizations:
+          - en
+          - fr
+          - de
+          - es
+          - pt-BR
+          - nl
         WKApplication: true
         WKCompanionAppBundleIdentifier: com.septena.tasks
     postBuildScripts:
@@ -513,6 +548,7 @@ targets:
         excludes:
           - "**/.DS_Store"
           - "**/*.entitlements"
+      - path: Septena/Localizable.xcstrings
       - path: SeptaskWatch/TasksTodayComplicationData.swift
     info:
       path: SeptaskWatchComplication/Info.plist
@@ -521,6 +557,13 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDisplayName: Septena
         CFBundleName: Septena
+        CFBundleLocalizations:
+          - en
+          - fr
+          - de
+          - es
+          - pt-BR
+          - nl
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     postBuildScripts:
@@ -631,8 +674,6 @@ targets:
 # ships, so ⌘R gives you that build. Consequences worth knowing:
 #   • debug-only affordances are gone at runtime — the dashboard's ⟨ / ⟩ day
 #     time-travel strip, the Milestones preview row, the server inspector;
-#   • telemetry is LIVE in Release (`Telemetry` / `SeptaskDiagnostics` return
-#     early only under `#if DEBUG`), so dev runs post to the community worker;
 #   • step-debugging is effectively gone (it was already imprecise under -Osize).
 # Flip a scheme's `run: config:` back to `Debug` here for a debugging session.
 #

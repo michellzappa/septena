@@ -285,3 +285,41 @@ export async function createTestPairingStore() {
     getAlarm: () => alarm,
   };
 }
+
+/// Creates a real `ProjectStore` (a shared project) on an in-memory database.
+export async function createTestProjectStore(env: Record<string, unknown>) {
+  installWorkerTestHooks();
+  const { ProjectStore } = await import("../src/store/ProjectStore.ts");
+  const db = new DatabaseSync(":memory:");
+  const pending: Promise<unknown>[] = [];
+  let inTx = false;
+  let alarm: number | null = null;
+  const ctx = {
+    storage: {
+      sql: makeSqlStorage(db),
+      transactionSync<T>(fn: () => T): T {
+        if (inTx) return fn();
+        inTx = true;
+        db.exec("BEGIN");
+        try {
+          const out = fn();
+          db.exec("COMMIT");
+          return out;
+        } catch (err) {
+          db.exec("ROLLBACK");
+          throw err;
+        } finally {
+          inTx = false;
+        }
+      },
+      async getAlarm() { return alarm; },
+      async setAlarm(ts: number) { alarm = ts; },
+    },
+    waitUntil(p: Promise<unknown>) { pending.push(Promise.resolve(p)); },
+  };
+  const store = new ProjectStore(ctx as never, env as never);
+  async function flushWaitUntil(): Promise<void> {
+    while (pending.length > 0) await Promise.allSettled(pending.splice(0, pending.length));
+  }
+  return { store, flushWaitUntil, alarmAt: () => alarm };
+}

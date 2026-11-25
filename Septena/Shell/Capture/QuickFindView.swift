@@ -141,11 +141,20 @@ struct QuickFindView: View {
     guard !tokens.isEmpty else { return [] }
 
     var out: [QuickFindHit] = []
-    let tagsByID = LocalCache.tagsByID(in: LocalStore.shared.container.mainContext)
+    let context = LocalStore.shared.container.mainContext
+    let tagsByID = LocalCache.tagsByID(in: context)
+    let refTexts = TaskRefLookup.searchTexts(in: context)
+    // A pasted link: the tasks that point at the item come first, whatever
+    // way the link is spelled there.
+    let pointing = Dictionary(uniqueKeysWithValues: (TaskRefLookup.taskIDs(forLink: trimmed, in: context) ?? [])
+      .enumerated().map { ($0.element, $0.offset) })
 
     for t in tasks where t.deletedAt == nil && !t.isHeading {   // Recently-Deleted rows + project headings aren't searchable
       let tagText = t.tagIDs.compactMap { tagsByID[$0]?.name }.map { "\($0) #\($0)" }.joined(separator: " ")
-      let s = score(title: t.title, body: [t.notes, tagText].compactMap { $0 }.joined(separator: " "), tokens: tokens)
+      let found = score(title: t.title,
+                        body: [t.notes, tagText, refTexts[t.id]].compactMap { $0 }.joined(separator: " "),
+                        tokens: tokens)
+      let s = found + (pointing[t.id].map { 10_000 - $0 } ?? 0)
       guard s > 0 else { continue }
       out.append(QuickFindHit(
         id: "t:\(t.id)",
@@ -153,7 +162,7 @@ struct QuickFindView: View {
         kind: .task(done: t.status == .done, today: t.isOnToday),
         title: t.title,
         subtitle: taskSubtitle(t),
-        score: s + (t.status == .done ? -1 : 0),
+        score: s + (t.status == .done ? (pointing[t.id] == nil ? -1 : -5_000) : 0),
         route: routeForTask(t)
       ))
     }

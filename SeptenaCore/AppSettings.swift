@@ -84,13 +84,8 @@ struct AppSettings: Codable {
   /// Defaulted so the existing memberwise-init call sites stay source-stable.
   var onboardedAt: Date? = nil
 
-  /// Graded analytics privacy level (`TelemetryClient.TelemetryLevel` raw value:
-  /// "none" | "minimal" | "balanced" | "full"). Synced so the user's privacy
-  /// choice follows them across their own devices; also mirrored into the
-  /// `septena.privacy.telemetryLevel` @AppStorage key that `TelemetryClient`
-  /// reads synchronously to gate what it sends. Nil → not yet chosen (the
-  /// device falls back to its local mirror / legacy flag / `.balanced` default).
-  /// Defaulted so existing settings payloads decode cleanly. See [[project_versioning_changelog]].
+  /// Retired (#436): the app sends no usage data and reads no level. The field
+  /// stays so a blob from an older build keeps its value through a sync.
   var telemetryLevel: String? = nil
 
   /// Calendars the user has hidden from the day timeline / Next feed, stored by

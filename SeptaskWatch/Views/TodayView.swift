@@ -159,7 +159,7 @@ struct SyncFooter: View {
         Text("Syncing…")
       }
       if !store.queue.isEmpty {
-        Text("\(store.queue.count) change(s) waiting")
+        Text(String(localized: "\(store.queue.count) changes waiting"))
       }
       if let at = store.lastSyncedAt, !store.isRefreshing {
         Text("Updated \(at.formatted(date: .omitted, time: .shortened))")

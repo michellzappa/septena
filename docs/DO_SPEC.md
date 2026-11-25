@@ -1,6 +1,6 @@
 # Do: one task now
 
-Status: accepted (2026-11-25). Not built.
+Status: building (2026-11-25; D0 to D2, #515 to #517).
 **Decision:** [ADR 0041](adr/0041-do-is-one-task-now-on-every-screen.md).
 **Builds on:** [ADR 0006](adr/0006-tasks-fade-by-default.md) (no guilt, stuck
 question), [ADR 0008](adr/0008-agent-loop-rules-live-in-the-store.md) (rules in
@@ -58,11 +58,16 @@ history window does not apply to them *(default)*. They never enter analytics.
 They live in `core/crates/septena-core` as one pure function over the rows, with
 vectors in `registry/conformance/do-session.json`. The store runs it in the
 same transaction as the write. A client runs it on its own rows, so Do works
-offline and without an account.
+offline and without an account. `resolve_do_sessions` takes the task status of
+each row. A client that syncs uses the result for display and for its own
+gestures, and leaves every other end to the store: in the middle of a pull it
+may not have the task yet.
 
-1. **One open.** Of the open rows, the one with the latest `startedAt` stays
-   open (equal times: the greater id). Each other one ends with exit `replaced`
-   at the `startedAt` of the row that follows it.
+1. **One open.** The row with the latest `startedAt` may stay open (equal
+   times: the greater id). Each earlier open row ends with exit `replaced` at
+   the `startedAt` of the row that follows it, open or closed. If that is after
+   the row was stale, `lapsed` is set. So a Do that was started offline and
+   syncs late ends where the next one began.
 2. **The earliest end wins.** If a closed row gets another end, the earlier
    `endedAt` stays, with its own exit. So the order in which offline devices
    sync does not change the result.
@@ -88,8 +93,8 @@ later. Stale is a read rule. Nothing runs when the limit passes.
   *title*?" with **Done**, **Stop for now** and **Still on it**. The first two
   set `lapsed`. The third sets `confirmedAt`.
 - A new Do ends a stale one as `replaced` and sets `lapsed`.
-- The store's daily job ends a Do that has been stale for 24 hours *(default)*:
-  exit `stopped`, `lapsed`.
+- A Do that has been stale for 24 hours *(default, `doLapseHours`)* ends at its
+  stale limit: exit `stopped`, `lapsed`. The store's daily job applies it.
 
 ### 2.3 What it does to the task
 

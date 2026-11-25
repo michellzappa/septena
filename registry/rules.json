@@ -14,5 +14,7 @@
   "tombstoneTtlDays": 90,
   "clientOpTtlDays": 30,
   "changeLogTtlDays": 365,
-  "deleteGraceSeconds": 120
+  "deleteGraceSeconds": 120,
+  "doStaleHours": 4,
+  "doLapseHours": 24
 }

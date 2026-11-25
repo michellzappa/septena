@@ -61,16 +61,6 @@ enum SettingsKey {
   /// ("Reset first-run welcome"); cleared when the welcome is completed.
   /// Never set in normal use, so the gate behaves exactly as before.
   static let welcomeForce = "septena.welcome.force"
-  /// Legacy on/off consent toggle for anonymous aggregate usage telemetry,
-  /// superseded by the graded `telemetryLevel`. Still defined because
-  /// `TelemetryClient.currentLevel()` honors a pre-levels value once, on upgrade.
-  static let shareUsageData   = "septena.privacy.shareUsageData"
-  /// Device-local mirror of `AppSettings.telemetryLevel` (a
-  /// `TelemetryClient.TelemetryLevel` raw value). Same key string as
-  /// `TelemetryClient.levelKey` so the actor's synchronous gating read and the
-  /// Privacy pane's `@AppStorage` binding stay in lockstep; kept in sync with
-  /// the CloudKit-synced payload by `SettingsStore.reconcileTelemetryLevel`.
-  static let telemetryLevel   = TelemetryClient.levelKey
   /// Optional first name used to personalise the homepage welcome greeting.
   /// Local-only (@AppStorage); not synced to CloudKit.
   static let welcomeName = RegistrySettings.StorageKey.welcomeName

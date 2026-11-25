@@ -67,6 +67,7 @@
     "convoHandoffActionType": ["open_url", "compose", "call", "none"],
     "convoTurnRole": ["user", "provider"],
     "convoTurnStep": ["confirm", "ground", "scope", "decide", "work"],
+    "doExit": ["done", "stopped", "later", "replaced", "closed"],
     "taskRefRole": ["about", "from", "blocked_by", "follow_up"],
     "telemetryLevel": ["none", "minimal", "balanced", "full"],
     "appearanceMode": ["system", "light", "dark"],
@@ -122,7 +123,8 @@
         "deferCount": { "kind": "int", "min": 0, "default": 0 },
         "fadedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
         "dropReason": { "kind": "text", "max": 16, "nullable": true },
-        "effort": { "kind": "text", "max": 16, "nullable": true }
+        "effort": { "kind": "text", "max": 16, "nullable": true },
+        "assignedTo": { "kind": "text", "max": 64, "nullable": true }
       }
     },
     "area": {
@@ -155,7 +157,8 @@
         "notesProposal": { "kind": "json", "maxJsonLength": 101000, "nullable": true },
         "githubRepo": { "kind": "text", "max": 200, "nullable": true },
         "attachment": { "kind": "json", "maxJsonLength": 4000, "nullable": true },
-        "position": { "kind": "int", "nullable": true }
+        "position": { "kind": "int", "nullable": true },
+        "share": { "kind": "json", "serverOwned": true }
       }
     },
     "attachment": {

@@ -8,6 +8,8 @@ pub(crate) const MS_PER_DAY: i64 = 86_400_000;
 pub(crate) struct Day(i64);
 
 impl Day {
+    pub(crate) const EPOCH: Day = Day(0);
+
     pub(crate) fn from_ymd(year: i64, month: u32, day: u32) -> Option<Day> {
         if !(1..=12).contains(&month) || day < 1 || day > days_in_month(year, month) {
             return None;

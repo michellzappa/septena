@@ -108,6 +108,8 @@ function validateRules(rules) {
     "clientOpTtlDays",
     "changeLogTtlDays",
     "deleteGraceSeconds",
+    "doStaleHours",
+    "doLapseHours",
   ];
   for (const k of required) {
     assert(typeof rules[k] === "number" && Number.isFinite(rules[k]) && rules[k] > 0, `rules.json: ${k} must be positive number`);
@@ -1781,14 +1783,14 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static func kind(_ id: String) -> RegistryTaskReferenceKind { kinds.first { $0.id == id } ?? otherKind }");
   lines.push("  /// The label of a role that shows one, by role.");
   lines.push(`  static let roleLabels: [String: String] = [${Object.entries(refs.roles).map(([id, r]) => `${swiftStr(id)}: ${L(r.label, r, "label")}`).join(", ")}]`);
-  for (const [name, node] of [["open", refs.open], ["createdFrom", refs.createdFrom], ["limitReached", refs.add.limitReached], ["suggestion", refs.add.suggestions]]) {
+  for (const [name, node] of [["open", refs.open], ["createdFrom", refs.createdFrom], ["limitReached", refs.add.limitReached], ["suggestion", refs.add.suggestions], ["alsoIn", refs.alsoIn]]) {
     const t = refTmpl(node);
     lines.push(`  static func ${name}(${t.params}) -> String { ${t.body} }`);
   }
   for (const [name, node, field] of [
     ["addPlaceholder", refs.add, "placeholder"], ["addConfirmTitle", refs.add, "confirmTitle"],
     ["offersTitle", refs.add.offers, "title"], ["invalidMessage", refs.add.invalid, "message"],
-    ["failedMessage", refs.add.failed, "message"],
+    ["failedMessage", refs.add.failed, "message"], ["alreadyTaskTitle", refs.alreadyTask, "title"],
   ]) lines.push(`  static let ${name}: String = ${L(node[field], node, field)}`);
   lines.push("  /// The most links of one task's title and notes that show as suggestions.");
   lines.push(`  static let maxSuggestions = ${refs.add.suggestions.max}`);
@@ -2573,9 +2575,11 @@ function generateFeatureMap({ caps }) {
   return lines.join("\n");
 }
 
+const tsOutput = generateTS(bundle);
 const outputs = [
   ["SeptenaCore/Generated/RegistryConstants.swift", generateSwift(bundle)],
-  ["backend/src/generated/registries.ts", generateTS(bundle)],
+  ["backend/src/generated/registries.ts", tsOutput],
+  ["web/src/lib/generated/registries.ts", tsOutput],
   ["android/core/src/main/kotlin/app/septena/core/generated/RegistryConstants.kt", generateKotlinCore(bundle)],
   ["core/crates/septena-core/src/generated/registry.rs", generateRustCore(bundle)],
   ["docs/FEATURE_MAP.md", generateFeatureMap(bundle)],

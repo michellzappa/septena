@@ -1,6 +1,6 @@
 # 0004. A shared project lives in its own store
 
-- Status: accepted (2026-11-19)
+- Status: accepted (2026-11-19); amended by [0042](0042-members-keep-replicas-of-a-shared-project.md) (replicas; conversations stay private)
 - Date: 2026-11-19
 - Deciders: mz
 

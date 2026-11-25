@@ -17,6 +17,7 @@
       "type": "enum",
       "enum": "telemetryLevel",
       "default": "balanced",
+      "ui": false,
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
       "featureId": "settings.display"
     },
@@ -1053,14 +1054,6 @@
           "id": "transfer",
           "items": [
             { "kind": "pageLink", "page": "import_export", "label": "Import & Export", "icon": "settings.data", "featureId": "sync.backend" }
-          ]
-        },
-        {
-          "id": "telemetry",
-          "header": "Anonymous usage data",
-          "footer": "Your task text and titles are never sent through analytics. This setting syncs across your devices.",
-          "items": [
-            { "kind": "setting", "key": "telemetryLevel", "label": "Usage data" }
           ]
         }
       ]

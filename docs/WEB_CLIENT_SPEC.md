@@ -1,6 +1,6 @@
 # Web client spec
 
-**Status:** building WB0 + WB1 spike (2026-11-25). Issue #21, milestone M3.
+**Status:** WB0, WB1, WB2, and WB3 core shipped on `web.septena.app` (2026-11-25). Issue #21, milestone M3.
 Domain decided 2026-11-25 (mz): `web.septena.app`.
 
 **Rests on:** ADR 0002 (own backend), ADR 0008 (agent loop rules live in the

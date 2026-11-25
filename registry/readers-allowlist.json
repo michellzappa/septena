@@ -52,6 +52,18 @@
     "RegistryRules.fadeGraceDays": {
       "reason": "The fade grace period is read by the shared Rust core (ADR 0025); Swift calls the core for fadeFill.",
       "issue": "#250"
+    },
+    "RegistryEntityEnums.doExit": {
+      "reason": "Do (ADR 0041): the core holds the rule; the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryRules.doStaleHours": {
+      "reason": "The shared core applies it (resolve_do_sessions).",
+      "issue": "#517"
+    },
+    "RegistryRules.doLapseHours": {
+      "reason": "The shared core applies it (resolve_do_sessions).",
+      "issue": "#517"
     }
   },
   "ts": {
@@ -59,20 +71,8 @@
       "reason": "The server accepts any product under the sync prefix; the StoreKit work narrows it to these IDs.",
       "issue": "#46"
     },
-    "GENERIC_EMPTY_STATE": {
-      "reason": "For the web client's list views.",
-      "issue": "#21"
-    },
     "FIRST_RUN": {
       "reason": "For the web client's first run.",
-      "issue": "#21"
-    },
-    "REGISTRY_LANGUAGES": {
-      "reason": "For the web client's localized copy.",
-      "issue": "#21"
-    },
-    "registryText": {
-      "reason": "For the web client's localized copy.",
       "issue": "#21"
     }
   },
@@ -142,8 +142,8 @@
       "issue": "#244"
     },
     "RegistryEntityEnums.TelemetryLevel.*": {
-      "reason": "Privacy settings are not on Android yet.",
-      "issue": "#244"
+      "reason": "Retired setting (#436): the backend still accepts it from older builds, no client reads it.",
+      "issue": "#436"
     },
     "RegistryEntityEnums.ConvoAssignee.*": {
       "reason": "Task conversations are not on Android yet.",
@@ -200,6 +200,30 @@
     "RegistryEntityFields.TaskRef.LAST_SEEN_AT": {
       "reason": "Server-owned re-capture timestamp rendered in task history.",
       "issue": "#390"
+    },
+    "RegistryEntityEnums.DoExit.STOPPED": {
+      "reason": "Do (ADR 0041): the core holds the rule; the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryEntityEnums.DoExit.LATER": {
+      "reason": "Do (ADR 0041): the core holds the rule; the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryEntityEnums.DoExit.REPLACED": {
+      "reason": "Do (ADR 0041): the core holds the rule; the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryEntityEnums.DoExit.CLOSED": {
+      "reason": "Do (ADR 0041): the core holds the rule; the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryRules.DO_STALE_HOURS": {
+      "reason": "The shared core applies it (resolve_do_sessions).",
+      "issue": "#517"
+    },
+    "RegistryRules.DO_LAPSE_HOURS": {
+      "reason": "The shared core applies it (resolve_do_sessions).",
+      "issue": "#517"
     }
   }
 }

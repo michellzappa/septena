@@ -186,8 +186,9 @@ client syncs the same account, and core migration adapters pass real fixtures.
 
 GitHub milestone: `"M4 Sharing and Starlings"`.
 
-- #10 S0 project store, relay, local store-scoped keys
-- #11 S1 share / invite / accept UI
+- #10 S0 project store and replicas, #11 S1 share / invite / join / assign:
+  MVP built 2026-11-25, ahead of the rest of M4 (mz). Needs #169 (email
+  sign-in) for people with no Apple device.
 - #12 L2 Starlings links, several workspaces, dedupe
 - #20 Android client on `api.septena.app` (`docs/ANDROID_CLIENT_SPEC.md`,
   phases #172 to #176; its Kotlin core #173 is Windows W0)
