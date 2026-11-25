@@ -1,13 +1,14 @@
 # Web client spec
 
-**Status:** proposal (2026-11-21). Issue #21, milestone M3.
+**Status:** building WB0 + WB1 spike (2026-11-25). Issue #21, milestone M3.
+Domain decided 2026-11-25 (mz): `web.septena.app`.
 
 **Rests on:** ADR 0002 (own backend), ADR 0008 (agent loop rules live in the
 store), ADR 0015 (shared registries), ADR 0016 (sign-in beyond Apple).
 
 ## 1. Goal
 
-A responsive web app at `app.septena.app`, on the same account as the other
+A responsive web app at `web.septena.app`, on the same account as the other
 apps. It is the first way to use Septena on Windows, Linux and Chromebooks,
 and on any computer where the user cannot install apps. It does not replace
 the native Windows app (#136, ADR 0013), and the site never presents it as
@@ -19,7 +20,7 @@ one.
 |---|---|
 | App | Next.js App Router, React 19, TypeScript, Tailwind, shadcn/ui, Zod at every boundary *(default)* |
 | Output | Static export, no server rendering of task data *(default)* |
-| Hosting | Cloudflare Workers static assets at `app.septena.app`, same account as the backend *(default)* |
+| Hosting | Cloudflare Workers static assets at `web.septena.app`, same account as the backend *(default)* |
 | Repo | This repo, `web/` (ADR 0015 already names it as a codegen target) *(default)* |
 | Package manager | pnpm |
 
@@ -47,7 +48,7 @@ the web session differs from the native one:
 
 - The access token (`sa1`, 1 hour) stays in memory only.
 - The refresh token lives in an HttpOnly, Secure, `SameSite=Lax` cookie on
-  `api.septena.app`, scoped to `/v1/auth/`. `app.septena.app` and
+  `api.septena.app`, scoped to `/v1/auth/`. `web.septena.app` and
   `api.septena.app` are the same site, so the browser sends it with
   credentialed requests.
 - `POST /v1/auth/refresh` accepts the cookie when the request carries an
@@ -60,7 +61,7 @@ the web session differs from the native one:
 
 | Work | Why |
 |---|---|
-| CORS for `https://app.septena.app` (credentials, the headers the client sends, preflight caching) | The backend has no CORS today |
+| CORS for `https://web.septena.app` (credentials, the headers the client sends, preflight caching) | The backend has no CORS today |
 | Cookie mode for `/v1/auth/*` with an `Origin` allowlist | §4 |
 | `POST /v1/sync/ws-ticket` returns a single-use ticket valid 30 seconds; `/v1/sync/ws?ticket=` accepts it | A browser cannot set `Authorization` on a WebSocket |
 | Stripe checkout and webhook write the entitlement row with `source: "stripe"` | #43, `docs/SYNC_SUBSCRIPTION_SPEC.md` §9 |
@@ -113,7 +114,7 @@ issue when the first release ships. Fields added in M2 (tags #96, checklists
 | WB2 Sync core | The TypeScript sync engine, IndexedDB store and multi-tab lock pass the conformance vectors. Rules and sync decisions come from the shared core's WASM (ADR 0025, C2 #248), not from a `packages/task-rules` copy. | WB1, #246 |
 | WB3 First release UI | The scope in §7, judged against the Mac app per `docs/DesignSpec.md`. | WB2, registries R1 to R3 |
 | WB4 Billing | Stripe checkout turns on sync on every device (#43). | WB3, entitlements enforced, #108 |
-| WB5 Launch | `app.septena.app` is public; the site's web page swaps the waitlist for a link. | WB3 |
+| WB5 Launch | `web.septena.app` is public; the site's web page swaps the waitlist for a link. | WB3 |
 
 Gate: `pnpm build` and the conformance tests in CI. mz tests in a browser.
 
@@ -122,7 +123,7 @@ Gate: `pnpm build` and the conformance tests in CI. mz tests in a browser.
 | Question | Default |
 |---|---|
 | Stack | Next.js static export on Cloudflare Workers static assets *(default)* |
-| Address | `app.septena.app` *(default)* |
+| Address | `web.septena.app` *(default)* |
 | Refresh token on web | HttpOnly cookie on `api.septena.app` *(default)* |
 | Offline | Works offline after first load; PWA installable *(default)* |
 | Shared rules | `packages/task-rules` used by backend and web *(default)* |

@@ -13,6 +13,9 @@ export interface Env {
   ENTITLEMENT_ENFORCE: string;
   APPLE_IAP_BUNDLE_IDS: string;    // comma-separated bundle ids whose purchases count
   APPLE_IAP_ENVIRONMENTS: string;  // comma-separated: Production, Sandbox
+  /// Comma-separated browser origins allowed to call /v1/* with credentials
+  /// (docs/WEB_CLIENT_SPEC.md §4–§5), e.g. "https://web.septena.app".
+  WEB_ALLOWED_ORIGINS?: string;
   /// Optional. "true" answers every request except /health and /v1/admin/*
   /// with 503, for the account move's copy window (docs/CLOUDFLARE_ACCOUNT_MOVE.md).
   /// The apps keep their changes in the outbox and retry.

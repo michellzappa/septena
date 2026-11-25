@@ -12,6 +12,15 @@ import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from 
 import { accountAlreadyDeleted, authenticate, issueSession, refreshSession, revokeSession, storeFor, withSession } from "./session.js";
 import { SESSION_HEADER } from "../store/sessions.js";
 import {
+  clearRefreshCookie,
+  cookieSessionResponse,
+  isAllowedWebOrigin,
+  issueWsTicket,
+  readRefreshCookie,
+  redeemWsTicket,
+  webCorsMiddleware,
+} from "./webAuth.js";
+import {
   approvePairing,
   denyPairing,
   zAgentName,
@@ -81,6 +90,9 @@ type Ctx = Context<{ Bindings: Env; Variables: Vars }>;
 
 export const api = new Hono<{ Bindings: Env; Variables: Vars }>();
 
+// CORS for browser clients (docs/WEB_CLIENT_SPEC.md §5).
+api.use("*", webCorsMiddleware);
+
 const zAppleBody = z.object({
   identityToken: z.string().min(20).max(8_000),
   nonce: z.string().min(16).max(256),
@@ -134,18 +146,63 @@ api.post("/auth/apple", async (c) => {
   }
 });
 
+async function parseRefreshInput(
+  c: Ctx,
+): Promise<{ mode: "body"; refreshToken: string } | { mode: "cookie" } | Response> {
+  const raw = await c.req.text();
+  if (raw.trim() === "") return { mode: "cookie" };
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return c.json({ error: "invalid_json" }, 400);
+  }
+  if (body !== null && typeof body === "object" && !Array.isArray(body) && Object.keys(body).length === 0) {
+    return { mode: "cookie" };
+  }
+  const parsed = zRefreshBody.safeParse(body);
+  if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.issues.slice(0, 20) }, 400);
+  return { mode: "body", refreshToken: parsed.data.refreshToken };
+}
+
 api.post("/auth/refresh", async (c) => {
-  const body = await parse(c, zRefreshBody);
-  if (body instanceof Response) return body;
-  const session = await refreshSession(c.env, body.refreshToken);
-  return session ? c.json(session) : c.json({ error: "invalid_grant" }, 401);
+  const input = await parseRefreshInput(c);
+  if (input instanceof Response) return input;
+  if (input.mode === "body") {
+    const session = await refreshSession(c.env, input.refreshToken);
+    return session ? c.json(session, 200, { "Cache-Control": "no-store" }) : c.json({ error: "invalid_grant" }, 401);
+  }
+  if (!isAllowedWebOrigin(c.env, c.req.header("Origin"))) {
+    return c.json({ error: "origin_not_allowed" }, 403, { "Cache-Control": "no-store" });
+  }
+  const cookieToken = readRefreshCookie(c.req.raw);
+  if (!cookieToken) return c.json({ error: "invalid_grant" }, 401, { "Cache-Control": "no-store" });
+  const session = await refreshSession(c.env, cookieToken);
+  if (!session) {
+    return c.json({ error: "invalid_grant" }, 401, {
+      "Cache-Control": "no-store",
+      "Set-Cookie": clearRefreshCookie(c.env),
+    });
+  }
+  return cookieSessionResponse(c.env, session);
 });
 
 api.post("/auth/signout", async (c) => {
-  const body = await parse(c, zRefreshBody);
-  if (body instanceof Response) return body;
-  await revokeSession(c.env, body.refreshToken);
-  return c.body(null, 204);
+  const input = await parseRefreshInput(c);
+  if (input instanceof Response) return input;
+  if (input.mode === "body") {
+    await revokeSession(c.env, input.refreshToken);
+    return c.body(null, 204);
+  }
+  if (!isAllowedWebOrigin(c.env, c.req.header("Origin"))) {
+    return c.json({ error: "origin_not_allowed" }, 403, { "Cache-Control": "no-store" });
+  }
+  const cookieToken = readRefreshCookie(c.req.raw);
+  if (cookieToken) await revokeSession(c.env, cookieToken);
+  return new Response(null, {
+    status: 204,
+    headers: { "Set-Cookie": clearRefreshCookie(c.env) },
+  });
 });
 
 // Device sign-in by approval (ADR 0016, issue #170): see src/shadow/oauth.ts.
@@ -161,13 +218,20 @@ api.post("/auth/device/start", async (c) => {
 api.post("/auth/device/poll", async (c) => {
   const body = await parse(c, zDevicePollBody);
   if (body instanceof Response) return body;
+  const cookieMode = body.sessionMode === "cookie";
+  if (cookieMode && !isAllowedWebOrigin(c.env, c.req.header("Origin"))) {
+    return c.json({ error: "origin_not_allowed" }, 403, { "Cache-Control": "no-store" });
+  }
   const res = await pollDevicePairing(c.env, body, c.req.header("CF-Connecting-IP"));
   if (res.status === "pending") return c.json({ status: "pending" }, 202, { "Cache-Control": "no-store" });
   if (res.status === "denied") return c.json({ error: "denied" }, 410, { "Cache-Control": "no-store" });
   if (res.status === "rate_limited") return c.json({ error: "too_many_attempts" }, 429, { "Cache-Control": "no-store" });
   if (res.status === "gone") return c.json({ error: "expired_or_unknown" }, 410, { "Cache-Control": "no-store" });
   if (!(await storeFor(c.env, res.userId).hasAppSession())) return c.json({ error: "expired_or_unknown" }, 410, { "Cache-Control": "no-store" });
-  return c.json(await issueSession(c.env, res.userId), 200, { "Cache-Control": "no-store" });
+  const session = await issueSession(c.env, res.userId);
+  return cookieMode
+    ? cookieSessionResponse(c.env, session)
+    : c.json(session, 200, { "Cache-Control": "no-store" });
 });
 
 // ---- everything below needs a bearer access token ----
@@ -273,7 +337,31 @@ async function apiHostOnly(c: Ctx, next: Next) {
   await next();
 }
 
-api.use("/sync/*", requireUser, loadPlan("open", "sync"), requireSyncDevice);
+/// Like `requireUser`, but also allows a single-use `?ticket=` on `GET /v1/sync/ws`
+/// because browser WebSockets cannot set `Authorization` (docs/WEB_CLIENT_SPEC.md §5).
+async function requireSyncUser(c: Ctx, next: Next) {
+  const header = c.req.header("Authorization") ?? "";
+  const isWsRoute = c.req.method === "GET" && new URL(c.req.url).pathname.endsWith("/sync/ws");
+  const ticket = isWsRoute && !header ? c.req.query("ticket") : undefined;
+  if (ticket) {
+    const origin = c.req.header("Origin");
+    if (origin && !isAllowedWebOrigin(c.env, origin)) {
+      return c.json({ error: "origin_not_allowed" }, 403);
+    }
+    const claims = await redeemWsTicket(c.env, ticket);
+    if (!claims) return c.json({ error: "unauthorized" }, 401);
+    c.set("userId", claims.userId);
+    c.set("sid", claims.sid);
+    c.set("session", claims.sid ?? "");
+    c.set("client", claims.client);
+    c.set("actor", `app:${claims.client ?? "unknown"}`);
+    await next();
+    return;
+  }
+  return requireUser(c, next);
+}
+
+api.use("/sync/*", requireSyncUser, loadPlan("open", "sync"), requireSyncDevice);
 api.use("/attachments/*", requireUser, loadPlan("closed", "attachments"), requireSyncDevice);
 api.use("/account", async (c, next) => {
   const header = c.req.header("Authorization") ?? "";
@@ -338,7 +426,7 @@ api.get("/sync/pull", async (c) => {
 });
 
 async function liveSocket(c: Ctx) {
-  if (c.req.header("Upgrade") !== "websocket") return c.json({ error: "expected_websocket" }, 426);
+  if (c.req.header("Upgrade")?.toLowerCase() !== "websocket") return c.json({ error: "expected_websocket" }, 426);
   // Without live sync the app polls `/sync/pull` (spec §3).
   const plan = c.get("plan");
   if (plan && !plan.limits.liveSync) {
@@ -347,6 +435,15 @@ async function liveSocket(c: Ctx) {
   }
   return storeFor(c.env, c.get("userId")).fetch(withSession(c.req.raw, c.get("session"), SESSION_HEADER));
 }
+
+api.post("/sync/ws-ticket", async (c) => {
+  const ticket = await issueWsTicket(c.env, {
+    userId: c.get("userId"),
+    sid: c.get("sid"),
+    client: c.get("client"),
+  });
+  return c.json(ticket, 200, { "Cache-Control": "no-store" });
+});
 
 api.get("/sync/ws", liveSocket);
 
