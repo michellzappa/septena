@@ -210,14 +210,14 @@ export const TASK_TOOLS: Tool[] = [
   {
     name: "tasks_set_endstate",
     title: "Set task conversation end state",
-    description: "Record the conversation's terminal end-state.",
+    description: "Hand the task to the user's Review (needs_verify, with a note that says what to check), or record that the work goes on elsewhere (decomposed). Only the user takes a task out of Review: they accept it or send it back. You may hand over again with a new note. Every other end state follows from what the user does (refused as human_ends).",
     inputSchema: setEndStateJsonSchema,
     annotations: { title: "Set task conversation end state", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
     name: "tasks_set_assignee",
     title: "Set task assignee",
-    description: "Route a task: me | local | claude, or null to let the router decide. Setting claude marks it for the reasoning queue.",
+    description: "Route a task: me | local | claude, or null to let the router decide. Setting claude marks it for the reasoning queue and makes it agent work: from then on only the user ends it or takes it back (refused as human_accepts, human_only:assignee).",
     inputSchema: setAssigneeJsonSchema,
     annotations: { title: "Set task assignee", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
